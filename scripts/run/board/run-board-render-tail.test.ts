@@ -9,12 +9,17 @@ import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_tail } from './run-board-render-tail'
 import type { UsualTimes } from './run-board-usual'
 
-// joshuafolkken/kit#3769: a running row ends on how long it has stood at its phase — colored against
-// the phase's usual time — then the kind and the age of its newest activity, both in one column on
-// every row; a waiting row's blockers start in that column too.
+// joshuafolkken/kit#3769, #4043, #4292: how long a child has stood at its phase is drawn in the row's
+// lead — right-aligned, colored against the phase's usual time — and a running row ends on the kind and
+// the age of its newest activity, right-aligned in one column on every row; the event that entered the
+// phase is not drawn twice.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const PHASE_TIME = '10:00'
+const PHASE_TIME = '10′00″'
+// The width the lead gives a time.
+const TIME_WIDTH = 8
+const PHASE_PART = PHASE_TIME.padStart(TIME_WIDTH)
+const ACTIVITY = '👀 3′00″'
 const SECOND = MINUTE / 60
 const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
@@ -62,14 +67,24 @@ function tail(row: BoardRow, extra: Partial<BoardHeader> = {}): Array<string | u
 	return run_board_render_tail.tail_of(row, board(extra))
 }
 
-// The phase time of a row that reached its phase `ago_ms` before now.
-function phase_time(ago_ms: number): string | undefined {
-	return tail(phased(running(1), ago_ms))[0]
+// A running row's whole end outside followup: one part.
+function quiet_tail(row: BoardRow, extra: Partial<BoardHeader> = {}): string | undefined {
+	return tail(row, extra)[0]
 }
 
-// Row 2 has no event of its own, so its newest activity is the operation `minutes` old.
+// How long a row has stood at its phase, as the lead draws it.
+function time_of(row: BoardRow, extra: Partial<BoardHeader> = {}): string {
+	return run_board_render_tail.phase_time(row, board(extra), TIME_WIDTH)
+}
+
+// The phase time of row 2, which reached its phase `ago_ms` before now.
+function phase_time(ago_ms: number, extra: Partial<BoardHeader> = {}): string {
+	return time_of(phased(running(2), ago_ms), extra)
+}
+
+// Row 2's newest activity is the operation `minutes` old.
 function operated_activity(minutes: number): string | undefined {
-	return tail(running(2), { operations: operations(2, NOW - minutes * MINUTE) })[1]
+	return quiet_tail(running(2), { operations: operations(2, NOW - minutes * MINUTE) })
 }
 
 afterEach(() => {
@@ -77,63 +92,71 @@ afterEach(() => {
 })
 
 describe('run_board_render_tail.tail_of phase time', () => {
-	it('draws how long the child has stood at its phase as MM:SS, plain without a usual time', () => {
+	it('draws how long the child has stood at its phase, right-aligned and plain without a usual time', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(tail(running(1))[0]).toBe(PHASE_TIME)
+		expect(time_of(running(2))).toBe(PHASE_PART)
 	})
 
-	it('draws it plain up to twice the usual time, yellow past it and red past three times', () => {
+	it('draws the time plain up to twice the usual time, yellow past it and red past three times', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(tail(running(1), { usual: usual(5) })[0]).toBe(PHASE_TIME)
-		expect(tail(running(1), { usual: usual(4) })[0]).toBe(styleText('yellow', PHASE_TIME))
-		expect(tail(running(1), { usual: usual(3) })[0]).toBe(styleText('red', PHASE_TIME))
+		expect(time_of(running(2), { usual: usual(5) })).toBe(PHASE_PART)
+		expect(time_of(running(2), { usual: usual(4) })).toBe(styleText('yellow', PHASE_PART))
+		expect(time_of(running(2), { usual: usual(3) })).toBe(styleText('red', PHASE_PART))
 	})
 
 	it('counts a near-zero usual time as two minutes, so a stage of seconds is not drawn as alarming', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
-		const row = running(1)
+		const floor = { usual: usual(0) }
 
-		function at(minutes: number): string | undefined {
-			const status = { ...row.status, state: 'running' as const, phase_ms: NOW - minutes * MINUTE }
-
-			return tail({ ...row, status }, { usual: usual(0) })[0]
-		}
-
-		expect(at(3)).toBe('03:00')
-		expect(at(5)).toBe(styleText('yellow', '05:00'))
-		expect(at(7)).toBe(styleText('red', '07:00'))
+		expect(phase_time(3 * MINUTE, floor)).toBe('3′00″'.padStart(TIME_WIDTH))
+		expect(phase_time(5 * MINUTE, floor)).toBe(styleText('yellow', '5′00″'.padStart(TIME_WIDTH)))
+		expect(phase_time(7 * MINUTE, floor)).toBe(styleText('red', '7′00″'.padStart(TIME_WIDTH)))
 	})
 
 	it('draws blanks where no event said when the child got to its phase', () => {
-		const row = running(1)
+		const row = running(2)
 		const status = { ...row.status, state: 'running' as const, phase_ms: undefined }
 
-		expect(tail({ ...row, status }, { usual: usual(1) })[0]).toBe(' '.repeat(PHASE_TIME.length))
+		expect(time_of({ ...row, status }, { usual: usual(1) })).toBe(' '.repeat(TIME_WIDTH))
 	})
 
-	it('draws seconds as MM:SS and never carries the minutes into hours', () => {
-		expect(phase_time(SECONDS_40)).toBe('00:40')
-		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('61:05')
+	it('draws seconds alone and carries the minutes into hours', () => {
+		expect(phase_time(SECONDS_40)).toBe('40″'.padStart(TIME_WIDTH))
+		expect(phase_time(MINUTES_61_SECONDS_5)).toBe('1°01′05″')
 	})
 })
 
 describe('run_board_render_tail.tail_of activity', () => {
-	it('draws the newest event’s phase icon and its age', () => {
-		expect(tail(running(1))[1]).toBe('👀 03:00')
+	it('draws the newest event’s phase icon and its age, and no phase time', () => {
+		expect(tail(running(1))).toStrictEqual([ACTIVITY])
 	})
 
 	it('draws 🔧 where the newest operation is newer than the newest event', () => {
-		expect(tail(running(1), { operations: operations(1, NOW - MINUTE) })[1]).toBe('🔧 01:00')
+		expect(quiet_tail(running(1), { operations: operations(1, NOW - MINUTE) })).toBe('🔧 1′00″')
 	})
 
 	it('ages the activity as the 💓 is: plain, yellow past 15 minutes, red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(operated_activity(10)).toBe('🔧 10:00')
-		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 20:00'))
-		expect(operated_activity(40)).toBe(styleText('red', '🔧 40:00'))
+		expect(operated_activity(5)).toBe('🔧 5′00″')
+		expect(operated_activity(20)).toBe(styleText('yellow', '🔧 20′00″'))
+		expect(operated_activity(40)).toBe(styleText('red', '🔧 40′00″'))
+	})
+
+	it('draws no activity where the newest is the event that entered the phase', () => {
+		const row = phased(running(1), 3 * MINUTE)
+
+		expect(quiet_tail(row)).toBe('')
+		expect(run_board_render_tail.activity_icon(row, board())).toBeUndefined()
+	})
+
+	it('right-aligns the activity’s age to the widest any running row draws', () => {
+		const layout = { ...EMPTY_LAYOUT, active: [running(1), running(2)] }
+		const extra = { layout, operations: operations(2, NOW - MINUTES_61_SECONDS_5) }
+
+		expect(quiet_tail(running(1), extra)).toBe('👀    3′00″')
 	})
 
 	it('draws nothing after a settled or a waiting row', () => {
@@ -145,15 +168,48 @@ describe('run_board_render_tail.tail_of activity', () => {
 	})
 })
 
-describe('run_board_render_tail.is_operation_drawn', () => {
-	it('is true only for a running row whose newest activity is an operation', () => {
+// joshuafolkken/kit#4052: a lane held in the core budget draws why, how long and which check in its
+// newest activity's place, the time in the activity's right-aligned column.
+describe('run_board_render_tail.tail_of held check', () => {
+	const held = {
+		command: 'lint:related',
+		lane: '2',
+		elsewhere: undefined,
+		waited_ms: 9 * SECOND,
+		reason: 'memory' as const,
+	}
+	const layout = { ...EMPTY_LAYOUT, active: [running(1), running(2)] }
+
+	it('draws the held check alone in the activity’s place, its reason and time leading the row', () => {
+		const extra = { layout, budget_waits: [held] }
+
+		expect(quiet_tail(running(2), extra)).toBe('lint')
+		expect(quiet_tail(running(1), extra)).toBe(ACTIVITY)
+	})
+
+	it('draws the newest activity again once the wait is gone', () => {
+		const extra = { layout, operations: operations(2, NOW - MINUTE) }
+
+		expect(quiet_tail(running(2), extra)).toBe('🔧 1′00″')
+	})
+
+	it('names the phase but no activity icon for the legend while held', () => {
+		const extra = board({ layout, budget_waits: [held], operations: operations(2, NOW - MINUTE) })
+
+		expect(run_board_render_tail.activity_icon(running(2), extra)).toBeUndefined()
+		expect(run_board_render_tail.phase_icon(running(2))).toBe('👀')
+	})
+})
+
+describe('run_board_render_tail.activity_icon', () => {
+	it('is the newest activity’s icon, only for a running row', () => {
 		const operated = board({ operations: operations(1, NOW - MINUTE) })
 
-		expect(run_board_render_tail.is_operation_drawn(running(1), operated)).toBe(true)
-		expect(run_board_render_tail.is_operation_drawn(running(1), board())).toBe(false)
+		expect(run_board_render_tail.activity_icon(running(1), operated)).toBe('🔧')
+		expect(run_board_render_tail.activity_icon(running(1), board())).toBe('👀')
 		expect(
-			run_board_render_tail.is_operation_drawn({ ...running(1), state: 'merged' }, operated),
-		).toBe(false)
+			run_board_render_tail.activity_icon({ ...running(1), state: 'merged' }, operated),
+		).toBeUndefined()
 	})
 })
 
@@ -169,7 +225,7 @@ function tail_lines(extra: Partial<BoardHeader> = {}): Array<string> {
 	const layout = {
 		...EMPTY_LAYOUT,
 		active: [running(1, 'Short'), running(2, 'A much longer title than the other')],
-		unreached: [{ ...waiting, waits: ['9'] }],
+		unreached: [{ ...waiting, waits: ['9', '10'], reason: { icon: '🔗', issues: ['9', '10'] } }],
 	}
 
 	return lines_of(board({ layout, ...extra }))
@@ -182,7 +238,7 @@ describe('run_board_render.render tail column', () => {
 		expect(column_of(lines, 'Short', PHASE_TIME)).toBe(column_of(lines, 'A much', PHASE_TIME))
 	})
 
-	it('starts every running row’s activity in one column where one phase time has three digits of minutes', () => {
+	it('starts every running row’s activity in one column where one phase time runs past an hour', () => {
 		const long = phased(running(2, 'Long'), LONG_PHASE)
 		const layout = { ...EMPTY_LAYOUT, active: [running(1, 'Short'), long] }
 		const lane_events = new Map([
@@ -191,14 +247,25 @@ describe('run_board_render.render tail column', () => {
 		])
 		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
 
-		expect(column_of(lines, 'Long', '👀')).toBe(column_of(lines, 'Short', '👀'))
-		expect(column_of(lines, 'Long', '125:00')).toBe(column_of(lines, 'Short', PHASE_TIME) - 1)
+		expect(column_of(lines, 'Long', '👀 3′00″')).toBe(column_of(lines, 'Short', '👀 3′00″'))
+		expect(lines.find((line) => line.includes('Long'))).toMatch(/Long {2,}👀 3′00″$/u)
+		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
 	})
 
-	it('starts a waiting row’s 🔗 in the tail’s column', () => {
-		const lines = tail_lines()
+	it('ends every running row’s activity age in one column where one runs past an hour', () => {
+		const lines = tail_lines({ operations: operations(2, NOW - MINUTES_61_SECONDS_5) })
+		const short_end = column_of(lines, 'Short', '3′00″') + '3′00″'.length
+		const long_end = column_of(lines, 'A much', '1°01′05″') + '1°01′05″'.length
 
-		expect(column_of(lines, 'Waiting', '🔗')).toBe(column_of(lines, 'Short', PHASE_TIME))
+		expect(short_end).toBe(long_end)
+	})
+
+	// joshuafolkken/kit#4026: a waiting row lines nothing up, so what it waits on follows its title.
+	// joshuafolkken/kit#4288: the first blocker leads it with 🔗, and the rest follow the title.
+	it('starts a waiting row’s other blockers two blanks after its title', () => {
+		const line = tail_lines().find((text) => text.includes('Waiting'))
+
+		expect(line).toMatch(/^ {4}🔗 9\+1 {9}3 {7}Waiting {2}10$/u)
 	})
 
 	// The header's third line says the run has ended, so only the row's tail draws 🔧.
@@ -207,7 +274,7 @@ describe('run_board_render.render tail column', () => {
 		const activity = { ...board().activity, is_stopped: true, latest }
 		const lines = tail_lines({ operations: operations(1, NOW - MINUTE), activity })
 
-		expect(stripVTControlCharacters(lines.at(-1) ?? '')).toContain('🔧 operation')
+		expect(stripVTControlCharacters(lines.slice(-2).join('\n'))).toContain('🔧 operation')
 		expect(stripVTControlCharacters(lines.slice(0, 3).join('\n'))).not.toContain('🔧')
 	})
 })

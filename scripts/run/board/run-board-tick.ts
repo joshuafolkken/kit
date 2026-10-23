@@ -1,118 +1,86 @@
-import { lane_await } from '#scripts/lane/lane-await'
-import { run_progress } from '#scripts/run/progress/run-progress'
 import type { ClosedIssue } from './run-board-closed'
+import type { EarlierLanes } from './run-board-earlier'
+import type { FrameBounds } from './run-board-fold'
+import type { GatherRead } from './run-board-gather'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
-import { run_board_idle } from './run-board-idle'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
 import { run_board_link } from './run-board-link'
-import { run_board_machine } from './run-board-machine'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
-import { run_board_reason } from './run-board-reason'
-import { run_board_render, type FrameBounds } from './run-board-render'
+import { run_board_reason, type ReasonRead } from './run-board-reason'
+import { run_board_released } from './run-board-released'
+import { run_board_render } from './run-board-render'
+import type { Known } from './run-board-snapshot'
 import { run_board_spin, type Spun } from './run-board-spin'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status, type RunActivity } from './run-board-status'
+import { run_board_status, type ItemStatus, type RunActivity } from './run-board-status'
 import { run_board_thanks } from './run-board-thanks'
-import { run_board_usage } from './run-board-usage'
 
-// One `run:board` redraw. **Three speeds**: the frame is redrawn once a second, on the second, so
-// every elapsed time moves by one, its spinners turned between redraws by `run-board-spin.ts`; the
-// run's own stream and lanes are re-read no more often than `LOCAL_READ_MS`, because each read parses
-// the whole stream and asks git twice, and a board left open all night would otherwise grow heavier
-// as the run grew longer; the GitHub reads they are laid over are `run-board-github.ts`'s, which a
-// live board never waits on. Between reads the last one is kept and drawn against the current time.
-// A run that ended stays on screen until the next one starts. With no run in this checkout it reads
-// nothing from GitHub. The machine is sampled once a second: one `sysctl` takes a few milliseconds,
-// and its gauges are the differences between consecutive samples.
+// One `run:board` redraw. The frame is redrawn once a second, on the second, so every elapsed time
+// moves by one, its spinners turned between redraws by `run-board-spin.ts`. It draws the last reads
+// off this machine (`run-board-gather.ts`) — a live board's taken on a worker thread, so the redraw
+// itself reads nothing that could stop a spinner — laid over the GitHub reads, `run-board-github.ts`'s,
+// which a live board never waits on. A run that ended stays on screen until the next one starts. With
+// no run in this checkout it reads nothing from GitHub.
 
 const { REDRAW_MS, SPOT } = run_board_spin
-const MACHINE_SAMPLE_MS = run_progress.MS_PER_SECOND
-const LOCAL_READ_SECONDS = 5
-const LOCAL_READ_MS = LOCAL_READ_SECONDS * run_progress.MS_PER_SECOND
-const { FRESH_STATE, is_due } = run_board_state
-const { PLAN_RETRY_MS, gather_github, statuses_for } = run_board_github
+const { FRESH_STATE } = run_board_state
+const { PLAN_RETRY_MS, gather_github, known_of, open_read_of, statuses_for } = run_board_github
 const { gather_thanks } = run_board_thanks
 
-async function read_at(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
-	const local = await ports.read_local()
-	const idle_since = run_board_idle.since_of(state.idle_since, local?.idle_lanes ?? [], now_ms)
+// What the last board on this run kept (`run-board-snapshot.ts`); one written on another run is
+// discarded.
+function saved_for(ports: BoardPorts, started_ms: number): Pick<BoardState, 'known' | 'closed'> {
+	const snapshot = ports.snapshot?.load()
 
-	return { ...state, local, read_ms: now_ms, idle_since }
+	if (snapshot?.run_started_ms !== started_ms) return FRESH_STATE
+
+	return { known: { titles: snapshot.titles, labels: snapshot.labels }, closed: snapshot.closed }
 }
 
-// A single frame has no earlier read to confirm an idle lane against (`run-board-idle.ts`).
-function is_unconfirmed(before: BoardState, read: BoardState, pace: Pace): boolean {
-	return pace === 'settled' && before.read_ms === undefined && read.idle_since.size > 0
-}
-
-async function reread(state: BoardState, ports: BoardPorts, pace: Pace): Promise<BoardState> {
-	const now_ms = ports.now()
-
-	if (!is_due(state.read_ms, LOCAL_READ_MS, now_ms)) return state
-
-	const read = await read_at(state, ports, now_ms)
-
-	if (!is_unconfirmed(state, read, pace)) return read
-
-	await ports.sleep(lane_await.RECONFIRM_MS)
-
-	return await read_at(read, ports, ports.now())
-}
-
-// Each lane's usage, read on the machine's second; a reading that failed draws no column.
-async function read_usages(
+// The state of the run on screen, over the reads just taken; a different run starts its plan state
+// from what the last board on it kept, or from nothing, so no row, count or baseline of the previous
+// run is drawn over the new one.
+function state_for(
 	state: BoardState,
+	read: GatherRead,
+	local: LocalRead,
 	ports: BoardPorts,
-): Promise<Pick<BoardState, 'usage' | 'usages'>> {
-	const usage = await ports.read_usage(state.usage)
-	const usages = usage === undefined ? undefined : run_board_usage.usage_of(state.usage, usage)
+): BoardState {
+	if (state.run_started_ms === local.started_ms) return { ...state, ...read }
 
-	return { usage, usages }
+	const saved = saved_for(ports, local.started_ms)
+
+	return { ...FRESH_STATE, ...saved, ...read, run_started_ms: local.started_ms }
 }
 
-// The sample is timed when it is taken, not when the tick began: a plan read between the two would put
-// its seconds on the wrong side of the rate's interval. It is due by the tick's clock, so a sample
-// taken a few milliseconds into its tick does not slip to the redraw after the second.
-async function resample(state: BoardState, ports: BoardPorts, now_ms: number): Promise<BoardState> {
-	if (!is_due(state.sampled_ms, MACHINE_SAMPLE_MS, now_ms)) return state
+// The titles and labels with a closed child's under the listing's own.
+function closed_under(known: Known, closed: ReadonlyMap<number, ClosedIssue>): Known {
+	const closed_titles = [...closed].map(([issue, { title }]) => [issue, title] as const)
+	const closed_labels = [...closed].map(([issue, { labels }]) => [issue, labels] as const)
 
-	const at_ms = ports.now()
-	const machine = { sample: await ports.read_machine(), at_ms }
-	const gauges = run_board_machine.gauges_of(state.machine, machine)
-	const budget_waits = ports.read_waits?.() ?? []
-	const usages = await read_usages(state, ports)
-
-	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: now_ms }
-}
-
-// The state of the run on screen; a different run starts its plan state from nothing, so no row, count
-// or baseline of the previous run is drawn over the new one.
-function state_for(state: BoardState, local: LocalRead): BoardState {
-	if (state.run_started_ms === local.started_ms) return state
-
-	const { local: kept, read_ms, idle_since } = state
-
-	return { ...FRESH_STATE, local: kept, read_ms, idle_since, run_started_ms: local.started_ms }
+	return {
+		titles: new Map([...closed_titles, ...known.titles]),
+		labels: new Map([...closed_labels, ...known.labels]),
+	}
 }
 
 // The plan with a closed child's title and labels under the listing's own.
 function with_closed(plan: BoardPlan, closed: ReadonlyMap<number, ClosedIssue>): BoardPlan {
-	const closed_titles = [...closed].map(([issue, { title }]) => [issue, title] as const)
-	const closed_labels = [...closed].map(([issue, { labels }]) => [issue, labels] as const)
-	const titles = new Map([...closed_titles, ...plan.context.titles])
-	const labels = new Map([...closed_labels, ...plan.labels])
+	const { titles, labels } = closed_under(
+		{ titles: plan.context.titles, labels: plan.labels },
+		closed,
+	)
 
 	return { ...plan, context: { ...plan.context, titles }, labels }
 }
 
-// The titles the findings name a parked issue by — the rows' own; none before the plan is read.
+// The titles the findings name a parked issue by — the rows' own; the snapshot's before the plan is
+// read.
 function titles_of(state: BoardState): Titles {
-	if (state.plan === undefined) return new Map()
-
-	return with_closed(state.plan, state.closed).context.titles
+	return closed_under(known_of(state), state.closed).titles
 }
 
 // A run `run:carry --end` closed and one nobody drives any more are both drawn as stopped.
@@ -123,38 +91,75 @@ function activity_here(local: LocalRead): RunActivity {
 	)
 }
 
+type RoomRead = Pick<
+	ReasonRead,
+	'free_lanes' | 'occupied_count' | 'lane_limit' | 'is_memory_held' | 'gauges'
+>
+
+// The room a waiting row is weighed against: the lanes under the limit, and the machine's memory.
+function room_of(state: BoardState, local: LocalRead): RoomRead {
+	return {
+		free_lanes: local.free_lanes,
+		occupied_count: local.occupied_count,
+		lane_limit: local.lane_limit,
+		is_memory_held: local.is_memory_held,
+		gauges: state.gauges,
+	}
+}
+
+// The run's statuses over the plan, a child read closed settled and one a person released left out.
+function planned_statuses(
+	state: BoardState,
+	plan: BoardPlan,
+	local: LocalRead,
+): ReadonlyMap<number, ItemStatus> {
+	const read = open_read_of(state, plan)
+
+	return run_board_released.without_released(
+		run_board_status.settle_closed(statuses_for(state, local), read),
+		read,
+	)
+}
+
+// The earlier run's lanes still holding a place, and the open lanes with no record.
+function earlier_here(local: LocalRead): EarlierLanes {
+	return {
+		lanes: local.earlier_occupied ?? [],
+		statuses: local.lane_states.earlier,
+		unknown: local.lane_states.unknown,
+	}
+}
+
 // The plan laid under its statuses, each waiting row saying why it waits.
 function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
-	const { closed } = state
-	const read = {
-		open_numbers: plan.context.open_numbers,
-		read_ms: state.fetched_ms,
-		closed,
-		labels: plan.labels,
-	}
-	const statuses = run_board_status.settle_closed(statuses_for(state, plan, local), read)
+	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
 		statuses,
 		events: local.events,
-		free_lanes: local.free_lanes,
-		occupied_lanes: local.occupied_lanes,
+		...room_of(state, local),
+		carry: local.carry,
 		is_stopped: activity_here(local).is_stopped,
 	})
 
-	return run_board_layout.layout_of(with_closed(plan, closed), statuses, reason_of)
+	return run_board_layout.layout_of(
+		with_closed(plan, state.closed),
+		statuses,
+		reason_of,
+		earlier_here(local),
+	)
 }
 
-// The statuses scoped to the run's plan, a running child the plan's listing no longer holds settled.
-// Before the plan is read, the run's own children alone.
+// The statuses scoped to the run's plan, a running child GitHub read closed settled.
+// Before the plan is read, the run's own children alone, named and settled as the snapshot left them.
 function layout_for(state: BoardState, local: LocalRead): BoardLayout {
 	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
 
-	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
+	const read = open_read_of(state, undefined)
+	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
+	const known = closed_under(state.known, state.closed)
 
-	return run_board_layout.local_layout_of(
-		run_board_status.statuses_of(local.events, local.lanes, new Set(), stopped),
-	)
+	return run_board_layout.local_layout_of(statuses, earlier_here(local), known)
 }
 
 // What one redraw draws with.
@@ -166,7 +171,7 @@ interface Redraw {
 // What the header reads off the local read.
 type LocalHeader = Pick<
 	BoardHeader,
-	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual'
+	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual' | 'lane_limit'
 >
 
 function local_header(local: LocalRead): LocalHeader {
@@ -176,6 +181,7 @@ function local_header(local: LocalRead): LocalHeader {
 		activity: activity_here(local),
 		operations: local.operations,
 		usual: local.usual,
+		lane_limit: local.lane_limit,
 	}
 }
 
@@ -192,6 +198,8 @@ function header_of(
 		baseline_total: state.baseline_total,
 		plan_fetched_ms: state.fetched_ms,
 		plan_failed_ms: state.failed_ms,
+		read_failed_ms: state.read_failed_ms,
+		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
 		machine: state.gauges,
 		usages: state.usages,
@@ -205,7 +213,7 @@ function header_of(
 
 // The pane a live frame is kept within and the footer it ends on, read at every redraw.
 function bounds_of(ports: BoardPorts): FrameBounds {
-	return { size: ports.size?.(), footer: ports.footer }
+	return { size: ports.size?.(), footer: ports.footer, folded: ports.folded?.() }
 }
 
 // The frame with its spinners drawn at this moment's frame, and where they are on screen.
@@ -213,7 +221,11 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 	const bounds = bounds_of(redraw.ports)
 	const lines = run_board_render.render({
 		header: header_of(state, local, layout, redraw),
-		notes: run_board_notes.notes_of(local.events, titles_of(state)),
+		notes: run_board_notes.notes_of(
+			local.events,
+			titles_of(state),
+			run_board_layout.listed_parks(layout),
+		),
 		resume: local.resume,
 		thanks: state.thanks,
 		link: redraw.ports.link,
@@ -248,27 +260,30 @@ async function tick(
 	ports: BoardPorts,
 	pace: Pace = 'settled',
 ): Promise<BoardState> {
-	const read = await reread(state, ports, pace)
+	const read = await ports.gather(pace)
 	// Taken after the read, which a single frame may have waited on to confirm an idle lane.
 	const now_ms = ports.now()
 	const { local } = read
 
 	if (local === undefined) {
-		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports)))
+		draw(ports, run_board_render.render_no_run(now_ms, bounds_of(ports), read))
 
-		return { ...read, spots: [] }
+		return { ...state, ...read, spots: [] }
 	}
 
-	const gathered = await gather_github(state_for(read, local), { ports, local, now_ms, pace })
+	const gathered = await gather_github(state_for(state, read, local, ports), {
+		ports,
+		local,
+		now_ms,
+		pace,
+	})
 	const thanked = await gather_thanks(gathered, ports, now_ms, pace)
 
-	return draw_run(await resample(thanked, ports, now_ms), local, { ports, now_ms })
+	return draw_run(thanked, local, { ports, now_ms })
 }
 
 const run_board_tick = {
 	FRESH_STATE,
-	LOCAL_READ_MS,
-	MACHINE_SAMPLE_MS,
 	PLAN_RETRY_MS,
 	REDRAW_MS,
 	tick,

@@ -1,5 +1,6 @@
+import { vitest_config_workers } from '#tools/test/vitest-config-workers'
 import { defineConfig } from 'vitest/config'
-import { unit_projects } from './scripts/test/unit-projects.ts'
+import { unit_projects } from './tools/test/unit-projects.ts'
 
 // The integration harness's slow suites — exactly the files `MAIN_EXCLUDE` keeps out of the unit
 // gate (joshuafolkken/kit#2447). Named on the command line under the main config, such a file is
@@ -16,5 +17,7 @@ export default defineConfig({
 		include: [...unit_projects.MAIN_EXCLUDE],
 		globalSetup: [...unit_projects.NETWORK_GUARD],
 		setupFiles: [...unit_projects.WORKER_GUARDS],
+		// The direct run above takes the same share of the machine as the main config's.
+		maxWorkers: vitest_config_workers.config_workers(),
 	},
 })

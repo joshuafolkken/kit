@@ -1,11 +1,12 @@
 import { machine_capacity, type MachineSample } from '#scripts/gate/machine-capacity'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_board_labels, type Paint } from './run-board-labels'
 
 // The machine line of `run:board`: whether a quiet run is stuck or only slow on a machine that has
 // run out of room.
 //
 // **The reading is the gate's own** (`machine-capacity.ts`), so the board shows what the core budget
-// admits against. 🔥 is the busy share of the CPU between two samples; 🧠 the kernel's memory pressure,
+// admits against. 💪 is the busy share of the CPU between two samples; 🧠 the kernel's memory pressure,
 // never a GB figure that would disagree with Activity Monitor's "memory used"; 💾 how fast pages are
 // swapped, never how much swap is held — macOS grows its swap files, so a usage share reads near 100%
 // and the amount itself does no harm. A figure that needs two samples is not drawn on the first, and a
@@ -18,7 +19,6 @@ import { run_board_labels, type Paint } from './run-board-labels'
 
 const { GAUGE_SHADES, HEADER_ICONS, bar_of, painted } = run_board_labels
 const PERCENT = 100
-const MS_PER_SECOND = 1000
 const PERCENT_WIDTH = '100%'.length
 const RATE_WIDTH = '3.1M/s'.length
 // Below this a rate keeps one decimal, so `0.4M/s` is not drawn as `0M/s`.
@@ -33,6 +33,7 @@ const CPU_RED = 90
 const MEMORY_YELLOW = 70
 const MEMORY_RED = 85
 const SWAP_FULL_MB_PER_S = 20
+const SWAP_YELLOW_MB_PER_S = 1
 const SWAP_RED_MB_PER_S = 10
 
 type Alert = 'normal' | 'yellow' | 'red'
@@ -101,7 +102,7 @@ const SPECS = {
 		icon: HEADER_ICONS.swap,
 		normal: undefined,
 		full: SWAP_FULL_MB_PER_S,
-		yellow: 1,
+		yellow: SWAP_YELLOW_MB_PER_S,
 		red: SWAP_RED_MB_PER_S,
 		format: rate_text,
 	},
@@ -199,12 +200,15 @@ function line_of(gauges: MachineGauges | undefined, width = 0): string | undefin
 const run_board_machine = {
 	CPU_YELLOW,
 	GAP,
+	MEMORY_RED,
 	MEMORY_YELLOW,
 	PERCENT_WIDTH,
+	SWAP_RED_MB_PER_S,
+	SWAP_YELLOW_MB_PER_S,
 	gauges_of,
 	line_of,
 	percent_text,
-	threshold_alert,
+	rate_text,
 }
 
 export { run_board_machine }

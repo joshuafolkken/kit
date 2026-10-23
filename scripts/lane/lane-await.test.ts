@@ -5,6 +5,7 @@ import { run_liveness } from '#scripts/run/run-liveness'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_await, type AwaitState, type CheckConfig } from './lane-await'
+import { lane_handoff } from './lane-handoff'
 
 vi.mock('node:child_process', async (original) => {
 	const actual = await original<{ spawnSync: typeof spawnSync }>()
@@ -24,10 +25,12 @@ const POLL_MS = 1
 const NOW = 1_000_000
 const NEVER_APPEARED_MESSAGE = 'never appeared'
 
-// The default settled read asks GitHub; every test answers "not settled" unless it says otherwise.
+// The default settled read asks GitHub and the default shipped read the machine's ship records; every
+// test answers "not settled" and "not shipped" unless it says otherwise.
 beforeEach(() => {
 	vi.restoreAllMocks()
 	vi.spyOn(run_liveness, 'read_child_settled').mockResolvedValue(false)
+	vi.spyOn(lane_handoff, 'is_ship_succeeded').mockReturnValue(false)
 })
 
 function make_state(overrides: Partial<AwaitState> = {}): AwaitState {

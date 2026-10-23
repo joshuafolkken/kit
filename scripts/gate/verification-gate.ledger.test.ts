@@ -4,6 +4,9 @@ import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { core_budget } from './core-budget'
+import { gate_ledger } from './gate-ledger'
+import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
 import { machine_capacity } from './machine-capacity'
 
@@ -48,13 +51,21 @@ async function run_into(ledger_path: string | undefined, exit_code: number): Pro
 	}
 }
 
+// joshuafolkken/kit#4309: the gate under test runs under the held mark, as it does inside `josh gate`,
+// so its checks never claim the real machine-wide budget — a mocked busy machine would otherwise
+// leave the unit claim waiting out `WAIT_CAP_MS`. No other lane's reservation reaches the sampler.
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv(core_budget.HELD_KEY, core_budget.HELD_VALUE)
+	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	live_runs.mockReturnValue(0)
 	RECORDS.clear()
 })
 
-afterEach(RECORDS.clear)
+afterEach(() => {
+	vi.unstubAllEnvs()
+	RECORDS.clear()
+})
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -87,7 +98,7 @@ describe('run_verification_gate — the lane ledger', () => {
 	// joshuafolkken/kit#3501: the gate reads the machine before its first check and after its last.
 	it('records the external cores the machine was busy with around the checks', async () => {
 		const ledger_path = path.join(scratch, 'gate-external.jsonl')
-		const busy_cores = machine_capacity.BASELINE_CORES + EXTERNAL_CORES
+		const busy_cores = gate_ledger.BACKGROUND_CORES + EXTERNAL_CORES
 
 		vi.spyOn(machine_capacity, 'read_machine').mockResolvedValue({
 			busy_cores,
@@ -109,11 +120,28 @@ describe('run_verification_gate — the lane ledger', () => {
 	})
 })
 
+// joshuafolkken/kit#4397: a gate that reused its green record still leaves a line, marked reused.
+describe('run_verification_gate — a reused gate', () => {
+	it('records a reused gate as reused, running no check', async () => {
+		const ledger_path = path.join(scratch, 'gate-reused.jsonl')
+
+		vi.spyOn(gate_skip, 'reusable_green_gate').mockReturnValueOnce({
+			taken_at: new Date().toISOString(),
+			files: {},
+		})
+		// Every check would fail, so a passing gate is one that ran none.
+		await expect(run_into(ledger_path, FAIL)).resolves.toBe(PASS)
+		expect(lane_ledger.read_entries(ledger_path)).toMatchObject([
+			{ kind: 'gate', is_passed: true, is_reused: true },
+		])
+	})
+})
+
 // joshuafolkken/kit#1515: a reading between the count and the marker would let another lane miss this gate.
 describe('run_verification_gate — the load reading and the run count', () => {
 	it('reads the machine before it counts the concurrent runs', async () => {
 		const read_machine = vi.spyOn(machine_capacity, 'read_machine').mockResolvedValue({
-			busy_cores: machine_capacity.BASELINE_CORES,
+			busy_cores: gate_ledger.BACKGROUND_CORES,
 			available_mb: undefined,
 		})
 

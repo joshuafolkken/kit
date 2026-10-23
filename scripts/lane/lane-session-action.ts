@@ -1,10 +1,12 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { api_auth } from '#scripts/agent/api-auth'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { detached_launch, type AttachedLaunchResult } from '#scripts/run/detached-launch'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { run_ship_stop_context } from '#scripts/run/ship/run-ship-stop-context'
 import { z } from 'zod'
 import { lane_child_invocation, type ShipStop } from './lane-child-invocation'
@@ -29,6 +31,8 @@ const stop_schema = z
 		flags: z.array(z.string()).readonly(),
 		is_review: z.boolean(),
 		conflicts: z.array(z.string()).readonly().default([]),
+		cause: z.enum(run_ship_stop_cause.CAUSE).exactOptional(),
+		is_review_stale: z.boolean().exactOptional(),
 		context: run_ship_stop_context.stop_context_schema.exactOptional(),
 	})
 	.strict()
@@ -74,12 +78,22 @@ function review_prompt(lane: LaneInfo, round: ReviewRound): string {
 	return `${prompt_of(target.brief, target.findings, lane.issue)} This is ${tail}`
 }
 
-function reviewer_answer(result: AttachedLaunchResult): BrokerAnswer {
+// **A reviewer that could not authenticate names it** with `api_auth.AUTH_FAILURE_NOTE`, read off its
+// log's exit record, so the ship stop is not booked as a review finding (joshuafolkken/kit#4216).
+function exited_answer(exit_code: number | null, log_path: string): BrokerAnswer {
+	const exited = `the reviewer exited with code ${String(exit_code)}`
+
+	if (!api_auth.is_auth_failed_transcript(stamp_file.read_stamp_text(log_path))) {
+		return failure(exited)
+	}
+
+	return failure(`${api_auth.AUTH_FAILURE_NOTE}: ${exited}`)
+}
+
+function reviewer_answer(result: AttachedLaunchResult, log_path: string): BrokerAnswer {
 	if (result.kind === 'failed') return failure(`the reviewer could not start: ${result.note}`)
 
-	return result.exit_code === 0
-		? SUCCESS
-		: failure(`the reviewer exited with code ${String(result.exit_code)}`)
+	return result.exit_code === 0 ? SUCCESS : exited_answer(result.exit_code, log_path)
 }
 
 async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<BrokerAnswer> {
@@ -103,7 +117,7 @@ async function launch_review(lane: LaneInfo, round: ReviewRound): Promise<Broker
 		console.error,
 	)
 
-	return reviewer_answer(result)
+	return reviewer_answer(result, target.log)
 }
 
 // An OpenAI lane's successor is its supervisor's to start, never a relaunch's.

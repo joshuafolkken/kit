@@ -13,10 +13,13 @@ import { rule_list } from './rule-list'
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'
 const COMMANDS_DOCUMENT = 'docs/josh-commands-automation.md'
+const RUN_COMMANDS_DOCUMENT = 'docs/josh-commands-run.md'
+const DISPATCH_MARK = '`JOSH_LANE_CHILD`'
 const FIRING_SUITE = 'scripts/rules/pre-gate-cut.test.ts'
 // Named once: the enumeration, the topic file and the command reference have to agree on both
 // commands, and a string kept correct in one of three places is not kept.
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
+const ROW_REFERENCE = '`pre-gate-cut` row of `pnpm josh rule:list`'
 const CUT_COMMAND = 'pnpm josh run:cut <N>'
 
 describe('the delivered text — what the refusal states', () => {
@@ -60,36 +63,42 @@ describe(`${RATIONALE_FILE} — the measurement behind the rule`, () => {
 describe(`${TOPIC_FILE} — the single source for the rule`, () => {
 	const content = read_unwrapped(TOPIC_FILE)
 
-	it.each(['### The gate refuses until the cut has been taken', GUARD_COMMAND])(
-		'states %j',
-		(marker) => {
-			expect(content).toContain(marker)
-		},
-	)
+	it.each([
+		'### The gate refuses until the cut has been taken',
+		ROW_REFERENCE,
+		'**It fires for a marked child and nowhere else**',
+		DISPATCH_MARK,
+		RUN_COMMANDS_DOCUMENT,
+	])('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#4129 moved how the guard and the mark work out of the skill, which keeps the
+// action alone, into the command reference.
+describe(`${RUN_COMMANDS_DOCUMENT} — how the guard and the mark work`, () => {
+	const content = read_unwrapped(RUN_COMMANDS_DOCUMENT)
 
 	// **The two silent states are what make the row worth having rather than worth removing.** A rule
 	// that fired in an ordinary checkout would refuse the gate of every interactive run, which this
 	// repository treats as worse than no rule at all.
 	it.each([
-		'**It fires for a marked child and nowhere else**',
-		'**It is silent once the cut is carried**',
-		'**It fires once per run.**',
+		'is silent once the cut is carried',
+		'once per run',
 		// The mark is what makes the guard's half mechanical, so the guard and `run:cut` need not agree.
-		'the guard and the command need not agree byte for byte',
+		'need not agree byte for byte',
 	])('states the boundary %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 
 	// **The mark's single-source documentation** (joshuafolkken/kit#1904): its name, meaning and
 	// lifetime live here and in the one module, so a reader learns what fires the rule in one place.
-	it.each([
-		'### The dispatch mark',
-		'`JOSH_LANE_CHILD`',
-		'scripts/lane/lane-child-marker.ts',
-		'documented here and nowhere else',
-	])('states the dispatch mark %j', (marker) => {
-		expect(content).toContain(marker)
-	})
+	it.each(['**The dispatch mark:**', DISPATCH_MARK, 'scripts/lane/lane-child-marker.ts'])(
+		'states the dispatch mark %j',
+		(marker) => {
+			expect(content).toContain(marker)
+		},
+	)
 
 	// The distinction the measurement turned on: four of the six children issued the asking spelling
 	// and went straight to the gate, so counting it would have credited exactly the failing runs.

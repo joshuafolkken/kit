@@ -79,3 +79,27 @@ describe('backlogrun_args.parse --stop', () => {
 		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
 	})
 })
+
+// joshuafolkken/kit#4154: `--restart` replaces the run's processes, so it too stands alone.
+describe('backlogrun_args.parse --restart', () => {
+	it('reads a lone --restart as the restart', () => {
+		expect(parse(['--restart'])).toStrictEqual({ kind: 'restart' })
+	})
+
+	it.each([
+		{ argv: ['3437', '--restart'] },
+		{ argv: ['--restart', '--only'] },
+		{ argv: ['--restart', '--agent', 'codex'] },
+		{ argv: ['--restart', '--stop'] },
+		{ argv: ['--restart', '--restart'] },
+	])('refuses $argv, so a mistyped restart stops nothing', ({ argv }) => {
+		expect(parse(argv)).toStrictEqual({ kind: 'refused' })
+	})
+
+	it.each([{ argv: ['constructor'] }, { argv: ['toString'] }])(
+		'does not read $argv as a lone flag inherited from Object',
+		({ argv }) => {
+			expect(parse(argv)).toStrictEqual({ kind: 'refused' })
+		},
+	)
+})

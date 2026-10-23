@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -48,7 +46,5 @@ async function sweep(): Promise<void> {
 }
 
 const run_tidy_cli = { sweep }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await sweep()
 
 export { run_tidy_cli }

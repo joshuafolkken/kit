@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { prompt_hooks } from '#tools/hooks/prompt-hooks'
 import { describe, expect, it } from 'vitest'
-import { prompt_hooks } from './prompt-hooks'
 import { step_zero_notice } from './step-zero-notice'
 
 // The `UserPromptSubmit` hooks are injected into the conversation on **every user turn**, and what
@@ -54,8 +54,8 @@ const MOVED_STEP_ZERO_DIRECTIVES: ReadonlyArray<string> = [
 	'禁じるのは内部識別子だけ',
 	'各行に具体的な主語を書き、主語のない文は不可',
 	'ファイルパス・関数名や型名・CLI のオプションフラグは書かない',
-	'`技術詳細`',
-	'### 出力はコードフェンスで囲まない（必須）',
+	'`josh report:template`',
+	'出力はコードフェンスで囲まない',
 	'`fullrun` / `halfrun` / `prrun` / `backlogrun` で必須',
 	'確認のための停止ではない',
 	'`Cause` / `Fix` / `Result`',

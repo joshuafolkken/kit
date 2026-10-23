@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
@@ -10,6 +9,7 @@ import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
+import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
@@ -101,7 +101,7 @@ function is_cut_stop(tail: string): boolean {
 	)
 }
 
-// The session language the refusal is written for — `write_stop_decision` has already loaded the `.env`.
+// The session language the refusal is written for — `respond_from_stdin` has already loaded the `.env`.
 function session_lang(): string {
 	return session_language.resolve_session_lang().lang
 }
@@ -208,13 +208,18 @@ async function run_report_checks(): Promise<void> {
 	await run_stranded_detect.run_stranded_check()
 }
 
-// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
-// held or the hook acted on it (`stop-actions.ts`).
-async function write_stop_decision(raw_payload: string): Promise<void> {
-	hook_decision.load_environment_file()
+async function decided_envelope(raw_payload: string): Promise<string | undefined> {
 	await run_report_checks()
 
-	const envelope = await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
+	return await stop_actions.envelope_of(await outcome_of(raw_payload), session_lang())
+}
+
+// Nothing reaches stdout on an ordinary stop, so what the harness parses stays empty unless the stop is
+// held or the hook acted on it (`stop-actions.ts`). The report checks print too — a strand's skipped
+// notify line — and text ahead of the envelope makes the harness drop the refusal, as the #4091 child's
+// lane-background block was (joshuafolkken/kit#4101), so everything before the write goes to stderr.
+async function write_stop_decision(raw_payload: string): Promise<void> {
+	const envelope = await stdout_on_stderr.run(async () => await decided_envelope(raw_payload))
 
 	if (envelope === undefined) return
 
@@ -224,8 +229,7 @@ async function write_stop_decision(raw_payload: string): Promise<void> {
 const stop_guard = { outcome_of, stop_outcome_for_payload }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('stop:guard')
-	else await write_stop_decision(await text(process.stdin))
+	await hook_decision.respond_from_stdin('stop:guard', write_stop_decision)
 }
 
 export { stop_guard, write_stop_decision }

@@ -4,10 +4,12 @@ import path from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_event, type AgentEventState } from '#scripts/agent/agent-event'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { ALREADY_DONE_LABEL, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { has_parked_label } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state } from '#scripts/issue/issue-state'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { lane_state, type LaneState } from '#scripts/lane/lane-state'
+import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_hold } from '#scripts/run/hold/run-hold'
 
 // `josh run:liveness <N>` — whether the delegated unit running child `<N>` is still working, or
@@ -33,13 +35,22 @@ import { run_hold } from '#scripts/run/hold/run-hold'
 // dead. `statSync` follows the link, and the size is compared as well as the modification time,
 // because it is the two-sample size comparison that actually proves liveness.
 
+//
+// **The lane state record answers before any trace** (joshuafolkken/kit#4270): a lane `lane:pause`
+// suspended has a live process and frozen output, which the traces read as `alive` for as long as it
+// stays paused; the record says `paused`. An `ended` record is a lane done with its child. Whether a
+// child that parked or died is still there is not the record's — it writes nothing then — so the
+// traces still decide every other lane.
+
 const ALIVE_VERDICT = 'alive'
+const PAUSED_VERDICT = 'paused'
 const SETTLED_VERDICT = 'settled'
 const STOPPED_VERDICT = 'stopped'
 const UNDETERMINED_VERDICT = 'undetermined'
 
 type LivenessVerdict =
 	| typeof ALIVE_VERDICT
+	| typeof PAUSED_VERDICT
 	| typeof SETTLED_VERDICT
 	| typeof STOPPED_VERDICT
 	| typeof UNDETERMINED_VERDICT
@@ -58,8 +69,6 @@ const DEFAULT_SILENT_MINUTES = 30
 // Two samples, a few seconds apart. The gap is what turns "this file has an old timestamp" into
 // "this file is not being written", and five seconds is long enough for a unit mid-turn to append.
 const DEFAULT_GAP_SECONDS = 5
-const MS_PER_MINUTE = 60_000
-const MS_PER_SECOND = 1000
 const OPEN_STATE = 'OPEN'
 const STATE_FIELDS = 'state,labels'
 
@@ -73,6 +82,8 @@ interface Traces {
 	is_child_settled: boolean | undefined
 	is_output_frozen: boolean | undefined
 	is_tree_dirty: boolean
+	// The lane's state record's state; `undefined` where the lane has none.
+	lane_state?: LaneState | undefined
 	process_trace: ProcessTrace
 }
 
@@ -95,8 +106,10 @@ interface LivenessRequest {
 const REASONS: Record<LivenessVerdict, string> = {
 	[ALIVE_VERDICT]:
 		'The unit is still working: its output moved, or a process of the child is alive.',
+	[PAUSED_VERDICT]:
+		'The lane state record says the lane is paused: its child is suspended, not working, and nothing moves until someone resumes it.',
 	[SETTLED_VERDICT]:
-		'The child is closed, parked with `needs-decision`, or marked `already-done`, so there is nothing here to recover.',
+		'The child is closed, parked with `needs-decision` or `run:stalled`, or marked `already-done`, so there is nothing here to recover.',
 	[STOPPED_VERDICT]:
 		'The output has been frozen past the silent window and no process of the child is alive in that checkout.',
 	[UNDETERMINED_VERDICT]:
@@ -104,6 +117,8 @@ const REASONS: Record<LivenessVerdict, string> = {
 }
 
 const ALIVE_ADVICE = 'Keep waiting on `pnpm josh lane:await`; do not touch the child.'
+const PAUSED_ADVICE =
+	'Do not wait on it and do not recover it: tell the person the lane is paused; `pnpm josh lane:resume <N>` resumes it once they ask.'
 const SETTLED_ADVICE =
 	'Read the child with `pnpm josh issue:state <N>` and take the branch its state says.'
 // The unit stopped, but *why* it stopped — abandoned mid-implementation, or dead because it could not
@@ -112,11 +127,11 @@ const SETTLED_ADVICE =
 // routed through `run:merge --output`, the same composite a returned child takes: it reads the exit
 // record without waiting for the unit to return, re-dispatches an outage child (counting the outage,
 // and stopping the run on the environment guard once a run of them trips it), and parks an abandoned
-// child with `needs-decision` against the consecutive-failure guard.
+// child with `run:stalled` against the consecutive-failure guard.
 const STOPPED_CLEAN_ADVICE =
-	'The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it reads the child\'s exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `needs-decision` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash.'
+	'The unit ended — classify how before booking it. Run `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it reads the child\'s exit record without waiting for the unit to return, re-dispatches a child that could not reach the API (counting the outage; a run of them trips the environment guard and stops the run), and parks an abandoned child with `run:stalled` against the consecutive-failure guard. The checkout is clean, so there is nothing to stash.'
 const STOPPED_DIRTY_ADVICE =
-	'Stash the half-finished work with `git stash push -u -m "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `needs-decision` against the consecutive-failure guard, without waiting for the unit to return.'
+	'Stash the half-finished work with `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` and record it on the Issue, then classify how the unit ended with `pnpm josh run:merge <N> --output <path>` (add `--epic <E> --repo <owner/repo> --owner "$PPID"` for a named epic): it re-dispatches an API-outage child (counting the outage; a run of them trips the environment guard) and parks an abandoned child with `run:stalled` against the consecutive-failure guard, without waiting for the unit to return.'
 const UNDETERMINED_ADVICE =
 	'Read the trace that failed and ask again. Where the process trace was given as `unknown`, leave `--process` out so the command reads it. Two of these in a row is a fault in the check itself rather than a slow unit: stop polling and report it.'
 
@@ -134,8 +149,19 @@ function is_agent_finished(traces: Traces): boolean {
 	return is_agent_state_finished(traces.agent_state)
 }
 
+// What the lane state record answers on its own: a paused lane, or one done with its child.
+function recorded_verdict(state: LaneState | undefined): LivenessVerdict | undefined {
+	if (state === 'paused') return PAUSED_VERDICT
+
+	return state === 'ended' ? SETTLED_VERDICT : undefined
+}
+
 function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
 	if (traces.is_child_settled === true) return SETTLED_VERDICT
+
+	const recorded = recorded_verdict(traces.lane_state)
+
+	if (recorded !== undefined) return recorded
 	if (is_agent_finished(traces)) return STOPPED_VERDICT
 	if (is_output_moving(traces)) return ALIVE_VERDICT
 
@@ -171,10 +197,16 @@ function to_verdict(traces: Traces): LivenessVerdict {
 	return is_check_running(traces) ? ALIVE_VERDICT : STOPPED_VERDICT
 }
 
+// The advice for every verdict but `stopped`, whose advice turns on the work left to stash.
+const ADVICE: Record<Exclude<LivenessVerdict, typeof STOPPED_VERDICT>, string> = {
+	[ALIVE_VERDICT]: ALIVE_ADVICE,
+	[PAUSED_VERDICT]: PAUSED_ADVICE,
+	[SETTLED_VERDICT]: SETTLED_ADVICE,
+	[UNDETERMINED_VERDICT]: UNDETERMINED_ADVICE,
+}
+
 function to_advice(verdict: LivenessVerdict, has_work_to_stash: boolean): string {
-	if (verdict === ALIVE_VERDICT) return ALIVE_ADVICE
-	if (verdict === SETTLED_VERDICT) return SETTLED_ADVICE
-	if (verdict === UNDETERMINED_VERDICT) return UNDETERMINED_ADVICE
+	if (verdict !== STOPPED_VERDICT) return ADVICE[verdict]
 
 	return has_work_to_stash ? STOPPED_DIRTY_ADVICE : STOPPED_CLEAN_ADVICE
 }
@@ -307,19 +339,13 @@ async function read_output_frozen(request: FreshnessRequest): Promise<boolean | 
 	return second.mtime_ms === first.mtime_ms && second.size === first.size
 }
 
-function carries_label(labels: ReadonlyArray<string>, wanted: string): boolean {
-	return labels.some((label) => label.toLowerCase() === wanted)
-}
-
-// The labels that say a unit stopped on purpose. `needs-decision` is the park branch; `already-done`
-// is the exit a child takes when it verifies its Issue's work is already merged
-// — it comments the evidence, applies the label and stops with the checkout
+// The park labels (`PARKED_LABELS`) say a unit stopped on purpose. `needs-decision` and `run:stalled`
+// are the park branches; `already-done` is the exit a child takes when it verifies its Issue's work is
+// already merged — it comments the evidence, applies the label and stops with the checkout
 // clean, which is settled by the same reasoning. Left out, this command reports a child that
 // finished correctly as `stopped` and a supervisor restarts the investigation it just completed.
-const SETTLED_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
 function carries_settled_label(labels: ReadonlyArray<string>): boolean {
-	return SETTLED_LABELS.some((label) => carries_label(labels, label))
+	return has_parked_label(labels)
 }
 
 // Settled needs positive evidence that the child is done with: it closed, or the unit parked it and
@@ -340,20 +366,25 @@ async function read_child_settled(issue: string, repo?: string): Promise<boolean
 	return state.state !== OPEN_STATE || carries_settled_label(state.labels)
 }
 
+function freshness_of(request: LivenessRequest): FreshnessRequest {
+	return {
+		gap_ms: request.gap_ms ?? DEFAULT_GAP_SECONDS * MS_PER_SECOND,
+		now_ms: Date.now(),
+		output_path: request.output_path,
+		silent_window_ms: request.silent_window_ms ?? DEFAULT_SILENT_MINUTES * MS_PER_MINUTE,
+	}
+}
+
 // The dirty tree is deliberately not one of the traces, so it is the one input that does not answer
 // `undetermined`. `run_hold.is_tree_dirty` reports an unreadable checkout as dirty, which here means
 // the advice offers a stash that may find nothing — the safe direction for the only question this
 // input decides, and one that cannot move the verdict.
 async function read_traces(request: LivenessRequest): Promise<Traces> {
-	const [is_initial_child_settled, is_output_frozen, is_tree_dirty] = await Promise.all([
+	const [is_initial_child_settled, is_output_frozen, is_tree_dirty, record] = await Promise.all([
 		read_child_settled(request.issue, request.repo),
-		read_output_frozen({
-			gap_ms: request.gap_ms ?? DEFAULT_GAP_SECONDS * MS_PER_SECOND,
-			now_ms: Date.now(),
-			output_path: request.output_path,
-			silent_window_ms: request.silent_window_ms ?? DEFAULT_SILENT_MINUTES * MS_PER_MINUTE,
-		}),
+		read_output_frozen(freshness_of(request)),
 		run_hold.is_tree_dirty(),
+		lane_state.read_state(request.issue),
 	])
 	const agent_state = read_agent_state(request.output_path)
 	// A child can close or park its Issue and append its terminal event after the parallel GitHub read
@@ -370,6 +401,7 @@ async function read_traces(request: LivenessRequest): Promise<Traces> {
 		is_child_settled,
 		is_output_frozen,
 		is_tree_dirty,
+		lane_state: record?.state,
 		process_trace: request.process_trace,
 	}
 }
@@ -400,8 +432,7 @@ export {
 	ALIVE_VERDICT,
 	DEFAULT_GAP_SECONDS,
 	DEFAULT_SILENT_MINUTES,
-	MS_PER_MINUTE,
-	MS_PER_SECOND,
+	PAUSED_VERDICT,
 	PROCESS_ALIVE,
 	PROCESS_NONE,
 	PROCESS_UNKNOWN,

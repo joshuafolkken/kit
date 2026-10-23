@@ -25,9 +25,58 @@ describe('run_ship.format_report — each step under its own header', () => {
 	})
 })
 
+// joshuafolkken/kit#4166: a stopped preflight's unmet preconditions reach the stop record.
+describe('run_ship.section_of — a stage result under its header', () => {
+	it('carries the preconditions and the conflicts a stage handed back', () => {
+		const result = { code: FAILED, out: 'red', conflicts: ['a.ts'], preconditions: ['lock'] }
+
+		expect(run_ship.section_of('h', result)).toStrictEqual({
+			header: 'h',
+			body: 'red',
+			code: FAILED,
+			out: 'red',
+			conflicts: ['a.ts'],
+			preconditions: ['lock'],
+		})
+	})
+
+	// joshuafolkken/kit#4431: a review round's tagged cause reaches the stop record.
+	it('carries the cause a review round tagged its stop with', () => {
+		expect(run_ship.section_of('h', { code: FAILED, out: 'red', cause: 'attest' })).toStrictEqual({
+			...section('h', 'red', FAILED),
+			out: 'red',
+			cause: 'attest',
+		})
+	})
+
+	// joshuafolkken/kit#4589: the poll's unreadable-read warnings go to stderr, and a stop log without
+	// them hid why the merge gate never concluded.
+	it('keeps the stderr of a failed stage in its body', () => {
+		const result = { code: FAILED, out: 'red', err: 'Could not read the PR state' }
+
+		expect(run_ship.section_of('h', result)).toMatchObject({
+			body: 'red\nCould not read the PR state',
+			out: 'red',
+		})
+	})
+
+	it('adds no stop key to a result that has none', () => {
+		expect(run_ship.section_of('h', { code: OK, out: 'ok' })).toStrictEqual({
+			...section('h', 'ok'),
+			out: 'ok',
+		})
+	})
+})
+
 describe('run_ship.failed_section — the step that stopped the ship', () => {
 	it('returns the first failed section', () => {
 		const failed = run_ship.failed_section([section('a', '', OK), section('b', '', FAILED)])
+
+		expect(failed?.header).toBe('b')
+	})
+
+	it('returns the last of two failed sections, the one printed last', () => {
+		const failed = run_ship.failed_section([section('a', '', FAILED), section('b', '', FAILED)])
 
 		expect(failed?.header).toBe('b')
 	})

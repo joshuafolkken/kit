@@ -1,24 +1,32 @@
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_cli } from '#scripts/run/progress/run-progress-cli'
 import type { ClosedAnswer } from './run-board-closed'
 import { run_board_fetch, type Fetch } from './run-board-fetch'
 import { run_board_idle } from './run-board-idle'
-import { run_board_layout, type BoardPlan } from './run-board-layout'
+import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
+import type { Known } from './run-board-snapshot'
 import { run_board_state, type BoardPorts, type BoardState, type Pace } from './run-board-state'
-import { run_board_status, type ItemStatus } from './run-board-status'
+import {
+	run_board_status,
+	type ItemState,
+	type ItemStatus,
+	type OpenRead,
+} from './run-board-status'
 
 // The GitHub reads a `run:board` redraw draws over: the plan, and the run's children that left the
-// open listing. Each is taken no more often than `run:progress` re-reads after a decline. **A live
+// open listing or are drawn stopped. Each is taken no more often than `run:progress` re-reads after a decline. **A live
 // board never waits on them**: each read is launched and folded in on the redraw after it lands, so
 // the clock keeps moving while GitHub answers; one plain frame waits for them. A failed plan read
 // keeps the previous plan on screen and says when it failed. A run that ended keeps its plan as it
 // last read.
 
-const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
+const PLAN_RETRY_MS = run_progress_cli.DECLINE_RETRY_SECONDS * MS_PER_SECOND
 // A rejected closed read answers nothing closed and not whole, so it is asked again.
 const UNANSWERED: ClosedAnswer = { closed: new Map(), is_whole: false }
 const { is_due } = run_board_state
+const STOPPED_STATE: ItemState = 'stopped'
+const RUNNING_STATE: ItemState = 'running'
 
 // What a step of the GitHub reads works against.
 interface Gather {
@@ -28,19 +36,39 @@ interface Gather {
 	pace: Pace
 }
 
-// A title the board once knew stays known, so an issue that left the open listing keeps its name.
-function with_titles(plan: BoardPlan, previous: BoardPlan | undefined): BoardPlan {
-	const titles = new Map([...(previous?.context.titles ?? []), ...plan.context.titles])
+// A title the board once knew stays known, so an issue that left the open listing keeps its name —
+// one the last board's snapshot named among them.
+function titles_of(state: BoardState): ReadonlyMap<number, string> {
+	return state.plan?.context.titles ?? state.known.titles
+}
+
+function with_titles(plan: BoardPlan, state: BoardState): BoardPlan {
+	const titles = new Map([...titles_of(state), ...plan.context.titles])
 
 	return { ...plan, context: { ...plan.context, titles } }
 }
 
+// A lane this run started after the last plan read was asked, on an issue the plan has no title for
+// (joshuafolkken/kit#4577). The read it launches is asked after the lane started, so a title still
+// missing after it — past the listing's cap, or a failed read — waits the usual interval.
+function has_untitled_lane(state: BoardState, gather: Gather): boolean {
+	const asked_ms = state.attempted_ms ?? Infinity
+	const titles = titles_of(state)
+
+	return [...gather.local.lane_states.own].some(
+		([issue, status]) => !titles.has(issue) && (status.started_ms ?? -Infinity) > asked_ms,
+	)
+}
+
 // An ended run's plan is read until it lands once, then held; a read in flight is not launched again.
+// A lane with no title is read for at once rather than after the interval.
 function is_plan_due(state: BoardState, gather: Gather): boolean {
 	if (state.plan_fetch !== undefined) return false
 	if (gather.local.ended_ms !== undefined && state.fetched_ms !== undefined) return false
 
-	return is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	return (
+		is_due(state.attempted_ms, PLAN_RETRY_MS, gather.now_ms) || has_untitled_lane(state, gather)
+	)
 }
 
 function launch_plan(state: BoardState, gather: Gather): BoardState {
@@ -67,41 +95,61 @@ function fold_plan(state: BoardState): BoardState {
 
 	return {
 		...settled,
-		plan: with_titles(answer.value, state.plan),
+		plan: with_titles(answer.value, state),
 		fetched_ms: state.attempted_ms,
 		failed_ms: undefined,
 	}
 }
 
-// joshuafolkken/kit#3969: the planned issues whose open lane may be this run's though the stream never
-// saw it launched. An earlier run's lane is not, so its issue waits until this run launches it.
-function lanes_in_run(plan: BoardPlan, local: LocalRead): ReadonlySet<number> {
-	const earlier = new Set(local.earlier_lanes?.map(Number))
-
-	return new Set([...run_board_layout.numbers_of(plan)].filter((issue) => !earlier.has(issue)))
-}
-
-function statuses_for(
-	state: BoardState,
-	plan: BoardPlan,
-	local: LocalRead,
-): ReadonlyMap<number, ItemStatus> {
-	const in_run = lanes_in_run(plan, local)
+function statuses_for(state: BoardState, local: LocalRead): ReadonlyMap<number, ItemStatus> {
 	const stopped = run_board_idle.stopped_of(state.idle_since, state.read_ms)
 
-	return run_board_status.statuses_of(local.events, local.lanes, in_run, stopped)
+	return run_board_status.statuses_of(local.events, local.lane_states, stopped)
 }
 
-// The children the run touched that the open listing no longer holds and the board has not read yet.
-// A listing cut short proves nothing missing, so it asks about none.
+// The open listing the statuses are settled against — none before a plan has landed.
+function open_read_of(state: BoardState, plan: BoardPlan | undefined): OpenRead {
+	return {
+		open_numbers: plan?.context.open_numbers,
+		read_ms: state.fetched_ms,
+		closed: state.closed,
+		labels: plan?.labels ?? new Map(),
+	}
+}
+
+function is_unlisted(issue: number, read: OpenRead): boolean {
+	const open = read.open_numbers
+
+	return open !== undefined && !open.has(issue)
+}
+
+// A child still drawn stopped or running holds no closed read of this launch — any it holds closed
+// before it relaunched — so it is asked again. A running child is asked too while the plan read fails:
+// the kept plan still lists it, and an empty listing — failed, or a repository whose last open issue
+// was this child — would otherwise leave it running forever (joshuafolkken/kit#4537).
+function is_closed_candidate(
+	issue: number,
+	status: ItemStatus,
+	read: OpenRead,
+	is_plan_failed: boolean,
+): boolean {
+	if (status.state === STOPPED_STATE) return true
+	if (status.state === RUNNING_STATE) return is_plan_failed || is_unlisted(issue, read)
+
+	return is_unlisted(issue, read) && !read.closed.has(issue)
+}
+
+// The children the board has not read closed yet that the open listing no longer holds, or that it
+// draws stopped: a child that merged itself and left its lane is drawn stopped until GitHub says it
+// merged (joshuafolkken/kit#4401), and a listing cut short proves nothing missing.
 function unread_closed(state: BoardState, local: LocalRead): Array<number> {
-	const open = state.plan?.context.open_numbers
+	const read = open_read_of(state, state.plan)
+	const drawn = run_board_status.settle_closed(statuses_for(state, local), read)
+	const is_plan_failed = state.failed_ms !== undefined
 
-	if (open === undefined || state.plan === undefined) return []
-
-	const touched = [...statuses_for(state, state.plan, local).keys()]
-
-	return touched.filter((issue) => !open.has(issue) && !state.closed.has(issue))
+	return [...drawn]
+		.filter(([issue, status]) => is_closed_candidate(issue, status, read, is_plan_failed))
+		.map(([issue]) => issue)
 }
 
 // An ended run asks until one ask after it ended has answered whole, then holds what it has, as its
@@ -114,18 +162,25 @@ function has_asked_since_end(state: BoardState, local: LocalRead): boolean {
 	return closed_answered_ms >= local.ended_ms
 }
 
-function is_closed_due(state: BoardState, gather: Gather): boolean {
+function has_new_child(state: BoardState, unread: ReadonlyArray<number>): boolean {
+	return unread.some((issue) => !state.closed_asked.has(issue))
+}
+
+function is_closed_due(state: BoardState, gather: Gather, unread: ReadonlyArray<number>): boolean {
 	if (state.closed_fetch !== undefined || has_asked_since_end(state, gather.local)) return false
 
-	return is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	return (
+		has_new_child(state, unread) || is_due(state.closed_attempted_ms, PLAN_RETRY_MS, gather.now_ms)
+	)
 }
 
 // A closed child is read once and its answer kept; one that has not answered closed is asked again no
-// sooner than the plan is, and an ended run's not again once an ask after the end has answered whole.
+// sooner than the plan is — unless a child the last ask did not hold has joined it — and an ended
+// run's not again once an ask after the end has answered whole.
 function launch_closed(state: BoardState, gather: Gather): BoardState {
 	const unread = unread_closed(state, gather.local)
 
-	if (unread.length === 0 || !is_closed_due(state, gather)) return state
+	if (unread.length === 0 || !is_closed_due(state, gather, unread)) return state
 
 	async function read(): Promise<ClosedAnswer> {
 		return await gather.ports.read_closed(unread)
@@ -133,7 +188,12 @@ function launch_closed(state: BoardState, gather: Gather): BoardState {
 
 	const closed_fetch = run_board_fetch.launch(read, UNANSWERED)
 
-	return { ...state, closed_fetch, closed_attempted_ms: gather.now_ms }
+	return {
+		...state,
+		closed_fetch,
+		closed_attempted_ms: gather.now_ms,
+		closed_asked: new Set(unread),
+	}
 }
 
 // A whole answer counts as of the moment it was asked.
@@ -158,6 +218,22 @@ async function settle(pending: Fetch<unknown> | undefined, pace: Pace): Promise<
 	if (pending !== undefined && pace === 'settled') await pending.landed
 }
 
+// The titles and labels the board names its rows by: the plan's once it has landed, the snapshot's before.
+function known_of(state: BoardState): Known {
+	if (state.plan === undefined) return state.known
+
+	return { titles: state.plan.context.titles, labels: state.plan.labels }
+}
+
+// Each read that landed rewrites the snapshot whole, for the board opened next on this run.
+function keep_snapshot(before: BoardState, after: BoardState, gather: Gather): void {
+	if (after.plan === before.plan && after.closed === before.closed) return
+
+	const run_started_ms = gather.local.started_ms
+
+	gather.ports.snapshot?.save({ run_started_ms, ...known_of(after), closed: after.closed })
+}
+
 // Folds what landed and launches what is due — the plan first, since the closed children are read off
 // the plan's listing.
 async function gather_github(state: BoardState, gather: Gather): Promise<BoardState> {
@@ -169,10 +245,14 @@ async function gather_github(state: BoardState, gather: Gather): Promise<BoardSt
 
 	await settle(closing.closed_fetch, gather.pace)
 
-	return fold_closed(closing)
+	const gathered = fold_closed(closing)
+
+	keep_snapshot(state, gathered, gather)
+
+	return gathered
 }
 
-const run_board_github = { PLAN_RETRY_MS, gather_github, statuses_for }
+const run_board_github = { PLAN_RETRY_MS, gather_github, known_of, open_read_of, statuses_for }
 
 export { run_board_github }
 export type { Gather }

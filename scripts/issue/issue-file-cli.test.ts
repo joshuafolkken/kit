@@ -37,10 +37,13 @@ const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条�
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {
-	return ['## 背景', '', '- 種別: 不具合', ...declarations, '', SECTIONS].join('\n')
+	return ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ...declarations, '', SECTIONS].join(
+		'\n',
+	)
 }
 
-const VALID_BODY = body_of('- 人の判断: 要（目視確認）')
+const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
+const VALID_BODY = body_of(JUDGEMENT_NEEDED)
 
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-'))
 const valid_path = path.join(work, 'valid.md')
@@ -49,11 +52,13 @@ const origin_path = path.join(work, 'origin.md')
 const judged_in_path = path.join(work, 'judged-in.md')
 const breaking_path = path.join(work, 'breaking.md')
 const undeclared_path = path.join(work, 'undeclared.md')
+const baseless_path = path.join(work, 'baseless.md')
 
 writeFileSync(valid_path, VALID_BODY)
 writeFileSync(judged_in_path, body_of(JUDGEMENT_NOT_NEEDED))
 writeFileSync(breaking_path, body_of(JUDGEMENT_NOT_NEEDED, '- 互換性: 破壊的変更'))
 writeFileSync(undeclared_path, body_of())
+writeFileSync(baseless_path, body_of(JUDGEMENT_NEEDED, '- 優先度: 緊急'))
 writeFileSync(invalid_path, '## 背景\n')
 writeFileSync(origin_path, `${body_of(JUDGEMENT_NOT_NEEDED)}\n## Origin\n\n${HERE}#2808\n`)
 
@@ -80,7 +85,7 @@ const OVER_CAP_LISTING = listing_of(issue_wip.WIP_CAP + 1)
 const OVER_CAP_FLAG = '--over-cap'
 
 function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<string> {
-	return [TITLE, '--body-file', body_path, '--depth', '1', ...extra]
+	return [TITLE, '--body-file', body_path, ...extra]
 }
 
 function create_body(): unknown {
@@ -119,7 +124,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 		expect(exec_gh_api).toHaveBeenCalledTimes(1)
 		expect(create_body()).toStrictEqual({
 			title: TITLE,
-			labels: ['depth:1', 'route:interrupt', 'bug'],
+			labels: ['route:interrupt', 'bug'],
 			body: VALID_BODY,
 		})
 		expect(report_for).toHaveBeenCalledWith(ISSUE_NUMBER, HERE, issue_file_cli.FRESH_ISSUE_POLL)
@@ -157,7 +162,7 @@ describe('issue_file_cli.run — a filing that clears every step', () => {
 	})
 })
 
-// joshuafolkken/kit#3176: a repository missing the depth labels gets them before the create call, so
+// joshuafolkken/kit#3176: a repository missing the workflow labels gets them before the create call, so
 // the create never auto-creates one with a generated color.
 describe('issue_file_cli.run — the labels it applies exist first', () => {
 	it('provisions the missing labels in the target repository before the create call', async () => {
@@ -176,7 +181,7 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:lane'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:lane', 'bug', 'auto-ok'] })
+		expect(create_body()).toMatchObject({ labels: ['run:lane', 'bug', 'auto-ok'] })
 		expect(vi.mocked(console.info).mock.calls.join('\n')).toContain('auto-ok: applied — ')
 	})
 
@@ -215,12 +220,12 @@ describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path, '--label', 'run:solo'))).toBe(
 			SUCCESS_EXIT_CODE,
 		)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'run:solo', 'bug', 'auto-ok'] })
+		expect(create_body()).toMatchObject({ labels: ['run:solo', 'bug', 'auto-ok'] })
 	})
 
 	it('files without a run label when auto-ok is not applied, as before', async () => {
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'bug'] })
+		expect(create_body()).toMatchObject({ labels: ['bug'] })
 	})
 })
 
@@ -229,7 +234,7 @@ describe('issue_file_cli.run — a named auto-ok', () => {
 		const argv = argv_of(judged_in_path, '--label', 'auto-ok', '--label', 'run:lane')
 
 		expect(await issue_file_cli.run(argv)).toBe(SUCCESS_EXIT_CODE)
-		expect(create_body()).toMatchObject({ labels: ['depth:1', 'auto-ok', 'run:lane', 'bug'] })
+		expect(create_body()).toMatchObject({ labels: ['auto-ok', 'run:lane', 'bug'] })
 	})
 
 	it('no longer accepts --requested', async () => {
@@ -309,6 +314,13 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a cross-repository filing with no Origin', async () => {
 		expect(await issue_file_cli.run(argv_of(valid_path, '--repo', THERE))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('## Origin')
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4383: an urgent declaration with no basis is refused before anything is sent.
+	it('refuses a priority declaration that names no basis', async () => {
+		expect(await issue_file_cli.run(argv_of(baseless_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('declare at most one priority')
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 

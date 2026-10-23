@@ -1,5 +1,6 @@
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
+import type { Cause } from './run-ship-stop-cause'
 
 // The command a relaunched lane child runs once it has fixed what stopped its detached ship.
 // The stopped stage decides the command mechanically, so it is decided here, once, and the prompt
@@ -43,6 +44,10 @@ interface ShipResume {
 	is_review: boolean
 	// The paths a merge of the default branch left unmerged.
 	conflicts?: ReadonlyArray<string>
+	// The cause a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
+	cause?: Cause
+	// The issue changed after the recorded review's brief (`run-ship-probe.ts`).
+	is_review_stale?: boolean
 }
 
 // Single quotes, so a `$` or a backtick in a title is never expanded by the shell that runs it.
@@ -98,6 +103,17 @@ const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
 	[STAGE.REPORT]: detach_again,
 }
 
+// Whatever stage stopped, a review that read the issue before its update is round 1's to redo: the
+// supervisor reviews it again even on a committed tree (`run-ship-stage.ts`), and `josh followup`
+// refuses the merge until it has (joshuafolkken/kit#4221).
+function detach_review_again(resume: ShipResume): string {
+	return `leave the fix uncommitted and run \`${ship_command(COMMAND.DETACH_REVIEW, resume)}\` — the review read the issue before its update, so the supervisor reviews round 1 again.`
+}
+
+function after_fix(stage: Stage, resume: ShipResume): string {
+	return resume.is_review_stale === true ? detach_review_again(resume) : AFTER_FIX[stage](resume)
+}
+
 // A conflict names its paths, so the resumed session resolves them without
 // reading the report or asking git which files are unmerged.
 function conflict_step(conflicts: ReadonlyArray<string>): string {
@@ -116,9 +132,9 @@ function fix_step(issue: string, stage: Stage, is_excerpted: boolean): string {
 function next_step(issue: string, stage: Stage, resume: ShipResume, is_excerpted = false): string {
 	const conflicts = resume.conflicts ?? []
 
-	if (conflicts.length > 0) return `${conflict_step(conflicts)} ${AFTER_FIX[stage](resume)}`
+	if (conflicts.length > 0) return `${conflict_step(conflicts)} ${after_fix(stage, resume)}`
 
-	return `${fix_step(issue, stage, is_excerpted)}, then ${AFTER_FIX[stage](resume)}`
+	return `${fix_step(issue, stage, is_excerpted)}, then ${after_fix(stage, resume)}`
 }
 
 const run_ship_next = { COMMAND, next_step, quoted, resume_of }

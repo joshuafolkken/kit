@@ -25,8 +25,9 @@ no consumer-reachable command needs it.
   before the script's first line, which an in-process import cannot give), or one whose import
   closure carries a second `process.argv[1] === fileURLToPath(import.meta.url)` main guard: each
   bundle is a single file, so every module in it shares the entry's `import.meta.url` and that guard
-  would fire too. Move the guarded main into a `*-cli.ts` file first, as the hooks did
-  (joshuafolkken/kit#2922). `build-commands.test.ts` refuses both.
+  would fire too. Move the guarded main into an entry nothing imports (`*-cli.ts` / `*-main.ts`)
+  first, as the hooks did (joshuafolkken/kit#2922). `build-commands.test.ts` refuses both, and
+  `main-guard-boundary.test.ts` keeps every imported module guard-free (joshuafolkken/kit#4186).
 
 ## The first step — `doc:section`
 
@@ -40,3 +41,8 @@ runs interleaved between the two builds:
 | ------------------------------ | -----: | ------: |
 | Before (tsx child)             | 344 ms |  262 ms |
 | After (`dist/commands` import) | 154 ms |  126 ms |
+
+## The second step — the run's repeated reads
+
+`doc:read`, `read:set`, `run:prep` and `run:step` were marked next (joshuafolkken/kit#4186): a run
+calls each of them at every entry and between its steps.

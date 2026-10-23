@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stats } from './lane-stats'
@@ -9,7 +10,6 @@ const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
 const LABEL = { limit: '4', period_days: 1 }
 const GATE_MINUTES = [2, 4, 9]
-const MS_PER_MINUTE = 60_000
 const MERGE_ISSUE = 7
 const PER_HOUR = 'merges / hour'
 const GATE_MEDIAN = 'gate median (min)'
@@ -110,6 +110,30 @@ describe('lane_stats.row beside the stage entries', () => {
 	})
 })
 
+// joshuafolkken/kit#4383: a priority judgement weighs a reduction against the median lane time per
+// merge — dispatch to merge of the same issue, the dispatch looked up before the window too.
+describe('lane_stats.row — the lane median', () => {
+	const LANE_MEDIAN = 'lane median (min)'
+	const OTHER_ISSUE = 8
+
+	it('takes the median of each merge minus the latest dispatch of its issue before it', () => {
+		const entries: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: hours_before_now(30), issue: MERGE_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(3), issue: MERGE_ISSUE },
+			{ kind: 'merge', at: hours_before_now(2), issue: MERGE_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(26), issue: OTHER_ISSUE },
+			{ kind: 'merge', at: hours_before_now(1), issue: OTHER_ISSUE },
+			{ kind: 'dispatch', at: hours_before_now(0), issue: MERGE_ISSUE },
+		]
+
+		expect(cell_of(entries, LANE_MEDIAN)).toBe('780.0')
+	})
+
+	it('skips a merge no dispatch preceded and prints the missing mark when none remains', () => {
+		expect(cell_of(MERGES, LANE_MEDIAN)).toBe(lane_stats.MISSING)
+	})
+})
+
 describe('lane_stats.row', () => {
 	it('labels the row with the limit and the period', () => {
 		expect(cells([]).slice(0, 2)).toStrictEqual(['4', '1'])
@@ -134,7 +158,24 @@ describe('lane_stats.row', () => {
 		expect(cell_of(GATES, GATE_MEDIAN)).toBe('4.0')
 		expect(cell_of(GATES, 'gate max (min)')).toBe('9.0')
 	})
+})
 
+// joshuafolkken/kit#4397: a reused gate ran no check, so its milliseconds are no gate time.
+describe('lane_stats.row — a reused gate', () => {
+	it('leaves a reused gate out of the gate median', () => {
+		const reused: LedgerEntry = {
+			kind: 'gate',
+			at: hours_before_now(1),
+			elapsed_ms: 0,
+			is_passed: true,
+			is_reused: true,
+		}
+
+		expect(cell_of([...GATES, reused, reused], GATE_MEDIAN)).toBe('4.0')
+	})
+})
+
+describe('lane_stats.row — the load figures', () => {
 	it('reduces load samples to load, free memory and lane figures', () => {
 		expect(cell_of(LOADS, EFFECTIVE_LANES)).toBe('3.0')
 		expect(cell_of(LOADS, LOAD_PEAK)).toBe('8.0')

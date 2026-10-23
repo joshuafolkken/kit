@@ -6,12 +6,17 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), the scoped pair, `pnpm josh ship --detach --review
-   "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. A stop relaunches a child
+   the implementer's self-check"), the scoped pair, the ship body draft filled in
+   (`report-format.md` → "PR 本文の受け入れ条件の対応表"), `pnpm josh ship --detach --review
+   "<title> #<N>"` (`--cite <N>`), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
+   `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
+   and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
+   `metrics` leaves no record it reuses. A stop relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing) and (Anthropic lane) the re-detach to run after
    the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
-   round 2, which is final (`scripts/run/ship/run-ship-next.ts`); the supervisor skips a recorded round 1.
+   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`); the
+   supervisor skips a recorded round 1 unless it went stale.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
    rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
@@ -19,8 +24,8 @@ Review results and successful pushes are never turn boundaries.
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), run the final scoped lint/test pair and
    `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
    brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
-   agent type with that brief and the alias of its `model=` id (`claude-opus-5-5` → `opus`) (every
-   tool, so `--fix` applies; never a guessed type name).
+   agent type with that brief and its `model` (`delegation.md`) (every tool, so `--fix` applies;
+   never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
@@ -41,6 +46,7 @@ Review results and successful pushes are never turn boundaries.
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
+   A change to the run tooling also takes the interaction review: `prompts/review.md` → "Interaction review".
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>" --body-file <evidence.md>` — the file carries `## 実機証跡` and
    `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →
@@ -49,8 +55,8 @@ Review results and successful pushes are never turn boundaries.
    `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then `pnpm josh followup`.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
-`pnpm josh ms` returned to the default branch, or when user judgment is required by an unverifiable
-CodeRabbit/Claude Review finding or a CI failure. In a lane `josh ms` refuses; the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
+`run:tail` returned to the default branch, or when user judgment is required by an unverifiable
+CodeRabbit/Claude Review finding or a CI failure. In a lane the parent closes it. Managed config claims are reported by `followup` and do not stop the merge.
 
 Recommendations are informational; severity decides. A CodeRabbit rate-limit warning is not a finding.
 

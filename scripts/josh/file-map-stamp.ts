@@ -3,7 +3,7 @@ import { stamp_file } from './stamp-file'
 
 // A stamp whose payload is "when this was taken, and the digest of every file it covers".
 //
-// `scripts/eval/eval-stamp.ts` was the only holder of this shape. `josh review:brief` needs two more
+// `tools/eval/eval-stamp.ts` was the only holder of this shape. `josh review:brief` needs two more
 // records of exactly the same kind — the gate's result, and the snapshot round 1 takes so round 2
 // can name the fix delta — and copying the payload type, its validation, the guarded read and the
 // comparison into a second module is the clone `CLAUDE.md` prohibits. What genuinely differs between
@@ -48,6 +48,14 @@ interface FileMapStamp {
 	// reads it and the two `josh review:brief` records, which assert a completed past fact by
 	// existing at all, neither write nor read it.
 	completed_at?: string
+	// The git blob of each mapped path as it was read — written only by the round-1 review snapshot
+	// (`review-round-one-blobs.ts`). When `base` moves, round 2 carries these onto the new base and
+	// measures the fix delta from there; a record without them falls back to the moved-base refusal.
+	blobs?: Record<string, string>
+	// The fingerprint of what the vouched check reads beside the files — its tools' versions and its
+	// environment (`verification-inputs.ts`, joshuafolkken/kit#4495). Written by a record created with an
+	// `inputs` source; a reader of such a record refuses one whose fingerprint is absent or differs.
+	inputs?: string
 }
 
 // Takes `unknown` rather than the declared field type, because the declared type is an assertion
@@ -64,28 +72,38 @@ function is_file_map(value: unknown): value is Record<string, string> {
 // reader treats an absent field as the safe answer — "not running" for a `pid`, "cannot be reused"
 // for a `base`. Spread rather than assigned, because `exactOptionalPropertyTypes` makes an explicit
 // `undefined` a different thing from an absent key.
-function optional_fields(
-	pid: unknown,
-	base: unknown,
-	completed_at: unknown,
-	process_start: unknown,
-): Partial<FileMapStamp> {
+function identity_fields({ pid, process_start }: Partial<FileMapStamp>): Partial<FileMapStamp> {
 	return {
 		...(typeof pid === 'number' && { pid }),
-		...(typeof base === 'string' && { base }),
-		...(typeof completed_at === 'string' && { completed_at }),
 		...(typeof process_start === 'string' && { process_start }),
 	}
 }
 
+function tree_fields({ base, completed_at, blobs }: Partial<FileMapStamp>): Partial<FileMapStamp> {
+	return {
+		...(typeof base === 'string' && { base }),
+		...(typeof completed_at === 'string' && { completed_at }),
+		...(is_file_map(blobs) && { blobs }),
+	}
+}
+
+function input_fields({ inputs }: Partial<FileMapStamp>): Partial<FileMapStamp> {
+	return typeof inputs === 'string' ? { inputs } : {}
+}
+
 function parse_stamp(raw: string): FileMapStamp | undefined {
-	const { taken_at, files, pid, base, completed_at, process_start } = JSON.parse(
-		raw,
-	) as Partial<FileMapStamp>
+	const parsed = JSON.parse(raw) as Partial<FileMapStamp>
+	const { taken_at, files } = parsed
 
 	if (typeof taken_at !== 'string' || !is_file_map(files)) return undefined
 
-	return { taken_at, files, ...optional_fields(pid, base, completed_at, process_start) }
+	return {
+		taken_at,
+		files,
+		...identity_fields(parsed),
+		...tree_fields(parsed),
+		...input_fields(parsed),
+	}
 }
 
 // Whether the process that wrote this record is still running. It takes the
@@ -152,14 +170,22 @@ function changed_since(stamp: FileMapStamp, tree: Record<string, string>): Reado
 interface FileMapStampAccess {
 	stamp_path: () => string
 	// `base` is written by the one record that is acted on rather than merely reported — the
-	// green-gate reuse. The others omit it and are unaffected.
-	write: (files: Record<string, string>, target?: string, base?: string) => string
+	// green-gate reuse. The others omit it and are unaffected. `blobs` is the round-1 snapshot's alone.
+	write: (
+		files: Record<string, string>,
+		target?: string,
+		base?: string,
+		blobs?: Record<string, string>,
+	) => string
 	// Marks an existing record as belonging to a run that finished. It
 	// amends rather than rewrites, and answers `undefined` where there is no record to amend: a run
 	// whose record never got written has nothing to assert a completion about, and inventing one here
 	// would manufacture the very vouching the field exists to withhold.
 	complete: (target?: string) => string | undefined
 	read: (source?: string) => FileMapStamp | undefined
+	// Whether `stamp` was written under the inputs fingerprint read now; always `true` for a record
+	// created without an `inputs` source, which never vouches for a check.
+	describes_inputs: (stamp: FileMapStamp) => boolean
 	// For a record whose meaning is its existence rather than its contents — the in-flight gate marker.
 	// A record nobody removes would go on asserting a gate that ended.
 	remove: (target?: string) => void
@@ -219,7 +245,11 @@ function complete_at(target: string): string | undefined {
 // The destination is a parameter on both sides so a test can exercise the round trip without
 // overwriting the record a real run may be relying on — two commands share one path by design, and a
 // suite that wrote to it would be a second writer nobody declared.
-function create(prefix: string, root?: string): FileMapStampAccess {
+//
+// `inputs` answers the fingerprint of what the record vouches for beside its files
+// (`verification-inputs.ts`); it is read at each write and each comparison, so a tool reinstalled or an
+// environment variable changed between them leaves the record standing for nobody.
+function create(prefix: string, root?: string, inputs?: () => string): FileMapStampAccess {
 	function resolve(): string {
 		return stamp_file.stamp_path(prefix, root)
 	}
@@ -229,15 +259,18 @@ function create(prefix: string, root?: string): FileMapStampAccess {
 		// `base` goes into the payload undefined and all — `JSON.stringify` drops an undefined value,
 		// so a caller that has no base writes exactly the record it wrote before this field existed.
 		// `own_fields` is what writes the pid, and the writing process's start time beside it — assembled in one place so no record can carry half an identity.
-		write: (files, target = resolve(), base?: string) =>
+		write: (files, target = resolve(), base?: string, blobs?: Record<string, string>) =>
 			stamp_file.write_stamp(target, {
 				taken_at: new Date().toISOString(),
 				files,
 				...process_identity.own_fields(),
 				base,
+				blobs,
+				inputs: inputs?.(),
 			}),
 		complete: (target = resolve()) => complete_at(target),
 		read: (source = resolve()) => read_at(source),
+		describes_inputs: (stamp) => inputs === undefined || stamp.inputs === inputs(),
 		remove: (target = resolve()) => {
 			stamp_file.remove_stamp(target)
 		},

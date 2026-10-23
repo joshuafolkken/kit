@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { classify_ai_review_comments, type ReviewComment } from './git-ai-review-scan'
 
 const COMMENT_URL = 'https://github.com/owner/repo/pull/1#issuecomment-1'
-const CLAUDE = 'claude'
-const CODERABBIT = 'coderabbitai'
-const CODERABBIT_BOT = 'coderabbitai[bot]'
+const CLAUDE = 'claude[bot]'
+const CODERABBIT = 'coderabbitai[bot]'
 const CLAUDE_REVIEW_HEADING = '## Code Review — PR #123'
 const CODERABBIT_SUMMARY_MARKER = '<!-- summary by coderabbit.ai -->'
 const TS_CODE_FENCE = '```ts'
@@ -140,7 +139,7 @@ describe('classify_ai_review_comments — CodeRabbit (temporary kit#753: info, n
 	it('does not flag rate-limit notice', () => {
 		const result = classify_ai_review_comments([
 			make_comment({
-				author_login: CODERABBIT_BOT,
+				author_login: CODERABBIT,
 				body: CODERABBIT_RATE_LIMIT_BODY,
 			}),
 		])
@@ -181,5 +180,15 @@ describe('classify_ai_review_comments — general input', () => {
 		expect(result.blockers[0]?.author_login).toBe(CLAUDE)
 		expect(result.infos).toHaveLength(1)
 		expect(result.infos[0]?.author_login).toBe(CODERABBIT)
+	})
+
+	// joshuafolkken/kit#4037: a bare login is an ordinary user account anyone could register.
+	it('does not count a login without the [bot] suffix as an AI review', () => {
+		const result = classify_ai_review_comments([
+			make_comment({ author_login: 'claude', body: CLAUDE_ISSUES_BODY }),
+			make_comment({ author_login: 'coderabbitai', body: CODERABBIT_ACTIONABLE_BODY }),
+		])
+
+		expect(result).toStrictEqual({ blockers: [], infos: [] })
 	})
 })

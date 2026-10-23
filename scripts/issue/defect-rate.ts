@@ -119,28 +119,12 @@ function rate_text(result: DefectRate): string {
 	return `${rate.toFixed(RATE_DIGITS)} (${String(result.defects)} / ${String(result.enhancements)})`
 }
 
-function format(result: DefectRate): ReadonlyArray<string> {
-	const lines = [
-		`Defect rate over the last ${String(result.days)} days (since ${result.since}): ${rate_text(result)}`,
-		`  Defects filed: ${String(result.defects)} — labelled ${DEFECT_LABELS.join(' / ')} or declared \`${DEFECT_DECLARATION_LINE}\``,
-		`  Enhancements completed: ${String(result.enhancements)} — labelled ${ENHANCEMENT_LABEL}, closed as completed`,
-	]
-
-	if (!result.is_capped) return lines
-
-	return [
-		...lines,
-		'⚠ The search stopped before the end of the window; both counts are lower bounds.',
-	]
-}
-
 const defect_rate = {
 	BASELINE_RATE,
 	DEFAULT_WINDOW_DAYS,
 	DEFECT_DECLARATION_LINE,
 	completed_query,
 	filed_query,
-	format,
 	is_above_baseline,
 	is_defect,
 	kind_of,

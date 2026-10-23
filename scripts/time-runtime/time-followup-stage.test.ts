@@ -11,7 +11,9 @@ const NO_LAP_YET = 0
 // Printed by the emitter itself rather than typed out here: a hand-written block would be this
 // suite's own idea of the format, and the point of the reader is that it tracks the printer.
 function block(stages: ReadonlyArray<{ name: string; duration_ms: number }>): string {
-	return git_followup_stages.format_stages({ stages: [...stages], last_ms: NO_LAP_YET }).join('\n')
+	const log = { ...git_followup_stages.new_log(), stages: [...stages], last_ms: NO_LAP_YET }
+
+	return git_followup_stages.format_stages(log).join('\n')
 }
 
 describe('time_followup_stage.read_stages', () => {

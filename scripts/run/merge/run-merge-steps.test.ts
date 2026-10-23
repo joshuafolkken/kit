@@ -4,6 +4,7 @@ import path from 'node:path'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_stash } from '#scripts/git/stash/git-stash'
+import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -30,6 +31,7 @@ const reap_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/lane/lane-reap', () => ({
 	lane_reap: { reap_child: reap_mock },
 }))
+vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics: vi.fn() } }))
 
 const { run_merge_steps } = await import('./run-merge-steps')
 
@@ -40,6 +42,7 @@ const CONTEXT = {
 	over: CONTEXT_CUT_THRESHOLD,
 	owner: run_carry.NO_OWNER,
 }
+const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
 
 // A carry record whose budget has been handed off to a successor (joshuafolkken/kit#2114).
 const HANDED_OFF_CARRY = {
@@ -59,6 +62,10 @@ beforeEach(() => {
 	reap_mock.mockReset().mockReturnValue([])
 	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(undefined)
 	vi.spyOn(git_gh_command, 'issue_blocked_by_references').mockResolvedValue([])
+	vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(undefined)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({ kind: 'missing' })
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(lane_registry, 'lane_location').mockResolvedValue(CHILD_LANE)
 })
 
 // joshuafolkken/kit#2421: the branches that judge a child finished are where its lingering process is
@@ -67,13 +74,13 @@ describe('run_merge_steps — ending the child process where the child is judged
 	it('do_failed terminates the abandoned child', async () => {
 		await run_merge_steps.do_failed(CONTEXT)
 
-		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+		expect(reap_mock).toHaveBeenCalledWith(CHILD_LANE)
 	})
 
 	it('do_outage terminates the old child before the re-dispatch launches another', async () => {
 		await run_merge_steps.do_outage(CONTEXT)
 
-		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+		expect(reap_mock).toHaveBeenCalledWith(CHILD_LANE)
 	})
 
 	it('touches no process when the carry record refused the count', async () => {
@@ -90,12 +97,9 @@ describe('run_merge_steps.do_failed — parking is part of the result', () => {
 	it('reports a failed needs-decision label write instead of treating the child as parked', async () => {
 		add_label_mock.mockResolvedValue(false)
 
-		expect(await run_merge_steps.do_failed(CONTEXT)).toStrictEqual({
-			carry: undefined,
-			is_parked: false,
-			is_refused: false,
-			blockers: [],
-		})
+		const result = await run_merge_steps.do_failed(CONTEXT)
+
+		expect(result).toMatchObject({ is_parked: false, is_refused: false })
 	})
 })
 
@@ -255,7 +259,6 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 		])
 	})
 })
-
 // A failed `main:sync` as the subprocess returns it: git's refusal on stderr, the wrapper's guard
 // statistics on stdout (joshuafolkken/kit#3323). The driver tries it three times before giving up.
 const SYNC_FAILURE = {

@@ -2,6 +2,16 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `nohup pnpm josh gate`, a wrapper the shell command walk skips (#4525).
+  - nohup
+  # `ps -o pgid=`, the process group `lane:close` spares when it ends a lane's leftovers (#4304).
+  - pgid
+  # `git rm --ignore-unmatch`, with which a release prunes the merged metrics approvals (#4187).
+  - unmatch
+  # `top`'s compressed-memory column and its size units, read for `run:board`'s usage columns (#4171).
+  - CMPRS
+  - cmprs
+  - BKMGT
   # macOS's process-policy command, named where lanes deliberately avoid efficiency-core confinement
   # (#3947).
   - taskpolicy
@@ -22,6 +32,9 @@ words:
   - binpnpmcjs
   # The signal a pipe reader that exits early sends a writer, exit 141 under `pipefail` (#3570).
   - SIGPIPE
+  # The signals `josh lane:pause` / `lane:resume` suspend and continue a lane child with (#4198).
+  - SIGSTOP
+  - SIGCONT
   # `lsof -F`'s field line naming a working directory, which the run:board usage reader parses (#3489).
   - fcwd
   # The macOS `libproc` call and mach clock the run:board usage reader reaches through `node:ffi` (#3529).
@@ -112,6 +125,8 @@ words:
   # A Claude Code built-in agent type, `statusline-setup` — enumerated in the known-agent-types set the
   # review-subagent document rule checks against (joshuafolkken/kit#2297).
   - statusline
+  # `git_stash.has_stashable_changes` — what `josh stash:push` would set aside (joshuafolkken/kit#4131).
+  - stashable
   # `josh fanout` — the command that says whether implementation units are file-disjoint, so their
   # subagents may be launched in one fan-out turn (joshuafolkken/kit#2345).
   - fanout
@@ -170,8 +185,8 @@ words:
   # the workflow docs and their tests.
   - dispatchable
   # "Undispatched" — ready backlog work that sits with a free lane while nothing is started, the stall
-  # state the detector reports (joshuafolkken/kit#2359). Named across the `backlog:stalled` code, its
-  # command descriptions, the stall event/notify strings and the docs.
+  # state the detector reports (joshuafolkken/kit#2359). Named across the stall detector's code, the
+  # stall event/notify strings and the docs.
   - undispatched
   # The connection-error signature the Anthropic client emits when the API refused the socket, matched
   # mechanically to tell an API outage apart from a child that stalled (joshuafolkken/kit#2240). It is
@@ -238,6 +253,8 @@ words:
   - pushd
   - popd
   - subshell
+  # A shell reader `protected-files.ts` refuses on `.env` (joshuafolkken/kit#4038).
+  - hexdump
   # How a session that never calls `Edit` or `Write` rewrites a file — the mode the density hook's
   # matcher was widened to reach (joshuafolkken/kit#1337). Named in `docs/` and in a test file,
   # neither of which `josh sync` copies, so it stays in this local list.
@@ -324,7 +341,7 @@ words:
   # carries it, so `docs/josh-commands.md` has used it for some time; the workflow is YAML, where
   # that dictionary is off, so the word has to be declared here to be spelled the same in both.
   - rollup
-  # What `scripts/time-runtime/time-history.ts` calls `scripts/time/`: the report directory that is
+  # What `scripts/time-runtime/time-history.ts` calls `tools/time/`: the report directory that is
   # deliberately left out of the package, so the recorder must not statically pull it into a
   # distributed command's closure (joshuafolkken/kit#2003). cspell derives "distributable" but not
   # the "un-" compound.

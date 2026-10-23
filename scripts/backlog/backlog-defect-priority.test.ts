@@ -4,6 +4,8 @@ import {
 	EPIC_NUMBER,
 	SUCCESS_EXIT_CODE,
 } from '#scripts/auto-ok/auto-ok-fixture'
+import type { EpicChild } from '#scripts/epic/epic-graph'
+import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { behavior_change_lint } from '#scripts/issue/behavior-change-lint'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
@@ -62,6 +64,16 @@ const { stdout, stderr } = streams
 
 const ABOVE_NOTE = 'above its baseline'
 
+// A row built without a read, the one shape `EpicChild.body` is optional for.
+const ROW: EpicChild = { number: 0, repo: 'owner/repo', state: 'OPEN', labels: [], blocked_by: [] }
+const EMPTY_RESULT: EpicNextResult = {
+	verdict: 'run',
+	candidates: [],
+	waiting: [],
+	blocked_on_people: [],
+	anomalies: [],
+}
+
 function stub(rate: Pick<BacklogInput, 'defect_rate' | 'is_rate_unreadable'>): void {
 	backlog_fixture.stub_backlog({
 		opted_in: [opted_in_epic()],
@@ -96,6 +108,35 @@ describe('backlog:next while the defect rate is above its baseline', () => {
 			joined([INTERRUPTED_MECHANISM, DEFECT, BUGFIX_ONLY, CODE_ONLY, UNDECLARED, MECHANISM]),
 		)
 		expect(stderr()).toContain(ABOVE_NOTE)
+	})
+
+	// joshuafolkken/kit#4550: the listing already carries each child's body, so none is read again.
+	it('reads no body the listing already carried', async () => {
+		stub({ defect_rate: ABOVE_BASELINE })
+
+		await backlog_next.run([])
+
+		expect(git_gh_command.issue_get_body).not.toHaveBeenCalled()
+	})
+
+	it('reads a body only for a row built without one', async () => {
+		stub({ defect_rate: ABOVE_BASELINE })
+		const children = [
+			{ ...ROW, number: MECHANISM },
+			{ ...ROW, number: DEFECT, body: defect_rate.DEFECT_DECLARATION_LINE },
+		]
+		const result = { ...EMPTY_RESULT, candidates: [{ repo: ROW.repo, children }] }
+
+		const ordered = await backlog_defect_priority.prioritize(result, ROW.repo)
+
+		expect(git_gh_command.issue_get_body).toHaveBeenCalledExactlyOnceWith(
+			String(MECHANISM),
+			ROW.repo,
+		)
+		expect(ordered.candidates[0]?.children.map((child) => child.number)).toEqual([
+			DEFECT,
+			MECHANISM,
+		])
 	})
 })
 

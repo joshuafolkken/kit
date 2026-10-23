@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_body } from '#scripts/josh/cli-body'
@@ -19,7 +17,6 @@ import { error_text } from '#scripts/lib/error-message'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const BODY_FLAG = '--body'
 const BODY_FILE_FLAG = '--body-file'
 const USAGE = `Usage: josh issue:comment <issue-number> ${BODY_FLAG} <text> | ${BODY_FILE_FLAG} <path>`
@@ -33,23 +30,12 @@ interface CommentRequest {
 // ignored. `cli_body.resolve` owns the both-flags-at-once refusal and the file read.
 const OPTIONS = { body: { type: 'string' }, 'body-file': { type: 'string' } } as const
 
-// The number is the one positional, and it must be a real issue number: a missing, malformed or
-// second one refuses the whole call rather than posting to some other issue.
-function single_issue_number(positionals: ReadonlyArray<string>): string | undefined {
-	const [issue_number, ...rest] = positionals
-	const is_single = rest.length === 0 && issue_number !== undefined
-
-	return is_single && issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue_number)
-		? issue_number
-		: undefined
-}
-
 // `resolve` may throw when both body flags are given, which `run` reports — the message names the two
 // flags a caller must pick between.
 function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 	if (parsed === undefined) return undefined
-	const issue_number = single_issue_number(parsed.positionals)
+	const issue_number = issue_number_shape.single_of(parsed.positionals)
 	if (issue_number === undefined) return undefined
 
 	const body = cli_body.resolve({
@@ -67,11 +53,16 @@ function parse_request(argv: ReadonlyArray<string>): CommentRequest | undefined 
 // A both-flags refusal and a file-read failure both surface as an `Error` from `resolve`, and its
 // message already names the flags or the resolved path — so it is printed as-is and `USAGE` is
 // withheld. `undefined` is the other refusal: a bad number or an empty body, which `USAGE` explains.
-function resolve_request(argv: ReadonlyArray<string>): CommentRequest | undefined {
+// `usage` is the caller's: `run:park` parks with the same issue number and body, so it reads them here
+// and prints its own usage on a refusal.
+function resolve_request(
+	argv: ReadonlyArray<string>,
+	usage: string = USAGE,
+): CommentRequest | undefined {
 	try {
 		const request = parse_request(argv)
 
-		if (request === undefined) console.error(USAGE)
+		if (request === undefined) console.error(usage)
 
 		return request
 	} catch (error) {
@@ -93,12 +84,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
+const issue_comment_cli = { USAGE, resolve_request, run }
 
-const issue_comment_cli = { USAGE, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
-
+export type { CommentRequest }
 export { issue_comment_cli }

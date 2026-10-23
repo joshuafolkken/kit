@@ -1,10 +1,12 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { git_pr_checks } from '#scripts/gh/git-pr-checks'
+import { git_pr_merge_checked } from '#scripts/gh/git-pr-merge-checked'
 import { git_command } from '#scripts/git/git-command'
 import { git_remote_branch } from '#scripts/git/git-remote-branch'
 import { repository_lock } from '#scripts/git/repository-lock'
+import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { write_version } from '#scripts/version/bump-version'
-import { version_targets } from '#scripts/version/version-targets'
+import { release_approval_prune } from './release-approval-prune'
 import { release_issue_close } from './release-issue-close'
 import type { ReleasePlan } from './release-plan'
 import { release_progress } from './release-progress'
@@ -19,10 +21,8 @@ import { release_worktree } from './release-worktree'
 // weakening it for a release commit would open exactly the "merge without green CI" path the issue's
 // closing note prohibits.
 
-const { PACKAGE_JSON } = version_targets
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const IGNORE_FOR_RELEASE_LABEL = 'ignore-for-release'
 const RELEASE_LOCK_PREFIX = 'josh-release-lock-'
 // A release waits on CI for minutes, so a second run refuses rather than queueing behind it.
 const RELEASE_LOCK_MAX_WAIT_MS = 0
@@ -109,6 +109,7 @@ async function clear_the_way(branch_name: string): Promise<void> {
 async function commit_release(plan: ReleasePlan): Promise<string> {
 	write_version(plan.next_version)
 	await git_command.add_path(PACKAGE_JSON)
+	await release_approval_prune.prune()
 	await git_command.commit(commit_message(plan.next_version))
 	await git_command.push()
 	const pr_url = await git_gh_command.pr_create(
@@ -136,8 +137,7 @@ async function merge_and_tag(
 	branch_name: string,
 	pr_url: string,
 ): Promise<number> {
-	await git_pr_checks.wait_for_pr_success(branch_name)
-	await git_gh_command.pr_merge(branch_name)
+	await git_pr_merge_checked.merge_when_green(branch_name)
 	console.info(release_progress.pr_merged_line(pr_url))
 
 	const is_tagged = await release_tag.wait_for_tag(plan.next_version)

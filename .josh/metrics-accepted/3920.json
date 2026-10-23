@@ -1,9 +1,0 @@
-{
-	"reason": "Round-2 review fix: shell_segments.first_of and the opening-segment gate keep the issue-comments rewrite off cd-prefixed, subshell, quoted and heredoc lines",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 155,
-		"ai_cost.on_demand_bytes": 231,
-		"prose.long_paragraphs": 1
-	}
-}

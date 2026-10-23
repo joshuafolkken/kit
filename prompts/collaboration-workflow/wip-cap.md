@@ -55,7 +55,7 @@
 1. **上限に関係なく起票する。** 1 件閉じることを条件にしない。本文の検査、分類ラベルの付与、重複探し、`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。
 
    ```bash
-   pnpm josh issue:file "<title>" --body-file <body-file> --depth <n> --route interrupt
+   pnpm josh issue:file "<title>" --body-file <body-file> --route interrupt
    ```
 
 2. 超過している事実と当たった条件の番号を、両方とも本文に 1 行書く（例:「オープン 37 件で起票。3 条件のうち 2（文書化された手順が完了できない）に該当」）。

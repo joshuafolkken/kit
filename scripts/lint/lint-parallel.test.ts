@@ -15,13 +15,18 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
 	},
 }))
-vi.mock('./cross-file-recheck', () => ({
-	cross_file_recheck: { verify: vi.fn(async (result: unknown) => await result) },
+vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('./eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
 }))
 
-const { cross_file_recheck } = await import('./cross-file-recheck')
-const mocked_verify = vi.mocked(cross_file_recheck.verify)
-const { lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
+const { eslint_cache_dependencies } = await import('./eslint-cache-dependencies')
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
+const { eslint_daemon } = await import('./eslint-daemon')
+const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
+const { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS } = await import('./lint-parallel')
 const { run_lint_checks, run_lint_parallel_checks } = lint_parallel
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
@@ -103,54 +108,77 @@ describe('run_lint_parallel_checks', () => {
 	})
 })
 
-// joshuafolkken/kit#3641: the verdict the run exits on is the re-read one, so a cached cross-file report
-// the re-reading withdrew does not fail the lint.
-describe('run_lint_parallel_checks — the cross-file recheck', () => {
-	it('exits on the eslint report the recheck returns', async () => {
-		mock_exit_codes(0, 1)
-		mocked_verify.mockResolvedValueOnce({ output: '', exit_code: 0, elapsed_ms: 0 })
+// joshuafolkken/kit#4581: a worker per runner core (#4579) did not shorten CI's lint over five runs,
+// so the whole-tree eslint stays single-threaded in CI as it is locally.
+describe('whole-tree eslint in CI', () => {
+	it('hands eslint the same arguments as a local run', async () => {
+		vi.stubEnv('CI', 'true')
+		mock_exit_codes(0, 0)
 
-		const code = await run_lint_parallel_checks()
+		await run_lint_parallel_checks()
+		vi.unstubAllEnvs()
 
-		expect(mocked_verify).toHaveBeenCalledWith(expect.objectContaining({ exit_code: 1 }), {
-			cache_file: ESLINT_CACHE_FILE,
-			patterns: [WHOLE_TREE],
-		})
-		expect(code).toBe(0)
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(ESLINT_ARGS)
 	})
 })
 
-describe('run_lint_checks', () => {
-	const TARGET = 'scripts/thing.ts'
-	const RECHECK = { cache_file: '.eslintcache.related', patterns: [TARGET] }
+const TARGET = 'scripts/thing.ts'
+const RELATED_CACHE_FILE = '.eslintcache.related'
 
+describe('run_lint_checks', () => {
 	it('runs the targets it was given instead of the whole tree', async () => {
 		const prettier_args = ['exec', 'prettier', '--check', TARGET]
 		const eslint_args = ['exec', 'eslint', TARGET]
 
 		mock_exit_codes(0, 0)
 
-		await run_lint_checks(prettier_args, eslint_args, RECHECK)
+		await run_lint_checks(prettier_args, eslint_args, RELATED_CACHE_FILE)
 
 		expect(mocked_execa.mock.calls[0]?.[1]).toEqual(prettier_args)
 		expect(mocked_execa.mock.calls[1]?.[1]).toEqual(eslint_args)
 	})
 
-	// One change's files can hold both sides of a cycle, so a narrowed run's cached report is
-	// re-read over the targets and the cache file that run used, not the whole tree's.
-	it('re-reads a narrowed run through the cross-file recheck it was given', async () => {
+	// joshuafolkken/kit#4415: the entries whose imports changed are dropped from the cache file the
+	// narrowed run reads — that run's own file, not the whole tree's — and the run exits on its report.
+	it('runs eslint inside the dependency guard of the cache file it was given', async () => {
 		mock_exit_codes(0, 1)
-		mocked_verify.mockResolvedValueOnce({ output: '', exit_code: 0, elapsed_ms: 0 })
 
 		const code = await run_lint_checks(
 			['exec', 'prettier', TARGET],
 			['exec', 'eslint', TARGET],
-			RECHECK,
+			RELATED_CACHE_FILE,
 		)
 
-		expect(mocked_verify).toHaveBeenCalledWith(expect.objectContaining({ exit_code: 1 }), RECHECK)
-		expect(mocked_cache_run).toHaveBeenCalledWith(RECHECK.cache_file, expect.any(Function))
-		expect(code).toBe(0)
+		expect(mocked_cache_run).toHaveBeenCalledWith(RELATED_CACHE_FILE, expect.any(Function))
+		expect(mocked_guard).toHaveBeenCalledWith(RELATED_CACHE_FILE, expect.any(Function))
+		expect(code).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon; the fallback to the
+// cold process is `eslint_daemon.run_or_cold`'s own.
+describe('run_lint_checks — the warm eslint daemon', () => {
+	const ESLINT = ['exec', 'eslint', TARGET]
+	const PRETTIER = ['exec', 'prettier', TARGET]
+	const WARM = { warm_daemon: true }
+
+	it('lints through the daemon when asked, spawning only prettier', async () => {
+		mocked_execa.mockResolvedValueOnce(fake_result(0))
+		mocked_run_or_cold.mockResolvedValueOnce({ exit_code: 1, output: 'x', elapsed_ms: 0 })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)).toBe(1)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(ESLINT)
+		expect(mocked_execa).toHaveBeenCalledOnce()
+	})
+
+	it('never reaches the daemon unless asked', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+
+		await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE)
+		await run_lint_parallel_checks()
+
+		expect(mocked_run_or_cold).not.toHaveBeenCalled()
 	})
 })
 
@@ -234,10 +262,11 @@ describe('basic project lint over the changed files', () => {
 		vi.spyOn(project_checks, 'prettier_skip_reason').mockReturnValue(NO_WEB_FILES)
 		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
-		const code = await run_lint_checks(['exec', 'prettier', 'a.py'], ['exec', 'eslint', 'a.py'], {
-			cache_file: ESLINT_CACHE_FILE,
-			patterns: ['a.py'],
-		})
+		const code = await run_lint_checks(
+			['exec', 'prettier', 'a.py'],
+			['exec', 'eslint', 'a.py'],
+			ESLINT_CACHE_FILE,
+		)
 
 		expect(code).toBe(0)
 		expect(mocked_execa).not.toHaveBeenCalled()

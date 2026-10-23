@@ -6,6 +6,7 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
+import type { WaitSink } from './core-wait-record'
 import type { MachineReading } from './machine-capacity'
 
 // joshuafolkken/kit#3943: a claim held back by the budget waited in silence. A waiting claim now
@@ -40,7 +41,7 @@ function free_blocker(): void {
 
 // The blocker fills every core, so the claim waits two polls, reading the board's view at each.
 async function records_and_prints_once(): Promise<void> {
-	write_blocker({ weight: CORES })
+	write_blocker({ weight: CORES, admitted_at: 0 })
 	const report = vi.fn<(line: string) => void>()
 	const seen: Array<ReturnType<typeof core_budget.budget_waits>> = []
 	const sleep = vi.fn(async () => {
@@ -67,19 +68,22 @@ async function records_and_prints_once(): Promise<void> {
 	])
 }
 
-// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free.
+// The blocker holds the tool's memory, ramped up, and the reading is pressured: nothing is free. The
+// stall passes with the blocker — a lone claim still waits out a stall (joshuafolkken/kit#4451).
 async function names_pressure(): Promise<void> {
 	write_blocker({ weight: 1, memory_mb: TOOL_MEMORY_MB, admitted_at: -core_admission.RAMP_UP_MS })
 	const report = vi.fn<(line: string) => void>()
+	const machine = { reading: PRESSURED }
 	const handle = await core_budget.reserve(1, {
 		directory: probe.directory,
 		budget: CORES,
 		memory_mb: TOOL_MEMORY_MB,
-		read_machine: async () => PRESSURED,
+		read_machine: async () => machine.reading,
 		report,
 		now: () => 1,
 		sleep: async () => {
 			free_blocker()
+			machine.reading = UNREAD
 		},
 	})
 
@@ -91,14 +95,99 @@ async function names_pressure(): Promise<void> {
 	})
 }
 
+// joshuafolkken/kit#4451: the wait cap released a lone claim into the swap stall it waited on. Each poll
+// runs past the cap; the stall lasts three of them, and the claim starts only once it passes.
+const STALL_POLLS = 3
+const WAIT_CAP_MS = 10
+
+async function waits_out_a_stall_past_the_cap(): Promise<void> {
+	const clock = { now: 1, polls: 0 }
+	const handle = await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		memory_mb: TOOL_MEMORY_MB,
+		report: vi.fn<(line: string) => void>(),
+		read_machine: async () => (clock.polls < STALL_POLLS ? PRESSURED : UNREAD),
+		wait_cap_ms: WAIT_CAP_MS,
+		now: () => clock.now,
+		sleep: async () => {
+			clock.now += WAIT_CAP_MS
+			clock.polls += 1
+		},
+	})
+
+	core_budget.release(handle)
+
+	expect(clock.polls).toBe(STALL_POLLS)
+	expect(handle.admission.overflow).toBeUndefined()
+}
+
 async function prints_nothing_solo(): Promise<void> {
 	const report = vi.fn<(line: string) => void>()
 
-	await core_budget.reserve(1, { directory: probe.directory, budget: CORES, report, now: () => 1 })
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		report,
+		read_machine: async () => UNREAD,
+		now: () => 1,
+	})
 
 	expect(report).not.toHaveBeenCalled()
 	expect(core_budget.budget_waits(probe.directory, 1)).toStrictEqual([])
 }
+
+// joshuafolkken/kit#4382: an admitted claim that waited records how long, so a lane's time splits
+// into work and waiting.
+const WAITED_MS = 500
+
+async function records_its_wait(): Promise<void> {
+	write_blocker({ weight: CORES, admitted_at: 0 })
+	const clock = { now: 1 }
+	const record_wait = vi.fn<WaitSink>().mockResolvedValue(undefined)
+
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		command: 'lint',
+		report: vi.fn<(line: string) => void>(),
+		read_machine: async () => UNREAD,
+		now: () => clock.now,
+		sleep: async () => {
+			clock.now += WAITED_MS
+			free_blocker()
+		},
+		record_wait,
+	})
+
+	const lane = lane_paths.lane_issue_of(process.cwd())
+	const issue = lane === undefined ? {} : { issue: Number(lane) }
+
+	expect(record_wait).toHaveBeenCalledExactlyOnceWith({
+		command: 'lint',
+		waited_ms: WAITED_MS,
+		...issue,
+	})
+}
+
+async function records_no_wait_solo(): Promise<void> {
+	const record_wait = vi.fn<WaitSink>().mockResolvedValue(undefined)
+
+	await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		read_machine: async () => UNREAD,
+		now: () => 1,
+		record_wait,
+	})
+
+	expect(record_wait).not.toHaveBeenCalled()
+}
+
+describe('core_budget.reserve — how long a claim waited', () => {
+	it('records the command, the wait and the lane once it is admitted', records_its_wait)
+	it('records nothing for a claim admitted at once', records_no_wait_solo)
+})
 
 describe('core_budget.reserve — a claim that waits says why', () => {
 	it(
@@ -107,4 +196,5 @@ describe('core_budget.reserve — a claim that waits says why', () => {
 	)
 	it('names memory pressure when the reading saw compression or swap', names_pressure)
 	it('prints nothing for a claim admitted at once', prints_nothing_solo)
+	it('keeps a lone claim a swap stall holds waiting past the cap', waits_out_a_stall_past_the_cap)
 })

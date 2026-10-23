@@ -1,7 +1,0 @@
-{
-	"reason": "origin_url clears the git location variables (one import and a three-line env argument); fewer lines would mean re-listing the variables at the call",
-	"date": "2026-10-11",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

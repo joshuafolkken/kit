@@ -55,6 +55,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: vi.fn().mockResolvedValue(false) } }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: vi.fn().mockResolvedValue(undefined) },
+}))
 
 const state = { directory: '' }
 
@@ -226,6 +229,31 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 	})
 })
 
+// joshuafolkken/kit#4344: a relaunch waited out the review's 30 minutes on a broker that never answered.
+describe('lane_session_broker — a relaunch the server never answers', () => {
+	const RELAUNCH = {
+		kind: 'relaunch',
+		stop: { stage: 'review', title: 'Fix the review', flags: [], is_review: true },
+	} as const
+	const PAST_RELAUNCH_LIMIT_MS = 3 * 60_000
+
+	it('gives up after the relaunch limit, well inside the review limit', async () => {
+		leave_response(Date.now(), { pid: process.pid })
+		mkdirSync(path.dirname(lane_session_broker.request_path(LANE.directory, ISSUE)), {
+			recursive: true,
+		})
+		vi.useFakeTimers(SILENT_TIMERS)
+		const pending = lane_session_broker.request(LANE.directory, ISSUE, RELAUNCH)
+
+		vi.setSystemTime(Date.now() + PAST_RELAUNCH_LIMIT_MS)
+
+		await expect(pending).resolves.toStrictEqual({
+			is_success: false,
+			reason: 'the broker gave no answer within 2 minutes',
+		})
+	})
+})
+
 describe('lane_session_broker.is_serving', () => {
 	it('answers true while a server holds the lane', async () => {
 		const is_result = await lane_session_broker.with_server(LANE, async () =>
@@ -239,5 +267,29 @@ describe('lane_session_broker.is_serving', () => {
 		await lane_session_broker.with_server(LANE, async () => undefined)
 
 		expect(lane_session_broker.is_serving(LANE.directory, ISSUE)).toBe(false)
+	})
+})
+
+async function session_of(): Promise<string | undefined> {
+	return await lane_session_broker.with_server(LANE, async () =>
+		lane_session_broker.serving_session(LANE.directory, ISSUE),
+	)
+}
+
+// joshuafolkken/kit#4344: a ship asks a failed relaunch again only of a server that replaced the one that failed.
+describe('lane_session_broker.serving_session', () => {
+	it('names a new session for each server that holds the lane', async () => {
+		const first = await session_of()
+		const second = await session_of()
+
+		expect(first).toBeDefined()
+		expect(second).toBeDefined()
+		expect(second).not.toBe(first)
+	})
+
+	it('names none once the server has stopped', async () => {
+		await lane_session_broker.with_server(LANE, async () => undefined)
+
+		expect(lane_session_broker.serving_session(LANE.directory, ISSUE)).toBeUndefined()
 	})
 })

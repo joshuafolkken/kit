@@ -7,19 +7,19 @@ import { issue_backlinks } from './issue-backlinks'
 import { issue_classification } from './issue-classification'
 import {
 	AUTO_OK_LABEL,
-	DEPTH_LABEL_ORDER,
 	FILING_ROUTE_LABELS,
 	has_label_name,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
+import { issue_not_before_label } from './issue-not-before-label'
+import { issue_priority } from './issue-priority'
 import { markdown_section } from './markdown-section'
 
 // The decisions behind `josh issue:file`, kept apart from the command that
 // reads the network so each one is a pure answer a test can pin. The filing steps are the command's
 // arguments: a label the filing owes is a required option rather than a line to remember.
 
-const DEPTH_PREFIX = 'depth:'
 const ROUTE_PREFIX = 'route:'
 const LIST_SEPARATOR = ','
 const WORD_SEPARATOR = /\s+/u
@@ -32,7 +32,6 @@ const DIGIT = /\d/u
 interface FileArguments {
 	title: string
 	body_file: string
-	depth: string
 	route: string | undefined
 	labels: ReadonlyArray<string>
 	repo: string | undefined
@@ -48,7 +47,6 @@ interface FileArguments {
 
 const OPTIONS = {
 	'body-file': { type: 'string' },
-	depth: { type: 'string' },
 	route: { type: 'string' },
 	label: { type: 'string', multiple: true },
 	repo: { type: 'string' },
@@ -58,8 +56,8 @@ const OPTIONS = {
 	release: { type: 'boolean' },
 } as const
 
-// The label a `--depth` / `--route` value names, or `undefined` when it names none — read against the
-// label sets `issue-labels.ts` defines, so the command cannot apply a depth or route nobody provisions.
+// The label a `--route` value names, or `undefined` when it names none — read against the route
+// labels `issue-labels.ts` defines, so the command cannot apply a route nobody provisions.
 function label_of(
 	prefix: string,
 	value: string | undefined,
@@ -97,18 +95,15 @@ function has_text(value: string | undefined): value is string {
 	return value !== undefined && value.trim() !== ''
 }
 
-// The labelled half of the arguments, or `undefined` when a depth, route or `--distinct` entry is not
-// one the command knows.
-function labelled_of(
-	values: ParsedValues,
-): Pick<FileArguments, 'depth' | 'route' | 'distinct'> | undefined {
-	const depth = label_of(DEPTH_PREFIX, values.depth, DEPTH_LABEL_ORDER)
+// The labelled half of the arguments, or `undefined` when a route or `--distinct` entry is not one the
+// command knows.
+function labelled_of(values: ParsedValues): Pick<FileArguments, 'route' | 'distinct'> | undefined {
 	const route = route_of(values)
 	const distinct = distinct_numbers(values.distinct ?? [])
 
-	if (route === false || depth === undefined || distinct === undefined) return undefined
+	if (route === false || distinct === undefined) return undefined
 
-	return { depth, route, distinct }
+	return { route, distinct }
 }
 
 function arguments_of(values: ParsedValues, title: string | undefined): FileArguments | undefined {
@@ -144,14 +139,19 @@ function is_undeclared_classification(label: string, body: string): boolean {
 	return is_classification && !has_label_name(issue_classification.required_labels(body), label)
 }
 
-// Every label the filing carries: the depth, the route when there is one, the classification labels
+// Every label the filing carries: the route when there is one, the classification labels
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
 // extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
-// already named it. One request applies them all, so no label is a separate step to forget.
+// already named it, `not-before` while the body's start time is ahead (`issue-not-before-label.ts`), and
+// the declared priority's label unless a `--label` typed one (`issue-priority.ts`).
+// One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
-	const declared = [args.depth, ...(args.route === undefined ? [] : [args.route]), ...extra]
-	const labels = issue_classification.labels_for(body, declared)
+	const declared = [...(args.route === undefined ? [] : [args.route]), ...extra]
+	const labels = issue_priority.with_label(
+		issue_not_before_label.with_label(issue_classification.labels_for(body, declared), body),
+		body,
+	)
 
 	if (!is_auto_ok || has_label_name(labels, AUTO_OK_LABEL)) return labels
 
@@ -168,7 +168,7 @@ function triage_problem(labels: ReadonlyArray<string>): string | undefined {
 
 	if (!is_owed) return undefined
 
-	return `an \`${AUTO_OK_LABEL}\` filing needs \`--label ${RUN_LANE_LABEL}\` or \`--label ${RUN_SOLO_LABEL}\` — \`${RUN_SOLO_LABEL}\` only for a defect in kit's own verification that makes unrelated PRs answer wrongly on main now (\`backlogrun-lanes.md\`), else \`${RUN_LANE_LABEL}\``
+	return `an \`${AUTO_OK_LABEL}\` filing needs \`--label ${RUN_LANE_LABEL}\` or \`--label ${RUN_SOLO_LABEL}\` — \`${RUN_SOLO_LABEL}\` only for a defect in kit's own verification that makes unrelated PRs answer wrongly on main on every run (\`backlogrun-lanes.md\`), else \`${RUN_LANE_LABEL}\` — a flaky one takes \`${RUN_LANE_LABEL}\` and \`priority:critical\``
 }
 
 function is_same_repository(target: string, current: string): boolean {

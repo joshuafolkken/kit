@@ -1,3 +1,4 @@
+import { cli_flags, type PositiveSetting } from '#scripts/lib/cli-flags'
 import { lane_limit_override } from './lane-limit-override'
 import type { LaneEnvironment } from './lane-paths'
 import { lane_seed_policy } from './lane-seed'
@@ -21,32 +22,16 @@ import { lane_seed_policy } from './lane-seed'
 // the swap peak, the slowest gates and most of the gate and commit failures.
 const DEFAULT_LANE_LIMIT = 4
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'
-const POSITIVE_INTEGER = /^[1-9]\d*$/u
 const NO_LANES = 0
 
-// The limit, or why it could not be read. A problem rather than a throw, for the reason
-// `eval-runner.ts` records for `JOSH_EVAL_CONCURRENCY`: the caller decides whether a bad setting
-// ends the command or is reported and worked around, and only it knows which.
-type LimitChoice = { kind: 'limit'; limit: number } | { kind: 'problem'; problem: string }
+// The limit, or why it could not be read.
+type LimitChoice = PositiveSetting
 
 // **An invalid value is a hard error, never a silent fall back to the default** — the rule
-// `PORT_SEED` already holds to. A typo that quietly becomes 4 is a limit nobody set, and the whole
-// point of the setting is that the number is the one a person chose.
-//
-// Blank is unset, not invalid: an `.env` line left as `JOSH_LANE_LIMIT=` is a variable nobody
-// configured, exactly as `lane_paths.lane_root` reads a blank root.
-//
-// `name` is what the problem names: `josh lane:limit` reads its argument by the same rule.
+// `PORT_SEED` already holds to. `name` is what the problem names: `josh lane:limit` reads its argument
+// by the same rule.
 function read_limit(raw: string | undefined, name: string): LimitChoice {
-	const trimmed = raw?.trim() ?? ''
-
-	if (trimmed === '') return { kind: 'limit', limit: DEFAULT_LANE_LIMIT }
-
-	if (!POSITIVE_INTEGER.test(trimmed)) {
-		return { kind: 'problem', problem: `${name} must be a positive integer, not "${trimmed}"` }
-	}
-
-	return { kind: 'limit', limit: Number(trimmed) }
+	return cli_flags.read_positive_setting(raw, name, DEFAULT_LANE_LIMIT)
 }
 
 // **A live run's `lane:limit` override outranks the environment**: a running
@@ -76,17 +61,23 @@ function seated_limit(limit: number): number {
 //
 // **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
 // `seated` counts every open lane, so the free count never offers more launches than seats are left.
+// The places left under the limit, port seats aside: what resuming a lane that keeps its seat is
+// weighed against (joshuafolkken/kit#4107).
+function limit_room(limit: number, occupied: number): number {
+	return Math.max(NO_LANES, seated_limit(limit) - occupied)
+}
+
 function free_lanes(limit: number, occupied: number, seated = occupied): number {
-	const by_limit = seated_limit(limit) - occupied
 	const by_seats = lane_seed_policy.LAST_LANE_SEAT - seated
 
-	return Math.max(NO_LANES, Math.min(by_limit, by_seats))
+	return Math.max(NO_LANES, Math.min(limit_room(limit, occupied), by_seats))
 }
 
 const lane_capacity = {
 	LANE_LIMIT_KEY,
 	free_lanes,
 	lane_limit,
+	limit_room,
 	read_limit,
 	seated_limit,
 }

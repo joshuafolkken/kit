@@ -181,3 +181,71 @@ describe('cli_flags.is_value_unusable', () => {
 		expect(cli_flags.is_value_unusable(argv, REPO_FLAG)).toBe(true)
 	})
 })
+
+const SETTING = 'JOSH_TEST_LIMIT'
+const FALLBACK = 4
+const PAST_SAFE = '9007199254740993'
+const REFUSES = 'refuses %s'
+const REFUSED_EVERYWHERE: ReadonlyArray<readonly [string, string | undefined]> = [
+	['a negative number', '-1'],
+	['a decimal', '1.5'],
+	['a word', 'abc'],
+	['an empty string', ''],
+	['a padded number', ' 3'],
+	['a hexadecimal', '0x10'],
+	['a number past the safe range', PAST_SAFE],
+	['an absent value', undefined],
+]
+
+describe('cli_flags.to_count', () => {
+	it.each([
+		['0', 0],
+		['7', 7],
+		['007', 7],
+	])('reads %s as %d', (raw, expected) => {
+		expect(cli_flags.to_count(raw)).toBe(expected)
+	})
+
+	it.each(REFUSED_EVERYWHERE)(REFUSES, (_label, raw) => {
+		expect(cli_flags.to_count(raw)).toBeUndefined()
+	})
+})
+
+describe('cli_flags.to_positive', () => {
+	it('reads a positive integer', () => {
+		expect(cli_flags.to_positive('12')).toBe(12)
+	})
+
+	it.each([...REFUSED_EVERYWHERE, ['zero', '0'], ['a leading zero', '05']] as const)(
+		REFUSES,
+		(_label, raw) => {
+			expect(cli_flags.to_positive(raw)).toBeUndefined()
+		},
+	)
+})
+
+describe('cli_flags.read_positive_setting', () => {
+	it.each([
+		['unset', undefined],
+		['blank', '  '],
+	])('answers the fallback when %s', (_label, raw) => {
+		expect(cli_flags.read_positive_setting(raw, SETTING, FALLBACK)).toEqual({
+			kind: 'limit',
+			limit: FALLBACK,
+		})
+	})
+
+	it('reads a trimmed positive integer', () => {
+		expect(cli_flags.read_positive_setting(' 2 ', SETTING, FALLBACK)).toEqual({
+			kind: 'limit',
+			limit: 2,
+		})
+	})
+
+	it.each(['0', '-3', '2.5', 'two'])('names the setting and the value for %s', (raw) => {
+		expect(cli_flags.read_positive_setting(raw, SETTING, FALLBACK)).toEqual({
+			kind: 'problem',
+			problem: `${SETTING} must be a positive integer, not "${raw}"`,
+		})
+	})
+})

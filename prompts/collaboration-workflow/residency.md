@@ -24,7 +24,7 @@
 
 > **その規則が効き始める瞬間を、1 件のツール呼び出しとして名指しできるか。**
 
-できるなら、規則本文を常駐から出し、配送ガードの行に `scripts/rules/rule-registry.ts` の項目を添え、[`rule-delivery.md`](./rule-delivery.md) が指す `pnpm josh rule:list` の一覧に載せる（joshuafolkken/kit#1524）。**規則ごとのトリガ行は常駐に残さない** — `CLAUDE.md` には一覧への導線 1 行だけを置く。フックが走らないセッションは一覧を自己点検に使う（`principles.md` →「Claude Code 以外のエージェントでの読み替え」）。
+できるなら、規則本文を常駐から出し、配送ガードの行に説明（`about`）を持たせ、[`rule-delivery.md`](./rule-delivery.md) が指す `pnpm josh rule:list` の一覧に載せる（joshuafolkken/kit#1524）。**規則ごとのトリガ行は常駐に残さない** — `CLAUDE.md` には一覧への導線 1 行だけを置く。フックが走らないセッションは一覧を自己点検に使う（`principles.md` →「Claude Code 以外のエージェントでの読み替え」）。
 
 ### 第 2 問 — skill なしのターンでも効く必要があるか
 
@@ -36,6 +36,6 @@
 
 - **常駐規則は、トリガと導線の 2 つで書く。** **判定は、導線を一度も開かないターンでも常駐の記述だけで正しく振る舞えるかである。**
 - **削ることは移すことであり、削除は理由を示して初めて許される例外である。** 先に導線の先へ移し、マーカーテストも付け替える。移さず引退させてよいのは 3 条件がすべて揃うときだけ — 同じ文書に単一ソースが宣言された文の写しである・単一ソースと突き合わせてほかにない文を含まない・マーカーテストが固定していない。揃わなければ候補と証拠を記録して規則は残す
-- 経緯（Issue 番号・なぜ・計測・却下案）は `docs/maintainers/<topic>-rationale.md` に置き、その冒頭で説明する手順文書を名指しする。**参照の向きは根拠 → 手順だけ** — AI が読む文書から根拠文書は指さない（`scripts/document/rationale-documents.test.ts` が検出する）。Issue 番号引用の件数は `scripts/document/issue-citation-budget.ts` のラチェットに従う — 減らしたら記録も下げる
+- 経緯（Issue 番号・なぜ・計測・却下案）は `docs/maintainers/<topic>-rationale.md` に置き、その冒頭で説明する手順文書を名指しする。**参照の向きは根拠 → 手順だけ** — AI が読む文書から根拠文書は指さない（`scripts/document/rationale-documents.test.ts` が検出する）。Issue 番号引用の件数は `tools/document/issue-citation-budget.ts` のラチェットに従う — 減らしたら記録も下げる
 - 引用は本文があるファイルを直接指す
 - 予算が詰まったら回収で解く。**引き上げは Tier C として扱う** — `RESIDENT_CEILING_BYTES`・`RESIDENT_HEADROOM_BYTES`・`RE_INLINE_GUARD_HEADROOM_BYTES` の緩和は、3 条件（回収の余地が尽きたことを計測で示す・需要が 1 規則ではなく常駐すべき規則数の増加から来る・増やす量は需要と回収可能量の差だけで丸めない）を示し、ユーザーの明示指示を得てから行う。条件が揃うこと自体は指示ではない

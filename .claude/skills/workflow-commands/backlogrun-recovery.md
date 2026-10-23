@@ -20,6 +20,7 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 | Answer | What the parent does |
 | --- | --- |
 | `alive` | Wait on `lane:await` again; touch nothing |
+| `paused` | Tell the person; neither wait nor recover (`docs/josh-commands-run.md` → `josh run:liveness`) |
 | `settled` | Re-read with `pnpm josh run:status <N>` and take the branch its state section says |
 | `undetermined` | Read the trace that failed and ask again. **A second in a row on the same child is a fault in the check**: send a `confirmation` naming the trace and stop — never escalate it to `stopped` |
 | `stopped` | The recovery below |
@@ -27,19 +28,18 @@ pnpm josh run:liveness <N> --output <absolute path> --process <command lines nam
 **On `stopped`, re-read with `pnpm josh run:status <N>`.** **A re-read carrying `needs-decision`** — the
 unit parked it, then stopped: leave the label on and count nothing. Otherwise, while `state: OPEN`:
 
-1. **Stash the half-finished work** — `git stash push -u -m "backlogrun: stopped unit for #<N>"` — and
-   record it on the Issue; it is popped by message, `pnpm josh stash:pop "backlogrun: stopped unit for
-   #<N>"`, never positionally.
+1. **Stash the half-finished work** — `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` — and
+   record it on the Issue; it is popped with `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`.
 2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo
    <owner/repo> --owner "$PPID"` for a named epic), **the same composite a returned child takes**. It
    tells an `outage` (re-dispatched with its session resumed, uncounted, bounded by
-   `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `needs-decision` and counted), and drops
+   `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `run:stalled` and counted), and drops
    the stale `in-progress` itself.
 3. **Act on the token it printed** — `backlogrun-progress.md` → "Running a named epic's children".
 
 ## A person withdraws a running child
 
-On a person's instruction to drop a running child's issue, run `pnpm josh lane:withdraw <N>
+On a person's instruction to drop a running child, run `pnpm josh lane:withdraw <N>
 --reason "<their reason>"` — `docs/josh-commands.md` → "`josh lane:withdraw`".
 
 ## Conflicts are not predicted

@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { GIT_LOCATION_VARIABLES } from '#scripts/git/git-location-environment'
 import { hook_command_bootstrap } from '#scripts/init/hook-command-bootstrap-fixture'
 import { hook_launch } from '#scripts/init/hook-launch'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -21,10 +22,14 @@ const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
 const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
 const REFUSED = 2
-const REAL_HOOK_TIMEOUT_MS = 60_000
+// A whole launch starts real git and node processes, which the full suite's load can slow past the
+// project's default timeout.
+const LAUNCH_TIMEOUT_MS = 60_000
 const BUNDLE_RAN = 'bundle first second cleared'
 const GATE_RAN = 'gate demo-hook demo:hook first second cleared'
 const LAUNCH_LOG = 'launches.log'
+// A git location variable pointing at no repository, as one inherited from another checkout's hook does.
+const FOREIGN_GIT_DIR = '/elsewhere'
 // Every program a hook launch could start through PATH, each logged by name when it starts.
 const COUNTED_PROGRAMS = ['node', 'git', 'env', 'dirname'] as const
 
@@ -65,7 +70,7 @@ function create_package(package_root: string, has_bundles = true): void {
 
 	mkdirSync(path.dirname(launcher_path), { recursive: true })
 	copyFileSync(RUN_HOOK_SOURCE, launcher_path)
-	write_file(path.join(package_root, 'scripts/hooks/hook-bundle-ready.ts'), GATE_STUB)
+	write_file(path.join(package_root, 'tools/hooks/hook-bundle-ready.ts'), GATE_STUB)
 	write_file(path.join(package_root, 'dist/josh.js'), DISPATCHER_STUB)
 	if (has_bundles) write_file(path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
 }
@@ -117,11 +122,13 @@ function launch(launcher: string, overrides: NodeJS.ProcessEnv = {}): LaunchResu
 	return run_launcher([launcher, 'demo-hook', 'first', 'second'], workspace.root, overrides)
 }
 
-// The whole hook command as settings.json holds it: the root prefix, then the launcher.
+// The whole hook command as settings.json holds it: the root prefix, then the launcher — launched as
+// Claude Code launches it, naming the root, unless the overrides take that away.
 function launch_hook_command(overrides: NodeJS.ProcessEnv = {}): LaunchResult {
 	const command = hook_launch.hook_launch_command('demo-hook first second')
+	const named_root = { [hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: workspace.root }
 
-	return run_launcher(['-c', command], workspace.root, overrides)
+	return run_launcher(['-c', command], workspace.root, { ...named_root, ...overrides })
 }
 
 function initialize_repository(git_arguments: ReadonlyArray<string>): void {
@@ -186,18 +193,29 @@ describe('run-hook.sh in installed package', () => {
 	})
 })
 
-// joshuafolkken/kit#3946: a hook runs on every tool call, so its launch starts git once — the root
-// lookup — and node once, with no `env` or `dirname` process around them.
+// joshuafolkken/kit#3946: a hook runs on every tool call, so its launch starts node once, with no
+// `env` or `dirname` process around it. git starts only to find a root Claude Code did not name, or
+// to decide on a git location variable that is set (joshuafolkken/kit#4187).
 describe('the hook command launch', () => {
-	it('starts git once and node once', () => {
+	beforeEach(() => {
 		create_package('.')
 		initialize_repository(['init', '-q'])
-
-		const result = launch_hook_command()
-
-		expect(result.stdout).toBe(GATE_RAN)
-		expect(result.launches).toEqual({ node: 1, git: 1, env: 0, dirname: 0 })
 	})
+
+	it.each([
+		['the root is named', {}, 0],
+		['Codex names no root', { [hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: undefined }, 1],
+		['a git location variable is set', { GIT_DIR: FOREIGN_GIT_DIR }, 1],
+	])(
+		'starts node once and git as often as needed when %s',
+		(_case, overrides: NodeJS.ProcessEnv, git_launches) => {
+			const result = launch_hook_command(overrides)
+
+			expect(result.stdout).toBe(GATE_RAN)
+			expect(result.launches).toEqual({ node: 1, git: git_launches, env: 0, dirname: 0 })
+		},
+		LAUNCH_TIMEOUT_MS,
+	)
 })
 
 describe('the hook command and git location variables', () => {
@@ -208,9 +226,27 @@ describe('the hook command and git location variables', () => {
 	it('clears them when the checkout resolves without them', () => {
 		initialize_repository(['init', '-q'])
 
-		const result = launch_hook_command({ GIT_DIR: '/elsewhere' })
+		const result = launch_hook_command({ GIT_DIR: FOREIGN_GIT_DIR })
 
 		expect(result.stdout).toBe(GATE_RAN)
+	})
+
+	it('clears them for a launch from a git hook, which names no root', () => {
+		initialize_repository(['init', '-q'])
+
+		const result = launch_hook_command({
+			[hook_command_bootstrap.PROJECT_DIRECTORY_VARIABLE]: undefined,
+			GIT_DIR: '.git',
+		})
+
+		expect(result.stdout).toBe(GATE_RAN)
+	})
+
+	it('names in run-hook.sh every variable git-location-environment.ts lists', () => {
+		const launcher = readFileSync(RUN_HOOK_SOURCE, 'utf8')
+
+		expect(launcher).toContain(`location_variables='${GIT_LOCATION_VARIABLES.join(' ')}'`)
+		expect(launcher).toContain(`"$${GIT_LOCATION_VARIABLES.join('$')}"`)
 	})
 
 	it('keeps them when the git metadata lives outside the work tree', () => {
@@ -238,6 +274,6 @@ describe('run-hook.sh with a real hook', () => {
 			expect(result.stdout).toContain('JOSH_SESSION_LANG): en')
 			expect(result.node_launches).toBe(1)
 		},
-		REAL_HOOK_TIMEOUT_MS,
+		LAUNCH_TIMEOUT_MS,
 	)
 })

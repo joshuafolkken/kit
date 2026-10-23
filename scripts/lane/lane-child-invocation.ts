@@ -47,6 +47,13 @@ function process_pattern(issue: string): string {
 	return `(${CHILD_INVOCATION}|${REVIEW_INVOCATION}|${SHIP_PROCESS} .*) ${issue_cite.plain(issue)}$`
 }
 
+// The `pgrep -f` pattern that finds the detached ship supervisor of `issue` alone.
+function ship_pattern(issue: string): string {
+	issue_number_shape.require_issue_number(issue)
+
+	return `${SHIP_PROCESS} .* ${issue_cite.plain(issue)}$`
+}
+
 function review_invocation(issue: string): string {
 	issue_number_shape.require_issue_number(issue)
 
@@ -126,6 +133,7 @@ const lane_child_invocation = {
 	process_pattern,
 	resume_invocation,
 	review_invocation,
+	ship_pattern,
 	ship_stop_invocation,
 }
 

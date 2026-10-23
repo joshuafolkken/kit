@@ -1,7 +1,0 @@
-{
-	"reason": "The board header gains a third column (repository name), a shared time column and a shared figure width; the +40 code lines are the column builders in run-board-header.ts and the width parameter in run-board-machine.ts (#3692)",
-	"date": "2026-10-12",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}

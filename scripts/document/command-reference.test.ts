@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import {
+	CATALOG_FILE,
+	format_command_entry,
+	generate_catalog,
+} from '#tools/document/generate-catalog'
 import { describe, expect, it } from 'vitest'
 import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
 import { document_scan } from './document-scan'
-import { CATALOG_FILE, generate_catalog } from './generate-catalog'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
 // suite used to pin a handful of command names by hand; this checks all of them at once, and a
@@ -70,6 +74,27 @@ describe('the command catalog is up to date', () => {
 		const missing = Object.keys(COMMAND_MAP).filter((name) => !catalog.includes(`\`josh ${name}\``))
 
 		expect(missing).toStrictEqual([])
+	})
+
+	// A table row per command, not a section of ten lines each (#4162).
+	it('gives every command exactly one table row', () => {
+		const rows = catalog.split('\n').filter((line) => line.startsWith('| `josh '))
+
+		expect(rows).toHaveLength(Object.keys(COMMAND_MAP).length)
+	})
+
+	it('renders a command as one row with its aliases and an escaped pipe', () => {
+		const row = format_command_entry('gate', {
+			category: 'Development',
+			description: 'Run the checks',
+			reference: ['[--a|--b]', 'developer', ['none']],
+			usage: { examples: [] },
+			script: 'gate.ts',
+		})
+
+		expect(row).toBe(
+			'| `josh gate` · `josh ga` | `[--a\\|--b]` | developer | none | Run the checks |',
+		)
 	})
 })
 

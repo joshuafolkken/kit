@@ -1,5 +1,6 @@
 import { stripVTControlCharacters, styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import string_width from 'string-width'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -12,22 +13,22 @@ import type { BoardLayout, BoardRow } from './run-board-layout'
 // joshuafolkken/kit#3692: three columns — the name, the time, then the progress over the machine.
 
 const { minute_of } = run_board_labels
-const { WORDS } = run_board_labels
-const MACHINE_UNKNOWN = '⚡ -  🧠 -  💾 -'
+const { HEADER_ICONS, WORDS } = run_board_labels
+const MACHINE_UNKNOWN = '💪 -  🧠 -  💾 -'
 // The second line's first two columns where nothing is drawn in them: no repository, no heartbeat.
 const NAME_BLANK = ' '.repeat('⏸ backlogrun'.length)
-const TIME_BLANK = ' '.repeat('⏰ 0:30:00'.length + 1)
+const TIME_BLANK = ' '.repeat('⏰ 30′00″'.length + 1)
 const RUNNING_CLOCK = `${NAME_BLANK}  ${TIME_BLANK}  ${MACHINE_UNKNOWN}`
 // joshuafolkken/kit#3749: the third line — blank where the stream holds no event, else what the run is
 // doing now: its time under the second column, its icon and words under the third.
 const NOW_BLANK = ''
 const ONE_RUNNING = `${NAME_BLANK}  ${TIME_BLANK}  🔄 1 running`
-const STALE_BEAT = '💓 0:40:00'
+const STALE_BEAT = '💓 40′00″'
 const EMPTY_BAR = '─'.repeat(10)
-const MINUTE = backlog_budget.MS_PER_MINUTE
+const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
 const NOW = STARTED + 30 * MINUTE
-const EMPTY_LAYOUT: BoardLayout = { active: [], waves: [], people: [], unreached: [] }
+const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }
 
 function row(number: number, state: BoardRow['state']): BoardRow {
 	return { number, title: undefined, kind: undefined, state, status: undefined, waits: [] }
@@ -101,8 +102,8 @@ describe('run_board_header.header_lines state', () => {
 		const board = header({ activity, ended_ms, now_ms: ended_ms + 10 * MINUTE })
 
 		expect(lines_of(board)).toStrictEqual([
-			`■ backlogrun  ⏰ 1:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}    ${MACHINE_UNKNOWN}`,
+			`■ backlogrun  ⏰ 1°30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  🔚 ${minute_of(ended_ms)}     ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -118,8 +119,8 @@ describe('run_board_header.header_lines shape', () => {
 		const activity = { last_event_ms: NOW - MINUTE, is_stopped: false }
 
 		expect(lines_of(header({ activity }))).toStrictEqual([
-			`⏸ backlogrun  ⏰ 0:30:00  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
-			`${NAME_BLANK}  💓 0:01:00  ${MACHINE_UNKNOWN}`,
+			`⏸ backlogrun  ⏰ 30′00″  ✅  0/0 ${EMPTY_BAR}  🔄 0  ⏳ 0  💤 0`,
+			`${NAME_BLANK}  💓  1′00″  ${MACHINE_UNKNOWN}`,
 			NOW_BLANK,
 		])
 	})
@@ -129,7 +130,7 @@ describe('run_board_header.header_lines shape', () => {
 		const layout = { ...RUNNING_LAYOUT, unreached: [row(2, 'waiting')] }
 
 		expect(lines_of(header({ layout }))).toStrictEqual([
-			`▶ backlogrun  ⏰ 0:30:00  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
+			`▶ backlogrun  ⏰ 30′00″  ✅  0/2 ${EMPTY_BAR}  🔄 1  ⏳ 1  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -145,7 +146,7 @@ describe('run_board_header.header_lines shape', () => {
 		}
 
 		expect(clock_line_of(header({ machine }))).toBe(
-			`${NAME_BLANK}  ${TIME_BLANK}  ⚡  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
+			`${NAME_BLANK}  ${TIME_BLANK}  💪  15% ■■────────  🧠  37% ■■■■──────  💾 3.1M/s ■■────────`,
 		)
 	})
 })
@@ -170,7 +171,7 @@ describe('run_board_header.header_lines before the plan is read', () => {
 		const board = header({ layout: RUNNING_LAYOUT, plan_fetched_ms: undefined, baseline_total: 0 })
 
 		expect(lines_of(board)).toStrictEqual([
-			`▶ backlogrun  ⏰ 0:30:00  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
+			`▶ backlogrun  ⏰ 30′00″  ✅  0/- ${EMPTY_BAR}  🔄 1  ⏳ -  💤 0`,
 			RUNNING_CLOCK,
 			ONE_RUNNING,
 		])
@@ -199,13 +200,18 @@ describe('run_board_header.header_lines chat', () => {
 
 describe('run_board_header.header_lines plan warning', () => {
 	it('says nothing about a plan read that succeeded', () => {
-		expect(title_of(header({ plan_fetched_ms: NOW }))).not.toContain('⚠')
+		expect(title_of(header({ plan_fetched_ms: NOW }))).not.toContain(HEADER_ICONS.warning)
 	})
 
 	it('warns with the minute of a failed plan read', () => {
 		const board = header({ plan_fetched_ms: NOW - MINUTE, plan_failed_ms: NOW })
 
-		expect(title_of(board)).toMatch(new RegExp(`💤 0  ⚠ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
+		expect(title_of(board)).toMatch(new RegExp(`💤 0  ❗ ${WORDS.plan} ${minute_of(NOW)}$`, 'u'))
+	})
+
+	// joshuafolkken/kit#4223: ⚠ is counted one column wide but drawn two, over the blank after it.
+	it('warns with an icon two columns wide', () => {
+		expect(string_width(HEADER_ICONS.warning)).toBe(2)
 	})
 })
 
@@ -229,8 +235,8 @@ describe('run_board_header.header_lines heartbeat color', () => {
 	it('leaves a fresh heartbeat plain, then yellow past 15 minutes and red past 30', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 
-		expect(aged_beat(MINUTE)).toContain(' 💓 0:01:00')
-		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 0:20:00'))
+		expect(aged_beat(MINUTE)).toContain(' 💓  1′00″')
+		expect(aged_beat(20 * MINUTE)).toContain(styleText('yellow', '💓 20′00″'))
 		expect(aged_beat(40 * MINUTE)).toContain(alarmed())
 	})
 
@@ -283,7 +289,7 @@ describe('run_board_header.counts_of', () => {
 		}
 		const layout: BoardLayout = {
 			active,
-			waves: [[epic, { kind: 'row', row: row(5, 'waiting') }]],
+			queued: [epic, { kind: 'row', row: row(5, 'waiting') }],
 			people: [row(6, 'human')],
 			unreached: [row(7, 'waiting')],
 		}

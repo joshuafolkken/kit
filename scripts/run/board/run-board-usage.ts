@@ -1,66 +1,61 @@
-// Each lane's CPU and memory on its `run:board` row: which lane is loading the machine the header's ⚡
-// and 🧠 show. How the processes are read is `run-board-usage-read.ts`'s; this file turns two readings
-// into each lane's figures.
+// Each process's CPU, memory and compressed memory on `run:board`: which lane, which part of the
+// backlogrun, or which app outside it is loading the machine the header's 💪 and 🧠 show. How the
+// processes are read is `run-board-usage-read.ts`'s, how they are grouped `run-board-process-groups.ts`'s;
+// this file turns two readings into each process's figures and each lane's sum.
 //
-// A lane's CPU is its processes' CPU time between two samples as a share of the whole machine — the
-// header's ⚡ scale, so the two read side by side, never Activity Monitor's one-core-is-100% — and its
-// memory the sum of their resident sets. Shared pages are counted once per process, so the figure is
-// larger than what the kernel holds; it compares lanes, which is all the column is for.
-
-const PERCENT = 100
+// CPU is a process's CPU time between two samples in cores, drawn as a percentage of the machine's
+// cores — the header's 💪 unit, never Activity Monitor's one-core-is-100% — and memory what `top`'s
+// MEM and CMPRS count, so the figures read the same in the lane rows and the processes section.
 
 interface ProcessReading {
 	cpu_ms: number
-	rss_bytes: number
+	memory_bytes: number
+	compressed_bytes: number
 }
 
 interface UsageMark {
 	at_ms: number
 	processes: ReadonlyMap<number, ProcessReading>
-	// Every listed process's lane, `undefined` for one under none — kept so each is looked up once.
+	// Every listed process's lane — its working directory's, else its nearest ancestor's — `undefined`
+	// for one under none; kept so each directory is looked up once (`run-board-usage-lanes.ts`).
 	lanes: ReadonlyMap<number, string | undefined>
-	// Each process's parent, kept only where the counts fold in the children each reaped — empty on the
-	// `ps` path, so nothing is deducted there.
+	// The processes an `lsof` cut short was asked about, asked again on the next sample.
+	unread: ReadonlySet<number>
+	// Each process's command, which names the app it belongs to.
+	names: ReadonlyMap<number, string>
+	// Each process's parent: the ancestry the processes section groups by, and the way to the ancestor
+	// a gone process's reaped time landed in.
 	parents: ReadonlyMap<number, number>
 	// The processes whose count was read with its reaped children folded in — one whose own read failed
-	// keeps the larger of `ps`'s own time and its last reading, so nothing reaped is taken off it.
+	// keeps the larger of `ps`'s own time and its last reading, so nothing reaped is taken off it. Empty
+	// on the `ps` path, so nothing is deducted there.
 	folded: ReadonlySet<number>
 	cores: number
 	total_bytes: number
 }
 
-// The CPU share is `undefined` on the first sample, which has nothing to take a difference from.
-interface LaneUsage {
-	cpu_percent: number | undefined
+// What one process or group uses. The cores are `undefined` on the first sample, which has nothing to
+// take a difference from.
+interface UsageFigure {
+	cpu_cores: number | undefined
 	memory_bytes: number
-	memory_percent: number
+	compressed_bytes: number
 }
 
-// Each lane's usage by its issue number.
-type LaneUsages = ReadonlyMap<number, LaneUsage>
+// Each process's figure by its pid.
+type ProcessFigures = ReadonlyMap<number, UsageFigure>
 
-interface LaneProcess {
-	lane: string
-	pid: number
-	reading: ProcessReading
+// Each lane's figure by its issue number.
+type LaneUsages = ReadonlyMap<number, UsageFigure>
+
+// The machine's cores and its physical memory: a processes row's gauge is full at them, a lane row's
+// at its share of them.
+interface UsageScale {
+	cores: number
+	total_bytes: number
 }
 
-interface LaneTotal {
-	cpu_ms: number
-	rss_bytes: number
-}
-
-const NO_TOTAL: LaneTotal = { cpu_ms: 0, rss_bytes: 0 }
-
-function lane_processes(mark: UsageMark): Array<LaneProcess> {
-	const processes = [...mark.processes].map(([pid, reading]) => {
-		const lane = mark.lanes.get(pid)
-
-		return lane === undefined ? undefined : { lane, pid, reading }
-	})
-
-	return processes.filter((lane_process) => lane_process !== undefined)
-}
+const NO_FIGURE: UsageFigure = { cpu_cores: 0, memory_bytes: 0, compressed_bytes: 0 }
 
 // The nearest of a gone process's ancestors still running — the one whose reaped-children time it has
 // landed in. Walked through the last sample's parents, at most once round them. Where a parent between
@@ -101,65 +96,87 @@ function reaped_counted(before: UsageMark, after: UsageMark): Map<number, number
 function cpu_spent(
 	before: UsageMark,
 	counted: ReadonlyMap<number, number>,
-	{ pid, reading }: LaneProcess,
+	pid: number,
+	reading: ProcessReading,
 ): number {
 	const earlier = (before.processes.get(pid)?.cpu_ms ?? 0) + (counted.get(pid) ?? 0)
 
 	return Math.max(0, reading.cpu_ms - earlier)
 }
 
-function spent_of(
+// The cores a process used since the last sample, `undefined` with none to take a difference from.
+function cores_of(
 	before: UsageMark | undefined,
 	after: UsageMark,
-): (process: LaneProcess) => number {
-	if (before === undefined) return () => 0
+): ((pid: number, reading: ProcessReading) => number) | undefined {
+	const elapsed = before === undefined ? 0 : after.at_ms - before.at_ms
+
+	if (before === undefined || elapsed <= 0) return undefined
 
 	const counted = reaped_counted(before, after)
 
-	return (lane_process) => cpu_spent(before, counted, lane_process)
+	return (pid, reading) => cpu_spent(before, counted, pid, reading) / elapsed
 }
 
-function totals_of(before: UsageMark | undefined, after: UsageMark): Map<string, LaneTotal> {
-	const totals = new Map<string, LaneTotal>()
-	const spent = spent_of(before, after)
-
-	for (const lane_process of lane_processes(after)) {
-		const total = totals.get(lane_process.lane) ?? NO_TOTAL
-
-		totals.set(lane_process.lane, {
-			cpu_ms: total.cpu_ms + spent(lane_process),
-			rss_bytes: total.rss_bytes + lane_process.reading.rss_bytes,
-		})
-	}
-
-	return totals
-}
-
-function cpu_percent(
+function process_figures(
 	before: UsageMark | undefined,
 	after: UsageMark,
-	cpu_ms: number,
-): number | undefined {
-	const elapsed = before === undefined ? 0 : after.at_ms - before.at_ms
+): Map<number, UsageFigure> {
+	const cores = cores_of(before, after)
+	const figures = [...after.processes].map(([pid, reading]) => {
+		const { memory_bytes, compressed_bytes } = reading
 
-	return elapsed <= 0 ? undefined : (cpu_ms / (elapsed * after.cores)) * PERCENT
+		return [pid, { cpu_cores: cores?.(pid, reading), memory_bytes, compressed_bytes }] as const
+	})
+
+	return new Map(figures)
 }
 
-function lane_usage(before: UsageMark | undefined, after: UsageMark, total: LaneTotal): LaneUsage {
-	return {
-		cpu_percent: cpu_percent(before, after, total.cpu_ms),
-		memory_bytes: total.rss_bytes,
-		memory_percent: (total.rss_bytes / after.total_bytes) * PERCENT,
+function cores_sum(left: number | undefined, right: number | undefined): number | undefined {
+	return left === undefined || right === undefined ? undefined : left + right
+}
+
+// The figures' sum, its cores `undefined` where any one's are.
+function sum_of(figures: Iterable<UsageFigure>): UsageFigure {
+	let sum = NO_FIGURE
+
+	for (const figure of figures) {
+		sum = {
+			cpu_cores: cores_sum(sum.cpu_cores, figure.cpu_cores),
+			memory_bytes: sum.memory_bytes + figure.memory_bytes,
+			compressed_bytes: sum.compressed_bytes + figure.compressed_bytes,
+		}
 	}
+
+	return sum
 }
 
-function usage_of(before: UsageMark | undefined, after: UsageMark): LaneUsages {
-	const totals = [...totals_of(before, after)]
+// Each group's sum, the group of each process given by `group_of`; one in none is left out.
+function grouped_sums<Key>(
+	figures: ProcessFigures,
+	group_of: (pid: number) => Key | undefined,
+): Map<Key, UsageFigure> {
+	const sums = new Map<Key, UsageFigure>()
 
-	return new Map(totals.map(([lane, total]) => [Number(lane), lane_usage(before, after, total)]))
+	for (const [pid, figure] of figures) {
+		const group = group_of(pid)
+
+		if (group !== undefined) sums.set(group, sum_of([sums.get(group) ?? NO_FIGURE, figure]))
+	}
+
+	return sums
 }
 
-const run_board_usage = { usage_of }
+function lane_number(lane: string | undefined): number | undefined {
+	return lane === undefined ? undefined : Number(lane)
+}
+
+// Each lane's processes' sum, by each process's lane in `mark.lanes`.
+function usage_of(mark: UsageMark, figures: ProcessFigures): LaneUsages {
+	return grouped_sums(figures, (pid) => lane_number(mark.lanes.get(pid)))
+}
+
+const run_board_usage = { grouped_sums, process_figures, sum_of, usage_of }
 
 export { run_board_usage }
-export type { LaneUsage, LaneUsages, ProcessReading, UsageMark }
+export type { LaneUsages, ProcessFigures, ProcessReading, UsageFigure, UsageMark, UsageScale }

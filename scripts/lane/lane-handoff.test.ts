@@ -1,5 +1,10 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_handoff } from './lane-handoff'
@@ -48,6 +53,114 @@ describe('lane_handoff.is_ship_running', () => {
 
 		expect(lane_handoff.is_ship_running(ISSUE, DIRECTORY)).toBe(false)
 		expect(read).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4245: the same reading for a caller that must not block, starting no process.
+function read_start(): string | undefined {
+	return undefined
+}
+
+describe('lane_handoff.ship_reader', () => {
+	it('reads the repository once, asynchronously, and each issue through the start reader given', async () => {
+		const repository = vi.spyOn(git_common_directory, 'repository')
+		const directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+		const read = vi
+			.spyOn(run_ship_detach, 'read_result')
+			.mockReturnValue({ launch_id: 'launch', result: 'running' })
+
+		const is_shipping = await lane_handoff.ship_reader(read_start)
+
+		expect([is_shipping(ISSUE), is_shipping('2963')]).toEqual([true, true])
+		expect(read).toHaveBeenCalledWith(REPOSITORY, ISSUE, read_start)
+		expect(directory).toHaveBeenCalledTimes(1)
+		expect(repository).not.toHaveBeenCalled()
+	})
+
+	it('reads a ship that is not running as not running', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+		vi.spyOn(run_ship_detach, 'read_result').mockReturnValue({ launch_id: 'l', result: 'failed' })
+
+		expect((await lane_handoff.ship_reader(read_start))(ISSUE)).toBe(false)
+	})
+
+	it('reads nothing as running where the repository could not be read', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(new Error('not a repository'))
+		const read = vi.spyOn(run_ship_detach, 'read_result')
+
+		expect((await lane_handoff.ship_reader(read_start))(ISSUE)).toBe(false)
+		expect(read).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4466: a running ship inside `josh followup` waits on its merge alone; a stop, a
+// merge-and-gate again, or a successor supervisor takes the mark down so the lane counts again.
+function ship_at(result: ShipResult, is_merge_waiting: boolean): string {
+	const directory = mkdtempSync(path.join(tmpdir(), 'merge-wait-'))
+	const target = path.join(directory, 'record.json')
+
+	run_ship_stage.mark_started(target, 'followup')
+	run_ship_stage.mark_merge_waiting(target, is_merge_waiting)
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
+	vi.spyOn(run_ship_detach, 'read_result').mockReturnValue({ launch_id: 'launch', result })
+	vi.spyOn(run_ship_stage, 'record_path').mockReturnValue(target)
+
+	return target
+}
+
+async function is_waiting(): Promise<boolean> {
+	return (await lane_handoff.merge_wait_reader(read_start))(ISSUE)
+}
+
+describe('lane_handoff.merge_wait_reader', () => {
+	it('reads a running ship inside its followup as waiting on the merge', async () => {
+		ship_at('running', true)
+
+		expect(await is_waiting()).toBe(true)
+		expect(run_ship_stage.record_path).toHaveBeenCalledWith(REPOSITORY, ISSUE)
+	})
+
+	it('reads a running ship whose followup stage is not marked waiting as not waiting', async () => {
+		ship_at('running', false)
+
+		expect(await is_waiting()).toBe(false)
+	})
+
+	it('reads a ship whose followup stopped as not waiting once its attempt ended', async () => {
+		run_ship_stage.end_attempt(ship_at('running', true))
+
+		expect(await is_waiting()).toBe(false)
+	})
+
+	it('reads a ship that is no longer running as not waiting', async () => {
+		ship_at('failed', true)
+
+		expect(await is_waiting()).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4466 round 2: a followup stop waiting for a place queues the waiters behind it, so only
+// a live supervisor's mark counts.
+function place_ship_at(result: ShipResult, is_place_waiting: boolean): void {
+	run_ship_stage.mark_place_waiting(ship_at(result, false), is_place_waiting)
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)
+}
+
+describe('lane_handoff.is_place_waiting', () => {
+	it('reads a running ship marked waiting for a place as waiting', () => {
+		place_ship_at('running', true)
+
+		expect(lane_handoff.is_place_waiting(ISSUE, '/lane')).toBe(true)
+		expect(run_ship_stage.record_path).toHaveBeenCalledWith(REPOSITORY, ISSUE)
+	})
+
+	it.each([
+		['an unmarked running ship', 'running', false],
+		['a marked ship that is no longer running', 'failed', true],
+	] as const)('reads %s as not waiting', (_case, result, is_marked) => {
+		place_ship_at(result, is_marked)
+
+		expect(lane_handoff.is_place_waiting(ISSUE, '/lane')).toBe(false)
 	})
 })
 

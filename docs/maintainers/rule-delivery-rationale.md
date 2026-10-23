@@ -1,10 +1,7 @@
 # Triggered delivery — rationale
 
-This is maintainer-only rationale behind
-[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md):
-the measurements and arguments that justify the procedure's boundaries and mechanism, and the list
-of what each marker test pins. No run reads it — every trigger, action, verdict and boundary an
-agent follows stays in the procedure, and a change to this file changes no rule.
+Rationale behind
+[`prompts/collaboration-workflow/rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md).
 
 ## Why delivery is needed
 
@@ -157,7 +154,7 @@ runs; this row avoids it
 because a body-only read **does not pass**. A `PreToolUse` refusal carries a single string, though,
 so **the hook does not inject the comment text** — the run fetches it itself, one round trip later.
 
-**This is the only row whose trigger overlaps `batch:guard`'s.** `time_batch_guard.is_guarded_call`
+**This is the only row whose trigger overlaps the `batching` row's.** `time_batch_guard.is_guarded_call`
 treats `gh issue view` as a candidate (`gh issue create` it does not). But this row refuses every time
 until its prerequisite is met, so it skips the `is_first_delivery` yield branch and refuses even on a
 turn that also draws a batching refusal. `delivered-rules.test.ts` pins this.
@@ -170,7 +167,7 @@ appears far more often inside `--jq`). Without that, a write quoting `gh issue v
 would vanish.
 
 **A write is not a read.** `gh api` becomes a POST as soon as `-f` / `-F` / `--field` / `--raw-field`
-/ `--input` appears, and `kickoff` PATCHes `…/issues/<N>` to normalize the title and fill an empty
+/ `--input` appears, and a run PATCHes `…/issues/<N>` to normalize the title and fill an empty
 body. A call whose method is not explicitly `GET`, or that carries a field flag, is out of scope.
 
 **`-c` does not count as "with comments".** `gh issue view <N> -c` is a correct read, but `-c` belongs
@@ -197,7 +194,7 @@ joshuafolkken/kit#1570: the parent set a fresh waiting timer every time it woke,
 once, and progress reports landed every few minutes instead of once per interval. So **a row that
 owns its own `decide` is outside once-per-run and refuses every time its condition holds**.
 
-**For such a row, the yield branch shared with `batch:guard` protects something else.** A
+**For such a row, the yield branch shared with the `batching` row protects something else.** A
 once-per-run row protected its **record** — losing the race would waste the run's only delivery. A
 call that sets a waiting timer is by definition a single `Bash`, a shape the batching guard also
 treats as a candidate, so **yielding the refusal as well would let a reissue inside the 10-second
@@ -212,7 +209,7 @@ once-per-run** (joshuafolkken/kit#2807). Kept once-per-run, a run that skipped t
 the run that skimmed the procedure would be the one that walked past the guard. The rows are
 `issue-comments`, `rule-body` and `oracle-consulted:*`. A run that complies is never
 stuck — once the prerequisite is done, the stand-down answers first and lets it through. There is no
-record to use up either, so it does not yield to `batch:guard` (yielding would let a reissue inside
+record to use up either, so it does not yield to the `batching` row (yielding would let a reissue inside
 the 10-second window through without the prerequisite).
 
 **When the evidence of the prerequisite cannot be read, the default is to refuse.** A deliberate
@@ -321,7 +318,7 @@ test file pins:
 - `scripts/rules/delivered-rules.test.ts` — each entry **actually fires** on its trigger and is silent
   otherwise. Prose that did not work is where this mechanism started, so **a move that does not fire
   is not a move**
-- `scripts/claude/claude-settings-hooks.test.ts` — `rule:guard` is wired under `PreToolUse` naming
+- `scripts/claude/claude-settings-hooks.test.ts` — `pretool:guard` is wired under `PreToolUse` naming
   `Bash` alone, declares a timeout and points at a josh subcommand that exists
 - `scripts/backlog/backlog-manufacturing-rule.test.ts` — the WIP cap exists in `wip-cap.md` as its
   single source, and the hold `issue:file` prints carries the refusal, the two exemptions and the
@@ -383,6 +380,15 @@ test file pins:
   switching to a branch other than its own lane branch, and is silent for its own branch, a create or
   detach, outside a lane, and in the main checkout), that it fires every time, and that only one row
   claims a command
+- `scripts/rules/lane-direct-tool.test.ts` — pins that a lane child's direct `eslint` / `vitest` /
+  `cspell` / `tsc` (bare, `pnpm exec`, `npx`, behind a `/usr/bin/time -p` prefix —
+  joshuafolkken/kit#4356) is refused, since the core budget counts only what a `josh` command
+  reserves (joshuafolkken/kit#4357), and that it is silent outside a lane, for a `pnpm josh` run
+  (`reserved-run` included) and for a tool name inside a quoted argument
+- `scripts/rules/timed-rerun.test.ts` — pins that a command timed with `time` / `/usr/bin/time` /
+  `hyperfine` is pointed at the recorded durations (the Actions jobs, `pnpm josh lane:stats`) once
+  per run, that a record read or a quoted mention is silent, and that the row precedes
+  `lane-direct-tool`, its one overlap (joshuafolkken/kit#4356)
 - `scripts/rules/git-argv.test.ts` / `scripts/rules/git-force.test.ts` /
   `scripts/rules/worktree-guard.test.ts` / `scripts/rules/file-body.test.ts` — pin the predicates and
   message wording of the three groups of Bash-string rows (joshuafolkken/kit#2120). `scripts/rules/delivered-rules-bash.test.ts`
@@ -394,6 +400,10 @@ test file pins:
 - `scripts/rules/direct-pr-create.test.ts` — pins the predicate that stops a direct PR creation which
   never generates `closes #N` (`gh pr create`, a `gh api` write to pulls, joshuafolkken/kit#3183). It is delivered as the
   fourth row of `permission-guards.ts`
+- `scripts/rules/pr-merge.test.ts` — pins the predicate that stops a PR merge by the agent's own
+  `Bash` call in the spellings the `gh pr merge*` glob misses (`curl … /pulls/<N>/merge`, a GraphQL
+  merge mutation or a file-sourced GraphQL body, joshuafolkken/kit#4038). It is delivered as the
+  fifth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),

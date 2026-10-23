@@ -24,6 +24,23 @@ async function read_changed_paths(is_staged: boolean): Promise<Array<string>> {
 	return [...tracked, ...untracked]
 }
 
-const changed_paths = { read_changed_paths, to_paths }
+// The same reading against any commit rather than the change base — the change since the tree a
+// test-read map was recorded on.
+async function read_changed_since(commit: string): Promise<Array<string>> {
+	const tracked = to_paths(await git_command.diff_names_since(commit))
+	const untracked = to_paths(await git_command.untracked_names())
+
+	return [...new Set([...tracked, ...untracked])]
+}
+
+// The paths among `paths` the tree of `commit` held. An empty list asks git nothing, since
+// `ls-tree` with no path lists the whole tree.
+async function read_held_at(commit: string, paths: ReadonlyArray<string>): Promise<Array<string>> {
+	if (paths.length === 0) return []
+
+	return to_paths(await git_command.tree_names_at(commit, paths))
+}
+
+const changed_paths = { read_changed_paths, read_changed_since, read_held_at, to_paths }
 
 export { changed_paths }

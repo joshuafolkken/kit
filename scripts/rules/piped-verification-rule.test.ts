@@ -18,7 +18,7 @@ import { rule_list } from './rule-list'
 // alternatives were measured and rejected — rewriting the procedure documents' examples, when a
 // survey of every document, prompt and skill found exactly one piped verification example and it was
 // the repository's own explanation of this bug; and stating a calling convention, which
-// `scripts/time/time-reported-failure.ts` had already rejected in writing. So what is asserted here is
+// `tools/time/time-reported-failure.ts` had already rejected in writing. So what is asserted here is
 // that the refusal carries the whole rule, that the reasoning stays at the topic file, and that the
 // boundary holds: a read-only listing must never be caught by it.
 const TOPIC_FILE = 'output-bounds.md'
@@ -27,7 +27,7 @@ const RATIONALE = 'docs/maintainers/output-bounds-rationale.md'
 const SUITE_PATH = 'scripts/rules/piped-verification-rule.test.ts'
 // Named once: the enumeration, the topic file and this suite have to agree on the command, and a
 // string kept correct in one of three places is not kept.
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
 // The escape hatch that keeps the check's status, asserted on both sides: a refusal that named no way
 // to bound the output would leave the caller with the problem that put the pipe there.
 const PIPEFAIL = '`set -o pipefail`'

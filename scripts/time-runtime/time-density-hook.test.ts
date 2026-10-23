@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, describe, expect, it } from 'vitest'
 import { time_density } from './time-density'
 import { time_density_hook } from './time-density-hook'
@@ -21,6 +21,7 @@ const ABSENT_PATH = path.join(WORK_DIRECTORY, 'no-such-session.jsonl')
 const AGENT_ID = 'a313eea340918b8a1'
 // The half of the line every case here recognizes it by.
 const DENSITY_PHRASE = 'calls per round trip'
+const NOT_JSON = 'not json at all'
 
 // A transcript of its own per case, so one case's throttle record never silences another's — the
 // record is keyed on the transcript the payload names. Each one is remembered rather than listed
@@ -142,13 +143,20 @@ describe('time_density_hook.density_notice — a forked agent reads its own tran
 describe('time_density_hook.density_notice — nothing it reads may fail the edit', () => {
 	it.each([
 		['a transcript that is not there', () => payload(ABSENT_PATH)],
-		['a payload that is not JSON', () => 'not json at all'],
+		['a payload that is not JSON', () => NOT_JSON],
 		['a payload carrying no transcript path', () => JSON.stringify({ tool_name: 'Edit' })],
 		['a transcript of unparseable lines', () => payload(write_transcript('junk', 'x\ny\nz'))],
 		['an empty transcript', () => payload(write_transcript('empty', ''))],
 	])('says nothing for %s', (_description, build) => {
 		expect(() => time_density_hook.density_notice(build(), NOW_MS)).not.toThrow()
 		expect(time_density_hook.density_notice(build(), NOW_MS)).toBeUndefined()
+	})
+})
+
+describe('time_density_hook payload reads', () => {
+	it('answers undefined for invalid stdin rather than throwing', () => {
+		expect(time_density_hook.parse_transcript_path(NOT_JSON)).toBeUndefined()
+		expect(time_density_hook.parse_call(NOT_JSON)).toBeUndefined()
 	})
 })
 

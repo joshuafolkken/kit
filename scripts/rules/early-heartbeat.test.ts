@@ -7,7 +7,6 @@ import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { early_heartbeat } from './early-heartbeat'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#1570. The three things the Issue asked to be able to demonstrate: an automatic
 // heartbeat cannot be armed before the interval has elapsed, one armed for the full interval is
@@ -76,7 +75,7 @@ function payload_for(transcript: string, command: string): string {
 // commits in its own `package.json` (joshuafolkken/kit#1576), so blanking the variable would hand
 // every case below whatever cadence the repository happens to ask for.
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	vi.stubEnv(run_progress.INTERVAL_KEY, String(INTERVAL_MS / MINUTE_MS))
 })
 
@@ -226,13 +225,13 @@ describe('decide — the mechanism, not the parent self-restraining', () => {
 	})
 })
 
-describe('rule_delivery — the row, through the hook that carries it', () => {
+describe('delivered_rules.delivery — the row, through the hook that carries it', () => {
 	it('delivers the rule on the call that arms an early timer', () => {
 		with_last_report(5 * MINUTE_MS)
 
 		const payload = payload_for(transcript_named('delivered'), EARLY_SLEEP)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
 	})
 
 	// **Not once per run.** Every other row is delivered once because the run then obeys it; this one
@@ -243,8 +242,10 @@ describe('rule_delivery — the row, through the hook that carries it', () => {
 
 		const payload = payload_for(transcript_named('repeat'), EARLY_SLEEP)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
-		expect(rule_delivery(payload, NOW_MS + 1)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.EARLY_HEARTBEAT_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS + 1)).toBe(
+			delivered_rules.EARLY_HEARTBEAT_REASON,
+		)
 	})
 
 	it('says nothing about an explicitly requested report', () => {
@@ -252,7 +253,7 @@ describe('rule_delivery — the row, through the hook that carries it', () => {
 
 		const payload = payload_for(transcript_named('explicit'), EXPLICIT_ASK)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 

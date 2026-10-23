@@ -114,7 +114,7 @@ function is_own_ship_event(event: RunEvent, issue: string): boolean {
 }
 
 // The issue an event's text names, the way every reader here — and `run:board` — keys an event to a child.
-function issue_named(event: RunEvent): string | undefined {
+function issue_named(event: Pick<RunEvent, 'text'>): string | undefined {
 	return ISSUE_REFERENCE.exec(event.text)?.[1]
 }
 
@@ -169,7 +169,7 @@ function last_issue_event(
 
 // A child's launch and the endings `run:merge` settles it with — the ones `run:board` stops drawing it
 // running on. A park or a split already ran `run:merge`, so a child closed after one owes nothing; a
-// withdrawal settles the child itself, its issue closed by the person who withdrew it.
+// withdrawal settles the child itself, its issue left open for the next run.
 const LAUNCH_OR_SETTLE_KINDS: ReadonlySet<string> = new Set([
 	KIND.CHILD_LAUNCH,
 	KIND.MERGE,

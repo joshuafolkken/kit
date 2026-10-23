@@ -4,7 +4,7 @@ import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { json_object_schema, string_array_schema, string_record_schema } from '#scripts/lib/schemas'
 import { safe_chain_preinstall } from '#scripts/safe-chain/preinstall-command'
-import { apply_jf_migrations, remove_retired_scripts } from './init-logic-migrate'
+import { init_logic_migrate } from './init-logic-migrate'
 import { PACKAGE_JSON_KEY_ORDER } from './init-logic-package-key-order'
 import { kit_base_preset } from './kit-base-preset'
 import { EXTENDS_FIELD, tsconfig_preset_migration } from './tsconfig-preset-migration'
@@ -203,7 +203,7 @@ function merge_package_scripts(content: string, scripts: Record<string, string>)
 	const parsed = parse_jsonc(content)
 	const raw = parsed['scripts']
 	const existing = raw === undefined ? {} : string_record_schema.parse(raw)
-	const migrated = remove_retired_scripts(apply_jf_migrations(existing))
+	const migrated = init_logic_migrate.migrate_scripts(existing)
 	const to_add = missing_entries(migrated, scripts)
 	const did_migrate = JSON.stringify(migrated) !== JSON.stringify(existing)
 

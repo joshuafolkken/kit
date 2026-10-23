@@ -27,6 +27,12 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { issue_list_by_label_in_repo: vi.fn() },
 }))
 
+const merge_waiting_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-snapshot-trace', () => ({
+	lane_snapshot_trace: { count_merge_waiting: merge_waiting_mock },
+}))
+
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const issue_list = vi.mocked(git_gh_command.issue_list_by_label_in_repo)
 
@@ -60,7 +66,7 @@ function pool(children: ReadonlyArray<EpicChild>): RepoPool {
 }
 
 function request(limit: number, is_all_lanes = true): LaneRequest {
-	return { repo: REPO, limit, is_all_lanes }
+	return { repo: REPO, limit, is_all_lanes, is_this_checkout: true }
 }
 
 function holders(numbers: ReadonlyArray<number>): string {
@@ -78,6 +84,7 @@ beforeEach(() => {
 	// Every holder these cases list is running; a stale one is `epic-solo-stale.test.ts`'s case.
 	vi.spyOn(lane_await, 'is_process_running_default').mockReturnValue(true)
 	vi.spyOn(epic_label_age, 'read_ages').mockResolvedValue(new Map())
+	merge_waiting_mock.mockResolvedValue(0)
 })
 
 describe('epic_lane_offer.offer_for_repo — how many children fit', () => {

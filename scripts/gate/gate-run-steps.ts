@@ -2,17 +2,24 @@ import { availableParallelism } from 'node:os'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { core_budget } from './core-budget'
+import { check_cpu, type CheckCpu } from './check-cpu'
+import { core_budget, type Admission } from './core-budget'
+import { free_cores } from './free-cores'
 import { gate_plan, type GatePlan } from './gate-plan'
-import type { GateStep, GateStepResult } from './gate-report'
-import { build_gate_step } from './gate-steps'
+import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
+import { build_gate_step, with_granted_workers } from './gate-steps'
 import { project_checks } from './project-checks'
 
 // Running the gate's checks: each one under its place in the machine-wide budget, a reused one
 // (`check-reuse.ts`) without starting it. `verification-gate.ts` decides what runs and records the
 // outcome; this module only runs it.
 
-async function run_gate_step(step: GateStep): Promise<GateStepResult> {
+// `cpu` is the gate's shared reader, so concurrent checks each take their own growth; a lone call
+// reads its child alone from a baseline of its own.
+async function run_gate_step(
+	step: GateStep,
+	cpu: CheckCpu = check_cpu.check_cpu_reader(),
+): Promise<GateStepResult> {
 	if (step.skip_reason !== undefined) {
 		return {
 			label: step.label,
@@ -28,7 +35,7 @@ async function run_gate_step(step: GateStep): Promise<GateStepResult> {
 		step.cwd === undefined ? {} : { cwd: step.cwd },
 	)
 
-	return { label: step.label, command: step.command_args.join(' '), ...result }
+	return { label: step.label, command: step.command_args.join(' '), ...result, cpu_ms: cpu() }
 }
 
 // This gate's share of the machine, resolved once at the gate's entry and carried down as one value.
@@ -55,6 +62,8 @@ interface ReservedStep {
 	step: GateStep
 	weight: number
 	memory_mb: number
+	// The plan's `--maxWorkers` for the unit suite, the width the free memory bounds once it is admitted.
+	worker_cap: number | undefined
 	// When the check's own green record was taken, for a check `check-reuse.ts` found reusable.
 	reused_at: string | undefined
 }
@@ -72,6 +81,7 @@ async function build_reserved_steps(
 			step: await build_gate_step(check, process.cwd(), plan),
 			weight: gate_plan.check_weight(check, plan, available_cores),
 			memory_mb: gate_plan.check_memory(check, plan, available_cores),
+			worker_cap: plan.unit_worker_cap,
 			reused_at: reused.get(check.label),
 		})),
 	)
@@ -90,6 +100,34 @@ function reused_result(step: GateStep, reused_at: string): GateStepResult {
 	}
 }
 
+// What the check asked the budget for and what it ran at, for its ledger row (`gate-ledger.ts`).
+function claim_of(requested: number, admission: Admission): CheckClaim {
+	return {
+		requested,
+		granted: admission.granted ?? requested,
+		waited_ms: admission.waited_ms ?? 0,
+	}
+}
+
+// **The unit step's width is bounded by the free memory too** (joshuafolkken/kit#4528). The plan's cap
+// and the granted width are sized from the cores alone, and the `--maxWorkers` they become skips the
+// guard's own reading (`test-unit-guard.ts`), so the memory is read here, once the claim is admitted
+// and the suite is about to start. The free cores are not applied: the admission has already narrowed
+// the claim to them (joshuafolkken/kit#4167).
+async function admitted_step(
+	reserved: ReservedStep,
+	admission: Admission,
+	available_cores: number,
+): Promise<GateStep> {
+	if (reserved.step.label !== gate_plan.UNIT_LABEL) return reserved.step
+
+	const { memory_workers } = await free_cores.read({ available_cores })
+	const asked = admission.granted ?? reserved.worker_cap
+	const workers = unit_worker_share.cap_to_free(asked, memory_workers, available_cores)
+
+	return with_granted_workers(reserved.step, workers)
+}
+
 // **A nested gate takes no reservation, and the budget is what makes that necessary rather than
 // merely tidy**. The unit step spawns the suite, which runs this repository's
 // own gate tests; each of those is a gate inside the outer gate's unit reservation, and a place it
@@ -98,20 +136,26 @@ function reused_result(step: GateStep, reused_at: string): GateStepResult {
 async function run_reserved_step(
 	reserved: ReservedStep,
 	budget: BudgetContext,
+	cpu: CheckCpu,
 ): Promise<GateStepResult> {
 	if (reserved.reused_at !== undefined) return reused_result(reserved.step, reserved.reused_at)
-	if (!budget.is_reserved) return await run_gate_step(reserved.step)
+	if (!budget.is_reserved) return await run_gate_step(reserved.step, cpu)
 
 	return await core_budget.with_core_reservation(
 		reserved.weight,
 		async (admission) => ({
-			...(await run_gate_step(reserved.step)),
+			...(await run_gate_step(
+				await admitted_step(reserved, admission, budget.available_cores),
+				cpu,
+			)),
 			budget_note: core_budget.describe_overflow(admission),
+			claim: claim_of(reserved.weight, admission),
 		}),
 		{
 			budget: budget.available_cores,
 			memory_mb: reserved.memory_mb,
 			command: `gate ${reserved.step.label}`,
+			is_unit: reserved.step.label === gate_plan.UNIT_LABEL,
 		},
 	)
 }
@@ -129,6 +173,7 @@ async function run_gate_steps(
 	reused: ReusedChecks = new Map(),
 ): Promise<ReadonlyArray<GateStepResult>> {
 	const reserved = await build_reserved_steps(plan, budget.available_cores, reused)
+	const cpu = check_cpu.check_cpu_reader()
 
 	// **The checks run under the held mark, so a check's own dispatch claims nothing**.
 	// Each check is a `pnpm josh <target>` child, and a target that declares
@@ -139,7 +184,7 @@ async function run_gate_steps(
 			await bounded_pool.bounded_map(
 				reserved,
 				plan.concurrency,
-				async (entry) => await run_reserved_step(entry, budget),
+				async (entry) => await run_reserved_step(entry, budget, cpu),
 			),
 	)
 }

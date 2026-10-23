@@ -1,10 +1,6 @@
 # Principles — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/principles.md`, the single
-source of the principles `CLAUDE.md`'s Communication section points at. It is never read during
-a run, and a change to this file changes no rule. The original seven used to be separate topic files, each
-closed by the same boilerplate line naming its `CLAUDE.md` bullet; they were merged into one file and
-the history below moved here (joshuafolkken/kit#2894).
+Rationale behind `prompts/collaboration-workflow/principles.md`.
 
 ## Why AGENTS and GEMINI are pointers
 
@@ -59,3 +55,13 @@ Prose the agent wrote kept coming out long, and the owner trimmed it afterwards:
 The "冗長さ" goal in quality-priority covers duplication only, so no rule said how to write. The
 recurring patterns — a packed paragraph, history in the body, heavy bold, restatement and meta
 sentences — each became one bullet of the rule.
+
+## Why a remedy for defects never halts evolution
+
+Asked about the number of defects, the agent proposed pausing new optimizations as the root fix
+(joshuafolkken/kit#4492). The owner's policy is to keep evolving and to prevent defects without
+stopping; when something is done is decided by priority. No prompt said so, so each new session made
+the same proposal again.
+
+The rule names the alternative — mechanisms that prevent defects while work
+continues — so the agent has something to propose instead.

@@ -44,6 +44,9 @@ interface ShipState {
 	is_committed: boolean
 	is_pushed: boolean
 	is_merged: boolean
+	// The issue changed after the recorded review's brief (`issue-watch-gate.ts`), so the review re-runs
+	// even on a committed tree (joshuafolkken/kit#4221).
+	is_review_stale?: boolean
 }
 
 const RECORD_PREFIX = 'josh-ship-stages-'
@@ -56,15 +59,24 @@ const STARTED_INDEX = 3
 const WORD_COUNT = STARTED_INDEX + 1
 
 // `started` lists the stages the current attempt started, kept across a supervisor that ended without a
-// stop so its successor's lines still carry them.
+// stop so its successor's lines still carry them. `is_merge_waiting` is set only while `josh followup`
+// itself runs, `is_place_waiting` only while a followup stop waits for a lane place
+// (`run-ship-place.ts`) (joshuafolkken/kit#4466).
 const record_schema = z.object({
 	done: z.array(z.string()),
 	started: z.array(z.string()).default([]),
+	is_merge_waiting: z.boolean().default(false),
+	is_place_waiting: z.boolean().default(false),
 })
 
 type ShipRecord = z.infer<typeof record_schema>
 
-const EMPTY_RECORD: ShipRecord = { done: [], started: [] }
+const EMPTY_RECORD: ShipRecord = {
+	done: [],
+	started: [],
+	is_merge_waiting: false,
+	is_place_waiting: false,
+}
 
 // Keyed on the repository and the issue: every lane of one repository shares the common git directory,
 // and two issues shipping from two lanes keep two records.
@@ -109,7 +121,36 @@ function mark_started(target: string, stage: Stage): void {
 // A `ship-stop` ends the attempt on the board (`run-board-phase.ts`), so the next attempt lists afresh
 // while the completed stages stay recorded.
 function end_attempt(target: string): void {
-	stamp_file.replace_stamp(target, { ...read_record(target), started: [] })
+	stamp_file.replace_stamp(target, { ...read_record(target), started: [], is_merge_waiting: false })
+}
+
+// Whether the ship waits on CI, CodeRabbit and the merge alone: its lane then holds no place under the
+// lane limit (`backlog-occupied.ts`). Cleared before any gate the followup stage runs, at a stop, and
+// when a successor supervisor opens the record, so a dead supervisor's flag frees nothing.
+function read_merge_waiting(target: string): boolean {
+	return read_record(target).is_merge_waiting
+}
+
+function mark_merge_waiting(target: string, is_merge_waiting: boolean): void {
+	stamp_file.replace_stamp(target, { ...read_record(target), is_merge_waiting })
+}
+
+// Whether a followup stop waits for a place before it relaunches its child (`run-ship-place.ts`).
+function read_place_waiting(target: string): boolean {
+	return read_record(target).is_place_waiting
+}
+
+function mark_place_waiting(target: string, is_place_waiting: boolean): void {
+	stamp_file.replace_stamp(target, { ...read_record(target), is_place_waiting })
+}
+
+// A supervisor that died mid-wait left its wait marked; its successor waits on nothing yet.
+function clear_waits(target: string): void {
+	stamp_file.replace_stamp(target, {
+		...read_record(target),
+		is_merge_waiting: false,
+		is_place_waiting: false,
+	})
 }
 
 // Removed once the report stage completes, so a later ship of the same issue starts from the preflight.
@@ -129,8 +170,9 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
 	// The `--review` round precedes the commit, so a commit is its output as it
 	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
-	// the recorded round, and only a commit pins the tree that round read.
-	[STAGE.REVIEW]: (_done, state) => state.is_merged || state.is_committed,
+	// the recorded round, and only a commit pins the tree that round read — unless the issue changed since.
+	[STAGE.REVIEW]: (_done, state) =>
+		state.is_merged || (state.is_committed && state.is_review_stale !== true),
 	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
 	// The merge of the default branch before the commit: once committed, a
 	// conflicting pull request is the followup's to merge again.
@@ -173,9 +215,11 @@ function commit_flags(state: ShipState): ReadonlyArray<string> {
 // **The newest line carries the attempt's history**: a fourth word lists every
 // stage the attempt has started, so the one line per issue a stream full of positions keeps still
 // draws the whole track. A line with no started stage keeps the three-word form.
+// The stage is a word rather than a `Stage`: the pre-detach checks, which are not one, are written in
+// the same form (`run-ship-pre-detach-timed.ts`).
 function event_text(
 	issue: string,
-	stage: Stage,
+	stage: string,
 	phase: Phase,
 	started: ReadonlyArray<string> = [],
 ): string {
@@ -205,13 +249,18 @@ const run_ship_stage = {
 	PHASE,
 	STAGE,
 	clear,
+	clear_waits,
 	commit_flags,
 	end_attempt,
 	event_text,
 	is_done,
 	mark_done,
+	mark_merge_waiting,
+	mark_place_waiting,
 	mark_started,
 	read_done,
+	read_merge_waiting,
+	read_place_waiting,
 	read_started,
 	record_path,
 	started_of,

@@ -246,6 +246,7 @@ const run_ending = {
 	decide,
 	ended_mid_turn,
 	read_exit,
+	read_transcript,
 	written_at,
 }
 

@@ -1,7 +1,9 @@
+import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { error_text } from '#scripts/lib/error-message'
+import { run_board_lane_time } from '#scripts/run/board/run-board-lane-time'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from './run-event-scope'
-import { run_event_stream, type RunEvent } from './run-event-stream'
+import { run_event_stream, type AppendResult, type RunEvent } from './run-event-stream'
 
 // The write side of the run's event stream. It resolves the run's identity and
 // appends, and it is where the "reporting must not break the work it reports on" contract is kept: every
@@ -27,17 +29,66 @@ async function stream_target(): Promise<string | undefined> {
 	return repository === undefined ? undefined : run_event_stream.target_of(repository)
 }
 
+// The child's lane record; an unreadable one reads as none, so the ending is still written.
+async function lane_record(issue: string): Promise<LaneStateRecord | undefined> {
+	try {
+		return await lane_state.read_state(issue)
+	} catch (error) {
+		error_text.trace_swallowed('run_event_stream_emit.lane_record', error)
+
+		return undefined
+	}
+}
+
+async function ending_fields(
+	target: string,
+	event: Omit<RunEvent, 'pos'>,
+): Promise<Pick<RunEvent, 'elapsed_ms'>> {
+	const issue = run_event_scope.issue_named(event)
+
+	if (issue === undefined || !run_board_lane_time.OFF_LANE_KINDS.has(event.kind)) return {}
+
+	const elapsed_ms = run_board_lane_time.ending_elapsed({
+		events: run_event_stream.read_events(target),
+		issue: Number(issue),
+		record: await lane_record(issue),
+		ended_ms: Date.parse(event.at),
+	})
+
+	return elapsed_ms === undefined ? {} : { elapsed_ms }
+}
+
+/**
+ * Append one event at `at`, an ending with its child's lane time (joshuafolkken/kit#4481). Every writer
+ * of an ending — `emit` and `run:event --append` — appends through here, so the time is computed once,
+ * as the ending is written, with the board's own count.
+ */
+async function append_at(
+	target: string,
+	kind: string,
+	text: string,
+	at: Date,
+): Promise<AppendResult> {
+	const event = { kind, text, at: at.toISOString() }
+
+	return run_event_stream.append_event(target, {
+		...event,
+		...(await ending_fields(target, event)),
+	})
+}
+
 /**
  * Append one session-facing event, best-effort. A kind outside the enumeration is refused by `append`;
  * every error is swallowed, because the reporting path must never fail the work it reports on.
+ * `at` is the caller's instant where another record must carry the same one.
  */
-async function emit(kind: string, text: string): Promise<void> {
+async function emit(kind: string, text: string, at: Date = new Date()): Promise<void> {
 	try {
 		const target = await stream_target()
 
 		if (target === undefined) return
 
-		run_event_stream.append(target, kind, text, now_iso())
+		await append_at(target, kind, text, at)
 	} catch {
 		// Reporting is best-effort: a failed append is dropped rather than raised into the caller's work.
 	}
@@ -85,27 +136,41 @@ function invocation_events(repository: string, target: string): ReadonlyArray<Ru
  * Append one event unless this kind is already on the stream since the newest `reset_kind` — the
  * episode marker for a condition that holds across other events. `emit_once`'s newest-event test would
  * re-fire each time a parallel lane appended a merge or a park; this ends the episode only at
- * `reset_kind`. Returns whether it appended, as `emit_once` does.
+ * `reset_kind`. The text is composed only once the episode is new, so a caller polled every pass whose
+ * text costs a network read pays it once. Returns the appended text, or `undefined` when nothing was.
  */
-async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
+async function emit_once_since_with(
+	kind: string,
+	reset_kind: string,
+	compose: () => Promise<string>,
+): Promise<string | undefined> {
 	try {
 		const repository = await run_carry.repository_directory()
 
-		if (repository === undefined) return false
+		if (repository === undefined) return undefined
 
 		const target = run_event_stream.target_of(repository)
 
 		if (run_event_stream.has_since(invocation_events(repository, target), kind, reset_kind)) {
-			return false
+			return undefined
 		}
 
-		return run_event_stream.append(target, kind, text, now_iso()).appended
+		const text = await compose()
+
+		return run_event_stream.append(target, kind, text, now_iso()).appended ? text : undefined
 	} catch (error) {
 		// Best-effort: a failed append is dropped rather than raised into the caller's work.
 		error_text.trace_swallowed('run_event_stream_emit.emit_once_since', error)
 
-		return false
+		return undefined
 	}
+}
+
+// `emit_once_since_with` for a text already in hand. Returns whether it appended, as `emit_once` does.
+async function emit_once_since(kind: string, text: string, reset_kind: string): Promise<boolean> {
+	const appended = await emit_once_since_with(kind, reset_kind, async () => text)
+
+	return appended !== undefined
 }
 
 // One progress heartbeat line onto the stream, so a relay reaches it across a cut.
@@ -113,9 +178,10 @@ async function emit_heartbeat(line: string): Promise<void> {
 	await emit(run_event_stream.EVENT_KIND.HEARTBEAT, line)
 }
 
-// The events of the invocation now running, `undefined` where the invocation's scope could not be told
-// — for a reader that must not take "no events" for "nothing launched" (`backlog-occupied.ts`).
-async function scoped_current_events(): Promise<ReadonlyArray<RunEvent> | undefined> {
+// The events of the invocation now running, for a reader restoring the run from its stream
+// (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
+// undetermined scope is an empty invocation.
+async function current_events(): Promise<ReadonlyArray<RunEvent>> {
 	try {
 		const repository = await run_carry.repository_directory()
 
@@ -125,17 +191,10 @@ async function scoped_current_events(): Promise<ReadonlyArray<RunEvent> | undefi
 		const scope = run_event_scope.scope_of(read)
 		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
 
-		return run_event_scope.scoped_events(events, scope)
+		return run_event_scope.scoped_events(events, scope) ?? []
 	} catch {
-		return undefined
+		return []
 	}
-}
-
-// The events of the invocation now running, for a reader restoring the run from its stream
-// (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
-// undetermined scope is an empty invocation.
-async function current_events(): Promise<ReadonlyArray<RunEvent>> {
-	return (await scoped_current_events()) ?? []
 }
 
 // The invocation's events for a writer deciding whether a marker is already there: unlike
@@ -167,13 +226,14 @@ async function all_events(): Promise<ReadonlyArray<RunEvent>> {
 
 const run_event_stream_emit = {
 	all_events,
+	append_at,
 	current_events,
 	emit,
 	emit_heartbeat,
 	emit_once,
 	emit_once_since,
+	emit_once_since_with,
 	invocation_or_all_events,
-	scoped_current_events,
 	stream_target,
 }
 

@@ -1,7 +1,0 @@
-{
-	"reason": "A re-dispatched child adopts its own stale hold, which needs a same-issue check before the dirty-tree block and one shared stop-mark test (#3888)",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

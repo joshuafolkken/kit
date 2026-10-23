@@ -42,7 +42,7 @@ const SUPERVISED_LINE = 'backlogrun: supervisor started (pid 4343)'
 const STOPPED_LINES = [
 	'backlogrun: stopped the supervisor (process 4242)',
 	"backlogrun: ended the run's record",
-	'backlogrun: 1 lane(s) still running, not stopped: #3701',
+	'backlogrun: 1 lane(s) still running, not stopped: #3701 — suspend them in place with `josh lane:pause --all`',
 ]
 
 function harness(
@@ -57,6 +57,7 @@ function harness(
 		start: vi.fn(() => started),
 		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
+		restart: vi.fn(async () => 0),
 		show_board: vi.fn(async () => 0),
 		write: (line) => {
 			lines.push(line)
@@ -288,7 +289,28 @@ describe('backlogrun_cli.run --stop', () => {
 		const { ports, lines } = harness(true)
 
 		await expect(backlogrun_cli.run(['--stop', '#3437'], ports)).resolves.toBe(1)
-		expect(lines).toStrictEqual([expect.stringMatching(/^Usage: josh backlogrun .* \| --stop$/u)])
+		expect(lines).toStrictEqual([expect.stringMatching(/^Usage: josh backlogrun .* \| --stop /u)])
 		expect(ports.stop).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4154: `--restart` is handed to the restart, which owns its lines and exit code.
+describe('backlogrun_cli.run --restart', () => {
+	it('hands the repository to the restart and exits with its code', async () => {
+		const { ports } = harness(true)
+		const refused = { ...ports, restart: vi.fn(async () => 1) }
+
+		await expect(backlogrun_cli.run(['--restart'], refused)).resolves.toBe(1)
+		expect(refused.restart).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY)
+		expect(ports.stop).not.toHaveBeenCalled()
+		expect(ports.start).not.toHaveBeenCalled()
+	})
+
+	it('restarts nothing and prints the usage when --restart is given with anything else', async () => {
+		const { ports, lines } = harness(true)
+
+		await expect(backlogrun_cli.run(['--restart', '3437'], ports)).resolves.toBe(1)
+		expect(lines).toStrictEqual([expect.stringMatching(/\| --restart$/u)])
+		expect(ports.restart).not.toHaveBeenCalled()
 	})
 })

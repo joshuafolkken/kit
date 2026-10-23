@@ -1,3 +1,4 @@
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { yaml_document } from '#scripts/lib/yaml-document'
 import {
 	package_pnpm_schema,
@@ -68,7 +69,6 @@ function compare(snapshot: Record<string, string>, current: Record<string, strin
 }
 
 const SNAPSHOT_PATH = '.overrides-snapshot.json'
-const PACKAGE_JSON_PATH = 'package.json'
 const WORKSPACE_YAML_PATH = 'pnpm-workspace.yaml'
 
 // Both source files are optional and either may be absent from a project entirely, so an empty
@@ -109,14 +109,12 @@ function count_entry(path: string, overrides: Record<string, string>): Array<str
 function describe_sources(sources: OverridesSources): string {
 	const counts = [
 		...count_entry(WORKSPACE_YAML_PATH, read_overrides_from_workspace(sources.workspace_yaml)),
-		...count_entry(PACKAGE_JSON_PATH, read_overrides_from_package(sources.package_json)).map(
+		...count_entry(PACKAGE_JSON, read_overrides_from_package(sources.package_json)).map(
 			(entry) => `${entry} (ignored by pnpm)`,
 		),
 	]
 
-	if (counts.length === 0) {
-		return `no overrides found in ${WORKSPACE_YAML_PATH} or ${PACKAGE_JSON_PATH}`
-	}
+	if (counts.length === 0) return `no overrides found in ${WORKSPACE_YAML_PATH} or ${PACKAGE_JSON}`
 
 	return counts.join(', ')
 }
@@ -202,7 +200,6 @@ const overrides_check = {
 	list_excluded_package_names,
 	read_dependency_names,
 	build_update_command,
-	PACKAGE_JSON_PATH,
 	WORKSPACE_YAML_PATH,
 	SNAPSHOT_PATH,
 }

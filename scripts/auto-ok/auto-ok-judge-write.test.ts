@@ -1,4 +1,3 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { AUTO_OK_LABEL, DEFERRED_LABEL, RUN_LANE_LABEL } from '#scripts/issue/issue-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -33,7 +32,7 @@ beforeEach(() => {
 })
 
 describe('auto_ok_judge_write.apply', () => {
-	it('applies the run label before auto-ok, notes it and records the judgement', async () => {
+	it('applies the run label before auto-ok and records the judgement without a board note', async () => {
 		read_issue.mockResolvedValueOnce(labels_and_body([]))
 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(SUCCESS_EXIT_CODE)
@@ -41,11 +40,9 @@ describe('auto_ok_judge_write.apply', () => {
 			RUN_LANE_LABEL,
 			AUTO_OK_LABEL,
 		])
-		expect(emit).toHaveBeenCalledWith(
-			expect.anything(),
-			`${issue_cite.plain(ISSUE)} auto-ok applied (${RUN_LANE_LABEL})`,
-		)
+		expect(emit).not.toHaveBeenCalled()
 		expect(post_comment.mock.calls[0]?.[1]).toContain('<!-- josh:auto-ok-judged body=')
+		expect(post_comment.mock.calls[0]?.[1]).toContain(`(${RUN_LANE_LABEL})`)
 	})
 
 	it('refuses an issue that gained an excluded label since the listing', async () => {
@@ -61,6 +58,53 @@ describe('auto_ok_judge_write.apply', () => {
 
 		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
 		expect(apply_label).not.toHaveBeenCalled()
+	})
+})
+
+describe('auto_ok_judge_write.apply write order', () => {
+	// A re-run skips an issue already carrying auto-ok, so labels landed before a failed comment would
+	// leave it unrecorded for good.
+	it('applies no label when the judgement comment cannot be posted', async () => {
+		read_issue.mockResolvedValueOnce(labels_and_body([]))
+		post_comment.mockRejectedValueOnce(new Error('offline'))
+
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
+	})
+
+	// The comment is posted and `auto-ok` is not, so the listing reads the issue as judged: the refusal
+	// names the explicit apply, which the missing `auto-ok` leaves open.
+	it('names the retry when a label fails after the comment, and the retry writes the labels', async () => {
+		const error = vi.mocked(console.error)
+
+		read_issue.mockResolvedValueOnce(labels_and_body([RUN_LANE_LABEL]))
+		apply_label.mockResolvedValueOnce({ is_applied: true })
+		apply_label.mockResolvedValueOnce({ is_applied: false, reason: 'offline' })
+
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(FAILURE_EXIT_CODE)
+		expect(error.mock.calls.at(-1)?.[0]).toContain('auto-ok:judge --apply')
+		expect(emit).not.toHaveBeenCalled()
+
+		read_issue.mockResolvedValueOnce(labels_and_body([RUN_LANE_LABEL]))
+
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(SUCCESS_EXIT_CODE)
+		expect(apply_label).toHaveBeenLastCalledWith(ISSUE, AUTO_OK_LABEL)
+	})
+})
+
+// joshuafolkken/kit#4097: a second apply to a merged issue repeated the comment.
+describe('auto_ok_judge_write.apply on a settled issue', () => {
+	it.each([
+		['a closed issue', JSON.stringify({ state: 'CLOSED', labels: [], body: 'Fix.' })],
+		['an issue already opted in', labels_and_body([AUTO_OK_LABEL])],
+	])('succeeds on %s and writes nothing', async (_, read) => {
+		read_issue.mockResolvedValueOnce(read)
+
+		expect(await auto_ok_judge_write.apply(ISSUE, RUN_LANE_LABEL)).toBe(SUCCESS_EXIT_CODE)
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(post_comment).not.toHaveBeenCalled()
+		expect(emit).not.toHaveBeenCalled()
 	})
 })
 

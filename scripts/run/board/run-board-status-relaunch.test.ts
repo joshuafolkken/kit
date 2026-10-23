@@ -1,6 +1,7 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { ClosedIssue } from './run-board-closed'
+import { run_board_lane_state } from './run-board-lane-state'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
 // joshuafolkken/kit#3971: a child launched again in the same run — a re-dispatch after an outage, or a
@@ -13,7 +14,7 @@ const T0 = '2026-10-16T13:35:30.000Z'
 const T1 = '2026-10-16T13:50:00.000Z'
 const T2 = '2026-10-16T13:56:31.000Z'
 const T3 = '2026-10-16T13:56:45.000Z'
-const NONE: ReadonlySet<number> = new Set()
+const { NO_LANES } = run_board_lane_state
 const NOT_READ: ReadonlyMap<number, ClosedIssue> = new Map()
 const NO_LABELS: ReadonlyMap<number, ReadonlyArray<string>> = new Map()
 
@@ -33,7 +34,7 @@ function status_after(...events: ReadonlyArray<[string, string, string]>): ItemS
 		text,
 	}))
 
-	return run_board_status.statuses_of(stream, [], NONE).get(ISSUE)
+	return run_board_status.statuses_of(stream, NO_LANES).get(ISSUE)
 }
 
 // Launched, moved on to implement, stopped on an outage, and launched again by `kind`.
@@ -55,6 +56,10 @@ describe('run_board_status.statuses_of relaunch', () => {
 			state: 'running',
 			started_ms: Date.parse(T0),
 			launched_ms: Date.parse(T3),
+			spans: [
+				{ from_ms: Date.parse(T0), end_ms: undefined },
+				{ from_ms: Date.parse(T3), end_ms: undefined },
+			],
 			track: ['investigate'],
 			phase_ms: Date.parse(T3),
 		})

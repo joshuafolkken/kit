@@ -58,6 +58,21 @@ describe('run_ship_next.next_step for a conflict with the default branch', () =>
 	})
 })
 
+// joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief is
+// round 1's to redo, so whatever stopped, the re-detach reviews again.
+describe('run_ship_next.next_step for a stale review', () => {
+	it.each([STAGE.FOLLOWUP, STAGE.ROUND_TWO, STAGE.GATE])(
+		're-detaches a %s stop with the review',
+		(stage: Stage) => {
+			const stale = { ...RESUME, is_review: false, is_review_stale: true }
+			const step = run_ship_next.next_step(ISSUE, stage, stale)
+
+			expect(step).toContain(`${COMMAND.DETACH_REVIEW} ${QUOTED}`)
+			expect(step).toContain('reviews round 1 again')
+		},
+	)
+})
+
 describe('run_ship_next.next_step for a ship started without a review', () => {
 	// A ship re-detached without `--review` after round 2 runs the preflight, the gate and the commit
 	// again; a review there would be a third round.

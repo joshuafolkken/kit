@@ -1,8 +1,0 @@
-{
-	"reason": "#3937 moves the run/session command usage from hand-written doc prose into the command registry (RUN_USAGE/SESSION_USAGE + tests); the generator emits one **Options:** label per command, splitting combined option lines",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 474,
-		"prose.excess_bold": 2
-	}
-}

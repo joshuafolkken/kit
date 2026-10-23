@@ -1,7 +1,0 @@
-{
-	"reason": "Four josh start probes record the setup Issue, pull request, its files and origin/main, which the fresh-machine acceptance criteria of #3718 and #3720 check",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

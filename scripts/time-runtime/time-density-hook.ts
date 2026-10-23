@@ -66,22 +66,22 @@ const notice_schema = z.object({ notified_at_ms: z.number() })
 const call_schema = z.object({ tool_name: z.string().min(1), tool_input: z.unknown() })
 
 function parse_transcript_path(raw_payload: string): string | undefined {
-	const parsed = payload_schema.safeParse(JSON.parse(raw_payload))
+	const payload = json_value.parse_with(raw_payload, payload_schema)
 
-	if (!parsed.success || parsed.data.transcript_path === undefined) return undefined
+	if (payload?.transcript_path === undefined) return undefined
 
-	return time_hook_transcript.transcript_of(parsed.data.transcript_path, parsed.data.agent_id)
+	return time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
 }
 
 // The call that has just run, as the payload names it — what the line checks
 // against the turns behind it, so a call that needed their result is never offered as one that could
 // have shared their turn. A payload without a tool name answers `undefined`, judged on those turns alone.
 function parse_call(raw_payload: string): GuardedCall | undefined {
-	const parsed = call_schema.safeParse(JSON.parse(raw_payload))
+	const call = json_value.parse_with(raw_payload, call_schema)
 
-	if (!parsed.success) return undefined
+	if (call === undefined) return undefined
 
-	return { name: parsed.data.tool_name, input: parsed.data.tool_input }
+	return { name: call.tool_name, input: call.tool_input }
 }
 
 // The last `max_bytes` of a file, as text. The leading line is usually cut mid-way, which every
@@ -173,6 +173,8 @@ function density_notice(raw_payload: string, now_ms: number = Date.now()): strin
 const time_density_hook = {
 	density_notice,
 	notice_path,
+	parse_call,
+	parse_transcript_path,
 	read_tail,
 }
 

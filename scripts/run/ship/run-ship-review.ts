@@ -23,12 +23,18 @@ const LINE_SEPARATOR = /\r?\n/u
 const HIGH = 'high'
 const MEDIUM = 'medium'
 const FIXED_PREFIX = 'fixed '
+const KIND_FIELDS = 2
 // What a finding line carries after its spec: one sentence saying what is wrong, so a stopped ship's
 // log tells the resumed lane child the defect rather than only its location.
 const DESCRIPTION_SEPARATOR = ' — '
 // Where the spec ends on read: a reviewer that types the dash as `-`, `--` or `–` still ends it there,
 // so its sentence never lands in the ledger's file field.
 const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
+// Where a description's first sentence ends, and the cap that keeps a run-on one a line. Japanese
+// sets no space after `。`, so it ends a sentence on its own.
+const SENTENCE_END = /(?<=[.!?])\s|(?<=。)/u
+const SENTENCE_LIMIT = 200
+const ELLIPSIS = '…'
 
 const VERDICT = {
 	CLEAN: 'clean',
@@ -57,6 +63,15 @@ interface Finding {
 	spec: string
 	is_fixed: boolean
 	line: string
+	description: string
+}
+
+// One finding that decided a stopped review, as the durable stop log keeps it: its kind, the
+// `<file>[:<line>]` it cites and the first sentence of what it said (joshuafolkken/kit#4519).
+interface StopFinding {
+	kind: string
+	location: string
+	sentence: string
 }
 
 const MISSING_NOTE = 'the reviewer wrote no findings file — the review did not complete'
@@ -120,17 +135,30 @@ function verification_prompt(brief_path: string, findings_path: string, issue: s
 	].join(' ')
 }
 
-// The spec is what `review:record` reads; the description after it travels only in the stage output.
-function spec_of(unmarked: string): string {
-	const end = unmarked.search(DESCRIPTION_BOUNDARY)
+// The spec is what `review:record` reads; the description after it travels in the stage output and,
+// for a finding that stopped the ship, its first sentence in the durable stop log.
+function split_description(unmarked: string): { spec: string; description: string } {
+	const boundary = DESCRIPTION_BOUNDARY.exec(unmarked)
 
-	return (end === -1 ? unmarked : unmarked.slice(0, end)).trim()
+	if (boundary === null) return { spec: unmarked.trim(), description: '' }
+
+	const rest = unmarked.slice(boundary.index + boundary[0].length)
+
+	return { spec: unmarked.slice(0, boundary.index).trim(), description: rest.trim() }
 }
 
 function finding_of(line: string): Finding {
 	const is_fixed = line.startsWith(FIXED_PREFIX)
 
-	return { spec: spec_of(is_fixed ? line.slice(FIXED_PREFIX.length) : line), is_fixed, line }
+	return { ...split_description(is_fixed ? line.slice(FIXED_PREFIX.length) : line), is_fixed, line }
+}
+
+function first_sentence(description: string): string {
+	const [sentence = ''] = description.split(SENTENCE_END, 1)
+
+	if (sentence.length <= SENTENCE_LIMIT) return sentence
+
+	return `${sentence.slice(0, SENTENCE_LIMIT - ELLIPSIS.length)}${ELLIPSIS}`
 }
 
 function spec_findings(text: string): ReadonlyArray<Finding> {
@@ -151,6 +179,43 @@ function is_blocking(finding: Finding): boolean {
 	const severity = review_record_cli.parse_finding(finding.spec)?.severity
 
 	return severity === HIGH || (severity === MEDIUM && !finding.is_fixed)
+}
+
+function kind_of(finding: Finding): string {
+	return finding.spec.split(':', KIND_FIELDS).join(':')
+}
+
+function kinds_of(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
+	return [...new Set(findings.map((finding) => kind_of(finding)))]
+}
+
+function stop_finding_of(finding: Finding): StopFinding {
+	const location = review_record_cli.parse_finding(finding.spec)?.file ?? ''
+
+	return { kind: kind_of(finding), location, sentence: first_sentence(finding.description) }
+}
+
+// `bug-risks:medium` — each kind of finding that decided a stopped stage, once per kind (the stop
+// counts once under each in `lane:stats`), so the lane ledger records which kinds of finding stop a
+// lane rather than only that one did (joshuafolkken/kit#4426). The blocking findings decide it where
+// there are any; otherwise the stop was decided by the fixes — round-1 fixes red on the scoped pair, or
+// a round 2 that edited the tree — so the fixed findings do. A line outside the grammar is the stage's
+// own prose and never counts.
+function deciding_findings(text: string): ReadonlyArray<Finding> {
+	const findings = spec_findings(text).filter((finding) => is_recordable(finding))
+	const blocking = findings.filter((finding) => is_blocking(finding))
+
+	return blocking.length > 0 ? blocking : findings.filter((finding) => finding.is_fixed)
+}
+
+function blocking_kinds(text: string): ReadonlyArray<string> {
+	return kinds_of(deciding_findings(text))
+}
+
+// The same findings `blocking_kinds` counts, each one whole — every finding, not once per kind — so a
+// stop can be classified by what was found where, not only by its kind (joshuafolkken/kit#4519).
+function blocking_details(text: string): ReadonlyArray<StopFinding> {
+	return deciding_findings(text).map((finding) => stop_finding_of(finding))
 }
 
 function scored_kind(findings: ReadonlyArray<Finding>): ScoredVerdict['kind'] {
@@ -216,6 +281,8 @@ const run_ship_review = {
 	FIXED_PREFIX,
 	UNVERIFIED_OUTCOME,
 	VERDICT,
+	blocking_details,
+	blocking_kinds,
 	has_fixes,
 	is_clean_round_one,
 	read_verdict,
@@ -225,5 +292,5 @@ const run_ship_review = {
 	verification_prompt,
 }
 
-export type { ReviewVerdict, RoundOutcome, ScoredVerdict }
+export type { ReviewVerdict, RoundOutcome, ScoredVerdict, StopFinding }
 export { run_ship_review }

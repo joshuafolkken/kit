@@ -197,46 +197,12 @@ describe('get_ai_copy_files CLAUDE.md distribution (joshuafolkken/kit#1878)', ()
 	})
 })
 
-describe('merge_package_scripts jf-* migration', () => {
-	it('removes jf-git script since git is a retired alias', () => {
-		const content = '{"scripts":{"git":"jf-git"}}'
-		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
-			scripts: Record<string, string>
-		}
-
-		expect(parsed.scripts['git']).toBeUndefined()
-	})
-
-	it('removes all jf-* aliases that map to retired script keys', () => {
-		const content =
-			'{"scripts":{"git":"jf-git","git:followup":"jf-git-followup","telegram:test":"jf-telegram-test","build":"tsc"}}'
-		const parsed = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
-			scripts: Record<string, string>
-		}
-
-		expect(parsed.scripts['git']).toBeUndefined()
-		expect(parsed.scripts['git:followup']).toBeUndefined()
-		expect(parsed.scripts['telegram:test']).toBeUndefined()
-		expect(parsed.scripts['build']).toBe('tsc')
-	})
-
-	it('leaves non-jf-* script values unchanged', () => {
-		const content = '{"scripts":{"build":"tsc"}}'
+// joshuafolkken/kit#4187: the `jf-` and retired-script migrations are gone, so such a script is kept.
+describe('merge_package_scripts on scripts an earlier kit wrote', () => {
+	it('leaves a jf- value and a retired script name unchanged', () => {
+		const content = '{"scripts":{"git":"jf-git","test:unit":"vitest run","build":"tsc"}}'
 
 		expect(init_logic.merge_package_scripts(content, {})).toBe(content)
-	})
-
-	it('removes retired alias scripts from existing package json', () => {
-		const content =
-			'{"scripts":{"git":"josh git","git:followup":"josh git-followup","telegram:test":"josh telegram-test","test:unit":"vitest run"}}'
-		const result = JSON.parse(init_logic.merge_package_scripts(content, {})) as {
-			scripts: Record<string, string>
-		}
-
-		expect(result.scripts['git']).toBeUndefined()
-		expect(result.scripts['git:followup']).toBeUndefined()
-		expect(result.scripts['telegram:test']).toBeUndefined()
-		expect(result.scripts['test:unit']).toBeUndefined()
 	})
 })
 

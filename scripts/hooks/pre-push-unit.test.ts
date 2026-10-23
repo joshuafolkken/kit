@@ -326,6 +326,7 @@ describe('the whole suite holds a place in the core budget', () => {
 
 		expect(reservation).toHaveBeenCalledTimes(1)
 		expect(reservation.mock.calls[0]?.[0]).toBeGreaterThanOrEqual(1)
+		expect(reservation.mock.calls[0]?.[2]?.is_unit).toBe(true)
 		expect(suite_run_count()).toBe(SUITE_RAN)
 	})
 

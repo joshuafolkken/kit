@@ -56,7 +56,7 @@ function plant_both(digest: string = DIGEST, base: string = BASE): ScopedSources
 	const planted = sources()
 
 	plant(planted.lint, digest, base)
-	plant(planted.test, digest, base)
+	review_stamps.test_related_stamp.write(tree_of(digest), planted.test, base)
 
 	return planted
 }
@@ -72,6 +72,20 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	rmSync(DIRECTORY, { recursive: true, force: true })
+})
+
+// joshuafolkken/kit#4495: a record carries the fingerprint of its own check's tools and environment.
+describe('missing_checks — the inputs fingerprint', () => {
+	it('names the check whose record was written under another check’s inputs', () => {
+		const planted = sources()
+
+		plant(planted.lint, DIGEST, BASE)
+		plant(planted.test, DIGEST, BASE)
+
+		expect(scoped_green.missing_checks(tree_of(), BASE, planted)).toStrictEqual([
+			scoped_green.TEST_COMMAND,
+		])
+	})
 })
 
 describe('missing_checks', () => {

@@ -1,4 +1,9 @@
 import { json_value } from '#scripts/lib/json-value'
+import {
+	transcript_record,
+	type TranscriptBlock,
+	type TranscriptContent,
+} from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 
 // Reading the content blocks out of a session transcript.
@@ -18,27 +23,7 @@ import { z } from 'zod'
 const CONTENT_ITEM_SCHEMA = z.object({ text: z.string().nullish() })
 const RESULT_CONTENT_SCHEMA = z.union([z.string(), z.array(CONTENT_ITEM_SCHEMA)])
 
-// Every field is optional, including `type`. A required field would make one unexpected block fail
-// the whole array it sits in, and with it every other block on that line — an entire assistant turn
-// dropped from the table because one tool wrote a shape this reader had not seen. A block that
-// parses to nothing contributes nothing, which is the cost it should have.
-const BLOCK_SCHEMA = z.object({
-	type: z.string().nullish(),
-	text: z.string().nullish(),
-	name: z.string().nullish(),
-	input: z.unknown().nullish(),
-	content: RESULT_CONTENT_SCHEMA.nullish(),
-})
-
-const LINE_CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
-const MESSAGE_SCHEMA = z.object({ content: LINE_CONTENT_SCHEMA.nullish() })
-const CONTENT_LINE_SCHEMA = z.object({ type: z.string(), message: MESSAGE_SCHEMA.nullish() })
-
-type RawBlock = z.infer<typeof BLOCK_SCHEMA>
-
-const TEXT_TYPE = 'text'
-const TOOL_USE_TYPE = 'tool_use'
-const TOOL_RESULT_TYPE = 'tool_result'
+const { TEXT_TYPE, TOOL_USE_TYPE, TOOL_RESULT_TYPE } = transcript_record
 const BASH_TOOL = 'Bash'
 const COMMAND_KEY = 'command'
 
@@ -71,7 +56,7 @@ function split_bash_input(input: unknown): { command: string; rest: string } {
 	}
 }
 
-function to_tool_use(block: RawBlock): ContentBlock {
+function to_tool_use(block: TranscriptBlock): ContentBlock {
 	const tool_name = block.name ?? ''
 	const is_bash = tool_name === BASH_TOOL
 	const { command, rest } = is_bash
@@ -83,31 +68,33 @@ function to_tool_use(block: RawBlock): ContentBlock {
 
 // A tool result is either a plain string or a list of blocks. Only the textual items are counted:
 // an image block carries no text here, and inventing a size for it would put a made-up number in a
-// table whose whole purpose is to be compared against another run's.
-function result_text(content: string | ReadonlyArray<z.infer<typeof CONTENT_ITEM_SCHEMA>>): string {
-	if (typeof content === 'string') return content
+// table whose whole purpose is to be compared against another run's. A body of neither shape
+// contributes nothing rather than dropping the line it sits on.
+function result_text(content: unknown): string {
+	const parsed = RESULT_CONTENT_SCHEMA.safeParse(content)
+	if (!parsed.success) return ''
+	if (typeof parsed.data === 'string') return parsed.data
 
-	return content.map((item) => item.text ?? '').join('')
+	return parsed.data.map((item) => item.text ?? '').join('')
 }
 
 // Everything that is not a tool call: a result contributes its textual content, and anything else —
 // text, thinking, a block type this reader has never seen — contributes its `text`, which for
 // thinking is the empty string Claude Code writes there.
-function to_plain_block(block: RawBlock): ContentBlock {
+function to_plain_block(block: TranscriptBlock): ContentBlock {
 	const base = { type: block.type ?? '', tool_name: '', command: '' }
-	const text =
-		block.type === TOOL_RESULT_TYPE ? result_text(block.content ?? '') : (block.text ?? '')
+	const text = block.type === TOOL_RESULT_TYPE ? result_text(block.content) : (block.text ?? '')
 
 	return { ...base, text }
 }
 
-function to_block(block: RawBlock): ContentBlock {
+function to_block(block: TranscriptBlock): ContentBlock {
 	return block.type === TOOL_USE_TYPE ? to_tool_use(block) : to_plain_block(block)
 }
 
 // A user turn whose content is a bare string — the prompt itself, plus whatever a `UserPromptSubmit`
 // hook injected into it. Counted as text, which is what it is.
-function to_blocks(content: string | ReadonlyArray<RawBlock>): Array<ContentBlock> {
+function to_blocks(content: string | ReadonlyArray<TranscriptBlock>): Array<ContentBlock> {
 	if (typeof content === 'string') {
 		return [{ type: TEXT_TYPE, tool_name: '', command: '', text: content }]
 	}
@@ -116,13 +103,11 @@ function to_blocks(content: string | ReadonlyArray<RawBlock>): Array<ContentBloc
 }
 
 // A blank line, a line that is not JSON, and a line carrying no message content are one answer:
-// nothing to count. With `BLOCK_SCHEMA` accepting anything object-shaped, the only line lost whole
+// nothing to count. With the block schema accepting anything object-shaped, the only line lost whole
 // is one that is not JSON at all — which `cost-usage.ts` already counts as unparseable, so
 // reporting it again here would double one missing-data figure.
-function content_of(line: string): z.infer<typeof LINE_CONTENT_SCHEMA> | undefined {
-	const parsed = CONTENT_LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
-
-	return parsed.success ? (parsed.data.message?.content ?? undefined) : undefined
+function content_of(line: string): TranscriptContent | undefined {
+	return transcript_record.parse(line)?.message?.content ?? undefined
 }
 
 function parse_line(line: string): Array<ContentBlock> {

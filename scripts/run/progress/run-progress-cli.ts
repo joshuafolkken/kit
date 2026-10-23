@@ -1,11 +1,10 @@
-#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { backlog_arrival, type ArrivalProbe } from '#scripts/backlog/backlog-arrival'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_args, type ParsedValues } from './run-progress-args'
@@ -34,7 +33,6 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 // How often the loop wakes to look at the clock — not how often it reports. It is short relative to
 // the interval so that a `--mark` written by the run is noticed promptly, and long enough that a
 // watcher left running overnight costs nothing measurable.
@@ -78,7 +76,7 @@ const WAIT_EXPIRED_NOTICE = `The watch bound (\`--hours\`, ${String(DEFAULT_WAIT
 // one: a `gh` call that hangs would otherwise block the synchronous read at startup and leave the
 // watcher neither running nor saying so.
 const REPO_LOOKUP_TIMEOUT_SECONDS = 10
-const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * run_progress.MS_PER_SECOND
+const REPO_LOOKUP_TIMEOUT_MS = REPO_LOOKUP_TIMEOUT_SECONDS * MS_PER_SECOND
 // A lookup that timed out or failed is not an argument the caller got wrong, so it is told apart from
 // the usage error — read as one, it would send a person to fix arguments that were correct.
 const REPO_UNRESOLVED_NOTICE = `The repository could not be resolved (\`gh\` did not answer within ${String(REPO_LOOKUP_TIMEOUT_SECONDS)}s or failed), so the progress watcher did not start. Pass \`--repo <owner/repo>\` and start it again.`
@@ -215,7 +213,7 @@ async function emit(options: WatchOptions, context: EmitContext): Promise<EmitRe
 function decline(loop: WatchLoop, now_ms: number, notice: string): WatchLoop {
 	if (loop.said !== notice) console.error(notice)
 
-	const cooldown_ms = DECLINE_RETRY_SECONDS * run_progress.MS_PER_SECOND
+	const cooldown_ms = DECLINE_RETRY_SECONDS * MS_PER_SECOND
 
 	return { ...loop, retry_at_ms: now_ms + cooldown_ms, said: notice }
 }
@@ -442,7 +440,7 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 		max_ms: run_progress_args.to_max_ms(values.hours, values.wait === true),
 		output_paths: values.output ?? [],
 		repo,
-		tick_ms: TICK_SECONDS * run_progress.MS_PER_SECOND,
+		tick_ms: TICK_SECONDS * MS_PER_SECOND,
 	}
 }
 
@@ -480,10 +478,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await run_watch(values)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_progress_cli = {
 	DECLINE_RETRY_SECONDS,
 	DEFAULT_WAIT_MAX_HOURS,
@@ -502,8 +496,6 @@ const run_progress_cli = {
 	to_interval_ms: run_progress_args.to_interval_ms,
 	wait_once,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { WatchLoop, WatchOptions }
 export { run_progress_cli }

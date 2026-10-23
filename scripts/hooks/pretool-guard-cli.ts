@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { pretool_guard } from './pretool-guard'
@@ -11,11 +10,5 @@ import { pretool_guard } from './pretool-guard'
 // `dist/hooks/pretool-guard.js`, so the bundled hook ran no guard at all and every refusal failed open.
 // An entry nothing imports keeps the self-invoke in the file that is actually launched.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('pretool:guard')
-	else {
-		const raw_payload = await text(process.stdin)
-
-		hook_decision.load_environment_file()
-		await pretool_guard.respond(raw_payload)
-	}
+	await hook_decision.respond_from_stdin('pretool:guard', pretool_guard.respond)
 }

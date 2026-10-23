@@ -222,22 +222,27 @@ function fetch_anomalies(
 //
 // A listing that could not be read is left out of the map rather than entered as `[]`, so a
 // transport failure reads as "not asked" instead of "nobody recorded anything" — the finding it
-// would otherwise manufacture is an `error`, which stops the epic.
+// would otherwise manufacture is an `error`, which stops the epic. Only a comment from an author with
+// write access records a rationale.
 async function read_order_comments(
 	pairs: ReadonlyArray<OrderPair>,
 ): Promise<Map<string, ReadonlyArray<string>>> {
 	const ends = epic_audit_rationale.pair_ends(pairs)
-	const listings = await Promise.all(
-		ends.map(async (child) => await git_gh_command.issue_list_comments(String(child.number))),
+	const parsed = await Promise.all(
+		ends.map(async (child) => {
+			const listing = await git_gh_command.issue_list_comments(String(child.number))
+
+			return await issue_read.parse_comments(listing)
+		}),
 	)
 
 	return new Map(
 		ends.flatMap((child, index) => {
-			const comments = issue_read.parse_comments(listings[index])
+			const comments = parsed[index]
 
 			return comments === undefined
 				? []
-				: [[epic_graph.key_of(child), comments.map((comment) => comment.body)] as const]
+				: [[epic_graph.key_of(child), issue_read.trusted_bodies(comments)] as const]
 		}),
 	)
 }
@@ -349,7 +354,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
 // a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
 // command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-cli.ts`, which met the truncation first.
+// is in `scripts/cost-runtime/cost-main.ts`, which met the truncation first.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
@@ -360,6 +365,7 @@ const epic_audit_cli = {
 	attach_bodies,
 	resolve_reference_states,
 	outside_references,
+	read_order_comments,
 	audit,
 	run,
 }

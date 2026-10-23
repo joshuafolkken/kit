@@ -1,4 +1,5 @@
 import type { ParseArgsOptionsConfig } from 'node:util'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 
 // The argument reading every `josh epic` form shares, on top of `cli_flags`.
@@ -94,7 +95,37 @@ function is_value_unusable(argv: ReadonlyArray<string>, flag: string): boolean {
 	)
 }
 
+// Deduplicated because a repeated number would render a duplicate task-list row, and with
+// `--ordered` would ask GitHub to make an issue block itself.
+function to_child_numbers(raw_children: ReadonlyArray<string>): Array<number> {
+	const numbers = raw_children
+		.filter((raw) => issue_number_shape.is_issue_number(raw))
+		.map(Number)
+		.filter((value) => Number.isSafeInteger(value))
+
+	return [...new Set(numbers)]
+}
+
+// `<E> <N1> <N2> …` — the shape `--promote`, `--add` and `--decide` share: an existing issue, then at
+// least one child other than itself.
+function read_epic_children(
+	parsed: EpicArgv,
+): { epic_number: number; children: Array<number> } | undefined {
+	const [raw_epic, ...raw_children] = parsed.positionals
+
+	if (raw_epic === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(raw_epic)) {
+		return undefined
+	}
+
+	const epic_number = Number(raw_epic)
+	const children = to_child_numbers(raw_children).filter((child) => child !== epic_number)
+
+	return children.length === 0 ? undefined : { epic_number, children }
+}
+
 const epic_cli_argv = {
+	to_child_numbers,
+	read_epic_children,
 	read_form,
 	positionals_of,
 	read_flag_value,

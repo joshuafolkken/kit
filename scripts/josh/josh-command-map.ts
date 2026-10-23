@@ -47,6 +47,7 @@ const ALIASES: Record<string, string> = {
 	tr: 'test:related',
 	td: 'test:declared',
 	trd: 'test:red',
+	tpn: 'test:pinned',
 	te: 'test:e2e',
 	c: 'check',
 	pt: 'port',
@@ -55,7 +56,6 @@ const ALIASES: Record<string, string> = {
 	st: 'start',
 	sy: 'sync',
 	un: 'uninstall',
-	rmi: 'registry:migrate',
 	g: 'git',
 	gp: 'pr',
 	ms: 'main:sync',
@@ -79,6 +79,7 @@ const ALIASES: Record<string, string> = {
 	rtr: 'retrospective',
 	ca: 'cost:audit',
 	rvf: 'review:findings',
+	rvs: 'review:stops',
 	ruv: 'rule:value',
 	ev: 'eval',
 	fr: 'fresh:run',
@@ -88,6 +89,8 @@ const ALIASES: Record<string, string> = {
 	lli: 'lane:limit',
 	lrs: 'lane:restart',
 	lwd: 'lane:withdraw',
+	lps: 'lane:pause',
+	lru: 'lane:resume',
 	blr: 'backlogrun',
 }
 

@@ -1,33 +1,29 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
-import type { BudgetWait } from '#scripts/gate/core-wait'
-import type { MachineSample } from '#scripts/gate/machine-capacity'
 import type { ClosedAnswer, ClosedIssue } from './run-board-closed'
 import type { Fetch } from './run-board-fetch'
-import type { TerminalSize } from './run-board-fit'
+import type { SectionKey, TerminalSize } from './run-board-fit'
+import type { Gatherer, GatherRead } from './run-board-gather'
 import type { BoardForm } from './run-board-header'
-import { run_board_idle, type IdleSince } from './run-board-idle'
+import { run_board_idle } from './run-board-idle'
+import type { KeyInput } from './run-board-keys'
 import type { BoardPlan } from './run-board-layout'
 import type { Link } from './run-board-link'
-import type { MachineGauges, MachineMark } from './run-board-machine'
-import type { LocalRead } from './run-board-read'
+import { run_board_snapshot, type Known, type SnapshotStore } from './run-board-snapshot'
 import type { Spot } from './run-board-spin'
 import type { Thanks } from './run-board-thanks-csv'
-import type { LaneUsages, UsageMark } from './run-board-usage'
 
 // What a `run:board` redraw reads through and folds forward, shared by the
 // redraw (`run-board-tick.ts`) and its GitHub reads (`run-board-github.ts`).
 
 interface BoardPorts {
 	read_plan: (scope: NamedPlan) => Promise<BoardPlan | undefined>
-	// `undefined` when no run has started here.
-	read_local: () => Promise<LocalRead | undefined>
-	read_machine: () => Promise<MachineSample>
-	// The claims waiting in the core budget, read on the machine's second; none where it is not given.
-	read_waits?: (() => Array<BudgetWait>) | undefined
-	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
-	read_usage: (before: UsageMark | undefined) => Promise<UsageMark | undefined>
+	// The reads off this machine a redraw draws from (`run-board-gather.ts`): a live board's come from
+	// a worker thread, so no read stops its spinner.
+	gather: Gatherer
 	// The issues that answered as closed, and whether every issue answered (`run-board-closed.ts`).
 	read_closed: (issues: ReadonlyArray<number>) => Promise<ClosedAnswer>
+	// Where the last GitHub reads are kept between boards (`run-board-snapshot.ts`); none keeps nothing.
+	snapshot?: SnapshotStore | undefined
 	now: () => number
 	write: (frame: string) => void
 	// Wraps an issue number in a hyperlink where the terminal opens one, and leaves it plain elsewhere.
@@ -39,6 +35,10 @@ interface BoardPorts {
 	size?: (() => TerminalSize) | undefined
 	// The lines a live frame ends on, the first to give way to a short pane.
 	footer?: ReadonlyArray<string> | undefined
+	// The keyboard a live board folds its sections from (`run-board-keys.ts`); none where nobody types.
+	keys?: KeyInput | undefined
+	// The sections a person folded, read at every redraw; none where the frame folds nothing.
+	folded?: (() => ReadonlySet<SectionKey>) | undefined
 	form: BoardForm
 	// Records that a progress report was just given, as `run:progress --mark` does, so the next scheduled
 	// one waits a full interval from here.
@@ -56,15 +56,13 @@ interface BoardPorts {
 // drawing.
 type Pace = 'background' | 'settled'
 
-interface BoardState {
-	// The last local read, drawn until the next is due; `undefined` when no run had started.
-	local: LocalRead | undefined
-	read_ms: number | undefined
-	// When each lane the reads found idle was first read so (`run-board-idle.ts`).
-	idle_since: IdleSince
+// The last reads off this machine, then what the board folds over them.
+interface BoardState extends GatherRead {
 	// The start of the run the plan state was built for, so a run that begins draws nothing of the last.
 	run_started_ms: number | undefined
 	plan: BoardPlan | undefined
+	// The titles and labels drawn before this board's first plan lands — the last board's snapshot.
+	known: Known
 	// The plan read in flight, `undefined` once it has been folded in.
 	plan_fetch: Fetch<BoardPlan | undefined> | undefined
 	attempted_ms: number | undefined
@@ -75,20 +73,12 @@ interface BoardState {
 	closed: ReadonlyMap<number, ClosedIssue>
 	closed_fetch: Fetch<ClosedAnswer> | undefined
 	closed_attempted_ms: number | undefined
+	// The children the last closed read asked about — a child not among them is asked without waiting.
+	closed_asked: ReadonlySet<number>
 	// The last ask every child answered, open or closed; a failed read leaves it where it was.
 	closed_answered_ms: number | undefined
-	// The last machine sample, which the next one is compared against, and the gauges drawn from them.
-	machine: MachineMark | undefined
-	gauges: MachineGauges | undefined
-	// The redraw the last sample was taken on, which the next sample is due a second after.
-	sampled_ms: number | undefined
 	// Where the last frame drew its spinners, turned between redraws.
 	spots: ReadonlyArray<Spot>
-	// The last process reading, which the next one is compared against, and each lane's usage drawn from
-	// them.
-	usage: UsageMark | undefined
-	usages: LaneUsages | undefined
-	budget_waits: ReadonlyArray<BudgetWait>
 	// The reviewers drawn above the legend, the read of them in flight, and when it was last launched.
 	thanks: Thanks
 	thanks_fetch: Fetch<Thanks> | undefined
@@ -101,6 +91,7 @@ const FRESH_STATE: BoardState = {
 	idle_since: run_board_idle.NO_IDLE,
 	run_started_ms: undefined,
 	plan: undefined,
+	known: run_board_snapshot.NO_KNOWN,
 	plan_fetch: undefined,
 	attempted_ms: undefined,
 	fetched_ms: undefined,
@@ -109,12 +100,10 @@ const FRESH_STATE: BoardState = {
 	closed: new Map(),
 	closed_fetch: undefined,
 	closed_attempted_ms: undefined,
+	closed_asked: new Set(),
 	closed_answered_ms: undefined,
-	machine: undefined,
 	gauges: undefined,
-	sampled_ms: undefined,
 	spots: [],
-	usage: undefined,
 	usages: undefined,
 	budget_waits: [],
 	thanks: [],

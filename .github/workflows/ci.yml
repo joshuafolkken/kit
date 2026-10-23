@@ -51,6 +51,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
@@ -87,6 +89,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The MCR image lags the npm publish by days, so a version-derived tag is not
       # guaranteed to exist. Probe it first and fall back to a plain runner instead of
@@ -150,6 +154,8 @@ jobs:
       pull-requests: read
     outputs:
       reuse: ${{ steps.prove.outputs.reuse }}
+      run-id: ${{ steps.prove.outputs.run-id }}
+      pull-number: ${{ steps.prove.outputs.pull-number }}
     steps:
       - name: Prove the pushed tree passed PR Checks
         id: prove
@@ -217,6 +223,8 @@ jobs:
           fi
 
           echo 'reuse=true' >> "$GITHUB_OUTPUT"
+          echo "run-id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "pull-number=${pull_number}" >> "$GITHUB_OUTPUT"
           echo "Reusing successful PR Checks for tree ${current_tree}."
 
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
@@ -250,8 +258,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
+          persist-credentials: false
 
       - name: Setup Node.js
+        id: setup-node
         uses: ./.github/actions/setup-node
         with:
           registry-url: 'https://npm.pkg.github.com'
@@ -273,11 +283,19 @@ jobs:
           # first — so the cache tracks `main` instead of freezing on the first commit that hit the
           # config-hash key and never re-saving. The config-hash body above still cold-invalidates on a
           # rule edit exactly as before; the sha only ever adds a save, never suppresses one.
-          key: ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          # joshuafolkken/kit#4346: ESLint hashes `process.version` into every entry, and runner
+          # images carry different Node.js patch releases for `'24'`. Restored across two of them,
+          # every entry was stale and lint ran cold (~340s against ~60s), so the resolved version
+          # leads every key and restore-key: each release keeps its own lineage.
+          # joshuafolkken/kit#4496: the key is not built from `scripts/gate/toolchain-inputs.ts`, the
+          # list every local reuse reads — the cache is restored before the install, with no tsx to run
+          # it. The lockfile and eslint config hashes move it with the two inputs ESLint's own
+          # per-entry check does not cover.
+          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
-            ${{ runner.os }}-eslint-cache-${{ hashFiles('pnpm-lock.yaml') }}-
-            ${{ runner.os }}-eslint-cache-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
 
       # `.tsbuildinfo` and `.cspellcache` were not cached in CI at all, so the type check and spell
       # check ran cold on every run. Both are content-addressed — `tsc` records its compiler options
@@ -360,6 +378,76 @@ jobs:
         env:
           JOSH_METRICS_BASE: HEAD^1
 
+      # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no
+      # ESLint cache, and a later pull request restored an entry several merges old. Since
+      # joshuafolkken/kit#4415 every entry whose imports changed since then is linted afresh — 1,180 to
+      # 2,281 of about 3,200 files at 38 to 58 changed ones. The cache this run leaves is the cache of
+      # the tree the push carries, so it is handed to `seed-eslint-cache` below rather than linted
+      # again there. The prefix is the cache key above without its sha; the seed job saves it under
+      # the push's sha, and the test pins the two together. The upload only saves time, so a
+      # transient artifact-service error must not turn this required job red; it continues on error.
+      - name: Write ESLint cache prefix
+        id: eslint-cache-prefix
+        if: github.event_name == 'pull_request'
+        env:
+          ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+        run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
+
+      - name: Upload ESLint cache
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: eslint-cache-${{ github.event.pull_request.number }}
+          path: |
+            .eslintcache
+            eslint-cache-prefix
+          include-hidden-files: true
+          retention-days: 1
+
+  # joshuafolkken/kit#4449: the other half of the hand-off above. It runs only on a push that reused
+  # a pull request's Checks, reads that exact run's cache, and saves it under this push's sha, so the
+  # next pull request restores the cache of the tree it branched from. `actions/cache` misses on the
+  # fresh key and saves the downloaded file in its post step; the prefix is checked before it becomes
+  # a key. A missing artifact — a run from before this — or a prefix that is not a key saves nothing
+  # and leaves the push green; the next pull request then restores an older entry, as it did before.
+  seed-eslint-cache:
+    name: Seed ESLint Cache
+    needs: reuse-pr-checks
+    if: ${{ needs.reuse-pr-checks.outputs.reuse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    steps:
+      - name: Download the reused run's ESLint cache
+        id: download
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ needs.reuse-pr-checks.outputs.run-id }}
+          PULL_NUMBER: ${{ needs.reuse-pr-checks.outputs.pull-number }}
+        run: |
+          if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}"; then
+            echo '::notice::The reused run left no ESLint cache; saving nothing.'
+            exit 0
+          fi
+          prefix=$(cat eslint-cache-prefix)
+          if ! printf '%s' "${prefix}" | grep -Eq '^[A-Za-z]+-eslint-cache-v[0-9.]+-[0-9a-f]+-[0-9a-f]+-$'; then
+            echo '::warning::The ESLint cache prefix is not a cache key; saving nothing.'
+            exit 0
+          fi
+          echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+
+      - name: Save the ESLint cache under this push
+        id: save
+        if: steps.download.outputs.prefix != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .eslintcache
+          key: ${{ steps.download.outputs.prefix }}${{ github.sha }}
+
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
   # (joshuafolkken/kit#2982), which `templates/workflows/ci.yml` calls the same way, so
@@ -374,16 +462,21 @@ jobs:
   # its files over more machines. `fail-fast: false` keeps a red shard from cancelling the others,
   # so one run reports every failing file. The `Checks` aggregate below reads `needs.unit.result`,
   # which for a matrix is `success` only when every shard succeeded — no change there is needed.
+  # The shards split by the recorded per-file durations in `tools/test/unit-durations.json`, not by
+  # file count, so they finish together (`tools/test/duration-shard.ts`, joshuafolkken/kit#4467).
+  # Four shards, not three (joshuafolkken/kit#4573): balanced at three, each shard still ran its tests
+  # for 196–227 seconds and set the CI wait; a fourth cuts each slice by a quarter for about 12
+  # seconds of duplicated setup.
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
-    name: Unit Tests (${{ matrix.shard }}/3)
+    name: Unit Tests (${{ matrix.shard }}/4)
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -392,6 +485,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -413,7 +508,7 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit --shard=${{ matrix.shard }}/3
+        run: pnpm josh test:unit --shard=${{ matrix.shard }}/4
 
       # One shard is enough: the check does not depend on which test files ran beside it.
       - name: Verify optional ESLint consumer install
@@ -440,21 +535,30 @@ jobs:
   # shell body is the pattern to keep out of a workflow regardless of the value's provenance.
   checks:
     name: Checks
-    needs: [reuse-pr-checks, static-checks, unit]
+    needs: [reuse-pr-checks, static-checks, unit, node-compat]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
     steps:
+      # `node-compat` is aggregated here rather than added to the ruleset: the ruleset holds the one
+      # `Checks` context, and a matrix check name would drift with every Node version bump. It runs on
+      # the reuse path too, so its result is required on both paths (joshuafolkken/kit#4545).
       - name: Require both halves of the verification gate
         env:
           REUSE_RESULT: ${{ needs.reuse-pr-checks.outputs.reuse }}
           STATIC_RESULT: ${{ needs.static-checks.result }}
           UNIT_RESULT: ${{ needs.unit.result }}
+          NODE_RESULT: ${{ needs.node-compat.result }}
         run: |
           echo "Reuse PR Checks: ${REUSE_RESULT}"
           echo "Static Checks: ${STATIC_RESULT}"
           echo "Unit Tests: ${UNIT_RESULT}"
+          echo "Node builds: ${NODE_RESULT}"
+          if [ "${NODE_RESULT}" != 'success' ]; then
+            echo "::error::the Node build matrix did not pass"
+            exit 1
+          fi
           if [ "${STATIC_RESULT}" = 'success' ] && [ "${UNIT_RESULT}" = 'success' ]; then
             exit 0
           fi
@@ -476,7 +580,7 @@ jobs:
 
       - name: Upload PR Checks evidence
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pr-checks-${{ github.event.pull_request.number }}
           path: pr-checks-evidence
@@ -491,6 +595,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Run security audit
         uses: google/osv-scanner-action/osv-scanner-action@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
@@ -508,6 +614,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # The same rule `scripts/test/test-e2e-guard.ts` applies locally, so a suite that runs under
       # `pnpm josh test:e2e` is a suite CI runs too. Every `*.e2e.{ts,js}` outside `node_modules`
@@ -561,6 +669,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -601,7 +711,7 @@ jobs:
       # marked red on the run and a missing report is never silent. This job is skipped while kit
       # ships no E2E specs; the guard is here so adding one cannot quietly turn the gap live.
       - name: Upload test results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         with:

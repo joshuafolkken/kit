@@ -37,10 +37,11 @@ classification lives in `backlogrun-child.md` → "Each child runs in a delegate
 main line.** The unit returns conclusions with `file:line` citations, never the file text. It may run
 a temporary probe script and return its output.
 
-**The threshold is 3 files, and it is a count, not a forecast.** Brief the unit on what was already
-read. **A delegation resets the counter rather than spending it**; `pnpm josh investigation:guard`
-refuses the threshold call, in a lane child too (`pnpm josh delegate --list`; counting:
-`docs/josh-commands-automation.md` → "`josh investigation:guard`").
+**Subject reading beyond the edit targets → dispatch the unit before the first read**
+(`pnpm josh run:prep` → `=== investigation ===`). **The threshold is 3 files, and it is a count, not a
+forecast** — where the guard refuses, not a budget. Brief the unit on what was already read.
+**A delegation resets the counter rather than spending it**; the `investigation` row of
+`pnpm josh rule:list` refuses the threshold call, in a lane child too (`pnpm josh delegate --list`).
 
 **Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
 the `model` its definition names.
@@ -57,4 +58,4 @@ the main line decides what that means and what to change.
 
 **A `general-purpose` dispatch → set `model`**: `sonnet` for routine work, `opus` for judgment; a review
 takes the alias of the `model=` id its brief prints (`claude-opus-5-5` → `opus`). Delivered by the
-`agent-model` row of `pnpm josh rule:guard`.
+`agent-model` row of `pnpm josh rule:list`.

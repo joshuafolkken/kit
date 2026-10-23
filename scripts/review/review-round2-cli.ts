@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { change_base } from '#scripts/git/change-base'
+import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_code_tree } from './review-code-tree'
-import { review_round2 } from './review-round2'
+import { review_round_one_blobs } from './review-round-one-blobs'
+import { review_round2, type RoundTwoAnswer } from './review-round2'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -17,7 +19,6 @@ import { review_tree } from './review-tree'
 
 const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh review:round2 [--round-1-closed] [--json]'
-const JSON_KEY = 'round2'
 const FAILURE_EXIT_CODE = 1
 
 // The one input no command can read for itself, so the caller states it: every round-1 High/Medium
@@ -48,9 +49,37 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 // Only the paths the code record covers are re-read, so a run without one parses nothing.
 async function read_comment_only(base: string | undefined): Promise<ReadonlyArray<string>> {
 	const snapshot = review_stamps.round_one_code_stamp.read()
-	const tree = await review_code_tree.read(Object.keys(snapshot?.files ?? {}))
+	const paths = Object.keys(snapshot?.files ?? {})
+	const tree = await review_code_tree.read(paths)
+	const unmoved = review_round_one_blobs.unmoved({ from: snapshot?.base, to: base, paths })
 
-	return review_code_tree.comment_only(snapshot, tree, base)
+	return review_code_tree.comment_only(snapshot, tree, base, unmoved)
+}
+
+// The carry over every path changed now, not only round 1's: a file the fix added after the merge is
+// in no round-1 record and has to be named all the same.
+function carried_reader(
+	base: string | undefined,
+	tree: Record<string, string>,
+): (snapshot: FileMapStamp) => ReadonlyArray<string> | undefined {
+	return (snapshot) =>
+		review_round_one_blobs.carried_delta({
+			blobs: snapshot.blobs,
+			from: snapshot.base,
+			to: base,
+			paths: Object.keys(tree),
+		})
+}
+
+// `--json` carries the reason code as well, the field `josh ship` records in the lane ledger.
+function print(answer: RoundTwoAnswer, is_json: boolean): void {
+	if (is_json) {
+		console.info(review_round2.to_json(answer))
+
+		return
+	}
+
+	path_decision.print_decision(review_round2.JSON_KEY, answer.verdict, answer.reason, is_json)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -66,19 +95,20 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	// against a different one — and the resolved commit rather than `git_command.change_base`, whose
 	// fallback is a ref name that moves and would compare equal to itself.
 	const base = await change_base.resolved()
-	const { verdict, reason } = review_round2.decide({
+	// No paths argument: `read_changed_tree` reads them itself, from the one definition of "changed"
+	// `josh review:level` and `josh review:brief` all decide from. Passing our own reading would be a
+	// second definition, which is the drift that module exists to prevent.
+	const tree = await review_tree.read_changed_tree()
+	const decision = review_round2.decide({
 		base,
+		carried_delta: carried_reader(base, tree),
 		comment_only: await read_comment_only(base),
 		is_round_one_closed: options.is_round_one_closed,
 		snapshot: review_stamps.round_one_stamp.read(),
-		// No paths argument: `read_changed_tree` reads them itself, from the one definition of
-		// "changed" `josh review:level` and `josh review:brief` all decide from.
-		// Passing our own reading would be a second definition, which is the drift that module exists
-		// to prevent.
-		tree: await review_tree.read_changed_tree(),
+		tree,
 	})
 
-	path_decision.print_decision(JSON_KEY, verdict, reason, options.is_json)
+	print(decision, options.is_json)
 
 	return 0
 }
@@ -87,7 +117,14 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const review_round2_cli = { CLOSED_FLAG, parse_options, read_comment_only, run }
+const review_round2_cli = {
+	CLOSED_FLAG,
+	carried_reader,
+	parse_options,
+	print,
+	read_comment_only,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

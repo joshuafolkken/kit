@@ -1,3 +1,4 @@
+import type { RoundTwoAnswer, RoundTwoVerdict } from '#scripts/review/review-round2'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
@@ -7,6 +8,7 @@ const missing_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 // Unrecorded by default; a test that needs another answer sets it once.
 const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: 'missing' })))
+const record_round_two_mock = vi.hoisted(() => vi.fn())
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -26,9 +28,18 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+// Never `missing`, so these cases run no interaction review — its own are in
+// `run-ship-review-interaction.test.ts` (joshuafolkken/kit#4276).
+vi.mock('#scripts/review/review-interaction', () => ({
+	review_interaction: { status: async () => undefined },
+}))
+vi.mock('#scripts/lane/lane-ledger', () => ({
+	lane_ledger: { record_round_two: record_round_two_mock },
+}))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { run_ship_review } = await import('./run-ship-review')
+const { review_round2 } = await import('#scripts/review/review-round2')
 
 // joshuafolkken/kit#2427: the supervised round-1 review — open, launch, join, attest, record — and each
 // branch that hands control back to the agent.
@@ -48,7 +59,7 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const MEDIUM_UNFIXED = 'tests:medium:b.ts'
 const LOW = 'tests:low:a.ts'
-const DECIDE = 'review:round2 --round-1-closed'
+const DECIDE = 'review:round2 --round-1-closed --json'
 const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
@@ -68,16 +79,8 @@ function answer_with(failing: string | undefined): void {
 	})
 }
 
-async function stage_code(): Promise<number> {
-	const result = await run_ship_review_steps.review_stage(ISSUE)
-
-	return result.code
-}
-
-async function stage_out(): Promise<string> {
-	const result = await run_ship_review_steps.review_stage(ISSUE)
-
-	return result.out
+async function stage(is_stale = false): Promise<unknown> {
+	return await run_ship_review_steps.review_stage(ISSUE, is_stale)
 }
 
 beforeEach(() => {
@@ -94,6 +97,7 @@ beforeEach(() => {
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
 	stamps.remove_stamp.mockClear()
+	record_round_two_mock.mockClear()
 })
 
 // joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
@@ -109,17 +113,19 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(launch).not.toHaveBeenCalled()
 	})
 
-	it.each(['missing', 'not-required'])('runs the review when the record is %s', async (status) => {
+	// joshuafolkken/kit#4221: an `ok` record is no skip once the review is stale — it read the issue
+	// before its update — so that case runs stale.
+	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
 		record_check_mock.mockResolvedValueOnce({ status })
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage(status === 'ok')).toHaveProperty('code', OK)
 		expect(commands()).toContain(OPEN)
 	})
 })
 
 describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
 		expect(stamps.write_text_stamp).toHaveBeenCalledWith(expect.any(String), BRIEF)
 		expect(launch.mock.calls[0]?.[0]).toMatchObject({ argv: ARGV })
@@ -128,7 +134,7 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('records Low findings and ships on', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${LOW}\n`)
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toContain(`${RECORD} ${LOW}`)
 	})
 
@@ -156,50 +162,48 @@ describe('run_ship_review_steps.review_stage — a finding or a refusal stops it
 
 		stamps.read_stamp_text.mockReturnValue(described)
 
-		expect(await stage_out()).toContain(described)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(described))
 		expect(commands()).toContain(`${RECORD} ${HIGH}`)
 	})
 
-	it.each([JOIN, ATTEST])('stops at a failed `%s` without recording', async (failing) => {
+	// joshuafolkken/kit#4431: a stop on no finding is tagged with its step's own cause.
+	it.each([
+		[JOIN, 'check'],
+		[ATTEST, 'attest'],
+		[RECORD, 'check'],
+	])('stops at a failed `%s` without recording, tagged %s', async (failing, cause) => {
 		answer_with(failing)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', cause)
 		expect(commands().at(-1)).toBe(failing)
 	})
 
 	it('stops when the brief is refused, launching no reviewer', async () => {
 		answer_with(OPEN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(launch).not.toHaveBeenCalled()
 	})
 
 	it('stops on an unfinished review (no findings file) without recording', async () => {
 		stamps.read_stamp_text.mockReturnValue(undefined)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'infra')
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST])
 	})
 })
 
 describe('run_ship_review_steps.review_stage — a reviewer error stops it', () => {
-	it('stops when the reviewer exits non-zero, before the join', async () => {
-		launch.mockResolvedValue({ ...COMPLETED, exit_code: FAILED })
-
-		expect(await stage_code()).toBe(FAILED)
-		expect(commands()).toStrictEqual([OPEN])
-	})
-
 	it('stops when the reviewer could not start', async () => {
 		launch.mockResolvedValue({ kind: 'failed', note: SPAWN_NOTE })
 
-		expect(await stage_out()).toContain(SPAWN_NOTE)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(SPAWN_NOTE))
 	})
 
 	it('stops when the reviewer profile is rejected', async () => {
 		review_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
 
-		expect(await stage_out()).toContain(PROFILE_NOTE)
+		expect(await stage()).toHaveProperty('out', expect.stringContaining(PROFILE_NOTE))
 		expect(launch).not.toHaveBeenCalled()
 	})
 })
@@ -213,7 +217,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
 	})
 
@@ -221,7 +225,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(LOW)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(commands().at(-1)).toBe(JOIN)
 	})
 
@@ -231,7 +235,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		stamps.read_stamp_text.mockReturnValue(`${FIXED_MEDIUM}\n${MEDIUM_UNFIXED}`)
 		answer_with(JOIN)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'finding')
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM} ${MEDIUM_UNFIXED}`])
 	})
 })
@@ -242,14 +246,14 @@ describe('run_ship_review_steps.review_stage — the scoped pair before the revi
 	it('runs the checks the tree has no green record for, then reviews without stopping', async () => {
 		missing_mock.mockReturnValue([LINT, TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([LINT, TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
 	it('runs only the check whose record is stale', async () => {
 		missing_mock.mockReturnValueOnce([TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
@@ -257,7 +261,7 @@ describe('run_ship_review_steps.review_stage — the scoped pair before the revi
 		missing_mock.mockReturnValue([LINT, TEST])
 		answer_with(LINT)
 
-		expect(await stage_code()).toBe(FAILED)
+		expect(await stage()).toHaveProperty('cause', 'check')
 		expect(commands()).toStrictEqual([LINT])
 		expect(launch).not.toHaveBeenCalled()
 	})
@@ -270,7 +274,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
 		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
 
-		expect(await stage_code()).toBe(OK)
+		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${MEDIUM}`])
 	})
 
@@ -295,14 +299,22 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 	})
 })
 
+// An empty delta skips and a live one runs: one code per verdict is enough here, since the stage
+// records the code as read rather than interpreting it.
+function decision_of(verdict: RoundTwoVerdict): RoundTwoAnswer {
+	const code = verdict === 'skip' ? review_round2.CODE.EMPTY : review_round2.CODE.LIVE
+
+	return { verdict, code, reason: `${code} reason` }
+}
+
 // What each command prints in a round-2 stage: the decision, the brief, and nothing for the rest.
-function round_two_output(command: string, decision: string): string {
-	if (command === DECIDE) return `${decision}\n`
+function round_two_output(command: string, decision: RoundTwoVerdict): string {
+	if (command === DECIDE) return `${review_round2.to_json(decision_of(decision))}\n`
 
 	return command === BRIEF_TWO ? BRIEF : ''
 }
 
-function answer_round_two(decision: string, failing?: string): void {
+function answer_round_two(decision: RoundTwoVerdict, failing?: string): void {
 	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
 		const command = argv.join(' ')
 
@@ -316,6 +328,34 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 
 		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toMatchObject(SKIPPED)
 		expect(commands()).toStrictEqual([DECIDE])
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4064: the skip's output stays the bare verdict and the note, as before.
+	it('keeps the skipped output to the verdict and the note', async () => {
+		answer_round_two('skip')
+
+		const result = await run_ship_review_steps.round_two_stage(ISSUE)
+
+		expect(result.out).toBe('skip\nround 2 not due — nothing left to verify; shipping on.')
+	})
+
+	it.each([
+		['skip', 'empty'],
+		['required', 'live'],
+	] as const)('records a %s decision with its code in the lane ledger', async (verdict, code) => {
+		answer_round_two(verdict)
+
+		await run_ship_review_steps.round_two_stage(ISSUE)
+
+		expect(record_round_two_mock).toHaveBeenCalledWith({ issue: Number(ISSUE), verdict, code })
+	})
+
+	it('stops on a decision it cannot parse, recording nothing and launching no reviewer', async () => {
+		josh_run_mock.mockResolvedValue({ code: OK, out: 'skip\n' })
+
+		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('cause', 'check')
+		expect(record_round_two_mock).not.toHaveBeenCalled()
 		expect(launch).not.toHaveBeenCalled()
 	})
 

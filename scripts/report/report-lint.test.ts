@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { report_format_reference } from './report-format-reference'
+import { report_labels } from './report-labels'
 import { report_lint } from './report-lint'
+
+// The Japanese table is passed explicitly, so a developer's own `JOSH_SESSION_LANG` never decides a
+// result here.
+const JA = report_labels.JAPANESE_LABELS
+const EN = report_labels.ENGLISH_LABELS
+
+function lint(summary: string): ReadonlyArray<string> {
+	return report_lint.lint_report(summary, JA)
+}
 
 const PATH_VIOLATION = 'file path or CLI flag'
 const CHANGES_HEADER = '**変更とテスト**'
@@ -43,11 +53,11 @@ function replace_once(summary: string, target: string, replacement: string): str
 
 describe('report_lint.lint_report — a conforming summary', () => {
 	it('accepts a summary that follows the shape', () => {
-		expect(report_lint.lint_report(CONFORMING_SUMMARY)).toEqual([])
+		expect(lint(CONFORMING_SUMMARY)).toEqual([])
 	})
 
 	it('leaves file paths in the changes section alone', () => {
-		expect(report_lint.lint_report(CONFORMING_SUMMARY)).toEqual([])
+		expect(lint(CONFORMING_SUMMARY)).toEqual([])
 	})
 })
 
@@ -55,32 +65,28 @@ describe('report_lint.lint_report — violations', () => {
 	it('flags a summary wrapped in a code fence', () => {
 		const fenced = ['```md', CONFORMING_SUMMARY, '```'].join('\n')
 
-		expect(report_lint.lint_report(fenced).some((line) => line.includes('code fence'))).toBe(true)
+		expect(lint(fenced).some((line) => line.includes('code fence'))).toBe(true)
 	})
 
 	it('flags a missing label', () => {
 		const without_details = replace_once(CONFORMING_SUMMARY, '**技術詳細**', '**something else**')
 
-		expect(
-			report_lint
-				.lint_report(without_details)
-				.some((line) => line.includes('missing label: 技術詳細')),
-		).toBe(true)
+		expect(lint(without_details).some((line) => line.includes('missing label: 技術詳細'))).toBe(
+			true,
+		)
 	})
 
 	it('flags an overview line over the character ceiling', () => {
 		const long_sentence = 'あ'.repeat(report_lint.MAX_OVERVIEW_CHARS + 1)
 		const over = replace_once(CONFORMING_SUMMARY, NOW_SENTENCE, long_sentence)
 
-		expect(report_lint.lint_report(over).some((line) => line.includes('over'))).toBe(true)
+		expect(lint(over).some((line) => line.includes('over'))).toBe(true)
 	})
 
 	it('flags a file path in the overview', () => {
 		const with_path = replace_once(CONFORMING_SUMMARY, FIX_SENTENCE, 'scripts/foo/bar.ts を直す。')
 
-		expect(report_lint.lint_report(with_path).some((line) => line.includes(PATH_VIOLATION))).toBe(
-			true,
-		)
+		expect(lint(with_path).some((line) => line.includes(PATH_VIOLATION))).toBe(true)
 	})
 
 	it('flags a CLI flag in the overview', () => {
@@ -90,9 +96,7 @@ describe('report_lint.lint_report — violations', () => {
 			'--notify-message で確認する。',
 		)
 
-		expect(report_lint.lint_report(with_flag).some((line) => line.includes(PATH_VIOLATION))).toBe(
-			true,
-		)
+		expect(lint(with_flag).some((line) => line.includes(PATH_VIOLATION))).toBe(true)
 	})
 })
 
@@ -101,7 +105,7 @@ const CASE_TIER_WITHOUT_REASON = '   - ケース: 正常 / 重複: 該当なし'
 
 describe('report_lint.lint_report — case-based test declaration', () => {
 	it('accepts the two-tier case declaration', () => {
-		expect(report_lint.lint_report(CONFORMING_SUMMARY)).toEqual([])
+		expect(lint(CONFORMING_SUMMARY)).toEqual([])
 	})
 
 	it('flags the old one-line declaration that lists no cases', () => {
@@ -111,31 +115,31 @@ describe('report_lint.lint_report — case-based test declaration', () => {
 			ONE_LINE_CHANGES,
 		)
 
-		expect(report_lint.lint_report(old_format).length).toBeGreaterThan(0)
+		expect(lint(old_format).length).toBeGreaterThan(0)
 	})
 
 	it('flags an N/A cross-out with no reason after it', () => {
 		const no_reason = replace_once(CONFORMING_SUMMARY, CASE_TIER_LINE, CASE_TIER_WITHOUT_REASON)
-		const report = report_lint.lint_report(no_reason)
+		const report = lint(no_reason)
 
-		expect(report.some((line) => line.includes(report_lint.NA_LABEL))).toBe(true)
+		expect(report.some((line) => line.includes(JA.not_applicable))).toBe(true)
 	})
 
 	it('flags a second tier with fewer than the required conditions', () => {
 		const two_conditions = replace_once(CONFORMING_SUMMARY, `\n${THIRD_CONDITION}`, '')
-		const report = report_lint.lint_report(two_conditions)
+		const report = lint(two_conditions)
 
-		expect(report.some((line) => line.includes(report_lint.BREAK_LABEL))).toBe(true)
+		expect(report.some((line) => line.includes(JA.if_it_breaks))).toBe(true)
 	})
 
 	it('accepts the never-breaks escape in place of three conditions', () => {
 		const escaped = replace_once(
 			CONFORMING_SUMMARY,
 			BREAK_TIER.join('\n'),
-			`${BREAK_TIER_LABEL} ${report_lint.NO_BREAK_ESCAPE}`,
+			`${BREAK_TIER_LABEL} ${JA.never_breaks}`,
 		)
 
-		expect(report_lint.lint_report(escaped)).toEqual([])
+		expect(lint(escaped)).toEqual([])
 	})
 })
 
@@ -143,9 +147,9 @@ describe('report_lint.lint_report — N/A per segment', () => {
 	it('flags a reasonless N/A that follows one that carries a reason on the same line', () => {
 		const trailing_na = `${CASE_TIER_LINE} / 順序: 該当なし`
 		const mixed = replace_once(CONFORMING_SUMMARY, CASE_TIER_LINE, trailing_na)
-		const report = report_lint.lint_report(mixed)
+		const report = lint(mixed)
 
-		expect(report.some((line) => line.includes(report_lint.NA_LABEL))).toBe(true)
+		expect(report.some((line) => line.includes(JA.not_applicable))).toBe(true)
 	})
 })
 
@@ -157,8 +161,74 @@ describe('report_lint.lint_report — inline emphasis', () => {
 			'この scripts/foo/bar.ts を **強調** して直す。',
 		)
 
+		expect(lint(with_emphasis).some((line) => line.includes(PATH_VIOLATION))).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4157: the labels follow the session language, so a summary translated by the
+// table passes in an English session and the Japanese labels alone no longer do.
+const ENGLISH_SUMMARY = [
+	`**${EN.overview}**`,
+	'',
+	`- **${EN.now}**: The report check rejects a translated summary.`,
+	`- **${EN.change}**: The check reads the labels of the session language.`,
+	`- **${EN.check}**: Automated tests run the check in both languages.`,
+	'',
+	`**${EN.details}**`,
+	'',
+	`**${EN.changes}**`,
+	'',
+	CHANGE_LINE,
+	`   - ${EN.cases}: normal / duplicate: ${EN.not_applicable} — the input is a set`,
+	`   - ${EN.if_it_breaks}:`,
+	'     1. an empty list',
+	'     2. a concurrent call',
+	'     3. a null input',
+].join('\n')
+
+describe('report_lint.lint_report — the English label table', () => {
+	it('accepts a summary written with the English labels', () => {
+		expect(report_lint.lint_report(ENGLISH_SUMMARY, EN)).toEqual([])
+	})
+
+	it('reports every English label missing from a Japanese-only summary', () => {
+		const report = report_lint.lint_report(CONFORMING_SUMMARY, EN)
+
+		expect(report).toEqual(
+			expect.arrayContaining(
+				report_lint.required_labels(EN).map((label) => `✖ missing label: ${label}`),
+			),
+		)
+	})
+
+	it('flags a missing Change line though Changes and tests contains the word', () => {
+		const without_change = ENGLISH_SUMMARY.replace(
+			`- **${EN.change}**: The check reads the labels of the session language.\n`,
+			'',
+		)
+
+		expect(report_lint.lint_report(without_change, EN)).toContain(`✖ missing label: ${EN.change}`)
+	})
+
+	it('flags an English N/A cross-out with no reason', () => {
+		const no_reason = ENGLISH_SUMMARY.replace(' — the input is a set', '')
+
 		expect(
-			report_lint.lint_report(with_emphasis).some((line) => line.includes(PATH_VIOLATION)),
+			report_lint.lint_report(no_reason, EN).some((line) => line.includes(EN.not_applicable)),
+		).toBe(true)
+	})
+})
+
+describe('report_lint.lint_report — the English overview region', () => {
+	it('keeps checking the overview past a sentence that contains the word Details', () => {
+		const long_tail = 'x'.repeat(report_lint.MAX_OVERVIEW_CHARS + 1)
+		const with_word = ENGLISH_SUMMARY.replace(
+			`- **${EN.now}**: The report check rejects a translated summary.`,
+			() => `- **${EN.now}**: ${EN.details} panel lists the rows.\n- **${EN.check}**: ${long_tail}`,
+		)
+
+		expect(
+			report_lint.lint_report(with_word, EN).some((line) => line.includes('overview line over')),
 		).toBe(true)
 	})
 })
@@ -169,11 +239,11 @@ describe('report_lint.with_reference', () => {
 	const pointer = report_format_reference.pointer(report_format_reference.SUMMARY_TEMPLATE_HEADING)
 
 	it('adds nothing to a clean summary', () => {
-		expect(report_lint.with_reference(report_lint.lint_report(CONFORMING_SUMMARY))).toEqual([])
+		expect(report_lint.with_reference(lint(CONFORMING_SUMMARY))).toEqual([])
 	})
 
 	it('ends a report with missing labels with one pointer to the template section', () => {
-		const violations = report_lint.lint_report('- prose only')
+		const violations = lint('- prose only')
 		const report = report_lint.with_reference(violations)
 
 		expect(violations.length).toBeGreaterThan(1)

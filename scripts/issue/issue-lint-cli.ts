@@ -1,10 +1,9 @@
-#!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { behavior_change_lint } from './behavior-change-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
+import { issue_not_before } from './issue-not-before'
 
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
 // one per line, exiting non-zero. It reads a path rather than stdin so it can
@@ -28,6 +27,7 @@ function problems(body: string): ReadonlyArray<string> {
 		...behavior_change_lint.problems(body),
 		...expected_effect_lint.problems(body),
 		...issue_classification.problems(body),
+		...issue_not_before.problems(body),
 	]
 }
 
@@ -56,14 +56,6 @@ async function run(body_path: string | undefined): Promise<number> {
 	return report(problems(body), body)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv[0])
-}
-
 const issue_lint_cli = { problems, run }
-
-const ARGV_OFFSET = 2
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_lint_cli }

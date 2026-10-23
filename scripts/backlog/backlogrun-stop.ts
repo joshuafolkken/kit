@@ -22,12 +22,27 @@ import { backlogrun_launch } from './backlogrun-launch'
 // after a `run:wake --stop` or a supervisor that gave up, and the session it woke outlives both.
 //
 // **Lanes are counted, never stopped**: a child killed mid-change leaves a tree nobody can resume.
+// `josh lane:pause --all` is the way to suspend them without discarding anything.
+//
+// **`--restart` stops the same processes and keeps the record** (`stop_keeping_record`), so the run's
+// budget, counters and named list carry over to the supervisor started after it.
 
 const STOPPED_REASON = 'stopped by a person with `josh backlogrun --stop`'
 const PREFIX = 'backlogrun:'
 const ISSUE_PREFIX = '#'
 
-type RecordOutcome = { kind: 'none' } | { kind: 'ended' } | { kind: 'held'; owner: number }
+type RecordOutcome =
+	{ kind: 'none' } | { kind: 'ended' } | { kind: 'kept' } | { kind: 'held'; owner: number }
+
+// What stopping the processes left: the pids stopped, the record as it stood, and the live owner this
+// command may not signal.
+interface StoppedProcesses {
+	supervisor: number | undefined
+	parent: number | undefined
+	session: number | undefined
+	read: CarryRead
+	holder: number | undefined
+}
 
 interface StopReport {
 	// The pids stopped, `undefined` where there was nothing to stop.
@@ -41,6 +56,8 @@ interface StopReport {
 }
 
 interface StopPorts {
+	running_supervisor: (git_directory: string) => number | undefined
+	running_parent: (git_directory: string) => number | undefined
 	stop_supervisor: (git_directory: string) => number | undefined
 	stop_parent: (git_directory: string) => number | undefined
 	stop_session: (pid: number) => void
@@ -59,6 +76,8 @@ async function open_lanes(): Promise<Array<string>> {
 
 // A person who typed the stop is at the terminal, so the ⏸️ confirmation a stop pushes is not sent.
 const LIVE_PORTS: StopPorts = {
+	running_supervisor: (git_directory) => run_wake.read_wake(run_wake.wake_path(git_directory))?.pid,
+	running_parent: backlogrun_launch.running_parent,
 	stop_supervisor: (git_directory) => run_wake_stop.stop(run_wake.wake_path(git_directory))?.pid,
 	stop_parent: backlogrun_launch.stop_parent,
 	stop_session: run_wake_stop.signal,
@@ -120,17 +139,67 @@ async function close_record(
 	return { kind: 'ended' }
 }
 
-async function stop(git_directory: string, ports: StopPorts = LIVE_PORTS): Promise<StopReport> {
+function stop_processes(git_directory: string, ports: StopPorts): StoppedProcesses {
 	const supervisor = ports.stop_supervisor(git_directory)
 	const parent = ports.stop_parent(git_directory)
 	const read = ports.read_carry(git_directory)
 	const owner = standing_owner(read, [supervisor, parent], ports)
 	const session = stop_headless(owner, read, ports)
 	const holder = session === undefined ? owner : undefined
-	const record = await close_record(git_directory, read, holder, ports)
-	const lanes = await ports.lanes()
 
-	return { supervisor, parent, session, record, lanes }
+	return { supervisor, parent, session, read, holder }
+}
+
+function kept_record(read: CarryRead, holder: number | undefined): RecordOutcome {
+	if (read.kind === 'none') return { kind: 'none' }
+
+	return holder === undefined ? { kind: 'kept' } : { kind: 'held', owner: holder }
+}
+
+const NOTHING_STOPPED = { supervisor: undefined, parent: undefined, session: undefined }
+
+// The live owner `--restart` may not signal, read before anything is stopped: a refusal found after the
+// supervisor and the parent were stopped would leave the run with neither.
+function foreign_owner(git_directory: string, ports: StopPorts): number | undefined {
+	const read = ports.read_carry(git_directory)
+
+	if (is_headless_owner(read)) return undefined
+
+	const running = [ports.running_supervisor(git_directory), ports.running_parent(git_directory)]
+
+	return standing_owner(read, running, ports)
+}
+
+async function report_of(
+	stopped: Pick<StoppedProcesses, 'supervisor' | 'parent' | 'session'>,
+	record: RecordOutcome,
+	ports: StopPorts,
+): Promise<StopReport> {
+	const { supervisor, parent, session } = stopped
+
+	return { supervisor, parent, session, record, lanes: await ports.lanes() }
+}
+
+async function stop(git_directory: string, ports: StopPorts = LIVE_PORTS): Promise<StopReport> {
+	const stopped = stop_processes(git_directory, ports)
+	const record = await close_record(git_directory, stopped.read, stopped.holder, ports)
+
+	return await report_of(stopped, record, ports)
+}
+
+async function stop_keeping_record(
+	git_directory: string,
+	ports: StopPorts = LIVE_PORTS,
+): Promise<StopReport> {
+	const holder = foreign_owner(git_directory, ports)
+
+	if (holder !== undefined) {
+		return await report_of(NOTHING_STOPPED, { kind: 'held', owner: holder }, ports)
+	}
+
+	const stopped = stop_processes(git_directory, ports)
+
+	return await report_of(stopped, kept_record(stopped.read, stopped.holder), ports)
 }
 
 function process_line(what: string, pid: number | undefined): Array<string> {
@@ -140,6 +209,7 @@ function process_line(what: string, pid: number | undefined): Array<string> {
 function record_lines(outcome: RecordOutcome): Array<string> {
 	if (outcome.kind === 'none') return []
 	if (outcome.kind === 'ended') return [`${PREFIX} ended the run's record`]
+	if (outcome.kind === 'kept') return [`${PREFIX} kept the run's record`]
 
 	return [
 		`${PREFIX} process ${String(outcome.owner)} owns the run and was not started by \`josh backlogrun\`; its record is kept — end the run from that session`,
@@ -151,7 +221,9 @@ function lane_lines(lanes: ReadonlyArray<string>): Array<string> {
 
 	const issues = lanes.map((issue) => `${ISSUE_PREFIX}${issue}`).join(' ')
 
-	return [`${PREFIX} ${String(lanes.length)} lane(s) still running, not stopped: ${issues}`]
+	return [
+		`${PREFIX} ${String(lanes.length)} lane(s) still running, not stopped: ${issues} — suspend them in place with \`josh lane:pause --all\``,
+	]
 }
 
 // What a person reads back: one line per thing done, or the one line that says nothing was running.
@@ -172,7 +244,7 @@ function is_stopped(report: StopReport): boolean {
 	return report.record.kind !== 'held'
 }
 
-const backlogrun_stop = { is_stopped, lines_of, stop }
+const backlogrun_stop = { is_stopped, lines_of, stop, stop_keeping_record }
 
 export type { StopPorts, StopReport }
 export { backlogrun_stop }

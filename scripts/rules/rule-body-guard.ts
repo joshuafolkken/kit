@@ -178,6 +178,14 @@ const ROW = {
 	reason: RULE_BODY_REASON,
 	already_satisfied: answered_placement,
 	keeps: bash_triggers.on_bash_command(runs_placement_oracle),
+	about: {
+		title: 'Question 0 and the ordering question before writing a rule into prose',
+		topic: '`residency.md`',
+		fires:
+			'an `Edit` / `Write` to `CLAUDE.md` / `prompts/**/*.md` / `.claude/skills/**/*.md` appending at least the threshold. Refused until both `pnpm josh oracle:list` and `pnpm josh run:step` ran',
+		quiet:
+			'not a rule document, an append under the threshold (typo, link swap, deletion), or both commands ran',
+	},
 }
 
 const rule_body_guard = {

@@ -1,13 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_content } from '#scripts/sync/file-content'
 import type { FileAction } from './init-actions'
 
 const SAMPLE_INDENT_WIDTH = 4
 const SAMPLE_INDENT = ' '.repeat(SAMPLE_INDENT_WIDTH)
 
 function write_new_file(action: FileAction, destination_path: string): void {
-	mkdirSync(path.dirname(destination_path), { recursive: true })
-	writeFileSync(destination_path, action.create())
+	file_content.write_contained(destination_path, action.create())
 	console.info(`  ✔ created   ${action.dest}`)
 }
 
@@ -17,14 +17,12 @@ function show_sample(action: FileAction): void {
 	console.info(action.create().replaceAll(/^/gmu, () => SAMPLE_INDENT))
 }
 
-// A file that already holds the sample needs nothing added, so only one that differs gets it shown —
-// for a create-only file (no merge) as for a merge that only migrates a kit-written line (#3069).
+// A file that already holds the sample needs nothing added, so only a create-only file (no merge)
+// that differs gets it shown (#3069).
 function report_unchanged(action: FileAction, existing: string): void {
 	const is_sample_missing = existing !== action.create()
-	const should_show_sample =
-		action.merge === undefined || action.should_show_sample_when_unchanged === true
 
-	if (is_sample_missing && should_show_sample) show_sample(action)
+	if (is_sample_missing && action.merge === undefined) show_sample(action)
 	else console.info(`  ✔ unchanged ${action.dest}`)
 }
 
@@ -38,7 +36,7 @@ function merge_existing_file(action: FileAction, destination_path: string): void
 		return
 	}
 
-	writeFileSync(destination_path, merged)
+	file_content.write_contained(destination_path, merged)
 	console.info(`  ✔ updated   ${action.dest}`)
 }
 

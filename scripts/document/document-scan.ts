@@ -57,7 +57,7 @@ function command_references(text: string): Array<string> {
 		.filter((name) => !name.endsWith(':'))
 }
 
-// A `<placeholder>` inside a command, and `depth:<n>` after the char class stops at `<`, both leave a
+// A `<placeholder>` inside a command, and `label:<n>` after the char class stops at `<`, both leave a
 // token that is not a real label. Real labels never end in a colon and never carry angle brackets.
 function is_real_label(token: string): boolean {
 	return token.length > 0 && !token.endsWith(':') && !token.includes('<')

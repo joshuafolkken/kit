@@ -1,15 +1,18 @@
 # Never put a body in shell double quotes — rationale
 
-This is maintainer-only rationale behind `prompts/collaboration-workflow/shell-body.md` — the
-incidents, measurements and arguments that justify the procedure's boundaries, trigger and blind
-spots. No run reads it. Every trigger, command, verdict and boundary an agent follows stays in the
-procedure, and a change to this file changes no rule.
+Rationale behind `prompts/collaboration-workflow/shell-body.md`.
 
 ## The incidents — two kinds of damage, one cause
 
-In the joshuafolkken/kit#1535 run late on 2026-09-07, the call under the procedure's "何が起きるのか"
-heading (a `gh api ... -f body="…"` whose body held the backticked word `pnpm josh ms`) **switched the
-lane's work tree to `main` and stopped the run**. Recovery was manual.
+A backtick and a `$` inside double quotes are evaluated before the command runs. In the
+joshuafolkken/kit#1535 run late on 2026-09-07, this call ran `pnpm josh ms` and embedded its output
+in the body:
+
+```bash
+gh api repos/{owner}/{repo}/issues/1535/comments -f body="… `pnpm josh ms` は …"
+```
+
+It **switched the lane's work tree to `main` and stopped the run**. Recovery was manual.
 
 The same root reaches a second mouth. A backticked word (`` `owner/repo#` ``) in a body passed to
 `pnpm josh followup --notify-message "…"` was replaced by an empty string, and the word vanished from
@@ -53,7 +56,7 @@ avoiding. So passing both is refused rather than resolved in favor of either.
 
 **That writing a rule down is not enough to have it followed has been measured repeatedly in this
 repository** ([`rule-delivery.md`](../../prompts/collaboration-workflow/rule-delivery.md)). So this rule
-rides as one row of the joshuafolkken/kit#1524 mechanism, and `pnpm josh rule:guard` refuses the matching `Bash` call and
+rides as one row of the joshuafolkken/kit#1524 mechanism, and the `shell-body` row of `pnpm josh rule:list` refuses the matching `Bash` call and
 puts the rule in front of the run. The enumeration's row is `shell-body` in
 `scripts/rules/delivered-rules.ts`, and the trigger it reads — which spellings carry a body inline and
 what the shell does to that value — is in `scripts/rules/shell-body-trigger.ts`.

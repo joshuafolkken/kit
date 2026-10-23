@@ -7,7 +7,10 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 // prefix so `observation-ledger-line.ts`'s `- k:` grammar never treats them as its own — one ledger,
 // one commit path, a second line *type* rather than a second ledger.
 
-const FINDING_PREFIX = '- rf:'
+// **The interaction review writes the same grammar under its own prefix** (joshuafolkken/kit#4276), so
+// its round is told apart from `/code-review`'s by the merge gate, and its findings stay out of the
+// `/code-review` tally a reader compares rounds by.
+const PREFIX = { code: '- rf:', interaction: '- ri:' } as const
 const FIELD_SEPARATOR = ' | '
 const FIELD_COUNT = 5
 
@@ -34,6 +37,7 @@ const NO_FILE = '-'
 
 type Category = (typeof CATEGORIES)[number]
 type Severity = (typeof SEVERITIES)[number]
+type LineKind = keyof typeof PREFIX
 
 interface Finding {
 	category: Category
@@ -65,27 +69,36 @@ function issue_field(issue: number): string {
 	return issue_cite.plain(issue)
 }
 
-function line_of(fields: ReadonlyArray<string>): string {
-	return `${FINDING_PREFIX}${fields.join(FIELD_SEPARATOR)}`
+function line_of(fields: ReadonlyArray<string>, kind: LineKind): string {
+	return `${PREFIX[kind]}${fields.join(FIELD_SEPARATOR)}`
 }
 
-function finding_line(finding: Finding, date: string, issue: number): string {
-	return line_of([finding.category, finding.severity, finding.file, date, issue_field(issue)])
+function finding_line(
+	finding: Finding,
+	date: string,
+	issue: number,
+	kind: LineKind = 'code',
+): string {
+	return line_of([finding.category, finding.severity, finding.file, date, issue_field(issue)], kind)
 }
 
 // **A zero-finding round records `none`, not nothing.** Reading its absence as "no findings" would
 // merge the round that found nothing with the round nobody recorded, which is the exact confusion the
 // ledger exists to end.
-function zero_round_line(date: string, issue: number): string {
-	return line_of([NONE, NONE, NO_FILE, date, issue_field(issue)])
+function zero_round_line(date: string, issue: number, kind: LineKind = 'code'): string {
+	return line_of([NONE, NONE, NO_FILE, date, issue_field(issue)], kind)
 }
 
-function is_finding_line(line: string): boolean {
-	return line.trimStart().startsWith(FINDING_PREFIX)
+function is_finding_line(line: string, kind: LineKind = 'code'): boolean {
+	return line.trimStart().startsWith(PREFIX[kind])
+}
+
+function fields_of(line: string, kind: LineKind = 'code'): ReadonlyArray<string> {
+	return line.trimStart().slice(PREFIX[kind].length).split(FIELD_SEPARATOR)
 }
 
 function category_of(line: string): string | undefined {
-	const fields = line.trimStart().slice(FINDING_PREFIX.length).split(FIELD_SEPARATOR)
+	const fields = fields_of(line)
 
 	return fields.length === FIELD_COUNT ? fields[0] : undefined
 }
@@ -135,8 +148,8 @@ function zero_round_count(content: string): number {
 // The issue a finding line is keyed to — its fifth field, the `#<N>` token — or `undefined` for a
 // non-finding or malformed line. The record check reads this to ask whether a given issue's round was
 // recorded at all.
-function issue_of(line: string): string | undefined {
-	const fields = line.trimStart().slice(FINDING_PREFIX.length).split(FIELD_SEPARATOR)
+function issue_of(line: string, kind: LineKind): string | undefined {
+	const fields = fields_of(line, kind)
 
 	return fields.length === FIELD_COUNT ? fields[FIELD_COUNT - 1] : undefined
 }
@@ -145,10 +158,12 @@ function issue_of(line: string): string | undefined {
 // asks whether the round was recorded, not whether it found anything — reading the issue field, which
 // a zero-finding line carries too, is what keeps a clean round's single line from reading as "nobody
 // recorded this".
-function has_issue_record(content: string, issue: number): boolean {
+function has_issue_record(content: string, issue: number, kind: LineKind = 'code'): boolean {
 	const target = issue_field(issue)
 
-	return content.split('\n').some((line) => is_finding_line(line) && issue_of(line) === target)
+	return content
+		.split('\n')
+		.some((line) => is_finding_line(line, kind) && issue_of(line, kind) === target)
 }
 
 const review_finding_ledger = {
@@ -165,5 +180,5 @@ const review_finding_ledger = {
 	zero_round_line,
 }
 
-export type { CategoryCount, Finding }
+export type { CategoryCount, Finding, LineKind }
 export { review_finding_ledger }

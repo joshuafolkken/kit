@@ -7,16 +7,16 @@ import { run_carry, type CarryOwner } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake } from './run-wake'
-import { run_wake_cli } from './run-wake-cli'
 import type { WakeContext } from './run-wake-describe'
 import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
+import { run_wake_ports } from './run-wake-ports'
 import { run_wake_restart } from './run-wake-restart'
 
 // joshuafolkken/kit#3701: a driver that exited non-zero left the carry record adopted for the
 // supervisor's own process, so every restarted pass read that owner as a session at work and waited
 // on itself — the driver ran once, the restart bound was never reached and nothing was reported.
 // These cases run the supervisor's real ports, loop, restart and driver; only the driver's command,
-// the clock between passes and the event stream are stood in for.
+// the clock between passes, the event stream and the lane-close retry are stood in for.
 
 const LIMIT = run_wake_restart.RESTART_LIMIT
 const INVOCATION = 'backlogrun #2509 --max 5 --only'
@@ -50,8 +50,10 @@ async function stop_at_the_first_wait(): Promise<void> {
 
 async function supervise(): Promise<LoopStop> {
 	const ports: LoopPorts = {
-		...run_wake_cli.ports_for(context(), PROFILE),
+		...run_wake_ports.ports_for(context(), PROFILE),
 		sleep: stop_at_the_first_wait,
+		// The retry reads and closes the checkout's own lanes, which are a live run's: never from a test.
+		retry_closes: async () => undefined,
 	}
 
 	return await run_wake_restart.supervise({

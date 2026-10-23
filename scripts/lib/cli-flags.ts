@@ -152,7 +152,59 @@ function attach_values(
 	return attached
 }
 
+// Digits and nothing else. `Number('')`, `Number(' ')` and `Number('0x10')` are all safe integers, so a
+// check that only asked `Number.isSafeInteger` would read an unset shell variable — `--max
+// "$max_issues"` — as zero. The magnitude check is separate because the pattern bounds nothing: a
+// number past the safe range would be read as a different number.
+const COUNT_PATTERN = /^\d+$/u
+// Whole and positive: `0`, a sign, a decimal point and anything not a digit are refused.
+const POSITIVE_PATTERN = /^[1-9]\d*$/u
+
+// The value a positive-integer setting answers, or why it could not be read. A problem rather than a
+// throw: the caller decides whether a bad setting ends the command or is reported and worked around.
+type PositiveSetting = { kind: 'limit'; limit: number } | { kind: 'problem'; problem: string }
+
+function to_integer(raw: string | undefined, pattern: RegExp): number | undefined {
+	if (raw === undefined || !pattern.test(raw)) return undefined
+
+	const parsed = Number(raw)
+
+	return Number.isSafeInteger(parsed) ? parsed : undefined
+}
+
+// A count flag's value — zero or more — or `undefined` when it is absent or not a count.
+function to_count(raw: string | undefined): number | undefined {
+	return to_integer(raw, COUNT_PATTERN)
+}
+
+// A value that must be one or more, or `undefined` when it is absent or not.
+function to_positive(raw: string | undefined): number | undefined {
+	return to_integer(raw, POSITIVE_PATTERN)
+}
+
+// A positive-integer setting read from the environment or an argument. Blank is unset, not invalid — an
+// `.env` line left as `KEY=` is a setting nobody configured — and answers `fallback`. Anything else that
+// is not a positive integer is a problem naming `name`, never a silent fall back to the default: a typo
+// that quietly became the default is a number nobody chose.
+function read_positive_setting(
+	raw: string | undefined,
+	name: string,
+	fallback: number,
+): PositiveSetting {
+	const trimmed = raw?.trim() ?? ''
+
+	if (trimmed === '') return { kind: 'limit', limit: fallback }
+
+	const limit = to_positive(trimmed)
+	if (limit !== undefined) return { kind: 'limit', limit }
+
+	return { kind: 'problem', problem: `${name} must be a positive integer, not "${trimmed}"` }
+}
+
 const cli_flags = {
+	to_count,
+	to_positive,
+	read_positive_setting,
 	attach_values,
 	usage_line,
 	refuse_unknown_flags,
@@ -167,3 +219,4 @@ const cli_flags = {
 }
 
 export { cli_flags }
+export type { PositiveSetting }

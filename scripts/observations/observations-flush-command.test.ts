@@ -5,7 +5,7 @@ import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LEGACY_OBSERVATION_LEDGER_PATHS } from './observation-ledger'
-import { observation_ledger_migrate } from './observation-ledger-migrate'
+import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush } from './observations-flush'
 import {
 	DEFAULT_BRANCH,
@@ -47,6 +47,7 @@ vi.mock('#scripts/git/git-command', () => ({
 		fast_forward_local: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
+		head_commit: vi.fn(),
 		merge_fast_forward: vi.fn(),
 		push: vi.fn(),
 		status: vi.fn(),
@@ -68,10 +69,11 @@ vi.mock('#scripts/gh/git-pr-checks', () => ({
 	},
 }))
 vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
-// The migration moves real files, so it is mocked like git: run unmocked from the repository root, it
-// would move this checkout's own ledger.
-vi.mock('./observation-ledger-migrate', () => ({
-	observation_ledger_migrate: { migrate: vi.fn() },
+// The ledger preparation migrates and reads real files, so it is mocked like git: run unmocked from the
+// repository root, it would move this checkout's own ledger and make these tests depend on its lines
+// (joshuafolkken/kit#4069).
+vi.mock('./observation-ledger-prepare', () => ({
+	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
 }))
 
 const HOOK_REJECTION = 'cspell found an unknown word'
@@ -118,6 +120,7 @@ function on_default_branch(): void {
 	vi.mocked(git_command.fetch_branch).mockResolvedValue('')
 	vi.mocked(git_command.commit_count_beyond).mockResolvedValue(NO_COMMITS)
 	vi.mocked(git_command.checkout_b).mockResolvedValue('')
+	vi.mocked(git_command.head_commit).mockResolvedValue('c0ffee1')
 	vi.mocked(git_command.checkout).mockResolvedValue('')
 	on_github()
 }
@@ -176,7 +179,7 @@ describe('observations_flush — the success path command sequence', () => {
 
 		await observations_flush.flush(new Date(MORNING_INSTANT))
 
-		expect(observation_ledger_migrate.migrate).toHaveBeenCalledWith(process.cwd())
+		expect(observation_ledger_prepare.prepare).toHaveBeenCalledWith(process.cwd())
 		expect(vi.mocked(git_command.add_path).mock.calls).toEqual([
 			[LEGACY_OBSERVATION_LEDGER_PATH],
 			[OBSERVATION_LEDGER_PATH],

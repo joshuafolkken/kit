@@ -76,7 +76,7 @@ describe('run_board_now.line_of while a child runs', () => {
 		const lanes = [{ issue: 7, operation: bash('pnpm josh test:related', 4 * SECOND) }]
 		const line = line_of(running([7], lanes))
 
-		expect(line).toBe('0:00:04 🔧 #7 · Bash pnpm josh test:related')
+		expect(line).toBe('4″ 🔧 #7 · Bash pnpm josh test:related')
 		expect(line).not.toContain('running')
 	})
 
@@ -89,7 +89,7 @@ describe('run_board_now.line_of while a child runs', () => {
 			},
 		]
 
-		expect(line_of(running([7, 8], lanes))).toBe('0:00:02 🔧 #8 · Edit scripts/lane/lane-open.ts')
+		expect(line_of(running([7, 8], lanes))).toBe('2″ 🔧 #8 · Edit scripts/lane/lane-open.ts')
 	})
 
 	it('writes a tool pointed at nothing by its name alone', () => {
@@ -97,7 +97,7 @@ describe('run_board_now.line_of while a child runs', () => {
 			{ issue: 7, operation: { kind: 'Agent', target: undefined, at_ms: NOW - SECOND } },
 		]
 
-		expect(line_of(running([7], lanes))).toBe('0:00:01 🔧 #7 · Agent')
+		expect(line_of(running([7], lanes))).toBe('1″ 🔧 #7 · Agent')
 	})
 
 	it('leaves out a lane whose child is not running, however new its operation', () => {
@@ -106,7 +106,7 @@ describe('run_board_now.line_of while a child runs', () => {
 			{ issue: 9, operation: bash('pnpm josh ship', SECOND) },
 		]
 
-		expect(line_of(running([7], lanes))).toBe('0:01:00 🔧 #7 · Bash pnpm josh gate')
+		expect(line_of(running([7], lanes))).toBe('1′00″ 🔧 #7 · Bash pnpm josh gate')
 	})
 })
 
@@ -116,13 +116,13 @@ describe('run_board_now.line_of — a child’s operation against its event', ()
 	it('writes the event, in its words and its row’s phase icon, where it is the newer', () => {
 		const read = with_events(SHIPPING, [[7, event('ship gate', 'gate', SECOND)]])
 
-		expect(line_of(read)).toBe('0:00:01 🚦 #7 · ship gate')
+		expect(line_of(read)).toBe('1″ 🚦 #7 · ship gate')
 	})
 
 	it('writes the operation where it is the newer', () => {
 		const read = with_events(SHIPPING, [[7, event('implement', 'implement', 5 * MINUTE)]])
 
-		expect(line_of(read)).toBe('0:02:46 🔧 #7 · Bash pnpm josh ship --detach --review')
+		expect(line_of(read)).toBe('2′46″ 🔧 #7 · Bash pnpm josh ship --detach --review')
 	})
 
 	it('writes the operation where the two are as new', () => {
@@ -138,13 +138,13 @@ describe('run_board_now.line_of — a child’s operation against its event', ()
 		]
 		const read = with_events(running([7, 8], lanes), [[8, event('ship review', 'review', SECOND)]])
 
-		expect(line_of(read)).toBe('0:00:01 👀 #8 · ship review')
+		expect(line_of(read)).toBe('1″ 👀 #8 · ship review')
 	})
 
 	it('draws a failed stage under 💥', () => {
 		const read = with_events(SHIPPING, [[7, event('ship gate failed', 'failed', SECOND)]])
 
-		expect(line_of(read)).toBe('0:00:01 💥 #7 · ship gate failed')
+		expect(line_of(read)).toBe('1″ 💥 #7 · ship gate failed')
 	})
 
 	it('leaves out the event of a child that is not running', () => {
@@ -156,7 +156,7 @@ describe('run_board_now.line_of — a child’s operation against its event', ()
 	it('writes the event where no operation could be read', () => {
 		const read = with_events(running([7], []), [[7, event('implement', 'implement', MINUTE)]])
 
-		expect(line_of(read)).toBe('0:01:00 🔨 #7 · implement')
+		expect(line_of(read)).toBe('1′00″ 🔨 #7 · implement')
 	})
 })
 
@@ -169,7 +169,7 @@ describe('run_board_now.line_of while a child runs — where nothing is to be re
 	it('reads an operation dated ahead of the clock as done now', () => {
 		const lanes = [{ issue: 7, operation: bash('ls', -3 * SECOND) }]
 
-		expect(line_of(running([7], lanes))).toBe('0:00:00 🔧 #7 · Bash ls')
+		expect(line_of(running([7], lanes))).toBe('0″ 🔧 #7 · Bash ls')
 	})
 })
 
@@ -179,7 +179,7 @@ describe('run_board_now.line_of at a stage a session works on', () => {
 		const activity = standing(STAGE.PLANNING, MINUTE)
 
 		expect(line_of({ activity, operations, waiting: 2 })).toBe(
-			'0:00:03 📝 planning · Bash pnpm josh backlog:plan',
+			'3″ 📝 planning · Bash pnpm josh backlog:plan',
 		)
 	})
 
@@ -192,7 +192,7 @@ describe('run_board_now.line_of at a stage a session works on', () => {
 		const activity = standing(STAGE.SESSION, MINUTE)
 
 		expect(line_of({ activity, operations: { ...NONE, judgment: read } })).toBe(
-			'0:00:01 💭 judgment session running · Read docs/setup/prerequisites.md',
+			'1″ 💭 judgment session running · Read docs/setup/prerequisites.md',
 		)
 	})
 
@@ -200,7 +200,7 @@ describe('run_board_now.line_of at a stage a session works on', () => {
 		const operations = { ...NONE, judgment: bash('ls', SECOND) }
 
 		expect(line_of({ activity: standing(STAGE.PLANNING, MINUTE), operations })).toBe(
-			'0:01:00 📝 planning — pool empty',
+			'1′00″ 📝 planning — pool empty',
 		)
 	})
 
@@ -210,7 +210,7 @@ describe('run_board_now.line_of at a stage a session works on', () => {
 		const activity = standing(STAGE.SESSION, 72 * SECOND)
 
 		expect(line_of({ activity, operations, waiting: 2 })).toBe(
-			'0:01:12 💭 judgment session running — 2 waiting',
+			'1′12″ 💭 judgment session running — 2 waiting',
 		)
 	})
 })
@@ -223,12 +223,12 @@ describe('run_board_now.line_of where no session’s operation is written', () =
 	}
 
 	it.each([
-		[STAGE.STARTING, '0:00:42 🚀 starting session — 1 running'],
-		[STAGE.HANDING_OFF, '0:00:42 🤝 handing off — 1 running'],
-		[STAGE.JUDGING, '0:00:42 🤔 waiting on judgment — 1 running'],
-		[run_event_setup.opening_lane('8'), '0:00:42 🚪 opening lane #8 — 1 running'],
-		[run_event_setup.installing('8'), '0:00:42 📥 installing dependencies #8 — 1 running'],
-		[run_event_setup.dispatching('8'), '0:00:42 📤 dispatching #8 — 1 running'],
+		[STAGE.STARTING, '42″ 🚀 starting session — 1 running'],
+		[STAGE.HANDING_OFF, '42″ 🤝 handing off — 1 running'],
+		[STAGE.JUDGING, '42″ 🤔 waiting on judgment — 1 running'],
+		[run_event_setup.opening_lane('8'), '42″ 🚪 opening lane #8 — 1 running'],
+		[run_event_setup.installing('8'), '42″ 📥 installing dependencies #8 — 1 running'],
+		[run_event_setup.dispatching('8'), '42″ 📤 dispatching #8 — 1 running'],
 	])('keeps `%s` as the stage, its time and why', (setup, line) => {
 		const activity = standing(setup, 42 * SECOND)
 
@@ -236,14 +236,14 @@ describe('run_board_now.line_of where no session’s operation is written', () =
 	})
 
 	it('keeps the watch where nothing runs and the run is at no stage', () => {
-		expect(line_of({ operations: EVERY })).toBe('0:01:00 🔭 watching — pool empty')
+		expect(line_of({ operations: EVERY })).toBe('1′00″ 🔭 watching — pool empty')
 	})
 
 	it('keeps the newest thing an ended run did', () => {
 		const activity = { ...MERGED, is_stopped: true }
 		const line = line_of({ activity, operations: EVERY, running: 1, children: new Set([7]) })
 
-		expect(line).toBe('0:01:00 🔚 #5 merged')
+		expect(line).toBe('1′00″ 🔚 #5 merged')
 	})
 })
 

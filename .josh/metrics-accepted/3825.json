@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 fix: resolve release-Issue blockers through epic_issue.blocker_references_of so a cross-repository blocker is named, not linked as a same-numbered local Issue",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 94
-	}
-}

@@ -1,6 +1,10 @@
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_child_marker, type MarkerSource } from './lane-child-marker'
+
+type StartRead = (pid: number) => string | undefined
 
 // Whether a lane has handed its post-implementation region to the detached ship.
 //
@@ -24,6 +28,62 @@ function is_ship_running(issue: string, directory: string): boolean {
 	)
 }
 
+// A detached ship for `issue` launched at or after `since_ms` ended in success — it merged, so no cut
+// hand-off follows it. The record outlives its run until the next `ship --detach` replaces it, so a
+// success launched earlier belongs to a past dispatch of the issue and never counts.
+function is_ship_succeeded(issue: string, directory: string, since_ms: number): boolean {
+	const repository = git_common_directory.repository(directory)
+	const reading =
+		repository === undefined ? undefined : run_ship_detach.read_result(repository, issue)
+
+	return reading?.result === 'success' && (reading.launched_at ?? since_ms - 1) >= since_ms
+}
+
+async function read_repository(): Promise<string | undefined> {
+	try {
+		return await run_carry.repository_directory()
+	} catch {
+		return undefined
+	}
+}
+
+// `is_ship_running` for this checkout, for a reader that must not block its event loop
+// (joshuafolkken/kit#4245): the repository is read asynchronously once and every recorded start time
+// through `read`, so no answer starts a synchronous process.
+async function ship_reader(read: StartRead): Promise<(issue: string) => boolean> {
+	const repository = await read_repository()
+
+	return (issue) =>
+		repository !== undefined &&
+		run_ship_detach.read_result(repository, issue, read)?.result === 'running'
+}
+
+// The live ship for `issue` is inside `josh followup`: it waits on CI, CodeRabbit and the merge alone
+// (joshuafolkken/kit#4466). The mark is down while the followup stage merges and gates again, after a
+// stop, and once a successor supervisor opens the record (`run_ship_stage.read_merge_waiting`).
+function is_merge_waiting(repository: string, issue: string, read: StartRead): boolean {
+	if (run_ship_detach.read_result(repository, issue, read)?.result !== 'running') return false
+
+	return run_ship_stage.read_merge_waiting(run_ship_stage.record_path(repository, issue))
+}
+
+// `is_merge_waiting` for this checkout, read the way `ship_reader` reads.
+async function merge_wait_reader(read: StartRead): Promise<(issue: string) => boolean> {
+	const repository = await read_repository()
+
+	return (issue) => repository !== undefined && is_merge_waiting(repository, issue, read)
+}
+
+// The live ship for `issue` in the repository `directory` belongs to waits for a lane place before it
+// relaunches its child (`run-ship-place.ts`); a dead supervisor's mark reads as no wait.
+function is_place_waiting(issue: string, directory: string): boolean {
+	const repository = git_common_directory.repository(directory)
+
+	if (repository === undefined || !is_ship_running(issue, directory)) return false
+
+	return run_ship_stage.read_place_waiting(run_ship_stage.record_path(repository, issue))
+}
+
 // When the detached ship for `issue` that is still live was launched, or `undefined` where none is.
 function ship_running_since(issue: string, directory: string): number | undefined {
 	const repository = git_common_directory.repository(directory)
@@ -40,6 +100,14 @@ function is_handed_off(directory: string, source: MarkerSource = process.env): b
 	return is_ship_running(issue, directory)
 }
 
-const lane_handoff = { is_handed_off, is_ship_running, ship_running_since }
+const lane_handoff = {
+	is_handed_off,
+	is_place_waiting,
+	is_ship_running,
+	is_ship_succeeded,
+	merge_wait_reader,
+	ship_reader,
+	ship_running_since,
+}
 
 export { lane_handoff }

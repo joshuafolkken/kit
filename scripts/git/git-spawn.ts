@@ -1,4 +1,4 @@
-import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { GIT_TIMEOUT_MS, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 import { git_utilities } from './constants'
 import {
@@ -47,7 +47,6 @@ async function read(
 // still takes this one. The push's budget is reused rather than a second number chosen: both transfer
 // objects over the same transport, and that one is already read off what a healthy transfer costs here.
 const REMOTE_TIMEOUT_MS = PUSH_TIMEOUT_MS
-const MS_PER_SECOND = 1000
 
 // A budget kill is reported as a timeout, never as whatever the killed process printed first, and
 // `cause` carries the same `TIMEOUT_EXIT_CODE` a timed-out push does. Unlike the push it is not

@@ -41,7 +41,7 @@ const MANDATORY_POINT_OF_USE: ReadonlyArray<[string, string, ReadonlyArray<strin
 	[
 		FOLLOWUP,
 		FOLLOWUP_HEADING,
-		['required CI', 'completion Telegram', 'merges by default', 'josh ms'],
+		['required CI', 'completion Telegram', 'merges by default', '`run:tail`'],
 	],
 	[BACKGROUND_COMMANDS, BACKGROUND_HEADING, ['josh gate', 'josh git -y', 'foreground']],
 ]

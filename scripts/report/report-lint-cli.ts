@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { text } from 'node:stream/consumers'
 import { fileURLToPath } from 'node:url'
+import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { report_lint } from './report-lint'
 
 // `josh report:lint` — read a two-layer work summary candidate from stdin and print `ok`, or the
@@ -38,7 +39,9 @@ async function read_and_run(): Promise<number> {
 	return run(await text(process.stdin))
 }
 
+// `.env` is read here, on the command path alone, so the labels follow the session language.
 async function main(): Promise<void> {
+	josh_environment_file.load_environment_file()
 	process.exitCode = await read_and_run()
 }
 

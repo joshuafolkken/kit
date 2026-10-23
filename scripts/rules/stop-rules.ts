@@ -1,4 +1,5 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
+import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
 import { filing_offer } from './filing-offer'
 import { issue_citation } from './issue-citation'
@@ -169,7 +170,7 @@ function build_citation_reason(references: ReadonlyArray<string>): string {
 const FILING_OFFER_REASON =
 	'⛔ filing offer: your reply offers to file an Issue instead of filing it, and this run is ' +
 	'unattended — nobody is there to answer. Run ' +
-	'`pnpm josh issue:file "<title>" --body-file <path> --depth <0|1|2>` (Tier A, ' +
+	'`pnpm josh issue:file "<title>" --body-file <path>` (Tier A, ' +
 	'`observation-filing.md`), then end with the one-line citation of what was filed; do not repeat ' +
 	'your previous reply. If it is not worth filing after all, say so in one line instead.'
 
@@ -447,9 +448,7 @@ function notice_envelope(notice: string): string {
 }
 
 function parse_stop_payload(raw_payload: string): StopPayload | undefined {
-	const parsed = stop_payload_schema.safeParse(JSON.parse(raw_payload))
-
-	return parsed.success ? parsed.data : undefined
+	return json_value.parse_with(raw_payload, stop_payload_schema)
 }
 
 function is_enabled(): boolean {

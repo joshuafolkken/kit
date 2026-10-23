@@ -1,4 +1,5 @@
-import { DEPTH_0_LABEL, RELEASE_LABEL } from './issue-labels'
+import { json_value } from '#scripts/lib/json-value'
+import { RELEASE_LABEL } from './issue-labels'
 
 // The decisions behind `josh issue:release`, kept apart from the command
 // that reads the network so each is a pure answer a test can pin. An Issue whose change reaches a
@@ -20,14 +21,9 @@ function is_listing_row(value: unknown): value is ListingRow {
 // release Issue at a time; were a person to open a second, the oldest is the one the next release
 // closes, so it is the one every new blocker joins.
 function open_release_of(json: string): number | undefined {
-	try {
-		const parsed: unknown = JSON.parse(json)
-		const rows = Array.isArray(parsed) ? parsed.filter((row) => is_listing_row(row)) : []
+	const rows = (json_value.parse_array(json) ?? []).filter((row) => is_listing_row(row))
 
-		return rows.length === 0 ? undefined : Math.min(...rows.map((row) => row.number))
-	} catch {
-		return undefined
-	}
+	return rows.length === 0 ? undefined : Math.min(...rows.map((row) => row.number))
 }
 
 function title_of(repo: string): string {
@@ -51,9 +47,8 @@ function body_of(repo: string): string {
 	].join('\n')
 }
 
-// The release label and a depth: the subject of a release is what a consumer touches.
-// Never `auto-ok`.
-const RELEASE_LABELS: ReadonlyArray<string> = [RELEASE_LABEL, DEPTH_0_LABEL]
+// The release label alone — never `auto-ok`.
+const RELEASE_LABELS: ReadonlyArray<string> = [RELEASE_LABEL]
 
 const issue_release = { RELEASE_LABELS, open_release_of, title_of, body_of }
 

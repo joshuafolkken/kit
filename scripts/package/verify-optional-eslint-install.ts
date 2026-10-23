@@ -1,16 +1,18 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { PACKAGE_JSON, package_manifest } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
+import { z } from 'zod'
 
 const root = process.cwd()
 const scratch = mkdtempSync(path.join(os.tmpdir(), 'kit-eslint-install-'))
-const PACKAGE_JSON = 'package.json'
 const IGNORE_SCRIPTS = '--ignore-scripts'
-const manifest = JSON.parse(readFileSync(path.join(root, PACKAGE_JSON), 'utf8')) as {
-	devDependencies: Record<string, string>
-	peerDependencies: Record<string, string>
-}
+const version_map_schema = z.record(z.string(), z.string())
+const manifest = package_manifest.read_manifest(
+	root,
+	z.object({ devDependencies: version_map_schema, peerDependencies: version_map_schema }),
+)
 const eslint_peers = Object.keys(manifest.peerDependencies).filter((name) =>
 	/^(?:@eslint\/|@stylistic\/|eslint|globals$|typescript)/u.test(name),
 )

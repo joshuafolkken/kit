@@ -1,8 +1,6 @@
 # Latest gate — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/latest-gate.md`. It is never
-read during a run — every trigger, command and answer an agent acts on stays in the procedure document,
-and a change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/latest-gate.md`.
 
 ## Why an elapsed-time window rather than once per batch
 

@@ -1,6 +1,12 @@
 // The workflow label names, defined once. The epic auto-close, the epic validator, the issue-prep
 // labeler and the next-issues display all key on these exact strings, and a drifted copy would
 // fail silently — an epic filtered on the wrong name is simply never closed or never excluded.
+//
+// **A new label is defined here and added to `REPOSITORY_LABELS`**, so `josh start` and `josh sync`
+// create it; a label deliberately not provisioned goes into `EXEMPT_FROM_PROVISIONING` with its
+// reason. Every other module imports the constant rather than spelling the name —
+// `issue-label-scan.test.ts` fails on a `*_LABEL` constant missing from `ALL_LABELS`, on a label name
+// spelled outside this module, and on a label call naming a label `ALL_LABELS` does not hold.
 const EPIC_LABEL = 'epic'
 const BUG_LABEL = 'bug'
 const ENHANCEMENT_LABEL = 'enhancement'
@@ -15,6 +21,11 @@ const PLANNED_LABEL = 'run:planned'
 // it: a parked child is why a run reports "nothing left that time will fix" rather than waiting
 // forever.
 const NEEDS_DECISION_LABEL = 'needs-decision'
+// Parks a child the `backlogrun` driver could not finish mechanically — its session ended unfinished, or
+// its ship hit the relaunch cap. **Not `needs-decision`**: nothing is asked of a person beyond fixing the
+// cause and removing it, so the board and the idle report keep it out of the decisions they list. Parked
+// all the same, so a child failing on one cause is not handed straight back until the cause is fixed.
+const RUN_STALLED_LABEL = 'run:stalled'
 // Marks an issue whose defect reaches the verification path, so it runs with nothing beside it.
 // A run applies it from the verification-path enumeration in `backlogrun-lanes.md`;
 // `backlog:next` enforces it (`backlog-solo.ts`), so the rule no longer rests on a judgement at
@@ -24,11 +35,15 @@ const RUN_SOLO_LABEL = 'run:solo'
 // Without it an issue lacking `run:solo` could mean "judged parallel" or
 // "never judged", and `backlog:next` withholds the second (`epic-triage.ts`).
 const RUN_LANE_LABEL = 'run:lane'
-// Puts an issue at the head of the backlog's ranking. A person or a run may
-// apply it — a run only where it can cite a deadline or a stated urgency, or a policy a person wrote
-// (`backlogrun-steps.md`) — and **only a person removes it**: a run that could clear it could undo
-// the person's ordering. Read by `issue-rank.ts`, the one place the ranking keys are decided.
+// Puts an issue at the head of the backlog's ranking, below `priority:critical`. `issue:file` applies
+// it from the body's priority declaration at its high level (`issue-priority.ts`), a person may apply it by
+// hand, and **only a person removes it**: a run that could clear it could undo the person's ordering.
+// Read by `issue-rank.ts`, the one place the ranking keys are decided.
 const PRIORITY_HIGH_LABEL = 'priority:high'
+// Ranks above `priority:high` — an urgent defect (one of the interrupt-filing conditions) or a lane
+// speed-up worth at least a tenth of a merge's median lane time. Applied from the urgent declaration;
+// it never interrupts a running lane, only takes the next free one. Only a person removes it.
+const PRIORITY_CRITICAL_LABEL = 'priority:critical'
 // Opts one issue outside any epic into unattended execution. **Only a
 // person applies it.** `epicrun #<E>` approves the merges inside `#<E>`; this label is the only way
 // a person extends that approval past the epic's edge, so a label an AI could apply to itself would
@@ -64,6 +79,10 @@ const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review'
 // takes it off, because taking it off asserts the work is *not* done, which is the same claim in
 // reverse and is no more a run's to make.
 const ALREADY_DONE_LABEL = 'already-done'
+// The mark of a measurement-only Issue a run closed itself (`josh issue:measured`). No pull request
+// closes such an Issue, so the merge reference a sweep reads is missing; this label is what tells the
+// run's own close from a person's, so every sweep counts it as merged (`issue-merged.ts`).
+const MEASURED_LABEL = 'measured'
 // Marks the Issue that tracks a repository's next release. An Issue whose
 // change reaches a consumer only once published is linked to it as a `blocked_by` blocker
 // (`josh issue:release`), so "merged but not yet released" is visible in the backlog. A run applies
@@ -71,16 +90,28 @@ const ALREADY_DONE_LABEL = 'already-done'
 // and only a person opts it into unattended execution.
 const RELEASE_LABEL = 'release'
 // A person's mark for work set aside for now; `issue-auto-ok.ts` reads it as an exclusion. Applied by
-// hand and never provisioned, so it is not in `REPOSITORY_LABELS`.
+// hand, so it is provisioned: a person cannot apply a label the repository does not have.
 const DEFERRED_LABEL = 'deferred'
-// Applied to an Issue whose second review round was skipped, so the condition stays auditable
-// (`prompts/review.md` → "When round 2 is skipped entirely, and when it is not").
-const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
+// A copy of the body's start-time declaration while that time is still ahead (`issue-not-before.ts`), so a
+// listing tells an issue that waits on the clock from one that can start. The body stays the source:
+// `issue-not-before-label.ts` applies and removes it. Only `run:merge` reads it as a reason to wait,
+// and only where the body itself could not be read (`run-merge-steps.ts`).
+const NOT_BEFORE_LABEL = 'not-before'
 
-// The four labels that mean an open issue must not be handed to a run as it stands: an `epic`
+// The labels that park an open issue: a run never starts or restarts it, and only a person lifts
+// them — `needs-decision` waits for an answer, `run:stalled` for a mechanical cause to be fixed, and
+// `already-done` for the close. The run that applied any of them committed nothing, so the checkout
+// is clean. Held once because the merge, the board, the pool, the classification and the liveness
+// read all ask "is this child parked", and a copy that missed a label would answer differently.
+const PARKED_LABELS: ReadonlySet<string> = new Set([
+	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
+	ALREADY_DONE_LABEL,
+])
+
+// The labels that mean an open issue must not be handed to a run as it stands: an `epic`
 // tracks a batch and is never run directly (its children are), `in-progress` is already claimed by
-// a running workflow, `needs-decision` was parked precisely because it cannot advance without a
-// person, and `already-done` names work that is already merged. Held here rather than in either
+// a running workflow, and a parked issue (`PARKED_LABELS`) waits on a person. Held here rather than in either
 // caller because both the next-issues display and the `auto-ok` pickup ask the same question, and
 // two copies would answer it differently the first time one of them gained another label.
 //
@@ -91,8 +122,7 @@ const REVIEW_ROUND2_SKIPPED_LABEL = 'review-round2-skipped'
 const NOT_DIRECTLY_RUNNABLE_LABELS: ReadonlySet<string> = new Set([
 	EPIC_LABEL,
 	IN_PROGRESS_LABEL,
-	NEEDS_DECISION_LABEL,
-	ALREADY_DONE_LABEL,
+	...PARKED_LABELS,
 ])
 
 // Filing-route labels, applied at filing time so the backlog's composition — a review-cap
@@ -149,61 +179,6 @@ const FILING_ROUTE_LABELS: ReadonlyArray<{
 	},
 ]
 
-// The depth of an issue's subject, recorded as a label at filing time.
-//
-// **The definition is not here.** `.claude/skills/workflow-commands/observation-filing.md` → "The depth test",
-// is the single source: depth 0 is what a consumer of this package touches, depth 1 the run
-// orchestration that executes an Issue, depth 2 what measures a run. These constants are the
-// recording of that table, never a second copy of it — a label whose description restated the rule
-// would be the clone `CLAUDE.md` prohibits, and the descriptions below therefore name the section
-// rather than paraphrase it.
-//
-// **Why a label at all.** The share of open issues at depth 0 is a measured target, and without a
-// recorded depth it could only be obtained by reading every open issue's body by hand — hand counts
-// disagree on the denominator and are not comparable, which is the failure a recorded label removes.
-//
-// **The depth is read off the subject, so a run applies it.** Unlike `auto-ok` and
-// `needs-human-review` this is not a person's judgement about authorization; it is the same reading
-// `observation-filing.md` already asks a run to make before it files, and none of the three withholds or widens anything
-// a run may do.
-const DEPTH_0_LABEL = 'depth:0'
-const DEPTH_1_LABEL = 'depth:1'
-const DEPTH_2_LABEL = 'depth:2'
-
-// Ordered shallowest first, which is what makes `depth_label_of` deterministic: an issue carrying
-// more than one depth label counts as the **lowest** depth present, the one closest to the consumer.
-// Without a fixed tie-break the same listing measured twice could answer differently.
-const DEPTH_LABEL_ORDER: ReadonlyArray<string> = [DEPTH_0_LABEL, DEPTH_1_LABEL, DEPTH_2_LABEL]
-
-// The metadata `gh api ... labels` needs, in the shape `FILING_ROUTE_LABELS` above uses and for the
-// same reason: applying a label at issue-creation auto-creates it with a generated color and no
-// description, so provisioning from here is what gives each one a stable color a reader can scan by.
-// Green, amber and pale blue, so the consumer-facing depth is the one that stands out in a listing.
-//
-// **`josh issue:file` provisions them** through `repository_labels.ensure_labels` before its create
-// call, so no document carries a creation command to keep in step.
-const DEPTH_LABELS: ReadonlyArray<{
-	name: string
-	color: string
-	description: string
-}> = [
-	{
-		name: DEPTH_0_LABEL,
-		color: '0e8a16',
-		description: 'Depth 0 — what a consumer of this package touches (observation-filing.md)',
-	},
-	{
-		name: DEPTH_1_LABEL,
-		color: 'fbc02d',
-		description: 'Depth 1 — the run orchestration that executes an Issue (observation-filing.md)',
-	},
-	{
-		name: DEPTH_2_LABEL,
-		color: 'c5def5',
-		description: 'Depth 2 — what measures a run (observation-filing.md)',
-	},
-]
-
 interface LabelDefinition {
 	name: string
 	color: string
@@ -235,6 +210,11 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Judged safe to run beside others in a backlogrun',
 	},
 	{
+		name: PRIORITY_CRITICAL_LABEL,
+		color: 'b60205',
+		description: 'Offered before priority:high in a backlogrun; only a person removes it',
+	},
+	{
 		name: PRIORITY_HIGH_LABEL,
 		color: 'e99695',
 		description: 'Offered first in a backlogrun; only a person removes it',
@@ -255,6 +235,12 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Parked: needs a decision before it can run',
 	},
 	{
+		name: RUN_STALLED_LABEL,
+		color: 'e99d42',
+		description:
+			'Parked: the driver could not finish it mechanically — no decision; fix the cause and remove',
+	},
+	{
 		name: NEEDS_HUMAN_REVIEW_LABEL,
 		color: 'd93f0b',
 		description: 'Implement and verify, but stop before committing so a person can look',
@@ -265,13 +251,22 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Verified already merged — a person closes it',
 	},
 	{
-		name: REVIEW_ROUND2_SKIPPED_LABEL,
-		color: 'c5def5',
-		description: 'Review round 2 was skipped under the condition in prompts/review.md',
+		name: MEASURED_LABEL,
+		color: '6f42c1',
+		description: 'Measurement-only — a run recorded the result and closed it',
+	},
+	{
+		name: DEFERRED_LABEL,
+		color: 'd4c5f9',
+		description: 'Set aside for now; never opted in to unattended execution',
+	},
+	{
+		name: NOT_BEFORE_LABEL,
+		color: 'bfd4f2',
+		description: "Waiting: the body's 実施可能日 has not arrived yet",
 	},
 	{ name: BUG_LABEL, color: 'd73a4a', description: "Something isn't working" },
 	...FILING_ROUTE_LABELS,
-	...DEPTH_LABELS,
 ]
 
 // The pull request release classifications `pr-classification.yml` requires exactly one of.
@@ -350,13 +345,9 @@ function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean 
 	return label_name_of(labels, wanted) !== undefined
 }
 
-// The depth recorded on one listing row, or `undefined` where none is — the reading every share
-// measurement makes. Lowercased through the same comparison as every other membership test above,
-// because GitHub keeps the casing a label was created with and `Depth:0` is the same label.
-function depth_label_of(labels: ReadonlyArray<LabelReference> | undefined): string | undefined {
-	const names = new Set((labels ?? []).map((label) => label.name.toLowerCase()))
-
-	return DEPTH_LABEL_ORDER.find((name) => names.has(name))
+// Whether label names carry any park label (`PARKED_LABELS`), compared as `has_label_name` does.
+function has_parked_label(labels: ReadonlyArray<string>): boolean {
+	return [...PARKED_LABELS].some((label) => has_label_name(labels, label))
 }
 
 // Every workflow label this package manages. The label-reference scan
@@ -372,21 +363,22 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	IN_PROGRESS_LABEL,
 	PLANNED_LABEL,
 	NEEDS_DECISION_LABEL,
+	RUN_STALLED_LABEL,
 	AUTO_OK_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
+	MEASURED_LABEL,
+	DEFERRED_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_LABEL,
+	NOT_BEFORE_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	REVIEW_CAP_ROUTE_LABEL,
-	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
-	DEPTH_0_LABEL,
-	DEPTH_1_LABEL,
-	DEPTH_2_LABEL,
 	BUGFIX_LABEL,
 	OTHER_CHANGE_LABEL,
 	IGNORE_FOR_RELEASE_LABEL,
@@ -406,36 +398,35 @@ export {
 	BUGFIX_LABEL,
 	BREAKING_CHANGE_LABEL,
 	DEFERRED_LABEL,
-	depth_label_of,
-	DEPTH_0_LABEL,
-	DEPTH_1_LABEL,
-	DEPTH_2_LABEL,
-	DEPTH_LABEL_ORDER,
-	DEPTH_LABELS,
 	ENHANCEMENT_LABEL,
 	EPIC_LABEL,
 	EXEMPT_FROM_PROVISIONING,
 	FILING_ROUTE_LABELS,
 	has_any_label,
 	has_label_name,
+	has_parked_label,
 	IGNORE_FOR_RELEASE_LABEL,
 	IN_PROGRESS_LABEL,
 	INTERRUPT_ROUTE_LABEL,
 	label_name_of,
+	MEASURED_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
+	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
+	PARKED_LABELS,
 	PLANNED_LABEL,
+	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
 	RELEASE_CLASSIFICATION_LABELS,
 	RELEASE_CLASSIFICATION_NAMES,
 	RELEASE_LABEL,
 	REPOSITORY_LABELS,
 	REVIEW_CAP_ROUTE_LABEL,
-	REVIEW_ROUND2_SKIPPED_LABEL,
 	RUN_LANE_LABEL,
 	RUN_SOLO_LABEL,
+	RUN_STALLED_LABEL,
 	SPLIT_ROUTE_LABEL,
 	TIER_A_ROUTE_LABEL,
 	WORKFLOW_LABELS,

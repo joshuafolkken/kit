@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { time_bundle_call } from './time-bundle-call'
 import { time_writes } from './time-writes'
 
-const READ_PATH = 'scripts/time/time-spans.ts'
-const OTHER_PATH = 'scripts/time/time-report.ts'
+const READ_PATH = 'tools/time/time-spans.ts'
+const OTHER_PATH = 'tools/time/time-report.ts'
 // The one operand of a `gh` line that sits outside its quotes (joshuafolkken/kit#1611).
 const ENDPOINT = '/issues/1'
 // The shape the measured genuine loss takes: an absolute path quoted for its length, not for a space.

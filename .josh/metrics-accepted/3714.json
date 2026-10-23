@@ -1,7 +1,0 @@
-{
-	"reason": "New josh fresh:run command (#3714): eight scripts/fresh-machine modules that build the fresh-machine Docker image, run a scenario and keep its log; no existing code covers this. Review round 1 added the three Medium fixes and their tests: numbering a GitHub run past the account's repositories, refusing a named pattern outside a kit checkout, and making the whole stage readable to the container",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 538
-	}
-}

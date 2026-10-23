@@ -4,7 +4,6 @@ import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
-import { hook_decision } from '#scripts/josh/hook-decision'
 import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
@@ -21,7 +20,7 @@ import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
 
@@ -162,7 +161,6 @@ async function decide_in(lang: string, message: string): Promise<Array<string>> 
 // `en` rather than the `ja` default, so a hard-coded default could not pass.
 describe('write_stop_decision — the session language is wired', () => {
 	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
 		// The suite may itself run inside a kit-launched agent, whose mark would stand the rule aside.
 		vi.stubEnv(agent_headless.KEY, undefined)
 	})
@@ -191,9 +189,14 @@ describe('write_stop_decision — the session language is wired', () => {
 	})
 })
 
-// The stdout writes of one stop decision in a lane child whose transcript tail has `pending` tasks.
-async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
+// The stdout writes of one stop decision in a lane child whose transcript tail has `pending` tasks,
+// with `arrange` laid over the quiet world.
+async function decide_in_lane(
+	pending: ReadonlyArray<string>,
+	arrange: () => void = () => undefined,
+): Promise<string> {
 	quiet_world()
+	arrange()
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 	vi.spyOn(lane_background, 'pending_background_ids').mockReturnValue(pending)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
@@ -201,6 +204,17 @@ async function decide_in_lane(pending: ReadonlyArray<string>): Promise<string> {
 	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
 
 	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// A carried run whose strand check prints its skipped-notify line on stdout, as the #4091 one did.
+function strand_prints_skip_line(): void {
+	vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(process.cwd())
+	vi.spyOn(run_carry, 'read_carry').mockReturnValue({ kind: 'carried', carry: CARRY })
+	vi.spyOn(run_carry, 'is_owner_live').mockReturnValue(false)
+	vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+	vi.spyOn(run_stranded_detect, 'run_stranded_check').mockImplementation(async () => {
+		await Promise.resolve(process.stdout.write('🔕 planning notifications are not opted in\n'))
+	})
 }
 
 const HELD: HoldRead = {
@@ -247,10 +261,6 @@ async function decide_held(
 
 // joshuafolkken/kit#2962: the hand-off reading reaches the stop rule, so a handed-off lane stops quietly.
 describe('write_stop_decision — the ship hand-off is wired', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('lets a held lane handed to the detached ship stop without a notify', async () => {
 		expect(await decide_held(true)).toBe('')
 	})
@@ -291,10 +301,6 @@ const QUOTED_MARKER_LINE = [
 // joshuafolkken/kit#3936: the successor's resume clears the record before the old session's turn ends,
 // so the record reads absent while the hold stands — the cut is read off the turn instead.
 describe('write_stop_decision — a relaunched cut whose record the successor already cleared', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('sends no notify and demands none when this turn relaunched the successor', async () => {
 		const written = await decide_held(false, false, [PROMPT_LINE, RELAUNCHED_CUT_LINE].join('\n'))
 
@@ -317,10 +323,6 @@ describe('write_stop_decision — a relaunched cut whose record the successor al
 
 // joshuafolkken/kit#3961: another session's hold, and a pause already announced, send nothing.
 describe('write_stop_decision — only this session’s unannounced pause is sent', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	afterEach(() => {
 		vi.unstubAllEnvs()
 	})
@@ -351,10 +353,6 @@ describe('write_stop_decision — only this session’s unannounced pause is sen
 
 // joshuafolkken/kit#2704: the lane mark and the transcript's pending tasks both reach the stop rule.
 describe('write_stop_decision — the lane background wait is wired', () => {
-	beforeEach(() => {
-		vi.spyOn(hook_decision, 'load_environment_file').mockReturnValue(undefined)
-	})
-
 	it('sends a lane child with a task still running back to wait', async () => {
 		expect(await decide_in_lane(['bxj18z032'])).toContain(
 			lane_background.LANE_BACKGROUND_STOP_REASON,
@@ -363,5 +361,13 @@ describe('write_stop_decision — the lane background wait is wired', () => {
 
 	it('lets a lane child with no task running stop', async () => {
 		expect(await decide_in_lane([])).not.toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
+	})
+
+	// joshuafolkken/kit#4101: the strand check's skipped-notify line went out ahead of the #4091 child's
+	// refusal, and the harness dropped the block it could no longer parse.
+	it('keeps what the report checks print off stdout, so the refusal is the whole of it', async () => {
+		const written = await decide_in_lane(['b21bxb7uh'], strand_prints_skip_line)
+
+		expect(JSON.parse(written)).toHaveProperty('decision', 'block')
 	})
 })

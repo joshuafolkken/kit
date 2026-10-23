@@ -2,6 +2,7 @@ import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { status_icons } from '#scripts/lib/status-icons'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
@@ -31,6 +32,18 @@ interface GateStepResult extends BufferedProcessResult {
 	// Set when the check was not started because its inputs match the record taken at this time
 	// (`check-reuse.ts`).
 	reused_at?: string | undefined
+	// The CPU milliseconds the check's process tree spent, where the gate could read it (`check-cpu.ts`).
+	cpu_ms?: number | undefined
+	// The check's place in the core budget, absent on a check that claimed none (`gate-run-steps.ts`).
+	claim?: CheckClaim | undefined
+}
+
+// The width a check asked the core budget for, the width it ran at and how long it waited for it, so
+// whether a unit claim's wait for room paid off is read per run (joshuafolkken/kit#4451).
+interface CheckClaim {
+	requested: number
+	granted: number
+	waited_ms: number
 }
 
 function is_gate_step_failed(result: GateStepResult): boolean {
@@ -147,7 +160,6 @@ function should_print_body(result: GateStepResult, is_verbose: boolean): boolean
 // Seconds to one decimal, which is the resolution the answer is read at: the question a gate's
 // timing answers is "which of the four is the long pole", and no check is ever separated from
 // another by less than a tenth of a second.
-const MS_PER_SECOND = 1000
 const SECONDS_DECIMALS = 1
 
 function format_seconds(elapsed_ms: number): string {
@@ -285,5 +297,5 @@ const gate_report = {
 	report_gate_steps,
 }
 
-export type { GateReport, GateStep, GateStepResult }
+export type { CheckClaim, GateReport, GateStep, GateStepResult }
 export { gate_report }

@@ -1,3 +1,4 @@
+import { figure_format } from '#scripts/lib/figure-format'
 import type { EventKind, RunEvent } from './run-event-stream'
 
 // One run event as the line a person reads in the watch pane. The pane is a script, not a session, so
@@ -10,8 +11,6 @@ import type { EventKind, RunEvent } from './run-event-stream'
 
 const JA = 'ja'
 const FIELD_SEPARATOR = ' · '
-const CLOCK_WIDTH = 2
-const CLOCK_PAD = '0'
 
 interface KindLabel {
 	ja: string
@@ -48,6 +47,9 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'lane-limit': { ja: 'レーン上限', en: 'lane limit' },
 	setup: { ja: '準備', en: 'setup' },
 	'pr-checks': { ja: 'PR のチェック', en: 'PR checks' },
+	'idle-notice': { ja: '待機の通知', en: 'idle notice' },
+	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
+	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))
@@ -60,18 +62,12 @@ function label_of(kind: string, lang: string): string {
 	return lang === JA ? label.ja : label.en
 }
 
-function two_digits(value: number): string {
-	return String(value).padStart(CLOCK_WIDTH, CLOCK_PAD)
-}
-
 // The local wall-clock `HH:MM` of the event, the reading a person watching a pane compares with the clock
 // on their screen; an unparseable stamp is shown as written rather than as `NaN:NaN`.
 function clock_of(at: string): string {
-	const date = new Date(at)
+	const ms = new Date(at).getTime()
 
-	if (Number.isNaN(date.getTime())) return at
-
-	return `${two_digits(date.getHours())}:${two_digits(date.getMinutes())}`
+	return Number.isNaN(ms) ? at : figure_format.minute_of(ms)
 }
 
 function render(event: RunEvent, lang: string): string {

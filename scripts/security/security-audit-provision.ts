@@ -1,9 +1,6 @@
-#!/usr/bin/env tsx
-import { chmodSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { error_text } from '#scripts/lib/error-message'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
 import { security_audit } from './security-audit'
@@ -43,24 +40,14 @@ async function download(url: string, timeout_ms: number): Promise<DownloadOutcom
 	}
 }
 
-// Staged beside the target and renamed onto it, under a name carrying this process's id. A download
-// interrupted halfway would otherwise leave a truncated file at the path `josh audit` spawns; and a
-// shared staging name would let two sessions of the same project — the `SessionStart` matcher is
-// empty, so a `clear` during a startup's download is exactly that — interleave their writes into one
-// file that both then rename into place, which the checksum cannot catch because it was verified
-// against each process's own buffer. The `finally` removes the staging file on every failing path.
+// Staged beside the target and renamed onto it (`atomic-write.ts`). A download interrupted halfway
+// would otherwise leave a truncated file at the path `josh audit` spawns; and a shared staging name
+// would let two sessions of the same project — the `SessionStart` matcher is empty, so a `clear`
+// during a startup's download is exactly that — interleave their writes into one file that both then
+// rename into place, which the checksum cannot catch because it was verified against each process's
+// own buffer.
 function install(target_path: string, content: Buffer): void {
-	const staging_path = security_audit_provision_logic.build_staging_path(target_path, process.pid)
-
-	mkdirSync(path.dirname(target_path), { recursive: true })
-
-	try {
-		writeFileSync(staging_path, content)
-		chmodSync(staging_path, EXECUTABLE_MODE)
-		renameSync(staging_path, target_path)
-	} finally {
-		rmSync(staging_path, { force: true })
-	}
+	atomic_write.replace_file(target_path, content, { mode: EXECUTABLE_MODE })
 }
 
 function failure_stamp_path(target_path: string): string {
@@ -167,8 +154,8 @@ async function report(
 // Every failure is a printed line and a zero exit, deliberately: this runs at session start, and a
 // non-zero exit there would take an agent's whole session away over a tool it does not need yet.
 // The audit's own gate is unchanged — a scanner that never arrived still fails the pre-push run.
-async function main(): Promise<void> {
-	const is_forced = process.argv.includes(FORCE_FLAG)
+async function run(argv: ReadonlyArray<string>): Promise<void> {
+	const is_forced = argv.includes(FORCE_FLAG)
 
 	try {
 		console.info(await report(PROJECT_ROOT, process.platform, process.arch, is_forced))
@@ -179,8 +166,6 @@ async function main(): Promise<void> {
 	}
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
-
-const security_audit_provision = { attempt, provision, report }
+const security_audit_provision = { attempt, provision, report, run }
 
 export { security_audit_provision }

@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_command } from '#scripts/git/git-command'
 import { main_sync } from '#scripts/git/main-sync'
+import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import type { BrokenLine } from './observation-ledger-line'
@@ -258,7 +259,11 @@ async function push_and_open(branch_name: string): Promise<string> {
 	try {
 		await git_command.push()
 
-		return await git_gh_command.pr_create(COMMIT_MESSAGE, pull_request_body(), 'ignore-for-release')
+		return await git_gh_command.pr_create(
+			COMMIT_MESSAGE,
+			pull_request_body(),
+			IGNORE_FOR_RELEASE_LABEL,
+		)
 	} catch (error) {
 		throw new Error(stranded_branch_message(branch_name, error_text.message_of(error)), {
 			cause: error,

@@ -4,22 +4,26 @@ The labels you put on an Issue to steer the agent, the labels a run puts on it f
 
 ## Labels you apply
 
-| Label                | What it does                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `auto-ok`            | Opts the Issue in to unattended work. On an epic's root it opts in every descendant. See [Run the backlog](./how-to/run-backlog.md). |
-| `needs-human-review` | Implement and verify, then stop before the commit — [below](#needs-human-review--the-opposite-label).                                |
-| `priority:high`      | Puts the Issue first in the backlog's order. Only you remove it.                                                                     |
-| `run:solo`           | Runs the Issue alone, with nothing else started beside it. The agent applies it to a defect in kit's own verification.               |
-| `run:lane`           | Lets the Issue run in a parallel lane beside others. The agent applies it to every other opted-in Issue.                             |
+| Label                | What it does                                                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto-ok`            | Opts the Issue in to unattended work. On an epic's root it opts in every descendant. See [Run the backlog](./how-to/run-backlog.md).                     |
+| `needs-human-review` | Implement and verify, then stop before the commit — [below](#needs-human-review--the-opposite-label).                                                    |
+| `priority:critical`  | Puts the Issue first in the backlog's order. Applied at filing from the body's `- 優先度:` declaration; only you remove it.                              |
+| `priority:high`      | Puts the Issue next, after `priority:critical`. Applied at filing the same way; only you remove it.                                                      |
+| `deferred`           | Sets the Issue aside for now: it never gets `auto-ok` at filing or from the agent's judgement.                                                           |
+| `run:solo`           | Runs the Issue alone, with nothing else started beside it. The agent applies it to a defect in kit's own verification that answers wrongly on every run. |
+| `run:lane`           | Lets the Issue run in a parallel lane beside others. The agent applies it to every other opted-in Issue.                                                 |
 
 ## Labels a run applies
 
-| Label            | What it means                                                                                                                                   |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)). |
-| `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                 |
-| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                  |
-| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                       |
+| Label            | What it means                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `in-progress`    | A run holds a working tree for this Issue. Remove a stale one only once the tree is clean ([Recover a stopped run](./how-to/recover-a-run.md)).         |
+| `needs-decision` | The run parked the Issue: it waits for your answer and the backlog skips it until you give one.                                                         |
+| `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then resume it with `fullrun #N` or remove the label; the backlog skips it until then. |
+| `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                          |
+| `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                 |
+| `epic`           | The Issue tracks child Issues and the order they land in.                                                                                               |
 
 ### `needs-human-review` — the opposite label
 
@@ -33,7 +37,7 @@ Single source: [`.claude/skills/workflow-commands/needs-human-review.md`](../.cl
 
 ### `already-done` — the exit for work that is already merged
 
-The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it; only a person removes it, by closing the issue.
+The exit for a run that verifies its issue's work is already in `main`: nothing to implement, and it cannot close the issue (Tier C). Not `needs-decision` — that waits for an answer; this one has its answer and only the close is outstanding. A run applies it with `josh issue:already-done`; only a person removes it, by closing the issue.
 
 ```bash
 gh api repos/{owner}/{repo}/labels -f name=already-done -f color=6f42c1 -f description="Verified already merged — a person closes it"

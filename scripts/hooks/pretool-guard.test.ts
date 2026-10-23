@@ -8,6 +8,7 @@ import { piped_verification } from '#scripts/rules/piped-verification'
 import { rule_rewrite } from '#scripts/rules/rule-rewrite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
+import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
 
 // The watcher guard is the one composed rule that reads off disk, so it is mocked here to pin the
@@ -44,7 +45,6 @@ const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
 const WATCHER_STALE_REASON = 'watcher stale'
 const PARENT_CUT_REASON = 'parent hand-off'
-const ALLOW_DECISION = '"permissionDecision":"allow"'
 
 function outcome(
 	reason: string | undefined,
@@ -55,14 +55,6 @@ function outcome(
 }
 
 const CLEAR = outcome(undefined, undefined, undefined)
-
-function in_lane(): boolean {
-	return true
-}
-
-function outside_lane(): boolean {
-	return false
-}
 
 // A real transcript file so the composed guards run their normal disk path rather than failing open,
 // and a fresh one per case so the once-per-run stamp never dedupes one case against another.
@@ -76,10 +68,12 @@ function fresh_transcript(): string {
 	return transcript_path
 }
 
-function payload_with_transcript(command: string): string {
-	const transcript_path = fresh_transcript()
-
+function bash_call(command: string, transcript_path: string): string {
 	return JSON.stringify({ tool_name: 'Bash', tool_input: { command }, transcript_path })
+}
+
+function payload_with_transcript(command: string): string {
+	return bash_call(command, fresh_transcript())
 }
 
 // The same fresh transcript, carried by an `Edit` of a runtime file instead of a shell call.
@@ -187,10 +181,10 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		expect(pretool_outcome(edit_payload_with_transcript()).notice).toBe(step_zero_notice.NOTICE)
 	})
 
-	it('says nothing on a shell call', async () => {
+	it('gives a shell call the shell rules rather than Step 0', async () => {
 		const result = await pretool_outcome_async(payload_with_transcript(BENIGN_COMMAND))
 
-		expect(result.notice).toBeUndefined()
+		expect(result.notice).toBe(shell_rules_notice.NOTICE)
 	})
 
 	// joshuafolkken/kit#3444: the reminder's edit is the lane child's move from plan to code.
@@ -211,6 +205,20 @@ describe('pretool_outcome — the Step 0 reminder at Edit time', () => {
 		const result = await pretool_outcome_async(edit_payload_with_transcript())
 
 		expect(result).toEqual(outcome(WATCHER_STALE_REASON, undefined, undefined))
+	})
+})
+
+// joshuafolkken/kit#3996: the shell rules reach the first Bash call, and a refusal keeps their stamp.
+describe('pretool_outcome — the shell rules at the first Bash call', () => {
+	it('lets a refusal win and keeps the notice for the next clear call', () => {
+		const transcript_path = fresh_transcript()
+		const refused = pretool_outcome(bash_call(SHELL_BODY_COMMAND, transcript_path))
+		const first = pretool_outcome(bash_call(BENIGN_COMMAND, transcript_path))
+		const second = pretool_outcome(bash_call(BENIGN_COMMAND, transcript_path))
+
+		expect(refused.notice).toBeUndefined()
+		expect(first.notice).toBe(shell_rules_notice.NOTICE)
+		expect(second.notice).toBeUndefined()
 	})
 })
 
@@ -258,34 +266,6 @@ describe('pretool_outcome_async — the composed parent hand-off guard', () => {
 
 		expect(refusal.reason).toContain(SHELL_BODY_REASON)
 		expect(parent_cut_reason).not.toHaveBeenCalled()
-	})
-})
-
-// joshuafolkken/kit#3154: a lane child's backgrounded `josh ship` is run in the foreground instead of
-// being refused, since a foreground ship detaches itself after its preflight.
-describe('pretool_guard.foreground_rewrite', () => {
-	const ship_payload = JSON.stringify({
-		tool_name: 'Bash',
-		tool_input: { command: 'pnpm josh ship --detach "Title #1"', run_in_background: true },
-		transcript_path: fresh_transcript(),
-	})
-	const clear = outcome(undefined, undefined, undefined)
-
-	it('allows the call with the background flag cleared in a lane child', () => {
-		const envelope = pretool_guard.foreground_rewrite(clear, ship_payload, in_lane) ?? ''
-
-		expect(envelope).toContain(ALLOW_DECISION)
-		expect(envelope).toContain('"run_in_background":false')
-	})
-
-	it('leaves a refusal from another guard in place', () => {
-		const refused = outcome(SHELL_BODY_REASON, undefined, undefined)
-
-		expect(pretool_guard.foreground_rewrite(refused, ship_payload, in_lane)).toBeUndefined()
-	})
-
-	it('rewrites nothing outside a lane child', () => {
-		expect(pretool_guard.foreground_rewrite(clear, ship_payload, outside_lane)).toBeUndefined()
 	})
 })
 

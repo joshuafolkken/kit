@@ -1,5 +1,6 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
@@ -22,6 +23,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_pushed: false,
 			is_merged: false,
 		}),
+		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
 	},
@@ -75,8 +77,12 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_lane_child_mock },
 }))
 
+// No ship body draft unless a test hands one (the draft itself: `run-ship-body-draft.test.ts`).
+const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
+
 const { run_ship_cli } = await import('./run-ship-cli')
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
 // runs nothing itself, `--log <N>` prints what a stopped supervisor left, `--cite` carries follow-ups so
@@ -88,7 +94,10 @@ const TITLE = 'Hand the region over #2428'
 const NUMBER = '2428'
 const REPOSITORY = '/repo/.git'
 const STOPPED_REPORT = '=== gate ===\nred'
+const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
+const LIVE_EVIDENCE = 'live-evidence'
+const TYPE_ERROR = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
 
 const info_lines: Array<string> = []
 
@@ -112,6 +121,21 @@ beforeEach(() => {
 	preflight_mock.mockReset().mockResolvedValue({ code: OK, out: 'ready' })
 	pre_detach_mock.mockReset().mockResolvedValue({ code: OK, out: 'passed' })
 	merge_mock.mockReset().mockResolvedValue({ kind: 'current', branch: 'main' })
+	with_draft_spy.mockReset().mockImplementation(async (args) => args)
+})
+
+// joshuafolkken/kit#4168: with `--body-file` omitted, the run's ship body draft is the body — the
+// preflight asks it and the supervisor is handed it.
+describe('run_ship_cli.run — the ship body draft', () => {
+	it('hands the draft to the preflight and the supervisor', async () => {
+		const body = run_ship_body_draft.body_arguments(DRAFT)
+
+		with_draft_spy.mockImplementation(async (args) => ({ ...args, body, body_path: DRAFT }))
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
+		expect(preflight_mock).toHaveBeenCalledWith({ title: TITLE, body_path: DRAFT })
+		expect(detach_mock).toHaveBeenCalledWith(expect.objectContaining({ body, body_path: DRAFT }))
+	})
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
@@ -190,7 +214,18 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
 		expect(detach_mock).not.toHaveBeenCalled()
-		expect(pre_detach_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4305: a lane shipped seven times to see one failure at a time.
+describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
+	it('reports the preflight refusal and the pre-detach failures together', async () => {
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
+
+		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(info_lines.join('\n')).toContain(PREFLIGHT_REFUSAL)
+		expect(info_lines.join('\n')).toContain(TYPE_ERROR)
 	})
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
@@ -201,7 +236,50 @@ describe('run_ship_cli.run — the preflight runs before the hand-off', () => {
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
 		await run_ship_cli.run([TITLE])
 
-		expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'preflight' }]])
+		expect(record.mock.calls).toStrictEqual([
+			[{ issue: Number(NUMBER), reason: 'preflight', cause: 'check' }],
+		])
+	})
+})
+
+// joshuafolkken/kit#4478: a lane read the report through `tail`, saw only the type error, and shipped
+// into the same refusal again.
+describe('run_ship_cli.run — the preflight refusal beside red pre-detach checks', () => {
+	beforeEach(() => {
+		preflight_mock.mockResolvedValue({
+			code: FAILED,
+			out: PREFLIGHT_REFUSAL,
+			preconditions: [LIVE_EVIDENCE],
+		})
+		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
+	})
+
+	it('prints the refusal after the pre-detach failures', async () => {
+		await run_ship_cli.run([TITLE, '--detach'])
+		const report = info_lines.join('\n')
+
+		expect(report.indexOf(PREFLIGHT_REFUSAL)).toBeGreaterThan(report.indexOf(TYPE_ERROR))
+		expect(report.endsWith('stopped at: === preflight ===')).toBe(true)
+	})
+
+	it('records the red pre-detach checks beside the unmet preconditions', async () => {
+		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+
+		await run_ship_cli.run([TITLE, '--detach'])
+
+		expect(record.mock.calls[0]?.[0].preconditions).toStrictEqual([LIVE_EVIDENCE, 'pre-detach'])
+	})
+})
+
+// joshuafolkken/kit#3998: every stage runs through the retry that re-runs an infrastructure stop.
+describe('run_ship_cli.run — the infrastructure retry', () => {
+	it('runs a stage through the infrastructure retry', async () => {
+		const retried = vi.spyOn(run_ship_infra_retry, 'retried')
+
+		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
+		await run_ship_cli.run([TITLE])
+
+		expect(retried).toHaveBeenCalledWith('preflight', expect.any(Function))
 	})
 })
 

@@ -117,10 +117,29 @@ describe('cases.cases_for', () => {
 	it('returns nothing for no boundaries', () => {
 		expect(cases.cases_for([])).toEqual([])
 	})
+
+	it('names the cases in English for an English session, one for one', () => {
+		expect(cases.cases_for(['network'], 'en')).toContain('timeout')
+		expect(cases.cases_for(['fs', 'time'], 'en')).toHaveLength(
+			cases.cases_for(['fs', 'time']).length,
+		)
+	})
+
+	it('takes a regional Japanese tag as Japanese', () => {
+		expect(cases.cases_for(['network'], 'ja-JP')).toEqual(cases.cases_for(['network']))
+	})
 })
 
 describe('cases.VOCABULARY', () => {
-	it('is exactly the four boundaries plus none', () => {
-		expect(cases.VOCABULARY).toEqual(['network', 'process', 'fs', 'time', cases.NONE])
+	it('is exactly the four boundaries, the two interactions, plus none', () => {
+		expect(cases.VOCABULARY).toEqual([
+			'network',
+			'process',
+			'fs',
+			'time',
+			'state',
+			'env',
+			cases.NONE,
+		])
 	})
 })

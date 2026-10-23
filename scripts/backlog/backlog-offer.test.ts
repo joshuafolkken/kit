@@ -62,6 +62,74 @@ describe('backlog_offer.answer_of — the verdict words map per the loop table',
 	})
 })
 
+// joshuafolkken/kit#4396: a `wait` the `run:solo` gate caused is marked, so `lane:stats` rows it apart.
+const SOLO_NOTICE =
+	'#12 carries `run:solo` and waits for joshuafolkken/kit’s running lanes to finish.'
+
+function wait_with(error: string, running: number): ReturnType<typeof backlog_offer.answer_of> {
+	return backlog_offer.answer_of(
+		{ code: OK_EXIT, tokens: [TOKENS.wait], err: error },
+		running,
+		NO_RETRIES,
+	)
+}
+
+describe('backlog_offer.answer_of — the run:solo cause', () => {
+	it('marks a blocked wait whose stderr carries the run:solo notice as solo', () => {
+		expect(wait_with(SOLO_NOTICE, SOME_RUNNING)).toStrictEqual({
+			answer: 'blocked',
+			issues: [],
+			retries: NO_RETRIES,
+			cause: 'solo',
+		})
+	})
+
+	it('leaves a blocked wait for any other reason without a cause', () => {
+		expect(wait_with('#12 is blocked by #11.', SOME_RUNNING).cause).toBeUndefined()
+	})
+
+	it('marks an exhausted wait the run:solo notice explains as solo', () => {
+		expect(wait_with(SOLO_NOTICE, NO_RUNNING).cause).toBe('solo')
+	})
+
+	it('leaves a retry unmarked whatever its stderr says', () => {
+		const read = { code: OK_EXIT, tokens: [TOKENS.retry], err: SOLO_NOTICE }
+
+		expect(backlog_offer.answer_of(read, SOME_RUNNING, NO_RETRIES).cause).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4513: a wait on a dependency chain or a start condition is marked with its issues.
+const CHAIN_LINE = 'Waiting on a dependency chain: [#4496](https://github.com/o/r/issues/4496)'
+const GATE_LINE = 'Waiting on a start condition: #4487'
+
+describe('backlog_offer.answer_of — the chain and gate causes', () => {
+	it('marks a blocked wait with its cause and the issues it waited on', () => {
+		expect(wait_with(`${CHAIN_LINE}\n${GATE_LINE}`, SOME_RUNNING)).toStrictEqual({
+			answer: 'blocked',
+			issues: [],
+			retries: NO_RETRIES,
+			cause: 'chain+gate',
+			waiting: [4496, 4487],
+		})
+	})
+
+	it('lets the run:solo notice win over a cause line', () => {
+		expect(wait_with(`${SOLO_NOTICE}\n${CHAIN_LINE}`, SOME_RUNNING).cause).toBe('solo')
+	})
+
+	// A wait with nothing in flight in this run — a start date, or a blocker another session holds.
+	it('marks an exhausted wait with its cause and issues too', () => {
+		expect(wait_with(GATE_LINE, NO_RUNNING)).toStrictEqual({
+			answer: 'exhausted',
+			issues: [],
+			retries: NO_RETRIES,
+			cause: 'gate',
+			waiting: [4487],
+		})
+	})
+})
+
 describe('backlog_offer.answer_of — retry is blocked until the third consecutive one', () => {
 	it('maps a retry below the limit to blocked and advances the count', () => {
 		expect(offer_of([TOKENS.retry], NO_RUNNING, NO_RETRIES)).toStrictEqual({

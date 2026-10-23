@@ -1,3 +1,4 @@
+import { defect_origin_line } from './defect-origin-line'
 import { issue_bug_label } from './issue-bug-label'
 import { BREAKING_CHANGE_LABEL, BUG_LABEL, ENHANCEMENT_LABEL, has_label_name } from './issue-labels'
 import { markdown_section } from './markdown-section'
@@ -44,16 +45,20 @@ function bug_classification_problem(body: string): string | undefined {
 	return undefined
 }
 
-function problems(body: string): ReadonlyArray<string> {
-	const classification_problem = bug_classification_problem(body)
-	const found: Array<string> = []
-
-	if (classification_problem !== undefined) found.push(classification_problem)
+function label_conflict(body: string): string | undefined {
 	const labels = required_labels(body)
 
-	if (labels.includes(BUG_LABEL) && labels.includes(ENHANCEMENT_LABEL)) found.push(CONFLICT)
+	return labels.includes(BUG_LABEL) && labels.includes(ENHANCEMENT_LABEL) ? CONFLICT : undefined
+}
 
-	return found
+function problems(body: string): ReadonlyArray<string> {
+	const found = [
+		bug_classification_problem(body),
+		label_conflict(body),
+		defect_origin_line.problem(body),
+	]
+
+	return found.filter((problem) => problem !== undefined)
 }
 
 const issue_classification = {

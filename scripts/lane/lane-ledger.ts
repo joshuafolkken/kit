@@ -1,12 +1,26 @@
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { z } from 'zod'
+import {
+	lane_ledger_schema,
+	type CoreWaitRecord,
+	type GateRecord,
+	type HeldRecord,
+	type LedgerEntry,
+	type OverlapRecord,
+	type RoundTwoRecord,
+	type StageRecord,
+	type StopRecord,
+	type TestRelatedRecord,
+	type UnitFileRecord,
+} from './lane-ledger-schema'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
 // lane merge, per finished `josh gate`, per machine-load sample, per lane dispatch, per finished
-// `josh ship` stage and per stopped `josh ship`, read back by `josh lane:stats`.
+// `josh ship` stage, per stopped `josh ship`, per round-2 decision, per core-budget wait and per
+// `josh test:related` run, read back by `josh lane:stats`. Each line's shape is `lane-ledger-schema.ts`.
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -23,127 +37,20 @@ const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
 // `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
 const CI_WAIT_STAGE = 'ci-wait'
+// The part of `followup`'s waits CodeRabbit spent running or rate-limited, and the rate-limited part
+// alone (joshuafolkken/kit#4574).
+const CODERABBIT_WAIT_STAGE = 'coderabbit-wait'
+const CODERABBIT_RATE_LIMIT_STAGE = 'coderabbit-rate-limit'
+// A detached `josh ship`'s fast checks in the agent's own turn — not a resumable ship stage, since the
+// supervised gate runs them again (joshuafolkken/kit#4382).
+const PRE_DETACH_STAGE = 'pre-detach'
 const LEDGER_FILE_MODE = 0o600
 // The flags `detached-launch.ts` appends its log with, for the same deterministic shared-temp path.
 const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
 // eslint-disable-next-line no-bitwise -- POSIX open flags are a bit field; `||` here would be a bug
 const APPEND_FLAGS = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW
 
-const KIND = {
-	MERGE: 'merge',
-	GATE: 'gate',
-	LOAD: 'load',
-	DISPATCH: 'dispatch',
-	STAGE: 'stage',
-	STOP: 'stop',
-	OVERLAP: 'overlap',
-} as const
-
-const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
-const check_schema = z.object({
-	label: z.string(),
-	elapsed_ms: z.number(),
-	is_passed: z.boolean(),
-	is_reused: z.boolean().optional(),
-})
-const gate_schema = z.object({
-	kind: z.literal(KIND.GATE),
-	at: z.string(),
-	elapsed_ms: z.number(),
-	is_passed: z.boolean(),
-	// The unit suite's own duration, present when this gate ran it — the one
-	// record of a full vitest run `josh metrics` reads, so the suite is never timed twice.
-	unit_ms: z.number().optional(),
-	// The whole cores busy outside this gate, beyond the machine's baseline, at its start or its end —
-	// whichever was higher. Absent when the machine could not be read.
-	external_cores: z.number().optional(),
-	// Each check's own duration and verdict, so `josh lane:stats` can name the check a slow gate waited
-	// on. A reused check started no process: its row says so, and its zero is no timing.
-	checks: z.array(check_schema).optional(),
-})
-// `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
-// platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
-// worth its load. `swapped_mb` is `machine_capacity`'s counter, every page swapped since boot.
-// Both memory fields were renamed with their meaning (joshuafolkken/kit#3593): an older row's
-// `free_mb` / `swap_mb` are stripped on read, so the two measurements never share a column.
-const process_kind_schema = z.object({
-	kind: z.string(),
-	cpu_percent: z.number(),
-	rss_mb: z.number(),
-	count: z.number(),
-})
-const load_schema = z.object({
-	kind: z.literal(KIND.LOAD),
-	at: z.string(),
-	load: z.number(),
-	available_mb: z.number().optional(),
-	swapped_mb: z.number().optional(),
-	lanes: z.number().optional(),
-	// The heaviest process kinds at the instant of the sample (`lane-process-load.ts`), so the load the
-	// core budget's ledger does not explain can be read back by what made it (joshuafolkken/kit#3874).
-	processes: z.array(process_kind_schema).optional(),
-})
-// A lane child started on `issue` — the instant its implementation is timed from.
-const dispatch_schema = z.object({
-	kind: z.literal(KIND.DISPATCH),
-	at: z.string(),
-	issue: z.number(),
-})
-// One finished stage of a lane's run, passed or failed: `at` is its end and `elapsed_ms` its length, so
-// its start is read from the two. `issue` is absent where the writer does not hold one — `followup`'s
-// CI wait, which is timed on a path that fails before the issue is known.
-const stage_schema = z.object({
-	kind: z.literal(KIND.STAGE),
-	at: z.string(),
-	stage: z.string(),
-	elapsed_ms: z.number(),
-	issue: z.number().optional(),
-})
-// A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
-// retrospective's stop reason. How long it stayed stopped is derived from the next ship stage, not
-// recorded, so a resumed ship never has to know the stop it ends.
-const stop_schema = z.object({
-	kind: z.literal(KIND.STOP),
-	at: z.string(),
-	issue: z.number(),
-	reason: z.string(),
-})
-// A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
-// before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
-// wait ran out first (joshuafolkken/kit#3901).
-const overlap_schema = z.object({
-	kind: z.literal(KIND.OVERLAP),
-	at: z.string(),
-	issue: z.number(),
-	lanes: z.array(z.number()),
-	paths: z.array(z.string()),
-	waited_ms: z.number(),
-	is_cleared: z.boolean(),
-})
-const entry_schema = z.discriminatedUnion('kind', [
-	merge_schema,
-	gate_schema,
-	load_schema,
-	dispatch_schema,
-	stage_schema,
-	stop_schema,
-	overlap_schema,
-])
-
-type LedgerEntry = z.infer<typeof entry_schema>
-type MergeEntry = z.infer<typeof merge_schema>
-type GateEntry = z.infer<typeof gate_schema>
-type LoadEntry = z.infer<typeof load_schema>
-type DispatchEntry = z.infer<typeof dispatch_schema>
-type StageEntry = z.infer<typeof stage_schema>
-type StopEntry = z.infer<typeof stop_schema>
-type OverlapEntry = z.infer<typeof overlap_schema>
-// What a finished gate reports; the ledger stamps the kind and the time.
-type GateRecord = Omit<GateEntry, 'kind' | 'at'>
-type GateCheckRecord = z.infer<typeof check_schema>
-type StageRecord = Omit<StageEntry, 'kind' | 'at'>
-type StopRecord = Omit<StopEntry, 'kind' | 'at'>
-type OverlapRecord = Omit<OverlapEntry, 'kind' | 'at'>
+const { KIND, entry_schema } = lane_ledger_schema
 
 function target_of(repository: string): string {
 	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -170,8 +77,8 @@ async function target(): Promise<string | undefined> {
 
 // **Append, never rewrite** — `O_APPEND` keeps each short line whole across concurrent writers, and
 // `O_NOFOLLOW` plus `stamp_file`'s ownership test keep a planted link or another account's file from
-// receiving it.
-function append(path: string, entry: LedgerEntry): void {
+// receiving it. Any JSON-lines log takes it — the durable review stop log too (joshuafolkken/kit#4519).
+function append(path: string, entry: object): void {
 	const descriptor = openSync(path, APPEND_FLAGS, LEDGER_FILE_MODE)
 
 	try {
@@ -224,6 +131,41 @@ async function record_overlap(overlap: OverlapRecord, path?: string): Promise<vo
 	await record({ kind: KIND.OVERLAP, at: now_iso(), ...overlap }, path)
 }
 
+// `waiting` is written only when the offer named issues, so a hold that waited on none stays one short line.
+async function record_held(held: HeldRecord, path?: string): Promise<void> {
+	const waiting = held.waiting ?? []
+	const named = waiting.length > 0 ? { waiting: [...waiting] } : {}
+
+	await record({ kind: KIND.HELD, at: now_iso(), reason: held.reason, ...named }, path)
+}
+
+async function record_released(path?: string): Promise<void> {
+	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
+}
+
+async function record_offerable(is_offerable: boolean, path?: string): Promise<void> {
+	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
+}
+
+async function record_round_two(round_two: RoundTwoRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.ROUND_TWO, at: now_iso(), ...round_two }, path)
+}
+
+async function record_core_wait(wait: CoreWaitRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.CORE_WAIT, at: now_iso(), ...wait }, path)
+}
+
+async function record_unit_files(
+	files: ReadonlyArray<UnitFileRecord>,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.UNIT_FILES, at: now_iso(), files: [...files] }, path)
+}
+
+async function record_test_related(run: TestRelatedRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.TEST_RELATED, at: now_iso(), ...run }, path)
+}
+
 function parse_line(line: string): LedgerEntry | undefined {
 	return entry_schema.safeParse(json_value.parse_or_undefined(line)).data
 }
@@ -232,9 +174,7 @@ function is_present(entry: LedgerEntry | undefined): entry is LedgerEntry {
 	return entry !== undefined
 }
 
-// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
-// whole ledger unreadable, and an absent or unowned file is an empty ledger.
-function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+function parse_entries(path: string): ReadonlyArray<LedgerEntry> {
 	const raw = stamp_file.read_stamp_text(path)
 
 	if (raw === undefined) return []
@@ -245,32 +185,61 @@ function read_entries(path: string): ReadonlyArray<LedgerEntry> {
 		.filter(is_present)
 }
 
+// Each ledger's entries, parsed again only once the file itself has changed (joshuafolkken/kit#4263).
+const parsed_ledgers = stamped_memo.create<ReadonlyArray<LedgerEntry>>()
+
+// Every entry, oldest first. A malformed line — a write cut short — is skipped rather than making the
+// whole ledger unreadable, and an absent or unowned file is an empty ledger.
+function read_entries(path: string): ReadonlyArray<LedgerEntry> {
+	return parsed_ledgers.of(path, stamped_memo.file_stamp(path), () => parse_entries(path))
+}
+
 const lane_ledger = {
 	CI_WAIT_STAGE,
+	CODERABBIT_RATE_LIMIT_STAGE,
+	CODERABBIT_WAIT_STAGE,
 	KIND,
+	PRE_DETACH_STAGE,
 	append,
 	read_entries,
 	record,
+	record_core_wait,
 	record_dispatch,
 	record_gate,
+	record_held,
+	record_released,
 	record_merge,
 	record_overlap,
+	record_offerable,
+	record_round_two,
 	record_stage,
 	record_stop,
+	record_test_related,
+	record_unit_files,
 	target,
 	target_of,
 }
 
 export type {
+	CoreWaitEntry,
+	CoreWaitRecord,
 	DispatchEntry,
 	GateCheckRecord,
 	GateEntry,
+	HeldEntry,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,
+	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	RoundTwoEntry,
 	StageEntry,
 	StopEntry,
-}
+	StopRecord,
+	TestRelatedEntry,
+	TestRelatedRecord,
+	UnitFileRecord,
+	UnitFilesEntry,
+} from './lane-ledger-schema'
 export { lane_ledger }

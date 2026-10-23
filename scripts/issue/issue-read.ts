@@ -1,3 +1,4 @@
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { parse_json_object_or_undefined, read_json_listing } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -30,6 +31,10 @@ const COMMENT_SEPARATOR = '\n\n'
 const SECTION_SEPARATOR = '\n\n'
 const COMMENT_HEADING = 'comment by '
 const AT = ' at '
+// **A comment from an author without write access is shown but never read** (joshuafolkken/kit#4021):
+// on a public repository anyone can comment, and `issue-comments.md` takes the later text as the
+// agreement in force, so a third party's comment printed whole would be an instruction to the run.
+const UNTRUSTED_COMMENT = `(body withheld — the author is not ${gh_author_association.TRUSTED_LIST}, so it is not an instruction)`
 
 const issue_fields_schema = z.looseObject({
 	title: z.string(),
@@ -41,6 +46,7 @@ const comment_schema = z.looseObject({
 	user: z.looseObject({ login: z.string() }).optional(),
 	created_at: z.string().optional(),
 	body: z.string().optional(),
+	author_association: z.string().nullish(),
 })
 
 interface IssueFields {
@@ -53,6 +59,7 @@ interface IssueComment {
 	author: string
 	created_at: string
 	body: string
+	is_trusted: boolean
 }
 
 const UNKNOWN_AUTHOR = '(unknown)'
@@ -74,11 +81,17 @@ function parse_issue_fields(json: string): IssueFields | undefined {
 	}
 }
 
-function to_comment(raw: z.infer<typeof comment_schema>): IssueComment {
+async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueComment> {
+	const login = raw.user?.login
+
 	return {
-		author: raw.user?.login ?? UNKNOWN_AUTHOR,
+		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
+		is_trusted: await gh_author_association.is_trusted({
+			login,
+			association: raw.author_association,
+		}),
 	}
 }
 
@@ -91,18 +104,27 @@ function to_comment(raw: z.infer<typeof comment_schema>): IssueComment {
 // outcomes it already tells apart; a `JSON.parse` plus `safeParse` pair here would be the clone
 // `CLAUDE.md` prohibits, on the one endpoint two modules would then parse two ways. All three collapse
 // to `undefined` here, because the block above draws only one distinction: read, or not read.
-function parse_comments(json: string | undefined): ReadonlyArray<IssueComment> | undefined {
+async function parse_comments(
+	json: string | undefined,
+): Promise<ReadonlyArray<IssueComment> | undefined> {
 	if (json === undefined) return undefined
 
 	const listing = read_json_listing(json, comment_schema)
 
-	return listing.kind === 'read' ? listing.rows.map((row) => to_comment(row)) : undefined
+	if (listing.kind !== 'read') return undefined
+
+	return await Promise.all(listing.rows.map(async (row) => await to_comment(row)))
+}
+
+// The bodies a caller may act on — the comments of authors with write access, in order.
+function trusted_bodies(comments: ReadonlyArray<IssueComment>): ReadonlyArray<string> {
+	return comments.filter((comment) => comment.is_trusted).map((comment) => comment.body)
 }
 
 function format_comment(comment: IssueComment): string {
 	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}`
 
-	return `${heading}\n${comment.body}`
+	return `${heading}\n${comment.is_trusted ? comment.body : UNTRUSTED_COMMENT}`
 }
 
 function format_comments(comments: ReadonlyArray<IssueComment> | undefined): string {
@@ -133,9 +155,11 @@ const issue_read = {
 	NO_COMMENTS,
 	COMMENTS_UNREADABLE,
 	COMMENT_HEADING,
+	UNTRUSTED_COMMENT,
 	format_issue,
 	parse_comments,
 	parse_issue_fields,
+	trusted_bodies,
 }
 
 export type { IssueComment, IssueFields }

@@ -1,15 +1,18 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_ship } from './run-ship'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_preflight } from './run-ship-preflight'
+import { run_ship_probe } from './run-ship-probe'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage, type ShipState, type Stage } from './run-ship-stage'
-import { run_ship_sync, type StepResult } from './run-ship-sync'
+import { run_ship_sync, type StepResult, type WaitMark } from './run-ship-sync'
 
 // The stages `josh ship` runs, in the order a change ships, kept apart from the chaining
 // CLI so the order is read in one place.
 
 const should_forward_stderr = true
+const SUCCESS_EXIT_CODE = 0
 
 interface ShipArguments {
 	title: string
@@ -54,19 +57,22 @@ async function gate_stage(): Promise<StepResult> {
 	return { ...result, is_skipped }
 }
 
+// The default branch is merged before the gate, so the pull request opens on a branch that is current;
+// a clean merge goes on without waking anyone. A merge after the gate would move the merge base the
+// gate's record pins, so the pre-push hook could not reuse that record. **With `--review` it runs before
+// round 1 too**: the gate round 1 launches then reads the base the commit carries, so a clean round
+// leaves the gate stage a reuse rather than a whole second gate over a moved base (joshuafolkken/kit#4442).
+const SYNC_STEP: Step = {
+	stage: STAGE.SYNC,
+	header: run_ship.SYNC_HEADER,
+	run: async (args) => await run_ship_sync.sync_stage(args.number),
+}
+
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
 // first: a round-1 reviewer may have edited the tree since the preflight, and `josh gate` refuses a tree
 // with no green record. The commit step carries the `--skip-*` flags a resumed ship needs, so an
 // existing commit or push is never made twice.
 const COMMIT_STEPS: ReadonlyArray<Step> = [
-	// The default branch is merged again before the commit, so the pull request opens on a branch that
-	// is current; a clean merge goes on without waking anyone. It runs before the gate: a merge after it
-	// would move the merge base the gate's record pins, so the pre-push hook could not reuse that record.
-	{
-		stage: STAGE.SYNC,
-		header: run_ship.SYNC_HEADER,
-		run: async (args) => await run_ship_sync.sync_stage(args.number),
-	},
 	{
 		stage: STAGE.GATE,
 		header: run_ship.GATE_HEADER,
@@ -80,12 +86,36 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	},
 ]
 
+// The followup's merge wait on the stage record, written best-effort as the stages are
+// (`run-ship-cli.ts`): a lost mark only keeps the lane counted (joshuafolkken/kit#4466).
+function wait_mark(target: string | undefined): WaitMark {
+	return function mark(is_merge_waiting: boolean): void {
+		if (target === undefined) return
+
+		try {
+			run_ship_stage.mark_merge_waiting(target, is_merge_waiting)
+		} catch {
+			// Best-effort: an unmarked wait holds the lane's place, the safe direction.
+		}
+	}
+}
+
+// The merge, then the ship body draft goes with it (`run-ship-body-draft.ts`).
+async function followup_stage(args: ShipArguments): Promise<StepResult> {
+	const mark = wait_mark(await run_ship_probe.record_target(args.number))
+	const result = await run_ship_sync.followup_stage(args.title, args.notify, mark)
+
+	if (result.code === SUCCESS_EXIT_CODE) await run_ship_body_draft.remove(args.number)
+
+	return result
+}
+
 // The merge before the report bookkeeping.
 const MERGE_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.FOLLOWUP,
 		header: run_ship.FOLLOWUP_HEADER,
-		run: async (args) => await run_ship_sync.followup_stage(args.title, args.notify),
+		run: async (args) => await followup_stage(args),
 	},
 	{
 		stage: STAGE.REPORT,
@@ -95,14 +125,15 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 ]
 
 // `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
-// the gate stage that follows reuses that tree's green record unless the sync stage between them
-// merged the default branch and changed the tree. It also puts the round-2 pass between the commit
+// the gate stage that follows reuses that tree's green record unless the round changed the tree. It
+// also puts the round-2 pass between the commit
 // and the followup, so the PR opens between the rounds and round 2 runs beside CI — a no-op when
 // round 1 left no fix delta.
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
-	run: async (args) => await run_ship_review_steps.review_stage(args.number),
+	run: async (args, state) =>
+		await run_ship_review_steps.review_stage(args.number, state.is_review_stale === true),
 }
 const ROUND_TWO_STEP: Step = {
 	stage: STAGE.ROUND_TWO,
@@ -111,9 +142,9 @@ const ROUND_TWO_STEP: Step = {
 }
 
 function steps(args: ShipArguments): ReadonlyArray<Step> {
-	if (!args.is_review) return [PREFLIGHT_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
+	if (!args.is_review) return [PREFLIGHT_STEP, SYNC_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
 
-	return [PREFLIGHT_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
+	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
 }
 
 const run_ship_steps = { PREFLIGHT_STEP, steps }

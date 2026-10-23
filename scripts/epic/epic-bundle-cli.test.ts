@@ -385,3 +385,28 @@ describe('epic_bundle_cli.run — a repository that could not be read', () => {
 		error.mockRestore()
 	})
 })
+
+describe('epic_bundle_cli.run — --apply', () => {
+	const FAILURE_EXIT_CODE = 1
+
+	it('reads the issue number on either side of the flag', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const repo_read = vi
+			.spyOn(git_gh_command, 'repo_get_name_with_owner')
+			.mockResolvedValue(undefined)
+
+		expect(await epic_bundle_cli.run(['--apply', '1'])).toBe(FAILURE_EXIT_CODE)
+		expect(repo_read).toHaveBeenCalledTimes(1)
+		expect(error.mock.calls.join('\n')).not.toContain(epic_bundle_cli.USAGE)
+		repo_read.mockRestore()
+		error.mockRestore()
+	})
+
+	it('refuses the flag alone with the usage line', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await epic_bundle_cli.run(['--apply'])).toBe(FAILURE_EXIT_CODE)
+		expect(error).toHaveBeenCalledWith(epic_bundle_cli.USAGE)
+		error.mockRestore()
+	})
+})

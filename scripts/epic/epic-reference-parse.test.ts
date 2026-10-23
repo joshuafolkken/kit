@@ -30,6 +30,12 @@ describe('parse_external_reference', () => {
 		[`prefix ${REFERENCE}`],
 		[`${REFERENCE} suffix`],
 		[`https://github.com/${REPO}/issues/${String(ISSUE_NUMBER)}`],
+		['../..#1'],
+		['./repo#1'],
+		['owner/..#1'],
+		['owner/.hidden#1'],
+		['-owner/repo#1'],
+		['owner/-repo#1'],
 	])('answers nothing for %j', (text) => {
 		expect(parse_external_reference(text)).toBeUndefined()
 	})

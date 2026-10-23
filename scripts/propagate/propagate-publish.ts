@@ -1,4 +1,5 @@
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { json_value } from '#scripts/lib/json-value'
 import { poll } from '#scripts/lib/poll'
 import { GH_API_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { with_page_size } from '#scripts/version/version-remote'
@@ -63,13 +64,7 @@ function fetch_published_versions(versions_endpoint: string): Array<string> | un
 	})
 	if (stdout === undefined) return undefined
 
-	try {
-		const parsed: unknown = JSON.parse(stdout)
-
-		return Array.isArray(parsed) ? parsed.filter((name) => typeof name === 'string') : undefined
-	} catch {
-		return undefined
-	}
+	return json_value.parse_array(stdout)?.filter((name) => typeof name === 'string')
 }
 
 // The knobs the wait exposes. Every one of them is injectable so the unit suite can drive the loop

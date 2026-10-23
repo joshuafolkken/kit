@@ -152,9 +152,9 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 	{
 		name: 'cases',
 		decision:
-			'Each boundary a change crosses (network, process, fs, time) and the abnormal cases it owes',
+			'Each boundary a change crosses (network, process, fs, time, shared state, environment) and the abnormal cases it owes',
 		args: '<path...>',
-		vocabulary: ['network', 'process', 'fs', 'time', NONE],
+		vocabulary: ['network', 'process', 'fs', 'time', 'state', 'env', NONE],
 		single_source: 'prompts/collaboration-workflow/report-format.md → 変更とテスト',
 	},
 	{

@@ -1,4 +1,3 @@
-import { backlog_budget_cli } from '#scripts/backlog/backlog-budget-cli'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 
@@ -71,15 +70,15 @@ function tokens_of(invocation: string): ReadonlyArray<string> {
 	return invocation.split(TOKEN_SEPARATOR).filter((token) => token.length > EMPTY_LENGTH)
 }
 
-// **The integer check is `backlog:budget`'s own, imported rather than restated.** It is the command
-// this invocation is going to be handed to, so a second copy of the rule here would be free to drift
-// from the one that actually reads the number. `--only` carries no value and renders to its own
+// **The integer check is `cli_flags.to_count`, the one `backlog:budget` reads the number with.** It is
+// the command this invocation is going to be handed to, so a second copy of the rule here would be free
+// to drift from the one that actually reads the number. `--only` carries no value and renders to its own
 // constant for the same taint reason every other token does — the constant severs the record's string
 // from the rebuilt one.
 function render_option(token: ArgumentToken): string | undefined {
 	if (token.name === cli_flags.option_name(ONLY_FLAG)) return ONLY_FLAG
 	const flag = KNOWN_FLAGS.find((known) => cli_flags.option_name(known) === token.name)
-	const value = backlog_budget_cli.to_count(token.value)
+	const value = cli_flags.to_count(token.value)
 
 	if (flag === undefined || value === undefined) return undefined
 
@@ -109,7 +108,7 @@ function rendered_options(tokens: ReadonlyArray<ArgumentToken>): ReadonlyArray<s
 // `backlog:budget`'s.** It already refuses `0` and a leading zero, which is what keeps `#05` from
 // rebuilding as `#5` and being refused downstream as a rewritten record.
 // **The magnitude bound is here and not in the pattern**, which is anchored on digits and says nothing
-// about size — the same shape `backlog_budget_cli.to_count` ends with for a flag value. Without it a
+// about size — the same shape `cli_flags.to_count` ends with for a flag value. Without it a
 // number past `Number.MAX_SAFE_INTEGER` rebuilds as a different number through precision loss, and the
 // record would carry a `done` entry that never matches anything in `remaining`.
 function issue_of(token: string): number | undefined {

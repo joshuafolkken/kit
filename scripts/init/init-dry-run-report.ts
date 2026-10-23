@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 
 type ChangeKind = 'create' | 'merge' | 'overwrite' | 'delete'
 
@@ -10,7 +11,6 @@ interface FileChange {
 
 type JsonRecord = Record<string, unknown>
 
-const PACKAGE_JSON = 'package.json'
 const JSON_EXTENSION = '.json'
 const KIND_WIDTH = 'overwrite'.length
 const NO_CHANGES = '  (no file changes)'

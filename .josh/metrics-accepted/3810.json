@@ -1,8 +1,0 @@
-{
-	"reason": "#3810: epic:bundle excludes the release issue — a membership helper, the labels read, and the epic-bundle.md paragraph stating the exclusion",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 19,
-		"ai_cost.on_demand_bytes": 377
-	}
-}

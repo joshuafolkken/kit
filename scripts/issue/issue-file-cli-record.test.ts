@@ -2,6 +2,7 @@ import { git_command } from '#scripts/git/git-command'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_hold_member } from '#scripts/run/hold/run-hold-member'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli, type Filing } from './issue-file-cli'
 
@@ -16,6 +17,7 @@ const FINDER = '3415'
 
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const branch = vi.spyOn(git_command, 'branch')
+const is_run_member = vi.spyOn(run_hold_member, 'is_run_member')
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -37,6 +39,7 @@ function filing_to(target: string): Filing {
 beforeEach(() => {
 	emit.mockResolvedValue()
 	branch.mockResolvedValue('main')
+	is_run_member.mockResolvedValue(false)
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 })
 
@@ -48,13 +51,21 @@ afterEach(() => {
 describe('issue_file_cli.record', () => {
 	it('names this repository’s Issue by number and the lane child that found it', async () => {
 		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		is_run_member.mockResolvedValue(true)
 
 		await issue_file_cli.record(URL, filing_to(HERE), [])
 
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.FILED,
-			`#3438[] ${TITLE} (found during #${FINDER})`,
+			`#3438[][run] ${TITLE} (found during #${FINDER})`,
 		)
+	})
+
+	// joshuafolkken/kit#4099: only a run's own session marks its filing as the run's.
+	it('leaves a filing from a session outside the run unmarked', async () => {
+		await issue_file_cli.record(URL, filing_to(HERE), [])
+
+		expect(emit).toHaveBeenCalledWith(run_event_stream.EVENT_KIND.FILED, `#3438[] ${TITLE}`)
 	})
 
 	// joshuafolkken/kit#3494: the filing's classification label rides on the event, for the board's icon.

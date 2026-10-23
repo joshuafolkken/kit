@@ -1,9 +1,11 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { backlog_ready, type LaneUse } from '#scripts/backlog/backlog-ready'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { lane_capacity, type LimitChoice } from './lane-capacity'
 import { lane_limit_override } from './lane-limit-override'
+import { lane_state } from './lane-state'
 
 // `josh lane:limit [<limit>] [--reset]` — change a live `backlogrun`'s lane limit without stopping it.
 // A running parent keeps the environment it started with, so `JOSH_LANE_LIMIT`
@@ -96,12 +98,21 @@ function limit_text(limit: number): string {
 		: `${String(seated)} (${String(limit)} capped at the seats)`
 }
 
+// The lanes with no state record, counted in use since their state is unknown.
+function unknown_text(unknown: ReadonlyArray<string>): string {
+	if (unknown.length === 0) return ''
+
+	const issues = unknown.map((issue) => session_cite.issue(issue)).join(' ')
+
+	return ` · ${issues}: ${lane_state.NO_STATE_HINT}`
+}
+
 function status_line(status: LimitStatus): string {
 	const source = status.override === undefined ? lane_capacity.LANE_LIMIT_KEY : OVERRIDE_SOURCE
 	const { occupied, seated } = status.use
 	const free = lane_capacity.free_lanes(status.limit, occupied, seated)
 
-	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(occupied)} · free ${String(free)}`
+	return `lane limit ${limit_text(status.limit)} (${source}) · in use ${String(occupied)} · free ${String(free)}${unknown_text(status.use.unknown)}`
 }
 
 async function show(ports: LimitPorts): Promise<number> {

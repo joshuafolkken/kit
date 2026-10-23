@@ -1,100 +1,30 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_wake, type RunWake } from './run-wake'
-import { run_wake_loop, type DriveResult, type LoopPorts } from './run-wake-loop'
+import { run_wake_loop, type DriveResult } from './run-wake-loop'
+import { run_wake_loop_fixture } from './run-wake-loop-fixture'
 import type { LaunchResult } from './run-wake-session'
 
 // joshuafolkken/kit#1719. The loop is where "one wake per cut" either holds or does not, and no test
 // of the decision alone can see it: what matters is what the supervisor writes back between passes.
 
-const NOW = new Date('2026-09-10T12:00:00.000Z')
-const INVOCATION = 'backlogrun --max 5 --idle 30'
-const LAUNCHED: LaunchResult = { kind: 'launched', pid: 4242 }
-
-function carry(overrides: Partial<RunCarry> = {}): RunCarry {
-	return {
-		invocation: INVOCATION,
-		started_at: '2026-09-10T08:00:00.000Z',
-		merged: 3,
-		filed: 1,
-		cuts: 2,
-		failures: 0,
-		outages: 0,
-		...overrides,
-	}
-}
-
-const HANDED_OFF: CarryRead = { kind: 'carried', carry: carry({ is_handed_off: true }) }
-const IN_FLIGHT: CarryRead = { kind: 'carried', carry: carry() }
-const ENDED: CarryRead = { kind: 'none' }
+const {
+	ENDED,
+	HAND_OFF_CALL,
+	HANDED_OFF,
+	HANDOFF_MATERIAL,
+	IN_FLIGHT,
+	INVOCATION,
+	NOW,
+	WAKE_CALL,
+	recorder,
+} = run_wake_loop_fixture
 const FAILED = 'failed'
 const ENOENT_NOTE = 'spawn claude ENOENT'
-const HANDOFF_MATERIAL = 'merge over #2500'
 const TRANSPORT_FAILED = 'transport failed'
 const scratch = { directory: '', target: '' }
-
-interface Recorder {
-	ports: LoopPorts
-	wakes: Array<string>
-	materials: Array<string>
-	session_ids: Array<string>
-	order: Array<string>
-}
-
-const HAND_OFF_CALL = 'hand_off'
-const WAKE_CALL = 'wake'
-
-// A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
-// what the record said over time. Running past the end reads as the run having ended.
-function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
-	const wakes: Array<string> = []
-	const materials: Array<string> = []
-	// The forced ids handed to `wake`, one per launch, deterministic so a test can assert exactly which
-	// sessions the supervisor started (joshuafolkken/kit#2407).
-	const session_ids: Array<string> = []
-	// Every hand-off and launch in call order, so a test can pin that the hand-off lands first
-	// (joshuafolkken/kit#2437).
-	const order: Array<string> = []
-	const remaining = [...reads]
-
-	return {
-		wakes,
-		materials,
-		session_ids,
-		order,
-		ports: {
-			read_carry: () => remaining.shift() ?? ENDED,
-			// Liveness read from the record itself: a handed-off record's owner is the predecessor, whose
-			// process is gone once `--cut` is its last write; a carried record no cut handed off is one a
-			// live successor is spending. A test that needs a *dead* owner over a not-handed-off record —
-			// the crash joshuafolkken/kit#2336 recovers — overrides this port with `() => false`.
-			is_owner_live: (read) => read.kind === 'carried' && read.carry.is_handed_off !== true,
-			// Work is there by default, so every test written before joshuafolkken/kit#2417 still sees
-			// the record-only decision; the idle tests override this port.
-			has_work: async () => true,
-			new_session_id: () => `sid-${String(session_ids.length + 1)}`,
-			hand_off: () => {
-				order.push(HAND_OFF_CALL)
-			},
-			drive: async () => ({ kind: 'judgment', material: HANDOFF_MATERIAL }),
-			wake: (invocation, session_id, material) => {
-				order.push(WAKE_CALL)
-				wakes.push(invocation)
-				materials.push(material)
-				session_ids.push(session_id)
-
-				return launch
-			},
-			sleep: async () => {
-				await Promise.resolve()
-			},
-			now: () => NOW,
-		},
-	}
-}
 
 describe('run_wake_loop.run_loop — deterministic driver', () => {
 	it('finishes a no-judgment run without launching an agent', async () => {
@@ -136,6 +66,22 @@ describe('run_wake_loop.run_loop — deterministic driver', () => {
 
 		expect(stop.reason).toBe('ended')
 		expect(scripted.wakes).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4300: a lane whose close a process outlived is closed again on every pass, and a
+// failed retry never stops the run.
+describe('run_wake_loop.run_loop — closing again what a process outlived', () => {
+	it('retries the closes on every pass, carrying on past a failed one', async () => {
+		const retry_closes = vi.fn(async () => {
+			throw new Error('lsof failed')
+		})
+		const ports = { ...recorder([IN_FLIGHT, IN_FLIGHT, ENDED]).ports, retry_closes }
+
+		const stop = await run_wake_loop.run_loop(scratch.target, ports, 0)
+
+		expect(stop.reason).toBe('ended')
+		expect(retry_closes).toHaveBeenCalledTimes(3)
 	})
 })
 

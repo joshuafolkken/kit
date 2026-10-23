@@ -6,9 +6,9 @@ import {
 	has_label_name,
 } from '#scripts/issue/issue-labels'
 
-// The text of a `filed` event: the Issue a run filed, its kind, its title, and the child whose work
-// turned it up. `issue:file` writes it and `run:board` reads it back, both through this module, so the
-// two never spell it differently.
+// The text of a `filed` event: the Issue a run filed, its kind, its title, whether a run's own session
+// filed it, and the child whose work turned it up. `issue:file` writes it and `run:board` reads it
+// back, both through this module, so the two never spell it differently.
 
 // The classification labels a filing's kind is read from, in precedence order: a breaking change is
 // named as one whatever else it is.
@@ -25,13 +25,18 @@ interface Filed {
 	title: string
 	// The lane child that was working when the Issue was filed, when the filing came from one.
 	found_during: string | undefined
+	// A run's own session filed it — the parent holding the run's hold or a lane child — rather than one
+	// outside the run sharing the repository's stream (joshuafolkken/kit#4099). An event written before
+	// the mark was recorded reads as filed outside.
+	is_run?: boolean | undefined
 }
 
 // The kind slot is always written, `[<label>]` or `[]`, against the reference with no space: an event
 // written before the kind always has the space there, so no title, whatever it opens with, reads as a
-// kind.
+// kind. The run's mark follows the kind slot, again with no space.
+const RUN_MARK = '[run]'
 const TEXT_PATTERN = new RegExp(
-	String.raw`^(?<reference>\S*#\d+)(?:\[(?<kind>${KINDS.join('|')}|)\])? (?<title>.*?)(?: \(found during #(?<during>\d+)\))?$`,
+	String.raw`^(?<reference>\S*#\d+)(?:\[(?<kind>${KINDS.join('|')}|)\](?<run>\[run\])?)? (?<title>.*?)(?: \(found during #(?<during>\d+)\))?$`,
 	'u',
 )
 
@@ -41,7 +46,7 @@ function kind_of(labels: ReadonlyArray<string>): FiledKind | undefined {
 }
 
 function text_of(filed: Filed): string {
-	const kind = `[${filed.kind ?? ''}]`
+	const kind = `[${filed.kind ?? ''}]${filed.is_run === true ? RUN_MARK : ''}`
 	const suffix =
 		filed.found_during === undefined
 			? ''
@@ -60,6 +65,7 @@ function parse(text: string): Filed | undefined {
 		kind: KINDS.find((kind) => kind === groups['kind']),
 		title: String(groups['title']),
 		found_during: groups['during'],
+		is_run: groups['run'] !== undefined,
 	}
 }
 

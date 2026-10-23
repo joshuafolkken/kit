@@ -4,6 +4,7 @@ import {
 	CHECK_STATUS_MISSING,
 	CHECK_STATUS_PASS,
 	CHECK_STATUS_PENDING,
+	parse_pr_state_snapshot,
 	parse_rollup_checks,
 	read_string,
 } from './git-pr-checks-parse'
@@ -13,6 +14,7 @@ const SONAR_QUBE = 'SonarQube'
 const AUTO_MERGE = 'auto-merge'
 const NON_STRING_VALUE = 'not a string'
 const RATE_LIMITED = 'Review rate limited'
+const CHECKED_SHA = 'c0ffee1'
 
 describe('read_string', () => {
 	it('returns the trimmed string for a non-empty value', () => {
@@ -206,6 +208,48 @@ describe('parse_rollup_checks — edge cases', () => {
 		expect(checks).toHaveLength(2)
 		expect(checks[0]?.name).toBe(CODE_RABBIT)
 		expect(checks[1]?.name).toBe(SONAR_QUBE)
+	})
+})
+
+// joshuafolkken/kit#4351: REST answers `null` where it has no value yet, and one rejected element
+// once read the whole rollup as empty.
+describe('parse_pr_state_snapshot — REST nulls', () => {
+	it('reads a running check run with a null conclusion as pending beside the others', () => {
+		const passing = `{"name":"${SONAR_QUBE}","status":"completed","conclusion":"success"}`
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const raw = `{"statusCheckRollup":[${passing},${running}]}`
+
+		expect(parse_pr_state_snapshot(raw).rollup).toStrictEqual([
+			{ name: SONAR_QUBE, status: CHECK_STATUS_PASS },
+			{ name: 'CodeQL', status: CHECK_STATUS_PENDING },
+		])
+	})
+})
+
+describe('parse_pr_state_snapshot — required_contexts', () => {
+	it('carries requiredContexts through as required_contexts', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], requiredContexts: [SONAR_QUBE] })
+
+		expect(parse_pr_state_snapshot(raw).required_contexts).toStrictEqual([SONAR_QUBE])
+	})
+
+	it('omits required_contexts when the branch requires none', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], requiredContexts: [] })
+
+		expect(parse_pr_state_snapshot(raw)).not.toHaveProperty('required_contexts')
+	})
+})
+
+// #4036: the merge names the head these checks were read from, so the parse must carry it through.
+describe('parse_pr_state_snapshot — head_sha', () => {
+	it('carries headRefOid through as head_sha', () => {
+		const raw = JSON.stringify({ statusCheckRollup: [], headRefOid: CHECKED_SHA })
+
+		expect(parse_pr_state_snapshot(raw).head_sha).toBe(CHECKED_SHA)
+	})
+
+	it('omits head_sha when the read carried no headRefOid', () => {
+		expect(parse_pr_state_snapshot('{}')).not.toHaveProperty('head_sha')
 	})
 })
 

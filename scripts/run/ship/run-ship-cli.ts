@@ -1,18 +1,21 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
-import { cli_flags } from '#scripts/lib/cli-flags'
+import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
+import { run_ship_args } from './run-ship-args'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_detach } from './run-ship-detach'
-import { run_ship_pre_detach } from './run-ship-pre-detach'
+import { run_ship_infra_retry } from './run-ship-infra-retry'
+import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
+import { run_ship_stop_cause } from './run-ship-stop-cause'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -38,50 +41,16 @@ import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 // the agent ends at the hand-off instead of relaunching itself for the gate, a supervised ship that stops
 // hands the stage back (`run-ship-return.ts`), and `--log <N>` prints the report it stopped on.
 //
-// The first positional is the `"<title> #<N>"` string `git -y` and `followup` already take; the issue
-// number is read off its tail for `run:tail`. Any further positionals are follow-up citations filed
-// this run (`fullrun-steps.md` routes branch-2 filing before `ship`), forwarded to `run:tail` after the
-// closed issue so `issue:cite` reports them too. A notify body — `--notify-message` or the
-// shell-body-safe `--notify-message-file` — is forwarded to `followup` alone; the completion prose is
-// composed before this command and passed straight through.
+// The command line it takes is read in `run-ship-args.ts`.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const FIRST = 0
-const NUMBER_GROUP = 1
-const EXTRA_CITE_START = 1
-// The issue reference at the tail of the title — `git -y` and `followup` read the whole string, and
-// `run:tail` needs the number alone.
-const TRAILING_ISSUE_PATTERN = /#([1-9]\d*)\s*$/u
-// Both body forms `followup` documents, forwarded verbatim: the inline `--notify-message` and the
-// shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
-const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
-// The PR body carrying the live-execution evidence `followup` gates the merge
-// on, forwarded to `git -y` as a path because it holds commands and their output.
-const BODY_FILE_OPTION = 'body-file'
 const USAGE =
 	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
 const LANE_CHILD_DETACH_NOTE =
 	'lane child: shipping through the detached supervisor (--detach implied), so the end of this turn cannot kill it'
-
-type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
-
-const OPTIONS = {
-	[NOTIFY_OPTIONS[0]]: { type: 'string' },
-	[NOTIFY_OPTIONS[1]]: { type: 'string' },
-	[BODY_FILE_OPTION]: { type: 'string' },
-	review: { type: 'boolean' },
-	// Hand the region to a detached supervisor (`run-ship-detach.ts`), print the
-	// report a stopped supervisor left, and carry follow-up citations as options so the supervisor's
-	// command line still ends with its title.
-	detach: { type: 'boolean' },
-	log: { type: 'string' },
-	cite: { type: 'string', multiple: true },
-} as const
-
-type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number: string }
 
 // What a resumed ship knows before its first stage: the record's path (absent outside a repository),
 // the stages it says completed, and the repository's actual state (`run-ship-stage.ts` decides from it).
@@ -94,87 +63,7 @@ interface ShipContext {
 	started: Array<string>
 }
 
-// The notify tail `followup` takes — whichever body form the caller composed, forwarded unchanged so a
-// path-based body reaches `followup` exactly as passed.
-function notify_arguments(values: NotifyValues): ReadonlyArray<string> {
-	return NOTIFY_OPTIONS.flatMap((option) => {
-		const value = values[option]
-
-		return value === undefined ? [] : [`--${option}`, value]
-	})
-}
-
-function body_arguments(path: string | undefined): ReadonlyArray<string> {
-	return path === undefined ? [] : [`--${BODY_FILE_OPTION}`, path]
-}
-
-const { PHASE } = run_ship_stage
-
-function issue_number(title: string): string | undefined {
-	return TRAILING_ISSUE_PATTERN.exec(title)?.[NUMBER_GROUP]
-}
-
-interface ParsedValues extends NotifyValues {
-	[BODY_FILE_OPTION]?: string
-	review?: boolean
-	detach?: boolean
-	log?: string
-	cite?: Array<string>
-}
-
-// A follow-up citation passed as a trailing positional is a bare issue number, so a stray flag is
-// refused rather than forwarded to the wrong step.
-function ship_args(
-	title: string,
-	rest: ReadonlyArray<string>,
-	values: ParsedValues,
-): ShipArguments | undefined {
-	const number = issue_number(title)
-	const cites = [...rest, ...(values.cite ?? [])]
-
-	if (number === undefined || cites.some((token) => !issue_number_shape.is_issue_number(token))) {
-		return undefined
-	}
-
-	return {
-		title,
-		number,
-		notify: notify_arguments(values),
-		body: body_arguments(values[BODY_FILE_OPTION]),
-		body_path: values[BODY_FILE_OPTION],
-		cites,
-		is_review: values.review === true,
-		is_detach: values.detach === true,
-	}
-}
-
-// `--log <N>` stands alone: a bare issue number and nothing to ship.
-function log_command(number: string, positionals: ReadonlyArray<string>): ShipCommand | undefined {
-	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(number) && positionals.length === 0
-		? { kind: 'log', number }
-		: undefined
-}
-
-function command_of(
-	values: ParsedValues,
-	positionals: ReadonlyArray<string>,
-): ShipCommand | undefined {
-	if (values.log !== undefined) return log_command(values.log, positionals)
-
-	const title = positionals[FIRST]
-	const args =
-		title === undefined ? undefined : ship_args(title, positionals.slice(EXTRA_CITE_START), values)
-
-	return args === undefined ? undefined : { kind: 'ship', args }
-}
-
-// Numbers-only tail and a strict parse, so a title with no `#<N>` or a stray flag is refused rather
-// than shipped past the wrong step.
-function parse(argv: ReadonlyArray<string>): ShipCommand | undefined {
-	const parsed = cli_flags.arguments_of(argv, OPTIONS)
-
-	return parsed === undefined ? undefined : command_of(parsed.values, parsed.positionals)
-}
+const { PHASE, STAGE } = run_ship_stage
 
 // Every stage that ran is timed into the lane ledger, failed ones included — a stage that stopped the
 // ship cost the lane its time as well. The append is local and best-effort, so it adds no wait.
@@ -186,15 +75,26 @@ async function record_timed(step: Step, issue: string, elapsed_ms: number): Prom
 	await lane_ledger.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
 }
 
-async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+async function run_once(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
 	const started_ms = performance.now()
 	const result = await step.run(args, state)
 	const elapsed_ms = performance.now() - started_ms
 
 	if (result.is_skipped !== true) await record_timed(step, args.number, elapsed_ms)
-	const section = { header: step.header, body: result.out, code: result.code }
 
-	return result.conflicts === undefined ? section : { ...section, conflicts: result.conflicts }
+	return run_ship.section_of(step.header, result)
+}
+
+// A stage that stopped on the infrastructure runs again in place before it stops the ship. A retry
+// re-reads the state, as a resumed ship does: a commit whose push failed is not made a second time.
+async function run_step(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
+	const first = [state]
+
+	return await run_ship_infra_retry.retried(step.stage, async () => {
+		const current = first.pop() ?? (await run_ship_probe.read_state())
+
+		return await run_once(step, args, current)
+	})
 }
 
 async function emit_phase(
@@ -237,6 +137,12 @@ async function settle(
 	})
 }
 
+// A function of its own so the write does not sit after an `await`, where `require-atomic-updates`
+// reads it as a possible race — the reason `held-mark.ts` gives `set_held_mark`.
+function set_state(context: ShipContext, state: ShipState): void {
+	context.state = state
+}
+
 // One stage: passed over when the record and the state say it is done, run and recorded otherwise.
 async function run_stage(
 	step: Step,
@@ -257,6 +163,8 @@ async function run_stage(
 	const section = await run_step(step, args, context.state)
 
 	await settle(step, args, context, section.code)
+	// A review may fix the tree and refreshes the brief, so the stages after it read the state anew.
+	if (step.stage === STAGE.REVIEW) set_state(context, await run_ship_probe.read_state())
 
 	return section
 }
@@ -270,19 +178,22 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 	const done = target === undefined ? new Set<string>() : run_ship_stage.read_done(target)
 	const started = target === undefined ? [] : [...run_ship_stage.read_started(target)]
 
+	// A supervisor that died mid-followup left its wait marked; this one waits on nothing yet.
+	record(target, (path) => {
+		run_ship_stage.clear_waits(path)
+	})
+
 	return { target, done, state, started }
 }
 
 // Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
-// before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason.
-async function record_stop(
-	args: ShipArguments,
-	stage: Stage,
-	conflicts?: ReadonlyArray<string>,
-): Promise<void> {
-	const reason = run_ship_stage.stop_reason(stage, conflicts)
+// before the hand-off — so `lane:stats` can say how long a ship stayed stopped for each reason. A review
+// stop's deciding findings also go, whole, to the durable stop log `review:stops` reads.
+async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
+	const issue = Number(args.number)
 
-	await lane_ledger.record_stop({ issue: Number(args.number), reason })
+	await lane_ledger.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
+	review_stop_log.record({ issue, stage, findings: run_ship_stop_cause.details_of(stage, failed) })
 }
 
 // A detached supervisor hands the stopped stage back (`run-ship-return.ts`); a
@@ -296,7 +207,7 @@ async function stopped(
 ): Promise<ReadonlyArray<ShipSection>> {
 	const failed = sections.at(-1)
 
-	await record_stop(args, step.stage, failed?.conflicts)
+	await record_stop(args, step.stage, failed)
 
 	if (run_ship_detach.is_supervised()) {
 		record(context.target, run_ship_stage.end_attempt)
@@ -372,23 +283,35 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
+// The preflight stop's unmet kinds, with `pre-detach` added when those checks went red beside it.
+function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
+	if (checks.code === SUCCESS_EXIT_CODE) return stop
+
+	return { ...stop, preconditions: [...(stop.preconditions ?? []), lane_ledger.PRE_DETACH_STAGE] }
+}
+
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
 // hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
 // supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
 // checks (`run-ship-pre-detach.ts`) follow it here for the same reason; they are not a stage, so the
-// supervisor's gate runs them again rather than passing over them.
+// supervisor's gate runs them again rather than passing over them. They run even when the preflight
+// refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the preflight's
+// refusal still comes before its own scoped pair, the one heavy check here.
+//
+// **The refusal is printed last**: a lane child reading the report through `tail` saw only the red
+// metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
+// preflight stop of joshuafolkken/kit#4478. The stop records the pre-detach checks' red beside the
+// unmet kinds, so the ledger shows which refusals came with one.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+	const result = await run_ship_pre_detach_timed.checks(args.number)
+	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
 	if (preflight.code !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage)
-
-		return [preflight]
+		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, checks))
 	}
 
-	const result = await run_ship_pre_detach.checks()
-
-	return [preflight, { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }]
+	return [checks, preflight]
 }
 
 async function detach_after_preflight(args: ShipArguments): Promise<number> {
@@ -437,7 +360,7 @@ async function run_ship_command(args: ShipArguments): Promise<number> {
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const command = parse(argv)
+	const command = run_ship_args.parse(argv)
 
 	if (command === undefined) {
 		console.error(USAGE)
@@ -447,7 +370,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	return command.kind === 'log'
 		? await print_log(command.number)
-		: await run_ship_command(command.args)
+		: await run_ship_command(await run_ship_body_draft.with_draft(command.args))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

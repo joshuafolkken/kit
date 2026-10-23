@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
@@ -8,7 +9,6 @@ import { lane_stats } from './lane-stats'
 
 const NOW = Date.parse('2026-10-10T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
-const MS_PER_MINUTE = 60_000
 const ISSUE = 3643
 const OTHER_ISSUE = 3644
 const REVIEW_MINUTES = [2, 4, 9]
@@ -68,6 +68,14 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 		expect(row_of(entries, CI_WAIT)).toStrictEqual(['3.0', '3.0', '1'])
 	})
 
+	// joshuafolkken/kit#4382: the pre-detach checks are timed apart from the preflight.
+	it('keeps the pre-detach checks on a row of their own', () => {
+		const pre_detach = 'pre-detach'
+		const entries = [stage('preflight', 1, 2), stage(pre_detach, 3, 1)]
+
+		expect(row_of(entries, pre_detach)).toStrictEqual(['3.0', '3.0', '1'])
+	})
+
 	it('prints not measured, never zero, for a stage nothing recorded', () => {
 		expect(row_of([stage(REVIEW, 2, 1)], 'round-2')).toStrictEqual(NOT_MEASURED_ROW)
 	})
@@ -76,6 +84,23 @@ describe('lane_stage_stats.table — the recorded stages', () => {
 		const day_and_a_half = 36 * 60
 
 		expect(row_of([stage(REVIEW, 2, day_and_a_half)], REVIEW)).toStrictEqual(NOT_MEASURED_ROW)
+	})
+})
+
+// joshuafolkken/kit#4574: CodeRabbit's part of followup's waits, and its rate-limited part.
+describe('lane_stage_stats.table — the CodeRabbit wait', () => {
+	it('keeps the CodeRabbit wait and its rate-limited part on rows of their own', () => {
+		const wait = 'coderabbit-wait'
+		const rate_limit = 'coderabbit-rate-limit'
+		const entries = [
+			stage(CI_WAIT, 30, 1),
+			stage(wait, 2, 3),
+			stage(wait, 25, 1),
+			stage(rate_limit, 20, 1),
+		]
+
+		expect(row_of(entries, wait)).toStrictEqual(['13.5', '25.0', '2'])
+		expect(row_of(entries, rate_limit)).toStrictEqual(['20.0', '20.0', '1'])
 	})
 })
 

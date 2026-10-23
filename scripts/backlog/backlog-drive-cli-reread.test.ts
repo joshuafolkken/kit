@@ -33,12 +33,18 @@ const scratch = { directory: '' }
 function ports_with(launch: DrivePorts['launch']): DrivePorts {
 	return {
 		is_finished: () => false,
+		adoptable: async () => [],
 		merge: async () => ({ token: 'none', outcome: 'merged', is_offer: true }),
 		offer: async (state) => await backlog_drive_cli.read_offer(state, CONTEXT),
 		launch,
 		free_lanes: async () => ROOMY_POOL,
+		limit_room: async () => ROOMY_POOL,
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
+		memory_held: async () => false,
+		hold: async () => undefined,
+		idle: async () => undefined,
+		paused: async () => undefined,
 		now: () => new Date(),
 	}
 }

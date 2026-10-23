@@ -334,7 +334,7 @@ describe('COMMAND_MAP shell commands', () => {
 
 	it('test:unit delegates to the guard script so it can skip when vitest is absent', () => {
 		expect(COMMAND_MAP['test:unit']?.shell).toBeUndefined()
-		expect(COMMAND_MAP['test:unit']?.script).toBe('scripts/test/test-unit-guard.ts')
+		expect(COMMAND_MAP['test:unit']?.script).toBe('scripts/test/test-unit-guard-main.ts')
 	})
 
 	it('test uses sh -c for chaining test:unit and test:e2e', () => {

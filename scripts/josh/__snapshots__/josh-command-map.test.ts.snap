@@ -25,8 +25,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lc": "latest:corepack",
     "lli": "lane:limit",
     "ln": "lines",
+    "lps": "lane:pause",
     "lr": "lint:related",
     "lrs": "lane:restart",
+    "lru": "lane:resume",
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
@@ -41,11 +43,11 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "r": "ranges",
     "rc": "ruleset:check",
     "re": "release",
-    "rmi": "registry:migrate",
     "rt": "reconcile-templates",
     "rtr": "retrospective",
     "ruv": "rule:value",
     "rvf": "review:findings",
+    "rvs": "review:stops",
     "sd": "cspell:dot",
     "st": "start",
     "sy": "sync",
@@ -54,6 +56,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "te": "test:e2e",
     "tm": "time",
     "tmd": "time:density",
+    "tpn": "test:pinned",
     "tr": "test:related",
     "trd": "test:red",
     "tu": "test:unit",
@@ -146,27 +149,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
-    "backlog:stalled": [
-      "",
-      "automation",
-      [
-        "network",
-      ],
-    ],
     "backlogrun": [
-      "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop",
+      "[<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop | --restart",
       "developer",
       [
         "files",
         "network",
         "processes",
-      ],
-    ],
-    "batch:guard": [
-      "",
-      "automation",
-      [
-        "none",
       ],
     ],
     "behavior": [
@@ -246,8 +235,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
-    "defect:rate": [
-      "[--days <n>]",
+    "defect:origin": [
+      "<N>",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "defect:report": [
+      "",
       "automation",
       [
         "network",
@@ -296,13 +292,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "git",
       ],
     ],
-    "duplicate-read:guard": [
-      "",
-      "automation",
-      [
-        "none",
-      ],
-    ],
     "e2e:retry-check": [
       "",
       "automation",
@@ -332,7 +321,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "epic:bundle": [
-      "<issue>",
+      "<issue> [--apply]",
       "automation",
       [
         "network",
@@ -433,13 +422,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
-    "investigation:guard": [
-      "",
-      "automation",
-      [
-        "none",
-      ],
-    ],
     "issue:ack": [
       "<issue>",
       "automation",
@@ -447,11 +429,12 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
-    "issue:backlinks": [
-      "<issue>",
+    "issue:already-done": [
+      "<issue> --evidence-file <path>",
       "automation",
       [
         "network",
+        "files",
       ],
     ],
     "issue:cite": [
@@ -469,7 +452,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> --depth <0|1|2> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
+      "<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
       "automation",
       [
         "network",
@@ -494,6 +477,21 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "files",
+      ],
+    ],
+    "issue:measured": [
+      "<issue> --evidence-file <path>",
+      "automation",
+      [
+        "network",
+        "files",
+      ],
+    ],
+    "issue:plan": [
+      "<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]",
+      "automation",
+      [
+        "network",
       ],
     ],
     "issue:read": [
@@ -585,6 +583,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "lane:pause": [
+      "<issue> | --all",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
     "lane:prune": [
       "",
       "automation",
@@ -601,6 +606,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "git",
         "processes",
         "network",
+      ],
+    ],
+    "lane:resume": [
+      "<issue> | --all",
+      "developer",
+      [
+        "processes",
       ],
     ],
     "lane:sample": [
@@ -651,6 +663,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "latest:if-required": [
+      "",
+      "automation",
+      [
+        "files",
+        "network",
+        "processes",
+      ],
+    ],
     "latest:scope": [
       "[--record] [--json]",
       "automation",
@@ -674,7 +695,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "lint": [
-      "",
+      "[--changed]",
       "developer",
       [
         "processes",
@@ -685,6 +706,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "processes",
+      ],
+    ],
+    "lockfile:policy": [
+      "",
+      "automation",
+      [
+        "network",
       ],
     ],
     "main:merge": [
@@ -760,6 +788,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "network",
+      ],
+    ],
+    "plan:consumers": [
+      "<identifier...>",
+      "automation",
+      [
+        "none",
       ],
     ],
     "port": [
@@ -868,15 +903,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
-    "registry:migrate": [
-      "",
-      "developer",
-      [
-        "files",
-        "network",
-        "processes",
-      ],
-    ],
     "release": [
       "[--dry-run]",
       "maintainer",
@@ -915,8 +941,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "report:template": [
+      "summary|done [<path>...]",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "reserved-run": [
-      "<weight> -- <command...>",
+      "<weight> [--memory <MB>] -- <command...>",
       "automation",
       [
         "processes",
@@ -937,7 +970,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:brief": [
-      "[--round <1|2>] | --level-only [--staged] [--json]",
+      "[--round <1|2>] | --interaction | --level-only [--staged] [--json]",
       "automation",
       [
         "files",
@@ -951,7 +984,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:record": [
-      "--issue <N> [--comment] [<category>:<severity>:<file> ...] | --check --issue <N>",
+      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>",
       "automation",
       [
         "files",
@@ -965,9 +998,9 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
-    "rule:guard": [
-      "",
-      "automation",
+    "review:stops": [
+      "[--period <days>]",
+      "developer",
       [
         "none",
       ],
@@ -1047,7 +1080,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:hold": [
-      "[<issue> [--fullrun | --halfrun-stop | --prrun-stop]]",
+      "[<issue> [--fullrun | --halfrun-stop | --human-review-stop | --prrun-stop]] | --adopt <issue>",
       "automation",
       [
         "files",
@@ -1075,6 +1108,23 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "run:park": [
+      "<issue> --body-file <path> | <issue> --clear",
+      "automation",
+      [
+        "files",
+        "network",
+      ],
+    ],
+    "run:pause": [
+      "<issue> --for <prerequisite>",
+      "automation",
+      [
+        "git",
+        "network",
+        "files",
+      ],
+    ],
     "run:prep": [
       "<issue>",
       "automation",
@@ -1097,7 +1147,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:report": [
-      "",
+      "[--handoff]",
       "automation",
       [
         "files",
@@ -1125,14 +1175,6 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "network",
         "files",
-      ],
-    ],
-    "run:stranded": [
-      "",
-      "automation",
-      [
-        "processes",
-        "notifications",
       ],
     ],
     "run:tail": [
@@ -1227,6 +1269,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "git",
       ],
     ],
+    "stash:push": [
+      "<message>",
+      "automation",
+      [
+        "git",
+      ],
+    ],
     "stop:guard": [
       "",
       "automation",
@@ -1266,6 +1315,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "[filters...]",
       "developer",
       [
+        "processes",
+      ],
+    ],
+    "test:pinned": [
+      "[--max <n>]",
+      "developer",
+      [
+        "git",
         "processes",
       ],
     ],

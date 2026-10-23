@@ -1,11 +1,9 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { EPIC_LABEL, has_label_name, NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { EPIC_LABEL, has_label_name, has_parked_label } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
-import { run_carry_added } from '#scripts/run/carry/run-carry-added'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
-import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
@@ -52,12 +50,12 @@ function budget_offer(
 }
 
 // The outcome a named issue has already reached without this run dispatching it: closed is merged, and
-// a `needs-decision` park waits on a person, so re-dispatching it only repeats the stop it parked on.
-// Either is booked done rather than offered.
+// a park (`PARKED_LABELS`) waits on a person, so re-dispatching it only repeats the stop it parked on.
+// Either is booked done rather than offered — the same reading `run:merge` gives a parked child.
 function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined {
 	if (state.state.toUpperCase() === 'CLOSED') return 'merged'
 
-	return has_label_name(state.labels, NEEDS_DECISION_LABEL) ? 'parked' : undefined
+	return has_parked_label(state.labels) ? 'parked' : undefined
 }
 
 async function classify(
@@ -102,10 +100,7 @@ async function is_unmerged(issue: number, merged: ReadonlyArray<number>): Promis
 // The issues `run:add` put in count too: one that parked is no more a merge
 // than a declared one.
 async function unmerged_of(carry: RunCarry): Promise<Array<number>> {
-	const declared = run_carry_added.ordered(
-		run_invocation.issue_numbers(carry.invocation) ?? [],
-		carry.added,
-	)
+	const declared = backlog_drive_named.named_issues(carry)
 	const merged = carry.merged_issues ?? []
 	const flags = await Promise.all(declared.map(async (issue) => await is_unmerged(issue, merged)))
 

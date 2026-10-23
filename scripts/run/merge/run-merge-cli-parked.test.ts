@@ -4,8 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // is — left on, it outlived the `needs-decision` a person lifted and held the backlog.
 
 const read_issue_mock = vi.hoisted(() => vi.fn())
-const unmark_mock = vi.hoisted(() => vi.fn())
+const release_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
+const record_change_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
@@ -33,10 +34,15 @@ vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_merge: record_merge_mock },
 }))
 
+vi.mock('#scripts/lane/lane-state', () => ({
+	lane_state: { record_change: record_change_mock },
+}))
+
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		ask_next: vi.fn().mockResolvedValue('2039'),
 		do_failed: do_failed_mock,
+		release_child: release_mock,
 		do_merged: vi.fn().mockResolvedValue(undefined),
 		has_resumable_cut: vi.fn().mockResolvedValue(false),
 		is_over_budget: vi.fn().mockResolvedValue(false),
@@ -44,7 +50,6 @@ vi.mock('./run-merge-steps', () => ({
 		resume_cut: vi.fn().mockResolvedValue(false),
 	},
 }))
-vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: unmark_mock } }))
 
 const { run_merge_cli } = await import('./run-merge-cli')
 
@@ -67,8 +72,9 @@ function open_with(labels: ReadonlyArray<string>): unknown {
 
 beforeEach(() => {
 	read_issue_mock.mockReset()
-	unmark_mock.mockReset().mockResolvedValue(true)
+	release_mock.mockReset().mockResolvedValue(true)
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
+	record_change_mock.mockReset().mockResolvedValue({ kind: 'skipped', reason: 'test' })
 	do_failed_mock.mockReset()
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
@@ -108,13 +114,33 @@ describe('run_merge_cli.merge_child — a child waiting on an open blocker', () 
 			carry: undefined,
 			is_parked: false,
 			is_refused: false,
-			blockers: ['#3501'],
+			waits: ['#3501'],
 		})
 
 		const result = await run_merge_cli.merge_child(context())
 
 		expect(result).toStrictEqual({ outcome: 'failed', token: '2039', code: 0, is_offer: true })
 		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} waiting on #3501`)
+	})
+})
+
+// joshuafolkken/kit#4215: the park event carries the cause, so the board row can name it.
+describe('run_merge_cli.merge_child — a park that gave no cause', () => {
+	it('names a session that ended unfinished', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		do_failed_mock.mockResolvedValue({
+			carry: undefined,
+			is_parked: true,
+			is_refused: false,
+			waits: [],
+		})
+
+		await run_merge_cli.merge_child(context())
+
+		expect(emit_mock).toHaveBeenCalledWith(
+			'park',
+			`#${CHILD} parked (run:stalled: session unfinished)`,
+		)
 	})
 })
 
@@ -127,7 +153,7 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 			const result = await run_merge_cli.merge_child(context())
 
 			expect(result.outcome).toBe('parked')
-			expect(unmark_mock).toHaveBeenCalledWith(CHILD)
+			expect(release_mock).toHaveBeenCalledWith(CHILD)
 		},
 	)
 
@@ -137,7 +163,7 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 		const result = await run_merge_cli.merge_child(context())
 
 		expect(result.outcome).toBe('merged')
-		expect(unmark_mock).not.toHaveBeenCalled()
+		expect(release_mock).not.toHaveBeenCalled()
 	})
 
 	// joshuafolkken/kit#3355: the lane-limit measurement counts merges from the ledger.
@@ -155,5 +181,25 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 		await run_merge_cli.merge_child(context())
 
 		expect(record_merge_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4300: a merged child's lane is ended on its state record by `lane:close` alone, so
+// a close that came back `incomplete` does not read as ended.
+describe('run_merge_cli.merge_child — the lane state record', () => {
+	it('leaves a merged child’s ended record to lane:close', async () => {
+		read_issue_mock.mockResolvedValue(CLOSED_STATE)
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_change_mock).not.toHaveBeenCalled()
+	})
+
+	it('records no state for a parked child', async () => {
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS, NEEDS_DECISION]))
+
+		await run_merge_cli.merge_child(context())
+
+		expect(record_change_mock).not.toHaveBeenCalled()
 	})
 })

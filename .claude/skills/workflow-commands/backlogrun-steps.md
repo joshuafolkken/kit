@@ -20,13 +20,13 @@ judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` wi
 
 ### The brake that replaces the promise
 
-**Every bound is counted in the carry record rather than in the conversation:**
+**Every bound is counted by a record or a guard rather than in the conversation:**
 
 | The bound | What it limits | Counted by |
 | --- | --- | --- |
 | `--max` | merges per invocation — a run's own filing competes for it | `run:carry --merged` |
 | `--idle` (8 hours unless typed) | how long the run waits once nothing can proceed | `--active`, the moment its hands became free |
-| **Ten filings per invocation** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `run:carry --filed` |
+| **Ten filings per run** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `scripts/rules/filing-cap.ts` |
 | The WIP cap on open issues | the pool across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
 **This section is the single source of how the `epic:bundle` obligation and this boundary meet.**
@@ -66,7 +66,7 @@ record is the parent loop's; a lane never touches it**. Count with `--merged <N>
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
-| `standing` | **Stop; do not open a lane**: report `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` and `pnpm josh run:carry --end` for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
+| `standing` | **Stop; do not open a lane**: report `pnpm josh backlogrun --restart` (continue the run) and `pnpm josh run:carry --end` (discard it) for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
 **End the record when the run ends** — `pnpm josh run:report`, then `pnpm josh run:carry --end`, **never
 batched with it**, and `pnpm josh run:wake --stop` in the same turn. **A run that ends by _stopping_**
 (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:carry --end --stopped
@@ -91,21 +91,21 @@ Waiting on a person, Out of scope) in the session language, with any truncated-l
 **Settle every `needs-decision` issue the plan listed in one pass**, from one `pnpm josh issue:read <N>
 <N> …` call (`issue-comments.md`):
 
-- **An answer already in the issue** — record it as a comment and **remove the label** (Tier A).
+- **An answer already in the issue** — record it as a comment and **remove the label** with `pnpm josh run:park <N> --clear` (Tier A).
   **Never measure in order to decide**: a question needing a benchmark or a run stays labelled.
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`").
 - **Order and isolate** — a native `blocked-by` where one must land first; `run:solo` on all three
   `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**, commenting the
   reason.
-- **`priority:high`** only on a cited ground (a stated deadline, a person's written policy), commented;
-  **never remove it**.
+- **`priority:critical` / `priority:high`** are applied at filing by `pnpm josh issue:file` from the
+  body's `- 優先度:` declaration (`issue-template.md`); **only a person removes them**.
 - **Report `pnpm josh backlog:plan --waves`** with the plan, never an order derived by hand; then start
   the loop, leaving whatever is still labelled parked.
 
-**`needs-decision`, `run:solo`, `run:lane` and `priority:high` are the only workflow labels a run
-applies by hand** — never `needs-human-review` (`needs-human-review.md`), and `auto-ok` only through
-`pnpm josh issue:file` or `pnpm josh auto-ok:judge`.
+**`needs-decision`, `run:solo` and `run:lane` are the only workflow labels a run applies by hand** —
+never `needs-human-review` (`needs-human-review.md`), the priority labels only through
+`pnpm josh issue:file`, and `auto-ok` only through it or `pnpm josh auto-ok:judge`.
 
 ## The loop
 
@@ -134,7 +134,7 @@ verdicts and stops are the driver's own.
 | Step | Where it is defined |
 | --- | --- |
 | `run:carry --begin` + `run:wake --start` before the plan; `run:carry --end` + `run:wake --stop` at the end | "The session cut is inside the invocation" above |
-| `pnpm josh ms`, `pnpm josh latest:scope`, `lane:prune` in the primary checkout before the first lane | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
+| `pnpm josh ms`, `pnpm josh latest:if-required`, `lane:prune` in the primary checkout before the first lane | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, once, never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight, before each child not in a lane | `docs/josh-commands-run.md` → "`josh run:hold`" |
 | `pnpm josh run:progress --wait` in the background, `--mark` at every real report | `progress-watcher.md` → "Progress while the run is quiet" |

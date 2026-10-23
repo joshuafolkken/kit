@@ -6,6 +6,8 @@ import { lane_reap, type ReapProbes } from './lane-reap'
 // the reaper signals — the matched child, everything under it, and never the caller's own ancestry.
 
 const ISSUE = '2398'
+const DIRECTORY = '/w/.kit-lanes/2398'
+const LANE = { issue: ISSUE, directory: DIRECTORY }
 const CHILD = 48_848
 const LOOP_SHELL = 48_900
 const LOOP_SUBSHELL = 48_901
@@ -50,7 +52,7 @@ describe('lane_reap.reap_child', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
 		expect(signalled).toStrictEqual([CHILD, LOOP_SHELL, LOOP_SUBSHELL])
 	})
 
@@ -58,7 +60,7 @@ describe('lane_reap.reap_child', () => {
 		const signalled: Array<number> = []
 		const probes = probes_over({ matching: [], children: {}, parents: own_ancestry() }, signalled)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([])
 		expect(signalled).toStrictEqual([])
 	})
 })
@@ -76,7 +78,7 @@ describe('lane_reap.reap_child — what it spares', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD])
 		expect(signalled).not.toContain(process.pid)
 		expect(signalled).not.toContain(OWN_PARENT)
 	})
@@ -93,7 +95,27 @@ describe('lane_reap.reap_child — what it spares', () => {
 			signalled,
 		)
 
-		expect(lane_reap.reap_child(ISSUE, probes)).toStrictEqual([CHILD])
+		expect(lane_reap.reap_child(LANE, probes)).toStrictEqual([CHILD])
+	})
+})
+
+// joshuafolkken/kit#4300: the lane's `eslint_d` is found by its working directory
+// (`lane-residents.ts`), so the reap matches no daemon title.
+describe('lane_reap.reap_child — no daemon title', () => {
+	it('matches only the child, never an eslint_d title', () => {
+		const patterns: Array<string> = []
+		const probes: ReapProbes = {
+			...probes_over({ matching: [], children: {}, parents: own_ancestry() }, []),
+			matching: (pattern) => {
+				patterns.push(pattern)
+
+				return []
+			},
+		}
+
+		lane_reap.reap_child(LANE, probes)
+
+		expect(patterns.some((pattern) => pattern.includes('eslint_d'))).toBe(false)
 	})
 })
 

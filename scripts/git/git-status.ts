@@ -1,9 +1,9 @@
 import { animation_helpers, type AnimationOptions } from '#scripts/lib/animation-helpers'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { REQUIRED_STATUS_LENGTH, STAGED_STATUS_INDEX, UNTRACKED_FILE_PREFIX } from './constants'
 import { git_command } from './git-command'
 
 const WARNING_ICON = '🔔'
-const PACKAGE_JSON_FILE = 'package.json'
 const STATUS_PREFIX_LENGTH = 2
 const VERSION_NOT_UPDATED = 'Not updated'
 
@@ -62,7 +62,7 @@ function is_package_json_staged(status_output: string): boolean {
 
 		const filename = extract_filename(line)
 
-		return filename === PACKAGE_JSON_FILE
+		return filename === PACKAGE_JSON
 	})
 }
 
@@ -148,7 +148,7 @@ async function check_package_json_version(): Promise<boolean> {
 	return await animation_helpers.execute_with_animation(
 		'Checking if package.json version is updated...',
 		async () => {
-			const diff_output: string = await git_command.diff_cached(PACKAGE_JSON_FILE)
+			const diff_output: string = await git_command.diff_cached(PACKAGE_JSON)
 
 			return is_version_updated_in_diff(diff_output)
 		},
@@ -166,7 +166,7 @@ async function check_branch_version(): Promise<boolean> {
 	return await animation_helpers.execute_with_animation(
 		'Checking if version is already updated on this branch...',
 		async () => {
-			const diff_output: string = await git_command.diff_main(PACKAGE_JSON_FILE)
+			const diff_output: string = await git_command.diff_main(PACKAGE_JSON)
 
 			return is_version_updated_in_diff(diff_output)
 		},

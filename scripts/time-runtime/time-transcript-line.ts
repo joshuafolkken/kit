@@ -1,6 +1,12 @@
 import type { FollowupStage } from '#scripts/followup/git-followup-stages'
 import { json_value } from '#scripts/lib/json-value'
-import { z } from 'zod'
+import {
+	transcript_record,
+	type TranscriptBlock,
+	type TranscriptContent,
+	type TranscriptMessage,
+	type TranscriptRecord,
+} from '#scripts/lib/transcript-record'
 import { time_background } from './time-background'
 import { time_followup_stage } from './time-followup-stage'
 import { time_instant } from './time-instant'
@@ -10,56 +16,20 @@ import { time_reported_failure } from './time-reported-failure'
 //
 // It moved out of `time-spans.ts` when that file passed its length limit — the seam that file is
 // already cut along elsewhere (`time-shell.ts`, `time-single-check.ts`), where the *reading* of a
-// field lives beside the field and the arithmetic stays next door. What is here is the JSONL shape
-// and nothing about time: schemas, the two records a line yields, and the parse that turns a string
-// into one.
+// field lives beside the field and the arithmetic stays next door. What is here is nothing about
+// time: the two records a line yields, and the read that turns a parsed line into one.
 //
 // **The block reader is not `cost-blocks.ts` and could not have been.** That module flattens every
 // line into one list of blocks for a token estimate, dropping the `id` / `tool_use_id` pair a call is
 // matched to its result by and the line boundary a timestamp belongs to. Both are the whole input
 // here.
-
-const BLOCK_SCHEMA = z.object({
-	type: z.string().nullish(),
-	name: z.string().nullish(),
-	id: z.string().nullish(),
-
-	tool_use_id: z.string().nullish(),
-	input: z.unknown().nullish(),
-	// Whether the harness wrote this result back as a failure. Present on a
-	// `tool_result` block and on nothing else, and absent even there for the tools that never report
-	// one — which is why it is read as three answers rather than as a boolean with a default.
-	is_error: z.boolean().nullish(),
-	// What the call printed. Read only to recover the outcome a pipeline threw away:
-	// it is kept as flattened text rather than as blocks, because that is
-	// the whole of what `time-reported-failure.ts` asks of it.
-	content: z.unknown().nullish(),
-})
-
-const CONTENT_SCHEMA = z.union([z.string(), z.array(BLOCK_SCHEMA)])
-// `id` is the assistant *message* the line belongs to, and Claude Code writes one line per content
-// block — a turn that thought and then issued two calls is three lines carrying one id.
-// Anything asking "how many calls did that turn make" therefore has to
-// group by this field; counting one line's blocks answers one, whatever the turn actually did. The
-// same field is what says how many *turns* a run had.
-const MESSAGE_SCHEMA = z.object({ id: z.string().nullish(), content: CONTENT_SCHEMA.nullish() })
-
-const LINE_SCHEMA = z.object({
-	type: z.string().nullish(),
-	timestamp: z.string().nullish(),
-	// The branch the line was written on, which is where the issue number lives — `josh git` names a
-	// branch `<N>-<slug>`. Read here rather than re-parsed by a second reader so `josh time --issue`
-	// and `josh cost --issue` answer from the same field.
-	gitBranch: z.string().nullish(),
-	// The two fields outside `message` that the harness writes an end-of-task notice on.
-	// **Both are read as `unknown` rather than as strings**: a schema
-	// insisting on a string here would reject every line whose `content` is a list of blocks — which is
-	// most of them — and a rejected line is dropped from the timeline entirely, so the shares would stop
-	// reconstructing the elapsed time. The shape is checked at the read below instead.
-	content: z.unknown().nullish(),
-	attachment: z.unknown().nullish(),
-	message: MESSAGE_SCHEMA.nullish(),
-})
+//
+// The line's schema is `transcript-record.ts`'s, shared with every other reader of these lines. A
+// message `id` groups the lines of one assistant turn — Claude Code writes one line per content block
+// — so "how many calls did that turn make" groups by it. `gitBranch` is where the issue number lives
+// (`josh git` names a branch `<N>-<slug>`), read here so `josh time --issue` and `josh cost --issue`
+// answer from the same field. A `tool_result`'s `is_error` is read as three answers — absent for the
+// tools that never report one — and its `content` only to recover the outcome a pipeline threw away.
 
 const UNKNOWN_BRANCH = ''
 // The field an attachment line carries the notice in, named rather than written as a literal.
@@ -137,8 +107,8 @@ interface TranscriptLine {
 	type: string
 	timestamp_ms: number
 	branch: string
-	// The background run this line is the harness's end-of-task notice for, and `''` for every other
-	// line. It is read here rather than downstream for the reason every
+	// The background run this line is the harness's end-of-task notice for — or the `TaskStop` result
+	// that stopped it, which gets no notice — and `''` for every other line. It is read here rather than downstream for the reason every
 	// derived field above is: the notice is the line's whole content, which a span does not keep, and
 	// it is the only thing in a transcript that says a command had *finished* rather than merely been
 	// looked at.
@@ -156,9 +126,7 @@ interface TranscriptLine {
 // The four string fields, defaulted together and apart from the two that are not strings. Split out
 // so neither half carries every `??` in the block: read as one function the defaulting alone reached
 // the complexity limit, and the next field added would have had to be squeezed in beside them.
-function block_names(
-	raw: z.infer<typeof BLOCK_SCHEMA>,
-): Pick<Block, 'type' | 'name' | 'id' | 'result_id'> {
+function block_names(raw: TranscriptBlock): Pick<Block, 'type' | 'name' | 'id' | 'result_id'> {
 	return {
 		type: raw.type ?? '',
 		name: raw.name ?? '',
@@ -190,7 +158,7 @@ function guard_from_refusal(text: string): string {
 // **Only the harness's own feedback line counts.** It writes a Stop block back as a user turn whose
 // whole body is `Stop hook feedback:` and the reason, so a prompt that merely quotes one never opens
 // with the label and reads `''`.
-function stop_guard_of(data: z.infer<typeof LINE_SCHEMA>): string {
+function stop_guard_of(data: TranscriptRecord): string {
 	const content = data.message?.content
 	if (typeof content !== 'string' || !STOP_FEEDBACK_LABEL.test(content)) return ''
 
@@ -209,7 +177,7 @@ function token_lines_of(text: string): Array<string> {
 // content field that may be a string or a list of blocks into one string, and it is idempotent on a
 // string — so passing its own output back to `has_failure_line` reads exactly as passing the raw
 // field did, at one flattening instead of two.
-function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
+function to_block(raw: TranscriptBlock): Block {
 	const text = time_reported_failure.result_text(raw.content)
 	const is_error = raw.is_error ?? undefined
 
@@ -229,9 +197,7 @@ function to_block(raw: z.infer<typeof BLOCK_SCHEMA>): Block {
 
 // A user turn written as a bare string carries no blocks, which is exactly right: it is a prompt,
 // and a prompt has no tool result to match.
-function to_blocks(
-	content: string | Array<z.infer<typeof BLOCK_SCHEMA>> | null | undefined,
-): Array<Block> {
+function to_blocks(content: TranscriptContent | null | undefined): Array<Block> {
 	return typeof content === 'string' || content === null || content === undefined
 		? []
 		: content.map((block) => to_block(block))
@@ -241,7 +207,7 @@ function to_blocks(
 // is written as one line per content block with the message's id repeated on each, so the id is what
 // says which blocks belonged to the same turn.
 function message_fields(
-	message: z.infer<typeof MESSAGE_SCHEMA> | null | undefined,
+	message: TranscriptMessage | null | undefined,
 ): Pick<TranscriptLine, 'message_id' | 'blocks'> {
 	return { message_id: message?.id ?? NO_MESSAGE_ID, blocks: to_blocks(message?.content) }
 }
@@ -253,16 +219,37 @@ function message_fields(
 // session happened to hold a different one. All three are read, and `time_background.finished_at`
 // keeps the earliest instant per id, so what is paired with the launch is when the task *ended* rather
 // than when the run was told about it.
-function notice_text(data: z.infer<typeof LINE_SCHEMA>): string {
+function notice_text(data: TranscriptRecord): string {
 	const attachment = json_value.is_record(data.attachment) ? data.attachment[PROMPT_KEY] : undefined
 	const carried = [data.message?.content, data.content, attachment]
 
 	return carried.find((one): one is string => typeof one === 'string') ?? ''
 }
 
+// The task a `TaskStop` result on this line stopped, which is an end the harness writes no notice for.
+// Its result body is a plain string, so only string contents are read and nothing is flattened again.
+function stopped_background(content: TranscriptContent | null | undefined): string {
+	if (!Array.isArray(content)) return time_background.NO_BACKGROUND
+
+	const ids = content.map((block) =>
+		typeof block.content === 'string' ? time_background.stopped_id(block.content) : '',
+	)
+
+	return ids.find((id) => id !== time_background.NO_BACKGROUND) ?? time_background.NO_BACKGROUND
+}
+
+// The task this line reports the end of: the harness's notice, or else a `TaskStop` result.
+function finished_background(data: TranscriptRecord): string {
+	const notice = time_background.finished_id(notice_text(data))
+
+	return notice === time_background.NO_BACKGROUND
+		? stopped_background(data.message?.content)
+		: notice
+}
+
 // A line without a parseable timestamp is dropped rather than dated: it has no place on a timeline,
 // and inventing one would move every span around it.
-function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined {
+function to_line(data: TranscriptRecord): TranscriptLine | undefined {
 	const timestamp_ms = time_instant.parse_instant(data.timestamp)
 
 	if (timestamp_ms === undefined) return undefined
@@ -271,16 +258,16 @@ function to_line(data: z.infer<typeof LINE_SCHEMA>): TranscriptLine | undefined 
 		type: data.type ?? '',
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
-		finished_background: time_background.finished_id(notice_text(data)),
+		finished_background: finished_background(data),
 		stop_guard: stop_guard_of(data),
 		...message_fields(data.message),
 	}
 }
 
 function parse_line(line: string): TranscriptLine | undefined {
-	const parsed = LINE_SCHEMA.safeParse(json_value.parse_or_undefined(line))
+	const record = transcript_record.parse(line)
 
-	return parsed.success ? to_line(parsed.data) : undefined
+	return record === undefined ? undefined : to_line(record)
 }
 
 // A whole transcript's text read as its parsed lines, the unparseable ones dropped.

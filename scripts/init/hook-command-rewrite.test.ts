@@ -24,6 +24,9 @@ const GUARD_OUTPUT = 'guard ran'
 const FOREIGN_DIRECTORY_PREFIX = 'kit-hook-foreign-'
 const CONSUMER_JOSH_COMMAND = 'node ./node_modules/@joshuafolkken/kit/dist/josh.js'
 const ROOT_COMMAND = 'git rev-parse --show-toplevel'
+const LEGACY_LOCATION_VARIABLES =
+	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
+const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LEGACY_LOCATION_VARIABLES}; ${ROOT_COMMAND} 2>/dev/null)"; then unset ${LEGACY_LOCATION_VARIABLES}; else project_root="$(${ROOT_COMMAND})"; fi && cd "$project_root" && `
 
 function hook_commands(settings_text: string): ReadonlyArray<string> {
 	const { hooks } = JSON.parse(settings_text) as ReturnType<
@@ -88,6 +91,17 @@ describe('rewrite_hook_commands', () => {
 
 		expect(rewrite_hook_commands(once)).toBe(once)
 	})
+
+	// A consumer's file still carries the root prefix kit wrote before joshuafolkken/kit#4187.
+	it('replaces the earlier root prefix with the current one', () => {
+		const once = rewrite_hook_commands(KIT_LAUNCHER_FORM)
+		const { command } = JSON.parse(once) as { command: string }
+		const legacy_command = `${LEGACY_ROOT_PREFIX}${command.slice(hook_launch.PROJECT_ROOT_PREFIX.length)}`
+
+		expect(rewrite_hook_commands(JSON.stringify({ command: legacy_command }))).toBe(
+			JSON.stringify({ command }),
+		)
+	})
 })
 
 describe('bootstrap without installed dependencies', () => {
@@ -144,8 +158,11 @@ describe('installed hook from a project subdirectory', () => {
 		expect(result.stdout).toBe(GUARD_OUTPUT)
 		expect(result.stderr).not.toContain(INSTALL_NOTICE)
 	})
+})
 
-	it('runs the hook bundle when Git points to another work tree', () => {
+describe('installed hook with Git located elsewhere', () => {
+	// A named root outranks a leaked `GIT_WORK_TREE`; without one, git is asked with it unset.
+	it('runs the hook bundle when Git points to another work tree under Claude Code', () => {
 		const foreign_root = mkdtempSync(path.join(tmpdir(), FOREIGN_DIRECTORY_PREFIX))
 		const rewritten = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(rewritten) as { command: string }
@@ -153,6 +170,7 @@ describe('installed hook from a project subdirectory', () => {
 		try {
 			const result = hook_command_bootstrap.run_in_temporary_checkout(command, true, true, {
 				git_overrides: { GIT_WORK_TREE: foreign_root },
+				is_project_directory_named: true,
 			})
 
 			expect(result.status).toBe(0)

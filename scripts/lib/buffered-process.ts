@@ -69,6 +69,16 @@ function collect_output(all: string, reason: ReadonlyArray<string>): string {
 	return [all, ...reason].filter((part) => part !== '').join('\n')
 }
 
+// A buffered child writes to a pipe, so it is told to keep its colors unless the caller opted out.
+// Exported for the eslint daemon route (`eslint-daemon.ts`), which buffers the same way.
+function child_environment(): NodeJS.ProcessEnv {
+	const environment = { ...process.env }
+	if (environment['NO_COLOR'] === undefined) environment['FORCE_COLOR'] = FORCE_COLOR
+	else delete environment['FORCE_COLOR']
+
+	return environment
+}
+
 async function run_buffered_process(
 	command_args: ReadonlyArray<string>,
 	options: BufferedProcessOptions = {},
@@ -76,14 +86,11 @@ async function run_buffered_process(
 	// `performance.now()` rather than `Date.now()`: it is monotonic, so a system clock adjusted
 	// mid-check cannot produce a negative or wildly inflated duration.
 	const started_at = performance.now()
-	const environment = { ...process.env }
-	if (environment['NO_COLOR'] === undefined) environment['FORCE_COLOR'] = FORCE_COLOR
-	else delete environment['FORCE_COLOR']
 	// `cwd` is spread in rather than assigned: `exactOptionalPropertyTypes` refuses an explicit
 	// `undefined` for an optional `string`, and passing one anyway breaks execa's overload
 	// resolution — which silently widens `result.all` back to `string | undefined`.
 	const result = await execa(PNPM, [...command_args], {
-		env: environment,
+		env: child_environment(),
 		extendEnv: false,
 		all: true,
 		reject: false,
@@ -104,7 +111,7 @@ function is_process_failed(result: Pick<BufferedProcessResult, 'exit_code'>): bo
 	return result.exit_code !== 0
 }
 
-const buffered_process = { is_process_failed, run_buffered_process }
+const buffered_process = { child_environment, is_process_failed, run_buffered_process }
 
 export type { BufferedProcessResult }
 export { buffered_process, FAIL_EXIT_CODE }

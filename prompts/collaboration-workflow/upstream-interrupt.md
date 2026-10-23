@@ -14,7 +14,7 @@
 
 **実行中のリポジトリ自身はこの手順の対象外である。** kit の中で kit のラン機構（`backlog:drive`、`run:wake`、`run:carry`、レーン、分類、カウンタ、ガードなど）の不具合を見つけたら、上流 Issue で停止する代わりに、このリポジトリの割り込みとして次を行う。
 
-1. **起票する** — `pnpm josh issue:file "<title>" --body-file <path> --depth <n> --route interrupt --label priority:high`。上限は効かない（`wip-cap.md` →「割り込み起票 — 上限が効かない側」の条件 2）
+1. **起票する** — `pnpm josh issue:file "<title>" --body-file <path> --route interrupt --label priority:high`。上限は効かない（`wip-cap.md` →「割り込み起票 — 上限が効かない側」の条件 2）
 2. **止まらずに直す** — 壊れた機構を迂回せず、検証ゲートも緩めない。`backlogrun` の中では割り込みを次の子にし、着地後に塞がれていた子へ戻る（プールでは `priority:high` が先頭、epic の下では `wip-cap.md` の手順 3 で挿入、名前指定のランでは `pnpm josh lane:launch <N>` で自分で dispatch）。バッチの外では `wip-cap.md` の手順 4 どおり、打つべき `fullrun #<N>` を報告して止まる
 3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、手渡し済み・所有者が死んだ記録・監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` を打つ。`pnpm josh run:wake --list` が監督プロセスを示し、ログに次の子の dispatch が現れることを確かめて報告する
 4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ
@@ -22,15 +22,25 @@
 
 手順:
 
-1. **現在の作業を退避する**: `git stash push -u -m "upstream-interrupt: paused #<N>"`（WIP コミットでも可）
+1. **現在の作業を退避する**: `pnpm josh stash:push "upstream-interrupt: paused #<N>"`（WIP コミットでも可）
 2. **進行中の Issue に状況を書く**: `pnpm josh issue:comment <N> --body-file <path>` で、stash したこと、中断理由（どの別パッケージのどんな問題か）、新 Issue へのリンク（`## Upstream issues` 見出しの下に `owner/repo#N` 形式、→「起票元へのバックリンク」）
-3. **対象パッケージのリポジトリに Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --depth <n> --route tier-a --repo <owner>/<repo>`（joshuafolkken/kit#1083）。検査・分類ラベル・重複探し・`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
+3. **対象パッケージのリポジトリに Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --route tier-a --repo <owner>/<repo>`（joshuafolkken/kit#1083）。検査・分類ラベル・重複探し・`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
 4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）
 5. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
 
+### first-party の Issue・PR への書き込みは確認不要
+
+`pnpm josh repo:party` が `first-party` と答えたリポジトリの Issue・PR への書き込みは Tier A で、ユーザーに確認しない。起票、コメント、ラベル、本文の編集、`@dependabot rebase` などの Dependabot へのコマンドコメントを含む。
+
+- 頼まれていない観察の起票はこの節で許可しない: この節が外すのは書き込み先の確認だけ。起票するかは `.claude/skills/workflow-commands/observation-filing.md` に従う
+- `unknown` はこの節の対象外: first-party と判定できないので、書き込む前にユーザーに確認する
+
+- **「外部への書き込み」は third-party への書き込みだけを指す**。first-party への書き込みをそう呼ばない
+- マージ・ブランチ削除などの共有状態の操作は書き込みに含まれず、Tier C のまま（`CLAUDE.md` → "Git Rules"）
+
 ### 第三者リポジトリへの書き込みは Tier C（明示指示が必要）
 
-「起票は確認なし」は first-party だけに成り立つ。
+「起票は確認なし」も「書き込みは確認不要」も first-party だけに成り立つ。
 
 - **判定は `pnpm josh repo:party [<owner/repo>]` が答える**: `first-party` / `third-party` / `unknown`（unknown は third-party 扱いしない）。fork や contribute しているだけの org リポジトリも third-party
 - **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない

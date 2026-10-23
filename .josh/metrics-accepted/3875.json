@@ -1,7 +1,0 @@
-{
-	"reason": "#3875: per-part pipefail wrap for mixed lines (refusing grouped parts, no note when nothing was wrapped), a decision-less rewrite envelope, and the reviewer's issue:read instruction (cited through issue_cite) are new behavior",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 61
-	}
-}

@@ -31,7 +31,8 @@ const TRIGGER_SUITE = 'scripts/rules/shell-body-trigger.test.ts'
 // The one line in that list that had drifted from the suite it credits.
 const STDIN_CLAIM = '`-` reads stdin'
 // Named once: the enumeration, the residency list and this suite have to agree on the command.
-const GUARD_COMMAND = 'pnpm josh rule:guard'
+const GUARD_COMMAND = 'pnpm josh pretool:guard'
+const ROW_REFERENCE = '`shell-body` row of `pnpm josh rule:list`'
 // The single safe spelling the rule steers every caller toward — asserted in the delivered text and
 // again at the topic file, so it is named once here rather than duplicated across the two.
 const ISSUE_COMMENT_SPELLING = 'pnpm josh issue:comment <N> --body-file <path>'
@@ -151,7 +152,7 @@ describe(`${SHELL_BODY_RATIONALE} — carries the marker list`, () => {
 describe.each([RESIDENCY])('%s — lists the rule as delivered', (list_path) => {
 	const content = read_unwrapped(list_path)
 
-	it.each([TOPIC_FILE, GUARD_COMMAND])('names %j', (marker) => {
+	it.each([TOPIC_FILE, ROW_REFERENCE])('names %j', (marker) => {
 		expect(content).toContain(marker)
 	})
 })

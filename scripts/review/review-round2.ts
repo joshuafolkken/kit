@@ -1,5 +1,7 @@
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
+import { json_value } from '#scripts/lib/json-value'
+import { z } from 'zod'
 import { review_level } from './review-level'
 
 // Whether the second review round runs at all.
@@ -22,6 +24,28 @@ type RoundTwoVerdict = 'required' | 'skip'
 
 const REQUIRED_VERDICT: RoundTwoVerdict = 'required'
 const SKIPPED_VERDICT: RoundTwoVerdict = 'skip'
+const VERDICTS = [REQUIRED_VERDICT, SKIPPED_VERDICT] as const
+
+// One stable code per branch of `decide`, so a decision can be counted by why it fell where it did —
+// the reason sentences carry paths and timestamps and cannot be (joshuafolkken/kit#4064).
+const CODE = {
+	EMPTY: 'empty',
+	INERT: 'inert',
+	OPEN_FINDING: 'open-finding',
+	NO_SNAPSHOT: 'no-snapshot',
+	BASE_MOVED: 'base-moved',
+	LIVE: 'live',
+} as const
+
+type RoundTwoCode = (typeof CODE)[keyof typeof CODE]
+
+// The key `josh review:round2 --json` prints its verdict under, read back by `josh ship`.
+const JSON_KEY = 'round2'
+const json_schema = z.object({
+	[JSON_KEY]: z.enum(VERDICTS),
+	code: z.enum(Object.values(CODE)),
+	reason: z.string(),
+})
 
 // **The default is `required`, and every uncertainty resolves to it.** A command that answered `skip`
 // on a missing record would be the cheapest possible run and the most dangerous — the direction
@@ -39,7 +63,7 @@ const DOCUMENTATION_PREFIX = 'docs/'
 const MARKDOWN_EXTENSION = '.md'
 const PROMPTS_PREFIX = 'prompts/'
 const BASE_MOVED_REASON =
-	'the change base moved since round 1 was recorded, so the two file maps do not cover the same set of paths and their difference is not the fix delta — the round runs rather than reading that difference as one'
+	"the change base moved since round 1 was recorded and round 1's tree could not be carried onto the new one — no recorded round-1 blobs, or the carry conflicts — so the fix delta cannot be named and the round runs"
 
 interface RoundTwoInput {
 	// **The commit the tree above is a diff against**. This decision reads the
@@ -58,11 +82,18 @@ interface RoundTwoInput {
 	// The paths whose code round 1's fixes left as it was (`review_code_tree.comment_only`). Absent is
 	// none, which is what a run without a code record pays.
 	comment_only?: ReadonlyArray<string>
+	// Asked only when the base moved: round 1's tree carried onto the current base, diffed against the
+	// tree now (`review-round-one-blobs.ts`). `undefined`, or no reader at all, is the moved-base refusal.
+	carried_delta?: (snapshot: FileMapStamp) => ReadonlyArray<string> | undefined
 }
 
-interface RoundTwoDecision {
+interface RoundTwoAnswer {
 	verdict: RoundTwoVerdict
+	code: RoundTwoCode
 	reason: string
+}
+
+interface RoundTwoDecision extends RoundTwoAnswer {
 	// The paths round 1's fixes changed. Returned even on `required` so the caller can name them, and
 	// on a `skip` so the record the run leaves behind says what went unreviewed.
 	delta: ReadonlyArray<string>
@@ -109,43 +140,80 @@ function verdict_for_delta(
 	delta: ReadonlyArray<string>,
 	taken_at: string,
 	comment_only: ReadonlyArray<string> = [],
-): { verdict: RoundTwoVerdict; reason: string } {
-	if (delta.length === 0) return { verdict: SKIPPED_VERDICT, reason: empty_reason(taken_at) }
+): RoundTwoAnswer {
+	if (delta.length === 0) {
+		return { verdict: SKIPPED_VERDICT, code: CODE.EMPTY, reason: empty_reason(taken_at) }
+	}
 
 	const deciding = delta.filter((relative) => !is_unexecuted(relative, comment_only))
 
-	if (deciding.length === 0) return { verdict: SKIPPED_VERDICT, reason: inert_reason(delta) }
+	if (deciding.length === 0) {
+		return { verdict: SKIPPED_VERDICT, code: CODE.INERT, reason: inert_reason(delta) }
+	}
 
-	return { verdict: REQUIRED_VERDICT, reason: live_reason(deciding) }
+	return { verdict: REQUIRED_VERDICT, code: CODE.LIVE, reason: live_reason(deciding) }
 }
 
-function required(reason: string): RoundTwoDecision {
-	return { verdict: REQUIRED_VERDICT, reason, delta: [] }
+function required(code: RoundTwoCode, reason: string): RoundTwoDecision {
+	return { verdict: REQUIRED_VERDICT, code, reason, delta: [] }
+}
+
+// On a moved base the digest comparison is a set difference, not the fix delta, so the carried
+// reading replaces it and every later rule is the same one an unmoved base gets.
+function fix_delta(
+	input: RoundTwoInput,
+	snapshot: FileMapStamp,
+): ReadonlyArray<string> | undefined {
+	if (file_map_stamp.describes_base(snapshot, input.base)) {
+		return file_map_stamp.changed_since(snapshot, input.tree)
+	}
+
+	return input.carried_delta?.(snapshot)
 }
 
 function decide(input: RoundTwoInput): RoundTwoDecision {
-	if (!input.is_round_one_closed) return required(OPEN_FINDING_REASON)
-	if (input.snapshot === undefined) return required(NO_SNAPSHOT_REASON)
-	if (!file_map_stamp.describes_base(input.snapshot, input.base)) return required(BASE_MOVED_REASON)
+	if (!input.is_round_one_closed) return required(CODE.OPEN_FINDING, OPEN_FINDING_REASON)
+	if (input.snapshot === undefined) return required(CODE.NO_SNAPSHOT, NO_SNAPSHOT_REASON)
 
-	const delta = file_map_stamp.changed_since(input.snapshot, input.tree)
+	const delta = fix_delta(input, input.snapshot)
+
+	if (delta === undefined) return required(CODE.BASE_MOVED, BASE_MOVED_REASON)
 
 	return { ...verdict_for_delta(delta, input.snapshot.taken_at, input.comment_only), delta }
 }
 
+function to_json(answer: RoundTwoAnswer): string {
+	return JSON.stringify({ [JSON_KEY]: answer.verdict, code: answer.code, reason: answer.reason })
+}
+
+// The answer `to_json` printed, or `undefined` for any other output — read by the one caller that
+// records it, which must not guess a verdict from text it cannot parse.
+function parse_json(text: string): RoundTwoAnswer | undefined {
+	const parsed = json_schema.safeParse(json_value.parse_or_undefined(text.trim())).data
+
+	return parsed === undefined
+		? undefined
+		: { verdict: parsed[JSON_KEY], code: parsed.code, reason: parsed.reason }
+}
+
 const review_round2 = {
 	BASE_MOVED_REASON,
+	CODE,
 	decide,
 	EMPTY_DELTA_REASON_PREFIX,
 	empty_reason,
 	INERT_DELTA_REASON_PREFIX,
 	inert_reason,
+	JSON_KEY,
 	live_reason,
 	NO_SNAPSHOT_REASON,
 	OPEN_FINDING_REASON,
+	parse_json,
 	REQUIRED_VERDICT,
 	SKIPPED_VERDICT,
+	to_json,
 	verdict_for_delta,
 }
 
+export type { RoundTwoAnswer, RoundTwoCode, RoundTwoVerdict }
 export { review_round2 }

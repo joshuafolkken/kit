@@ -12,14 +12,14 @@ import { gate_tree, type GateTree } from './gate-tree'
 // tree neither check has read return their findings one round trip at a time; one call running both
 // checks first returns most of them at once.
 //
-// **It fixes when the checks run, never whether they run, and never what they check.** Nothing here
-// skips a check, narrows one, or reinterprets its output — a green record buys ordering and nothing
-// else, and `josh gate` still runs its four checks exactly as before. It never *reuses* a scoped
-// check's result in place of re-running it.
+// **It fixes when the checks run, never whether they run.** Nothing here skips a check or
+// reinterprets its output, and `josh gate` still runs its four checks exactly as before. The one other
+// reader is the checks' own re-run, which narrows to what moved since this record (`since-green.ts`).
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
 // moved" is `review_brief.matching_stamp` plus the base equality `gate_skip.reusable_green_gate`
-// already compares, over the same `FileMapStamp` shape written to the same kind of file. A second
+// already compares and the inputs fingerprint each record carries (`verification-inputs.ts`), over the
+// same `FileMapStamp` shape written to the same kind of file. A second
 // definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
 // two commands would start disagreeing about one working tree.
 //
@@ -95,7 +95,11 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 function describes_tree(check: ScopedCheck, tree: Record<string, string>, base: string): boolean {
 	const stamp = review_brief.matching_stamp(check.stamp.read(check.source), tree)
 
-	return stamp !== undefined && file_map_stamp.describes_base(stamp, base)
+	return (
+		stamp !== undefined &&
+		file_map_stamp.describes_base(stamp, base) &&
+		check.stamp.describes_inputs(stamp)
+	)
 }
 
 // **Whether there is a tree to speak about at all**, asked once and used from both ends: the reader
@@ -161,8 +165,8 @@ function refusal(missing: ReadonlyArray<string>): string {
 		'282 seconds, 31% of the run, picking up one lint rule and one failing test at a time after its ' +
 		'review had already started. Run them in one call — ' +
 		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — and reissue this command. ` +
-		'The record fixes when the checks run and never whether they run: nothing is skipped, narrowed ' +
-		'or reused because of it. `prompts/review.md` → "The scoped checks answer on the last edit".'
+		'The record fixes when the checks run and never whether they run: nothing is skipped or reused ' +
+		'because of it. `prompts/review.md` → "The scoped checks answer on the last edit".'
 	)
 }
 

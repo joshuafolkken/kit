@@ -24,6 +24,9 @@ import { shell_segments } from './shell-segments'
 // deletes (`:branch`). Both open the refspec with a character the deny list cannot match as a literal.
 const FORCE_LONG_PREFIX = '--force'
 const DELETE_LONG = '--delete'
+// `--mirror` force-updates every remote ref to the local set and deletes the rest; `--prune` deletes
+// every remote branch with no local counterpart. Both are a delete with no refspec to read.
+const DESTRUCTIVE_PUSH_LONG: ReadonlySet<string> = new Set([DELETE_LONG, '--mirror', '--prune'])
 const PUSH_SHORT_LETTERS = 'fd'
 const FORCE_OR_DELETE_REFSPEC = /^[+:]/u
 
@@ -31,7 +34,7 @@ function is_force_or_delete_push(args: ReadonlyArray<string>): boolean {
 	return args.some(
 		(argument) =>
 			argument.startsWith(FORCE_LONG_PREFIX) ||
-			argument === DELETE_LONG ||
+			DESTRUCTIVE_PUSH_LONG.has(argument) ||
 			git_argv.short_cluster_has(argument, PUSH_SHORT_LETTERS) ||
 			FORCE_OR_DELETE_REFSPEC.test(argument),
 	)
@@ -66,7 +69,7 @@ function is_destructive_segment(segment: string): boolean {
 // quoted inside another command's argument is read as the write it is not, exactly as every other
 // trigger in this directory reads its own.
 function is_force_or_delete(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_destructive_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_destructive_segment(segment))
 }
 
 // The instruction in the shape a refusal can carry: what the command does and the one route left. The
@@ -87,6 +90,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_force_or_delete),
 	reason: GIT_FORCE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Force push / branch delete',
+		topic: '`operating-rules.md`',
+		fires:
+			'a `git push` / `git branch` read as force (`--force` / `-f` / `-uf` …) or delete (`--delete` / `-d` / `-D` / `:branch`) in any spelling. Every occurrence',
+		quiet: 'a plain `git push` / `git branch`',
+	},
 }
 
 const git_force = {

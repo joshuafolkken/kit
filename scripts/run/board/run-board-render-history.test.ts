@@ -5,16 +5,18 @@ import type { BoardRow } from './run-board-layout'
 import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemState } from './run-board-status'
-import type { LaneUsages } from './run-board-usage'
 
 // joshuafolkken/kit#3526: a running row led by the phase it reached last, the lane's CPU and memory in
 // one column. joshuafolkken/kit#3769: no phase track after them — a running row ends on how long it has
 // stood at its phase and its newest activity, a settled row on its finish time.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
-const { minute_of } = run_board_labels
-const GB = 1024 * 1024 * 1024
-const CPU = '⚡'
+const { EMPTY_LAYOUT, GB, MINUTE, NOW, board_usage, header, lines_of } = run_board_render_fixture
+const { day_minute_of } = run_board_labels
+// Each figure right-aligned in a column as wide as its label, so the lanes rule leaves the label room
+// over it.
+const CELLS = '     5.0      0.5        0.0'
+// The width of a time column in a lane row's lead.
+const TIME_WIDTH = 8
 const TITLE_WIDTH = 48
 
 const PLANNED: ReadonlyArray<Phase> = ['investigate', 'plan']
@@ -52,8 +54,10 @@ function running(number: number, track: ReadonlyArray<Phase>): BoardRow {
 
 const ROWS = [running(1, PLANNED), running(2, RETRIED), running(3, FAILED), running(4, SHIPPED)]
 
-const usages: LaneUsages = new Map(
-	ROWS.map((row) => [row.number, { cpu_percent: 8, memory_bytes: GB / 2, memory_percent: 3 }]),
+const usages = board_usage(
+	new Map(
+		ROWS.map((row) => [row.number, { cpu_cores: 0.5, memory_bytes: GB / 2, compressed_bytes: 0 }]),
+	),
 )
 
 const GATE_EVENT: LaneEvent = { phase: 'gate', words: 'ship gate', at_ms: NOW - MINUTE }
@@ -76,9 +80,9 @@ describe('run_board_render.render running rows', () => {
 	it('leads every running row with the last phase it reached, and draws no track after it', () => {
 		const lines = board_lines()
 
-		expect(row_line(lines, 1)).toMatch(/^ {2}📝 1 .* 02:00$/u)
-		expect(row_line(lines, 3)).toMatch(/^ {2}💥 3 .* 02:00$/u)
-		expect(row_line(lines, 4)).toMatch(/^ {2}📣 4 .* 02:00$/u)
+		expect(row_line(lines, 1)).toMatch(/^ {5}📝 +2′00″ +5′00″ /u)
+		expect(row_line(lines, 3)).toMatch(/^ {5}💥 +2′00″ +5′00″ /u)
+		expect(row_line(lines, 4)).toMatch(/^ {5}📣 +2′00″ +5′00″ /u)
 		expect(lines.join('\n')).not.toContain('🔍📝')
 	})
 
@@ -88,19 +92,19 @@ describe('run_board_render.render running rows', () => {
 		expect(rows.every((line) => !line.includes('─'))).toBe(true)
 	})
 
-	it('keeps the CPU and memory in one column on every running row', () => {
+	it('keeps the CPU, MEM and CMPRS in one column on every running row', () => {
 		const lines = board_lines()
-		const columns = ROWS.map((row) => row_line(lines, row.number).indexOf(CPU))
+		const columns = ROWS.map((row) => row_line(lines, row.number).indexOf(CELLS))
 
 		expect(columns[0]).toBeGreaterThan(0)
 		expect(new Set(columns).size).toBe(1)
 	})
 
-	it('draws a row as the reference does: lead, number, title, time, usage, phase time, activity', () => {
+	it('draws a row as the reference does: lead, phase time, run time, usage, number, title, activity', () => {
 		const title = 'Sample 2'.padEnd(TITLE_WIDTH)
 
 		expect(row_line(board_lines(), 2)).toBe(
-			`  🚦 2    ${title}  05:00  ⚡  8% 🧠0.5G  02:00  🚦 01:00`,
+			`     🚦    2′00″    5′00″ ${CELLS} 2       ${title}  🚦 1′00″`,
 		)
 	})
 })
@@ -115,23 +119,27 @@ function settled_line(state: ItemState, track: ReadonlyArray<Phase>): string {
 
 // joshuafolkken/kit#3535: a settled row leads with its own state icon — it runs no process, so it draws
 // no CPU or memory; a finished one draws its finish time in their place (joshuafolkken/kit#3554), and
-// nothing after it (joshuafolkken/kit#3769).
+// nothing after it (joshuafolkken/kit#3769). joshuafolkken/kit#4292: it leads with `MM-DD HH:MM`, no 🔚.
 describe('run_board_render.render settled rows', () => {
 	const title = 'Sample 1'.padEnd(TITLE_WIDTH)
 
 	it.each<[ItemState, string]>([
 		['merged', '✅'],
 		['done', '🏁'],
-	])('ends a %s row on its finish time', (state, icon) => {
-		const finish = `🔚 ${minute_of(NOW)}`
+	])('leads a %s row with its finish time and ends it on its duration', (state, icon) => {
+		const finish = day_minute_of(NOW)
 
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00  ${finish}`)
+		expect(settled_line(state, FAILED)).toBe(`    ${icon} ${finish} 1       ${title}  5′00″`)
 	})
 
+	// joshuafolkken/kit#4171: a lane no child works in blanks its CPU, MEM and CMPRS.
 	it.each<[ItemState, string]>([
 		['stopped', '🛑'],
 		['parked', '💤'],
-	])('ends a %s row on its time', (state, icon) => {
-		expect(settled_line(state, FAILED)).toBe(`  ${icon} 1    ${title}  05:00`)
+	])('ends a %s row on its time, its usage blank', (state, icon) => {
+		const blank = ' '.repeat(CELLS.length)
+		const lead = `     ${icon} ${' '.repeat(TIME_WIDTH)} ${'5′00″'.padStart(TIME_WIDTH)}`
+
+		expect(settled_line(state, FAILED)).toBe(`${lead} ${blank} 1       Sample 1`)
 	})
 })

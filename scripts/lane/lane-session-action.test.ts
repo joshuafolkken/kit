@@ -1,3 +1,6 @@
+import { api_auth } from '#scripts/agent/api-auth'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LaneInfo } from './lane-registry'
 import { lane_relaunch } from './lane-relaunch'
@@ -7,6 +10,11 @@ const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const parked_mock = vi.hoisted(() => vi.fn())
 const ROUND_ONE = { kind: 'review', round: '1' } as const
+const AUTH_FAILED_LOG = JSON.stringify({
+	type: 'result',
+	is_error: true,
+	result: 'Failed to authenticate: OAuth session expired and could not be refreshed',
+})
 const RELAUNCH = {
 	kind: 'relaunch',
 	stop: { stage: 'review', title: 'Address the review', flags: [], is_review: true, conflicts: [] },
@@ -61,6 +69,18 @@ describe('lane_session_action.answer — a review round', () => {
 	})
 })
 
+// joshuafolkken/kit#4216: a reviewer whose session expired is named so, not left a bare exit code.
+describe('lane_session_action.answer — a reviewer that could not authenticate', () => {
+	it('names an authentication failure the reviewer log ends on', async () => {
+		launch_mock.mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 1 })
+		vi.spyOn(stamp_file, 'read_stamp_text').mockReturnValue(AUTH_FAILED_LOG)
+
+		const answer = await lane_session_action.answer(LANE, ROUND_ONE)
+
+		expect(reason_of(answer)).toBe(`${api_auth.AUTH_FAILURE_NOTE}: the reviewer exited with code 1`)
+	})
+})
+
 describe('lane_session_action.answer', () => {
 	it('answers success when the reviewer exits cleanly', async () => {
 		const answer = await lane_session_action.answer(LANE, ROUND_ONE)
@@ -100,5 +120,30 @@ describe('lane_session_action.answer', () => {
 		const answer = await lane_session_action.answer(LANE, RELAUNCH)
 
 		expect(reason_of(answer)).toBe('the broker failed: spawn EACCES')
+	})
+})
+
+// joshuafolkken/kit#4221: a stale review rides on the stop, so the strict schema must take it.
+describe('lane_session_action.action_schema — a relaunch stop', () => {
+	it('takes a stale review', () => {
+		const stop = { ...RELAUNCH.stop, is_review_stale: true }
+		const parsed = lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop })
+
+		expect(parsed.success).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4489: the ship tags its stop with a cause, and the strict schema refused every relaunch.
+describe('lane_session_action.action_schema — a stop cause', () => {
+	it.each(Object.values(run_ship_stop_cause.CAUSE))('takes the %s cause', (cause) => {
+		const stop = { ...RELAUNCH.stop, cause }
+
+		expect(lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop }).success).toBe(true)
+	})
+
+	it('refuses a cause the ship never writes', () => {
+		const stop = { ...RELAUNCH.stop, cause: 'weather' }
+
+		expect(lane_session_action.action_schema.safeParse({ ...RELAUNCH, stop }).success).toBe(false)
 	})
 })

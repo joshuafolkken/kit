@@ -201,10 +201,11 @@ describe('the split lost nothing', () => {
 	// of what the suite is for. A sentence from a topic that still holds a body took its place.
 	// joshuafolkken/kit#2893 did the same for the overrides sample: its body moved into
 	// `.claude/skills/dependency-update/SKILL.md`, so a sentence from the body `operating-rules.md`
-	// still holds — the CI-failure report — replaced it.
+	// still holds — the CI-failure report — replaced it. joshuafolkken/kit#4188 cut `plan-comment.md`
+	// to Step 3, so its sample is now the `kickoff` stop line that Step 3 keeps.
 	it.each([
-		'9. 検証ゲート（`CLAUDE.md` の Completion gate）を実行する',
-		'**(1) ラベルはセッション言語に訳す。**',
+		'`kickoff` はここで**停止**する',
+		'ラベルに注釈を付けない。',
 		'**完了コメントに失敗を隠してはならない**',
 	])('keeps %j in a topic file, not only in the index', (marker) => {
 		expect(topics).toContain(marker)
@@ -251,8 +252,22 @@ describe('quality-priority keeps the three tiers and the conflict order', () => 
 		'1. **まず、全部を満たす方法を探す**',
 		'2. **1 つを悪くするなら、同じ変更の中で別の場所を削って埋め合わせる**',
 		'3. **それでも両立しないときは、数字を示して利用者に聞く**（Tier B）',
+		'機能や最適化の追加を止める・凍結する・後回しにする案を出さない。順序は優先度ラベルが決める',
+		'進化を続けたまま不具合を防ぐ仕組み（単一ソース化、層の統合、不変条件のテスト）を提案する',
 	])('states %j', (marker) => {
 		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).toContain(marker)
+	})
+
+	// joshuafolkken/kit#4492: the no-halt rule is on demand, so only this pointer brings it into a session.
+	it('points CLAUDE.md at it for a remedy for defects', () => {
+		expect(read_repo_file('CLAUDE.md')).toContain('a remedy for defects → "quality-priority"')
+	})
+
+	// joshuafolkken/kit#4492: the reason for the no-halt rule lives in the rationale document only.
+	it('does not point at its rationale document', () => {
+		expect(read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)).not.toContain(
+			'principles-rationale',
+		)
 	})
 })
 

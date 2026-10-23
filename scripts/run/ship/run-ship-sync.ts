@@ -6,6 +6,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_scoped } from './run-ship-scoped'
+import type { Cause } from './run-ship-stop-cause'
 
 // `josh ship` keeps the branch current with the default branch itself: a default branch that moves
 // while the pull request opens and CI runs would otherwise stop the followup as `interrupted`, though
@@ -29,10 +30,14 @@ const MERGED_PREFIX = 'merged '
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 // `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
-// that reused a green record — so its few seconds are not timed as a run of it.
+// that reused a green record — so its few seconds are not timed as a run of it. `preconditions` names
+// the kinds of the preconditions a stopped preflight found unmet (`run-ship-preflight.ts`). `cause` is the
+// one a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
 interface StepResult extends JoshResult {
 	is_skipped?: boolean
 	conflicts?: ReadonlyArray<string>
+	preconditions?: ReadonlyArray<string>
+	cause?: Cause
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
@@ -117,21 +122,53 @@ async function merge_again(title: string, failed: JoshResult): Promise<StepResul
 	return await push_merged(title)
 }
 
-async function followup_stage(
+// Whether the ship waits on the merge alone, for its stage record (`run_ship_stage.mark_merge_waiting`).
+type WaitMark = (is_merge_waiting: boolean) => void
+
+function ignore_wait(): void {
+	// A ship with no stage record has no lane place to free.
+}
+
+// The wait is marked only while `josh followup` runs: the merge again and its gate run unmarked, so a
+// lane gating here still holds its place (joshuafolkken/kit#4466).
+async function marked_followup(
 	title: string,
 	notify: ReadonlyArray<string>,
-	retries = 0,
+	mark: WaitMark,
+): Promise<JoshResult> {
+	mark(true)
+
+	try {
+		return await josh(['followup', title, ...notify])
+	} finally {
+		mark(false)
+	}
+}
+
+async function followup_attempt(
+	title: string,
+	notify: ReadonlyArray<string>,
+	mark: WaitMark,
+	retries: number,
 ): Promise<StepResult> {
-	const result = await josh(['followup', title, ...notify])
+	const result = await marked_followup(title, notify, mark)
 
 	if (result.code === SUCCESS_EXIT_CODE || retries >= MAX_MERGE_RETRIES) return result
 
 	const stop = await merge_again(title, result)
 
-	return stop ?? (await followup_stage(title, notify, retries + 1))
+	return stop ?? (await followup_attempt(title, notify, mark, retries + 1))
+}
+
+async function followup_stage(
+	title: string,
+	notify: ReadonlyArray<string>,
+	mark: WaitMark = ignore_wait,
+): Promise<StepResult> {
+	return await followup_attempt(title, notify, mark, 0)
 }
 
 const run_ship_sync = { CONFLICT_NOTE, MAX_MERGE_RETRIES, followup_stage, sync_stage }
 
-export type { StepResult }
+export type { StepResult, WaitMark }
 export { run_ship_sync }

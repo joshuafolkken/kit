@@ -17,6 +17,7 @@ const PR_GROUP = 'pr'
 // `new` is gh's own alias for `pr create`.
 const PR_CREATE_ACTIONS: ReadonlySet<string> = new Set(['create', 'new'])
 const FLAG_PREFIX = '-'
+const HELP_FLAGS: ReadonlySet<string> = new Set(['-h', '--help'])
 // The repository selector gh accepts before `pr` or between `pr` and its action; with no `=` it
 // swallows the next word, so that word is not read as the group or the action.
 const VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set(['-R', '--repo'])
@@ -80,16 +81,64 @@ function is_pr_create_cli_call(args: ReadonlyArray<string>): boolean {
 	return group === PR_GROUP && PR_CREATE_ACTIONS.has(action)
 }
 
+// A help call prints the usage and creates nothing. A help flag right after another flag may be that
+// flag's value (`--title -h`), so it is not read as one — a boolean flag before it errs toward refusal.
+function is_help_call(args: ReadonlyArray<string>): boolean {
+	return args.some(
+		(argument, index) =>
+			HELP_FLAGS.has(argument) && !(args[index - 1] ?? '').startsWith(FLAG_PREFIX),
+	)
+}
+
 function is_pr_create_segment(segment: string): boolean {
 	const args = git_argv.arguments_of(segment, GH_COMMAND)
 
-	if (args === undefined) return false
+	if (args === undefined || is_help_call(args)) return false
 
 	return is_pr_create_cli_call(args) || is_pr_create_api_call(args)
 }
 
+// Quoted text the shell still runs: a command substitution, or the string `sh -c` (its `-c` alone or
+// in a cluster such as `-lc`, after any other flags), `ssh` or `eval` executes. `ssh` and `eval` count
+// only as the segment's program, so `grep -E "ssh|gh pr create"` stays one quoted pattern.
+const RUNS_QUOTED_TEXT = /\$\(|`/u
+const QUOTED_TEXT_RUNNERS: ReadonlySet<string> = new Set(['ssh', 'eval'])
+const SHELL_DASH_C = /\b(?:ba|da|k|z)?sh\s+(?:-\S+\s+)*-[A-Za-z]*c\b/u
+// A `#` comment hides its apostrophe from the shell but not from the quote pairing, so a multi-line
+// segment holding one may be lines the pairing joined (`# don't` … `'`) rather than one quoted span.
+const COMMENT_MARKER = /(?:^|\s)#/mu
+const LINE_BREAK = '\n'
+
+function is_run_by_shell(segment: string): boolean {
+	if (RUNS_QUOTED_TEXT.test(segment) || SHELL_DASH_C.test(segment)) return true
+
+	return QUOTED_TEXT_RUNNERS.has(git_argv.program_of(segment)?.name ?? '')
+}
+
+function is_runs_quoted_text(segment: string): boolean {
+	if (is_run_by_shell(segment)) return true
+
+	return segment.includes(LINE_BREAK) && COMMENT_MARKER.test(segment)
+}
+
+// A segment whose quotes still run keeps the plain cut, so `bash -c 'git push && gh pr create --fill'`
+// is refused as it was before the quote-aware cut.
+function judged_segments(segment: string): Array<string> {
+	return is_runs_quoted_text(segment) ? shell_segments.commands_of(segment) : [segment]
+}
+
+// The cut is quote-aware, so `grep -E "a|gh pr create|b"` stays one `grep` call rather than yielding
+// a `gh pr create` segment from inside its pattern (joshuafolkken/kit#4091). Shared with the
+// `direct-issue-comment` row, which judges a `gh` call by the same cut.
+function has_run_segment(command: string, is_match: (segment: string) => boolean): boolean {
+	return shell_segments
+		.quote_aware_commands_of(command)
+		.flatMap((segment) => judged_segments(segment))
+		.some((segment) => is_match(segment))
+}
+
 function is_direct_pr_create(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_pr_create_segment(segment))
+	return has_run_segment(command, is_pr_create_segment)
 }
 
 const DIRECT_PR_CREATE_REASON =
@@ -103,8 +152,25 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_direct_pr_create),
 	reason: DIRECT_PR_CREATE_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Direct PR creation',
+		topic: '`CLAUDE.md` → Git Rules',
+		fires:
+			'`gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence',
+		quiet: '`pnpm josh pr`, or reading a PR — the path that writes `closes #N`',
+	},
 }
 
-const direct_pr_create = { DIRECT_PR_CREATE_REASON, ROW, is_direct_pr_create }
+const direct_pr_create = {
+	API_VALUE_TAKING_FLAGS,
+	DIRECT_PR_CREATE_REASON,
+	GH_COMMAND,
+	ROW,
+	VALUE_TAKING_FLAGS,
+	has_run_segment,
+	is_direct_pr_create,
+	is_help_call,
+	positional_words,
+}
 
 export { direct_pr_create }

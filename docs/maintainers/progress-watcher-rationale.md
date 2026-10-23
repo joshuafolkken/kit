@@ -1,11 +1,8 @@
 # Rationale behind the progress watcher
 
-This document is maintainer-only: it holds the reasons, measurements and history behind
-`.claude/skills/workflow-commands/progress-watcher.md`, so that the procedure document can stay a list
-of triggers, actions and answers. It is never read during a run — every rule it explains is stated in
-full in the procedure document, and a change to a rule is made there first. Both moved out of the
-`backlogrun` progress documents in joshuafolkken/kit#3172, because the heartbeat binds every
-implementing run, not the batch alone.
+Rationale behind `.claude/skills/workflow-commands/progress-watcher.md`. The watcher has its own
+document apart from `backlogrun`'s because the heartbeat binds every implementing run, not the batch
+alone (joshuafolkken/kit#3172).
 
 ## Why the heartbeat reads as it does
 

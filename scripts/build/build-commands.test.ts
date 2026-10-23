@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
@@ -10,10 +10,9 @@ import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 const BUILD_TIMEOUT = 60_000
 const PACKAGE_DIR = path.join(SCRIPTS_DIR, '..')
 const DIST_DIR = path.join(PACKAGE_DIR, 'dist')
-const DOC_SECTION_SCRIPT = 'scripts/document/document-section-cli.ts'
-const SECTION_ARGUMENTS = ['CLAUDE.md', 'Project']
-const SECTION_HEADING = '## Project'
-const MAIN_GUARD = 'process.argv[1]'
+const DOC_SECTION_SCRIPT = 'scripts/document/document-section-main.ts'
+const SECTION_ARGUMENTS = ['CLAUDE.md', 'Communication']
+const SECTION_HEADING = '## Communication'
 
 // A private directory at the same depth as `dist/commands`, so a module that finds the package from
 // its own `import.meta.url` resolves the same root, and a `pnpm build` running beside this suite never
@@ -63,7 +62,7 @@ describe('every is_bundled command can be bundled safely', () => {
 	it.each(bundled_scripts())('%s carries no other main guard in its import closure', (script) => {
 		const entry = path.join(PACKAGE_DIR, script)
 		const others = [...import_closure.closure([entry])].filter((file) => file !== entry)
-		const guarded = others.filter((file) => readFileSync(file, 'utf8').includes(MAIN_GUARD))
+		const guarded = others.filter((file) => import_closure.has_main_guard(file))
 
 		expect(guarded).toStrictEqual([])
 	})

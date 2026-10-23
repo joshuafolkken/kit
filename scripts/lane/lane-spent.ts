@@ -89,8 +89,11 @@ const LIVE_PROBES: SpentProbes = {
 	unpushed_commits: read_unpushed_commits,
 }
 
+// The one probe the in-use readings take, so a reader holding a process snapshot passes its own.
+type TraceProbes = Pick<SpentProbes, 'process_trace'>
+
 // A stranded lane has no work tree for a child to be in, so it is never in use.
-function trace_of(lane: LaneInfo, probes: SpentProbes): ProcessTrace {
+function trace_of(lane: LaneInfo, probes: TraceProbes): ProcessTrace {
 	return lane.is_stranded ? PROCESS_NONE : probes.process_trace(lane.issue)
 }
 
@@ -178,7 +181,7 @@ function issues_traced(traced: ReadonlyArray<TracedLane>, trace: ProcessTrace): 
 	return traced.filter(([, answer]) => answer === trace).map(([issue]) => issue)
 }
 
-function traced_of(lanes: ReadonlyArray<LaneInfo>, probes: SpentProbes): Array<TracedLane> {
+function traced_of(lanes: ReadonlyArray<LaneInfo>, probes: TraceProbes): Array<TracedLane> {
 	return lanes.map((lane): TracedLane => [lane.issue, trace_of(lane, probes)])
 }
 
@@ -195,7 +198,7 @@ async function lanes_in_use(probes: SpentProbes = LIVE_PROBES): Promise<LaneUse>
 /** The lanes no child is working in, read as such — never one whose probe did not answer. */
 function idle_lanes(
 	lanes: ReadonlyArray<LaneInfo>,
-	probes: SpentProbes = LIVE_PROBES,
+	probes: TraceProbes = LIVE_PROBES,
 ): Array<string> {
 	return issues_traced(traced_of(lanes, probes), PROCESS_NONE)
 }

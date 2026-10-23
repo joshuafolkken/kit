@@ -1,8 +1,6 @@
 # `halfrun` manifest — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/halfrun.md`. It is never read
-during a run — every step, stop and command an agent acts on stays in the procedure document, and a
-change to this file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/halfrun.md`.
 
 ## Where each rule came from
 
@@ -11,5 +9,5 @@ change to this file changes no rule.
   joshuafolkken/kit#3174.
 - The `Next:` line leading the stop's `confirmation` Telegram, because a verified `halfrun` ships by a
   `fullrun` / `prrun` whose `run:entry` adopts the marked hold — joshuafolkken/kit#2796.
-- The `-- ':!.josh/observations'` pathspec on the `halfrun new` pre-existing-changes stash —
-  joshuafolkken/kit#2919.
+- The `halfrun new` pre-existing-changes stash leaving the observation ledger in the tree —
+  joshuafolkken/kit#2919; the exclusion moved into `josh stash:push` — joshuafolkken/kit#4131.

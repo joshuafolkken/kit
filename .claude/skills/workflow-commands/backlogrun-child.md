@@ -15,8 +15,9 @@ or a split found mid-run does **not** stop it:
 
 1. File the new Issue(s) — `route:split` for a split, `route:tier-a` for a prerequisite — no
    confirmation.
-2. **Stash and remove `in-progress`**, as steps 2 and 4 of "A prerequisite discovered mid-run" do:
-   `git stash push -u -m "..."`, a `gh api repos/{owner}/{repo}/issues/<N>/comments` post recording the
+2. **Stash and remove `in-progress`**: for a prerequisite `<P>`, `pnpm josh run:pause <N> --for <P>`
+   (`prerequisite.md`), which also records the dependency step 3 would; for a split,
+   `pnpm josh stash:push "..."`, `pnpm josh issue:comment <N> --body-file <path>` recording the
    stash, and `pnpm josh run:release <N>`.
 3. **Ask `pnpm josh epic:bundle <N>` whether an epic already tracks `#<N>` before creating one.**
 
@@ -44,7 +45,7 @@ or a split found mid-run does **not** stop it:
 5. **Do not stop.** Continue into the loop against `#<E>`.
 
 - **Nothing found means no epic** — the run finishes at `#<N>`'s merge.
-- **Every guard applies unchanged** — 30 children, 10 Issues filed, 3 consecutive failures.
+- **Every guard applies unchanged** (`backlogrun.md` → "Guards").
 - **`fullrun` does not promote itself** — it files and **stops** (`split-assessment.md` → "Finding a
   split mid-run stops the run"). `josh epic:next` still refuses an Issue with no task list.
 - **A bare Issue named beside an epic is a mistyped command.** Named alone, the refusal is the answer;
@@ -65,6 +66,8 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 - **The brief names the invocation it descends from** — e.g. `backlogrun #<E> --only`, the child
   number, and that it runs as `fullrun #<N>` under that authorization; the unit refuses a brief without
   it.
+- A child whose ship waits on its merge frees its lane — the next child launches beside it, and a
+  stop at `followup` relaunches the child once a place is free: `scripts/backlog/backlog-occupied.ts`.
 
 ### What the summary carries, and how long it may be
 
@@ -93,14 +96,13 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Ask once, the first time the loop hands back a child number, before implementing it:
+Run once, the first time the loop hands back a child number, before implementing it:
 
 ```bash
-pnpm josh latest:scope   # → required | skip ; the reason on stderr
-git stash push -u -m "backlogrun: josh latest #<N>"        # only if the tree has staged or modified files — never conditional on the answer
+pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
 pnpm josh ms
-pnpm josh latest         # on `required` only
-pnpm josh stash:pop "backlogrun: josh latest #<N>"         # only if you stashed above — by message, not a positional pop
+pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
+pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
 ```
 
 On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed

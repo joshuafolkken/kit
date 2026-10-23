@@ -2,6 +2,7 @@ import type { BusyRead } from '#scripts/epic/epic-busy'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import type { SoloSelection } from '#scripts/epic/epic-solo'
 import { session_cite } from '#scripts/issue/session-cite'
+import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 
 // Which candidates may not run side by side because their bodies declare overlapping paths.
 // joshuafolkken/kit#3221 held back only a path both bodies named beside a move, split, rename or
@@ -76,6 +77,8 @@ function overlaps(left: string, right: string): boolean {
 interface SeparateContext {
 	read: BusyRead
 	repo: string
+	// The holders' lane state records, so a clash names a paused holder (joshuafolkken/kit#4270).
+	lanes?: LaneRecords | undefined
 }
 
 // The path each of `holders` declares, mapped to the issue that holds it.
@@ -130,15 +133,29 @@ function running_clash(child: EpicChild, declared: Declared, holding: Holding): 
 	return clash_of(claims, paths_of(child, declared, holding.repo))
 }
 
-function clash_note(child: EpicChild, clash: Clash): string {
+// Whether `waiting` declares a path `holder` declares — the overlap `separate` withholds it on.
+function holds(declared: Declared, holder: number, waiting: number): boolean {
+	return clash_of(claims_of(declared, [holder]), declared.get(waiting) ?? new Set()) !== undefined
+}
+
+// ` — paused since 01:28 by lane:pause` for a holder whose lane is paused: it holds the path while
+// nothing moves, so the wait lasts until someone resumes it.
+function paused_tail(clash: Clash, lanes: LaneRecords): string {
+	const note = lane_state.paused_note(lanes.get(String(clash.holder)))
+
+	return note === undefined ? '' : ` — ${note}`
+}
+
+function clash_note(child: EpicChild, clash: Clash, lanes: LaneRecords): string {
 	const waiting = session_cite.issue(child.number, undefined, child.repo)
 	const holder = session_cite.issue(clash.holder, undefined, child.repo)
 
-	return `${waiting} waits: its \`${clash.path}\` overlaps \`${clash.claimed}\`, which ${holder} declares.`
+	return `${waiting} waits: its \`${clash.path}\` overlaps \`${clash.claimed}\`, which ${holder} declares${paused_tail(clash, lanes)}.`
 }
 
 interface Walk {
 	claims: Map<string, number>
+	lanes: LaneRecords
 	offered: Array<EpicChild>
 	withheld: Array<EpicChild>
 	notes: Array<string>
@@ -155,7 +172,7 @@ function visit(walk: Walk, child: EpicChild, paths: ReadonlySet<string>): void {
 	}
 
 	walk.withheld.push(child)
-	walk.notes.push(clash_note(child, clash))
+	walk.notes.push(clash_note(child, clash, walk.lanes))
 }
 
 function merged_notice(
@@ -176,6 +193,7 @@ function separate(
 ): SoloSelection {
 	const walk: Walk = {
 		claims: running_claims(declared, context.read),
+		lanes: context.lanes ?? new Map(),
 		offered: [],
 		withheld: [],
 		notes: [],
@@ -189,7 +207,7 @@ function separate(
 	return { offered: walk.offered, withheld, ...(notice !== undefined && { notice }) }
 }
 
-const backlog_overlap = { declared_of, declared_paths, running_clash, separate }
+const backlog_overlap = { declared_of, declared_paths, holds, running_clash, separate }
 
 export { backlog_overlap }
 export type { Clash, Declared }

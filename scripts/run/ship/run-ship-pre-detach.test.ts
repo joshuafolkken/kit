@@ -21,6 +21,16 @@ vi.mock('#scripts/gate/project-checks', () => ({
 	project_checks: { is_kit_repository: is_kit_mock },
 }))
 
+const record_mock = vi.hoisted(() => vi.fn())
+const READ_TREE = vi.hoisted(() => ({ files: { digest_of: 'digest-a' }, base: 'base-a' }))
+
+vi.mock('#scripts/gate/check-reuse', () => ({
+	check_reuse: { DEFAULT_RECORDS: (): string => '', record_green_checks: record_mock },
+}))
+vi.mock('#scripts/gate/gate-tree', () => ({
+	gate_tree: { read_gate_tree: vi.fn(async () => READ_TREE) },
+}))
+
 const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
 
 // joshuafolkken/kit#3222: the type check and the guard tests a detached ship runs before the hand-off.
@@ -70,6 +80,7 @@ function create(target: string): void {
 beforeEach(() => {
 	tree.directory = mkdtempSync(path.join(tmpdir(), 'pre-detach-'))
 	run_mock.mockReset()
+	record_mock.mockClear()
 	is_kit_mock.mockReturnValue(false)
 	answer(new Map())
 })
@@ -154,7 +165,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 	const unread = `josh exports: 1 namespace member(s) nothing reads\n  scripts/lane/lane-stage-stats.ts:149  lane_stage_stats.STAGES`
 
 	it('runs the unused-export and spelling checks the related pair never selects', () => {
-		expect(run_ship_pre_detach.STATIC_CHECKS.map((list) => list.join(' '))).toStrictEqual(
+		expect(run_ship_pre_detach.STATIC_CHECKS.map(({ list }) => list.join(' '))).toStrictEqual(
 			STATIC.slice(1),
 		)
 	})
@@ -172,8 +183,8 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 		expect(run_ship_pre_detach.GUARD_TEST_TARGETS).toStrictEqual(
 			expect.arrayContaining([
 				'scripts/issue/session-cite-scan.test.ts',
-				'scripts/test/untested-sources.test.ts',
-				'scripts/test/pure-files.test.ts',
+				'tools/test/untested-sources.test.ts',
+				'tools/test/pure-files.test.ts',
 			]),
 		)
 	})
@@ -208,5 +219,47 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			code: FAILED,
 			out: grown,
 		})
+	})
+})
+
+interface Handed {
+	label: string
+	command: string
+	exit_code: number
+}
+
+function handed(): ReadonlyArray<Handed> {
+	const call = record_mock.mock.calls.at(-1) as unknown as [ReadonlyArray<Handed>] | undefined
+
+	return call?.[0] ?? []
+}
+
+// joshuafolkken/kit#4505: the gate's own checks hand their results to the gate's per-check record.
+describe('run_ship_pre_detach.checks — what the gate reuses', () => {
+	it('hands the type check and the unused-export check over under their gate labels', async () => {
+		await run_ship_pre_detach.checks(tree.directory)
+
+		expect(handed().map(({ label, command }) => [label, command])).toStrictEqual([
+			['check', TYPE_CHECK],
+			['exports', EXPORTS],
+		])
+		expect(record_mock).toHaveBeenCalledWith(expect.anything(), READ_TREE, expect.anything())
+	})
+
+	it('hands over no spelling, guard test or metrics result', async () => {
+		create(GUARD_TARGET)
+		is_kit_mock.mockReturnValue(true)
+
+		await run_ship_pre_detach.checks(tree.directory)
+
+		expect(handed().map(({ label }) => label)).toStrictEqual(['check', 'exports'])
+	})
+
+	it('hands a failed check over as failed, for the gate to leave unrecorded', async () => {
+		answer(new Map([[EXPORTS, { exit_code: FAILED, output: TYPE_ERROR }]]))
+
+		await run_ship_pre_detach.checks(tree.directory)
+
+		expect(handed().map(({ exit_code }) => exit_code)).toStrictEqual([OK, FAILED])
 	})
 })

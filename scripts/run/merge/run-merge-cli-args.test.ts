@@ -18,3 +18,14 @@ describe('run_merge_cli.parse — sanitizes subprocess-bound arguments', () => {
 		expect(run_merge_cli.parse([CHILD, '--epic', EPIC, '--repo', REPO])?.repo).toBe(REPO)
 	})
 })
+
+// joshuafolkken/kit#4102: the driver has no context to cut, so `--driver` carries no hand-off threshold.
+describe('run_merge_cli.parse — --driver', () => {
+	it('drops the hand-off threshold under --driver', () => {
+		expect(run_merge_cli.parse([CHILD, '--driver'])?.over).toBeUndefined()
+	})
+
+	it('keeps the hand-off threshold without --driver', () => {
+		expect(run_merge_cli.parse([CHILD])?.over).toBeDefined()
+	})
+})

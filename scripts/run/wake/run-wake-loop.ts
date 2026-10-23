@@ -1,3 +1,4 @@
+import { error_text } from '#scripts/lib/error-message'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import {
 	run_wake,
@@ -22,8 +23,10 @@ import type { LaunchResult } from './run-wake-session'
 
 const STOPPED_REASON: WakeStopReason = 'stopped'
 const FAILED_REASON: WakeStopReason = 'failed'
+const RELOAD_REASON: WakeStopReason = 'reload'
 const NO_ATTEMPTS = 0
 const STOPPED_BY_PERSON: LoopStop = { reason: STOPPED_REASON, note: undefined }
+const CODE_CHANGED: LoopStop = { reason: RELOAD_REASON, note: undefined }
 
 interface LoopPorts {
 	// The carry record, re-read every pass rather than cached: it is written by the parent loop of a
@@ -47,10 +50,15 @@ interface LoopPorts {
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
+	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`).
+	retry_closes: () => Promise<void>
+	// Whether the code this process loaded differs from the code on disk now (`run-wake-code.ts`).
+	is_code_stale: () => Promise<boolean>
 }
 
-// `released`: the carry record ended while the driver paused, so there is nothing to hand on and the
-// next pass decides from the record how the run ends.
+// `released`: the carry record ended while the driver paused, or the driver's window was spent, so
+// there is nothing to hand on and the next pass decides from the record whether the run ends, reloads
+// or drives on.
 type DriveResult =
 	| { kind: 'finished' }
 	| { kind: 'released' }
@@ -151,15 +159,37 @@ async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecisio
 	return run_wake.decide({ ...input, has_work: await ports.has_work(input.read) })
 }
 
+// A lane whose close a process outlived ends once the process is gone (joshuafolkken/kit#4300). A
+// failed retry is the next pass's to try again, never a reason to stop the run.
+async function retry_closes(ports: LoopPorts): Promise<void> {
+	try {
+		await ports.retry_closes()
+	} catch (error) {
+		error_text.trace_swallowed('run_wake_loop.retry_closes', error)
+	}
+}
+
 // The record is re-read at the top of every pass rather than carried in a variable, so a `--stop` that
 // removed it ends the loop at the next interval and a `--list` reads what the loop actually wrote.
 // One pass: decide, act, write the result back. `undefined` means carry on to the next interval.
+//
+// **A pass boundary is where the supervisor reloads its code** (joshuafolkken/kit#4509): no driver
+// is running and no session is being launched, so a successor on the new code takes over without
+// stopping any lane. A record already removed ends the loop before this pass is reached, and a carry
+// record that ended or became unreadable stops the run before the code is checked, so a reload never
+// hands a finished run to a successor.
 async function run_pass(
 	target: string,
 	wake: RunWake,
 	ports: LoopPorts,
 ): Promise<LoopStop | undefined> {
-	const outcome = await step(wake, await decide_pass(wake, ports), ports)
+	const decision = await decide_pass(wake, ports)
+
+	if (decision.kind !== 'stop' && (await ports.is_code_stale())) return CODE_CHANGED
+
+	await retry_closes(ports)
+
+	const outcome = await step(wake, decision, ports)
 
 	if (outcome.kind === 'stop') return outcome.stop
 
@@ -197,6 +227,7 @@ async function run_loop(target: string, ports: LoopPorts, interval_ms: number): 
 
 const run_wake_loop = {
 	FAILED_REASON,
+	RELOAD_REASON,
 	run_loop,
 }
 

@@ -12,7 +12,12 @@ import { fileURLToPath } from 'node:url'
 // `import()` is a sanctioned escape hatch, so neither belongs to the closure this walks.
 
 const SCRIPTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const SCRIPTS_ALIAS = '#scripts/'
+// The kit-only sibling of `scripts/`, which `package.json` `files` does not ship.
+const TOOLS_DIR = path.join(SCRIPTS_DIR, '..', 'tools')
+const ALIAS_DIRECTORIES: ReadonlyArray<readonly [string, string]> = [
+	['#scripts/', SCRIPTS_DIR],
+	['#tools/', TOOLS_DIR],
+]
 
 // Every module a static value-import in `source` names. Whole-statement `import type` lines are
 // dropped first; a mixed `{ value, type X }` import still loads its module at runtime, so keeping its
@@ -25,11 +30,12 @@ function value_import_specs(source: string): Array<string> {
 		.filter((spec): spec is string => spec !== undefined)
 }
 
-// A bare specifier resolved to a source file inside `scripts/`, or undefined for an external package.
+// A bare specifier resolved to a source file inside `scripts/` or `tools/`, or undefined for an
+// external package.
 function resolve_spec(spec: string, from_file: string): string | undefined {
-	if (spec.startsWith(SCRIPTS_ALIAS)) {
-		return path.join(SCRIPTS_DIR, `${spec.slice(SCRIPTS_ALIAS.length)}.ts`)
-	}
+	const aliased = ALIAS_DIRECTORIES.find(([alias]) => spec.startsWith(alias))
+
+	if (aliased !== undefined) return path.join(aliased[1], `${spec.slice(aliased[0].length)}.ts`)
 
 	if (spec.startsWith('.')) return `${path.resolve(path.dirname(from_file), spec)}.ts`
 
@@ -61,6 +67,14 @@ function closure(seeds: Array<string>): Set<string> {
 	return visited
 }
 
-const import_closure = { closure }
+// A main guard is a statement at the start of a line, so a comment or a string that only names
+// `process.argv[1]` is not one (joshuafolkken/kit#4186).
+const MAIN_GUARD = /^if \(process\.argv\[1\] ===/mu
 
-export { import_closure, SCRIPTS_DIR }
+function has_main_guard(file: string): boolean {
+	return MAIN_GUARD.test(readFileSync(file, 'utf8'))
+}
+
+const import_closure = { closure, has_main_guard, imports_of }
+
+export { import_closure, SCRIPTS_DIR, TOOLS_DIR }

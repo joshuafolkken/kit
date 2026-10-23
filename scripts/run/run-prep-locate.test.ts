@@ -8,8 +8,6 @@ const { run_prep_locate } = await import('./run-prep-locate')
 
 const MAX_TARGETS = 10
 const MAX_FILES = 3
-const MAX_EXCERPT = 80
-const LONG_TEXT_LENGTH = 200
 const GIT_USAGE_EXIT = 129
 const LS_FILES = 'ls-files'
 const PREP_PATH = 'scripts/run/run-prep.ts'
@@ -36,12 +34,12 @@ beforeEach(() => {
 
 describe('run_prep_locate.extract_targets', () => {
 	it('keeps backticked paths, identifiers and commands', () => {
-		const body = 'See `scripts/run/run-prep.ts`, `run_prep_cli` and `investigation:guard`.'
+		const body = 'See `scripts/run/run-prep.ts`, `run_prep_cli` and `pretool:guard`.'
 
 		expect(run_prep_locate.extract_targets(body)).toStrictEqual([
 			PREP_PATH,
 			'run_prep_cli',
-			'investigation:guard',
+			'pretool:guard',
 		])
 	})
 
@@ -71,25 +69,15 @@ describe('run_prep_locate.extract_targets', () => {
 	})
 })
 
-describe('run_prep_locate.parse_hits', () => {
-	it('splits path and line off the first two colons only', () => {
-		const [hit] = run_prep_locate.parse_hits(GREP_OUTPUT)
+describe('run_prep_locate.locate — per-name cap', () => {
+	it('caps the files per name', async () => {
+		const output = Array.from({ length: MAX_FILES + 1 }, (_, index) => `f${String(index)}.ts:1:x`)
 
-		expect(hit).toStrictEqual({
-			path: 'scripts/josh/josh-commands-ai.ts',
-			line: '42',
-			excerpt: '\'run:prep\': { script: "a:b:c" },',
-		})
-	})
+		mock_git(async () => output.join('\n'))
 
-	it('shortens a long excerpt and caps the files per name', () => {
-		const long_line = `a.ts:1:${'x'.repeat(LONG_TEXT_LENGTH)}`
-		const output = Array.from({ length: MAX_FILES + 1 }, () => long_line).join('\n')
+		const report = await run_prep_locate.locate(`touch ${RUN_PREP_SPAN}`)
 
-		const hits = run_prep_locate.parse_hits(output)
-
-		expect(hits).toHaveLength(MAX_FILES)
-		expect(hits[0]?.excerpt).toBe(`${'x'.repeat(MAX_EXCERPT)}…`)
+		expect(report.split('\n').slice(1)).toHaveLength(MAX_FILES)
 	})
 })
 

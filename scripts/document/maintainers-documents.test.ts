@@ -16,10 +16,12 @@ const HOW_TO_INDEX = 'docs/how-to.md'
 const TROUBLESHOOTING = 'docs/troubleshooting.md'
 const ENTRY_DOCUMENTS: ReadonlyArray<string> = [README, OVERVIEW, HOW_TO_INDEX]
 const USER_DOCS_DIRECTORY = 'docs'
-// Maintainer pages announce their audience with either phrase: the index-level pages say "For kit
-// maintainers", the rationale pages say "maintainer-only".
+// Maintainer pages announce their audience with one of these phrases: the index-level pages say "For
+// kit maintainers", the rationale pages open with "Rationale behind" (joshuafolkken/kit#4188), and the
+// older pages still say "maintainer-only".
 const MAINTAINER_AUDIENCE_MARKERS: ReadonlyArray<string> = [
 	'For kit maintainers',
+	'Rationale behind',
 	'maintainer-only',
 ]
 const USER_GUIDE_PAGES: ReadonlyArray<string> = [

@@ -1,8 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { lint_parallel } from './lint-parallel'
@@ -36,7 +39,8 @@ async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
 	return await lint_parallel.run_lint_checks(
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
-		lint_related_scope.cross_file_recheck_options(scope.files),
+		lint_related_scope.RELATED_CACHES.eslint_file,
+		{ warm_daemon: true },
 	)
 }
 
@@ -63,6 +67,38 @@ async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<
 	return byte_check_exit_code(scope, root)
 }
 
+// **A bare run reads only what moved since its last green run** (`since-green.ts`), while a lintable file
+// is among it; otherwise the whole branch change, as before.
+async function since_green_scope(root: string): Promise<ChangedFileScope | undefined> {
+	const moved = await since_green.read_moved(review_stamps.lint_related_stamp, gate_plan.LINT_LABEL)
+
+	if (moved === undefined) return undefined
+
+	const inputs = lint_related_scope.scope_inputs(existsSync)
+	const files = moved.map((file) => path.join(root, file))
+
+	if (changed_file_scope.select_files(files, inputs).length === 0) return undefined
+
+	process.stdout.write(`${since_green.describe(lint_related_scope.COMMAND_LABEL, moved)}\n`)
+
+	return changed_file_scope.resolve_scope(files, inputs)
+}
+
+async function resolve_lint_scope(
+	command_arguments: ReadonlyArray<string>,
+	root: string,
+): Promise<ChangedFileScope> {
+	const since = command_arguments.length === 0 ? await since_green_scope(root) : undefined
+
+	if (since !== undefined) return since
+
+	return await changed_file_scope.resolve_command_scope({
+		command_arguments,
+		root,
+		inputs: lint_related_scope.scope_inputs(existsSync),
+	})
+}
+
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
 // whole one, and a fallback says which of the two it was rather than looking like a narrow run
 // that found nothing.
@@ -72,11 +108,7 @@ async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<
 // and the three states in which it is withheld, are `scoped-green.ts`.
 async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const scope = await changed_file_scope.resolve_command_scope({
-		command_arguments,
-		root,
-		inputs: lint_related_scope.scope_inputs(existsSync),
-	})
+	const scope = await resolve_lint_scope(command_arguments, root)
 
 	changed_file_scope.report_unusable_arguments(
 		command_arguments,

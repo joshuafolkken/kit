@@ -10,11 +10,16 @@ import { run_invocation } from '#scripts/run/run-invocation'
 // **A bare number is an issue.** A shell reads an unquoted `#3437` as a comment, so `3437` in the named
 // list is taken as `#3437`; a number after the first flag is that flag's value and is left alone.
 //
-// **`--stop` stands alone.** It stops the run rather than starting one, so beside an issue or any other
-// flag it is refused before anything is stopped — a mistyped start must never end a run.
+// **`--stop` and `--restart` stand alone.** Each stops the run rather than starting one, so beside an
+// issue or any other flag it is refused before anything is stopped — a mistyped start must never end a
+// run.
 
 const AGENT_FLAG = '--agent'
-const STOP_FLAG = '--stop'
+// A map, not an object literal: a token such as `constructor` must not read an inherited property.
+const LONE_FLAGS: ReadonlyMap<string, LoneKind> = new Map([
+	['--stop', 'stop'],
+	['--restart', 'restart'],
+])
 const BACKLOG_COMMAND = 'backlogrun'
 const ISSUE_PREFIX = '#'
 const FLAG_PREFIX = '-'
@@ -30,8 +35,13 @@ interface BacklogrunArguments {
 	issues: ReadonlyArray<number>
 }
 
+type LoneKind = 'stop' | 'restart'
+
 type ArgumentsResult =
-	{ kind: 'args'; args: BacklogrunArguments } | { kind: 'stop' } | { kind: 'refused' }
+	| { kind: 'args'; args: BacklogrunArguments }
+	| { kind: 'stop' }
+	| { kind: 'restart' }
+	| { kind: 'refused' }
 
 interface AgentSplit {
 	agent: string | undefined
@@ -74,12 +84,14 @@ function parse_start(argv: ReadonlyArray<string>): ArgumentsResult {
 }
 
 function parse(argv: ReadonlyArray<string>): ArgumentsResult {
-	if (!argv.includes(STOP_FLAG)) return parse_start(argv)
+	const lone = argv.map((token) => LONE_FLAGS.get(token)).find((kind) => kind !== undefined)
 
-	return { kind: argv.length === 1 ? 'stop' : 'refused' }
+	if (lone === undefined) return parse_start(argv)
+
+	return { kind: argv.length === 1 ? lone : 'refused' }
 }
 
 const backlogrun_args = { parse }
 
-export type { BacklogrunArguments }
+export type { ArgumentsResult, BacklogrunArguments }
 export { backlogrun_args }

@@ -149,12 +149,10 @@ describe('init_logic_json_merge.merge_package_scripts', () => {
 		expect(init_logic_json_merge.merge_package_scripts(content, {})).toBe(content)
 	})
 
-	it('migrates jf- prefixed script values to josh prefix', () => {
-		const result = JSON.parse(
-			init_logic_json_merge.merge_package_scripts(`{"scripts":{"${SCRIPT_BUILD}":"jf-build"}}`, {}),
-		) as { scripts: Record<string, string> }
+	it('keeps a jf- prefixed script value as it is (joshuafolkken/kit#4187)', () => {
+		const content = `{"scripts":{"${SCRIPT_BUILD}":"jf-build"}}`
 
-		expect(result.scripts[SCRIPT_BUILD]).toBe('josh build')
+		expect(init_logic_json_merge.merge_package_scripts(content, {})).toBe(content)
 	})
 
 	it('preserves scripts key position when other keys precede it', () => {

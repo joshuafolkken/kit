@@ -2,10 +2,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
+import {
+	production_dependency_graph,
+	type Lockfile,
+} from '#tools/package/production-dependency-graph'
 import { execaSync } from 'execa'
 import { loadAll } from 'js-yaml'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { production_dependency_graph, type Lockfile } from './production-dependency-graph'
 
 const ROOT = process.cwd()
 const SCRATCH = mkdtempSync(path.join(os.tmpdir(), 'kit-optional-eslint-'))

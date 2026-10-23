@@ -1,7 +1,0 @@
-{
-	"reason": "New .claude/settings.json merge for josh sync (#3728): the merge module and the kit-hook predicate are new behavior with no existing code to replace; the review fix adds the six pre-#1930 hook commands and the withdrawn-permission list with their tests",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 128
-	}
-}

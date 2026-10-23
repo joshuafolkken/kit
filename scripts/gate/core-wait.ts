@@ -9,13 +9,15 @@ import type { MachineBudget } from './machine-capacity'
 // says it once on its own output; `run:board` draws every marker still waiting. Everything here is a
 // pure function of the ledger and the budget it is handed.
 
-const WAIT_REASONS = ['cores', 'memory', 'pressure'] as const
+const WAIT_REASONS = ['cores', 'cpu', 'memory', 'pressure'] as const
 
 type WaitReason = (typeof WAIT_REASONS)[number]
 
-// The one wording of each reason, shared by the waiting command's line and the board's.
+// The one wording of each reason, on the waiting command's own line; the board draws the reason as the
+// header's icon instead (joshuafolkken/kit#4052).
 const REASON_TEXT: Record<WaitReason, string> = {
 	cores: 'not enough free cores',
+	cpu: 'CPU saturated',
 	memory: 'not enough free memory',
 	pressure: 'memory under pressure',
 }
@@ -49,6 +51,18 @@ interface BudgetWait extends BudgetPlace {
 	reason: WaitReason
 }
 
+// A claim short of cores waits on the CPU when it would fit on what the ledger declares — the cores it
+// lacks are taken by busy load beyond the ledger (joshuafolkken/kit#4238) — and on the ledger otherwise.
+function core_reason(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+): WaitReason {
+	const declared = { cores: budget.cores + (budget.busy_excess ?? 0), memory_mb: Infinity }
+
+	return core_admission.is_admitted(key, reservations, declared) ? 'cpu' : 'cores'
+}
+
 // **The cores decide first**: a claim that would not fit even with unlimited memory waits for cores;
 // one that fits on cores waits for memory, named as pressure when the reading saw compression or swap.
 function wait_reason(
@@ -56,11 +70,29 @@ function wait_reason(
 	reservations: ReadonlyArray<LedgerEntry>,
 	budget: MachineBudget,
 ): WaitReason {
-	const cores_only = { cores: budget.cores, memory_mb: Infinity }
+	const cores_only = { ...budget, memory_mb: Infinity }
 
-	if (!core_admission.is_admitted(key, reservations, cores_only)) return 'cores'
+	if (!core_admission.is_admitted(key, reservations, cores_only)) {
+		return core_reason(key, reservations, budget)
+	}
 
 	return budget.memory_pressured === true ? 'pressure' : 'memory'
+}
+
+// Why a claim is not admitted yet, or `undefined` once it is: a unit claim the budget admits only too
+// narrow (`core_admission.is_too_narrow`) still waits, on the CPU — admitted, it fits what the ledger
+// declares, so only busy load beyond the ledger narrowed it (`core_reason`).
+function hold_reason(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+	granted: number | undefined,
+): WaitReason | undefined {
+	if (!core_admission.is_admitted(key, reservations, budget)) {
+		return wait_reason(key, reservations, budget)
+	}
+
+	return core_admission.is_too_narrow(key, reservations, granted) ? 'cpu' : undefined
 }
 
 // The line a waiting command prints once, when its wait starts.
@@ -118,8 +150,8 @@ function waits_of(
 }
 
 const core_wait = {
-	REASON_TEXT,
 	WAIT_REASONS,
+	hold_reason,
 	wait_line,
 	wait_reason,
 	waits_of,

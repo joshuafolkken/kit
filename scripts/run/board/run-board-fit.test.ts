@@ -11,8 +11,9 @@ import {
 
 // joshuafolkken/kit#3486: a live frame is kept within the terminal, so the header stays at the top;
 // every line is counted by the rows it takes on screen. joshuafolkken/kit#3505: what gives way, and in
-// which order — the footer, the legend, the finished rows, the notes, the rows not yet started, the
-// parked rows, the running rows — each stage from its oldest.
+// which order. joshuafolkken/kit#4099: from the frame's bottom up — the footer, the legend, the rows
+// under the notes, the notes, the thanks, then the rows above them: not yet started, parked, waiting
+// on a decision, running — each stage from its oldest.
 
 const { fit, height_of, whole } = run_board_fit
 const HEADER = ['state', 'clock']
@@ -86,64 +87,71 @@ describe('run_board_fit.fit', () => {
 	})
 })
 
-// One frame holding every stage: two finished, two parked and two running rows mixed in the active
-// section as they started, a wave of two not yet started, two notes past one already hidden, the
-// legend and the footer — 22 lines whole.
+// One frame holding every stage: two parked and two running rows mixed in the active section as they
+// started, two notes past one already hidden, then under them a wave of two not yet started and two
+// finished rows, the legend and the footer — 24 lines whole.
 const NOTES: NotesPart = { head: ['', '── 📝 ──'], lines: ['  new', '  old'], hidden: 1 }
 const ACTIVE = section([
 	issue(1, 'running', 30),
-	issue(2, 'finished', 20),
 	issue(3, 'parked', 10),
-	issue(4, 'finished', 10),
 	issue(5, 'running', 40),
 	issue(6, 'parked', 5),
 ])
 const WAVE = section([issue(7), issue(8)], ['', '── 1 ──'])
-const STAGED = parts_of([ACTIVE, WAVE], { notes: NOTES, footer: FOOTER })
+const ENDED = section([issue(2, 'finished', 20), issue(4, 'finished', 10)], ['', 'D'])
+const STAGED = parts_of([ACTIVE], { notes: NOTES, below: [WAVE, ENDED], footer: FOOTER })
 const KEPT_ACTIVE = ['', '  1', '  3', '  5', '  6']
+const KEPT_NOTES = [...NOTES.head, '  new', '  old', '  more 1']
 const KEPT_WAVE = ['', '── 1 ──', '  7', '  8']
 
 describe('run_board_fit.fit order', () => {
 	it('draws every part while the pane holds them', () => {
-		expect(fit_wide(STAGED, 22)).toStrictEqual(whole(STAGED))
-		expect(whole(STAGED)).toHaveLength(22)
+		expect(fit_wide(STAGED, 24)).toStrictEqual(whole(STAGED))
+		expect(whole(STAGED)).toHaveLength(24)
 	})
 
 	it.each([
-		['the footer first', 21, whole(STAGED).slice(0, -2)],
-		['then the legend', 19, whole(STAGED).slice(0, -4)],
+		['the footer first', 23, whole(STAGED).slice(0, -2)],
+		['then the legend', 21, whole(STAGED).slice(0, -4)],
 	])('gives way %s', (_, rows, lines) => {
 		expect(fit_wide(STAGED, rows)).toStrictEqual(lines)
 	})
 
-	it('cuts the finished rows next, the one that ended first before the other', () => {
-		const notes = [...NOTES.head, '  new', '  old', '  more 1']
+	it('cuts the finished rows under the notes next', () => {
+		const lines = [...HEADER, ...KEPT_ACTIVE, ...KEPT_NOTES, ...KEPT_WAVE, '  more 2']
 
-		expect(fit_wide(STAGED, 17)).toStrictEqual([
+		expect(fit_wide(STAGED, 19)).toStrictEqual(lines)
+	})
+
+	// joshuafolkken/kit#4099: a wave drawn under the notes gives way before them.
+	it('cuts the rows not yet started under the notes before any note, from the plan end', () => {
+		const wave = ['', '── 1 ──', '  7', '  more 3']
+
+		expect(fit_wide(STAGED, 16)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, ...KEPT_NOTES, ...wave])
+		expect(fit_wide(STAGED, 15)).toStrictEqual([
 			...HEADER,
 			...KEPT_ACTIVE,
-			...KEPT_WAVE,
-			'  more 2',
-			...notes,
+			'  more 4',
+			...KEPT_NOTES,
 		])
 	})
 
 	it('cuts the notes next, the oldest first, and the section with the last', () => {
-		const plan = [...HEADER, ...KEPT_ACTIVE, ...KEPT_WAVE, '  more 2']
+		const notes = [...NOTES.head, '  new', '  more 2']
 
-		expect(fit_wide(STAGED, 16)).toStrictEqual([...plan, ...NOTES.head, '  new', '  more 2'])
-		expect(fit_wide(STAGED, 15)).toStrictEqual(plan)
+		expect(fit_wide(STAGED, 12)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, '  more 4', ...notes])
+		expect(fit_wide(STAGED, 11)).toStrictEqual([...HEADER, ...KEPT_ACTIVE, '  more 4'])
+	})
+
+	it('leads the plan’s more with a blank when no section is left above the notes', () => {
+		const parts = parts_of([], { notes: NOTES, below: [WAVE] })
+
+		expect(fit_wide(parts, 9)).toStrictEqual([...HEADER, '', '  more 2', ...KEPT_NOTES])
 	})
 })
 
 describe('run_board_fit.fit order of the rows that stay longest', () => {
 	it.each([
-		[
-			'a row not yet started from the plan end',
-			11,
-			[...KEPT_ACTIVE, '', '── 1 ──', '  7', '  more 3'],
-		],
-		['the last row not yet started, and its rule', 10, [...KEPT_ACTIVE, '  more 4']],
 		['the oldest parked row', 7, ['', '  1', '  3', '  5', '  more 5']],
 		['the other parked row', 6, ['', '  1', '  5', '  more 6']],
 		['the running row that started first', 5, ['', '  5', '  more 7']],
@@ -153,19 +161,8 @@ describe('run_board_fit.fit order of the rows that stay longest', () => {
 	})
 })
 
-// joshuafolkken/kit#3815: the footer and the legend go first, the notes down to three before the
-// finished rows, the rest of the notes after them, then the thanks — before any row not yet started.
+// joshuafolkken/kit#3815: the thanks go after the notes, before any row not yet started.
 const THANKS = ['', '  🙏 fish']
-const FIVE_NOTES: NotesPart = {
-	head: ['', 'N'],
-	lines: ['  n1', '  n2', '  n3', '  n4', '  n5'],
-	hidden: 0,
-}
-const CROWDED = parts_of([section([issue(1, 'finished', 10), issue(2)])], {
-	notes: FIVE_NOTES,
-	thanks: THANKS,
-	footer: FOOTER,
-})
 
 describe('run_board_fit.fit thanks', () => {
 	it('drops the footer and the legend before the thanks, and draws them right above the legend', () => {
@@ -180,36 +177,78 @@ describe('run_board_fit.fit thanks', () => {
 	})
 })
 
-describe('run_board_fit.fit order of the notes', () => {
-	it.each([
-		[
-			'the oldest notes down to three, keeping the finished row',
-			13,
-			['', '  1', '  2'],
-			['  n1', '  n2', '  n3', '  more 2'],
-		],
-		[
-			'the finished row, then the next oldest note',
-			12,
-			['', '  2', '  more 1'],
-			['  n1', '  n2', '  more 3'],
-		],
-	])('cuts %s', (_, rows, plan, notes) => {
-		expect(fit_wide(CROWDED, rows)).toStrictEqual([
-			...HEADER,
-			...plan,
-			'',
-			'N',
-			...notes,
-			...THANKS,
-		])
+// joshuafolkken/kit#4099: the parts give way from the frame's bottom up — a running, a decision, a
+// parked and a not-yet-started row above three notes, a 🔗 waiting and a finished row under them, the
+// thanks, the legend and the footer — 24 lines whole.
+const CROWDED_PLAN = section([
+	issue(1, 'running', 5),
+	issue(2, 'decision', 10),
+	issue(3, 'parked', 10),
+	issue(4),
+])
+const WAITING = section([issue(6, 'waiting', 20)], ['', 'W'])
+const FINISHED = section([issue(5, 'finished', 10)], ['', 'D'])
+const THREE_NOTES: NotesPart = { head: ['', 'N'], lines: ['  n1', '  n2', '  n3'], hidden: 0 }
+const CROWDED = parts_of([CROWDED_PLAN], {
+	notes: THREE_NOTES,
+	below: [WAITING, FINISHED],
+	thanks: THANKS,
+	footer: FOOTER,
+})
+const CROWDED_ROWS = [...HEADER, '', '  1', '  2', '  3', '  4']
+
+describe('run_board_fit.fit order from the bottom up', () => {
+	it('cuts the finished and the 🔗 waiting rows under the notes before any note', () => {
+		const notes = ['', 'N', '  n1', '  n2', '  n3']
+		const waiting = ['', 'W', '  6', '  more 1']
+
+		expect(whole(CROWDED)).toHaveLength(24)
+		expect(fit_wide(CROWDED, 18)).toStrictEqual([...CROWDED_ROWS, ...notes, ...waiting, ...THANKS])
+		expect(fit_wide(CROWDED, 15)).toStrictEqual([...CROWDED_ROWS, '  more 2', ...notes, ...THANKS])
 	})
 
-	it('cuts the rest of the notes before the thanks, and the thanks before a row not yet started', () => {
-		const plan = [...HEADER, '', '  2', '  more 1']
+	it('cuts the notes oldest first, the plan’s more staying above them, before the thanks', () => {
+		const plan = [...CROWDED_ROWS, '  more 2']
 
-		expect(fit_wide(CROWDED, 7)).toStrictEqual([...plan, ...THANKS])
-		expect(fit_wide(CROWDED, 6)).toStrictEqual(plan)
+		expect(fit_wide(CROWDED, 14)).toStrictEqual([...plan, '', 'N', '  n1', '  more 2', ...THANKS])
+		expect(fit_wide(CROWDED, 13)).toStrictEqual([...plan, ...THANKS])
+		expect(fit_wide(CROWDED, 8)).toStrictEqual(plan)
+	})
+
+	it.each([
+		['a row not yet started', 7, ['', '  1', '  2', '  3', '  more 3']],
+		['then the parked row', 6, ['', '  1', '  2', '  more 4']],
+		['then the row waiting on a decision, before the running row', 5, ['', '  1', '  more 5']],
+		['the running row last', 4, ['', '  more 6']],
+	])('after the thanks cuts %s', (_, rows, plan) => {
+		expect(fit_wide(CROWDED, rows)).toStrictEqual([...HEADER, ...plan])
+	})
+})
+
+// joshuafolkken/kit#4042: a folding section counts its own cut rows on its last line, not on the plan's
+// `more N`, until its last row is cut and it goes.
+const DONE_HEAD = ['', '── done ──']
+const DONE = {
+	...section(
+		[issue(2, 'finished', 30), issue(3, 'finished', 20), issue(4, 'finished', 10)],
+		DONE_HEAD,
+	),
+	fold: (cut: ReadonlyArray<PlanLine>): string => `  folded ${String(cut.length)}`,
+}
+const FOLDING = parts_of([section([issue(1, 'running', 5)]), DONE])
+const RUNNING = [...HEADER, '', '  1']
+
+describe('run_board_fit.fit folding section', () => {
+	it('draws every row and no fold line while the pane holds them', () => {
+		expect(fit_wide(FOLDING, 9)).toStrictEqual([...RUNNING, ...DONE_HEAD, '  2', '  3', '  4'])
+	})
+
+	it('folds the oldest rows into its own count, keeping its heading', () => {
+		expect(fit_wide(FOLDING, 8)).toStrictEqual([...RUNNING, ...DONE_HEAD, '  2', '  folded 2'])
+	})
+
+	it('goes with its last row, the plan’s more counting every row it held', () => {
+		expect(fit_wide(FOLDING, 7)).toStrictEqual([...RUNNING, '  more 3'])
 	})
 })
 

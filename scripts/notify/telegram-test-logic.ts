@@ -28,7 +28,6 @@ const VALID_TASK_TYPES: ReadonlyArray<TelegramTaskType> = [
 	'warning',
 	'kickoff_retry',
 	'confirmation',
-	'stalled',
 ]
 
 const DEFAULT_TASK_TYPE: TelegramTaskType = 'planning'

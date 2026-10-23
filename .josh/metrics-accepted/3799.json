@@ -1,7 +1,0 @@
-{
-	"reason": "#3799: process-tools.ts is the single refusal for a missing ps/pgrep, shared by lane-reap and lane-await instead of their silent empty answer",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

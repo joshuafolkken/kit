@@ -1,10 +1,6 @@
 # `josh epic:*` commands — rationale
 
-This is maintainer-only rationale behind `.claude/skills/epic-commands/SKILL.md`: the history and the
-measurements that justify `epic:audit`, cross-repository epics and `epic:bundle`. It is never read
-during a run — every trigger, command, verdict and bound an agent acts on stays in the skill, and a
-change to this file changes no rule. It used to live, in Japanese, in the three epic topic files
-under `prompts/collaboration-workflow/`, which now point at the skill (joshuafolkken/kit#2892).
+Rationale behind `.claude/skills/epic-commands/SKILL.md`.
 
 ## `epic:audit` — why the children are read across
 
@@ -111,8 +107,11 @@ steps with the body template (joshuafolkken/kit#3178).
 
 **Why every split gets an epic.** Kept as a comment on the first child, the split rationale ends up
 inside the issue a batch merges and closes first, burying the plan for the rest. An earlier caveat
-("with few children, the epic costs more than it organizes") lost its ground once `followup` began
-auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`): with no abandoned
+("with few children, the epic costs more than it organizes") lost its ground once josh began
+auto-closing an epic whose children are all closed (`scripts/epic/epic-close.ts`, run by `followup`
+after its merge, `issue:measured` after its close and `run:merge` for every merged child; an epic
+whose last child a person closed — an `already-done` child — closes at the next of those closes,
+for any child, unless a person reopened it): with no abandoned
 epic left to manage, the only risk is misjudging the branch. A `closes #<epic>` in the last PR was
 rejected because it also fires when a batch fails midway.
 
@@ -138,7 +137,7 @@ backlogrun #<E> --only
 ```
 
 - `Progress` is a task list because GitHub ticks only that notation when the child closes; it never
-  closes the epic itself, which is `followup`'s job (and why the `epic` label and the task list are both
+  closes the epic itself, which is josh's job on every child close (and why the `epic` label and the task list are both
   required — either missing leaves the epic open).
 - `Dependencies` is an arrow chain (`->` or `→`) because `followup`'s missing-relation warning fires
   only on that notation. Order-free batches write `None — the children are independent; any execution

@@ -153,8 +153,17 @@ function read_recorded_reasons(body: string | undefined): string {
 	].join('\n')
 }
 
+// Whether `## Decisions` already carries this record, compared as `append_decision` writes it — so a
+// rerun of `epic --decide` after a partial failure appends nothing a second time.
+function has_decision(body: string | undefined, record: string): boolean {
+	if (body === undefined) return false
+
+	return read_section(body, DECISIONS_HEADING_PATTERN).includes(record.trimEnd())
+}
+
 const epic_decision = {
 	append_decision,
+	has_decision,
 	append_replacements,
 	read_recorded_reasons,
 	find_decision_error,

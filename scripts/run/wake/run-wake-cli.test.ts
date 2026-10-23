@@ -355,6 +355,7 @@ describe('josh run:wake — which stops reach a person', () => {
 	it('stays silent where nothing went wrong', () => {
 		expect(run_wake_cli.stop_body('ended')).toBeUndefined()
 		expect(run_wake_cli.stop_body('stopped')).toBeUndefined()
+		expect(run_wake_cli.stop_body('reload')).toBeUndefined()
 	})
 })
 

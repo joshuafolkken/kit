@@ -1,3 +1,6 @@
+import { figure_format } from '#scripts/lib/figure-format'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+
 // The column and number formatting every timing report is laid out through.
 //
 // It was `time-report.ts`'s until three renderers shared it: the run scope's own tables, the epic
@@ -12,13 +15,9 @@
 // imports either of them. **The words two blocks must spell identically are the exception**, and they
 // are here for the reason `NO_CALLS` is: a label printed by two renderers, one of which cannot import
 // the other, has to be written once or the two reports come to disagree about what a row is called.
+// The figures themselves are `figure_format`'s, shared with the cost reports.
 
-const MS_PER_MINUTE = 60_000
-const MS_PER_SECOND = 1000
-const MINUTE_DECIMALS = 1
 const SECOND_DECIMALS = 1
-const PERCENT_SCALE = 100
-const PERCENT_DECIMALS = 1
 const LABEL_WIDTH = 24
 // Wide enough for a three-digit run (`335.4 min`), so a long session's rows stay in column with a
 // short one's rather than pushing the share out by a character.
@@ -53,30 +52,10 @@ function overflow_line(row_count: number): Array<string> {
 	]
 }
 
-function format_minutes(duration_ms: number): string {
-	return `${(duration_ms / MS_PER_MINUTE).toFixed(MINUTE_DECIMALS)} min`
-}
-
 // Seconds rather than minutes for a per-turn figure: one turn is tens of seconds, and `0.1 min` is
 // too coarse to show the rise across a batch that this scale exists to make visible.
 function format_seconds(duration_ms: number): string {
 	return `${(duration_ms / MS_PER_SECOND).toFixed(SECOND_DECIMALS)} s`
-}
-
-function format_share(part: number, whole: number): string {
-	if (whole === 0) return 'n/a'
-
-	return `${((part / whole) * PERCENT_SCALE).toFixed(PERCENT_DECIMALS)}%`
-}
-
-// A dollar figure, to the caller's own precision. Two cost blocks print money now — the phase costs
-// and the per-subagent context-construction costs — and each rounds to a different place (a run total
-// to the cent, a per-round-trip figure finer), so the decimals are the caller's and only the `$` and
-// the `toFixed` are shared. It sits here beside the other number formatters rather than in one block,
-// for the reason `format_minutes` does: a second copy beside the second renderer is how two cost rows
-// of one report come to punctuate a dollar amount two ways.
-function usd(amount: number, decimals: number): string {
-	return `$${amount.toFixed(decimals)}`
 }
 
 // The one place the three columns are laid out, so a row carrying words instead of a duration lines
@@ -86,7 +65,7 @@ function format_columns(label: string, minutes: string, suffix: string): string 
 }
 
 function format_row(label: string, duration_ms: number, suffix: string): string {
-	return format_columns(label, format_minutes(duration_ms), suffix)
+	return format_columns(label, figure_format.format_minutes(duration_ms), suffix)
 }
 
 // **A share nobody read says so rather than totalling zero.** The duration column is left empty
@@ -101,8 +80,6 @@ const time_format = {
 	NO_CALLS,
 	overflow_line,
 	format_seconds,
-	format_share,
-	usd,
 	format_columns,
 	format_row,
 	// `format_clock` stays private: `format_window` is its only caller, and a namespace that offers

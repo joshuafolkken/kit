@@ -2,11 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { lane_split_park } from './lane-split-park'
-import { rule_delivery, SWITCH_ENV_KEY } from './rule-guard'
 
 // joshuafolkken/kit#3296: the lane child for #3255 promoted its Issue to an epic mid-run, then applied
 // `needs-decision` to that epic and sent a `confirmation` Telegram. This suite pins the refusal of both
@@ -53,7 +52,7 @@ function payload_of(name: string, command: string, tail: string): string {
 }
 
 beforeEach(() => {
-	process.env[SWITCH_ENV_KEY] = ''
+	process.env[delivered_rules.SWITCH_ENV_KEY] = ''
 	Reflect.deleteProperty(process.env, lane_child_marker.KEY)
 	process.chdir(WORK_DIRECTORY)
 })
@@ -88,7 +87,7 @@ describe('promoted_issues', () => {
 	})
 })
 
-describe('rule_delivery — a lane child that promoted its own issue', () => {
+describe('delivered_rules.delivery — a lane child that promoted its own issue', () => {
 	beforeEach(() => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
@@ -99,43 +98,46 @@ describe('rule_delivery — a lane child that promoted its own issue', () => {
 	it.each([
 		['the REST label write onto the epic', EPIC_LABEL_COMMAND],
 		['the gh issue edit label write onto the epic', EDIT_LABEL_COMMAND],
+		['the josh run:park onto the epic', `pnpm josh run:park ${ISSUE} --body-file /tmp/park.md`],
 		['the confirmation notify about the epic', NOTIFY_COMMAND],
 	])('refuses %s on every reissue', (name, command) => {
 		const payload = payload_of(`split-${name}`, command, PROMOTE_LINE)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(REASON)
-		expect(rule_delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(REASON)
+		expect(delivered_rules.delivery(payload, A_LATER_CALL_MS)).toBe(REASON)
 	})
 
 	// The leftover child is the one issue the procedure does park after a split.
 	it('leaves a label write onto another issue alone', () => {
 		const payload = payload_of('split-child-label', CHILD_LABEL_COMMAND, PROMOTE_LINE)
 
-		expect(rule_delivery(payload, NOW_MS)).not.toBe(REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).not.toBe(REASON)
 	})
 
 	it('leaves the notify about the leftover child to lane-park', () => {
 		const payload = payload_of('split-child-notify', CHILD_NOTIFY_COMMAND, PROMOTE_LINE)
 
-		expect(rule_delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.LANE_PARK_REASON)
 	})
 
 	it.each([
 		['the label write', EPIC_LABEL_COMMAND],
 		['the notify', NOTIFY_COMMAND],
 	])('says nothing about %s when the run promoted nothing', (name, command) => {
-		expect(rule_delivery(payload_of(`no-split-${name}`, command, ''), NOW_MS)).not.toBe(REASON)
+		expect(delivered_rules.delivery(payload_of(`no-split-${name}`, command, ''), NOW_MS)).not.toBe(
+			REASON,
+		)
 	})
 })
 
-describe('rule_delivery — a person working in a lane', () => {
+describe('delivered_rules.delivery — a person working in a lane', () => {
 	it('says nothing without the dispatch mark', () => {
 		mkdirSync(LANE_DIRECTORY, { recursive: true })
 		process.chdir(LANE_DIRECTORY)
 
 		const payload = payload_of('person', EPIC_LABEL_COMMAND, PROMOTE_LINE)
 
-		expect(rule_delivery(payload, NOW_MS)).toBeUndefined()
+		expect(delivered_rules.delivery(payload, NOW_MS)).toBeUndefined()
 	})
 })
 

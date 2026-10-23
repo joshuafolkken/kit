@@ -9,7 +9,6 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_reuse, type CheckRecords } from './check-reuse'
-import { free_cores } from './free-cores'
 import { gate_ledger, type GateLedgerStart } from './gate-ledger'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_report, type GateStepResult } from './gate-report'
@@ -165,21 +164,19 @@ async function run_marked_gate<T>(
 // The concurrent-run count is read here rather than inside `gate-plan.ts` for the reason the core
 // count already is: that module stays a pure function of its inputs, and the machine is asked once and
 // handed to both calls. Counted *before* the unit step writes its own marker, so `+ 1` is this gate.
-// `free` bounds the unit cap the run count produced (`gate_plan.bound_by_free`).
-function announce_gate_plan(
-	is_unit_included: boolean,
-	available_cores: number,
-	free: number | undefined,
-): GatePlan {
+//
+// **The free cores do not cap the plan** (joshuafolkken/kit#4167). The unit claim's admission narrows it
+// to the room the outside load leaves, read over its wait rather than once at the gate's start — a
+// width fixed off one busy instant held for the whole suite (`core_admission.is_too_narrow`).
+function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
-	const resolved = gate_plan.resolve_gate_plan(
+	const plan = gate_plan.resolve_gate_plan(
 		available_cores,
 		concurrent_runs,
 		is_unit_included,
 		is_kit_repository,
 	)
-	const plan = gate_plan.bound_by_free(resolved, available_cores, free)
 
 	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores, concurrent_runs)}\n`)
 
@@ -217,10 +214,6 @@ interface GateOptions {
 	// Where each check's own green record lives (`check-reuse.ts`). Only the CLI entry resolves it, for
 	// the ledger's reason: a suite whose checks never ran must not record them green on the live tree.
 	check_records?: CheckRecords | undefined
-	// The cores free of load from outside the core budget's ledger (`free-cores.ts`). Only the CLI entry
-	// resolves it, for the ledger's reason: a suite driving the gate never reads the machine, so its plan
-	// does not depend on what else happened to be running.
-	read_free_cores?: ((available_cores: number) => Promise<number | undefined>) | undefined
 }
 
 // **Per-check records belong to the full local gate alone**: CI's `--no-unit` gate is the safety net
@@ -325,9 +318,7 @@ async function run_checked_gate(
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing.
 	const budget = gate_run_steps.default_budget()
-	// Read before the count for the ledger's reason: the reading waits out a sample window.
-	const free = await options.read_free_cores?.(budget.available_cores)
-	const plan = announce_gate_plan(is_unit_included, budget.available_cores, free)
+	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
 	const reused = await checks_to_reuse(plan, tree, options)
 
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
@@ -353,17 +344,30 @@ function reusable_stamp(tree: GateTree, options: GateOptions): FileMapStamp | un
 	return gate_skip.reusable_green_gate(tree.files, tree.base, options.stamp_path)
 }
 
+// The reuse leaves its line in the ledger too, so `josh lane:stats` counts the gates it saved
+// (joshuafolkken/kit#4397).
+async function reuse_gate(
+	stamp: FileMapStamp,
+	options: GateOptions,
+	started_at: number,
+): Promise<number> {
+	process.stdout.write(`${gate_skip.format_skip(stamp.taken_at)}\n`)
+	await gate_ledger.record_reused(options.ledger_path, performance.now() - started_at)
+
+	return 0
+}
+
 // The two ways a gate ends before it runs a check: a green record it can reuse (exit 0), and the
 // scoped pre-check refusing a tree the pair has not been green on (exit 1). `undefined` means neither
 // fired and the checks run. **Nothing else stands between the skip and the checks.**
-function short_circuit_gate(tree: GateTree, options: GateOptions): number | undefined {
+async function short_circuit_gate(
+	tree: GateTree,
+	options: GateOptions,
+	started_at: number,
+): Promise<number | undefined> {
 	const reusable = reusable_stamp(tree, options)
 
-	if (reusable !== undefined) {
-		process.stdout.write(`${gate_skip.format_skip(reusable.taken_at)}\n`)
-
-		return 0
-	}
+	if (reusable !== undefined) return await reuse_gate(reusable, options, started_at)
 
 	const scoped_refusal = scoped_precheck_refusal(tree, options)
 
@@ -379,7 +383,7 @@ async function run_verification_gate(options: GateOptions = {}): Promise<number>
 	// four checks alone took — the gate's own bookkeeping is part of the wait either way.
 	const started_at = performance.now()
 	const tree = await gate_tree.read_gate_tree()
-	const short_circuit = short_circuit_gate(tree, options)
+	const short_circuit = await short_circuit_gate(tree, options, started_at)
 
 	if (short_circuit !== undefined) return short_circuit
 
@@ -438,7 +442,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
 		ledger_path: await lane_ledger.target(),
 		check_records: check_reuse.DEFAULT_RECORDS,
-		read_free_cores: async (available_cores) => await free_cores.read({ available_cores }),
 	})
 }
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +21,6 @@ import { entry_read_set } from './entry-read-set'
 // renamed would otherwise print nothing and read as a section with nothing in it — the one outcome
 // that is worse than reading the whole file.
 
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const FILE_ARGUMENT = 0
 const HEADING_ARGUMENT = 1
@@ -101,12 +99,6 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 	return markdown === undefined ? FAILURE_EXIT_CODE : print_section(markdown, heading, root)
 }
 
-function main(argv: ReadonlyArray<string>): void {
-	process.exitCode = run(argv)
-}
-
 const document_section_cli = { FAILURE_EXIT_CODE, USAGE, resolve_document, run }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))
 
 export { document_section_cli }

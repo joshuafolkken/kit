@@ -1,7 +1,0 @@
-{
-	"reason": "#3682 adds five 5.5-generation price rows, a per-model cache-read multiplier and Haiku 5.5's per-request prompt-length band to the price table; the growth is the new price data and the billed-model resolution, with no existing logic duplicated",
-	"date": "2026-10-11",
-	"growth": {
-		"scripts.code_lines": 35
-	}
-}

@@ -1,4 +1,6 @@
+import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { backlog_offer_exclude } from './backlog-offer-exclude'
 
 const ISSUE_IN_EVENT = /#([1-9]\d*)\b/u
 const SETTLED_KINDS: ReadonlySet<string> = new Set([
@@ -46,14 +48,33 @@ function settled_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
 	)
 }
 
+function issues_of_kind(events: ReadonlyArray<RunEvent>, kind: string): ReadonlyArray<string> {
+	return events
+		.filter((event) => event.kind === kind)
+		.map((event) => issue_of(event))
+		.filter((issue) => issue !== undefined)
+}
+
+// The issues a person withdrew from this run and nobody launched again: the withdrawal leaves the issue
+// open for the next run, so this one keeps it out of the offer (joshuafolkken/kit#4365).
+function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
+	const named = issues_of_kind(events, run_event_stream.EVENT_KIND.WITHDRAW)
+
+	return named.filter((issue) => run_event_scope.is_withdrawn(events, issue))
+}
+
+// The offer's exclusion as the stream records it: the merged and withdrawn children and the ones still
+// in flight — the list the drive keeps in memory, read by a reader that has only the stream
+// (joshuafolkken/kit#4349).
+function offer_exclude(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
+	const merged = issues_of_kind(events, run_event_stream.EVENT_KIND.MERGE)
+	const settled = [...merged, ...withdrawn_issues(events)]
+
+	return backlog_offer_exclude.exclude_of(settled, active_issues(events))
+}
+
 function parked_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
-	return new Set(
-		events
-			.filter((event) => event.kind === run_event_stream.EVENT_KIND.PARK)
-			.map((event) => issue_of(event))
-			.filter((issue) => issue !== undefined)
-			.map(Number),
-	)
+	return new Set(issues_of_kind(events, run_event_stream.EVENT_KIND.PARK).map(Number))
 }
 
 // The issues this invocation launched or settled — any other dispatched lane was carried in from an
@@ -87,7 +108,9 @@ function restore(
 export const backlog_drive_restore = {
 	active_issues,
 	mentioned_issues,
+	offer_exclude,
 	restore,
+	withdrawn_issues,
 	settled_issues,
 	parked_issues,
 }

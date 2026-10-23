@@ -271,7 +271,7 @@ function closed_action(input: StepInput): StepAction {
 
 	return {
 		kind: 'decide',
-		line: `decide: ${session_cite.issue(input.issue_number)} is closed but this tree holds uncommitted work — keep it with \`git stash push -u -m "${message}"\` | carry it into a new issue`,
+		line: `decide: ${session_cite.issue(input.issue_number)} is closed but this tree holds uncommitted work — keep it with \`pnpm josh stash:push "${message}"\` | carry it into a new issue`,
 	}
 }
 

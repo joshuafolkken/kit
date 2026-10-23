@@ -11,6 +11,11 @@ const DETAILS_TAIL_LENGTH = 2048
 const TRUNCATION_MARK = '... '
 // The prefix `backlog-drive-cli.ts` gives the exception it catches.
 const ERROR_PREFIX = 'error '
+// **The driver is bounded so the supervisor reaches its pass boundary between dispatches**
+// (joshuafolkken/kit#4509): unbounded, `backlog:drive` dispatches, collects and merges lanes in its own
+// loop until a judgment hand-off, and the code check at the pass boundary would wait for that.
+const WINDOW_MINUTES = '5'
+const WINDOW_VERDICT = 'window'
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 	const rebuilt = run_invocation.rebuild(invocation)
@@ -21,6 +26,8 @@ function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 		'backlog:drive',
 		'--owner',
 		String(process.pid),
+		'--window',
+		WINDOW_MINUTES,
 		...rebuilt.split(' ').slice(1 + named_count),
 	]
 }
@@ -141,11 +148,11 @@ function claim_record(target: string, invocation: string): boolean {
 }
 
 // **A verdict with nothing to judge is re-driven here, never handed to a session.** A woken session
-// met with `window`, `merge busy` or `merge retry` could only cut and hand the loop back for the same
-// driver to run again — a model round trip, at a cache write each, that decides nothing. The record
-// is already this process's, so the rerun needs no fresh claim; the limit keeps a driver that never
-// settles from holding the supervisor past its own checks.
-const RERUN_VERDICTS: ReadonlyArray<string> = ['window', 'merge busy', 'merge retry']
+// met with `merge busy` or `merge retry` could only cut and hand the loop back for the same driver to
+// run again — a model round trip, at a cache write each, that decides nothing. The record is already
+// this process's, so the rerun needs no fresh claim; the limit keeps a driver that never settles from
+// holding the supervisor past its own checks.
+const RERUN_VERDICTS: ReadonlyArray<string> = ['merge busy', 'merge retry']
 const RERUN_LIMIT = 10
 const RERUN_PAUSE_MS = 60_000
 
@@ -157,18 +164,21 @@ async function pause(ms: number): Promise<void> {
 	})
 }
 
-function is_mechanical(result: JoshResult): boolean {
+function is_verdict(result: JoshResult, entries: ReadonlyArray<string>): boolean {
 	const verdict = result.out.split('\n', 1)[FIRST_LINE] ?? ''
 
 	return (
 		result.code === SUCCESS &&
-		RERUN_VERDICTS.some((entry) => verdict === entry || verdict.startsWith(`${entry} `))
+		entries.some((entry) => verdict === entry || verdict.startsWith(`${entry} `))
 	)
 }
 
 // A record that was removed during the pause answers `undefined`: its stale verdict must not reach a
 // session, so the supervisor's own next pass re-reads the record and ends the run as `ended` or
 // `stopped`; a rerun would only fail on it and report the run as `failed`.
+//
+// **A spent window answers `undefined` too**, so the supervisor's next pass checks its code before it
+// drives again; the restarted driver adopts the lanes still in flight.
 async function run_driver(
 	target: string,
 	args: ReadonlyArray<string>,
@@ -176,7 +186,8 @@ async function run_driver(
 	remaining: number,
 ): Promise<JoshResult | undefined> {
 	const result = await josh_command.josh_run(args, true)
-	if (remaining === 0 || !is_mechanical(result)) return result
+	if (is_verdict(result, [WINDOW_VERDICT])) return undefined
+	if (remaining === 0 || !is_verdict(result, RERUN_VERDICTS)) return result
 
 	await wait(RERUN_PAUSE_MS)
 	if (run_carry.read_carry(target).kind !== 'carried') return undefined

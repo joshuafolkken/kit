@@ -1,10 +1,10 @@
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { PACK_HOOK_FILE } from '#scripts/safe-chain/pack-hook'
 import { PROJECT_CONFIG_FILE } from '#scripts/safe-chain/project-config'
 import { managed_config_scope } from '#scripts/sync/managed-config-scope'
 import { BASIC_PRETTIER_CONFIG } from './init-actions'
 import { CLAUDE_MD_FILENAME } from './init-ai-copy'
 
-const MANIFEST_FILE = 'package.json'
 const LOCKFILE = 'pnpm-lock.yaml'
 
 // The paths `josh init` writes beyond what `managed_config_scope` enumerates. They stay out of that
@@ -15,7 +15,7 @@ const SETUP_ONLY_PATHS: ReadonlySet<string> = new Set([
 	BASIC_PRETTIER_CONFIG,
 	PROJECT_CONFIG_FILE,
 	PACK_HOOK_FILE,
-	MANIFEST_FILE,
+	PACKAGE_JSON,
 	LOCKFILE,
 ])
 

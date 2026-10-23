@@ -33,7 +33,9 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const RECORDS = gate_test_fixture.suite_records('check-reuse')
 const scratch = mkdtempSync(path.join(tmpdir(), 'verification-gate-check-reuse-test-'))
 const TREE: GateTree = { files: { [path.join('scripts', 'a.ts')]: 'digest-a' }, base: 'base-a' }
-const SCOPED_CHECKS = 3
+// lint, the type check, exports, metrics and — through the test-read map — the unit step
+// (joshuafolkken/kit#4314).
+const SCOPED_CHECKS = 5
 
 function check_records(): CheckRecords {
 	const directory = mkdtempSync(path.join(scratch, 'checks-'))
@@ -80,7 +82,7 @@ afterAll(() => {
 })
 
 describe('run_verification_gate — the per-check records', () => {
-	it('reuses lint, the type check and exports on the next gate over the same inputs', async () => {
+	it('reuses every scoped check, the unit step included, on the next gate over the same inputs', async () => {
 		const options = { check_records: check_records() }
 		const first = await processes_started(options)
 

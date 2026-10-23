@@ -1,9 +1,6 @@
 # Working-tree hold — rationale
 
-This is maintainer-only rationale behind `.claude/skills/workflow-commands/working-tree-hold.md`: why
-the hold is keyed to the working tree and where its resumes came from. It is never read during a run —
-every command, answer and stop an agent acts on stays in the procedure document, and a change to this
-file changes no rule.
+Rationale behind `.claude/skills/workflow-commands/working-tree-hold.md`.
 
 ## Where each rule came from
 

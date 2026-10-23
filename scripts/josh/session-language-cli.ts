@@ -1,8 +1,5 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import { josh_environment_file } from './josh-environment-file'
 import { session_language, type Resolution } from './session-language'
 
 // `josh session:lang` — say, on stdout, which language this session writes in, so a
@@ -43,7 +40,8 @@ const LIVE_PORTS: LivePorts = {
 	is_running: backlogrun_launch.is_running,
 }
 
-// The file load happens in `main`, on the command path only; the resolver reads the environment.
+// The file load happens in `session-language-main.ts`, on the command path only; the resolver reads
+// the environment.
 // The line carries the value alone: what the language covers is `CLAUDE.md` → "Output language",
 // already in context every turn, so repeating it here only spent context on each prompt. The default
 // prints nothing — that resident line already names `ja`.
@@ -68,8 +66,7 @@ function prompt_lines(resolution: Resolution, is_live: boolean): Array<string> {
 	return [format_line(resolution), is_live ? BOARD_LINE : ''].filter((line) => line !== '')
 }
 
-async function main(): Promise<void> {
-	josh_environment_file.load_environment_file()
+async function print_prompt_lines(): Promise<void> {
 	const lines = prompt_lines(resolve_session_lang(), await is_run_live())
 
 	for (const line of lines) console.info(line)
@@ -81,11 +78,10 @@ const session_language_cli = {
 	ENV_KEY,
 	format_line,
 	is_run_live,
+	print_prompt_lines,
 	prompt_lines,
 	resolve_session_lang,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
 
 export type { LivePorts }
 export { session_language_cli }

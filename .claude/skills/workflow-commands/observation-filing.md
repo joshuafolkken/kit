@@ -23,12 +23,13 @@ report. Drop an observation nobody would act on.
 `pnpm josh run:event --append note "#<N> <text>"`, shown by `pnpm josh run:board`
 (`docs/josh-commands-run.md` → "`josh run:board`").
 
-**The filing ceilings still apply.** Count it in the run's ten-Issue limit; above the target
+**The filing ceilings still apply.** It counts toward the per-run cap (`prerequisite.md`); above the target
 repository's WIP cap, close one first or do not file (`prompts/collaboration-workflow/wip-cap.md`).
 File with `pnpm josh issue:file` (`issue-scout.md`): it lints the body, applies the classification
 labels, scans for duplicates and runs `epic:bundle` (an `auto-ok` epic adds it to the backlog pool —
 `backlogrun-steps.md` → "What one invocation approves"). On the second filing of the run it asks the fold
 question and holds a `fold` (`split-assessment.md` → "The same two questions decide the filing-time fold").
+A bug filing's origin line: `prompts/collaboration-workflow/issue-template.md` (`- 原因:`).
 
 ### The depth test — a discretionary filing cites the product work it blocked
 
@@ -40,24 +41,7 @@ question and holds a `fold` (`split-assessment.md` → "The same two questions d
 | **1** | The run orchestration that executes an Issue | `fullrun` / `backlogrun`, lanes, the `epic:*` commands, the filing routes themselves |
 | **2** | What measures a run | `josh cost` and the run-timing report |
 
-**The depth is recorded on the Issue as a label, and the label is applied when the Issue is filed.**
-`depth:0` / `depth:1` / `depth:2` are defined in `scripts/issue/issue-labels.ts` with no definition of
-their own — **the table above is the single source**. **Every filing route applies one**: each route
-of `prerequisite.md`'s table, a split child and a review branch-2 filing pass `--depth <n>` to
-`pnpm josh issue:file`, beside any `--route`.
-
-```bash
-pnpm josh issue:file "<title>" --body-file <body-file> --depth 1
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=depth:1'   # an Issue already filed
-```
-
-`issue:file` creates any missing workflow label from `DEPTH_LABELS` before the create call.
-
-- **It is read off the subject, exactly as the table is** — not a judgement, unlike `auto-ok` and
-  `needs-human-review`; it withholds nothing.
-- **Applied at filing, not at completion.**
-- **An Issue carrying more than one counts as the lowest depth present.**
-- **An `epic` takes no depth label** and is excluded from the share's denominator.
+**The depth is read, not recorded** — no label carries it.
 
 - **A discretionary observation at depth 1 or deeper is filed only where it can cite the depth-0 work
   it stopped or delayed** — an Issue number or a run, never "this would slow runs down". **Cannot cite
@@ -80,22 +64,6 @@ to branch 2 of `prompts/review.md` → "Review round cap" is filed under that se
 to decide something, or the path of the rule that reads it. **A measurement with no reader is not
 added.** `route:tier-a` and `route:interrupt` carry over unchanged.
 
-### The depth-0 share — what is counted
-
-**The depth-0 share is the share of open Issues at depth 0.**
-
-**The denominator is a rule, not a choice, and this is it:**
-
-- **Counted: every open Issue that does not carry `epic`.**
-- **`route:tier-a` and `route:interrupt` are counted like anything else.**
-- **An Issue with no depth label is in the denominator**, counted separately as `unlabelled`.
-- **The numerator is what is left**: open, non-epic Issues carrying `depth:0`.
-
-**Two readings of the same backlog give the same number.**
-
-**What the number is for is not decided here** — no `backlog:next` change and no target value until it
-has been measured the same way more than once.
-
 ### A delegated child does not take this route
 
 **A delegated child files `route:tier-a` and `route:interrupt` only.** Its discretionary observations
@@ -104,6 +72,6 @@ summary carries, and how long it may be"); the parent files what survives the de
 run's ceiling.
 
 **A delegated child does not append to the ledger either — the parent collapses the duplicates and
-appends what is left.** **The 10-per-run ceiling for this route is the parent's to count.** **Lines
+appends what is left.** **Lines
 its own `review:record` and `measure:rerun` write are not this route** — they go to its issue's file in
 its lane (`observation-ledger.md` → "The ledger — where an observation that cannot cite a blockage goes").

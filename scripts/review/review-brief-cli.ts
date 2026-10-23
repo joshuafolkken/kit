@@ -1,4 +1,3 @@
-#!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -8,21 +7,26 @@ import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { find_package_directory } from '#scripts/josh/josh-logic'
 import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
 import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
+import { review_interaction } from './review-interaction'
 import { review_level, type ReviewLevel } from './review-level'
+import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
+import { review_untouched_readers, type ReadersRead } from './review-untouched-readers'
 
 // `josh review:brief` — print the whole `/code-review` invocation, not just the level.
 //
@@ -33,8 +37,8 @@ import { review_tree } from './review-tree'
 // so "still running" is the usual answer at this point), how this project runs its unit tests, and —
 // on round 2 — which files the first round's fixes touched.
 
-const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh review:brief [--round <1|2>] | --level-only [--staged] [--json]'
+const USAGE =
+	'Usage: josh review:brief [--round <1|2>] | --interaction | --level-only [--staged] [--json]'
 
 // The rubric's absolute path, resolved against the kit package rather than the review checkout root.
 // The rubric ships inside the package, so a consumer that keeps no
@@ -54,6 +58,7 @@ const ROUND_FLAG = '--round'
 // paths and nothing else. `--staged` and `--json` are passed straight through, exactly as the old
 // command took them.
 const LEVEL_ONLY_FLAG = '--level-only'
+const INTERACTION_FLAG = '--interaction'
 const LEVEL_KEY = 'level'
 const FIRST_ROUND = 1
 const FAILURE_EXIT_CODE = 1
@@ -132,7 +137,12 @@ function record_round_one(
 			return false
 		}
 
-		review_stamps.round_one_stamp.write(tree, target, base)
+		review_stamps.round_one_stamp.write(
+			tree,
+			target,
+			base,
+			review_round_one_blobs.capture(Object.keys(tree)),
+		)
 
 		return true
 	} catch {
@@ -202,6 +212,7 @@ interface ComposeRequest {
 	tree: Record<string, string>
 	base: string
 	profile: AgentProfile
+	interaction?: ReadonlyArray<string> | undefined
 }
 
 // **Swallowed, and the brief keeps its target line**: parts that could not be
@@ -221,9 +232,35 @@ async function read_diff(
 	}
 }
 
+// **Swallowed, and the brief omits the list**: `josh ship` and `followup` read the same list again
+// and refuse on a failure, so the merge never rests on this reading.
+async function read_removed_tests(): Promise<ReadonlyArray<string>> {
+	try {
+		return (await removed_tests_check.read()) ?? []
+	} catch {
+		return []
+	}
+}
+
+// **A failure is marked, and the brief says the list could not be read** — never an empty list,
+// which would read as a change with no reader outside it.
+async function read_readers(
+	root: string,
+	base: string,
+	paths: ReadonlyArray<string>,
+): Promise<ReadersRead> {
+	try {
+		return await review_untouched_readers.read({ root, base, paths })
+	} catch {
+		return review_untouched_readers.FAILED_READ
+	}
+}
+
 async function compose_brief(request: ComposeRequest): Promise<string> {
-	const { round, paths, tree, base, profile } = request
-	const contract = await open_contract()
+	const { round, paths, tree, base, profile, interaction } = request
+	const opened = await open_contract()
+	// The interaction review reads the whole change, never a resume's narrowing (joshuafolkken/kit#4276).
+	const contract = interaction === undefined ? opened : { ...opened, resumed_from: undefined }
 	const stamps = {
 		gate: review_stamps.gate_stamp.read(),
 		in_flight: review_stamps.in_flight_stamp.read(),
@@ -245,6 +282,9 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		rubric_path: RUBRIC_PATH,
 		...contract,
 		diff: await read_diff(contract.checkout.root, base, paths),
+		readers: await read_readers(contract.checkout.root, base, paths),
+		removed_tests: await read_removed_tests(),
+		interaction,
 	})
 }
 
@@ -325,7 +365,13 @@ async function record_review(
 	record_briefed(round, tree, commit)
 }
 
-async function run_review(round: number, reading: ChangeReading): Promise<number> {
+// An interaction brief records nothing: the round-one and briefed stamps describe `/code-review`'s
+// round, which already ran, and retaking them would move the delta round 2 is measured from.
+async function run_review(
+	round: number,
+	reading: ChangeReading,
+	interaction?: ReadonlyArray<string>,
+): Promise<number> {
 	const { base, commit, paths, tree } = reading
 	const refusal = scoped_green.refusal_for(tree, commit)
 
@@ -334,24 +380,46 @@ async function run_review(round: number, reading: ChangeReading): Promise<number
 
 	if (resolved.kind === 'rejected') return report_error(resolved.note)
 	agent_role_profile.warn_of_default()
-	console.info(await compose_brief({ round, paths, tree, base, profile: resolved.profile }))
-	await record_review(round, tree, commit)
+	const { profile } = resolved
+
+	console.info(await compose_brief({ round, paths, tree, base, profile, interaction }))
+	if (interaction === undefined) await record_review(round, tree, commit)
 
 	return 0
 }
 
+// The interaction review's brief (joshuafolkken/kit#4276): `/code-review`'s round-1 brief over the
+// whole change, with the role and the run-tooling paths appended. Not due, it says so and exits 0.
+//
+// **An issue update taken in after round 1's brief refuses it**: minting this brief moves the pointer
+// `josh followup` measures that update against (`issue-watch-gate.ts`), so a round 1 that read the
+// earlier specification would merge without that refusal.
+async function run_interaction(): Promise<number> {
+	const reading = await read_change()
+	const targets = review_interaction.due_paths(reading.paths)
+
+	if (targets.length === 0) {
+		console.info(review_interaction.NOT_DUE_LINE)
+
+		return 0
+	}
+
+	const stale = await issue_watch_gate.review_refusal_here()
+
+	if (stale !== undefined) return report_error(stale)
+
+	return await run_review(FIRST_ROUND, reading, targets)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction()
 
 	const round = parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
 
 	return await run_review(round, await read_change())
-}
-
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
 }
 
 const review_brief_cli = {
@@ -364,7 +432,5 @@ const review_brief_cli = {
 	report_error,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_brief_cli }

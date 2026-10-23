@@ -10,6 +10,8 @@ const FINDINGS = 'stamps/josh-ship-review-findings-x.txt'
 const LOW_ONLY = 'tests:low:a.ts'
 const MEDIUM_OPEN = 'bug-risks:medium:a.ts:3'
 const MEDIUM_FIXED = `fixed ${MEDIUM_OPEN}`
+const MEDIUM_KIND = 'bug-risks:medium'
+const MEDIUM_LOCATION = 'a.ts:3'
 const ISSUE = '3875'
 
 describe('run_ship_review.reviewer_prompt', () => {
@@ -198,6 +200,74 @@ describe('run_ship_review.has_fixes — whether the reviewer edited the tree', (
 
 	it('reads an absent findings file as not edited', () => {
 		expect(run_ship_review.has_fixes(undefined)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4426: the kinds a stopped review's output lists, for the lane ledger — only the
+// findings that block, once per kind, never the stage's own prose around them.
+describe('run_ship_review.blocking_kinds — the kinds that stopped a review', () => {
+	const medium_kind = MEDIUM_KIND
+	const tests_kind = 'tests:medium'
+
+	it.each([
+		['', []],
+		[LOW_ONLY, []],
+		[`${MEDIUM_FIXED}\n${tests_kind}:c.ts`, [tests_kind]],
+		// A stop no blocking finding decided — fixes red on the scoped pair, a round 2 that edited the
+		// tree — was decided by the fixed findings.
+		[MEDIUM_FIXED, [medium_kind]],
+		[`${MEDIUM_FIXED}\n${LOW_ONLY}\nreview fixes did not pass the scoped checks`, [medium_kind]],
+		[`${MEDIUM_FIXED}\nfixed ${tests_kind}:c.ts\n${MEDIUM_FIXED}`, [medium_kind, tests_kind]],
+		[`${MEDIUM_OPEN}\n${medium_kind}:b.ts`, [medium_kind]],
+		[`${MEDIUM_OPEN} — the guard reads a stale stamp`, [medium_kind]],
+		[`fixed assumptions:high:b.ts — never fixed in place`, ['assumptions:high']],
+		[
+			`${MEDIUM_OPEN}\n${LOW_ONLY}\n${tests_kind}:c.ts\nreview found High/Medium: x`,
+			[medium_kind, tests_kind],
+		],
+		['✗ verification gate failed: test:unit', []],
+	])('reads %j as %j', (text, kinds) => {
+		expect(run_ship_review.blocking_kinds(text)).toStrictEqual(kinds)
+	})
+})
+
+// joshuafolkken/kit#4519: each finding that stopped a review, whole, for the durable stop log.
+describe('run_ship_review.blocking_details — each finding that stopped a review', () => {
+	it('keeps the kind, the file:line and the first sentence of every deciding finding', () => {
+		const text = [
+			`${MEDIUM_OPEN} — the guard reads a stale stamp. It never re-reads it.`,
+			`${MEDIUM_OPEN} – a second finding on the same line`,
+			`${LOW_ONLY} — a Low decides nothing`,
+			'review found High/Medium: x',
+		].join('\n')
+
+		expect(run_ship_review.blocking_details(text)).toStrictEqual([
+			{ kind: MEDIUM_KIND, location: MEDIUM_LOCATION, sentence: 'the guard reads a stale stamp.' },
+			{
+				kind: MEDIUM_KIND,
+				location: MEDIUM_LOCATION,
+				sentence: 'a second finding on the same line',
+			},
+		])
+	})
+
+	it('falls back to the fixed findings and leaves a finding without a description empty', () => {
+		expect(run_ship_review.blocking_details(MEDIUM_FIXED)).toStrictEqual([
+			{ kind: MEDIUM_KIND, location: MEDIUM_LOCATION, sentence: '' },
+		])
+	})
+
+	it('ends a Japanese sentence at its full stop, which takes no space after it', () => {
+		const [detail] = run_ship_review.blocking_details(`${MEDIUM_OPEN} — 古い値を読む。再読しない。`)
+
+		expect(detail?.sentence).toBe('古い値を読む。')
+	})
+
+	it('caps a run-on sentence with an ellipsis', () => {
+		const [detail] = run_ship_review.blocking_details(`${MEDIUM_OPEN} — ${'x'.repeat(500)}`)
+
+		expect(detail?.sentence).toHaveLength(200)
+		expect(detail?.sentence.endsWith('…')).toBe(true)
 	})
 })
 

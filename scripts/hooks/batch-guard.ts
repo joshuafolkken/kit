@@ -1,6 +1,3 @@
-#!/usr/bin/env tsx
-import { text } from 'node:stream/consumers'
-import { fileURLToPath } from 'node:url'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -120,11 +117,6 @@ const notice_refusal_path = hook_decision.create_refusal_stamp(
 	time_batch_guard.NOTICE_STAMP_PREFIX,
 ).path
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	if (process.stdin.isTTY) hook_decision.report_no_payload('batch:guard')
-	else hook_decision.write_outcome(await text(process.stdin), batch_outcome)
-}
 
 export {
 	batch_outcome,

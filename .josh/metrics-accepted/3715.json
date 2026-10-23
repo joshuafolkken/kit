@@ -1,7 +1,0 @@
-{
-	"reason": "The fresh-machine init patterns gain three probes (profile, file list, second-init checksum diff) that #3715's acceptance criteria are read from",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

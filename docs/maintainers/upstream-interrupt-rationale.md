@@ -1,8 +1,6 @@
 # Upstream interrupt — rationale
 
-This is maintainer-only history behind `prompts/collaboration-workflow/upstream-interrupt.md`. It is
-never read during a run, and a change to this file changes no rule. The reasons below used to sit
-inside the rule text; they moved here in joshuafolkken/kit#3179 so the procedure states each rule once.
+Rationale behind `prompts/collaboration-workflow/upstream-interrupt.md`.
 
 ## Why there is no blocking test
 

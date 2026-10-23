@@ -10,6 +10,7 @@ import {
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { file_content } from '#scripts/sync/file-content'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { init_bootstrap } from './init-bootstrap'
@@ -167,6 +168,17 @@ describe('hand_off — a directory without package.json', () => {
 		expect(call_options(0)).toMatchObject({ cwd: project })
 		expect(JSON.parse(read_manifest(project))).toStrictEqual({ private: true })
 		expect(read_manifest(fixture.root)).toBe(ancestor_manifest)
+	})
+
+	it('writes the new package.json through the contained write', () => {
+		const write_contained = vi.spyOn(file_content, 'write_contained')
+
+		init_bootstrap.hand_off(KIT_DIR, fixture.root, PROFILE_ARGS)
+
+		expect(write_contained).toHaveBeenCalledWith(
+			path.join(fixture.root, PACKAGE_JSON),
+			expect.any(String),
+		)
 	})
 
 	it('leaves an existing package.json as it is', () => {

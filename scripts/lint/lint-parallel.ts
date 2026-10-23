@@ -1,6 +1,5 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { project_checks } from '#scripts/gate/project-checks'
+import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import {
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
@@ -13,7 +12,9 @@ import {
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
-import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-recheck'
+import { eslint_cache_dependencies } from './eslint-cache-dependencies'
+import { eslint_daemon } from './eslint-daemon'
+import { lint_gate_scope } from './lint-gate-scope'
 
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
 // cache flags come from the same constant the ignore rules are asserted against.
@@ -21,29 +22,43 @@ import { cross_file_recheck, type CrossFileRecheckOptions } from './cross-file-r
 // moves, with every test still green.
 const WHOLE_TREE = '.'
 const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as const
-const WHOLE_TREE_RECHECK: CrossFileRecheckOptions = {
-	cache_file: ESLINT_CACHE_FILE,
-	patterns: [WHOLE_TREE],
-}
 
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS] as const
 
-// What one eslint run is made of: the child's arguments, and what re-reading a cached cross-file report
-// (`cross-file-recheck.ts`) needs to ask the same question again — the cache file and the targets.
+// What one eslint run is made of: the child's arguments and the cache file they name.
 interface EslintRun {
 	args: ReadonlyArray<string>
-	recheck: CrossFileRecheckOptions
+	cache_file: string
+	warm_daemon: boolean
 }
 
-// The finished report is re-read before it is returned, inside the lane's cache sharing, because
-// the re-reading uses that same cache file.
-async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
-	return await lane_cache_run.run(eslint.recheck.cache_file, async () => {
-		const result = await buffered_process.run_buffered_process(eslint.args)
+// Whether eslint may go through the checkout's warm daemon (`eslint-daemon.ts`). `josh lint:related`
+// asks for it; the gate's own lint does not, so its whole-tree run stays one cold process of its own.
+interface LintRunOptions {
+	warm_daemon: boolean
+}
 
-		return await cross_file_recheck.verify(result, eslint.recheck)
+const COLD_RUN: LintRunOptions = { warm_daemon: false }
+
+// The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
+async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessResult> {
+	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
+
+	return await buffered_process.run_buffered_process(eslint.args)
+}
+
+// The run sits inside the lane's cache sharing, between dropping the entries whose imports changed
+// and recording what the fresh ones read (`eslint-cache-dependencies.ts`).
+async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
+	const { cache_file } = eslint
+
+	return await lane_cache_run.run(cache_file, async () => {
+		return await eslint_cache_dependencies.guard(
+			cache_file,
+			async () => await run_eslint_process(eslint),
+		)
 	})
 }
 
@@ -103,19 +118,16 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // and through the same basic-project skip, so a narrowed run never reaches a tool the whole-tree
 // run would have skipped. The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
-//
-// A narrowed run re-reads a cached cross-file report too (`cross-file-recheck.ts`): one change's
-// files can hold both the reported file and the one it reads, and fixing the second leaves the
-// first's cached report standing.
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
-	recheck: CrossFileRecheckOptions,
+	cache_file: string,
+	options: LintRunOptions = COLD_RUN,
 ): Promise<number> {
 	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
 		run_prettier(directory, prettier_args),
-		run_checked_eslint(directory, { args: eslint_args, recheck }),
+		run_checked_eslint(directory, { args: eslint_args, cache_file, ...options }),
 	])
 
 	write_output(with_ran_notice('prettier', prettier, eslint))
@@ -125,18 +137,38 @@ async function run_lint_checks(
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, WHOLE_TREE_RECHECK)
+	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE)
 }
 
-// `process.exitCode` rather than `process.exit()`: both reports are buffered and written here in
-// one go, and `process.exit()` truncates a piped stdout at its buffer size — which is exactly how
-// this command is read when `josh gate` runs it as one of four concurrent checks. Setting the code
-// lets the writes drain and the process end on its own, which it can, since both children have
-// already exited by here.
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run_lint_parallel_checks()
+// `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the
+// whole tree where `lint-gate-scope.ts` cannot narrow. The line naming the decision is printed first,
+// so a narrowed run is never read as a whole one.
+async function run_changed_lint_checks(): Promise<number> {
+	const root = await changed_file_scope.repository_root_or_cwd()
+	const files = await changed_file_scope.read_changed_files(root)
+	const scope = lint_gate_scope.resolve_gate_scope(files, root, process.env)
+
+	process.stdout.write(`${lint_gate_scope.describe_scope(scope, root)}\n`)
+
+	if (scope.mode === 'all') return await run_lint_parallel_checks()
+
+	const narrowed = lint_gate_scope.narrowed_run(scope.files)
+
+	return await run_lint_checks(narrowed.prettier, narrowed.eslint, narrowed.eslint_cache_file)
 }
 
-const lint_parallel = { run_lint_checks, run_lint_parallel_checks }
+async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
+	if (command_arguments.includes(lint_gate_scope.CHANGED_FLAG)) {
+		return await run_changed_lint_checks()
+	}
+
+	return await run_lint_parallel_checks()
+}
+
+const lint_parallel = {
+	run_lint_checks,
+	run_lint_command,
+	run_lint_parallel_checks,
+}
 
 export { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS }

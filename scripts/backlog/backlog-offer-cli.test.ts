@@ -10,9 +10,16 @@ vi.mock('#scripts/rules/rule-value-cache', () => ({
 	rule_value_cache: { emit: rule_value_emit_mock },
 }))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit_once: emit_once_mock, emit: emit_mock },
+	run_event_stream_emit: {
+		emit_once: emit_once_mock,
+		emit: emit_mock,
+		stream_target: vi.fn(async () => undefined),
+	},
 }))
 
+const { shared_cache } = await import('#scripts/josh/shared-cache')
+const { shared_cache_fixture } = await import('#scripts/josh/shared-cache-fixture')
+const { backlog_next_shared } = await import('./backlog-next-shared')
 const { backlog_offer_cli } = await import('./backlog-offer-cli')
 
 const OK = 0
@@ -30,6 +37,7 @@ const CANDIDATES = 'candidates'
 interface JoshResult {
 	code: number
 	out: string
+	err?: string
 }
 
 const info_lines: Array<string> = []
@@ -44,6 +52,8 @@ beforeEach(() => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+	return shared_cache_fixture.isolate_shared_cache(backlog_next_shared.NEXT_CACHE)
 })
 
 // Stub `backlog:next`, then `backlog:budget`, run the command, and read back the `--answer` word the
@@ -54,6 +64,8 @@ async function answer_for(
 	budget_verdict: string,
 	argv: ReadonlyArray<string> = [],
 ): Promise<string> {
+	// Each answer is a fresh `backlog:next` read, never the one an earlier call in the same case kept.
+	shared_cache.clear(backlog_next_shared.NEXT_CACHE)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValueOnce(next)
 	josh_run_mock.mockResolvedValueOnce({
@@ -221,5 +233,26 @@ describe('backlog_offer_cli — the argv it builds for each underlying command',
 		const values = backlog_offer_cli.read_values([...BASE, '--running', 'lots'])
 
 		expect(backlog_offer_cli.counts_of(values ?? {})).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4396: the `run:solo` wait `backlog:next` printed on stderr reaches the driver.
+describe('backlog_offer_cli.run --json — the cause', () => {
+	it('prints the solo cause of a wait the run:solo gate caused', async () => {
+		const error =
+			'#12 carries `run:solo` and waits for joshuafolkken/kit’s running lanes to finish.'
+
+		await answer_for({ code: OK, out: 'wait', err: error }, 'watch', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"cause":"solo"')
+	})
+
+	// joshuafolkken/kit#4513: a chain wait reaches the driver with the issues it waited on.
+	it('prints the chain cause with the issues the wait named', async () => {
+		const error = 'Waiting on a dependency chain: #4496 #4497'
+
+		await answer_for({ code: OK, out: 'wait', err: error }, 'watch', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"cause":"chain","waiting":[4496,4497]')
 	})
 })

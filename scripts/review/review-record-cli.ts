@@ -1,11 +1,10 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_comment_round } from './review-comment-round'
-import { review_finding_ledger, type Finding } from './review-finding-ledger'
+import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
+import { review_interaction } from './review-interaction'
 import { review_record, type RecordVerdict } from './review-record'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
@@ -23,16 +22,21 @@ import { review_record, type RecordVerdict } from './review-record'
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
 // merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
 // merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
+//
+// **`--interaction` records and checks the interaction review's pass instead** (`review-interaction.ts`):
+// the same grammar under `- ri:`. It takes no `--comment` — the pass runs before the pull request, and
+// a pass kept only on the issue would leave the merge gate reading it as missing.
 
-const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh review:record --issue <N> [--comment] [<category>:<severity>:<file> ...] | josh review:record --check --issue <N>'
+	'Usage: josh review:record --issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | josh review:record --check [--interaction] --issue <N>'
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
-const CHECK_USAGE = 'Usage: josh review:record --check --issue <N>'
+const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
+const INTERACTION_NOT_REQUIRED_LINE =
+	'No interaction review is due: the change touches no run tooling, or this checkout keeps no ledger.'
 const CARRIED_LINE =
 	'review-finding line(s) recorded on closed issues after their pull requests opened into the ledger.'
 const CARRY_FAILED_LINE =
@@ -41,6 +45,7 @@ const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
 	comment: { type: 'boolean' },
+	interaction: { type: 'boolean' },
 } as const
 
 interface Request {
@@ -51,6 +56,7 @@ interface Request {
 interface Parsed {
 	check: boolean
 	comment: boolean
+	interaction: boolean
 	issue: string | undefined
 	positionals: ReadonlyArray<string>
 }
@@ -99,6 +105,7 @@ function parse_argv(argv: ReadonlyArray<string>): Parsed | undefined {
 	return {
 		check: parsed.values.check === true,
 		comment: parsed.values.comment === true,
+		interaction: parsed.values.interaction === true,
 		issue: parsed.values.issue,
 		positionals: parsed.positionals,
 	}
@@ -129,13 +136,17 @@ function usage_text(): string {
 	].join('\n')
 }
 
-function build_lines(request: Request, date: string): ReadonlyArray<string> {
+function build_lines(
+	request: Request,
+	date: string,
+	kind: LineKind = 'code',
+): ReadonlyArray<string> {
 	if (request.findings.length === 0) {
-		return [review_finding_ledger.zero_round_line(date, request.issue)]
+		return [review_finding_ledger.zero_round_line(date, request.issue, kind)]
 	}
 
 	return request.findings.map((finding) =>
-		review_finding_ledger.finding_line(finding, date, request.issue),
+		review_finding_ledger.finding_line(finding, date, request.issue, kind),
 	)
 }
 
@@ -143,28 +154,62 @@ function confirmation(count: number, ledger_path: string): string {
 	return `Recorded ${String(count)} review-finding line(s) in ${ledger_path}.`
 }
 
-function check_line(verdict: RecordVerdict): string {
-	return verdict.status === 'ok' ? RECORDED_LINE : NOT_REQUIRED_LINE
+type CheckStatus = RecordVerdict['status']
+
+interface CheckMode {
+	status: (issue: number, root: string) => Promise<CheckStatus>
+	refusal: (issue: number) => string
+	not_required: string
 }
 
-async function run_check(issue: string | undefined, root: string): Promise<number> {
+async function code_status(issue: number, root: string): Promise<CheckStatus> {
+	const verdict = await review_record.check(issue, root)
+
+	return verdict.status
+}
+
+// The two rounds a check reads, each with its own ledger line, refusal and quiet answer.
+const CHECK_MODES: Record<LineKind, CheckMode> = {
+	code: {
+		status: code_status,
+		refusal: review_record.refusal_message,
+		not_required: NOT_REQUIRED_LINE,
+	},
+	interaction: {
+		status: review_interaction.status,
+		refusal: review_interaction.refusal_message,
+		not_required: INTERACTION_NOT_REQUIRED_LINE,
+	},
+}
+
+function kind_of(parsed: Parsed): LineKind {
+	return parsed.interaction ? 'interaction' : 'code'
+}
+
+async function report_check(issue: number, mode: CheckMode, root: string): Promise<number> {
+	const status = await mode.status(issue, root)
+
+	if (status === 'missing') {
+		console.error(mode.refusal(issue))
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(status === 'ok' ? RECORDED_LINE : mode.not_required)
+
+	return 0
+}
+
+async function run_check(parsed: Parsed, root: string): Promise<number> {
+	const { issue } = parsed
+
 	if (issue === undefined || !issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) {
 		console.error(CHECK_USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const verdict = await review_record.check(Number(issue), root)
-
-	if (verdict.status === 'ok' || verdict.status === 'not-required') {
-		console.info(check_line(verdict))
-
-		return 0
-	}
-
-	console.error(review_record.refusal_message(Number(issue)))
-
-	return FAILURE_EXIT_CODE
+	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
 // **A comment that could not be posted fails the record**: it is the round's only copy, so a
@@ -216,7 +261,7 @@ async function append_round(
 }
 
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
-	const request = to_request(parsed)
+	const request = parsed.comment && parsed.interaction ? undefined : to_request(parsed)
 
 	if (request === undefined) {
 		console.error(usage_text())
@@ -224,7 +269,7 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = build_lines(request, observation_ledger_home.ledger_date(now))
+	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind_of(parsed))
 
 	if (parsed.comment) return await post_comment(request.issue, lines)
 
@@ -247,13 +292,9 @@ async function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	if (parsed.check) return await run_check(parsed.issue, root)
+	if (parsed.check) return await run_check(parsed, root)
 
 	return await run_record(parsed, now, root)
-}
-
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv, new Date())
 }
 
 const review_record_cli = {
@@ -263,7 +304,5 @@ const review_record_cli = {
 	run,
 	usage_text,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { review_record_cli }

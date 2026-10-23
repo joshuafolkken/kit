@@ -5,6 +5,7 @@ import path from 'node:path'
 import { run_board_phase } from '#scripts/run/board/run-board-phase'
 import { afterAll, describe, expect, it } from 'vitest'
 import { run_event_stream, type RunEvent } from './run-event-stream'
+import { run_event_stream_fixture } from './run-event-stream-fixture'
 
 // joshuafolkken/kit#2205: the append-only, ordered event stream. The pure module takes an explicit
 // target, so the tests write to a temp file rather than resolving a run identity — the emit side is
@@ -13,6 +14,9 @@ import { run_event_stream, type RunEvent } from './run-event-stream'
 // of a kind outside the one enumeration.
 
 const KIND = run_event_stream.EVENT_KIND
+const { EVENT_CAP } = run_event_stream
+const { fill } = run_event_stream_fixture
+
 const AT = '2026-09-21T00:00:00.000Z'
 const REVIEW_STAGE = '#3521 review start'
 const GATE_STAGE = '#3521 gate start'
@@ -188,9 +192,7 @@ describe('run_event_stream.append — the bound', () => {
 		const target = fresh_target()
 		const overflow = run_event_stream.EVENT_CAP + 1
 
-		for (let index = 0; index < overflow; index += 1) {
-			run_event_stream.append(target, KIND.MERGE, `#${String(index)} merged`, AT)
-		}
+		fill(target, KIND.MERGE, overflow, (index) => `#${String(index)} merged`)
 
 		const events = run_event_stream.read_events(target)
 
@@ -203,9 +205,7 @@ describe('run_event_stream.append — the bound', () => {
 		const target = fresh_target()
 		const overflow = run_event_stream.EVENT_CAP + 5
 
-		for (let index = 0; index < overflow; index += 1) {
-			run_event_stream.append(target, KIND.MERGE, 'merged', AT)
-		}
+		fill(target, KIND.MERGE, overflow, () => 'merged')
 
 		expect(run_event_stream.read_last(target)?.pos).toBe(overflow)
 	})
@@ -215,9 +215,7 @@ describe('run_event_stream.append — the bound', () => {
 
 		run_event_stream.append(target, KIND.CUT, '#3245 cut', AT)
 
-		for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
-			run_event_stream.append(target, KIND.SHIP_STAGE, `stage ${String(index)}`, AT)
-		}
+		fill(target, KIND.SHIP_STAGE, EVENT_CAP, (index) => `stage ${String(index)}`)
 
 		const events = run_event_stream.read_events(target)
 
@@ -235,9 +233,7 @@ describe('run_event_stream.append — the bound keeps the findings', () => {
 		run_event_stream.append(target, KIND.FILED, '#3438 Count the seats', AT)
 		run_event_stream.append(target, KIND.NOTE, '#3415 gate slowed', AT)
 
-		for (let index = 0; index < run_event_stream.EVENT_CAP; index += 1) {
-			run_event_stream.append(target, KIND.HEARTBEAT, `beat ${String(index)}`, AT)
-		}
+		fill(target, KIND.HEARTBEAT, EVENT_CAP, (index) => `beat ${String(index)}`)
 
 		const kinds = run_event_stream.read_events(target).map((event) => event.kind)
 
@@ -246,10 +242,8 @@ describe('run_event_stream.append — the bound keeps the findings', () => {
 })
 
 // Lines the bound may not drop, one lane-phase per slot — a full stream unless `count` says fewer.
-function fill_with_lane_phases(target: string, count = run_event_stream.EVENT_CAP): void {
-	for (let index = 0; index < count; index += 1) {
-		run_event_stream.append(target, KIND.LANE_PHASE, `#${String(index)} implement`, AT)
-	}
+function fill_with_lane_phases(target: string, count = EVENT_CAP): void {
+	fill(target, KIND.LANE_PHASE, count, (index) => `#${String(index)} implement`)
 }
 
 function ship_stages_of(target: string): ReadonlyArray<string> {

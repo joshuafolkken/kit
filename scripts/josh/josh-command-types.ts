@@ -56,7 +56,8 @@ interface CommandFlag {
 }
 
 // What `josh help <command>` prints and what the reference pages render between their usage
-// markers — one source for both, so the page and the terminal cannot disagree (#3932).
+// markers — one source for both, so the page and the terminal cannot disagree (#3932). Each command's
+// entry carries its own, so a command cannot be registered without one (#4185).
 interface CommandUsage {
 	examples: ReadonlyArray<CommandExample>
 	flags?: ReadonlyArray<CommandFlag>
@@ -68,6 +69,7 @@ interface CommandEntry {
 	description: string
 	category: CommandCategory
 	reference: CommandReference
+	usage: CommandUsage
 	tsx_arguments?: ReadonlyArray<string>
 	default_script_arguments?: ReadonlyArray<string>
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
@@ -93,6 +95,8 @@ interface CommandEntry {
 	// The memory the command's tools hold, claimed with its cores; read like
 	// `core_weight`, and none declared is none waited for.
 	memory_mb?: number | (() => number)
+	// A unit suite's claim, whose weight is its worker count (`gate_plan.DIRECT_UNIT_CLAIM`).
+	is_unit_claim?: boolean
 }
 
 // The name `josh gate` registers under. It lives here rather than in `verification-gate.ts` so a
@@ -184,7 +188,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // The `PostToolUse` edit hook runs eslint too, and ESLint *deletes* the file at `--cache-location`
 // whenever it is started without `--cache` — so a shared file would be wiped by every single edit,
 // leaving the gate a cold lint. The hook is given a location of its own rather than the
-// gate's because the two run at the same time: `josh gate` lints the whole tree beside the review
+// gate's because the two run at the same time: `josh gate` lints beside the review
 // while this hook fires on every edit, and each eslint run rewrites its cache file whole from the
 // copy it loaded at start-up — so two writers silently discard each other's entries. A file of its
 // own makes the hook structurally unable to degrade the cache this exists to protect.
@@ -193,7 +197,7 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // true, and a single-file run against the gate's full cache was measured byte-identical, so a shared
 // file would keep the entries that run never visited.
 // The same reasoning for the scoped lint. `josh lint:related` is what an implementation loop calls
-// between edits, and `josh gate` lints the whole tree beside the review — so those two run at the
+// between edits, and `josh gate` lints beside the review — so those two run at the
 // same time as readily as the hook and the gate do. Whichever of a pair sharing one file wrote last
 // would replace it with "the copy I loaded at start-up plus what I visited", so a narrowed run
 // finishing during a whole-tree run would roll the cache back to its pre-gate state, and a
@@ -204,8 +208,8 @@ const GATE_CACHE_FILES: ReadonlyArray<string> = GATE_CACHE_SPECS.map((spec) => s
 // warm from its own second call onwards, and the gate's stays exactly as the gate left it.
 //
 // **The lint's target scope is untouched.** This is where a cache is written, not what is read:
-// `josh lint:related` narrows in front of the gate and `josh gate` still runs `josh lint` over the
-// whole tree before any commit. The scoped lint's prettier cache is its own for the same reason:
+// `josh lint:related` and the gate's `josh lint --changed` each narrow to the change, on caches of
+// their own. The scoped lint's prettier cache is its own for the same reason:
 // prettier rewrites its cache file whole as well.
 // What the ignore rules are asserted against: every cache file this package writes, wherever it is
 // written from. The gate's, the edit hook's, the scoped lint's and the pre-commit hook's — a cache
@@ -250,7 +254,8 @@ export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // them per target: the lint step writes only the eslint one, so a target
 // that cleared the list would report a cold type check as the lint's own cost. The edit hook's cache
 // stays private; the scoped lint cache is exported because #2060 shares its completed file between
-// worktrees, but it still never overlaps the gate's distinct cache location.
+// worktrees, but it still never overlaps the gate's distinct cache location. The pre-commit hook's
+// eslint cache is exported because the hook re-reads a red report against it (#4407).
 export {
 	COMMAND_AUDIENCES,
 	COMMAND_SIDE_EFFECTS,
@@ -259,6 +264,7 @@ export {
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FLAGS,
 	ESLINT_EDIT_CACHE_FLAGS,
 	ESLINT_RELATED_CACHE_FLAGS,

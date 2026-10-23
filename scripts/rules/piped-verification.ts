@@ -16,7 +16,7 @@ import { shell_segments } from './shell-segments'
 // document, prompt and skill in this repository found exactly one piped verification example, and it
 // was the repository's own explanation of this bug — so there were no examples to rewrite, and the
 // pipe is invented each time rather than copied. The other candidate, a calling convention, had
-// already been rejected in writing by `scripts/time/time-reported-failure.ts`: a convention is obeyed
+// already been rejected in writing by `tools/time/time-reported-failure.ts`: a convention is obeyed
 // or it is not. `prompts/collaboration-workflow/output-bounds.md` is the single source for the rule.
 //
 // It lives beside the enumeration rather than inside it because `delivered-rules.ts` is the list —

@@ -2,7 +2,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
-import { run_progress } from '#scripts/run/progress/run-progress'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { z } from 'zod'
 import { run_board_thanks_csv, type Thanks } from './run-board-thanks-csv'
 
@@ -16,7 +16,7 @@ const ROSTER_URL =
 	'https://docs.google.com/spreadsheets/d/e/2PACX-1vR8Ia38Wiw6Kfyk9Or594J8ZRS8okynV30CpOtq5B6_GyJG7A1-t8Au64jTYvmzgIOlbafcKKgrNFVJ/pub?gid=0&single=true&output=csv'
 const RECORD_PREFIX = 'josh-run-board-thanks-'
 const TTL_MINUTES = 5
-const TTL_MS = TTL_MINUTES * run_progress.MS_PER_MINUTE
+const TTL_MS = TTL_MINUTES * MS_PER_MINUTE
 
 const thanker_schema = z.object({ name: z.string(), url: z.string().optional() })
 const record_schema = z.object({ checked_ms: z.number(), thanks: z.array(thanker_schema) })

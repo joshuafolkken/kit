@@ -58,6 +58,20 @@ function waiting(gated: EpicNextResult): ReadonlyArray<number> {
 	return gated.waiting.map((entry) => entry.number)
 }
 
+// joshuafolkken/kit#4391: the running holder `select` and `run:board`'s 🔒 rows share.
+describe('epic_solo.holder_of', () => {
+	it('answers the running issue that carries run:solo, whatever its casing', () => {
+		const running = [child(FIRST), child(HOLDER, ['RUN:Solo'])]
+
+		expect(epic_solo.holder_of(running)).toBe(HOLDER)
+	})
+
+	it('answers undefined where no running issue carries run:solo', () => {
+		expect(epic_solo.holder_of([child(FIRST), child(SECOND, [IN_PROGRESS_LABEL])])).toBeUndefined()
+		expect(epic_solo.holder_of([])).toBeUndefined()
+	})
+})
+
 describe('epic_solo.gate', () => {
 	it('leaves the offer unchanged when no candidate or holder carries run:solo', () => {
 		const input = result([child(FIRST), child(SECOND)])
@@ -153,5 +167,51 @@ describe('epic_solo.gate on a later run:solo candidate', () => {
 		const gated = epic_solo.gate(result([child(FIRST)]), busy([RUN_SOLO_LABEL]), REPO)
 
 		expect(epic_report.candidates_for_repo(gated.result, OTHER_REPO)).toHaveLength(1)
+	})
+})
+
+// joshuafolkken/kit#4294: `run:board` reads the same first `run:solo` candidate the gate does.
+describe('epic_solo.queue_of', () => {
+	it('answers nothing where no candidate carries run:solo', () => {
+		expect(epic_solo.queue_of([child(FIRST), child(SECOND)])).toBeUndefined()
+	})
+
+	it('names a run:solo head and every candidate behind it', () => {
+		const queue = epic_solo.queue_of([solo(FIRST), child(SECOND), solo(THIRD)])
+
+		expect(queue?.solo.number).toBe(FIRST)
+		expect(queue?.index).toBe(0)
+		expect(queue?.behind.map((item) => item.number)).toStrictEqual([SECOND, THIRD])
+	})
+
+	it('names where a later run:solo candidate sits, the ones ahead of it not behind', () => {
+		const queue = epic_solo.queue_of([child(FIRST), solo(SECOND), child(THIRD)])
+
+		expect(queue?.index).toBe(1)
+		expect(queue?.behind.map((item) => item.number)).toStrictEqual([THIRD])
+	})
+})
+
+// joshuafolkken/kit#4396: `backlog:offer` tells a `run:solo` wait apart off the gate's own notices.
+describe('epic_solo.is_solo_wait', () => {
+	it('reads both of the gate’s wait notices as a run:solo wait', () => {
+		const waiting_notice = epic_solo.gate(result([solo(FIRST)]), busy([]), REPO).notice ?? ''
+		const held_notice = epic_solo.gate(result([child(FIRST)]), busy([RUN_SOLO_LABEL]), REPO).notice
+
+		expect(epic_solo.is_solo_wait(waiting_notice)).toBe(true)
+		expect(epic_solo.is_solo_wait(held_notice ?? '')).toBe(true)
+	})
+
+	it('reads a triage notice that names run:solo as no run:solo wait', () => {
+		const triage = `#${String(FIRST)} carries neither \`${RUN_SOLO_LABEL}\` nor \`run:lane\`.`
+
+		expect(epic_solo.is_solo_wait(triage)).toBe(false)
+		expect(epic_solo.is_solo_wait('')).toBe(false)
+	})
+
+	it('reads the stale-holder release notice as no run:solo wait', () => {
+		const stale = `#${String(HOLDER)} carries \`${RUN_SOLO_LABEL}\` and \`${IN_PROGRESS_LABEL}\`, but no process of it is running in ${REPO}.`
+
+		expect(epic_solo.is_solo_wait(stale)).toBe(false)
 	})
 })

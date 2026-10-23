@@ -11,6 +11,7 @@ const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const parked_mock = vi.hoisted(() => vi.fn())
+const emit_mock = vi.hoisted(() => vi.fn())
 const ISSUE = '2654'
 const MISSING_RESPONSE = 'response path is missing'
 const ROUND_ONE = { kind: 'review', round: '1' } as const
@@ -54,6 +55,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: parked_mock } }))
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: { emit: emit_mock },
+}))
 
 const state = { directory: '' }
 
@@ -69,6 +73,7 @@ beforeEach(() => {
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
 	parked_mock.mockReset().mockResolvedValue(false)
+	emit_mock.mockReset().mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -251,6 +256,62 @@ describe('lane_session_broker — a failed action names its reason', () => {
 		expect(reason_of(await request_relaunch(CLAUDE_LANE))).toContain(
 			'the broker answered a failure: the broker failed',
 		)
+	})
+})
+
+// joshuafolkken/kit#4509: the supervisor defers its reload while a request is being answered.
+describe('lane_session_broker.is_answering', () => {
+	it('reads true only while a request is being answered', async () => {
+		const seen: Array<boolean> = []
+
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+			seen.push(lane_session_broker.is_answering())
+
+			return REJECTED
+		})
+		await request_relaunch(CLAUDE_LANE)
+
+		expect([...seen, lane_session_broker.is_answering()]).toStrictEqual([true, false])
+	})
+})
+
+// joshuafolkken/kit#4230: a supervisor started before main added a stop field dropped the newer ship's
+// request unread, and the ship waited out the 30-minute limit on a server that was still alive.
+describe('lane_session_broker — a request the broker cannot read', () => {
+	const NEWER = { ...RELAUNCH, stop: { ...RELAUNCH.stop, is_from_newer_main: true } }
+	// joshuafolkken/kit#4489: the reason names the refused field rather than guessing at the supervisor.
+	const UNREADABLE =
+		'the broker answered a failure: the broker could not read the request — unrecognized key: action.stop.is_from_newer_main'
+
+	it('answers the unreadable request at once, naming why, and starts nothing', async () => {
+		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
+
+		expect(await request_review(CLAUDE_LANE, NEWER)).toStrictEqual({
+			is_success: false,
+			reason: UNREADABLE,
+		})
+		expect(relaunch).not.toHaveBeenCalled()
+		expect(launch_mock).not.toHaveBeenCalled()
+	})
+
+	it('names the path of a field whose value the schema refused', async () => {
+		const stop = { ...RELAUNCH.stop, cause: 'weather' }
+		const unknown_cause = { ...RELAUNCH, stop } as unknown as BrokerAction
+
+		expect(reason_of(await request_review(CLAUDE_LANE, unknown_cause))).toContain(
+			'could not read the request — action.stop.cause: ',
+		)
+	})
+
+	it("puts the failure on the run's stream under the lane's issue", async () => {
+		await request_review(CLAUDE_LANE, NEWER)
+
+		expect(emit_mock).toHaveBeenCalledWith('note', `#${ISSUE} lane broker: ${UNREADABLE}`)
+	})
+
+	it('puts nothing on the stream for an answered request', async () => {
+		expect(await request_review(LANE, ROUND_ONE)).toStrictEqual(SUCCESS)
+		expect(emit_mock).not.toHaveBeenCalled()
 	})
 })
 

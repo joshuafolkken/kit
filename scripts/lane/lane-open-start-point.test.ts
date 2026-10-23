@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_install } from './lane-install'
 import { lane_open } from './lane-open'
 import { lane_paths } from './lane-paths'
+import { lane_state } from './lane-state'
 
 // The regression this suite exists for (joshuafolkken/kit#1535): a lane opened after a merge must
 // carry what was merged. It drives **real git**, because what it asserts is a property of git's own
@@ -253,6 +254,25 @@ describe('reopening a lane whose branch is only on the remote', () => {
 
 			expect(outcome.kind).toBe('opened')
 			expect(lane_holds(PUSHED_FILE)).toBe(false)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#4268: the lane's state record starts at the open.
+describe('the state record an opened lane starts', () => {
+	it(
+		'records the lane as open by lane:open',
+		async () => {
+			const record = vi.spyOn(lane_state, 'record_change')
+
+			await lane_open.open_lane(ISSUE)
+
+			expect(record).toHaveBeenCalledExactlyOnceWith({
+				issue: ISSUE,
+				state: 'open',
+				command: 'lane:open',
+			})
 		},
 		TIMEOUT_MS,
 	)

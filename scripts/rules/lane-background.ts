@@ -26,7 +26,7 @@ import { run_tail_rule } from './run-tail-rule'
 // killed at the turn's end before any supervisor exists. Issued in the foreground it returns at
 // `launched` within the tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone
 // is not refused but rewritten into that foreground call (`foreground_input`); one chained after
-// another long command is refused.
+// another long command is refused. A foreground `ship` without the cap is given it the same way.
 //
 // **Its stop-time half reads the same fact from the other side.** A backgrounded task the transcript
 // launched but never saw finish is still running, and in a child the stop about to happen kills it —
@@ -43,9 +43,10 @@ const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set([
 
 const BACKGROUND_KEY = 'run_in_background'
 const TIMEOUT_KEY = 'timeout'
-// The longest a foreground Bash call may run. A backgrounded call rarely carries a `timeout`, and one that
-// does may exceed the foreground cap, so the rewrite sets it: left at the two-minute default, a preflight
-// whose scoped pair outruns it is cut before `launched`, the #3027 failure the rewrite exists to avoid.
+// The longest a foreground Bash call may run. A `ship` rarely carries a `timeout`, and a backgrounded one
+// that does may exceed the foreground cap, so the rewrite sets it: left at the two-minute default, a
+// preflight whose scoped pair outruns it is cut before `launched` (#3027) or moved to the background and
+// killed with the turn (#4101).
 const FOREGROUND_TIMEOUT_MS = 600_000
 
 function is_backgrounded(input: unknown): boolean {
@@ -101,38 +102,72 @@ function is_background_long_run(
 	return is_candidate(call) && is_lane_child()
 }
 
-// **A backgrounded `ship` in a child is rewritten, not refused**. The refusal
-// asked for nothing but the same call in the foreground — 14 of 41 lane `ship` refusals in one measured
-// backlogrun were that round trip, paid at the run's largest context. The input with the flag cleared,
-// or `undefined` for every call this does not apply to.
+// The input of a Bash call whose long-running work is `ship` alone, or `undefined` for any other call.
+function ship_alone_input(call: GuardedCall): Record<string, unknown> | undefined {
+	if (call.name !== cost_blocks.BASH_TOOL || !json_value.is_record(call.input)) return undefined
+
+	return ships_alone(time_shell.bash_command(call.input)) ? call.input : undefined
+}
+
+// A foreground call that already carries the foreground cap, which the harness never moves aside.
+function is_capped_foreground(input: Record<string, unknown>): boolean {
+	const timeout = input[TIMEOUT_KEY]
+
+	return !is_backgrounded(input) && typeof timeout === 'number' && timeout >= FOREGROUND_TIMEOUT_MS
+}
+
+// **A `ship` in a child is run in the foreground at the cap, not refused**. The refusal of a
+// backgrounded one asked for nothing but the same call in the foreground — 14 of 41 lane `ship`
+// refusals in one measured backlogrun were that round trip, paid at the run's largest context.
+//
+// A foreground one at the two-minute default is moved aside once its preflight outruns it, and dies
+// the same way (joshuafolkken/kit#4101). The input with the flag cleared and the cap set, or
+// `undefined` for every call this does not apply to.
 function foreground_input(
 	call: GuardedCall,
 	is_lane_child: () => boolean = () => lane_child_marker.is_child_of(process.cwd()),
 ): Record<string, unknown> | undefined {
-	if (!is_backgrounded_ship(call) || !json_value.is_record(call.input) || !is_lane_child()) {
-		return undefined
-	}
+	const input = ship_alone_input(call)
 
-	return { ...call.input, [BACKGROUND_KEY]: false, [TIMEOUT_KEY]: FOREGROUND_TIMEOUT_MS }
+	if (input === undefined || is_capped_foreground(input) || !is_lane_child()) return undefined
+
+	return { ...input, [BACKGROUND_KEY]: false, [TIMEOUT_KEY]: FOREGROUND_TIMEOUT_MS }
 }
 
 const FOREGROUND_NOTE =
-	'lane background: this lane child backgrounded `josh ship`, which would die with the headless turn ' +
-	'before its supervisor exists — so it was run in the foreground instead, where it detaches itself ' +
-	'after the preflight. End the turn on `launched` / `busy`.'
+	"lane background: a lane child's `josh ship` backgrounded, by its flag or by outrunning the Bash " +
+	'timeout, dies with the headless turn before its supervisor exists — so it was run in the ' +
+	'foreground at the 600000 ms cap, where it detaches itself after the preflight. End the turn on ' +
+	'`launched` / `busy`.'
+
+type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
+
+// One line's word on each id: a launch opens it, a finish notice closes it.
+function apply_line(open: Set<string>, line: string, launched_ids: LaunchedIds): void {
+	const parsed = time_transcript_line.parse_line(line)
+
+	if (parsed === undefined) return
+
+	const launched = parsed.blocks.flatMap((block) => launched_ids(block))
+
+	for (const id of launched) open.add(id)
+	open.delete(parsed.finished_background)
+}
 
 // The launches `launched_ids` reads off the transcript tail that never saw their finish. A launch is
-// read off its own tool result and a finish off the harness notice, both by `time_transcript_line`.
-function unfinished_ids(
-	tail: string,
-	launched_ids: (block: TranscriptBlock) => ReadonlyArray<string>,
-): ReadonlyArray<string> {
-	const lines = tail.split('\n').map((line) => time_transcript_line.parse_line(line))
-	const finished = new Set(lines.map((line) => line?.finished_background ?? ''))
-	const blocks = lines.flatMap((line) => line?.blocks ?? [])
-	const launched = blocks.flatMap((block) => launched_ids(block))
+// read off its own tool result and a finish off the harness notice or a `TaskStop` result, both by
+// `time_transcript_line`.
+//
+// **Read in order, so the later word on an id wins.** A subagent resumed by `SendMessage` runs again
+// under the id its first run's notice already named; a set of every finish ever seen would read the
+// resumed run as finished (joshuafolkken/kit#4347).
+function unfinished_ids(tail: string, launched_ids: LaunchedIds): ReadonlyArray<string> {
+	const open = new Set<string>()
 
-	return launched.filter((id) => id !== '' && !finished.has(id))
+	for (const line of tail.split('\n')) apply_line(open, line, launched_ids)
+	open.delete('')
+
+	return [...open]
 }
 
 // The background tasks the tail launched and never saw finish — commands and subagents alike,
@@ -167,6 +202,13 @@ const ROW = {
 	is_trigger: (call: GuardedCall): boolean => is_background_long_run(call),
 	reason: LANE_BACKGROUND_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Lane child background push',
+		topic: '`.claude/skills/workflow-commands/background-commands.md`',
+		fires:
+			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence',
+		quiet: 'not a lane child, or the foreground `ship --detach`',
+	},
 }
 
 const lane_background = {

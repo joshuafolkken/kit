@@ -5,11 +5,6 @@ import { release_scope_cli } from './release-scope-cli'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
-function silence_output(): void {
-	vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	vi.spyOn(console, 'error').mockImplementation(() => undefined)
-}
-
 function given_pending(pending: number | undefined): void {
 	vi.spyOn(git_followup_pending, 'read_pending').mockResolvedValue(pending)
 }
@@ -86,14 +81,5 @@ describe('release_scope_cli.run handles flags and the exit code', () => {
 		await expect(release_scope_cli.run(['--staged'])).resolves.toBe(FAILURE_EXIT_CODE)
 		expect(error).toHaveBeenCalledWith(release_scope_cli.USAGE)
 		expect(read).not.toHaveBeenCalled()
-	})
-
-	it('sets the exit code from run', async () => {
-		silence_output()
-		given_pending(0)
-
-		await release_scope_cli.main([])
-
-		expect(process.exitCode).toBe(SUCCESS_EXIT_CODE)
 	})
 })

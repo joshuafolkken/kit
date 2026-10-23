@@ -1,6 +1,7 @@
 import { styleText } from 'node:util'
-import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import type { BudgetWait } from '#scripts/gate/core-wait'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
+import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
@@ -8,14 +9,18 @@ import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-l
 import { run_board_machine, type MachineGauges } from './run-board-machine'
 import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
+import { run_board_priority } from './run-board-priority'
+import type { ProcessGroups } from './run-board-process-groups'
 import { run_board_render_slot } from './run-board-render-slot'
+import { run_board_render_title } from './run-board-render-title'
 import type { RunActivity } from './run-board-status'
-import type { LaneUsages } from './run-board-usage'
+import type { LaneUsages, UsageScale } from './run-board-usage'
 import type { UsualTimes } from './run-board-usual'
 
 // The top of `run:board`: whether the run is moving, how long it has run, how fresh its last event is,
 // and how far through the plan it is. Every time comes from a record (the carry's start, the stream's
-// events); nothing here guesses one. Two lines of symbols rather than sentences: the `⏰` that moves
+// events); nothing here guesses one, but the estimated finish after the progress bar, which is drawn `~`
+// as the estimate it is (`run-board-estimate.ts`). Two lines of symbols rather than sentences: the `⏰` that moves
 // every second is the proof the board is live, so no `updated` line is drawn. **Always three lines,
 // the first two in three columns**: the run's mark and name over its repository's, the run's age over
 // the `💓`, then the progress over the machine the run is on — so the first line reads as how far the
@@ -28,6 +33,9 @@ import type { UsualTimes } from './run-board-usual'
 
 const { HEADER_ICONS, STATE_ICONS, WORDS, bar_of, minute_of, span_of } = run_board_labels
 const { cell_of } = run_board_render_slot
+const { title_of } = run_board_render_title
+// The columns a failed read's reason is cut to, so the header keeps its line.
+const REASON_LIMIT = 40
 const { padded } = run_board_fresh
 const aged_fresh = run_board_fresh.aged
 const UNKNOWN = '-'
@@ -37,7 +45,7 @@ const { GAP, PERCENT_WIDTH } = run_board_machine
 // A running run whose newest event is older than this is drawn as stale, so a hang stands out; past
 // twice that it is drawn as alarming.
 const STALE_MINUTES = 15
-const STALE_MS = STALE_MINUTES * backlog_budget.MS_PER_MINUTE
+const STALE_MS = STALE_MINUTES * MS_PER_MINUTE
 const ALARM_FACTOR = 2
 const ALARM_MS = STALE_MS * ALARM_FACTOR
 const RUN_NAME = 'backlogrun'
@@ -46,6 +54,14 @@ const RUN_NAME = 'backlogrun'
 // draws what the screen does but for the machine, its memory alone — a CPU or swap figure read once
 // means nothing.
 type BoardForm = 'screen' | 'chat'
+
+// What the lane cells and the processes section are drawn from, and the machine a gauge's width
+// stands for.
+interface BoardUsage {
+	lanes: LaneUsages
+	processes: ProcessGroups
+	scale: UsageScale
+}
 
 interface BoardHeader {
 	now_ms: number
@@ -60,16 +76,22 @@ interface BoardHeader {
 	baseline_total: number | undefined
 	plan_fetched_ms: number | undefined
 	plan_failed_ms: number | undefined
+	// When the reads off this machine last failed (`run-board-gather-thread.ts`); none once they answer.
+	read_failed_ms?: number | undefined
+	// Why they failed, drawn beside the failure.
+	read_error?: string | undefined
 	// Whether a plan read is in flight.
 	is_plan_loading: boolean
 	// The machine's gauges, `undefined` before the first sample.
 	machine: MachineGauges | undefined
-	// Each running lane's CPU and memory, `undefined` where none could be read.
-	usages?: LaneUsages | undefined
+	// Each running lane's and each process group's usage, `undefined` where none could be read.
+	usages?: BoardUsage | undefined
 	// The claims waiting in the machine-wide core budget (`run-board-render-waits.ts`).
 	budget_waits?: ReadonlyArray<BudgetWait> | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined
+	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
+	lane_limit?: number | undefined
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
@@ -126,7 +148,9 @@ function quiet_mark(header: BoardHeader): RunMark {
 
 	if (header.activity.setup !== undefined) return 'setup'
 
-	return layout?.waves.length === 0 && layout.people.length > 0 ? 'human' : 'idle'
+	return layout?.queued.length === 0 && run_board_layout.people_of(layout).length > 0
+		? 'human'
+		: 'idle'
 }
 
 // The run's state, each state overriding the ones below it.
@@ -250,13 +274,13 @@ function time_parts(header: BoardHeader, mark: RunMark, now: NowLine | undefined
 	]
 }
 
-// A plan fetch is said only when it failed — the board otherwise keeps quiet about a routine read.
-function plan_warning(header: BoardHeader): string | undefined {
-	const failed = header.plan_failed_ms
-
+// A read is said only when it failed — the board otherwise keeps quiet about a routine read — and why,
+// where that is known, cut so it never pushes the line past its pane.
+function warning_of(word: string, failed: number | undefined, reason?: string): string | undefined {
 	if (failed === undefined) return undefined
+	const why = reason === undefined || reason === '' ? '' : ` ${title_of(reason, REASON_LIMIT)}`
 
-	return styleText('yellow', `⚠ ${WORDS.plan} ${minute_of(failed)}`)
+	return styleText('yellow', `${HEADER_ICONS.warning} ${word} ${minute_of(failed)}${why}`)
 }
 
 // A plan read in flight turns the spinner after ⏳ and says nothing more; a
@@ -307,20 +331,39 @@ function tally_part(counts: BoardCounts, header: BoardHeader): string {
 	return `${STATE_ICONS.merged} ${tally} ${bar}`
 }
 
-function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string> {
+// The estimated finish after the bar (`run-board-estimate.ts`), once the plan says what is left to run.
+// A stopped run advances nothing, so an estimate would count down to a finish that never comes.
+function estimate_part(header: BoardHeader): string | undefined {
+	const is_moving = is_plan_read(header) && !header.activity.is_stopped
+
+	return is_moving ? run_board_estimate.part_of(header) : undefined
+}
+
+// The ⏳ count with the priorities among it (joshuafolkken/kit#4383).
+function waiting_of(counts: BoardCounts, header: BoardHeader): string {
+	return `${String(counts.remaining)}${run_board_priority.tally_of(layout_of(header))}`
+}
+
+function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string | undefined> {
 	const is_read = is_plan_read(header)
 
 	return [
 		`${tally_part(counts, header)}${is_read ? plus_of(counts, header) : ''}`,
+		estimate_part(header),
 		`${STATE_ICONS.running} ${String(counts.running)}`,
-		`${STATE_ICONS.waiting} ${is_read ? String(counts.remaining) : UNKNOWN}`,
+		`${STATE_ICONS.waiting} ${is_read ? waiting_of(counts, header) : UNKNOWN}`,
 		`${STATE_ICONS.parked} ${String(counts.parked)}`,
 	]
 }
 
-// The run's progress, then what its plan read is doing.
+// The run's progress, then what its reads are doing.
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
-	const parts = [...progress_parts(counts, header), loading_part(header), plan_warning(header)]
+	const parts = [
+		...progress_parts(counts, header),
+		loading_part(header),
+		warning_of(WORDS.plan, header.plan_failed_ms),
+		warning_of(WORDS.read, header.read_failed_ms, header.read_error),
+	]
 
 	return parts.filter((part) => part !== undefined).join(GAP)
 }
@@ -342,7 +385,7 @@ function now_line(counts: BoardCounts, header: BoardHeader): NowLine | undefined
 		children: running_issues(layout_of(header)),
 		running: counts.running,
 		waiting: is_plan_read(header) ? counts.remaining : undefined,
-		people: layout_of(header).people.length,
+		people: run_board_layout.people_of(layout_of(header)).length,
 	})
 }
 
@@ -375,7 +418,7 @@ function column_of(cells: ReadonlyArray<string>): Array<string> {
 }
 
 // The run's name, age and progress, then its repository, heartbeat and machine under them, then what
-// it is doing now — its time under theirs, its kind's icon under the `⚡`, the name's column left blank
+// it is doing now — its time under theirs, its kind's icon under the `💪`, the name's column left blank
 // and no label — in every state the board can be in. A stream with no event yet leaves it blank.
 function header_lines(header: BoardHeader): Array<string> {
 	const counts = counts_of(layout_of(header))
@@ -397,7 +440,26 @@ function now_legend(header: BoardHeader): string | undefined {
 	return now?.legend === undefined ? undefined : `${now.icon} ${now.legend}`
 }
 
-const run_board_header = { aged, counts_of, header_lines, is_plan_read, now_legend }
+// The estimated finish as the legend names it, on a frame that draws it alone.
+function estimate_legend(header: BoardHeader): string | undefined {
+	return estimate_part(header) === undefined ? undefined : run_board_estimate.LEGEND
+}
+
+// The third line's icon, so the legend names the phase it draws.
+function now_icon(header: BoardHeader): string | undefined {
+	return now_line(counts_of(layout_of(header)), header)?.icon
+}
+
+const run_board_header = {
+	aged,
+	counts_of,
+	estimate_legend,
+	header_lines,
+	is_plan_read,
+	now_icon,
+	now_legend,
+	warning_of,
+}
 
 export { run_board_header }
-export type { BoardCounts, BoardForm, BoardHeader }
+export type { BoardCounts, BoardForm, BoardHeader, BoardUsage }

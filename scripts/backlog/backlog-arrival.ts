@@ -7,11 +7,12 @@ import { backlog_arrival_added } from './backlog-arrival-added'
 import { backlog_next } from './backlog-next'
 import { backlog_ready, type ReadyPorts, type ReadyReading } from './backlog-ready'
 import { backlog_stalled } from './backlog-stalled'
+import { backlog_stalled_detect } from './backlog-stalled-detect'
 
 // The arrival probe a `backlogrun` parent's `--wait` watcher runs while children are in flight.
 // Without it, an issue opted in with `auto-ok` mid-run is picked up only when the parent
 // next wakes — a child's merge, or the progress interval — so in practice the ten-minute stall detector
-// becomes the pick-up, and the person gets a ⏳ notification for the wait.
+// becomes the pick-up, ten minutes late.
 //
 // **The watcher's exit is the only thing that wakes a live parent**, so the probe rides it: once a
 // minute it reads the backlog the pick-up line reads (`backlog_ready.read_ready`, cheap first — a full
@@ -66,15 +67,18 @@ async function bounded_ready_issues(): Promise<ReadonlyArray<string>> {
 	return answered_issues(await backlog_ready.read_backlog_next(COMMAND_TIMEOUT_MS))
 }
 
-// The backlog reads, plus whether `run:add` handed the run an issue since a given instant.
+// The backlog reads, whether `run:add` handed the run an issue since a given instant, and the stall
+// detector's record of whether work and a free lane coexist (joshuafolkken/kit#4349).
 interface ArrivalPorts extends ReadyPorts {
 	is_added_since: (since_ms: number) => Promise<boolean>
+	observe_offerable: (is_offerable: boolean) => Promise<void>
 }
 
 const ARRIVAL_PORTS: ArrivalPorts = {
 	free_lane_count: backlog_ready.free_lane_count,
 	ready_issues: bounded_ready_issues,
 	is_added_since: backlog_arrival_added.is_added_since,
+	observe_offerable: backlog_stalled_detect.observe_offerable,
 }
 
 interface ArrivalProbe {
@@ -92,6 +96,11 @@ function arrivals(
 	if (reading.free_lanes <= NO_FREE) return []
 
 	return is_raised ? reading.issues : reading.issues.filter((issue) => !baseline.has(issue))
+}
+
+// The stall detector's condition, off the reading the probe already made.
+function is_offerable(reading: ReadyReading): boolean {
+	return reading.issues.length > NONE && reading.free_lanes > NO_FREE
 }
 
 // The baseline is the whole runnable pool, free lane or not: an issue that was waiting for a lane is not
@@ -149,7 +158,7 @@ async function retry_baseline(
 function pool_probe_of(
 	initial: ReadonlySet<string> | undefined,
 	first_ms: number,
-	ports: ReadyPorts,
+	ports: ArrivalPorts,
 	is_raised: () => boolean,
 ): ArrivalProbe {
 	let next_ms = first_ms
@@ -167,6 +176,8 @@ function pool_probe_of(
 		if (baseline === undefined) return await retry_baseline(answered, ports)
 
 		const reading = await read_reading(ports)
+
+		if (reading !== undefined) await ports.observe_offerable(is_offerable(reading))
 
 		return reading !== undefined && arrivals(baseline, reading, is_raised()).length > NONE
 	}

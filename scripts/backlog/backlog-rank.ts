@@ -4,6 +4,7 @@ import { epic_rank } from '#scripts/epic/epic-rank'
 import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { epic_solo, type SoloGate, type SoloSelection } from '#scripts/epic/epic-solo'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
+import type { LaneRecords } from '#scripts/lane/lane-state'
 import { backlog_overlap, type Declared } from './backlog-overlap'
 
 // What the backlog offers, in the order it is decided: rank, then the
@@ -82,15 +83,21 @@ interface OfferInput {
 	// The paths each issue declares; two candidates whose paths overlap are not offered together.
 	// Absent, nothing is separated.
 	declared?: Declared
+	// The issues' lane state records; a clash with a paused holder says so. Absent, none is named.
+	lanes?: LaneRecords
 }
 
 // The overlap separation runs before the cap, for the reason the gate does: the cap only ever
 // removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
 	const ranked = rank(input.candidates, input.pool)
-	const { read, repo } = input
+	const { read, repo, lanes } = input
 	const gated = epic_solo.select(ranked, read, repo)
-	const separated = backlog_overlap.separate(gated, input.declared ?? new Map(), { read, repo })
+	const separated = backlog_overlap.separate(gated, input.declared ?? new Map(), {
+		read,
+		repo,
+		lanes,
+	})
 
 	return cap(separated, input.standalone)
 }
@@ -98,6 +105,7 @@ function select(input: OfferInput): SoloSelection {
 interface GateScope {
 	standalone: ReadonlySet<string>
 	declared: Declared
+	lanes?: LaneRecords
 }
 
 // `backlog:next`'s gate: `epic_solo.gate` with this selection in place of its bare one.

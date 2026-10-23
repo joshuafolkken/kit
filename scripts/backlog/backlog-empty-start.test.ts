@@ -27,8 +27,9 @@ const OWNER_PID = 4242
 const NO_ATTEMPTS = 0
 const NONE_RUNNING = 0
 const NO_RETRIES = 0
-// `backlog:drive`, `--owner` and the supervisor's pid lead the driver's argv; the budget flags follow.
-const DRIVER_FLAG_OFFSET = 3
+// `backlog:drive`, `--owner`, the supervisor's pid and its `--window` lead the driver's argv; the
+// budget flags follow.
+const DRIVER_FLAG_OFFSET = 5
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {

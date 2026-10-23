@@ -1,12 +1,13 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import {
-	ALREADY_DONE_LABEL,
 	EPIC_LABEL,
 	has_label_name,
-	NEEDS_DECISION_LABEL,
+	has_parked_label,
+	RUN_STALLED_LABEL,
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import type { CarryChange, RunCarry } from '#scripts/run/carry/run-carry'
+import { run_stalled } from '#scripts/run/park/run-stalled'
+import type { ChildOutcome } from './run-merge-outcome'
 
 // The pure core of `run:merge`, the one composite command for a `backlogrun` merge event: the parent —
 // the session whose context is largest and per-turn cost highest — calls `run:merge <N>` once at a
@@ -38,28 +39,22 @@ const ONE = 1
 //                   child a merged pull request's `closes #N` names — GitHub merged it without closing
 //                   the issue.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
-// - `parked`      — OPEN and carrying `needs-decision` or `already-done`; a person still owns it.
+// - `parked`      — OPEN and carrying a park label (`PARKED_LABELS`); a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
-// - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API; not
-//                   the child's failure, so it is re-dispatchable and uncounted against the failure guard.
+// - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API, a
+//                   host restart killed it, or its ship stop went unanswered; not the child's failure, so
+//                   it is re-dispatchable and uncounted against the failure guard.
 // - `cut`         — OPEN and carrying neither, but its lane holds a declared cut no successor adopted;
 //                   the child ended its session on purpose, so it is resumed rather than parked and
 //                   counts nothing.
+// - `unauthenticated` — OPEN and carrying neither, but the exit record shows the session could not
+//                   authenticate; no child can run until a person runs `/login`, so the run stops with
+//                   the child left `in-progress` and nothing counted (joshuafolkken/kit#4216).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
-//                   GitHub state: closed as not planned, or about to be, it is neither merged nor failed.
+//                   GitHub state: left OPEN for the next run, it is neither merged nor failed.
 // - `unresolved`  — the state could not be read; re-read before deciding.
-type ChildOutcome =
-	| 'merged'
-	| 'withdrawn'
-	| 'human-review'
-	| 'parked'
-	| 'split'
-	| 'cut'
-	| 'outage'
-	| 'failed'
-	| 'unresolved'
-	| 'shipping'
+// The names themselves are `run-merge-outcome.ts`'s.
 
 // What the CLI read beside the GitHub state: whether the exit record is an API outage, and whether the
 // lane holds a cut its successor never adopted.
@@ -71,8 +66,11 @@ interface EndingSignals {
 	merged_pr?: string | undefined
 	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`).
 	is_withdrawn?: boolean | undefined
-	// The outage is a ship stop no relaunch answered, not an API the child could not reach.
-	is_unanswered?: boolean | undefined
+	// The outage is not an API the child could not reach — a ship stop no relaunch answered, or a host
+	// restart that killed it — so it is left out of the run-wide streak.
+	is_streak_exempt?: boolean | undefined
+	// The exit record shows the session could not authenticate (`api-auth.ts`).
+	is_auth_failure?: boolean | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }
@@ -81,12 +79,10 @@ function is_closed(state: IssueState): boolean {
 	return state.state.toUpperCase() === CLOSED_STATE
 }
 
-// A parked child is one a person still owns: it stopped for a decision (`needs-decision`) or it was
-// found already merged (`already-done`). Either way it is left alone and not counted as a failure.
-const PARK_LABELS: ReadonlyArray<string> = [NEEDS_DECISION_LABEL, ALREADY_DONE_LABEL]
-
+// A parked child is one a person still owns (`PARKED_LABELS`): it is left alone and not counted as a
+// failure again.
 function is_parked(state: IssueState): boolean {
-	return PARK_LABELS.some((label) => has_label_name(state.labels, label))
+	return has_parked_label(state.labels)
 }
 
 // **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
@@ -101,6 +97,8 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 	if (signals.merged_pr !== undefined) return 'merged'
 
 	if (signals.is_cut) return 'cut'
+
+	if (signals.is_auth_failure === true) return 'unauthenticated'
 
 	return signals.is_outage ? 'outage' : 'failed'
 }
@@ -117,8 +115,8 @@ function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 
 // The signals are read by the CLI and, but for a withdrawal, matter only for an OPEN child — a CLOSED
 // child is merged regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
-// records it before stopping the child, so the parent may collect it while the issue is still OPEN, and
-// once it is CLOSED as not planned the closed state would otherwise read as a merge.
+// records it before stopping the child and leaves the issue OPEN, which would otherwise read as a child
+// to resume or park.
 function classify_child(
 	state: IssueState | undefined,
 	signals: EndingSignals = NO_SIGNALS,
@@ -173,7 +171,7 @@ function counters_comment(carry: RunCarry): string {
 }
 
 // Why the run parked a child it judged failed. A child that stops itself leaves its own comment; one
-// the driver stops leaves none, so this tells a person why it carries `needs-decision`.
+// the driver stops leaves none, so this tells a person why it carries `run:stalled`.
 // Script-emitted, so English.
 interface ParkReason {
 	child: string
@@ -192,21 +190,22 @@ function park_comment(reason: ParkReason): string {
 	const transcript = reason.output === undefined ? '' : ` (\`${reason.output}\`)`
 
 	return [
-		'Parked with `needs-decision` by `pnpm josh run:merge`, the `backlogrun` driver — not by the child itself.',
+		`Parked with \`${RUN_STALLED_LABEL}\` by \`pnpm josh run:merge\`, the \`backlogrun\` driver — a mechanical failure, with no decision to make.`,
 		`- Why: ${reason.cause}`,
-		'- Read: the issue is OPEN, carries none of `needs-decision`, `already-done`, `needs-human-review` or `epic`, and no merged pull request’s `closes #N` names it.',
+		'- Read: the issue is OPEN, carries no park label, `needs-human-review` or `epic`, no merged pull request’s `closes #N` names it, and it declares no open blocker, start date still ahead or sample condition not yet met.',
 		streak_line(reason.carry),
-		`- Next: read the child’s transcript${transcript}, then either resume it with \`fullrun ${issue_cite.plain(reason.child)}\`, or record the decision here and remove \`needs-decision\`.`,
+		`- Next: read the child’s transcript${transcript}, ${run_stalled.next_step(reason.child)}.`,
 	].join('\n')
 }
 
-// Why the run released a child it would otherwise have parked: the child records open blockers, so
-// its order is already decided and it waits rather than asking a person. Script-emitted, so English.
-function waiting_comment(blockers: ReadonlyArray<string>): string {
+// Why the run released a child it would otherwise have parked: the child records open blockers or a
+// start date still ahead or samples still short, so when it runs is already decided and it waits rather than asking a person.
+// Script-emitted, so English.
+function waiting_comment(waits: ReadonlyArray<string>): string {
 	return [
 		'Released to wait by `pnpm josh run:merge`, the `backlogrun` driver — not parked, and not counted as a failure.',
-		`- Why: the child’s session ended unfinished while it records open blockers: ${blockers.join(', ')}.`,
-		'- Next: its order is already recorded — it becomes runnable again once its blockers merge; a blocker outside the backlog still needs a person to land it.',
+		`- Why: the child’s session ended unfinished while it waits on: ${waits.join(', ')}.`,
+		'- Next: when it runs is already recorded — it becomes runnable again once its blockers merge, its start date arrives and its sample condition is met; a blocker outside the backlog still needs a person to land it.',
 	].join('\n')
 }
 
@@ -222,5 +221,7 @@ const run_merge = {
 	is_outage_guard_tripped,
 }
 
-export type { ChildOutcome, EndingSignals, ParkReason }
+export type { EndingSignals, ParkReason }
 export { run_merge }
+
+export { type ChildOutcome } from './run-merge-outcome'

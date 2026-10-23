@@ -8,6 +8,7 @@ const FIRST = 'a'
 const SECOND = 'b'
 const BOTH: ReadonlyArray<string> = [FIRST, SECOND]
 const LONE_COMMAND = 'pnpm josh gate'
+const QUOTED_SEPARATOR = "echo 'x && y'"
 
 describe('segments_of', () => {
 	it.each([
@@ -33,7 +34,7 @@ describe('first_of', () => {
 	it.each([
 		[LONE_COMMAND, LONE_COMMAND],
 		[`${FIRST} && ${SECOND}`, FIRST],
-		[`echo 'x && y' && ${SECOND}`, "echo 'x && y'"],
+		[`${QUOTED_SEPARATOR} && ${SECOND}`, QUOTED_SEPARATOR],
 	])('takes the first command of %j, a quoted separator left uncut', (command, expected) => {
 		expect(shell_segments.first_of(command)).toBe(expected)
 	})
@@ -44,5 +45,43 @@ describe('first_of', () => {
 
 	it('trims each segment so a caller may anchor at the command position', () => {
 		expect(shell_segments.segments_of(`  ${FIRST}  &&   ${SECOND} `)).toStrictEqual(BOTH)
+	})
+})
+
+// joshuafolkken/kit#4038: the argv-reading rows cut at the pipe and the background `&` too, and never
+// at a `&` that belongs to a redirection.
+describe('commands_of', () => {
+	it.each([
+		[`${FIRST} && ${SECOND}`, BOTH],
+		[`${FIRST} | ${SECOND}`, BOTH],
+		[`${FIRST} |& ${SECOND}`, BOTH],
+		[`${FIRST} & ${SECOND}`, BOTH],
+		[`${FIRST} 2>&1 | ${SECOND}`, [`${FIRST} 2>&1`, SECOND]],
+		[`${FIRST} &> log`, [`${FIRST} &> log`]],
+		[`${FIRST} >&2`, [`${FIRST} >&2`]],
+	])('cuts %j', (command, expected) => {
+		expect(shell_segments.commands_of(command)).toStrictEqual(expected)
+	})
+})
+
+// joshuafolkken/kit#4091: the same cut, never inside a quoted argument.
+describe('quote_aware_commands_of', () => {
+	it.each([
+		[`${FIRST} && ${SECOND}`, BOTH],
+		[`${FIRST} | ${SECOND}`, BOTH],
+		[`${FIRST} 2>&1 | ${SECOND}`, [`${FIRST} 2>&1`, SECOND]],
+		[`grep -E "x|y" f; ${SECOND}`, ['grep -E "x|y" f', SECOND]],
+		[`${QUOTED_SEPARATOR} | ${SECOND}`, [QUOTED_SEPARATOR, SECOND]],
+		[`${FIRST};`, [FIRST, '']],
+	])('cuts %j', (command, expected) => {
+		expect(shell_segments.quote_aware_commands_of(command)).toStrictEqual(expected)
+	})
+
+	it('falls back to commands_of for a heredoc line', () => {
+		const command = "cat > f <<'EOF'\na | b\nEOF"
+
+		expect(shell_segments.quote_aware_commands_of(command)).toStrictEqual(
+			shell_segments.commands_of(command),
+		)
 	})
 })

@@ -2,20 +2,7 @@
 
 ## 0. Per-Requirement Test Coverage (MANDATORY)
 
-Before any implementation code, **list every requirement from the user's request and assign a test to each one**.
-
-### Planning template
-
-```text
-Req 1: "Label chip shown immediately"
-  → E2E: open editor, type new label, press Enter → chip visible without blurring
-
-Req 2: "Down arrow moves to next row"
-  → E2E: open editor on row 1, press ↓ → row 2 enters edit mode
-
-Req N: ...
-  → Unit/E2E: ...
-```
+Every requirement gets a test (`CLAUDE.md` → "Code Change Rules" Step 0); the declaration's form is `prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか". This section decides which test.
 
 ### Rules
 
@@ -24,7 +11,6 @@ Req N: ...
 - **Non-runtime updates (pre-approved manual-only exception):** a change touching no executable runtime code path — docs, non-executable config, editor/IDE files, cosmetic asset swaps with no selector/path change — may be verified by hand; declare it in Step 0 with the reason. The mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) need no declaration. A runtime change whose test is infeasible needs the reason and user approval.
 - **basic で kit がテストできない言語だけの変更:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）があり、変更が HTML/CSS や Lua などのソースだけなら自動テストは不要。HTML/CSS はブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認する。そのほかのソースは変更した処理を実際に動かす。どちらも結果を記録する。JavaScript または TypeScript のファイルを含む変更は自動テストを行う。
 - Test infeasible (e.g., a native OS date-picker Playwright cannot drive) → comment why in the test file and test the closest observable behavior (e.g., the editor stays open after `change`).
-- A requirement without its test is not done.
 
 ### Verification checklist (add to the completion gate)
 
@@ -58,10 +44,7 @@ Req N: ...
 
 ## 2. Test Guidelines
 
-### Naming
-
-- Variables/functions: `snake_case` | Constants: `UPPER_SNAKE_CASE`
-- Boolean prefix: `is_`, `has_`, `should_`, `can_`, `will_`, `did_`
+Naming, imports, `any`, `@ts-ignore`, magic numbers, template `String()` and the 10-statement limit are lint-enforced (`eslint/base.js`); this section holds only what lint cannot see.
 
 ### Test Functions
 
@@ -72,15 +55,6 @@ Req N: ...
 
 - Playwright: `for` loop; Vitest: `test.each` / `it.each`
 - Cases: a `cases` or `*_cases` array at file top, outside test functions
-
-### Constants
-
-- Magic numbers/strings except `0`, `1`, `-1` → `UPPER_SNAKE_CASE` constants after the imports
-
-### Imports
-
-- Always the `.js` extension: `import { foo } from './bar.js'`
-- Type imports: `import { type Foo } from '...'`
 
 ### Playwright
 
@@ -102,17 +76,6 @@ When tests leave persistent state behind:
 ### Error Messages
 
 - State expected and actual values
-- Wrap `number` in template literals with `String()`
-- No `?? ''` unless the value can be `undefined`
-
-### Type Safety
-
-- No `any`; use every loop variable
-- `@ts-expect-error`, not `@ts-ignore`
-
-### Statement Limit
-
-- Max 10 statements per test function; split beyond that
 
 ### No live network
 
@@ -122,15 +85,15 @@ When tests leave persistent state behind:
 
 ### A josh command that writes state runs through the integration harness (kit only)
 
-- A new or changed state-writing josh command needs a test in all three environments of `scripts/test/josh-harness.ts` — kit, a consumer without `docs/`, a lane worktree (joshuafolkken/kit#2402). Packed suite: `vitest.harness.config.ts`
+- A new or changed state-writing josh command needs a test in all three environments of `tools/test/josh-harness.ts` — kit, a consumer without `docs/`, a lane worktree (joshuafolkken/kit#2402). Packed suite: `vitest.harness.config.ts`
 
 ---
 
 ## 3. Checklist
 
-- [ ] `pnpm josh gate`, then E2E per § 6: the CI E2E job where a pull request is open; where there is none, run `pnpm josh test:e2e` with `CI` unset (DEV: `pnpm run dev` on the port `playwright.config.ts` derives from `PORT_SEED`); no `pnpm build` or `CI=true` unless asked. Playwright cannot run here → report the E2E result missing and the gate not closed
-- [ ] `read_lints`: 0 errors on touched files; Playwright: no failures and no flaky runs
-- [ ] § 2 holds: constants, `.js` imports, `data-testid` selectors, correct `async`/`await`, no `any`, ≤10 statements, `String()` / no needless `?? ''`
+- [ ] `pnpm josh gate`, then the E2E gate per § 6
+- [ ] `pnpm josh lint:related`: 0 errors on touched files; Playwright: no failures and no flaky runs
+- [ ] § 2 holds: `data-testid` selectors, `async` Playwright tests, expected/actual in error messages
 
 ---
 
@@ -160,6 +123,8 @@ Decided by whether a pull request is open:
 | No pull request — `halfrun`'s stop before commit, a completion reported outside any workflow | `pnpm josh test:e2e`, run by **you**, output read by you.                                                        |
 
 **Never ask the user to run it**, in either row, and never report completion on an unread E2E result — unread is not a pass.
+
+Second row: run with `CI` unset (DEV: `pnpm run dev` on the port `playwright.config.ts` derives from `PORT_SEED`); no `pnpm build` or `CI=true` unless asked. Playwright cannot run here → report the E2E result missing and the gate not closed.
 
 Second row: prefer an integrated gate when the installed toolkit's printed command list has one (not by toolkit or version) — `@joshuafolkken/app-kit`'s `pnpm josh-app verify` builds and boots once for E2E and the DAST scan, delegating E2E to `josh test:e2e` (so the skip below applies).
 

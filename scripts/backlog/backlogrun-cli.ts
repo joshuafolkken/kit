@@ -7,12 +7,14 @@ import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { run_wake_cli } from '#scripts/run/wake/run-wake-cli'
-import { backlogrun_args, type BacklogrunArguments } from './backlogrun-args'
+import { backlogrun_args, type ArgumentsResult, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
+import { backlogrun_restart } from './backlogrun-restart'
 import { backlogrun_stop, type StopReport } from './backlogrun-stop'
 
-// `josh backlogrun` — start a `backlogrun` from the terminal and watch it, or stop it with `--stop`. A
+// `josh backlogrun` — start a `backlogrun` from the terminal and watch it, stop it with `--stop`, or
+// replace its processes with `--restart` while its record is kept (`backlogrun-restart.ts`). A
 // run already going is never joined by a second one: the board is shown, and any issue named is pointed
 // at `run:add` rather than added behind the person's back. Otherwise the agent is started in the
 // background, its output to a log file, and the board takes over the terminal at once. Closing the
@@ -27,7 +29,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlogrun [<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop'
+	'Usage: josh backlogrun [<n>...] [--only] [--max <n>] [--idle <minutes>] [--agent claude|codex] | --stop | --restart'
 
 interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
@@ -36,6 +38,7 @@ interface BacklogrunPorts {
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
 	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
+	restart: (git_directory: string) => Promise<number>
 	show_board: () => Promise<number>
 	write: (line: string) => void
 }
@@ -48,6 +51,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
+	restart: async (git_directory) => await backlogrun_restart.restart(git_directory),
 	show_board: async () => await run_board_cli.run([]),
 	write: (line) => process.stdout.write(`${line}\n`),
 }
@@ -150,6 +154,17 @@ async function stop(git_directory: string, ports: BacklogrunPorts): Promise<numb
 	return backlogrun_stop.is_stopped(report) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+async function dispatch(
+	parsed: Exclude<ArgumentsResult, { kind: 'refused' }>,
+	git_directory: string,
+	ports: BacklogrunPorts,
+): Promise<number> {
+	if (parsed.kind === 'stop') return await stop(git_directory, ports)
+	if (parsed.kind === 'restart') return await ports.restart(git_directory)
+
+	return await begin(parsed.args, git_directory, ports)
+}
+
 function refuse(line: string, ports: BacklogrunPorts): number {
 	ports.write(line)
 
@@ -167,9 +182,8 @@ async function run(
 	const git_directory = await ports.repository_directory()
 
 	if (git_directory === undefined) return refuse('backlogrun: not inside a git repository', ports)
-	if (parsed.kind === 'stop') return await stop(git_directory, ports)
 
-	return await begin(parsed.args, git_directory, ports)
+	return await dispatch(parsed, git_directory, ports)
 }
 
 const backlogrun_cli = { run }

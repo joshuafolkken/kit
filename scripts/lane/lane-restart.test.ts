@@ -9,6 +9,7 @@ import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_preserve } from './lane-preserve'
 import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_residents } from './lane-residents'
 import { lane_restart } from './lane-restart'
 
 // joshuafolkken/kit#3772: a person stops a running lane child and re-dispatches its issue in a fresh
@@ -40,6 +41,7 @@ const find_open_lane = vi.spyOn(lane_registry, 'find_open_lane')
 const reap_child = vi.spyOn(lane_reap, 'reap_child')
 const is_child_running = vi.spyOn(lane_reap, 'is_child_running')
 const changes_probe = vi.spyOn(git_stash, 'has_changes')
+const conflict_probe = vi.spyOn(git_stash, 'has_conflict')
 const push = vi.spyOn(git_stash, 'push')
 const announce = vi.spyOn(lane_preserve, 'announce')
 const claim_marker = vi.spyOn(lane_dispatch, 'claim_marker')
@@ -47,6 +49,9 @@ const dispatch_child = vi.spyOn(lane_dispatch, 'dispatch_child')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const lane_cut_sync = vi.spyOn(run_cut, 'lane_cut_sync')
 const end_cut = vi.spyOn(run_cut, 'end_cut')
+const end_residents = vi.spyOn(lane_residents, 'end_residents')
+
+vi.spyOn(lane_residents, 'report').mockReturnValue()
 
 vi.spyOn(lane_dispatch, 'describe').mockReturnValue('dispatch described')
 
@@ -55,6 +60,7 @@ function arrange_running_child(): void {
 	is_child_running.mockReturnValue(true)
 	claim_marker.mockResolvedValue({ is_applied: true })
 	reap_child.mockReturnValue([PID])
+	conflict_probe.mockResolvedValue(false)
 }
 
 function arrange_relaunch(): void {
@@ -65,6 +71,7 @@ function arrange_relaunch(): void {
 	emit.mockResolvedValue()
 	lane_cut_sync.mockReturnValue(undefined)
 	end_cut.mockReturnValue()
+	end_residents.mockReturnValue([])
 }
 
 beforeEach(() => {
@@ -77,7 +84,7 @@ describe('lane_restart.restart — stopping and re-dispatching', () => {
 	it('stops the child, then dispatches the issue in a fresh session', async () => {
 		const outcome = await lane_restart.restart(ISSUE)
 
-		expect(reap_child).toHaveBeenCalledWith(ISSUE)
+		expect(reap_child).toHaveBeenCalledWith(LANE)
 		expect(dispatch_child).toHaveBeenCalledWith(ISSUE, 'restart')
 		expect(outcome).toStrictEqual({ kind: 'restarted', dispatch: DISPATCHED, stash: undefined })
 	})
@@ -100,6 +107,16 @@ describe('lane_restart.restart — stopping and re-dispatching', () => {
 		)
 		expect(dispatch_child.mock.invocationCallOrder[0]).toBeLessThan(
 			emit.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	// joshuafolkken/kit#4315: what the stopped child started outside its tree goes before the relaunch.
+	it('ends the stopped child’s residents, sparing what the reap ended, before the dispatch', async () => {
+		await lane_restart.restart(ISSUE)
+
+		expect(end_residents).toHaveBeenCalledWith(LANE, [PID])
+		expect(end_residents.mock.invocationCallOrder[0]).toBeLessThan(
+			dispatch_child.mock.invocationCallOrder[0] ?? 0,
 		)
 	})
 })
@@ -165,6 +182,18 @@ describe('lane_restart.restart — what stops before or after the kill', () => {
 		expect(outcome).toStrictEqual({ kind: 'unclaimed', reason: 'HTTP 502' })
 		expect(reap_child).not.toHaveBeenCalled()
 		expect(lane_restart.describe(outcome, ISSUE)).toContain('nothing was stopped')
+	})
+
+	// joshuafolkken/kit#4233: a tree mid-merge cannot be stashed, so the child must not be stopped first.
+	it('leaves the child running when the tree has unresolved conflicts', async () => {
+		conflict_probe.mockResolvedValue(true)
+		const outcome = await lane_restart.restart(ISSUE)
+
+		expect(conflict_probe).toHaveBeenCalledWith(DIRECTORY)
+		expect(outcome).toStrictEqual({ kind: 'conflicted', directory: DIRECTORY })
+		expect(claim_marker).not.toHaveBeenCalled()
+		expect(reap_child).not.toHaveBeenCalled()
+		expect(lane_restart.describe(outcome, ISSUE)).toContain(`git -C ${DIRECTORY} merge --abort`)
 	})
 
 	it('re-dispatches nothing when the work cannot be stashed', async () => {

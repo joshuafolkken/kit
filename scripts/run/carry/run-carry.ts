@@ -323,11 +323,16 @@ function adopt_carry(
 // A live pid with no readable start token is conservatively held rather than replaced. The command
 // cannot prove its generation inside that sandbox, but a false `busy` stops for a person while a
 // false `standing` can put two parents on one budget. A record with no pid still resolves false.
-// A gone process whose conversation is still being continued is live (`run-carry-conversation.ts`).
-function is_owner_live(carry: RunCarry, now: Date = new Date()): boolean {
-	if (process_identity.is_same_process(carry.owner_pid, carry.owner_start) !== false) return true
+// A gone process whose conversation is still being continued is live (`run-carry-conversation.ts`);
+// a headless owner is never resumed into a new process, so its gone process is a gone owner.
+function is_owner_live(
+	carry: RunCarry,
+	now: Date = new Date(),
+	same_process: typeof process_identity.is_same_process = process_identity.is_same_process,
+): boolean {
+	if (same_process(carry.owner_pid, carry.owner_start) !== false) return true
 
-	return run_carry_conversation.is_conversation_live(carry, now)
+	return carry.is_owner_headless !== true && run_carry_conversation.is_conversation_live(carry, now)
 }
 
 function is_owned_by(carry: RunCarry, owner: CarryOwner): boolean {

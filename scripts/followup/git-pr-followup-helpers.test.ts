@@ -8,32 +8,9 @@ import {
 	read_coderabbit_skip_notes,
 	type TelegramContext,
 } from './git-pr-followup'
-import { is_blank_issue_body } from './git-pr-followup-wrapup'
 
 // The pure half of `git-pr-followup`: functions that answer from their arguments alone. Kept apart
 // from the run tests, which need the whole `gh` surface mocked before the module is even imported.
-
-describe('is_blank_issue_body', () => {
-	it('returns true for undefined', () => {
-		expect(is_blank_issue_body(undefined)).toBe(true)
-	})
-
-	it('returns true for empty string', () => {
-		expect(is_blank_issue_body('')).toBe(true)
-	})
-
-	it('returns true for whitespace-only string', () => {
-		expect(is_blank_issue_body('   \n\t  ')).toBe(true)
-	})
-
-	it('returns false for non-empty body', () => {
-		expect(is_blank_issue_body('## Background\nSome content')).toBe(false)
-	})
-
-	it('returns false for body with leading whitespace and content', () => {
-		expect(is_blank_issue_body('  content  ')).toBe(false)
-	})
-})
 
 describe('has_closes_keyword', () => {
 	it('returns false for undefined', () => {

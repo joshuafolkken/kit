@@ -1,3 +1,4 @@
+import { json_value } from '#scripts/lib/json-value'
 import { yaml_document } from '#scripts/lib/yaml-document'
 import { z } from 'zod'
 
@@ -88,17 +89,7 @@ function expected_checks(read_workflow: (workflow: string) => string | undefined
 	})
 }
 
-function parse_json(stdout: string): unknown {
-	try {
-		return JSON.parse(stdout)
-	} catch {
-		return undefined
-	}
-}
-
-function status_check_rules(payload: unknown): Array<BranchRule> {
-	if (!Array.isArray(payload)) return []
-
+function status_check_rules(payload: ReadonlyArray<unknown>): Array<BranchRule> {
 	return payload.flatMap((entry: unknown) => {
 		const parsed = branch_rule_schema.safeParse(entry)
 
@@ -110,8 +101,8 @@ function status_check_rules(payload: unknown): Array<BranchRule> {
 // rulesets. The contexts of all of them are combined, since each is enforced; the first ruleset is the
 // one `--apply` writes to. No `required_status_checks` rule at all reads as `none`.
 function parse_branch_rules(stdout: string | undefined): RequiredSource {
-	const payload = stdout === undefined ? undefined : parse_json(stdout)
-	if (!Array.isArray(payload)) return { kind: 'unreadable' }
+	const payload = stdout === undefined ? undefined : json_value.parse_array(stdout)
+	if (payload === undefined) return { kind: 'unreadable' }
 	const rules = status_check_rules(payload)
 	const [first] = rules
 	if (first === undefined) return { kind: 'none' }
@@ -132,7 +123,7 @@ function parse_protection(read: ApiRead): RequiredSource {
 		return { kind: read.status === NOT_FOUND_STATUS ? 'none' : 'unreadable' }
 	}
 
-	const parsed = protection_schema.safeParse(parse_json(read.stdout))
+	const parsed = protection_schema.safeParse(json_value.parse_or_undefined(read.stdout))
 
 	return parsed.success
 		? { kind: 'protection', contexts: parsed.data.contexts }
@@ -175,7 +166,7 @@ function ruleset_update_body(
 	ruleset_stdout: string,
 	missing: ReadonlyArray<string>,
 ): string | undefined {
-	const parsed = ruleset_schema.safeParse(parse_json(ruleset_stdout))
+	const parsed = ruleset_schema.safeParse(json_value.parse_or_undefined(ruleset_stdout))
 	if (!parsed.success) return undefined
 
 	return JSON.stringify({

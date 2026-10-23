@@ -1,5 +1,6 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_overlap } from './run-ship-overlap'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
@@ -20,6 +21,7 @@ vi.mock('./run-ship-probe', () => ({
 			is_pushed: false,
 			is_merged: false,
 		}),
+		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
 	},
@@ -62,6 +64,8 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 // No lane overlaps (pinned in `run-ship-overlap.test.ts`), so no test lists this repository's work trees.
 vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
+// No ship body draft (pinned in `run-ship-body-draft.test.ts`), so no test reads this checkout's own.
+vi.spyOn(run_ship_body_draft, 'with_draft').mockImplementation(async (args) => args)
 
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
 const { run_ship_cli } = await import('./run-ship-cli')
@@ -305,10 +309,10 @@ describe('run_ship_cli.run — a failed step stops the ship', () => {
 describe('run_ship_cli.run — --review owns the round-1 review (joshuafolkken/kit#2427)', () => {
 	it('reviews before the gate, then ships the clean path without an agent turn', async () => {
 		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
-		expect(review_mock).toHaveBeenCalledWith(NUMBER)
+		expect(review_mock).toHaveBeenCalledWith(NUMBER, false)
 		expect(argv_calls()).toStrictEqual([GATE, COMMIT, FOLLOWUP, REPORT])
 		expect(info_lines[0]).toMatch(
-			/^=== preflight ===\nready\n\n=== review ===\nreview clean\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== gate ===/u,
+			/^=== preflight ===\nready\n\n=== sync origin\/main ===\nmain brings nothing in\n\n=== review ===\nreview clean\n\n=== gate ===/u,
 		)
 	})
 
@@ -373,24 +377,19 @@ describe('run_ship_cli.run — --review carries round 2 between the commit and t
 
 // joshuafolkken/kit#3643: every stage that ran leaves its duration in the lane ledger, so
 // `lane:stats` can say where a lane's time went — the stage that stopped the ship included.
-it('records each stage a ship ran, never a skipped one, up to the one that failed', async () => {
+// joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began;
+// joshuafolkken/kit#3998: with its cause — a red gate is a check whatever it prints, never retried.
+it('records each stage a ship ran, never a skipped one, and the stop with its cause', async () => {
 	const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+	const record_stop = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+	const stop = { issue: Number(NUMBER), reason: 'gate', cause: 'check' }
 
 	review_mock.mockResolvedValue({ code: OK, out: 'round 1 already recorded', is_skipped: true })
-	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
+	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red: rate limit test' })
 	await run_ship_cli.run([TITLE, '--review'])
 
 	expect(
 		record.mock.calls.map(([stage]) => `${stage.stage} #${String(stage.issue)}`),
 	).toStrictEqual(['preflight', 'sync', 'gate'].map((stage) => `${stage} #${NUMBER}`))
-})
-
-// joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began.
-it('records the stop of a ship with the stage it stopped at', async () => {
-	const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
-
-	josh_run_mock.mockResolvedValueOnce({ code: FAILED, out: 'gate red' })
-	await run_ship_cli.run([TITLE, '--review'])
-
-	expect(record.mock.calls).toStrictEqual([[{ issue: Number(NUMBER), reason: 'gate' }]])
+	expect(record_stop.mock.calls).toStrictEqual([[stop]])
 })

@@ -1,5 +1,5 @@
 import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TIMEOUT_EXIT_CODE } from './git-execa-error'
 import { git_spawn } from './git-spawn'
@@ -8,7 +8,7 @@ import { git_spawn } from './git-spawn'
 // synchronous counterpart, so a local git that never answered held an unattended run open for good.
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })

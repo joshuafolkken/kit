@@ -103,6 +103,21 @@ describe('reason', () => {
 	})
 })
 
+// joshuafolkken/kit#4302: the pre-gate notice fires on the split verdict only.
+describe('notice', () => {
+	it('names the measurement and the two actions when both guides are exceeded', () => {
+		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
+
+		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
+		expect(notice).toContain('record why it stays one Issue, or carve the rest out')
+		expect(notice).toContain('Over the guide before the gate')
+	})
+
+	it('prints nothing under the guide', () => {
+		expect(split_assess.notice({ files: 12, lines: 30, verdict: 'single' })).toBeUndefined()
+	})
+})
+
 describe('cli flag parsing', () => {
 	it('reads --json', () => {
 		expect(split_assess_cli.parse_is_json(['--json'])).toBe(true)

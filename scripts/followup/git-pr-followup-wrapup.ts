@@ -1,5 +1,8 @@
 import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks'
+import { git_pr_merge_checked, type WaitForGreen } from '#scripts/gh/git-pr-merge-checked'
+import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { git_followup_cleanup } from './git-followup-cleanup'
@@ -40,6 +43,10 @@ interface WrapupInput {
 	// already on the issue does not post it twice (`git-followup-merged.ts`).
 	is_merged?: boolean | undefined
 	is_completion_recorded?: boolean | undefined
+	// The snapshot the merge gate passed, whose head the merge names, and the wait to go back to when
+	// that head moved before the merge (`git-pr-merge-checked.ts`, #4036).
+	checked?: PrStateSnapshot | undefined
+	wait_for_green: WaitForGreen
 }
 
 function build_notify_body(input: {
@@ -57,12 +64,6 @@ function build_notify_body(input: {
 	})
 }
 
-function is_blank_issue_body(body: string | undefined): boolean {
-	if (body === undefined) return true
-
-	return body.trim().length === 0
-}
-
 async function post_notify_issue(input: {
 	issue_number: string | undefined
 	body: string
@@ -71,12 +72,7 @@ async function post_notify_issue(input: {
 		throw new Error('Issue number is required for issue notification.')
 	}
 
-	const current_body = await git_gh_command.issue_get_body(input.issue_number)
-	const should_edit_body = current_body !== undefined && is_blank_issue_body(current_body)
-
-	await (should_edit_body
-		? git_gh_command.issue_edit_body(input.issue_number, input.body)
-		: git_gh_command.issue_comment(input.issue_number, input.body))
+	await issue_body_or_comment.post(input.issue_number, input.body)
 }
 
 function should_notify_pr(target: GitNotifyConfig['target']): boolean {
@@ -239,7 +235,7 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
 	if (input.should_merge && input.is_merged !== true) {
 		await issue_watch_gate.assert_read_here()
-		await git_gh_command.pr_merge(input.branch_name)
+		await git_pr_merge_checked.merge_checked(input)
 		lap(log, STAGE.merge)
 	}
 
@@ -256,7 +252,6 @@ export {
 	git_pr_followup_wrapup,
 	post_notify_issue,
 	post_completion_notification,
-	is_blank_issue_body,
 	build_notify_body,
 }
 export type { WrapupInput }

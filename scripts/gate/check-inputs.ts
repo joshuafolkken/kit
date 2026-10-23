@@ -1,85 +1,24 @@
 import path from 'node:path'
-import { lint_related_scope } from '#scripts/lint/lint-related-scope'
-import { gate_plan } from './gate-plan'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { test_related } from '#scripts/test/test-related'
+import {
+	verification_inputs,
+	type InputDeclaration,
+	type PrettierIgnored,
+} from './verification-inputs'
 
-// Which paths each gate check reads, so a gate re-run reuses a check none of whose inputs moved
-// (`check-reuse.ts`). **A check with no scope here always runs**: `cspell` reads every
-// text file, the unit suite reads documents and fixtures as well as code, `behavior` reads a transcript
-// outside the tree and `metrics` reads whatever it measures. Naming a scope for any of them would be a
-// guess, and a wrong guess is a check reported green without having run.
+// The file-level answer of a check's declaration (`verification-inputs.ts`): whether any of the paths
+// that moved is one the check reads, so a gate re-run reuses a check none of whose inputs moved
+// (`check-reuse.ts`). It lives apart from the declarations because following imports reads the
+// test-read map (`test-related.ts`), whose own since-green narrowing reads the declarations.
 //
-// **The scopes over-approximate, never under**: a path in doubt is an input. `check` and `exports`
-// read source modules and the JSON they import. `lint` is prettier plus eslint, so its inputs are those
-// sources plus every file prettier formats — the extensions `lint:related` already selects, less what
-// prettier's own ignore files leave out (`.claude/**/*.md`). Prettier answers that itself through
-// `getFileInfo`, so the two ignore files stay the single source.
-//
-// **A configuration file is an input of every scoped check**: a manifest or lock file moves the
-// installed toolchain, and an ignore or editor file moves what prettier reads.
-
-const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
-	'.ts',
-	'.tsx',
-	'.mts',
-	'.cts',
-	'.js',
-	'.jsx',
-	'.mjs',
-	'.cjs',
-	'.svelte',
-	'.vue',
-	'.json',
-	'.jsonc',
-])
-
-const GIT_IGNORE = '.gitignore'
-const PRETTIER_IGNORE = '.prettierignore'
-const PRETTIER_IGNORE_FILES = [GIT_IGNORE, PRETTIER_IGNORE] as const
-
-const CONFIG_FILES: ReadonlySet<string> = new Set([
-	'package.json',
-	'pnpm-lock.yaml',
-	'pnpm-workspace.yaml',
-	'package-lock.json',
-	'yarn.lock',
-	'bun.lock',
-	'bun.lockb',
-	'.npmrc',
-	'.editorconfig',
-	...PRETTIER_IGNORE_FILES,
-])
-
-const PRETTIER_CONFIG_PREFIX = '.prettierrc'
-
-// Whether prettier would leave `relative` out; `false` when prettier cannot be asked, which keeps the
-// path an input.
-type PrettierIgnored = (relative: string) => Promise<boolean>
-
-type InputTest = (relative: string, is_ignored: PrettierIgnored) => Promise<boolean>
-
-function is_config(relative: string): boolean {
-	const name = path.basename(relative)
-
-	return CONFIG_FILES.has(name) || name.startsWith(PRETTIER_CONFIG_PREFIX)
-}
-
-function is_source(relative: string): boolean {
-	return SOURCE_EXTENSIONS.has(path.extname(relative))
-}
-
-async function is_lint_input(relative: string, is_ignored: PrettierIgnored): Promise<boolean> {
-	if (is_source(relative)) return true
-	if (!lint_related_scope.is_lintable(relative)) return false
-
-	return !(await is_ignored(relative))
-}
-
-async function is_source_input(relative: string): Promise<boolean> {
-	return is_source(relative)
-}
+// **The unit step's inputs are the test-read map's, not a guess** (joshuafolkken/kit#4314): it is
+// reusable only when `josh test:related` would run no test for what moved — every moved file one no
+// recorded test reads. No map, or one recorded on a tree git can no longer diff against, reaches every
+// test, so the step runs.
 
 function prettier_ignored(root: string): PrettierIgnored {
-	const ignore_path = PRETTIER_IGNORE_FILES.map((name) => path.join(root, name))
+	const ignore_path = verification_inputs.PRETTIER_IGNORE_FILES.map((name) => path.join(root, name))
 
 	return async function is_ignored(relative: string): Promise<boolean> {
 		try {
@@ -95,35 +34,40 @@ function prettier_ignored(root: string): PrettierIgnored {
 	}
 }
 
-const SCOPES: ReadonlyMap<string, InputTest> = new Map([
-	[gate_plan.LINT_LABEL, is_lint_input],
-	[gate_plan.TYPE_CHECK_LABEL, is_source_input],
-	[gate_plan.EXPORTS_LABEL, is_source_input],
-])
-
-function is_scoped(label: string): boolean {
-	return SCOPES.has(label)
-}
-
-// Whether any of `paths` (repository-root relative) is an input of the check `label`. An unscoped
-// check answers `true` for every set of paths, so the only way to reuse it is never.
-async function touches_inputs(
-	label: string,
+async function reads_any(
+	declaration: InputDeclaration,
 	paths: ReadonlyArray<string>,
 	is_ignored: PrettierIgnored,
+	root: string,
 ): Promise<boolean> {
-	const scope = SCOPES.get(label)
+	if (declaration.reads === 'recorded') return await test_related.reaches_tests(root, paths)
 
-	if (scope === undefined || paths.some((relative) => is_config(relative))) return true
+	const { is_input } = declaration
+
+	if (is_input === undefined) return true
 
 	const answers = await Promise.all(
-		paths.map(async (relative) => await scope(relative, is_ignored)),
+		paths.map(async (relative) => await is_input(relative, is_ignored)),
 	)
 
 	return answers.includes(true)
 }
 
-const check_inputs = { is_scoped, prettier_ignored, touches_inputs }
+// Whether any of `paths` (repository-root relative) is an input of the check `label`. An undeclared
+// check answers `true` for every set of paths, so the only way to reuse it is never.
+async function touches_inputs(
+	label: string,
+	paths: ReadonlyArray<string>,
+	is_ignored: PrettierIgnored,
+	root: string = PROJECT_ROOT,
+): Promise<boolean> {
+	const declaration = verification_inputs.declaration_of(label)
 
-export type { PrettierIgnored }
+	if (declaration === undefined || verification_inputs.configures(label, paths)) return true
+
+	return await reads_any(declaration, paths, is_ignored, root)
+}
+
+const check_inputs = { prettier_ignored, touches_inputs }
+
 export { check_inputs }

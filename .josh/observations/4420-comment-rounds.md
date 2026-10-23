@@ -1,0 +1,1 @@
+- rf:comments | low | scripts/lint/eslint-cache-dependencies.ts:116 | 2026-10-21 | #4420

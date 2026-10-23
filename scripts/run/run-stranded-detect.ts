@@ -42,6 +42,8 @@ interface DetectPorts {
 	notify_stranded: (body: string) => Promise<boolean>
 }
 
+type SameProcess = NonNullable<Parameters<typeof run_stranded.supervisor_liveness>[1]>
+
 interface RecordTargets {
 	carry: string
 	wake: string
@@ -151,6 +153,16 @@ function is_stranded_at(directory: string, ports: DetectPorts = DEFAULT_PORTS): 
 	return input !== undefined && run_stranded.is_stranded(input)
 }
 
+// The default ports with both liveness probes asked through `same_process` — `run:board` hands the one
+// that reads its own `ps` snapshot (joshuafolkken/kit#4263).
+function ports_with(same_process: SameProcess): DetectPorts {
+	return {
+		...DEFAULT_PORTS,
+		is_owner_live: (carry) => run_carry.is_owner_live(carry, new Date(), same_process),
+		supervisor_liveness: (wake) => run_stranded.supervisor_liveness(wake, same_process),
+	}
+}
+
 // The judgement a supervisor asks of the run it is about to stop watching. The asker is that
 // supervisor on its way out, so it is taken as gone, and so is an owner that is the asker itself
 // (`run_carry.is_held_by_another`) — that owner is about to be gone. A
@@ -173,6 +185,7 @@ const run_stranded_detect = {
 	detect_and_report,
 	is_left_stranded,
 	is_stranded_at,
+	ports_with,
 	run_stranded_check,
 }
 

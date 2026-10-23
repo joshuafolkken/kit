@@ -29,10 +29,11 @@ const EVENT_PREFIX = 'josh-run-events-'
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
-// A run's session-facing events over one unattended night: a plan, a launch/PR/review-round/merge
-// per child across a few dozen children, plus parks, cuts and stops. Five hundred keeps the whole of a
-// large `backlogrun` and still bounds an unattended run — past it the oldest events roll off.
-const EVENT_CAP = 500
+// A week of a busy run's events, so `josh lane:stats --period 7` reads the parks that end a stop's wait
+// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). A four-lane `backlogrun` wrote about
+// 75 events an hour (1,877 in 25 hours), so fifteen thousand holds about eight days at that rate and
+// still bounds the file to a few megabytes — past it the oldest events roll off.
+const EVENT_CAP = 15_000
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1
 const LINE_SEPARATOR = '\n'
@@ -64,7 +65,7 @@ const EVENT_KIND = {
 	// (`lane:restart`). It follows the fresh dispatch's `CHILD_LAUNCH`, so it is a launch to the parent and
 	// the board, and — like that launch — a batch record a lane child never reads as its own position.
 	RESTART: 'restart',
-	// A person withdrew a lane child — stopped it and closed its issue as not planned (`lane:withdraw`).
+	// A person withdrew a lane child — stopped it and left its issue open for the next run (`lane:withdraw`).
 	// It is written before the stop, so `run:merge` settles the child as withdrawn whatever GitHub says
 	// by the time the parent collects it, and counts it as neither a merge, a failure nor an outage.
 	WITHDRAW: 'withdraw',
@@ -143,6 +144,19 @@ const EVENT_KIND = {
 	// in followup without asking GitHub (joshuafolkken/kit#3770). A trace: it says how the checks stand,
 	// not where the run is.
 	PR_CHECKS: 'pr-checks',
+	// `backlog:drive` reached a watch with no child running and nothing to dispatch — the point a person's
+	// hand is wanted. Emitted once per idle episode (`emit_once_since_with`, reset by `CHILD_LAUNCH`), it
+	// is the dedup marker for the one idle Telegram. A trace: a drain's retrospective is read off the
+	// position beneath it, so the marker must not stand over it.
+	IDLE_NOTICE: 'idle-notice',
+	// A person paused or resumed a lane child (`lane:pause` / `lane:resume`), so who halted a lane and
+	// when is on the stream rather than only in a shell history (joshuafolkken/kit#4268). A trace: it
+	// says what a lane's processes were told, not where the run is.
+	LANE_STATE: 'lane-state',
+	// `backlog:drive` found nothing of the run in flight and only paused lanes left, paused past the
+	// silent window (joshuafolkken/kit#4270). Emitted once per pause episode (`emit_once_since_with`,
+	// reset by `LANE_STATE`), it is the dedup marker for the one paused-lane Telegram. A trace.
+	PAUSED_NOTICE: 'paused-notice',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -162,6 +176,9 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_LIMIT,
 	EVENT_KIND.SETUP,
 	EVENT_KIND.PR_CHECKS,
+	EVENT_KIND.IDLE_NOTICE,
+	EVENT_KIND.LANE_STATE,
+	EVENT_KIND.PAUSED_NOTICE,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
@@ -181,6 +198,9 @@ const event_schema = z.object({
 	at: z.string(),
 	kind: z.string(),
 	text: z.string(),
+	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
+	// reader never has to find its launch again. An event written before it has none.
+	elapsed_ms: z.number().optional(),
 })
 
 type RunEvent = z.infer<typeof event_schema>
@@ -346,12 +366,12 @@ function append_held(target: string, event: Omit<RunEvent, 'pos'>): number {
  * unlocked read-then-rewrite would lose one writer's event to another's. A lock still
  * held after the wait is reported on stderr and thrown, which the best-effort emit side swallows.
  */
-function append(target: string, kind: string, text: string, at: string): AppendResult {
-	if (!is_event_kind(kind)) return { appended: false, position: FIRST_POSITION }
+function append_event(target: string, event: Omit<RunEvent, 'pos'>): AppendResult {
+	if (!is_event_kind(event.kind)) return { appended: false, position: FIRST_POSITION }
 
 	const lock = `${target}${LOCK_SUFFIX}`
 	const position = repository_lock.with_lock_sync(
-		() => append_held(target, { at, kind, text }),
+		() => append_held(target, event),
 		lock,
 		LOCK_WAIT_MS,
 	)
@@ -364,6 +384,11 @@ function append(target: string, kind: string, text: string, at: string): AppendR
 	}
 
 	return { appended: true, position }
+}
+
+// `append_event` for an event that records nothing beyond its kind, text and instant.
+function append(target: string, kind: string, text: string, at: string): AppendResult {
+	return append_event(target, { at, kind, text })
 }
 
 /**
@@ -415,6 +440,7 @@ const run_event_stream = {
 	EVENT_KINDS,
 	TRACE_KINDS,
 	append,
+	append_event,
 	format_event,
 	has_since,
 	is_stage_start,

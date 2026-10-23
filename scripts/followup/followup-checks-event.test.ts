@@ -1,4 +1,8 @@
-import type { PrStateSnapshot, RollupCheck } from '#scripts/gh/git-pr-checks-parse'
+import {
+	parse_pr_state_snapshot,
+	type PrStateSnapshot,
+	type RollupCheck,
+} from '#scripts/gh/git-pr-checks-parse'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { followup_checks_event } from './followup-checks-event'
@@ -58,6 +62,16 @@ describe('followup_checks_event.summary_of', () => {
 		expect(followup_checks_event.summary_of(snapshot(done), 1).coderabbit).toBe('done')
 		expect(followup_checks_event.summary_of(snapshot(failed), 1).coderabbit).toBe('failed')
 		expect(followup_checks_event.summary_of(snapshot(...CI), 1).coderabbit).toBe('none')
+	})
+
+	// joshuafolkken/kit#4351: a running REST check run carries `conclusion: null`, which once failed the
+	// whole snapshot's parse, so every poll read `pass 0 pending 0` until the last check completed.
+	it('counts the checks of a parsed REST snapshot with a run still in progress', () => {
+		const passing = '{"name":"Checks","status":"completed","conclusion":"success"}'
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const parsed = parse_pr_state_snapshot(`{"statusCheckRollup":[${passing},${running}]}`)
+
+		expect(followup_checks_event.summary_of(parsed, 1)).toMatchObject({ pass: 1, pending: 1 })
 	})
 })
 

@@ -1,7 +1,9 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_pr_ai_review, type TelegramContext } from '#scripts/gh/git-pr-ai-review'
+import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks'
 import { git_pr_coderabbit } from '#scripts/gh/git-pr-coderabbit'
 import { git_pr_managed_config } from '#scripts/gh/git-pr-managed-config'
+import type { WaitForGreen } from '#scripts/gh/git-pr-merge-checked'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import type { GitNotifyConfig } from '#scripts/notify/git-notify'
@@ -11,6 +13,7 @@ import {
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
 import { followup_checks_event } from './followup-checks-event'
+import { followup_coderabbit_wait } from './followup-coderabbit-wait'
 import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
@@ -226,22 +229,45 @@ async function run_comment_scans(
 // different destinations: every note reaches the completion notification, and this one alone also
 // reaches the completion report posted to the Issue. Returning it twice is
 // what lets `run_stages` hand each destination what belongs to it without re-deriving the answer.
+//
+// **The snapshot travels on to the merge**, which names its head, and the same wait is what the merge
+// goes back to when that head moved before it (#4036).
+interface ReviewChecks {
+	notes: Array<string>
+	managed: Array<string>
+	snapshot?: PrStateSnapshot
+}
+
+function wait_for_green_of(
+	input: FollowupInput,
+	context: TelegramContext,
+	issue_number: string | undefined,
+	log: StageLog,
+): WaitForGreen {
+	return async function wait_for_green(): Promise<PrStateSnapshot> {
+		return await run_checks({
+			branch_name: input.branch_name,
+			is_skip_watch: input.is_skip_watch,
+			observe: followup_coderabbit_wait.both(
+				followup_checks_event.observer_of(issue_number, context.pr_url),
+				followup_coderabbit_wait.observer_of(log.coderabbit),
+			),
+		})
+	}
+}
+
 async function run_review_checks(
 	input: FollowupInput,
 	context: TelegramContext,
 	log: StageLog,
 	issue_number: string | undefined,
-): Promise<{ notes: Array<string>; managed: Array<string> }> {
+): Promise<ReviewChecks> {
 	if (input.is_merged === true) return { notes: [], managed: [] }
 
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
-	const snapshot = await run_checks({
-		branch_name: input.branch_name,
-		is_skip_watch: input.is_skip_watch,
-		observe: followup_checks_event.observer_of(issue_number, context.pr_url),
-	})
+	const snapshot = await wait_for_green_of(input, context, issue_number, log)()
 
 	lap(log, STAGE.checks_wait)
 	const check_notes = read_coderabbit_skip_notes(snapshot)
@@ -249,7 +275,7 @@ async function run_review_checks(
 	log_skip_notes(check_notes)
 	const scan_notes = await run_comment_scans(input, context, log)
 
-	return { notes: [...managed, ...check_notes, ...scan_notes], managed }
+	return { notes: [...managed, ...check_notes, ...scan_notes], managed, snapshot }
 }
 
 // **A tail re-run after a merge does not report twice**: where the issue
@@ -296,6 +322,8 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			managed_notes: checks.managed,
 			is_merged: input.is_merged,
 			is_completion_recorded,
+			checked: checks.snapshot,
+			wait_for_green: wait_for_green_of(input, context, issue_number, log),
 		},
 		log,
 	)
@@ -319,7 +347,7 @@ async function run(input: FollowupInput): Promise<string | undefined> {
 		throw error
 	} finally {
 		git_followup_stages.print_stages(log)
-		await git_followup_stages.record_ci_wait(log)
+		await git_followup_stages.record_waits(log)
 	}
 }
 

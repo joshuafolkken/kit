@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { forget_branch_rules } from './git-gh-branch-rules'
+import { git_gh_conditional } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
+import { git_gh_poll_read } from './git-gh-poll-read'
 import {
 	check_runs_pages,
 	commit_check_runs_path,
 	commit_status_path,
+	conditional_read_over,
 	gh_api_routes,
 	gh_failure,
 	PR_BRANCH,
+	pr_detail_path,
+	PR_HEAD_SHA,
 	pr_lookup_path,
 	pr_reviews_path,
 	pr_routes,
@@ -35,7 +42,13 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 }))
 
+vi.mock('./git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: vi.fn() },
+}))
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
+
+const mocked_conditional = vi.mocked(git_gh_conditional.read_conditional)
 
 const SONAR_QUBE = 'SonarQube'
 const CODE_RABBIT = 'CodeRabbit'
@@ -43,6 +56,7 @@ const PASSING_RUN = { name: SONAR_QUBE, status: 'completed', conclusion: 'succes
 const APPROVED_REVIEW = { state: 'APPROVED', user: { login: 'alice' } }
 const NO_REVIEWS = '[]'
 const RATE_LIMITED = '{"message":"rate limited"}'
+const LONGER_THAN_A_PAGE = 101
 
 function routes(input: {
 	pull?: Record<string, unknown>
@@ -67,7 +81,11 @@ async function read_snapshot(
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	// The per-poll reads, answered by the same router (joshuafolkken/kit#4550).
+	mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 	forget_pr_numbers()
+	forget_branch_rules()
+	git_gh_poll_read.forget_poll_reads()
 })
 
 describe('pr_get_state_snapshot — the three fields', () => {
@@ -94,6 +112,24 @@ describe('pr_get_state_snapshot — the three fields', () => {
 		const snapshot = await read_snapshot()
 
 		expect(snapshot.review_decision).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4589: GitHub computes `mergeable_state` lazily and answers 304 for a pull request
+// whose state moved, so a detail read through the poll cache kept the gate on a stale `blocked`.
+describe('pr_get_state_snapshot — a lazily computed mergeable_state', () => {
+	it('reads the state that moved under an unchanged ETag', async () => {
+		await read_snapshot({ pull: { mergeable_state: 'blocked' } })
+		const fresh = conditional_read_over(mocked_api)
+
+		mocked_conditional.mockImplementation(async (path, etag) =>
+			etag !== undefined && path === pr_detail_path()
+				? { kind: 'unchanged' }
+				: await fresh(path, etag),
+		)
+		const snapshot = await read_snapshot({ pull: { mergeable_state: 'clean' } })
+
+		expect(snapshot.merge_state_status).toBe('CLEAN')
 	})
 })
 
@@ -131,22 +167,52 @@ describe('pr_get_state_snapshot — mergeable_state is upper-cased', () => {
 	})
 })
 
+// joshuafolkken/kit#4351 end to end: the required CI has passed and default-setup CodeQL is still
+// running — `conclusion: null`, GitHub's `unstable` — and the snapshot reaches the merge.
+describe('pr_get_state_snapshot — an optional check still running', () => {
+	it('reaches success once the base branch rules are read', async () => {
+		const rules_path = `${git_gh_api_path.branch_rules_api_path('main')}${FULL_PAGE_QUERY}`
+		const rule = {
+			type: 'required_status_checks',
+			parameters: { required_status_checks: [{ context: SONAR_QUBE }] },
+		}
+		const passing = JSON.stringify(PASSING_RUN)
+		const running = '{"name":"CodeQL","status":"in_progress","conclusion":null}'
+		const check_runs = `[{"check_runs":[${passing},${running}]}]`
+		const pull = { mergeable_state: 'unstable', base: { ref: 'main' } }
+		const answers = { ...routes({ pull, check_runs }), [rules_path]: JSON.stringify([rule]) }
+
+		mocked_api.mockImplementation(gh_api_routes(answers))
+
+		const snapshot = parse_pr_state_snapshot(await pr_get_state_snapshot(PR_BRANCH))
+
+		expect(evaluate_pr_state(snapshot)).toBe('success')
+	})
+})
+
 describe('pr_get_state_snapshot — which endpoints it reads', () => {
-	it('pages every listing a full page at a time', async () => {
+	it('asks every listing a full page at a time', async () => {
 		await read_snapshot()
 
-		const paged = mocked_api.mock.calls
-			.map(([request]) => request)
-			.filter((request) => request.should_paginate === true)
+		const listings = mocked_api.mock.calls
+			.map(([request]) => request.path)
+			.filter((path) => path.endsWith(FULL_PAGE_QUERY))
 
-		expect(paged).toHaveLength(3)
+		expect(listings).toStrictEqual([
+			commit_check_runs_path(),
+			commit_status_path(),
+			pr_reviews_path(),
+		])
 	})
 
 	// The two commit endpoints answer an object wrapping the listing, so `--paginate` alone would emit
 	// one document per page and `JSON.parse` would reject the pair. The reviews endpoint answers a
 	// bare array, whose pages `gh` merges on its own — slurping it would wrap them again.
 	it('slurps the two commit endpoints and not the review listing', async () => {
-		await read_snapshot()
+		await read_snapshot({
+			check_runs: JSON.stringify([{ total_count: LONGER_THAN_A_PAGE, check_runs: [PASSING_RUN] }]),
+			statuses: JSON.stringify([{ total_count: LONGER_THAN_A_PAGE, statuses: [] }]),
+		})
 
 		const slurped = mocked_api.mock.calls
 			.map(([request]) => request.path)
@@ -182,6 +248,14 @@ describe('the snapshot split into its checks half and its review half', () => {
 		const checks = await pr_get_checks_snapshot(PR_BRANCH)
 
 		await expect(pr_get_review_decision(checks.pr_number)).resolves.toBe('')
+	})
+
+	// #4036: the merge names this head, so a checks half without it leaves no commit to bind to.
+	it('carries the head commit the rollup was read from', async () => {
+		mocked_api.mockImplementation(gh_api_routes(routes({})))
+		const checks = await pr_get_checks_snapshot(PR_BRANCH)
+
+		expect(parse_pr_state_snapshot(checks.snapshot_json).head_sha).toBe(PR_HEAD_SHA)
 	})
 
 	it('folds the review history when the review half is read', async () => {

@@ -53,7 +53,8 @@ interface RunWake {
 	idle_since?: string | undefined
 }
 
-type WakeStopReason = 'ended' | 'unreadable' | 'failed' | 'stopped'
+// `reload`: the supervisor's code changed on disk, so it hands the run to a successor on that code.
+type WakeStopReason = 'ended' | 'unreadable' | 'failed' | 'stopped' | 'reload'
 
 // `superseded`: another supervisor holds the record and this process is the replaced one.
 type WakeTidyResult = 'absent' | 'removed' | 'superseded'

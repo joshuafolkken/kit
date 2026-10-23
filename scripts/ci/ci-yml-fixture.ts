@@ -61,6 +61,7 @@ interface Workflow {
 }
 
 interface CompositeAction {
+	outputs?: Record<string, { value?: string }>
 	runs: { using: string; steps: ReadonlyArray<WorkflowStep> }
 }
 

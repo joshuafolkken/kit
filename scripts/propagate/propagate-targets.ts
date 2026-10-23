@@ -1,7 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { RepoMap } from '#scripts/discovery/repo-map-logic'
-import { json_value } from '#scripts/lib/json-value'
+import { package_manifest } from '#scripts/lib/package-manifest'
 import { z } from 'zod'
 
 // Deciding which repositories a published release should be carried into.
@@ -16,7 +16,6 @@ import { z } from 'zod'
 // us rather than a roster, so a new consumer needs no edit here — and it covers a consumer that is
 // not a published package at all, which a list of downstream package names cannot.
 
-const MANIFEST_NAME = 'package.json'
 const NODE_MODULES = 'node_modules'
 
 // Why a candidate is not going to be processed, or that it is. `not_selected` is the one state set
@@ -64,14 +63,7 @@ function has_checkout(repository_path: string): boolean {
 }
 
 function read_manifest(repository_path: string): Manifest | undefined {
-	const manifest_path = path.join(repository_path, MANIFEST_NAME)
-	if (!existsSync(manifest_path)) return undefined
-
-	try {
-		return json_value.parse_with(readFileSync(manifest_path, 'utf8'), manifest_schema)
-	} catch {
-		return undefined
-	}
+	return package_manifest.read_manifest_if_valid(repository_path, manifest_schema)
 }
 
 // The range a manifest declares for `package_name`, from either dependency field. Undefined when the
@@ -95,7 +87,7 @@ function installed_version(repository_path: string, package_name: string): strin
 // the parent directory), which is an ordinary "not downstream" rather than damage.
 function classify_manifest_absence(repository_path: string): TargetState | undefined {
 	if (!has_checkout(repository_path)) return 'missing_checkout'
-	if (!existsSync(path.join(repository_path, MANIFEST_NAME))) return 'not_downstream'
+	if (!existsSync(package_manifest.manifest_path(repository_path))) return 'not_downstream'
 
 	return undefined
 }

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
@@ -27,7 +25,6 @@ import { issue_report_failures, type ReadFailureKind } from './issue-report-fail
 // wins, and a comment nobody read cannot win anything.
 
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh issue:read <issue-number> [<issue-number> ...]'
 const BLOCK_SEPARATOR = '\n\n---\n\n'
 // The same bound `issue:state` puts on its batch read, for the same reason: every read is a `gh`
@@ -82,7 +79,9 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 
 	if (fields === undefined) return { kind: 'unreadable' }
 
-	return { kind: 'issue', content: { fields, comments: issue_read.parse_comments(comments_json) } }
+	const comments = await issue_read.parse_comments(comments_json)
+
+	return { kind: 'issue', content: { fields, comments } }
 }
 
 // One issue's block for a caller that wants the text rather than the printing — `run:prep` composes it
@@ -134,18 +133,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return issue_report_failures.report_failures(reports, FAILURE_TERMS)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const issue_read_cli = {
 	USAGE,
 	parse_numbers,
 	read_block,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { BlockRead }
 export { issue_read_cli }

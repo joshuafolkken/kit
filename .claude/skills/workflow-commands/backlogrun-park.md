@@ -28,11 +28,12 @@ parks, re-dispatches or files.
 ## `needs-human-review` — the one stop that is not a park
 
 A child carrying **`needs-human-review`** stops `halfrun`-shaped and **the whole run ends there**:
-implementation and the gate run, nothing is committed, the tree is left dirty and unstashed, a
-`confirmation` Telegram carries the resume command, and the remaining children are not started.
+implementation and the gate run, nothing is committed, the tree is left dirty and unstashed,
+`pnpm josh run:hold <N> --human-review-stop` sends the `confirmation` Telegram with the resume command
+and the lane directory, and the remaining children are not started.
 
 **The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
-lane directory in the stop report and in the Telegram.** Lanes in flight finish; no new lane opens.
+lane directory in the stop report.** Lanes in flight finish; no new lane opens.
 
 **Never apply or remove the label** — a person's alone (`needs-human-review.md`, the single source).
 
@@ -42,8 +43,7 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-gh api repos/{owner}/{repo}/issues/<N>/labels -f 'labels[]=needs-decision'
-pnpm josh issue:comment <N> --body-file <path>   # what needs deciding, and the options
+pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision
 ```
 
 `in-progress` stays; the parked child does **not** hold the repository (`needs-decision` takes
@@ -60,7 +60,7 @@ still filed at once, and a workaround is still forbidden. `epic:bundle`'s `ask` 
 **Removing the label is Tier A — do it without asking**, once the decision is recorded:
 
 ```bash
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/needs-decision 2>/dev/null || true
+pnpm josh run:park <N> --clear   # succeeds when the label is already off
 ```
 
 **The released child goes back to a lane, never into the parent's own context** — `pnpm josh
@@ -81,7 +81,9 @@ It never carries:
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
   (`prerequisite.md`);
 - a defect in the running repository's own run tooling — the run fixes it and resumes
-  (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合").
+  (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合");
+- a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
+- a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`).
 
 **When in doubt, it is Tier A**: decide, comment the decision, and continue. **A label a mechanical step
 applied** (a failed or abandoned child, a lost merge race) is read against this list once its reason is
@@ -114,22 +116,11 @@ Something else in **this** repository has to land first: not a split, not an ups
 
 1. File the prerequisite `<N>` with `route:tier-a` (Tier A, first-party, no confirmation) — **first**,
    because the next step names it.
-2. **Stash the work in progress**:
-
-   ```bash
-   git stash push -u -m "backlogrun: paused #<M> for prerequisite #<N>"
-   pnpm josh issue:comment <M> --body-file <path>   # what was stashed, and that #<N> must land first
-   ```
-
-   **`-u` is not optional** (new test files are untracked). **Pop it by message, never by position** —
-   `pnpm josh stash:pop "backlogrun: paused #<M> for prerequisite #<N>"` — when `epic:next` offers `<M>`
-   again, after its `pnpm josh ms`; expect conflicts.
-3. `pnpm josh epic --add <E> <N> --before <M>` — row, declaration and `blocked-by` in one command;
-   never a hand edit. **With no epic**, record `<M>` blocked by `<N>` alone with the `gh api
-   …/dependencies/blocked_by` call in
-   `prompts/collaboration-workflow/issue-template.md` → "複数 Issue に分割するときの epic Issue", step 4.
-4. **Remove `in-progress` from `<M>`** — `pnpm josh run:release <M>`; a labelled child is never offered again.
-5. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
+2. **`pnpm josh run:pause <M> --for <N>`** — the stash, the comment naming its `stash:pop`, `<M>`
+   blocked by `<N>` (the epic's row and declaration too) and `run:release <M>` in one call
+   (`prerequisite.md`). Pop the stash the comment names when `epic:next` offers `<M>` again, after its
+   `pnpm josh ms`; expect conflicts.
+3. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
 
 **A stop a dependency can express is never parked**, including a defect in this repository's own gate
 or run tooling — `prerequisite.md`.

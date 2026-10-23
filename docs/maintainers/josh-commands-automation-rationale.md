@@ -34,21 +34,17 @@ The issues that introduced or reshaped each command, kept here so the reference 
 provenance citations. Read an issue for the decision behind a behavior; the reference states only
 the behavior.
 
-| Command                     | Issues                                                           |
-| --------------------------- | ---------------------------------------------------------------- |
-| `josh batch:guard`          | #2138, #2164, #2178, #2276, #2405, #2984 (the hook launch shape) |
-| `josh time:density`         | #2405                                                            |
-| `josh investigation:guard`  | #2138, #2382, #3927                                              |
-| `josh duplicate-read:guard` | #2298                                                            |
-| `josh rule:guard`           | #2297, #2385, #2807                                              |
-| `josh pretool:guard`        | #2138, #2164, #2178, #2276, #2298, #2382, #2405                  |
-| `josh stop:guard`           | #2121, #2247, #2422                                              |
-| `josh followup`             | #2446, #2770, #3023                                              |
-| `josh observations:flush`   | #2763, #2919                                                     |
-| `josh measure:rerun`        | #2178, #3064                                                     |
-| `josh review:record`        | #2325, #2343, #2419, #2919, #3645                                |
-| `josh reserved-run`         | #2351                                                            |
-| `josh repo:party`           | #2122                                                            |
+| Command                   | Issues                                                                                                     |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `josh time:density`       | #2405                                                                                                      |
+| `josh pretool:guard`      | #2138, #2164, #2178, #2276, #2297, #2298, #2382, #2385, #2405, #2807, #2984 (the hook launch shape), #3927 |
+| `josh stop:guard`         | #2121, #2247, #2422                                                                                        |
+| `josh followup`           | #2446, #2770, #3023                                                                                        |
+| `josh observations:flush` | #2763, #2919                                                                                               |
+| `josh measure:rerun`      | #2178, #3064                                                                                               |
+| `josh review:record`      | #2325, #2343, #2419, #2919, #3645                                                                          |
+| `josh reserved-run`       | #2351                                                                                                      |
+| `josh repo:party`         | #2122                                                                                                      |
 
 ## `josh refactor:scan` in detail
 
@@ -58,13 +54,15 @@ Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 descri
 
 - **Reports the problems `eslint --fix` could not fix** on the same `additionalContext`, lifted from the `--fix` pass's own stdout (no extra process) — file, `line:col` and rule name, so they are seen on the edit rather than deferred to the gate. What eslint fixed is applied silently; a file that runs prettier alone (`.md` / `.yml`) reports nothing. The block is cut to a bounded length and marked when a lint dump would be large. It never sets `permissionDecision`, so the edit is not turned into a failure.
 
-## `josh batch:guard` in detail
+## The batching guard and the hook launch in detail
 
-Refuse a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is **not wired standalone**: it is one of the three `PreToolUse` guards consolidated into `josh pretool:guard` (with `investigation:guard` and the rule guard), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
+The batching guard refuses a tool call that would make a third consecutive single-call turn, pushing the run toward batching independent calls. It is one of the `PreToolUse` guards consolidated into `josh pretool:guard` (with the investigation and rule guards), so `.claude/settings.json` names the union of their matchers and runs the one process, fed the pending call as JSON on stdin.
 
 - The launcher (`scripts/hooks/run-hook.sh <name> [arguments]`) holds everything the hooks share, once: it hands the hook to the ready gate, which runs `dist/hooks/<name>.js` once it passes and otherwise runs the live source through `pnpm josh <command>` — the name with its first `-` turned into `:` (`pretool-guard` → `pretool:guard`).
-- The root prefix in front of it (`scripts/init/hook-launch.ts`) clears the git location variables with the shell's own `unset` when the root resolves without them, so a hook call starts `git` once and no `env` or `dirname` process (joshuafolkken/kit#3946): a hook runs on every tool call across every lane, and on macOS each process start is also scanned by `XprotectService` / `syspolicyd`.
-- The ready gate (`scripts/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs in the gate's own process, so a hook call starts node once. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
+- The root prefix in front of it (`scripts/init/hook-launch.ts`) takes the root Claude Code names in `CLAUDE_PROJECT_DIR`, so a Claude Code hook call starts no `git` and no `env` or `dirname` process (joshuafolkken/kit#3946, joshuafolkken/kit#4187): a hook runs on every tool call across every lane, and on macOS each process start is also scanned by `XprotectService` / `syspolicyd`.
+- Codex names no root and runs a hook in the session's directory, so there the prefix asks git once.
+- The launcher clears the git location variables with the shell's own `unset`, and only when one is set and git still resolves without them, so the ordinary call pays nothing for it. The prefix stays one short line in every `settings.json` and `hooks.json`.
+- The ready gate (`tools/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs in the gate's own process, so a hook call starts node once. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
 - Silent in a dispatched lane child (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, and a `PreToolUse` hook cannot see the turn it is in, so the notice is `off`; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`. Why: "The batching guard is off in a lane child" above.
 - Fires more than once per run (main line). The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the refusal every `REFIRE_EVERY` further turns (the initial limit), the notice every `NOTICE_REFIRE_EVERY` (tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence.
 
@@ -72,11 +70,11 @@ Refuse a tool call that would make a third consecutive single-call turn, pushing
 
 Report tool calls per round trip across the recent lane sessions — the density the batching guard is measured on, as a command rather than a hand-counted `node -e`. Kit-only (it reads kit's own lane transcripts). Aggregates the ten most recent lane sessions holding at least thirty round trips, dividing summed calls by summed round trips through the same `time-round-trips.ts` the guard and the live density line read, so the three cannot disagree about what a round trip is.
 
-## `josh investigation:guard` in detail
+## The investigation guard in detail
 
 - **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`), at the same threshold. Why: "The investigation guard refuses in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.
 
-## `josh rule:guard` in detail
+## The rule guard in detail
 
 - **The implementation-phase cut row**: the trigger is an `Edit` / `Write` from a lane working tree that has not yet taken its cut, once the recent-context verdict (`pnpm josh cost --cut`'s, unmeasurable read `!== UNDER` on the safety-net side) is over the shared threshold, handing over `pnpm josh run:cut --impl <N> --handoff <path>`. Unlike the pre-gate row it fires on every threshold crossing: once per run left a `busy` / `failed` verdict to grow the context unwatched, so it carries `decide` and lets an edit reissued right after a refusal through. The verdict read is reused over a few-second per-checkout window. `.claude/skills/workflow-commands/pre-gate-cut.md` is the single source.
 
@@ -101,6 +99,29 @@ Fail when a pull request adds any new SonarCloud issue — of any type or severi
 ## `josh followup` in detail
 
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive. Every CI poll and the step right before the merge also check the run's issue: a person's update the run has not acknowledged stops it unmerged, printing the update ([`josh issue:ack`](../josh-commands-backlog.md#josh-issueack)); the blocking `gh pr checks --watch` phase before the polls is not interrupted.
+
+**Stage timing:** one `followup stage: <name> <seconds>` row per stage, then `followup stages total:`.
+
+- A failed run prints it up to the stage that threw, named `interrupted`; the `merge` row appears only
+  on a run that merged.
+- A row named `<a>-and-<b>` is a batch of requests sent together; `checks-wait` is never overlapped.
+- The total is the sum of the stages, not the wall clock — the post-merge tail sits outside it.
+
+**AI-reviewer scan:** top-level PR comments from AI reviewers are scanned independently of CI status.
+
+- Blockers are structural, not NLP: a Claude Review body with `### Issues`, `### Problem`,
+  `#### Logic bug` or a numbered `### 1. …` heading; a CodeRabbit `Actionable comments posted: N` with
+  N > 0. Rate-limit notices and sign-offs (`All issues resolved ✓`) match nothing.
+- A standing blocker without `--ai-review-ignore-reason` sends a `confirmation` Telegram and exits
+  non-zero; with it, the reason is posted and the run proceeds. A comment listing that could not be
+  read is a standing blocker.
+- CodeRabbit is temporarily non-blocking end to end — out of the default required checks (restore via
+  `JOSH_REQUIRED_CHECKS`); its findings are audit notes.
+
+**Config claims:** every changed path is matched against what `josh sync` distributes
+(`AI_COPY_FILES`, `AI_COPY_FILE_MAPPINGS`, `AI_COPY_DIRECTORIES`, `SYNCED_PATHS`), and the claimed
+paths are reported in the notification and the Issue report. It stops nothing; `josh sync:scope`
+gives the same answer.
 
 ## `josh notify` in detail
 
@@ -144,7 +165,7 @@ Runs the unit suite for the pre-push hook, reusing the result when [`josh gate`]
 
 ## `josh reserved-run` in detail
 
-Runs a command while holding a place in the machine-wide core budget ([`josh gate`](../josh-commands.md#josh-gate)'s ledger, `scripts/gate/core-budget.ts`). Wired in by `lefthook/base.yml` as the pre-push `setup` install and the `audit` command, so both count toward the same budget the gate's checks reserve from — eight lanes pushing around the same time no longer spike a machine the gate thought it had to itself.
+Runs a command while holding a place in the machine-wide core budget ([`josh gate`](../josh-commands.md#josh-gate)'s ledger, `scripts/gate/core-budget.ts`). Wired in by `lefthook/base.yml` as the pre-push `setup` install and the `audit` command, so both count toward the same budget the gate's checks reserve from — eight lanes pushing around the same time no longer spike a machine the gate thought it had to itself. It reserves memory too (joshuafolkken/kit#4582): a lane ran `reserved-run 4 -- sh -c '… eslint . --concurrency 4 …'`, typed eslint holds about 2.4 GB per worker, and a 12 GB process admitted beside four lanes swapped the machine. The estimate is the largest tool on the line, not the sum, because commands on one line run one after another. A command the table does not know stays at 0 MB, so a josh command that reserves its own (`pnpm josh audit`) is not counted twice. eslint's `--concurrency auto` is read as half the cores, ESLint 10's own cap. A lane child is refused a multi-worker eslint even when reserved: one lane's 12 GB starves every other lane whatever the ledger says, so a concurrency is measured outside a lane.
 
 ## `josh pre-commit-type-check` in detail
 

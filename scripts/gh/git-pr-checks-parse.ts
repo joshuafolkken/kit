@@ -1,5 +1,6 @@
 import { pr_raw_schema, type RollupItemData } from '#scripts/git/git-schemas'
 import { json_value } from '#scripts/lib/json-value'
+import type { z } from 'zod'
 
 const CHECK_STATUS_PASS = 'pass'
 const CHECK_STATUS_PENDING = 'pending'
@@ -9,8 +10,8 @@ const CHECK_STATUS_MISSING = 'missing'
 // GitHub reports a job whose `if:` condition was false as COMPLETED with conclusion `skipped`, and
 // counts it as satisfied for branch protection — a pull request reaches CLEAN with such jobs in its
 // rollup. Recording them as `fail` would disagree with GitHub itself, and it would disable the
-// CodeRabbit non-blocking exemption: `is_unstable_only_from_coderabbit` opens the gate only when
-// every non-passing check is CodeRabbit's, so kit's own conditional jobs (`auto-merge`, `E2E`,
+// CodeRabbit non-blocking exemption: `is_unstable_only_from_optional` opens the gate only when
+// every non-passing check is CodeRabbit's or an optional one still running, so kit's own conditional jobs (`auto-merge`, `E2E`,
 // `Notify Auto Tag`) would keep a slow review blocking the merge until the wait loop timed out. That
 // is invisible on fast reviews, where CLEAN short-circuits the predicate — it surfaces only on the
 // exact path the exemption exists to protect.
@@ -45,6 +46,12 @@ interface PrStateSnapshot {
 	rollup: Array<RollupCheck>
 	merge_state_status: string | undefined
 	review_decision: string | undefined
+	// The commit `rollup` was read from — the head a merge has to name so that it lands what passed and
+	// nothing pushed since (#4036). Absent where the snapshot carried none.
+	head_sha?: string
+	// The base branch's required status check contexts (joshuafolkken/kit#4351). Absent where the
+	// branch requires none or they could not be read, which keeps the merge gate waiting for `CLEAN`.
+	required_contexts?: Array<string>
 }
 
 function read_string(value: unknown): string | undefined {
@@ -118,16 +125,39 @@ function parse_rollup_checks(raw_json: string): Array<RollupCheck> {
 	return checks
 }
 
-function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
-	const parsed = json_value.parse_or_undefined(raw_json)
-	const result = pr_raw_schema.safeParse(parsed)
-	const data = result.success ? result.data : undefined
+function with_head_sha(snapshot: PrStateSnapshot, head_sha: string | undefined): PrStateSnapshot {
+	return head_sha === undefined ? snapshot : { ...snapshot, head_sha }
+}
 
-	return {
+function with_required_contexts(
+	snapshot: PrStateSnapshot,
+	required_contexts: Array<string> | undefined,
+): PrStateSnapshot {
+	if (required_contexts === undefined || required_contexts.length === 0) return snapshot
+
+	return { ...snapshot, required_contexts }
+}
+
+type PrRawData = Partial<z.infer<typeof pr_raw_schema>>
+
+function read_pr_raw_data(raw_json: string): PrRawData {
+	const result = pr_raw_schema.safeParse(json_value.parse_or_undefined(raw_json))
+
+	return result.success ? result.data : {}
+}
+
+function parse_pr_state_snapshot(raw_json: string): PrStateSnapshot {
+	const data = read_pr_raw_data(raw_json)
+	const snapshot = {
 		rollup: parse_rollup_checks(raw_json),
-		merge_state_status: read_string(data?.mergeStateStatus),
-		review_decision: read_string(data?.reviewDecision),
+		merge_state_status: read_string(data.mergeStateStatus),
+		review_decision: read_string(data.reviewDecision),
 	}
+
+	return with_required_contexts(
+		with_head_sha(snapshot, read_string(data.headRefOid)),
+		data.requiredContexts,
+	)
 }
 
 export {

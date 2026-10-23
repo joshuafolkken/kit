@@ -35,16 +35,21 @@ function coderabbit_state_of(check: RollupCheck | undefined): CodeRabbitState {
 	return is_coderabbit_rate_limited(check) ? 'rate-limited' : 'done'
 }
 
+// CodeRabbit's state on one poll — the reading `run:board` draws and `followup` times
+// (`followup-coderabbit-wait.ts`).
+function coderabbit_of(snapshot: PrStateSnapshot): CodeRabbitState {
+	return coderabbit_state_of(snapshot.rollup.find((check) => is_coderabbit_check(check.name)))
+}
+
 function summary_of(snapshot: PrStateSnapshot, pr: number): PrChecks {
 	const ci = snapshot.rollup.filter((check) => !is_coderabbit_check(check.name))
-	const coderabbit = snapshot.rollup.find((check) => is_coderabbit_check(check.name))
 
 	return {
 		pr,
 		pass: count_of(ci, CHECK_STATUS_PASS),
 		pending: count_of(ci, CHECK_STATUS_PENDING),
 		fail: count_of(ci, CHECK_STATUS_FAIL),
-		coderabbit: coderabbit_state_of(coderabbit),
+		coderabbit: coderabbit_of(snapshot),
 	}
 }
 
@@ -77,6 +82,6 @@ function observer_of(issue: string | undefined, pr_url: string | undefined): Sna
 	}
 }
 
-const followup_checks_event = { observer_of, summary_of }
+const followup_checks_event = { coderabbit_of, observer_of, summary_of }
 
 export { followup_checks_event }

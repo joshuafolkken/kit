@@ -8,8 +8,8 @@ import { bash_triggers } from './bash-triggers'
 // pointed there.
 
 const DIRECT_FILING_REASON =
-	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path> ' +
-	'--depth <0|1|2>`, never with `gh api …/issues` or `gh issue create` — it runs the scout, the lint, ' +
+	'⛔ direct filing: an Issue is filed with `pnpm josh issue:file "<title>" --body-file <path>`, ' +
+	'never with `gh api …/issues` or `gh issue create` — it runs the scout, the lint, ' +
 	'the labels and `epic:bundle` itself. It fires on every occurrence (`docs/josh-commands-backlog.md` ' +
 	'→ "`josh issue:file`").'
 
@@ -27,6 +27,14 @@ const ROW = {
 	decide: (): boolean => true,
 	keeps: bash_triggers.on_bash_command(bash_triggers.is_issue_filing),
 	reaches: bash_triggers.on_bash_command(is_any_filing),
+	about: {
+		title: 'Direct filing',
+		topic: '`docs/josh-commands-backlog.md` → `josh issue:file`',
+		fires:
+			'a `Bash` that creates an Issue outside `josh issue:file` (`gh issue create`, or a POST with `title` to `…/issues`); the refusal hands over the `pnpm josh issue:file` form. Every occurrence',
+		quiet:
+			'filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run',
+	},
 }
 
 const direct_filing = { DIRECT_FILING_REASON, ROW }

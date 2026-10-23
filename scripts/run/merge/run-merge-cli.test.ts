@@ -32,7 +32,7 @@ vi.mock('./run-merge-ship')
 vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))
 
 vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn() },
+	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn(), read_transcript: vi.fn() },
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
@@ -49,10 +49,10 @@ vi.mock('./run-merge-steps', () => ({
 		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: is_over_budget_mock,
 		refused_carry: refused_carry_mock,
+		release_child: vi.fn(),
 		resume_cut: resume_cut_mock,
 	},
 }))
-vi.mock('#scripts/run/run-label', () => ({ run_label: { unmark: vi.fn() } }))
 
 const { run_merge_cli } = await import('./run-merge-cli')
 const { MERGE_TOKEN } = run_merge_token
@@ -71,8 +71,15 @@ const IN_PROGRESS = 'in-progress'
 const EPIC = 'epic'
 const NEEDS_DECISION = 'needs-decision'
 const NEEDS_HUMAN_REVIEW = 'needs-human-review'
-const NOT_REFUSED = { is_refused: false, blockers: [] }
-const PARKED_FAILURE = { carry: { failures: BELOW_GUARD }, is_parked: true, ...NOT_REFUSED }
+const NOT_REFUSED = { is_refused: false, waits: [] }
+const STALL_CAUSE = 'review failed'
+const PARKED_FAILURE = {
+	carry: { failures: BELOW_GUARD },
+	is_parked: true,
+	cause: STALL_CAUSE,
+	...NOT_REFUSED,
+}
+const PARK_EVENT = `#${CHILD} parked (run:stalled: ${STALL_CAUSE})`
 
 function state_read(
 	state: string,
@@ -110,6 +117,15 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(do_merged_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
 		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
+	})
+
+	it('leaves the next offer to the driver under --driver', async () => {
+		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
+
+		expect(await run_merge_cli.run([CHILD, '--driver'])).toBe(SUCCESS)
+		expect(do_merged_mock).toHaveBeenCalledOnce()
+		expect(ask_next_mock).not.toHaveBeenCalled()
+		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining('"token":"deferred"'))
 	})
 
 	it('hands off when the merge crosses the budget', async () => {
@@ -170,17 +186,12 @@ describe('run_merge_cli.run — a failed child', () => {
 		expect(do_failed_mock).toHaveBeenCalledOnce()
 		expect(ask_next_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+		expect(emit_mock).toHaveBeenCalledWith('park', PARK_EVENT)
 	})
 
 	it('stops when the failure guard trips', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: AT_GUARD },
-			is_parked: true,
-			is_refused: false,
-			blockers: [],
-		})
+		do_failed_mock.mockResolvedValue({ ...PARKED_FAILURE, carry: { failures: AT_GUARD } })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.STOP)
@@ -224,7 +235,7 @@ describe('run_merge_cli.run — a child that ended on a cut', () => {
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_failed_mock).toHaveBeenCalledOnce()
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${CHILD} parked (needs-decision)`)
+		expect(emit_mock).toHaveBeenCalledWith('park', PARK_EVENT)
 	})
 
 	it('still parks a child that stopped without a cut', async () => {
@@ -295,12 +306,7 @@ describe('run_merge_cli.run — a carry ownership refusal', () => {
 
 	it('emits busy and exits 1 when the failed carry count is refused', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: false,
-			is_refused: true,
-			blockers: [],
-		})
+		do_failed_mock.mockResolvedValue({ ...PARKED_FAILURE, is_parked: false, is_refused: true })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.BUSY)
@@ -325,12 +331,7 @@ describe('run_merge_cli.run — a cut fallback from a session that does not own 
 describe('run_merge_cli.run — a stop and a refusal', () => {
 	it('stops with an error when the failed child could not be parked', async () => {
 		read_issue_mock.mockResolvedValue(state_read(OPEN, [IN_PROGRESS]))
-		do_failed_mock.mockResolvedValue({
-			carry: { failures: BELOW_GUARD },
-			is_parked: false,
-			is_refused: false,
-			blockers: [],
-		})
+		do_failed_mock.mockResolvedValue({ ...PARKED_FAILURE, is_parked: false })
 
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.STOP)

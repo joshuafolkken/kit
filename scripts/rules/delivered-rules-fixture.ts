@@ -1,4 +1,4 @@
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 
 // Command and transcript-tail fixtures shared by the delivery suites — `delivered-rules.test.ts`,
 // `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `filing-cap.test.ts`.
@@ -8,7 +8,7 @@ import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
 // The filing act the run-level filing rows trigger on — `josh issue:file` —
 // reused wherever a case needs that trigger to match so no case can pass on a spelling the others do
 // not use.
-const FILING_COMMAND = 'pnpm josh issue:file "x" --body-file body.md --depth 1'
+const FILING_COMMAND = 'pnpm josh issue:file "x" --body-file body.md'
 // The two hand-built spellings of a filing, which the `direct-filing` row refuses on every occurrence.
 const DIRECT_FILING_COMMAND = 'gh issue create --title "x"'
 const DIRECT_FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'

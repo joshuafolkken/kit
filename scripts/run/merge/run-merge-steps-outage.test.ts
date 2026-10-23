@@ -1,3 +1,4 @@
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
@@ -20,7 +21,8 @@ const CONTEXT = {
 	over: undefined,
 	owner: run_carry.NO_OWNER,
 }
-const UNANSWERED = { ...CONTEXT, is_unanswered: true }
+const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
+const UNANSWERED = { ...CONTEXT, is_streak_exempt: true }
 const OWNED_CARRY: RunCarry = {
 	invocation: 'backlogrun #3964 #3936 #3961',
 	started_at: new Date().toISOString(),
@@ -44,6 +46,8 @@ beforeEach(() => {
 	vi.restoreAllMocks()
 	unmark_mock.mockReset().mockResolvedValue(true)
 	reap_mock.mockReset().mockReturnValue([])
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(lane_registry, 'lane_location').mockResolvedValue(CHILD_LANE)
 })
 
 describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
@@ -55,7 +59,7 @@ describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
 			is_refused: false,
 		})
 		expect(apply).not.toHaveBeenCalled()
-		expect(reap_mock).toHaveBeenCalledWith(CONTEXT.child)
+		expect(reap_mock).toHaveBeenCalledWith(CHILD_LANE)
 		expect(unmark_mock).toHaveBeenCalledOnce()
 	})
 

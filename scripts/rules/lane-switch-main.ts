@@ -120,6 +120,13 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_switch_away_from_lane),
 	reason: LANE_SWITCH_MAIN_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Lane child on `git switch main`',
+		topic: '`.claude/skills/workflow-commands/backlogrun-lanes.md`',
+		fires:
+			'a dispatched lane child switching to the default branch or running `josh main:sync`. Every occurrence',
+		quiet: 'not a lane child — `pnpm josh main:merge` brings the default in at the gate',
+	},
 }
 
 const lane_switch_main = {

@@ -1,0 +1,4 @@
+- rf:bug-risks | low | tools/metrics/metrics-base-cache.ts:101 | 2026-10-21 | #4382
+- rf:bug-risks | low | tools/metrics/metrics-base-cache.ts:62 | 2026-10-21 | #4382
+- rf:performance | low | tools/metrics/metrics-base-cache.ts:88 | 2026-10-21 | #4382
+- rf:project-conventions | low | docs/maintainers/josh-commands-rationale.md:34 | 2026-10-21 | #4382

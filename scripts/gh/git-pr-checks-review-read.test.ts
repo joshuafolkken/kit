@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_gh_conditional } from './git-gh-conditional'
 import { git_gh_exec } from './git-gh-exec'
+import { git_gh_poll_read } from './git-gh-poll-read'
 import {
 	check_runs_pages,
 	commit_check_runs_path,
 	commit_status_path,
+	conditional_read_over,
 	gh_api_routes,
 	PR_BRANCH,
 	pr_reviews_path,
@@ -36,7 +39,14 @@ vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: { exec_gh_api: vi.fn() },
 }))
 
+vi.mock('./git-gh-conditional', () => ({
+	git_gh_conditional: { read_conditional: vi.fn() },
+}))
+
 const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
+const mocked_conditional = vi.mocked(git_gh_conditional.read_conditional)
+
+mocked_conditional.mockImplementation(conditional_read_over(mocked_api))
 
 const SONAR_QUBE = 'SonarQube'
 const PASSING_RUN = { name: SONAR_QUBE, status: 'completed', conclusion: 'success' }
@@ -79,9 +89,17 @@ function review_reads(): number {
 const MERGE_GATE_PREDICATE =
 	MERGE_GATE_EVALUATOR.should_read_review_decision ?? should_always_read_review_decision
 
+// The requests of the last poll that GitHub answered 304, which cost nothing against the rate limit.
+function unchanged_reads(): number {
+	return mocked_conditional.mock.settledResults.filter(
+		(read) => read.type === 'fulfilled' && read.value.kind === 'unchanged',
+	).length
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	forget_pr_numbers()
+	git_gh_poll_read.forget_poll_reads()
 })
 
 describe('is_review_decision_decisive — when the review listing can change the verdict', () => {
@@ -162,6 +180,22 @@ describe('default_fetch_pr_state — requests per poll', () => {
 
 		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
 		expect(review_reads()).toBe(0)
+	})
+})
+
+// joshuafolkken/kit#4550: a poll that finds nothing changed sends the same three requests, and GitHub
+// answers the two commit listings 304, so they cost nothing against the rate limit. The pull detail is
+// read fresh: its `mergeable_state` can move under an unchanged ETag (joshuafolkken/kit#4589).
+describe('default_fetch_pr_state — a poll that finds nothing changed', () => {
+	it('is answered 304 on every request but the pull detail', async () => {
+		arrange({ is_green: false })
+
+		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
+		vi.clearAllMocks()
+		await default_fetch_pr_state(PR_BRANCH, MERGE_GATE_PREDICATE)
+
+		expect(mocked_api).toHaveBeenCalledTimes(CHECKS_ONLY_REQUESTS)
+		expect(unchanged_reads()).toBe(CHECKS_ONLY_REQUESTS - 1)
 	})
 })
 

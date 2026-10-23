@@ -95,13 +95,14 @@ describe('close_completed_epics — incomplete batch', () => {
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 
-	it('leaves the epic open when a sibling state cannot be read', async () => {
+	it('leaves the epic open and says so when a sibling state cannot be read', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: EPIC_BODY }]))
-		mocked_get_child.mockResolvedValue(undefined)
+		mocked_get_child.mockResolvedValueOnce(CLOSED_UNLINKED).mockResolvedValueOnce(undefined)
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
 		expect(mocked_close).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('state could not be read;'))
 	})
 })
 
@@ -166,12 +167,12 @@ describe('close_completed_epics — issue lookup', () => {
 })
 
 describe('close_completed_epics — no-op cases', () => {
-	it('does nothing when no epic references the merged issue', async () => {
+	it('leaves an epic open that does not reference the merged issue and has an open child', async () => {
 		mocked_list.mockResolvedValue(epic_list_json([{ number: 200, body: '- [ ] #900 unrelated\n' }]))
+		mocked_get_child.mockResolvedValue(child_json({ state: 'OPEN' }))
 
 		await close_completed_epics({ issue_number: MERGED_ISSUE, is_merged: true })
 
-		expect(mocked_get_child).not.toHaveBeenCalled()
 		expect(mocked_close).not.toHaveBeenCalled()
 	})
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
@@ -26,7 +24,6 @@ import { run_prep_locate } from './run-prep-locate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh run:prep <issue-number>'
 const LANE_SKIP_SCOPE = 'not asked'
 const LANE_SKIP_REASON =
@@ -88,7 +85,7 @@ async function lane_has_changes(): Promise<boolean> {
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
 
 	try {
-		return await git_stash.has_changes(process.cwd())
+		return await git_stash.has_stashable_changes(process.cwd())
 	} catch (error) {
 		error_text.trace_swallowed('run_prep_cli.lane_has_changes', error)
 
@@ -155,14 +152,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return exit_code(reads)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 // `gather` and `to_parts` are exported so `run:next` reads the same state from the same three reads
 // rather than growing a second copy of the gather.
 const run_prep_cli = { gather, parse_number, run, to_parts }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_prep_cli }

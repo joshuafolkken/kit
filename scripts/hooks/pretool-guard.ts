@@ -11,6 +11,7 @@ import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { batch_outcome } from './batch-guard'
+import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
 
 // One PreToolUse process for the three guards that used to be three. A Bash
@@ -52,12 +53,13 @@ function combine_outcomes(
 	return outcomes.find((outcome) => !is_clear(outcome)) ?? CLEAR
 }
 
-// The Step 0 reminder is the last word: asked only where every guard stayed
-// clear, so a refusal or another notice never spends its once-per-session stamp unseen.
-function with_step_zero_notice(outcome: GuardOutcome, raw_payload: string): GuardOutcome {
+// The once-per-session reminders are the last word: asked only where every guard stayed clear, so a
+// refusal or another notice never spends their stamps unseen. Step 0 answers an edit and the shell
+// rules a Bash call, so at most one of them speaks on a call.
+function with_session_notice(outcome: GuardOutcome, raw_payload: string): GuardOutcome {
 	if (!is_clear(outcome)) return outcome
 
-	const notice = step_zero_notice.notice(raw_payload)
+	const notice = step_zero_notice.notice(raw_payload) ?? shell_rules_notice.notice(raw_payload)
 
 	return notice === undefined ? outcome : { reason: undefined, notice, fault: undefined }
 }
@@ -75,9 +77,9 @@ function guard_outcome(raw_payload: string): GuardOutcome {
 	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
 }
 
-// The synchronous verdict the Codex adapter asks for, with the Step 0 reminder as its last layer.
+// The synchronous verdict the Codex adapter asks for, with the session reminders as its last layer.
 function pretool_outcome(raw_payload: string): GuardOutcome {
-	return with_step_zero_notice(guard_outcome(raw_payload), raw_payload)
+	return with_session_notice(guard_outcome(raw_payload), raw_payload)
 }
 
 // The Step 0 notice fires once, on the first runtime-file edit: the moment a lane child's plan turns
@@ -116,7 +118,7 @@ async function pretool_outcome_async(raw_payload: string): Promise<GuardOutcome>
 
 	if (reason !== undefined) return { reason, notice: undefined, fault: undefined }
 
-	const outcome = with_step_zero_notice(base, raw_payload)
+	const outcome = with_session_notice(base, raw_payload)
 
 	await mark_phase(outcome)
 
@@ -140,26 +142,36 @@ function rewrite_context(note: string, outcome: GuardOutcome): string {
 	return [note, outcome.notice ?? outcome.fault].filter(Boolean).join('\n\n')
 }
 
-// The envelope that replaces the outcome's own when a lane child backgrounded `josh ship` alone:
-// the call is run in the foreground instead of being refused. A refusal from
-// any guard still wins, and a notice the outcome carried rides along in the same context.
+function foreground_input_of(
+	raw_payload: string,
+	is_lane_child?: () => boolean,
+): Record<string, unknown> | undefined {
+	const call = guarded_call(raw_payload)
+
+	return call === undefined ? undefined : lane_background.foreground_input(call, is_lane_child)
+}
+
+// The envelope that replaces the outcome's own when a lane child runs `josh ship` alone: the call is
+// run in the foreground at the cap instead of being refused or moved aside. A refusal from any guard
+// still wins, and a notice the outcome carried rides along in the same context. On top of a row's
+// rewrite — `raw_payload` is then the rewritten call — it keeps that row's notes and its lack of a
+// permission decision, so the cap is never lost to a pipefail or tail rewrite (joshuafolkken/kit#4101).
 function foreground_rewrite(
 	outcome: GuardOutcome,
 	raw_payload: string,
 	is_lane_child?: () => boolean,
+	rewrite?: RuleRewrite,
 ): string | undefined {
-	if (outcome.reason !== undefined) return undefined
-
-	const call = guarded_call(raw_payload)
 	const input =
-		call === undefined ? undefined : lane_background.foreground_input(call, is_lane_child)
+		outcome.reason === undefined ? foreground_input_of(raw_payload, is_lane_child) : undefined
 
 	if (input === undefined) return undefined
 
-	return hook_decision.rewrite_envelope(
-		input,
-		rewrite_context(lane_background.FOREGROUND_NOTE, outcome),
-	)
+	const note = [rewrite?.note, lane_background.FOREGROUND_NOTE].filter(Boolean).join('\n\n')
+	const envelope_of =
+		rewrite === undefined ? hook_decision.rewrite_envelope : hook_decision.flow_rewrite_envelope
+
+	return envelope_of(input, rewrite_context(note, outcome))
 }
 
 // The rows' rewrite carries no permission decision: whatever else the line runs meets its own prompt.
@@ -174,7 +186,8 @@ function rule_envelope(
 
 // The hook's one write: a rewrite where one applies, the outcome's own envelope otherwise.
 function emit(raw_payload: string, outcome: GuardOutcome, rewrite?: RuleRewrite): void {
-	const envelope = rule_envelope(outcome, rewrite) ?? foreground_rewrite(outcome, raw_payload)
+	const envelope =
+		foreground_rewrite(outcome, raw_payload, undefined, rewrite) ?? rule_envelope(outcome, rewrite)
 
 	if (envelope === undefined) hook_decision.emit_outcome(outcome)
 	else process.stdout.write(`${envelope}\n`)

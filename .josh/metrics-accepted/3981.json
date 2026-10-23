@@ -1,8 +1,0 @@
-{
-	"reason": "#3981 registers usage for the 26 uncovered commands: the usage tables grow by their examples and flags, and the two new generated **Options:** blocks (observation:record, latest:scope) are the generator's own format",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 148,
-		"prose.excess_bold": 2
-	}
-}

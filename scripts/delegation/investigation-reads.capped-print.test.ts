@@ -1,7 +1,7 @@
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { capped_print_part } from '#scripts/document/capped-print-part'
-import { time_transcript_fixture } from '#scripts/time/time-transcript-fixture'
+import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
 import { investigation_reads } from './investigation-reads'
 

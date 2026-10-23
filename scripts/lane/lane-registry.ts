@@ -222,9 +222,28 @@ async function main_repository_root(): Promise<string> {
 	return repo_discovery.main_worktree(await git_command.repository_root())
 }
 
-/** Every open lane of this repository, lowest issue number first. */
-async function list_lanes(): Promise<Array<LaneInfo>> {
-	const root = lane_paths.lane_root(await main_repository_root())
+/**
+ * The directory this repository's lanes live in, read from the main work tree rather than this one —
+ * derived from the current work tree, a command run inside a lane would look for lanes inside it.
+ */
+async function lane_root_directory(): Promise<string> {
+	return lane_paths.lane_root(await main_repository_root())
+}
+
+/**
+ * The issue's lane by the directory its number implies, registered or not — what ending its processes
+ * needs (`lane_reap.reap_child`), so a lane `list_lanes` no longer reads is still reached.
+ */
+async function lane_location(issue: string): Promise<Pick<LaneInfo, 'issue' | 'directory'>> {
+	return { issue, directory: lane_paths.lane_directory(await lane_root_directory(), issue) }
+}
+
+/**
+ * Every open lane of this repository, lowest issue number first. `main_root` is the main work tree a
+ * caller already resolved — `run:board` resolves it once rather than with a `git` call each read.
+ */
+async function list_lanes(main_root?: string): Promise<Array<LaneInfo>> {
+	const root = lane_paths.lane_root(main_root ?? (await main_repository_root()))
 	const blocks = await worktree_blocks()
 	const lanes = blocks.map((block) => parse_block(block, root)).filter(is_lane)
 
@@ -279,6 +298,8 @@ const lane_registry = {
 	find_lane,
 	find_open_lane,
 	has_lanes_in_flight,
+	lane_location,
+	lane_root_directory,
 	list_lanes,
 	main_repository_root,
 	parse_block,

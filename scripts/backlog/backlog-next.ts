@@ -1,4 +1,3 @@
-import { fileURLToPath } from 'node:url'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
@@ -13,11 +12,16 @@ import { epic_solo_stale } from '#scripts/epic/epic-solo-stale'
 import { epic_triage, type TriageVerdict } from '#scripts/epic/epic-triage'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
+import { session_cite } from '#scripts/issue/session-cite'
+import { lane_state } from '#scripts/lane/lane-state'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_overlap } from './backlog-overlap'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank, type GateScope } from './backlog-rank'
+import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
 //
@@ -30,7 +34,6 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 // `auto-ok:next`'s own listing and runnability rules, and the verdict comes from
 // `epic_report.decide_verdict` so it cannot drift from what `epic:next` means by the same word.
 
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
@@ -130,6 +133,31 @@ function warn_gaps(context: PoolContext, has_answer: boolean): void {
 	warn_epic_gap(context)
 }
 
+// Why a row on the time side is not offered yet, when the reason is a declared start time or sample
+// condition — the waits a reader cannot see from the labels or the blockers. A sample condition names
+// its pull request as `#N`, linkified like the explanation.
+function warn_not_before(context: PoolContext): void {
+	for (const issue of context.opted_in.issues) {
+		const reason = issue_not_before.waiting_reason(issue.body)
+
+		if (reason === undefined) continue
+
+		const cited = session_cite.issue(issue.number, undefined, context.repo)
+
+		console.error(`${cited} ${issue_citation.linkify(reason, context.repo)}`)
+	}
+}
+
+// Which waiting issues hold the backlog on a dependency chain or a start condition, read back by
+// `backlog:offer` so a lane held by them is told apart in `lane:stats` (joshuafolkken/kit#4513).
+function warn_wait_causes(result: EpicNextResult, context: PoolContext): void {
+	const causes = backlog_wait_cause.classify(result.waiting, context.repo)
+
+	for (const line of backlog_wait_cause.lines_of(causes)) {
+		console.error(issue_citation.linkify(line, context.repo))
+	}
+}
+
 function report(result: EpicNextResult, context: PoolContext): number {
 	warn_gaps(context, result.verdict === 'run')
 	// The explanation names epics and children as `#N` (`tracked by epic #N`); linkified so the text a
@@ -139,8 +167,12 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	const explanation = epic_report.format_result(result, context.repo)
 
 	console.error(issue_citation.linkify(explanation, context.repo))
+	warn_not_before(context)
 
-	for (const token of tokens_of(result, context.repo)) console.info(token)
+	const tokens = tokens_of(result, context.repo)
+
+	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
+	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE
 }
@@ -297,11 +329,15 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 
 // The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
 // which is what lets a candidate be held back from a path a running lane already declares.
-// `backlog:plan --waves` reads the same scope, so its first wave is this offer.
-function gate_scope(context: PoolContext): GateScope {
+// `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
+// records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
+async function gate_scope(context: PoolContext): Promise<GateScope> {
+	const { issues } = context.opted_in
+
 	return {
 		standalone: standalone_keys(context),
-		declared: backlog_overlap.declared_of(context.opted_in.issues),
+		declared: backlog_overlap.declared_of(issues),
+		lanes: await lane_state.read_states(issues.map((issue) => String(issue.number))),
 	}
 }
 
@@ -320,7 +356,7 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 
 	if (notice !== undefined) console.error(notice)
 
-	const gated = backlog_rank.gate(result, read, repo, gate_scope(context))
+	const gated = backlog_rank.gate(result, read, repo, await gate_scope(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -393,6 +429,11 @@ async function context_of(
 }
 
 async function answer(opted_in: OptedIn, exclude: ReadonlyArray<number>): Promise<number> {
+	// The scan has every opted-in body and its labels already, so it keeps `not-before` in line with them
+	// and with every other issue the label is on — before any answer, so a drained backlog or a failed
+	// read still takes a passed label off.
+	await issue_not_before_label.sweep(opted_in.issues)
+
 	if (opted_in.issues.length === 0) return report_none()
 
 	const context = await context_of(opted_in, exclude)
@@ -422,13 +463,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await answer(opted_in, options.exclude ?? [])
 }
 
-// `process.exitCode` rather than `process.exit()`, for the reason `auto-ok:next` records: the whole
-// contract is `answers=$(pnpm josh backlog:next)`, and exiting outright can cut the pipe before it
-// has drained.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const backlog_next = {
 	USAGE,
 	REPO_UNREADABLE_MESSAGE,
@@ -440,8 +474,6 @@ const backlog_next = {
 	context_of,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { backlog_next }
 export type { BacklogVerdict, OptedIn, PoolContext }

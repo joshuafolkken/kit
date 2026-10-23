@@ -1,10 +1,11 @@
-import { hanging_execa } from '#scripts/test/hanging-execa'
+import { availableParallelism, cpus } from 'node:os'
+import { hanging_execa } from '#tools/test/hanging-execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { core_admission, type LedgerEntry } from './core-admission'
 import { machine_capacity, type MachineReading, type MemoryReading } from './machine-capacity'
 
 vi.mock('execa', async () => {
-	const { hanging_execa: stand_in } = await import('#scripts/test/hanging-execa')
+	const { hanging_execa: stand_in } = await import('#tools/test/hanging-execa')
 
 	return { execa: stand_in.spawn }
 })
@@ -44,18 +45,11 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 		expect(machine_capacity.machine_budget(CORES, reading, ledger).cores).toBe(CORES)
 	})
 
-	it('gives way to busy cores beyond the baseline the weights were measured beside', () => {
+	it('gives way to every busy core outside the ledger, the background included', () => {
 		const external = 5
 		const reading = { busy_cores: external, available_mb: AVAILABLE_MB }
-		const expected = CORES - (external - machine_capacity.BASELINE_CORES)
 
-		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(expected)
-	})
-
-	it('does not count the baseline itself as external load', () => {
-		const reading = { busy_cores: machine_capacity.BASELINE_CORES, available_mb: undefined }
-
-		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(CORES)
+		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(CORES - external)
 	})
 
 	it('adds back the memory the admitted ledger already holds', () => {
@@ -71,7 +65,57 @@ describe('machine_capacity.machine_budget — the budget the ledger admits again
 		expect(machine_capacity.machine_budget(CORES, UNREAD, NO_LEDGER)).toEqual({
 			cores: CORES,
 			memory_mb: Infinity,
+			busy_excess: 0,
+			is_overloaded: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#4361: lanes took the 11-core machine to a load average of 25–34 while the first
+// waiter ignored outside load. A run queue past twice the cores beyond the ledger now holds it too.
+describe('machine_capacity.machine_budget — a run queue past twice the cores', () => {
+	const cap = CORES * 2
+
+	function overloaded(run_queue: number | undefined): boolean | undefined {
+		const reading = { busy_cores: CORES, available_mb: undefined, run_queue }
+
+		return machine_capacity.machine_budget(CORES, reading, {
+			cores: LEDGER_CORES,
+			memory_mb: 0,
+		}).is_overloaded
+	}
+
+	it('is overloaded once the queue beyond the ledger passes twice the cores', () => {
+		expect(overloaded(LEDGER_CORES + cap + 1)).toBe(true)
+	})
+
+	it('is not overloaded at exactly twice the cores beyond the ledger', () => {
+		expect(overloaded(LEDGER_CORES + cap)).toBe(false)
+	})
+
+	it('is not overloaded when the queue could not be read', () => {
+		expect(overloaded(undefined)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4238: 10 cores reserved and all 11 busy read as no excess under the old two-core
+// baseline, so the next claim was admitted onto a saturated CPU.
+describe('machine_capacity.machine_budget — a CPU busier than the ledger declares', () => {
+	it('leaves no room past the ledger when every core is busy', () => {
+		const ledger_cores = 10
+		const reading = { busy_cores: CORES, available_mb: undefined }
+		const budget = machine_capacity.machine_budget(CORES, reading, {
+			cores: ledger_cores,
+			memory_mb: 0,
+		})
+
+		expect(budget).toMatchObject({ cores: ledger_cores, busy_excess: 1 })
+	})
+
+	it('is never below zero when outside load passes the core count', () => {
+		const reading = { busy_cores: CORES + LEDGER_CORES, available_mb: undefined }
+
+		expect(machine_capacity.machine_budget(CORES, reading, NO_LEDGER).cores).toBe(0)
 	})
 })
 
@@ -174,66 +218,72 @@ const CALM: MemoryReading = {
 }
 const HEAVY_MB = 2000
 
-function claim(key: string, claimed_at: number): LedgerEntry {
-	return { key, reservation: { weight: 1, memory_mb: HEAVY_MB, claimed_at } }
+function claim(key: string, claimed_at: number, admitted_at?: number): LedgerEntry {
+	return { key, reservation: { weight: 1, memory_mb: HEAVY_MB, claimed_at, admitted_at } }
 }
 
+// `first` is running and in the reading, so the budget adds its memory back.
 function admits_second_claim(after: MemoryReading): boolean {
-	const available_mb = machine_capacity.pressured_available(CALM, after)
+	const available_mb = machine_capacity.pressured_available(after)
 	const reading = { busy_cores: 0, available_mb }
 	const ledger = { cores: 1, memory_mb: HEAVY_MB }
 	const budget = machine_capacity.machine_budget(CORES, reading, ledger)
 
-	return core_admission.is_admitted('second', [claim('first', 0), claim('second', 1)], budget)
+	return core_admission.is_admitted('second', [claim('first', 0, 0), claim('second', 1)], budget)
 }
 
-describe('machine_capacity.pressured_available — memory under compression and swap pressure', () => {
+// joshuafolkken/kit#4313: a machine that swaps and compresses all day held a third of every wait with
+// memory to spare, so the traffic alone no longer answers no free memory.
+describe('machine_capacity.pressured_available — swap and compressor traffic alone set no limit', () => {
 	it('answers the available memory when nothing is under pressure', () => {
-		expect(machine_capacity.pressured_available(CALM, CALM)).toBe(AVAILABLE_MB)
+		expect(machine_capacity.pressured_available(CALM)).toBe(AVAILABLE_MB)
 	})
 
-	it('answers no free memory while the kernel reports pressure', () => {
-		const after = { ...CALM, pressure_level: WARNING }
-
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
-	})
-
-	it('answers no free memory when swap traffic across the window passes the threshold', () => {
+	it('answers the available memory while swap traffic passes the threshold', () => {
 		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
 
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(0)
+		expect(machine_capacity.pressured_available(after)).toBe(AVAILABLE_MB)
 	})
 
-	it('answers the available memory under the trickle of a machine that swapped once', () => {
-		const after = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB }
-
-		expect(machine_capacity.pressured_available(CALM, after)).toBe(AVAILABLE_MB)
-	})
-
-	// Round 2 of #3943: the incident's thrash was compressor traffic with the kernel's verdict normal
-	// and the swap counters quiet, so the swap threshold alone admitted it.
-	it('answers no free memory when compressor traffic alone passes the threshold, swap quiet', () => {
+	it('answers the available memory while compressor traffic passes the threshold', () => {
 		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB + 1
 
-		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(0)
+		expect(machine_capacity.pressured_available({ ...CALM, compressed_mb })).toBe(AVAILABLE_MB)
 	})
 
-	it('answers the available memory under compressor traffic at the threshold', () => {
-		const compressed_mb = COMPRESSED_MB + machine_capacity.COMPRESSION_PRESSURE_MB
+	it('admits a claim under swap traffic when the free memory holds what it declares', () => {
+		const swapping = { ...CALM, swapped_mb: SWAPPED_MB + machine_capacity.SWAP_PRESSURE_MB + 1 }
 
-		expect(machine_capacity.pressured_available(CALM, { ...CALM, compressed_mb })).toBe(
-			AVAILABLE_MB,
-		)
+		expect(admits_second_claim(swapping)).toBe(true)
+	})
+
+	it('holds a claim back when the free memory falls short of what it declares', () => {
+		expect(admits_second_claim({ ...CALM, available_mb: HEAVY_MB - 1 })).toBe(false)
 	})
 
 	it('leaves memory that could not be read unread, so it sets no limit', () => {
 		const unread = { available_mb: undefined, swapped_mb: undefined, pressure_level: undefined }
 
-		expect(machine_capacity.pressured_available(unread, unread)).toBeUndefined()
+		expect(machine_capacity.pressured_available(unread)).toBeUndefined()
+	})
+})
+
+describe('machine_capacity.pressured_available — the kernel verdict', () => {
+	const CRITICAL = { ...CALM, pressure_level: machine_capacity.PRESSURE_HOLD }
+
+	it('answers no free memory while the kernel reports critical pressure', () => {
+		expect(machine_capacity.pressured_available(CRITICAL)).toBe(0)
+	})
+
+	// joshuafolkken/kit#4199: macOS keeps the warning long after the pressure passed.
+	it('answers the available memory under the kernel warning alone', () => {
+		const after = { ...CALM, pressure_level: WARNING }
+
+		expect(machine_capacity.pressured_available(after)).toBe(AVAILABLE_MB)
 	})
 
 	it('holds a heavy claim back under pressure and admits it when there is none', () => {
-		expect(admits_second_claim({ ...CALM, pressure_level: WARNING })).toBe(false)
+		expect(admits_second_claim(CRITICAL)).toBe(false)
 		expect(admits_second_claim(CALM)).toBe(true)
 	})
 })
@@ -264,9 +314,19 @@ async function read_swapping_machine(): Promise<MachineReading> {
 }
 
 describe('machine_capacity.read_machine — memory read at both ends of the window', () => {
-	it('answers no free memory when the swap counter advanced past the threshold during the window', async () => {
+	it('names the pressure but keeps the free memory when the swap counter advanced during the window', async () => {
 		const reading = await read_swapping_machine()
 
-		expect(reading.available_mb).toBe(0)
+		expect(reading.memory_pressured).toBe(true)
+		expect(reading.available_mb).toBeGreaterThan(0)
+	})
+
+	// joshuafolkken/kit#4361: the run queue is read on the host, and never under a CPU quota.
+	it('reads the run queue exactly where the host CPU times are this process', async () => {
+		const reading = await read_swapping_machine()
+		const is_host = cpus().length > 0 && cpus().length === availableParallelism()
+		const expected = is_host ? 'number' : 'undefined'
+
+		expect(typeof reading.run_queue).toBe(expected)
 	})
 })

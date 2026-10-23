@@ -3,15 +3,26 @@ import {
 	CSPELL_CACHE_FLAGS,
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_CACHE_FLAGS,
+	ESLINT_COMMIT_CACHE_FILE,
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('#scripts/lint/eslint-cache-dependencies', () => ({
+	eslint_cache_dependencies: {
+		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
+	},
+}))
 
 const execa_module = await import('execa')
 const mocked_execa = vi.mocked(execa_module.execa)
+const { eslint_daemon } = await import('#scripts/lint/eslint-daemon')
+const mocked_run_or_cold = vi.mocked(eslint_daemon.run_or_cold)
+const { eslint_cache_dependencies } = await import('#scripts/lint/eslint-cache-dependencies')
+const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { pre_commit_lint } = await import('./pre-commit-lint')
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
@@ -92,5 +103,47 @@ describe('pre_commit_lint.run', () => {
 
 		expect(await pre_commit_lint.run(['stylelint'])).toBe(pre_commit_lint.USAGE_ERROR_EXIT_CODE)
 		expect(mocked_execa).not.toHaveBeenCalled()
+	})
+})
+
+const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
+
+// joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
+// eslint reservation.
+describe('pre_commit_lint.run — eslint', () => {
+	it('lints the staged files through the daemon route inside the eslint reservation', async () => {
+		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+		reservation.mockImplementation(async (_weight, work) => await work())
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+		expect(mocked_run_or_cold).toHaveBeenCalledWith(built('eslint'))
+		expect(mocked_execa).not.toHaveBeenCalled()
+		expect(reservation).toHaveBeenCalledOnce()
+		reservation.mockRestore()
+	})
+
+	it('fails a run that ended without an exit code', async () => {
+		mocked_run_or_cold.mockResolvedValueOnce({ ...STALE_RED, exit_code: undefined })
+		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4415: a merge can change only what a staged file imports, and the hook's content
+// cache keeps the staged file's verdict. Its entry is dropped from the hook's cache file before the
+// run reads it, and the run's own report is the one printed.
+describe('pre_commit_lint.run — the dependency guard', () => {
+	it('runs eslint inside the guard of the hook cache file and prints its report', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		mocked_run_or_cold.mockResolvedValueOnce(STALE_RED)
+
+		expect(await pre_commit_lint.run(['eslint', ...STAGED])).toBe(1)
+		expect(mocked_guard).toHaveBeenCalledWith(ESLINT_COMMIT_CACHE_FILE, expect.any(Function))
+		expect(write).toHaveBeenCalledWith(STALE_RED.output)
 	})
 })

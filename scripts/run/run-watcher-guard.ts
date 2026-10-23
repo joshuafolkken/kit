@@ -1,4 +1,5 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { run_headless } from './run-headless'
 
@@ -18,7 +19,6 @@ import { run_headless } from './run-headless'
 
 const WATCHER_TICK_MS = 30_000
 const TICK_MULTIPLIER = 3
-const MS_PER_SECOND = 1000
 
 const STALE_THRESHOLD_MS = WATCHER_TICK_MS * TICK_MULTIPLIER
 const STALE_THRESHOLD_S = STALE_THRESHOLD_MS / MS_PER_SECOND

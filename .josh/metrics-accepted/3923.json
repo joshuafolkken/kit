@@ -1,8 +1,0 @@
-{
-	"reason": "#3923 adds the ship-stop context module (failed output tail with spinner frames resolved + changed files) and its prompt wiring; chain-rule step 0 names what the relaunch prompt now carries",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 139,
-		"ai_cost.on_demand_bytes": 85
-	}
-}

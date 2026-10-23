@@ -107,12 +107,27 @@ function reason(measurement: SizeMeasurement): string {
 	return `${counted} (${guide}) — ${tail}`
 }
 
+// The `split-assessment.md` heading the notice points at; the document-rule test pins the document to it.
+const NOTICE_SECTION = 'Over the guide before the gate'
+const NOTICE_ACTION = `record why it stays one Issue, or carve the rest out into a new Issue — split-assessment.md → "${NOTICE_SECTION}"`
+
+// The pre-gate notice `josh main:merge` prints for a diff over the guide. "Clearly" is the `split`
+// verdict — both guides exceeded — so the one bar this file draws is the one the notice fires on,
+// and a diff under it prints nothing.
+function notice(measurement: SizeMeasurement): string | undefined {
+	if (measurement.verdict !== SPLIT_VERDICT) return undefined
+
+	return `split notice: ${reason(measurement)}. Before the run:cut, ${NOTICE_ACTION}`
+}
+
 const split_assess = {
 	FILE_GUIDE,
 	LINE_GUIDE,
+	NOTICE_SECTION,
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,
+	notice,
 	parse_numstat,
 	reason,
 }

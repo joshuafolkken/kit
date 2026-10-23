@@ -16,6 +16,7 @@ describe('destructive_command.is_destructive_command — refuses', () => {
 		'rm -Rf dist',
 		'rm --recursive --force dist',
 		'sudo rm -fr /tmp/x',
+		'x & /bin/rm -rf dist',
 		'gh repo delete joshuafolkken/kit --yes',
 		'gh repo archive joshuafolkken/kit',
 		'gh repo edit --visibility public',

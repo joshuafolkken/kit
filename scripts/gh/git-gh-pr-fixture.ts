@@ -1,4 +1,6 @@
+import { json_value } from '#scripts/lib/json-value'
 import { FULL_PAGE_QUERY } from './git-gh-api-path'
+import type { ConditionalRead } from './git-gh-conditional'
 import type { GhApiRequest } from './git-gh-exec'
 
 // One pull request as `repos/{owner}/{repo}/pulls/{N}` answers it, the paths the reads ask for, and
@@ -84,7 +86,32 @@ function check_runs_pages(...pages: ReadonlyArray<ReadonlyArray<Record<string, u
 }
 
 function status_pages(...pages: ReadonlyArray<ReadonlyArray<Record<string, unknown>>>): string {
-	return JSON.stringify(pages.map((statuses) => ({ state: 'success', statuses })))
+	return JSON.stringify(
+		pages.map((statuses) => ({ state: 'success', total_count: statuses.length, statuses })),
+	)
+}
+
+// The page a one-page read of a commit listing gets: a slurped answer of exactly one page is that
+// page, and anything else is answered as routed.
+function one_page(body: string): string {
+	const pages = json_value.parse_array(body)
+	const [page] = pages ?? []
+
+	return pages?.length === 1 && json_value.is_record(page) ? JSON.stringify(page) : body
+}
+
+// `git_gh_conditional.read_conditional` the way GitHub answers it, over the `exec_gh_api` router: the
+// body is its own ETag, so a poll that finds nothing changed is answered 304. The router is still
+// asked, which keeps every request a poll sends in `exec_gh_api`'s calls; the 304s are the free ones
+// among them (joshuafolkken/kit#4550).
+function conditional_read_over(
+	api: (request: GhApiRequest) => Promise<string>,
+): (path: string, etag: string | undefined) => Promise<ConditionalRead> {
+	return async (path, etag) => {
+		const body = one_page(await api({ path }))
+
+		return etag === body ? { kind: 'unchanged' } : { kind: 'changed', etag: body, body }
+	}
 }
 
 // `state` is lower case and `url` is the API endpoint on purpose: those are two of the fields the
@@ -111,8 +138,9 @@ function rest_pull_page(rows: ReadonlyArray<Record<string, unknown>>): string {
 // thing under test. The thunk form exists for `pr_merge`, whose tests have to arrange "the merge
 // request failed and the pull request reads back merged" — two different outcomes on two paths,
 // which a body-only mapping cannot express. Written as a widening of this one router rather than as
-// a second one beside it.
-type GhApiAnswer = string | (() => Promise<string>)
+// a second one beside it. The thunk receives the request, so a write and a read on one path (the
+// labels endpoint) can answer differently.
+type GhApiAnswer = string | ((request: GhApiRequest) => Promise<string>)
 
 // A request routed by path rather than by call order: one read now asks for the repository name, the
 // branch lookup and the pull request, and a path with no route fails loudly instead of answering the
@@ -125,7 +153,7 @@ function gh_api_routes(
 
 		if (answer === undefined) throw new Error(`unexpected gh api path: ${request.path}`)
 
-		return typeof answer === 'string' ? answer : await answer()
+		return typeof answer === 'string' ? answer : await answer(request)
 	}
 }
 
@@ -160,6 +188,7 @@ function request_body(request: GhApiRequest): Record<string, unknown> {
 export type { GhApiAnswer }
 export {
 	check_runs_pages,
+	conditional_read_over,
 	find_request,
 	request_body,
 	commit_check_runs_path,

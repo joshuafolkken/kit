@@ -9,7 +9,7 @@ import { read_document } from './ai-document-fixture'
 // literal — the `*_KEY = 'JOSH_…'` constant its reader passes to the environment — while a name in a
 // comment is backticked, so the literal is the read and nothing else is.
 const REFERENCE = 'docs/environment-variables.md'
-const SOURCE_ROOTS: ReadonlyArray<string> = ['scripts', 'ports', 'env', 'eslint']
+const SOURCE_ROOTS: ReadonlyArray<string> = ['scripts', 'tools', 'ports', 'env', 'eslint']
 const SOURCE_FILE = /\.(?:ts|js)$/u
 const TEST_SUFFIX = '.test.ts'
 const KEY_LITERAL = /'(JOSH_[A-Z0-9_]+)'/gu

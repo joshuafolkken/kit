@@ -1,7 +1,0 @@
-{
-	"reason": "Review fixes: stamp stale holds via hold_of, and keep a sent notify done when its stamp fails, each with a regression test",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 145
-	}
-}

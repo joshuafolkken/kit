@@ -149,7 +149,7 @@ describe('a rule-module edit invalidates both sides', () => {
 	})
 })
 
-// joshuafolkken/kit#1347, the second defect: `josh gate` lints the whole tree beside the review while
+// joshuafolkken/kit#1347, the second defect: `josh gate` lints beside the review (the whole tree then, the branch's changed files since #4085) while
 // an implementation loop calls `josh lint:related` between edits, so those two overlap exactly as the
 // hook and the gate do. Each eslint run rewrites its cache file whole from the copy it loaded at
 // start-up, so on one file the run that finished last discarded the other's entries.

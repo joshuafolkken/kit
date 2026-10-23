@@ -1,19 +1,18 @@
-import { backlog_drive_restore } from '#scripts/backlog/backlog-drive-restore'
+import { backlog_drive_adopt } from '#scripts/backlog/backlog-drive-adopt'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
-import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import type { LaneInfo } from '#scripts/lane/lane-registry'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_merge } from './run-merge'
 import { run_merge_cli } from './run-merge-cli'
 
 type IssueRead = Awaited<ReturnType<typeof issue_state_cli.read_issue>>
 
-// The merges a run ends with, recorded at `run:carry --end`. `backlog:drive` collects only the lanes
-// it holds in memory, and a restarted driver reseeds them from the open lanes, so a lane that merged
-// while no driver watched it never reached `run:merge`: no `merge` event, no ledger line, no merged
+// The merges a run ends with, recorded at `run:carry --end`. `backlog:drive` collects the lanes it
+// holds or adopts while it runs (`backlog-drive-adopt.ts`), so a lane that merged while no driver
+// watched it never reached `run:merge`: no `merge` event, no ledger line, no merged
 // count. Each lane still open on a child the run launched and never settled is read once more, and
 // **only a merged one is collected** — closed by a merged pull request, or left open behind one —
 // through the same `run:merge` recording a driver would have made.
@@ -79,13 +78,7 @@ function owner_of(carry: RunCarry): CarryOwner {
 }
 
 async function collect_carried(carry: RunCarry): Promise<void> {
-	const in_flight = backlog_drive_restore.active_issues(
-		await run_event_stream_emit.current_events(),
-	)
-	const lanes = await lane_registry.list_lanes()
-	const collectable = lanes.filter((lane) => !lane.is_stranded && in_flight.has(lane.issue))
-
-	await collect_all(collectable, owner_of(carry))
+	await collect_all(await backlog_drive_adopt.active_lanes(), owner_of(carry))
 }
 
 // Asked by `--end` before it closes the record under `directory`, the common git directory; a run with

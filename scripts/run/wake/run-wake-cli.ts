@@ -1,25 +1,24 @@
-#!/usr/bin/env tsx
-import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import type { AgentProfile, AgentProvider } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
-import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_headless } from '#scripts/run/run-headless'
 import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
 import { run_wake, type WakeStopReason, type WakeTidyResult } from './run-wake'
 import { run_wake_await } from './run-wake-await'
+import { run_wake_code } from './run-wake-code'
 import { run_wake_describe, type WakeContext } from './run-wake-describe'
-import { run_wake_driver } from './run-wake-driver'
-import { run_wake_handoff } from './run-wake-handoff'
-import { run_wake_loop, type LoopPorts, type LoopStop } from './run-wake-loop'
+import { run_wake_loop, type LoopStop } from './run-wake-loop'
+import { run_wake_ports } from './run-wake-ports'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 import { run_wake_stop } from './run-wake-stop'
 import { run_wake_supervise } from './run-wake-supervise'
+import { run_wake_takeover, type TakeoverResult } from './run-wake-takeover'
 
 // `josh run:wake --start | --list | --stop | --loop` — the supervisor that continues a cut
 // `backlogrun` or `queue` without a person retyping the keyword. **Which invocations it may continue
@@ -29,24 +28,22 @@ import { run_wake_supervise } from './run-wake-supervise'
 // The stdout/stderr split is the contract every `run:*` command shares: exactly one verdict token on
 // stdout on every path, the reason and the advice on stderr, so a loop branches on one token.
 //
-// **`--start` and `--loop` are two halves of one thing.** `--start` spawns this same script detached
+// **`--start` and `--loop` are two halves of one thing.** `--start` spawns the command's entry detached
 // with `--loop` and returns immediately, which is what leaves the supervisor outside the conversation;
 // `--loop` is the body, and running it in the foreground is how a person watches what it does.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const ONE_GROUP = 1
-const MS_PER_SECOND = 1000
-// Whole and positive. A zero interval is a busy loop against the temp directory, not a faster
-// supervisor.
-const INTERVAL_PATTERN = /^[1-9]\d*$/u
+// The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
+// the temp directory, not a faster supervisor.
 // **Bounded above as well as below, and for the same reason.** `setTimeout` clamps any delay past
 // 2^31−1 ms to *one millisecond*, so a number large enough to look like "poll rarely" produces exactly
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600
-const SCRIPT_PATH = fileURLToPath(import.meta.url)
+// The command's entry, not this module: the guard that runs `main` lives in `run-wake-main.ts`.
+const SCRIPT_PATH = fileURLToPath(new URL('run-wake-main.ts', import.meta.url))
 
 const STARTED_VERDICT = 'started'
 const RUNNING_VERDICT = 'running'
@@ -57,13 +54,6 @@ const NONE_VERDICT = 'none'
 const UNKNOWN_VERDICT = 'unknown'
 const FAILED_VERDICT = 'failed'
 
-// **The note covers both ways `wake_argv` answers `undefined`**, because it cannot tell them apart and
-// a message that named only the first would accuse a legitimate invocation of carrying unsafe text.
-// The second is the one a person actually meets: a `queue` whose references carry a `owner/repo#`
-// prefix is a grammar this supervisor does not rebuild, and `queue.md` → "The session boundary" is why
-// such a queue begins no record in the first place.
-const UNSAFE_INVOCATION_NOTE =
-	'the carried invocation is not one this supervisor can continue — it is neither a backlogrun nor a queue it can rebuild, or it carries text that may not be passed to a command line'
 // The command rather than one entry point: the supervisor continues a `queue` as readily as a
 // `backlogrun`, and a warning that named the wrong one would send the reader looking at a run that is
 // not the one that stopped.
@@ -82,12 +72,21 @@ const WARNING_RECOVERY = `Check the wake command, then restart with \`pnpm josh 
 const STOP_BODIES: Record<WakeStopReason, string | undefined> = {
 	ended: undefined,
 	stopped: undefined,
+	reload: undefined,
 	failed: 'The supervisor could not continue the run and has stopped.',
 	unreadable:
 		'The carry record could not be read, so the supervisor stopped rather than guess at it.',
 }
 const NO_PROFILE_NOTE = 'the scheduler profile could not be resolved'
+const RELOAD_FAILED_NOTE =
+	"The supervisor's code changed, but the supervisor to replace it did not start"
+const TAKEOVER_NOTES: Record<Exclude<TakeoverResult, 'taken'>, string> = {
+	died: 'it exited before it claimed the run',
+	unclaimed: 'it did not claim the run in time, so it was stopped',
+}
 const SUPERSEDED_RESULT: WakeTidyResult = 'superseded'
+const REMOVED_RESULT: WakeTidyResult = 'removed'
+const STOPPED_STOP: LoopStop = { reason: 'stopped', note: undefined }
 const SUPERSEDED_NOTE =
 	'another supervisor now holds the record, so it was left alone; this loop is the superseded one'
 
@@ -115,17 +114,15 @@ function usage(): number {
 	return FAILURE_EXIT_CODE
 }
 
-function note_to_stderr(note: string): void {
-	console.error(`wake: ${note}`)
-}
+const { note_to_stderr } = run_wake_ports
 
 function to_interval_ms(value: string | boolean | undefined): number | undefined {
 	if (typeof value !== 'string') return backlog_budget.OFFER_INTERVAL_MS
-	if (!INTERVAL_PATTERN.test(value)) return undefined
+	const seconds = cli_flags.to_positive(value)
 
-	const seconds = Number(value)
-
-	return seconds > MAX_INTERVAL_SECONDS ? undefined : seconds * MS_PER_SECOND
+	return seconds === undefined || seconds > MAX_INTERVAL_SECONDS
+		? undefined
+		: seconds * MS_PER_SECOND
 }
 
 // Exactly one verb, never a guessed order between two.
@@ -152,56 +149,6 @@ function refuse_without_carry(kind: CarryRead['kind']): number {
 	console.error(`No carried run here to supervise — \`pnpm josh run:carry --json\` says ${kind}.`)
 
 	return report(NONE_VERDICT, FAILURE_EXIT_CODE)
-}
-
-// **A session that started is said on the stream.** The driver's `waiting on judgment` is the moment it
-// asked; from here a session is at work on the answer, until the supervisor's next hand-off.
-function say_session_running(context: WakeContext): void {
-	run_event_setup.emit_to(context.event_target, run_event_setup.STAGE.SESSION, new Date())
-}
-
-function wake_session(
-	context: WakeContext,
-	invocation: string,
-	profile: AgentProfile,
-	session: { id: string; material: string },
-): LaunchResult {
-	const built = run_wake_session.wake_argv(invocation, profile, context.worktree, session)
-
-	if (built === undefined) return { kind: 'failed', note: UNSAFE_INVOCATION_NOTE }
-	if (built.kind === 'rejected') return { kind: 'failed', note: built.note }
-
-	// The headless mark is what lets the stop hook hold this session's turn open while its lanes run —
-	// under `claude -p` a turn-end is the process's end (`run-headless.ts`).
-	const environment = run_headless.environment()
-	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
-	const result = run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
-
-	if (result.kind === 'launched') say_session_running(context)
-
-	return result
-}
-
-// **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
-// adopted for this process, so reading that owner as live would have every restarted pass wait on
-// itself and never drive again.
-function ports_for(context: WakeContext, profile: AgentProfile): LoopPorts {
-	return {
-		read_carry: () => run_carry.read_carry(context.carry_target),
-		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_held_by_another(read.carry),
-		has_work: async () => true,
-		new_session_id: () => randomUUID(),
-		hand_off: () => {
-			run_wake_handoff.hand_off(context.carry_target)
-		},
-		drive: async () => await run_wake_driver.drive(context.carry_target),
-		wake: (invocation, session_id, material) =>
-			wake_session(context, invocation, profile, { id: session_id, material }),
-		sleep: async (milliseconds) => {
-			await new Promise((resolve) => setTimeout(resolve, milliseconds))
-		},
-		now: () => new Date(),
-	}
 }
 
 // The log is named in the warning rather than only in `--list`, because the person reading a warning
@@ -256,7 +203,7 @@ async function record_failure(
 }
 
 // **Only a failed wake exits non-zero; `unreadable` warns but exits zero.** The
-// verdict-and-exit-code table in `docs/josh-commands-automation.md` is a contract callers branch on,
+// verdict-and-exit-code table in `docs/josh-commands-run.md` → `run:wake` is a contract callers branch on,
 // and what that one needs is the notification, not a different exit code.
 function exit_code_of(reason: WakeStopReason): number {
 	return reason === run_wake_loop.FAILED_REASON ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
@@ -317,8 +264,12 @@ function start_for_launch(git_directory: string, provider: AgentProvider): Launc
 	return launch_supervisor(context_of(git_directory), undefined, resolved.profile)
 }
 
-function spawn_supervisor(context: WakeContext, interval: string | undefined): number {
-	const result = launch_supervisor(context, interval, run_wake_session.scheduler_profile())
+function spawn_supervisor(
+	context: WakeContext,
+	interval: string | undefined,
+	profile: AgentProfile | undefined,
+): number {
+	const result = launch_supervisor(context, interval, profile)
 
 	if (result.kind === 'failed') {
 		console.error(`Could not start the supervisor: ${result.note}`)
@@ -346,7 +297,15 @@ function start(context: WakeContext, interval: string | undefined): number {
 		return report(RUNNING_VERDICT)
 	}
 
-	return spawn_supervisor(context, interval)
+	return spawn_supervisor(context, interval, run_wake_session.scheduler_profile())
+}
+
+// The supervisor `josh backlogrun --restart` starts in place of the one it stopped, on that one's
+// profile, so the shell the restart was typed in does not choose it; the shell's where none was running.
+function restart_supervisor(git_directory: string, profile: AgentProfile | undefined): number {
+	const chosen = profile ?? run_wake_session.scheduler_profile()
+
+	return spawn_supervisor(context_of(git_directory), undefined, chosen)
 }
 
 // **The loop removes its record on the way out, and only its own.** A loop that ended after its record
@@ -357,8 +316,78 @@ function start(context: WakeContext, interval: string | undefined): number {
 // replaced would leave no trace of that anywhere. Which of the two happened is `tidy_own_wake`'s
 // answer rather than a second read taken here — the branch that decides it belongs beside the record,
 // where it is tested, not in a CLI that would have to re-derive it.
-function tidy_up(target: string): void {
-	if (run_wake.tidy_own_wake(target) === SUPERSEDED_RESULT) note_to_stderr(SUPERSEDED_NOTE)
+function tidy_up(target: string): WakeTidyResult {
+	const tidied = run_wake.tidy_own_wake(target)
+
+	if (tidied === SUPERSEDED_RESULT) note_to_stderr(SUPERSEDED_NOTE)
+
+	return tidied
+}
+
+// **No reload while a lane's request is being answered**: ending the broker closes every lane's server
+// but waits out the slowest request, a review up to its limit, leaving the run unwatched and the other
+// lanes unserved meanwhile. The check is skipped, not taken, so the moved commit is still read as
+// stale at the first idle pass.
+function code_check(is_stale: () => Promise<boolean>): () => Promise<boolean> {
+	return async () => !lane_session_broker.is_answering() && (await is_stale())
+}
+
+function reload_failed(note: string): LoopStop {
+	return { reason: run_wake_loop.FAILED_REASON, note: `${RELOAD_FAILED_NOTE}: ${note}` }
+}
+
+// A record removed by `--stop` or taken over while the loop ended is not this loop's to hand on.
+function as_not_handed_on(stop: LoopStop): LoopStop {
+	return stop.reason === run_wake_loop.RELOAD_REASON ? STOPPED_STOP : stop
+}
+
+// **The successor starts only once this supervisor's broker has closed and its record is gone**
+// (joshuafolkken/kit#4509): two brokers for one lane overwrite each other's response
+// (`claude-lane-broker.ts`), and a record still held by a live process refuses the successor's claim.
+// The lanes and the carry record are left as `backlogrun --restart` leaves them: untouched, for the
+// successor to adopt. A successor that did not start leaves the run unwatched, so it fails as a warning.
+async function reload(
+	context: WakeContext,
+	interval_ms: number,
+	profile: AgentProfile,
+): Promise<LoopStop> {
+	const interval = String(Math.round(interval_ms / MS_PER_SECOND))
+	const result = launch_supervisor(context, interval, profile)
+
+	if (result.kind === 'failed') return reload_failed(result.note)
+
+	const ports = run_wake_takeover.ports_of(context.wake_target)
+	const takeover = await run_wake_takeover.await_takeover(result.pid, ports)
+
+	if (takeover !== 'taken') return reload_failed(TAKEOVER_NOTES[takeover])
+
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.NOTE,
+		`The supervisor's code changed on main, so process ${String(process.pid)} handed the run to process ${String(result.pid)} on the new code.`,
+	)
+
+	return { reason: run_wake_loop.RELOAD_REASON, note: undefined }
+}
+
+async function supervised(
+	context: WakeContext,
+	interval_ms: number,
+	profile: AgentProfile,
+): Promise<LoopStop> {
+	const source = run_wake_code.source_of(context.worktree, SCRIPT_PATH)
+	const is_stale = code_check(await run_wake_code.watch(source))
+	const ports = run_wake_ports.ports_for(context, profile, is_stale)
+	const stop = await run_wake_supervise.supervise({
+		context,
+		ports,
+		interval_ms,
+		note: note_to_stderr,
+	})
+
+	if (tidy_up(context.wake_target) !== REMOVED_RESULT) return as_not_handed_on(stop)
+	if (stop.reason !== run_wake_loop.RELOAD_REASON) return stop
+
+	return await reload(context, interval_ms, profile)
 }
 
 // A failed pass is restarted while the carry record is still resumable (`run-wake-restart.ts`), so
@@ -376,15 +405,7 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 	if (claimed.kind === 'running') return report(RUNNING_VERDICT)
 	if (claimed.kind === 'refused') return refuse_without_carry(claimed.carry_kind)
 
-	const ports = ports_for(context, claimed.wake.profile ?? profile)
-	const stop = await run_wake_supervise.supervise({
-		context,
-		ports,
-		interval_ms,
-		note: note_to_stderr,
-	})
-
-	tidy_up(context.wake_target)
+	const stop = await supervised(context, interval_ms, claimed.wake.profile ?? profile)
 
 	return await finish(stop, context, claimed.carry.started_at)
 }
@@ -436,28 +457,26 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await dispatch(values, context, interval_ms)
 }
 
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const run_wake_cli = {
 	FAILED_VERDICT,
 	NONE_VERDICT,
 	RUNNING_VERDICT,
+	SCRIPT_PATH,
 	STALE_VERDICT,
 	STOPPED_VERDICT,
 	SUPERVISING_VERDICT,
 	UNKNOWN_VERDICT,
 	USAGE,
 	finish,
-	ports_for,
+	RELOAD_FAILED_NOTE,
 	record_failure,
+	reload,
+	restart_supervisor,
 	run,
 	start_for_launch,
 	stop_body,
+	supervised,
 	warning_body,
 }
-
-if (process.argv[1] === SCRIPT_PATH) await main(process.argv.slice(ARGV_OFFSET))
 
 export { run_wake_cli }

@@ -25,8 +25,8 @@ vi.mock('./lane-registry', () => ({
 	lane_registry: {
 		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
 			lanes.find((lane) => lane.issue === issue),
+		lane_root_directory: vi.fn(),
 		list_lanes: vi.fn(),
-		main_repository_root: vi.fn(),
 	},
 }))
 
@@ -34,20 +34,34 @@ vi.mock('./lane-reap', () => ({
 	lane_reap: { reap_child: vi.fn() },
 }))
 
+vi.mock('./lane-residents', () => ({
+	lane_residents: { end_residents: vi.fn(() => []) },
+}))
+
 // Nothing is spent unless a test says so: a live lane is kept, as it was before spent lanes were swept.
 vi.mock('./lane-spent', () => ({
 	lane_spent: { sort_lanes: vi.fn(async () => ({ spent: [], kept: [] })) },
 }))
 
+// No process outlives the close unless a test says so (`lane-close-settle.test.ts`).
+vi.mock('./lane-reap-settle', () => ({
+	lane_reap_settle: { settle: vi.fn(async () => []), survivor_texts: vi.fn(() => []) },
+}))
+
+vi.mock('./lane-state', () => ({
+	lane_state: { record_change: vi.fn(), read_state: vi.fn(), record_stuck: vi.fn() },
+}))
+
+const { lane_state } = await import('./lane-state')
 const { lane_spent } = await import('./lane-spent')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_reap } = await import('./lane-reap')
+const { lane_residents } = await import('./lane-residents')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_registry } = await import('./lane-registry')
 const { lane_close } = await import('./lane-close')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-close-test-'))
-const REPOSITORY_ROOT = path.join(scratch, 'kit')
 const LANE_ROOT = path.join(scratch, 'lanes')
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
@@ -93,7 +107,7 @@ beforeEach(() => {
 	mkdirSync(LANE_ROOT, { recursive: true })
 	process.env[lane_paths.LANE_ROOT_KEY] = LANE_ROOT
 	lanes_are([])
-	vi.mocked(lane_registry.main_repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	vi.mocked(lane_registry.lane_root_directory).mockResolvedValue(LANE_ROOT)
 	vi.mocked(git_worktree.worktree_prune).mockResolvedValue('')
 	vi.mocked(git_worktree.branch_delete).mockResolvedValue('')
 	vi.mocked(git_command.branch_exists).mockResolvedValue(false)
@@ -165,8 +179,35 @@ describe('ending the lane child with its lane', () => {
 
 		const outcome = await lane_close.close_lane(ISSUE)
 
-		expect(vi.mocked(lane_reap.reap_child)).toHaveBeenCalledWith(ISSUE)
+		expect(vi.mocked(lane_reap.reap_child)).toHaveBeenCalledWith({
+			issue: ISSUE,
+			directory: lane.directory,
+		})
 		expect(outcome.reaped).toStrictEqual([hung_child])
+	})
+
+	// joshuafolkken/kit#4304: a process started from the checkout and re-parented to pid 1 outlived the
+	// merged lane — no tree reaches it, so its working directory is what finds it.
+	it('ends what still runs from the checkout before removing it, sparing what the reap ended', async () => {
+		const lane = open_on_disk(ISSUE, SEED)
+		const hung_child = 48_848
+		const detached = [66_330, 79_739]
+
+		lanes_are([lane])
+		vi.mocked(lane_reap.reap_child).mockReturnValue([hung_child])
+		vi.mocked(lane_residents.end_residents).mockImplementationOnce(() => {
+			expect(existsSync(lane.directory)).toBe(true)
+
+			return detached
+		})
+
+		const outcome = await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_residents.end_residents)).toHaveBeenCalledWith(
+			{ issue: ISSUE, directory: lane.directory },
+			[hung_child],
+		)
+		expect(outcome.residents).toStrictEqual(detached)
 	})
 })
 
@@ -182,6 +223,33 @@ describe('judging a close by what is left', () => {
 
 		expect(outcome.kind).toBe('incomplete')
 		expect(outcome.left_behind).toStrictEqual([LANE_BRANCH])
+	})
+})
+
+// joshuafolkken/kit#4268: the lane's state record outlives the lane, marked `ended` — only by a close
+// that left nothing behind.
+describe('ending the lane state record', () => {
+	beforeEach(() => {
+		vi.mocked(lane_state.record_change).mockClear()
+	})
+
+	it('records a closed lane as ended by lane:close', async () => {
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_state.record_change)).toHaveBeenCalledExactlyOnceWith({
+			issue: ISSUE,
+			state: 'ended',
+			command: 'lane:close',
+		})
+	})
+
+	it('records nothing when the close left something behind', async () => {
+		lanes_are([open_on_disk(ISSUE, SEED)])
+		vi.mocked(git_command.branch_exists).mockResolvedValue(true)
+		await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_state.record_change)).not.toHaveBeenCalled()
 	})
 })
 

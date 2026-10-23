@@ -49,8 +49,8 @@ function launch_line(id: string, content = `Command running in background with I
 }
 
 // The result the harness writes when a foreground call outruns its timeout (joshuafolkken/kit#3304).
-function moved_line(id: string): string {
-	const content = `Command did not complete within its 600s timeout and was moved to the background (ID: ${id}).`
+function moved_line(id: string, seconds = 600): string {
+	const content = `Command did not complete within its ${String(seconds)}s timeout and was moved to the background (ID: ${id}).`
 
 	return launch_line(id, content)
 }
@@ -75,6 +75,13 @@ function finish_line(id: string): string {
 	const content = `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>`
 
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content } })
+}
+
+// The `TaskStop` result the harness writes in place of a notice (joshuafolkken/kit#4472).
+function stopped_line(id: string): string {
+	const body = { message: `Successfully stopped task: ${id} (pnpm josh test:related)`, task_id: id }
+
+	return launch_line(id, JSON.stringify(body))
 }
 
 describe('lane_background.is_background_long_run', () => {
@@ -168,11 +175,44 @@ describe('lane_background.foreground_input', () => {
 			lane_background.foreground_input(background_call(GATE_AND_SHIP), in_lane),
 		).toBeUndefined()
 	})
+})
 
-	it('does not rewrite a foreground ship, nor read the lane mark for it', () => {
+// joshuafolkken/kit#4101: the #4091 child's foreground ship ran at the two-minute default, was moved to
+// the background by it, and died with the turn before its supervisor existed.
+describe('lane_background.foreground_input — a foreground ship', () => {
+	it('gives a foreground ship with no timeout the foreground cap in a lane child', () => {
 		const call = { name: BASH, input: { command: DETACHED_SHIP } }
 
+		expect(lane_background.foreground_input(call, in_lane)).toStrictEqual({
+			command: DETACHED_SHIP,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('raises a foreground ship timeout under the cap to it', () => {
+		const input = { command: SHIP, timeout: 120_000 }
+		const rewritten = lane_background.foreground_input({ name: BASH, input }, in_lane)
+
+		expect(rewritten?.['timeout']).toBe(FOREGROUND_TIMEOUT_MS)
+	})
+
+	it('leaves a foreground ship already at the cap alone, without reading the lane mark', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP, timeout: FOREGROUND_TIMEOUT_MS } }
+
 		expect(lane_background.foreground_input(call, never)).toBeUndefined()
+	})
+
+	it('leaves a foreground ship outside a lane child untouched', () => {
+		const call = { name: BASH, input: { command: DETACHED_SHIP } }
+
+		expect(lane_background.foreground_input(call, outside_lane)).toBeUndefined()
+	})
+
+	it('does not rewrite a command other than ship, nor read the lane mark for it', () => {
+		expect(
+			lane_background.foreground_input({ name: BASH, input: { command: GATE } }, never),
+		).toBeUndefined()
 	})
 })
 
@@ -228,6 +268,13 @@ describe('lane_background.pending_background_ids', () => {
 		expect(lane_background.pending_background_ids(moved_line(TASK_ID))).toStrictEqual([TASK_ID])
 	})
 
+	// joshuafolkken/kit#4101: the #4091 ship was moved aside at the two-minute default.
+	it('reports a call moved to the background at the two-minute default', () => {
+		expect(lane_background.pending_background_ids(moved_line(TASK_ID, 120))).toStrictEqual([
+			TASK_ID,
+		])
+	})
+
 	it('drops a moved call whose finish notice is on the tail', () => {
 		const tail = [moved_line(TASK_ID), finish_line(TASK_ID)].join('\n')
 
@@ -236,6 +283,22 @@ describe('lane_background.pending_background_ids', () => {
 
 	it('ignores a partial first line and a tail with no launch', () => {
 		expect(lane_background.pending_background_ids('{"type":"us\nnot json')).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#4472: the #4469 child stopped a moved call with `TaskStop`, which writes no
+// notice, and every stop after it was sent back.
+describe('lane_background.pending_background_ids — a task stopped with TaskStop', () => {
+	it('drops a moved call stopped with TaskStop', () => {
+		const tail = [moved_line(TASK_ID), stopped_line(TASK_ID)].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([])
+	})
+
+	it('keeps a task open when TaskStop stopped a different one', () => {
+		const tail = [launch_line(TASK_ID), stopped_line('b9other9')].join('\n')
+
+		expect(lane_background.pending_background_ids(tail)).toStrictEqual([TASK_ID])
 	})
 })
 

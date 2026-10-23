@@ -13,6 +13,7 @@ import { lane_paths } from './lane-paths'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_seed_policy } from './lane-seed'
 import { lane_start_point } from './lane-start-point'
+import { lane_state } from './lane-state'
 
 // Opening a lane: one linked work tree, one branch, one port seed, and the dependencies to run in it.
 //
@@ -256,6 +257,13 @@ async function clear_the_way(
 	await lane_leftover.reclaim(lane_paths.lane_directory(root, issue))
 }
 
+// The lane's state record starts here, so no lane opened from now on is without one.
+async function opened(lane: LaneInfo): Promise<OpenOutcome> {
+	await lane_state.record_change({ issue: lane.issue, state: 'open', command: 'lane:open' })
+
+	return { kind: 'opened', lane }
+}
+
 /**
  * Open the lane for `issue`, or say why it was not opened.
  *
@@ -283,7 +291,7 @@ async function open_lane(issue: string): Promise<OpenOutcome> {
 
 	await materialize(plan, repository_root)
 
-	return { kind: 'opened', lane: plan.lane }
+	return await opened(plan.lane)
 }
 
 const lane_open = {

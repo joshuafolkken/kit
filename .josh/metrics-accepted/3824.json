@@ -1,8 +1,0 @@
-{
-	"reason": "#3824 adds issue:release --wait (the reverse blocked_by edge) and its one-paragraph branch in prerequisite.md / backlogrun-park.md; the growth is the new feature itself",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 31,
-		"ai_cost.on_demand_bytes": 609
-	}
-}

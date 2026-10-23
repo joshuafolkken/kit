@@ -1,7 +1,7 @@
 // The environment variables that name the **parent** agent session, and which a child session must
 // not inherit.
 //
-// `scripts/eval/eval-session.ts` and `josh run:wake` both launch a headless session. Two copies of
+// `tools/eval/eval-session.ts` and `josh run:wake` both launch a headless session. Two copies of
 // this list is the clone `CLAUDE.md`
 // prohibits, and this is the shape of clone that fails silently: the copy that drifts does not throw
 // or lint — the child dials the parent's private socket, is refused, and the session dies as

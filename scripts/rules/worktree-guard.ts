@@ -17,7 +17,9 @@ import { shell_segments } from './shell-segments'
 // that stash findable and poppable by `pnpm josh stash:pop`, which is the whole of `operating-rules.md`'s
 // safety argument; the forms it warns against are the *positional/bare* ones. So `git stash push -m`
 // (with or without `-u`) and the read-only `git stash list` / `show` pass, and everything else — bare
-// `git stash`, a message-less push, `pop` / `apply` / `drop` / `save` / `clear` — is refused.
+// `git stash`, a message-less push, `pop` / `apply` / `drop` / `save` / `clear` — is refused. Those
+// flows now push with `pnpm josh stash:push` (joshuafolkken/kit#4131), invisible here; the raw message
+// form still passes for a procedure written before it.
 //
 // **The refusal names the way on for a handed-over stash.** joshuafolkken/kit#3630's plan restored a
 // stash with `git stash apply`, and the lane parked on how to apply it instead of popping by message;
@@ -117,7 +119,7 @@ function is_unauthorized_segment(segment: string): boolean {
 }
 
 function is_unauthorized_worktree_change(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_unauthorized_segment(segment))
+	return shell_segments.commands_of(command).some((segment) => is_unauthorized_segment(segment))
 }
 
 // The instruction in the shape a refusal can carry: what the command touches, the authorized route,
@@ -125,7 +127,7 @@ function is_unauthorized_worktree_change(command: string): boolean {
 // invisible to this trigger, so a run that uses them is never refused.
 const WORKTREE_MUTATION_REASON =
 	'⛔ unauthorized working-tree change: `git checkout --`, `git restore`, `git clean -f`, ' +
-	'`git stash`. A documented flow stashes with `git stash push -u -m "<message>"`; a handed-over ' +
+	'`git stash`. A documented flow stashes with `pnpm josh stash:push "<message>"`; a handed-over ' +
 	'stash is `pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
 	'the plan says why the owner keeps the stash: then stop and confirm. It fires on every occurrence ' +
 	'(`operating-rules.md`).'
@@ -135,6 +137,14 @@ const ROW = {
 	is_trigger: bash_triggers.on_bash_command(is_unauthorized_worktree_change),
 	reason: WORKTREE_MUTATION_REASON,
 	decide: (): boolean => true,
+	about: {
+		title: 'Unauthorized work-tree mutation',
+		topic: '`operating-rules.md`',
+		fires:
+			'`git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence',
+		quiet:
+			'`git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`',
+	},
 }
 
 const worktree_guard = {

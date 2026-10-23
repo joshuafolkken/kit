@@ -1,12 +1,20 @@
 import type { NamedPlan } from '#scripts/backlog/backlog-plan'
 import type { MachineSample } from '#scripts/gate/machine-capacity'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import { vi } from 'vitest'
 import type { ClosedAnswer } from './run-board-closed'
+import {
+	run_board_gather,
+	type Gatherer,
+	type GatherPorts,
+	type GatherRead,
+	type GatherState,
+} from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
+import { run_board_lane_state } from './run-board-lane-state'
 import type { BoardPlan } from './run-board-layout'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
-import type { UsageMark } from './run-board-usage'
 
 // What the `run:board` redraw suites share: the ports a test drives the board
 // through — a clock it moves by hand, the frames it wrote, and counted reads.
@@ -20,6 +28,7 @@ const LOCAL: LocalRead = {
 	scope: ALL,
 	events: [],
 	lanes: [],
+	lane_states: run_board_lane_state.NO_LANES,
 	resume: undefined,
 	is_stranded: false,
 }
@@ -34,18 +43,21 @@ const SAMPLE: MachineSample = {
 // The counted reads a test answers and inspects.
 interface Reads {
 	read_plan: ReturnType<typeof vi.fn<(scope: NamedPlan) => Promise<BoardPlan | undefined>>>
-	read_local: ReturnType<typeof vi.fn<() => Promise<LocalRead | undefined>>>
+	// No process snapshot is read unless a test answers otherwise.
+	read_table: ReturnType<typeof vi.fn<TableRead>>
+	read_local: ReturnType<typeof vi.fn<(table: TableRead) => Promise<LocalRead | undefined>>>
 	read_machine: ReturnType<typeof vi.fn<() => Promise<MachineSample>>>
 	// No process is read unless a test answers otherwise.
-	read_usage: ReturnType<
-		typeof vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>
-	>
+	read_usage: ReturnType<typeof vi.fn<GatherPorts['read_usage']>>
 	// Nothing reads closed unless a test answers otherwise.
 	read_closed: ReturnType<typeof vi.fn<(issues: ReadonlyArray<number>) => Promise<ClosedAnswer>>>
 }
 
 interface Harness extends Reads {
 	ports: BoardPorts
+	// The ports the board's reads are taken through (`run-board-gather.ts`), read on each redraw, so a
+	// test sets a reading wait, a frame read off a terminal or the core budget's claims here.
+	gathering: GatherPorts
 	frames: Array<string>
 	clock: { now_ms: number }
 	leaves: Array<() => void>
@@ -77,9 +89,10 @@ function stopper(): () => Promise<void> {
 function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Reads {
 	return {
 		read_plan: vi.fn(async (_scope: NamedPlan) => plans.shift()),
-		read_local: vi.fn(async () => local),
+		read_table: vi.fn<TableRead>(),
+		read_local: vi.fn(async (_table: TableRead) => local),
 		read_machine: vi.fn(async () => SAMPLE),
-		read_usage: vi.fn<(before: UsageMark | undefined) => Promise<UsageMark | undefined>>(),
+		read_usage: vi.fn<GatherPorts['read_usage']>(),
 		read_closed: vi.fn(async (_issues: ReadonlyArray<number>): Promise<ClosedAnswer> => ({
 			closed: new Map(),
 			is_whole: true,
@@ -90,7 +103,9 @@ function reads_of(local: LocalRead | undefined, plans: Array<BoardPlan | undefin
 type Recorded = Pick<Harness, 'frames' | 'clock' | 'leaves' | 'marks' | 'pushes'>
 
 // The ports that only record what the board did with them.
-function recording_ports(recorded: Recorded): Omit<BoardPorts, keyof Reads> {
+function recording_ports(
+	recorded: Recorded,
+): Omit<BoardPorts, 'read_plan' | 'read_closed' | 'gather'> {
 	const { frames, clock, leaves, marks, pushes } = recorded
 
 	return {
@@ -114,6 +129,42 @@ function recording_ports(recorded: Recorded): Omit<BoardPorts, keyof Reads> {
 	}
 }
 
+interface Carry {
+	state: GatherState
+}
+
+// A function of its own so the write does not sit after an `await`, where `require-atomic-updates`
+// reads it as a possible race; the redraws a test drives never overlap.
+function keep(carry: Carry, state: GatherState): GatherRead {
+	carry.state = state
+
+	return run_board_gather.read_of(state)
+}
+
+// The reads a live board's worker takes, folded here on each redraw so a test drives them by hand.
+function carried(ports: GatherPorts): Gatherer {
+	const carry: Carry = { state: run_board_gather.FRESH_GATHER }
+
+	return async (pace) => keep(carry, await run_board_gather.gather(carry.state, ports, pace))
+}
+
+function gather_ports(
+	reads: Reads,
+	board: Omit<BoardPorts, 'read_plan' | 'read_closed' | 'gather'>,
+): GatherPorts {
+	const { read_table, read_local, read_machine, read_usage } = reads
+
+	return {
+		read_table,
+		read_local,
+		read_machine,
+		read_usage,
+		is_live: true,
+		now: board.now,
+		sleep: board.sleep,
+	}
+}
+
 function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefined>): Harness {
 	const recorded: Recorded = {
 		frames: [],
@@ -123,8 +174,12 @@ function harness(local: LocalRead | undefined, plans: Array<BoardPlan | undefine
 		pushes: [],
 	}
 	const reads = reads_of(local, plans)
+	const board = recording_ports(recorded)
+	const { read_plan, read_closed } = reads
+	const gathering = gather_ports(reads, board)
+	const ports = { read_plan, read_closed, gather: carried(gathering), ...board }
 
-	return { ...reads, ...recorded, ports: { ...reads, ...recording_ports(recorded) } }
+	return { ...reads, ...recorded, gathering, ports }
 }
 
 // The plan read's loading spinner after its ⏳, not the waiting count the same line draws after its own

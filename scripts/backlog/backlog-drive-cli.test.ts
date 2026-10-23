@@ -1,16 +1,17 @@
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
-import { run_merge_cli } from '#scripts/run/merge/run-merge-cli'
-import { describe, expect, it, vi } from 'vitest'
+import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
+import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
+import { describe, expect, it, vi, type MockInstance } from 'vitest'
 import { backlog_drive } from './backlog-drive'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
-const MS_PER_MINUTE = 60_000
 const WINDOW_MINUTES = 9
 
 const CARRY: RunCarry = {
@@ -102,18 +103,39 @@ describe('backlog_drive_cli.offer_argv', () => {
 	})
 })
 
+// joshuafolkken/kit#4102: each merge runs `run:merge --driver` as its own process, so a fix merged
+// after the loop started is the code that decides the child.
+const MERGED: MergeResult = { token: '2600', code: 0, outcome: 'merged', is_offer: true }
+
+function arrange_merge(out: string, code = 0): MockInstance<typeof josh_command.josh_run> {
+	vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
+	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
+	vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
+
+	return vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code, out })
+}
+
 describe('backlog_drive_cli.merge', () => {
-	it('merges without a hand-off threshold, so the supervisor is never handed back over', async () => {
-		vi.spyOn(backlog_drive_owner, 'assert_current').mockResolvedValue(CARRY)
-		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
-		vi.spyOn(backlog_drive_named, 'mark_done').mockResolvedValue()
-		const merge_child = vi
-			.spyOn(run_merge_cli, 'merge_child')
-			.mockResolvedValue({ token: '2600', code: 0, outcome: 'merged', is_offer: true })
+	it('runs run:merge --driver as a child process and reads its printed result', async () => {
+		const run = arrange_merge(`progress\n${run_merge_driver.print(MERGED)}`)
 
-		await backlog_drive_cli.merge('2500', '4242')
+		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual(MERGED)
+		expect(run).toHaveBeenCalledWith(
+			['run:merge', '2500', '--owner', '4242', '--driver'],
+			expect.any(Boolean),
+		)
+		vi.restoreAllMocks()
+	})
 
-		expect(merge_child).toHaveBeenCalledWith(expect.objectContaining({ over: undefined }))
+	it('answers no token when the child process printed no result', async () => {
+		arrange_merge('crashed', 1)
+
+		await expect(backlog_drive_cli.merge('2500', '4242')).resolves.toStrictEqual({
+			token: '',
+			code: 1,
+			is_offer: true,
+			outcome: 'unresolved',
+		})
 		vi.restoreAllMocks()
 	})
 })
@@ -129,7 +151,25 @@ describe('backlog_drive_cli output', () => {
 		})
 		expect(backlog_drive_cli.to_offer('not json')).toBeUndefined()
 	})
+})
 
+// joshuafolkken/kit#4396: the `run:solo` cause reaches the hold the driver records.
+describe('backlog_drive_cli output — the offer’s cause', () => {
+	it('reads the cause an offer that started nothing names', () => {
+		const offer = { verdict: 'watch', issues: [], retries: 0, answer: 'blocked', cause: 'solo' }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.cause).toBe('solo')
+	})
+
+	// joshuafolkken/kit#4513: the issues a chain wait named survive the read into the hold.
+	it('reads the issues a chain or gate wait waited on', () => {
+		const offer = { verdict: 'watch', issues: [], retries: 0, cause: 'chain', waiting: [4496] }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.waiting).toStrictEqual([4496])
+	})
+})
+
+describe('backlog_drive_cli output — the rest', () => {
 	it('prints the hand-back with its token and child', () => {
 		expect(backlog_drive_cli.end_line({ reason: 'merge', token: 'over', issue: '2493' })).toBe(
 			'merge over #2493',
@@ -166,6 +206,19 @@ describe('backlog_drive_cli — a merge stop across a hand-back', () => {
 		expect(line).toBe(`resume: --owner 4242 --active ${ACTIVE} --stopped 2401`)
 		expect(backlog_drive_cli.parse(['--owner', '4242', '--stopped', '2401'])?.stopped).toBe('2401')
 		expect(backlog_drive_cli.parse(['--owner', '4242', '--stopped', 'x'])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4365: a child withdrawn while the drive was handed back is never collected by the
+// resumed drive, so the resume line alone would offer it again in the same run.
+describe('backlog_drive_cli.seeded_state — a withdrawal across a hand-back', () => {
+	it('excludes a child the stream reads withdrawn beside the resume line exclusion', () => {
+		const context = backlog_drive_cli.parse(['--owner', '4242', '--exclude', '2400'])
+		const seeded = { lanes: ['2402'], withdrawn: ['2401', '2400'] }
+		const state = context && backlog_drive_cli.seeded_state(seeded, context)
+
+		expect(state?.exclude).toStrictEqual(['2400', '2401'])
+		expect(state?.in_flight).toStrictEqual(['2402'])
 	})
 })
 

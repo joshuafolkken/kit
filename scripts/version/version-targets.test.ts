@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { version_targets } from './version-targets'
@@ -28,7 +29,7 @@ function global_ls_json(version: string): string {
 const ctx = { work_directory: '' }
 
 function write_manifest(content: string): void {
-	writeFileSync(path.join(ctx.work_directory, 'package.json'), content)
+	writeFileSync(path.join(ctx.work_directory, PACKAGE_JSON), content)
 }
 
 beforeEach(() => {
@@ -75,20 +76,29 @@ describe('version_targets.build_pnpm_ls_arguments', () => {
 	})
 })
 
-describe('version_targets.parse_project_version', () => {
-	it('extracts the version from a package.json string', () => {
-		expect(version_targets.parse_project_version(JSON.stringify({ version: '0.241.0' }))).toBe(
-			'0.241.0',
-		)
+function write_installed_manifest(content: string): void {
+	const package_directory = path.join(ctx.work_directory, 'node_modules', KIT)
+
+	mkdirSync(package_directory, { recursive: true })
+	writeFileSync(path.join(package_directory, PACKAGE_JSON), content)
+}
+
+describe('version_targets.read_project_version', () => {
+	it('reads the version from <cwd>/node_modules/<package>/package.json', () => {
+		write_manifest(JSON.stringify({ version: GLOBAL_VERSION }))
+		write_installed_manifest(JSON.stringify({ version: PROJECT_VERSION }))
+
+		expect(version_targets.read_project_version(ctx.work_directory, KIT)).toBe(PROJECT_VERSION)
 	})
 
-	it('returns undefined when raw is undefined (file missing)', () => {
-		expect(version_targets.parse_project_version(undefined)).toBeUndefined()
+	it('returns undefined when the package is not installed', () => {
+		expect(version_targets.read_project_version(ctx.work_directory, KIT)).toBeUndefined()
 	})
 
-	it('returns undefined for malformed package.json', () => {
-		expect(version_targets.parse_project_version('{ broken')).toBeUndefined()
-		expect(version_targets.parse_project_version('{}')).toBeUndefined()
+	it('returns undefined when the installed manifest is malformed', () => {
+		write_installed_manifest('{ broken')
+
+		expect(version_targets.read_project_version(ctx.work_directory, KIT)).toBeUndefined()
 	})
 })
 
@@ -106,14 +116,6 @@ describe('version_targets.read_global_version', () => {
 		mocked_execa_sync.mockReturnValue(fake_stdout(''))
 
 		expect(version_targets.read_global_version(KIT)).toBeUndefined()
-	})
-})
-
-describe('version_targets.project_package_path', () => {
-	it('points at the package.json under cwd node_modules for the given package', () => {
-		expect(version_targets.project_package_path('/project', KIT)).toBe(
-			`/project/node_modules/${KIT}/package.json`,
-		)
 	})
 })
 

@@ -13,7 +13,17 @@ const TEST_UNIT_COMMAND = 'test:unit'
 const ALL_ALIAS_KEYS = Object.keys(ALIASES)
 const DEVELOPMENT_CATEGORY = 'Development'
 const OPTIONAL_ENV_FILE_FLAG = '--env-file-if-exists=.env'
-const REGISTRY_MIGRATE_COMMAND = 'registry:migrate'
+const RETIRED_COMMANDS = [
+	'rule:guard',
+	'investigation:guard',
+	'duplicate-read:guard',
+	'batch:guard',
+	'registry:migrate',
+	'defect:rate',
+	'backlog:stalled',
+	'run:stranded',
+	'issue:backlinks',
+]
 
 function get_command(name: string): CommandEntry | undefined {
 	return COMMAND_MAP[name]
@@ -120,11 +130,10 @@ describe('COMMAND_MAP — reference metadata', () => {
 })
 
 describe('COMMAND_MAP — command lookup by name', () => {
-	it('routes registry migration to the project command', () => {
-		expect(get_command(REGISTRY_MIGRATE_COMMAND)?.script).toBe(
-			'scripts/registry-migration/migrate.ts',
-		)
-		expect(get_alias('rmi')).toBe(REGISTRY_MIGRATE_COMMAND)
+	it('no longer registers the retired commands nothing called (joshuafolkken/kit#4183)', () => {
+		for (const name of RETIRED_COMMANDS) expect(get_command(name)).toBeUndefined()
+
+		expect(get_alias('rmi')).toBeUndefined()
 	})
 
 	it('resolves lint command with script and Development category', () => {
@@ -170,7 +179,7 @@ describe('COMMAND_MAP — new dev commands', () => {
 	it('routes test:unit through the guard script instead of a raw shell command', () => {
 		const entry = get_command(TEST_UNIT_COMMAND)
 
-		expect(entry?.script).toBe('scripts/test/test-unit-guard.ts')
+		expect(entry?.script).toBe('scripts/test/test-unit-guard-main.ts')
 		expect(entry?.shell).toBeUndefined()
 		expect(entry?.category).toBe(DEVELOPMENT_CATEGORY)
 	})

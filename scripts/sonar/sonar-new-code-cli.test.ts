@@ -1,5 +1,5 @@
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
-import { http_fault_injection } from '#scripts/test/http-fault-injection'
+import { http_fault_injection } from '#tools/test/http-fault-injection'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CLEAN, FINDINGS, UNREADABLE } from './sonar-new-code'
 import { sonar_new_code_cli } from './sonar-new-code-cli'

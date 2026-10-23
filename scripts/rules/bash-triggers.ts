@@ -1,6 +1,7 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
+import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
@@ -35,10 +36,52 @@ const TITLE_FIELD = /(?:-f|-F|--field|--raw-field)\s*'?title=/u
 
 // A filing made by hand rather than through `josh issue:file` — the call the `direct-filing` row
 // refuses on every occurrence.
-function is_direct_filing(command: string): boolean {
-	if (ISSUE_CREATE_COMMAND.test(command)) return true
+//
+// **Read outside quotes, but not outside a heredoc** (joshuafolkken/kit#4525). `echo "… gh issue create
+// …"` files nothing, so the `gh` call is matched on the unquoted line — which keeps a `"$(gh issue
+// create …)"` that runs. A heredoc body is matched as written: `bash <<EOF` runs it, and the body cannot
+// be told apart from prose, so the rule errs on the refusing side. The endpoint and the title field are
+// still read from the line as written, where a quoted path or field keeps them.
+//
+// **A quoted script handed to a shell runs, so it is read as written too**: `bash -c "gh issue create
+// …"`, `sh -c '…'` and `eval "…"` file the Issue the quotes would otherwise hide.
+const GH_API_COMMAND = /\bgh\s+api\b/u
+const SHELL_SCRIPT_RUNNER = /\b(?:(?:ba|z|da|k)?sh\s+(?:-\w+\s+)*-\w*c\b|eval\b)/u
 
-	return ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
+function spoken_line(command: string): string {
+	if (time_shell.has_heredoc(command)) return command
+
+	const plain = time_shell.unquoted(command)
+
+	return SHELL_SCRIPT_RUNNER.test(plain) ? command : plain
+}
+
+const LEADING_SHELL_SCRIPT_RUNNER = new RegExp(`^${SHELL_SCRIPT_RUNNER.source}`, 'u')
+const QUOTE_MARK = /["']/gu
+
+// The quoted script a segment's shell runs, as a line of its own: `sh -c 'pnpm exec eslint .'` reads
+// as `pnpm exec eslint .`, so a caller cutting it into commands reads the programs the script
+// launches. Only when the segment's program is the runner — `echo sh -c x` hands no script to a shell.
+// `undefined` when the segment runs no shell script.
+function shell_script_of(segment: string): string | undefined {
+	const call = git_argv.program_of(segment)
+
+	if (call === undefined) return undefined
+
+	const spoken = [call.name, ...call.args].join(' ')
+	const runner = LEADING_SHELL_SCRIPT_RUNNER.exec(spoken)
+
+	if (runner === null) return undefined
+
+	return spoken.slice(runner[0].length).replaceAll(QUOTE_MARK, '').trim()
+}
+
+function is_direct_filing(command: string): boolean {
+	const spoken = spoken_line(command)
+
+	if (ISSUE_CREATE_COMMAND.test(spoken)) return true
+
+	return GH_API_COMMAND.test(spoken) && ISSUES_ENDPOINT.test(command) && TITLE_FIELD.test(command)
 }
 
 // `pnpm josh issue:file`, in either spelling — **the** filing act once a direct one is refused, so the
@@ -52,6 +95,6 @@ function is_issue_filing(command: string): boolean {
 		.some((segment) => shell_segments.is_josh_command(segment, FILING_NAMES))
 }
 
-const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command }
+const bash_triggers = { is_direct_filing, is_issue_filing, on_bash_command, shell_script_of }
 
 export { bash_triggers }
