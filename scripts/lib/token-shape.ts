@@ -60,6 +60,11 @@ function find(text: string): TokenShape | undefined {
 	return SHAPES.find((shape) => shape.pattern.test(text))
 }
 
+// Whether `text` holds any shape — `find`'s test without the shape it names.
+function holds(text: string): boolean {
+	return SHAPES.some((shape) => shape.pattern.test(text))
+}
+
 // Throws when `text` holds a credential, naming the shape and never the value: `subject` is what was
 // about to be sent, so the refusal says which send stopped.
 function refuse(text: string, subject: string): void {
@@ -91,7 +96,16 @@ function decoded(body: string): string {
 	return value === undefined ? body : string_leaves(value).join('\n')
 }
 
-const token_shape = { ANTHROPIC_OAUTH_TOKEN, REDACTED, SHAPES, decoded, find, refuse, redact }
+const token_shape = {
+	ANTHROPIC_OAUTH_TOKEN,
+	REDACTED,
+	SHAPES,
+	decoded,
+	find,
+	holds,
+	refuse,
+	redact,
+}
 
 export { token_shape }
 export type { TokenShape }

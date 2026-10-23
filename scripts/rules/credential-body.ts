@@ -8,7 +8,7 @@ import { git_argv } from './git-argv'
 // The `credential-body` row of `delivered-rules.ts`. A body kit sends is refused when it holds a
 // token-shaped string (`git-gh-exec.ts`, joshuafolkken/kit#4658), but a `gh api` call a run types on
 // the shell never passes through kit's code, so the same scan runs here before the call does
-// (joshuafolkken/kit#4682). The shapes are `token-shape.ts`'s, read by `token_shape.find` — the test
+// (joshuafolkken/kit#4682). The shapes are `token-shape.ts`'s, read by `token_shape.holds` — the test
 // `token_shape.refuse` throws on — so no second copy of a pattern exists.
 //
 // **The text `gh` would send, not the command line alone**: each field value, and the file a
@@ -31,8 +31,8 @@ function sent_text(source: FieldSource): string {
 }
 
 function holds_token(text: string): boolean {
-	return [text, text.replaceAll(TYPED_ESCAPE, () => ' ')].some(
-		(reading) => token_shape.find(reading) !== undefined,
+	return [text, text.replaceAll(TYPED_ESCAPE, () => ' ')].some((reading) =>
+		token_shape.holds(reading),
 	)
 }
 

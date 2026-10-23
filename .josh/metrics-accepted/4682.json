@@ -1,8 +1,8 @@
 {
-	"reason": "credential-body scans a typed body both as sent and with escapes read as spaces, so a backslash before a token and a non-JSON file with a typed \\n are both caught (round-2 review)",
+	"reason": "token_shape.holds added so callers test for a credential without comparing find() to undefined (SonarQube S7754), plus its tests",
 	"date": "2026-10-23",
 	"growth": {
-		"scripts.code_lines": 94,
+		"scripts.code_lines": 106,
 		"ai_cost.on_demand_bytes": 60
 	}
 }
