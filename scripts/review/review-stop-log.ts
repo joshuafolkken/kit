@@ -19,7 +19,6 @@ import { z } from 'zod'
 // **A test run writes nothing** unless it passes its own path, the lane ledger's rule: the writer sits on
 // the ship's stop path, which many suites exercise.
 
-const LOG_DIRECTORY = 'josh'
 const LOG_FILE = 'review-stops.jsonl'
 const LINE_SEPARATOR = '\n'
 
@@ -46,7 +45,9 @@ function target(): string | undefined {
 
 	const common = git_common_directory.repository()
 
-	return common === undefined ? undefined : path.join(common, LOG_DIRECTORY, LOG_FILE)
+	return common === undefined
+		? undefined
+		: path.join(common, git_common_directory.STATE_DIRECTORY, LOG_FILE)
 }
 
 function write(destination: string, stop: ReviewStop): void {

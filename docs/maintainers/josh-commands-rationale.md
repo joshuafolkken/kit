@@ -49,7 +49,7 @@ Performance is a goal no change may worsen (`prompts/collaboration-workflow/prin
 - **`josh_startup` and `guard_startup` are timed only when `josh metrics` runs on its own** — the gate passes `--no-startup` and neither times nor prints them. Each is the fastest of five runs of `josh --help` and of the `pretool-guard` hook every tool call starts. A startup regression therefore fails a hand-run `pnpm josh metrics`, never a gate.
 - **A tolerance of +10%**, where the static totals have none: a count read off a tree is the same on every run, a duration is not.
 - **The baseline never moves down on its own.** One quiet run would set a bar the next ordinary run misses; a speedup is recorded with `--accept`, as a raise is.
-- **The baseline is per machine and never committed.** It is `josh-metrics-durations.json` in the repository's common git directory — one file per clone, shared by every lane of it. The same durations on two machines do not compare, CI starts each job on a fresh runner, and a committed table keyed by host would publish host names and conflict on every merge. A machine's first measurement of a duration becomes its baseline; deleting the file starts that machine over.
+- **The baseline is per machine and never committed.** It is `josh/metrics-durations.json` in the repository's common git directory — one file per clone, shared by every lane of it. The same durations on two machines do not compare, CI starts each job on a fresh runner, and a committed table keyed by host would publish host names and conflict on every merge. A machine's first measurement of a duration becomes its baseline; deleting the file starts that machine over.
 
 ## `josh gate` in detail
 
