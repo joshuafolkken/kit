@@ -48,6 +48,9 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 		"which part of the body the shell was meant to expand is the author's, not the hook's",
 	),
 	'raw-field-body': judgment('the body moves to a file the call does not name'),
+	'credential-body': judgment(
+		'which text is the credential, and what replaces it, is the author’s',
+	),
 	'rule-body': judgment('a trigger-plus-pointer line is written, not derived'),
 	'direct-filing': judgment(ANOTHER_COMMAND),
 	'direct-issue-comment': judgment(ANOTHER_COMMAND),

@@ -4,6 +4,7 @@ import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
+import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
 import { early_heartbeat } from './early-heartbeat'
@@ -115,6 +116,9 @@ const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_s
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// First: a third-party write is stopped before the first-party filing rows count anything.
 	third_party_write.ROW,
+	// Before every first-party row: a credential is refused whatever the call's other faults, and the
+	// commands those rows point at run the same scan in-process.
+	credential_body.ROW,
 	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
 	// question are `issue:file`'s own steps, so no row gates them.
 	direct_filing.ROW,

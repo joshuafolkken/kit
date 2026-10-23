@@ -4,6 +4,10 @@
   - fires: `pnpm josh pretool:guard` — a `gh api` write (field flag or a write method) or a `gh <group> <action>` write selected by `-R` / `GH_REPO` to a repository whose owner is not this session, or a `gh api graphql` call whose line names `mutation` or whose query the shell expands, outside the merge and administration rows. Every occurrence
   - silent: a read, a GraphQL query, or a first-party owner (pinned at session start, `pnpm josh repo:party`)
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Credential in a body** (`credential-body`, `shell-body.md`)
+  - fires: `pnpm josh pretool:guard` — a `gh api` call whose field value, or the file `-F key=@<path>` / `--input <path>` names, holds a token-shaped string (`token-shape.ts`). Every occurrence
+  - silent: a body with no credential, or a body sent through kit, which runs the same scan
+  - not automated: which text is the credential, and what replaces it, is the author’s
 - **Direct filing** (`direct-filing`, `docs/josh-commands-backlog.md` → `josh issue:file`)
   - fires: `pnpm josh pretool:guard` — a `Bash` that creates an Issue outside `josh issue:file` (`gh issue create`, or a POST with `title` to `…/issues`); the refusal hands over the `pnpm josh issue:file` form. Every occurrence
   - silent: filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run

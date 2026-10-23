@@ -1,7 +1,6 @@
 import { has_timed_out } from '#scripts/git/git-execa-error'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { error_text } from '#scripts/lib/error-message'
-import { json_value } from '#scripts/lib/json-value'
 import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
 import { check_gh_installed } from './git-gh-check'
@@ -301,27 +300,11 @@ function optional_flag(flag: string, value?: string): Array<string> {
 }
 
 // Every Issue and pull-request body kit writes travels through the two entries below, so a credential
-// pasted into one is refused here, once, before it reaches a public tracker.
-//
-// The writers pass the body JSON-encoded, where a token starting a line follows the `n` of an escaped
-// newline, and the shape's "no letter before it" guard reads that `n` as a letter. So the scan reads the strings the JSON decodes to — what
-// GitHub stores — and the raw text only when the body is not JSON.
-function string_leaves(value: unknown): Array<string> {
-	if (typeof value === 'string') return [value]
-	if (typeof value !== 'object' || value === null) return []
-
-	return Object.values(value).flatMap((entry: unknown) => string_leaves(entry))
-}
-
-function decoded_body(body: string): string {
-	const value = json_value.parse_or_undefined(body)
-
-	return value === undefined ? body : string_leaves(value).join('\n')
-}
-
+// pasted into one is refused here, once, before it reaches a public tracker. The writers pass the body
+// JSON-encoded, so it is scanned decoded.
 function refuse_credential_body(request: GhApiRequest): void {
 	if (request.body !== undefined) {
-		token_shape.refuse(decoded_body(request.body), `The gh api ${request.path} body`)
+		token_shape.refuse(token_shape.decoded(request.body), `The gh api ${request.path} body`)
 	}
 }
 

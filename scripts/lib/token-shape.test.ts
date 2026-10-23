@@ -30,8 +30,18 @@ async function secretlint_rules(text: string): Promise<Array<string>> {
 }
 
 function is_refused(sample: string, prefix: string): boolean {
-	return sample.startsWith(prefix) && token_shape.find(sample) !== undefined
+	return sample.startsWith(prefix) && token_shape.holds(sample)
 }
+
+describe('token_shape.holds', () => {
+	it.each(SHAPE_NAMES)('is true for a text holding a %s', (name) => {
+		expect(token_shape.holds(`token: ${token_shape_fixture.sample_of(name)}`)).toBe(true)
+	})
+
+	it('is false for a text that only names a prefix', () => {
+		expect(token_shape.holds('A classic token starts with `ghp_`.')).toBe(false)
+	})
+})
 
 describe('token_shape.refuse', () => {
 	it.each(SHAPE_NAMES)('refuses a body holding a %s, naming the shape not the value', (name) => {
@@ -58,6 +68,23 @@ describe('token_shape.refuse', () => {
 		expect(() => {
 			token_shape.refuse(body, SUBJECT)
 		}).not.toThrow()
+	})
+})
+
+describe('token_shape.decoded', () => {
+	const [github_token = ''] = SHAPE_NAMES
+	const plain_text = 'plain text'
+
+	it('reads a JSON body as its string values, so a token after an escaped newline is found', () => {
+		const sample = token_shape_fixture.sample_of(github_token)
+		const body = JSON.stringify({ body: `line\n${sample}`, labels: ['bug'] })
+
+		expect(token_shape.find(body)).toBeUndefined()
+		expect(token_shape.find(token_shape.decoded(body))?.name).toBe(github_token)
+	})
+
+	it('keeps a body that is not JSON as it is', () => {
+		expect(token_shape.decoded(plain_text)).toBe(plain_text)
 	})
 })
 

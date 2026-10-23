@@ -53,6 +53,30 @@ describe('gh_api read vs write', () => {
 	})
 })
 
+describe('gh_api.field_sources', () => {
+	it.each([
+		['a raw field', "gh api repos/o/r/issues/5/comments -f 'body=hi'", 'text', 'hi'],
+		['a raw field naming a path', 'gh api x -f body=@notes.md', 'text', '@notes.md'],
+		['a typed field', 'gh api x --field title=t', 'text', 't'],
+		['a typed field read from a file', 'gh api x -F body=@notes.md', 'file', 'notes.md'],
+		['a long typed field read from a file', 'gh api x --field "body=@a b.md"', 'file', 'a b.md'],
+		['an input file', 'gh api x --input body.json', 'file', 'body.json'],
+		['an attached input file', 'gh api x --input=body.json', 'file', 'body.json'],
+		['an attached raw field', 'gh api x -fname=y', 'text', 'y'],
+		['an attached typed field', 'gh api x -Fx=@b.md', 'file', 'b.md'],
+	])('reads %s', (_name, command, kind, value) => {
+		expect(gh_api.field_sources(command)).toStrictEqual([{ kind, value }])
+	})
+
+	it.each([
+		['standard input', 'gh api x --input -'],
+		['a typed field from standard input', 'gh api x -F body=@-'],
+		['a call with no field', 'gh api repos/o/r/issues/5 --jq .body'],
+	])('reads nothing from %s', (_name, command) => {
+		expect(gh_api.field_sources(command)).toStrictEqual([])
+	})
+})
+
 describe('gh_api.repo_target', () => {
 	it.each([
 		['bare path', 'gh api repos/joshuafolkken/kit/issues', 'joshuafolkken', 'kit'],

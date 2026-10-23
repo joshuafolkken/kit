@@ -23,6 +23,7 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'issue-comments': [],
 	'shell-body': [],
 	'raw-field-body': [QUOTED, HEREDOC],
+	'credential-body': [],
 	'file-body': [],
 	'rule-body': [],
 	[ORACLE_PKG_SCOUT]: [HEREDOC],
