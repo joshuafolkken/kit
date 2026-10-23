@@ -25,7 +25,7 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 // Mocked so no case reads this checkout's real green record; unset, it answers "read the whole branch".
 vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(), read_moved: vi.fn() },
+	since_green: { UNMOVED_REASON: 'nothing moved', describe: vi.fn(), read_moved: vi.fn() },
 }))
 // Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
 // unrelated document over its ceiling mid-work failed the whole-tree fallback case here
@@ -268,5 +268,41 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		await lint_related.run_related_lint([CHANGED_SOURCE])
 
 		expect(since_green.read_moved).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4593: a re-run with no edit since its green run re-linted the whole branch diff.
+describe('lint_related.run_related_lint — nothing moved since the last green run', () => {
+	it('returns green without starting a linter or the byte check', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue([])
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
+		expect(mocked_scoped).not.toHaveBeenCalled()
+		expect(mocked_whole_tree).not.toHaveBeenCalled()
+		expect(mocked_byte_files).not.toHaveBeenCalled()
+		expect(written_output()).toContain(since_green.UNMOVED_REASON)
+	})
+
+	// A main sync can move the base while moving no path; a record left on the old base refuses the gate.
+	it('still hands the recorder its green verdict, so the record follows a moved base', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue([])
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+			before: BEFORE_TREE,
+			exit_code: 0,
+		})
+	})
+
+	// No record (a red run writes none, `scoped-green.test.ts`), other inputs, or a moved configuration
+	// all answer `undefined` (`since-green.test.ts`).
+	it('lints the branch change when the record cannot vouch for this tree', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue(undefined)
+
+		await lint_related.run_related_lint([])
+
+		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_record).toHaveBeenCalledOnce()
 	})
 })

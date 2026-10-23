@@ -19,6 +19,9 @@ import { verification_inputs } from './verification-inputs'
 // says nothing under the new one. An empty list is
 // the positive fact that nothing moved: the gate's unit step on the tree the preflight just passed.
 
+// Why a command that found nothing moved ran nothing, in the words both scoped commands print.
+const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
+
 // The narrowing line each command prints before it runs, so a since-green run is never read as one
 // over the whole branch.
 function describe(label: string, moved: ReadonlyArray<string>): string {
@@ -57,6 +60,6 @@ async function read_moved(
 	return parts === undefined ? undefined : moved_paths.union_of(parts)
 }
 
-const since_green = { describe, read_moved, read_moved_parts }
+const since_green = { UNMOVED_REASON, describe, read_moved, read_moved_parts }
 
 export { since_green }
