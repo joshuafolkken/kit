@@ -64,7 +64,7 @@ pnpm josh lint --changed   # the branch's changed files — the gate's form
 
 <!-- usage: lint:related -->
 
-Check only the changed files with prettier and eslint (whole tree on fallback).
+Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback).
 
 ```bash
 pnpm josh lint:related

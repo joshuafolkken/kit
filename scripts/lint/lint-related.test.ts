@@ -4,6 +4,7 @@ import { gate_plan } from '#scripts/gate/gate-plan'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
@@ -34,6 +35,11 @@ vi.mock('#scripts/gate/since-green', () => ({
 vi.mock('#scripts/document/document-byte-check', () => ({
 	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
 }))
+// Mocked so no case spawns this checkout's real guard tests; what they report is
+// `structural-checks.test.ts`.
+vi.mock('#scripts/gate/structural-checks', () => ({
+	structural_checks: { run_structural: vi.fn(async () => 0) },
+}))
 // Mocked so no case runs this checkout's real `josh metrics`; what it asks is `metrics-totals.test.ts`.
 vi.mock('#scripts/gate/metrics-totals', () => ({
 	metrics_totals: { growth_notice: vi.fn() },
@@ -48,6 +54,7 @@ const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_byte_all = vi.mocked(document_byte_check.check_all)
 const mocked_byte_files = vi.mocked(document_byte_check.check_files)
 const mocked_notice = vi.mocked(metrics_totals.growth_notice)
+const mocked_structural = vi.mocked(structural_checks.run_structural)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
 // tree rather than checking nothing, so both branches are asserted by which runner they called.
@@ -247,6 +254,30 @@ describe('lint_related.run_related_lint — the document byte check', () => {
 		mocked_byte_files.mockReturnValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+			before: BEFORE_TREE,
+			exit_code: FAILED,
+		})
+	})
+})
+
+// joshuafolkken/kit#4643: the structural checks a ship stopped on, answered beside the lint.
+describe('lint_related.run_related_lint — the structural checks', () => {
+	it('runs them over the scope the lint read, before the lint finishes', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(mocked_structural.mock.calls[0]?.[0].files).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_structural.mock.calls[0]?.[1]).toBe(REPOSITORY_ROOT)
+		expect(mocked_structural.mock.invocationCallOrder[0]).toBeLessThan(
+			mocked_scoped.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('returns and records a structural failure after a green lint, skipping the byte check', async () => {
+		mocked_structural.mockResolvedValueOnce(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(mocked_byte_files).not.toHaveBeenCalled()
 		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
 			before: BEFORE_TREE,
 			exit_code: FAILED,
