@@ -22,22 +22,36 @@
 #   `dirname`, and `node` replaces this shell through `exec` rather than running beside it.
 # - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
 #   a missing bundle and run the hook twice.
+# - A hook launched inside one of Claude Code's own worktrees (`EnterWorktree`, an
+#   `isolation: "worktree"` subagent) runs in that worktree. Claude Code keeps `CLAUDE_PROJECT_DIR` on
+#   the main checkout there, so the prefix lands on it and hands over where the hook was launched in
+#   `JOSH_HOOK_CWD` (joshuafolkken/kit#4617). The code still comes from the project root — a fresh
+#   worktree has no install and no bundles — so only the working directory moves.
+
+hook_name=$1
+shift
+case $0 in
+/*) hooks_dir=${0%/*} ;;
+*/*) hooks_dir=$PWD/${0%/*} ;;
+*) hooks_dir=$PWD ;;
+esac
+package_dir="$hooks_dir/../.."
+bundle="$package_dir/dist/hooks/$hook_name.js"
+josh_command="${hook_name%%-*}:${hook_name#*-}"
+
+worktrees_dir=$PWD/.claude/worktrees/
+case $JOSH_HOOK_CWD in
+"$worktrees_dir"?*)
+	worktree_path=${JOSH_HOOK_CWD#"$worktrees_dir"}
+	cd "$worktrees_dir${worktree_path%%/*}" || exit
+	;;
+esac
 
 location_variables='GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
 if [ -n "$GIT_ALTERNATE_OBJECT_DIRECTORIES$GIT_COMMON_DIR$GIT_DIR$GIT_INDEX_FILE$GIT_NAMESPACE$GIT_OBJECT_DIRECTORY$GIT_WORK_TREE" ] &&
 	(unset $location_variables && git rev-parse --show-toplevel >/dev/null 2>&1); then
 	unset $location_variables
 fi
-
-hook_name=$1
-shift
-case $0 in
-*/*) hooks_dir=${0%/*} ;;
-*) hooks_dir=. ;;
-esac
-package_dir="$hooks_dir/../.."
-bundle="$package_dir/dist/hooks/$hook_name.js"
-josh_command="${hook_name%%-*}:${hook_name#*-}"
 
 case $0 in
 *node_modules/*)

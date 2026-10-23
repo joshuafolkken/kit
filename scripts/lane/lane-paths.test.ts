@@ -113,6 +113,26 @@ describe('lane_issue_of', () => {
 	})
 })
 
+// joshuafolkken/kit#4617: a hook launched in one of Claude Code's own worktrees runs there.
+describe('lane_issue_of inside a Claude Code worktree', () => {
+	const DEFAULT_ROOT = lane_paths.lane_root(REPOSITORY_ROOT, {})
+
+	it.each([['.claude/worktrees/agent-a1'], ['.claude/worktrees/agent-a1/src/lib']])(
+		'reads %s inside a lane as that lane',
+		(nested) => {
+			const directory = path.join(lane_paths.lane_directory(DEFAULT_ROOT, ISSUE), nested)
+
+			expect(lane_paths.lane_issue_of(directory, {})).toBe(ISSUE)
+		},
+	)
+
+	it('says nothing about one inside a checkout that is not a lane', () => {
+		const directory = path.join(REPOSITORY_ROOT, '.claude', 'worktrees', ISSUE)
+
+		expect(lane_paths.lane_issue_of(directory, {})).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#3370: the stray sweep acts only on the names the lane machinery writes.
 describe('which names in a lanes root belong to the lane machinery', () => {
 	it.each([[ISSUE], ['.1665-lanes'], ['.app-kit-lanes']])('claims %j', (name) => {

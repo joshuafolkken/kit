@@ -1,0 +1,8 @@
+{
+	"reason": "Lane detection reads a Claude Code worktree as its lane, and the hook fallback runs tsx in the hook's own directory (#4617 review round 1)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 8,
+		"prose.long_paragraphs": 1
+	}
+}
