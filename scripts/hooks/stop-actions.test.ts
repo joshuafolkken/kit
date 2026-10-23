@@ -1,9 +1,9 @@
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
-import { issue_cite_cli } from '#scripts/issue/issue-cite-cli'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
 import { stop_rules, type StopAction, type StopOutcome } from '#scripts/rules/stop-rules'
+import { stop_rules_fixture } from '#scripts/rules/stop-rules-fixture'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_hold_session } from '#scripts/run/hold/run-hold-session'
@@ -14,8 +14,6 @@ const REPLY = 'paused for a decision'
 const DECISION = { recommended: 'merge it', alternative: undefined }
 const NOTIFY: StopAction = { kind: 'notify', issue: '7', message: REPLY, decision: DECISION }
 const RELEASE: StopAction = { kind: 'release', issue: '7' }
-const CITE: StopAction = { kind: 'cite', references: ['#7'] }
-const CITATION_LINE = '[#7](https://github.com/joshuafolkken/kit/issues/7) — title'
 const NOTICE_KEY = 'systemMessage'
 const NOTIFY_NOTICE = 'confirmation notify'
 const KIT_ORIGIN = 'git@github.com:joshuafolkken/kit.git'
@@ -51,7 +49,6 @@ beforeEach(() => {
 	vi.spyOn(run_hold_cli, 'run').mockResolvedValue(0)
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue('git-dir')
 	vi.spyOn(run_hold_session, 'mark_notified').mockReturnValue(undefined)
-	vi.spyOn(issue_cite_cli, 'cite').mockResolvedValue({ lines: [CITATION_LINE], failures: [] })
 })
 
 afterEach(() => {
@@ -81,13 +78,12 @@ describe('stop_actions.envelope_of — the Telegram body', () => {
 // joshuafolkken/kit#3919: the hook runs the fixed operations itself and lets the stop through.
 describe('stop_actions.envelope_of — the actions take', () => {
 	it('lets the stop through with a notice for each action', async () => {
-		const written = await envelope([NOTIFY, RELEASE, CITE])
+		const written = await envelope([NOTIFY, RELEASE])
 		const notice = String(written[NOTICE_KEY])
 
 		expect(written).not.toHaveProperty('decision')
 		expect(notice).toContain(NOTIFY_NOTICE)
 		expect(notice).toContain('released')
-		expect(notice).toContain(CITATION_LINE)
 	})
 
 	it('sends the confirmation with the held Issue URL and the reply opening', async () => {
@@ -151,7 +147,28 @@ describe('stop_actions.envelope_of — stops with nothing to run', () => {
 		const written = await stop_actions.envelope_of(refused, 'en')
 
 		expect(record_of(written)).toMatchObject({ decision: 'block' })
-		expect(issue_cite_cli.cite).not.toHaveBeenCalled()
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4626: the reply's bare `#N` gets no citation lines and no refusal from the hook.
+describe('stop_actions.envelope_of — a reply carrying a bare #N', () => {
+	const { context, DECISION_MESSAGE } = stop_rules_fixture
+
+	it('writes nothing for a stop with no hold', async () => {
+		const outcome = stop_rules.stop_outcome(context({ message: 'done in #7 and #8' }))
+
+		expect(await stop_actions.envelope_of(outcome, 'en')).toBeUndefined()
+	})
+
+	it('shows the hold actions alone, with no citation line', async () => {
+		const held = context({ hold_issue: '7', tree_clean: true, message: `${DECISION_MESSAGE} #8` })
+		const written = record_of(await stop_actions.envelope_of(stop_rules.stop_outcome(held), 'en'))
+		const notice = String(written[NOTICE_KEY])
+
+		expect(written).not.toHaveProperty('decision')
+		expect(notice).toContain('released')
+		expect(notice).not.toContain('Issue citations')
 	})
 })
 
@@ -182,12 +199,6 @@ describe('stop_actions.envelope_of — an action fails', () => {
 
 		expect(written).not.toHaveProperty('decision')
 		expect(String(written[NOTICE_KEY])).toContain(NOTIFY_NOTICE)
-	})
-
-	it('falls back on a citation with any number left unanswered', async () => {
-		vi.mocked(issue_cite_cli.cite).mockResolvedValue({ lines: [CITATION_LINE], failures: ['#8'] })
-
-		expect(await field_of([CITE], 'reason')).toContain('pnpm josh issue:cite')
 	})
 
 	it('only reports past the loop-breaker, never refusing', async () => {

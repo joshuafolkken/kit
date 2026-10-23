@@ -27,7 +27,7 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'docs/josh-commands.md', citations: 2 },
 	{ path: 'prompts/collaboration-workflow/file-edits.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', citations: 1 },
-	{ path: 'prompts/collaboration-workflow/issue-citation.md', citations: 2 },
+	{ path: 'prompts/collaboration-workflow/issue-citation.md', citations: 1 },
 	{ path: 'prompts/collaboration-workflow/issue-template.md', citations: 5 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', citations: 3 },
 	{ path: 'prompts/collaboration-workflow/output-bounds.md', citations: 3 },

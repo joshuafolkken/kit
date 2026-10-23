@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { issue_citation } from './issue-citation'
 
 // Reused across the suites below so the same literal is not spelled twice: a cross-repo mention, the
-// argument it becomes, and a reply mixing a linked reference with a bare one.
+// reference read off it, and a reply mixing a linked reference with a bare one.
 const CROSS_REPO_PROSE = 'see joshuafolkken/kit#45'
 const CROSS_REPO_REF = 'joshuafolkken/kit#45'
 const LINKED_BESIDE_BARE = 'done [#12](https://x) but also #34'
@@ -147,16 +147,6 @@ describe('issue_citation.bare_references — leads that are not glued', () => {
 	})
 })
 
-describe('issue_citation.cite_arguments', () => {
-	it('strips the # from a bare reference so issue:cite reads a number', () => {
-		expect(issue_citation.cite_arguments(['#123', '#456'])).toEqual(['123', '456'])
-	})
-
-	it('passes a qualified reference through unchanged', () => {
-		expect(issue_citation.cite_arguments([CROSS_REPO_REF])).toEqual([CROSS_REPO_REF])
-	})
-})
-
 const SLUG = 'joshuafolkken/kit'
 
 // The number-link `linkify` should produce for one same-repo reference, built the way the code does
@@ -201,32 +191,10 @@ describe('issue_citation.linkify — leaves excluded and unreferenced text untou
 	})
 
 	// The guarantee the printing side exists for: whatever a command's output was, the detector reads
-	// the linkified form as carrying no bare reference — so the stop guard never fires on it.
+	// the linkified form as carrying no bare reference.
 	it('produces output the bare-reference detector never flags', () => {
 		const message = 'Related: #2328, #2330\n> quoting #1\nsee other/repo#9 and `#5`'
 
 		expect(issue_citation.has_bare_reference(issue_citation.linkify(message, SLUG))).toBe(false)
-	})
-})
-
-describe('issue_citation.unquoted_references', () => {
-	it('drops a bare #N the prompt already carried, even inside a fence there', () => {
-		const prompt = '```\nmerged #7\n```'
-
-		expect(issue_citation.unquoted_references('see #7 and #8', prompt)).toEqual(['#8'])
-	})
-
-	it('drops an owner/repo#N only when the prompt wrote that same reference', () => {
-		const message = `${CROSS_REPO_PROSE} and other/repo#45`
-
-		expect(issue_citation.unquoted_references(message, CROSS_REPO_PROSE)).toEqual(['other/repo#45'])
-	})
-
-	it('keeps a #N whose digits only prefix a quoted number', () => {
-		expect(issue_citation.unquoted_references('see #7', 'closed #70')).toEqual(['#7'])
-	})
-
-	it('keeps every bare reference when the prompt is empty', () => {
-		expect(issue_citation.unquoted_references('see #7', '')).toEqual(['#7'])
 	})
 })

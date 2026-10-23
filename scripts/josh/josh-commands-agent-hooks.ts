@@ -36,7 +36,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 	'stop:guard': {
 		script: 'scripts/hooks/stop-guard.ts',
 		description:
-			'Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin)',
+			'Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: {

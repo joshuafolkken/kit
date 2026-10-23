@@ -129,7 +129,6 @@ async function build_context(
 		...(await hold_facts(tail)),
 		tree_clean: !(await run_hold.is_tree_dirty()),
 		message: payload_tail.message,
-		prompt: last_prompt.prompt_text(tail),
 		answers_question: stop_decision.is_question(last_prompt.turn_prompt(tail)),
 		stop_hook_active: payload_tail.stop_hook_active,
 		cut_pending: is_cut_stop(tail),

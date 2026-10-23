@@ -33,18 +33,6 @@ const ROWS: ReadonlyArray<StopRule> = [
 		},
 	},
 	{
-		id: 'issue-citation',
-		about: {
-			title: 'Issue citation format',
-			topic: '`prompts/collaboration-workflow/issue-citation.md`',
-			entry: STOP_GUARD,
-			fires:
-				'a bare `#N` in the prose of the last reply. Prints the citation lines itself; blocks only when a number cannot be cited',
-			quiet:
-				'link form, inside code or a quote, `#N` right after `PR`, or a GitHub-facing artifact',
-		},
-	},
-	{
 		id: 'filing-offer',
 		about: {
 			title: 'Offer to file',
