@@ -4,7 +4,7 @@ import { core_admission, type LedgerEntry } from './core-admission'
 // joshuafolkken/kit#4313: a solo gate's unit claim waited out the 120 s cap behind one core of load
 // outside the ledger, and a `lint:related` that fitted the free cores waited behind a heavy unit claim
 // that did not. The first waiter is now held by the ledger alone, and a lighter claim passes a waiter
-// claimed within the window before it.
+// claimed within the window before it — a heavier waiter within the heavier window (#4595).
 
 const CORES = 11
 const SOLO_UNIT_WEIGHT = 7
@@ -44,16 +44,16 @@ describe('core_admission.is_admitted — the first waiter and load outside the l
 	})
 
 	it('holds a claim queued behind a waiter on the outside load', () => {
-		const late = core_admission.BYPASS_WINDOW_MS + 1
+		const late = core_admission.HEAVIER_BYPASS_WINDOW_MS + 1
 		const ledger = [...SOLO_GATE, waiting('next', 1, late)]
 
 		expect(core_admission.is_admitted('next', ledger, outside_load(1))).toBe(false)
 	})
 })
 
-describe('core_admission.is_admitted — a light claim passes a heavy waiter', () => {
-	const HEAVY_AHEAD = [running('run', RUNNING_WEIGHT), waiting('heavy', HEAVY_WEIGHT, 1)]
+const HEAVY_AHEAD = [running('run', RUNNING_WEIGHT), waiting('heavy', HEAVY_WEIGHT, 1)]
 
+describe('core_admission.is_admitted — a light claim passes a heavy waiter', () => {
 	it('admits a light claim that fits beside the running claims', () => {
 		const ledger = [...HEAVY_AHEAD, waiting('light', LIGHT_WEIGHT, 2)]
 
@@ -64,15 +64,6 @@ describe('core_admission.is_admitted — a light claim passes a heavy waiter', (
 		const ledger = [...HEAVY_AHEAD, waiting('wide', CORES - RUNNING_WEIGHT + 1, 2)]
 
 		expect(core_admission.is_admitted('wide', ledger, outside_load(0))).toBe(false)
-	})
-
-	// The bound: a claim made past the window queues, so the heavy claim is passed a bounded number of
-	// times and runs once the claims already in flight finish.
-	it('holds a light claim made past the window after the waiter', () => {
-		const late = 1 + core_admission.BYPASS_WINDOW_MS
-		const ledger = [...HEAVY_AHEAD, waiting('light', LIGHT_WEIGHT, late)]
-
-		expect(core_admission.is_admitted('light', ledger, outside_load(0))).toBe(false)
 	})
 
 	it('admits the heavy waiter first once the running claims leave it room', () => {
@@ -97,5 +88,36 @@ describe('core_admission.is_admitted — a light claim passes a heavy waiter', (
 		const ledger = [...HEAVY_AHEAD, waiting('light', LIGHT_WEIGHT, 2)]
 
 		expect(core_admission.admitted_keys(ledger, CORES)).toEqual(new Set(['run', 'light']))
+	})
+})
+
+// joshuafolkken/kit#4595: a lighter claim passes a heavier waiter for longer than an equal one does.
+describe('core_admission.is_admitted — the heavier window', () => {
+	it('admits a light claim made past the window but within the heavier window', () => {
+		const late = 1 + core_admission.BYPASS_WINDOW_MS
+		const ledger = [...HEAVY_AHEAD, waiting('light', LIGHT_WEIGHT, late)]
+
+		expect(core_admission.is_admitted('light', ledger, outside_load(0))).toBe(true)
+	})
+
+	it('holds a claim made past the window after a waiter no heavier than it', () => {
+		const late = 1 + core_admission.BYPASS_WINDOW_MS
+		const ledger = [
+			running('run', RUNNING_WEIGHT),
+			waiting('equal', LIGHT_WEIGHT, 1),
+			waiting('light', LIGHT_WEIGHT, late),
+		]
+		const budget = { ...outside_load(0), cores: RUNNING_WEIGHT + LIGHT_WEIGHT + 1 }
+
+		expect(core_admission.is_admitted('light', ledger, budget)).toBe(false)
+	})
+
+	// The bound: a claim made past the heavier window queues, so the heavy claim is passed a bounded
+	// number of times and runs once the claims already in flight finish.
+	it('holds a light claim made past the heavier window after the waiter', () => {
+		const late = 1 + core_admission.HEAVIER_BYPASS_WINDOW_MS
+		const ledger = [...HEAVY_AHEAD, waiting('light', LIGHT_WEIGHT, late)]
+
+		expect(core_admission.is_admitted('light', ledger, outside_load(0))).toBe(false)
 	})
 })

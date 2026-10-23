@@ -121,7 +121,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		target: METRICS_LABEL,
 		args: ['--no-startup'],
 		reserved_cores: 0,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		memory_mb: core_budget.MEMORY_MB.metrics,
 		is_kit_only: true,
 	},
 	// The lockfile policy check is network-bound and usually instant: it verifies only when the
