@@ -158,6 +158,15 @@ describe('run_ship_review_steps.review_stage — the interaction review beside r
 			INTERACTION_RECORD,
 		])
 	})
+
+	it('runs none after a round 1 that stopped before it was due', async () => {
+		interaction_status_mock.mockResolvedValueOnce(NOT_REQUIRED).mockResolvedValue(MISSING)
+		read_stamp_text.mockReturnValue(HIGH)
+
+		expect(await stage()).toHaveProperty('code', FAILED)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${HIGH}`])
+		expect(launch).toHaveBeenCalledOnce()
+	})
 })
 
 describe('run_ship_review_steps.review_stage — a High in either review beside round 1', () => {
