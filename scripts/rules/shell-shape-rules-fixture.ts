@@ -12,10 +12,11 @@ const QUOTED: ShellShapeId = 'quoted-mention'
 const SUBSHELL: ShellShapeId = 'subshell'
 const SEMICOLON: ShellShapeId = 'semicolon-chain'
 const TIME_FLAG_GATE: ShellShapeId = 'time-flag-gate'
+const MULTILINE_FIELD: ShellShapeId = 'multiline-quoted-field'
 
 // Filings, comments, bodies and oracle consultations.
 const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
-	'third-party-write': [HEREDOC],
+	'third-party-write': [MULTILINE_FIELD, HEREDOC],
 	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
 	'filing-cap': [HEREDOC],
@@ -35,7 +36,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'run-tail': [HEREDOC],
 	'timed-rerun': ['hyperfine-quoted', 'time-flag-value', TIME_FLAG_GATE, HEREDOC],
 	'josh-git-bare': ['and-chain', HEREDOC],
-	'git-force': ['multiline-quoted-field', HEREDOC],
+	'git-force': [MULTILINE_FIELD, HEREDOC],
 	'worktree-mutation': [SUBSHELL, HEREDOC],
 	'index-mutation': ['and-chain', HEREDOC],
 	'destructive-command': [SUBSHELL, HEREDOC],

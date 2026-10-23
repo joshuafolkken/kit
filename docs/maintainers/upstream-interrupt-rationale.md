@@ -33,7 +33,8 @@ we do not own.
   by search. Closing it later undoes none of that, and it spends maintainer time nobody offered.
 - The first-party flow gains no new friction from this split.
 - The `third-party-write` row in `scripts/rules/delivered-rules.ts` uses the same computation as
-  `pnpm josh repo:party` to refuse a third-party `gh api` write; reads pass.
+  `pnpm josh repo:party` to refuse a third-party `gh api` or `gh … -R` write, and any GraphQL
+  mutation, whose target it cannot read; reads pass. The session owner is pinned at session start.
 
 ## Why a correct diagnosis is not authorization
 
