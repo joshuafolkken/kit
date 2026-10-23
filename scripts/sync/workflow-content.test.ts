@@ -64,9 +64,10 @@ describe('production.yml — release merge source', () => {
 	})
 })
 
-// `auto-tag.yml` and `production.yml` push with the checkout's credentials, so they keep them.
-describe('checkout credential hygiene in workflows that never push', () => {
+describe('checkout credential hygiene', () => {
 	it.each([
+		AUTO_TAG_PATH,
+		PRODUCTION_PATH,
 		CI_TEMPLATE_PATH,
 		GITHUB_RELEASE_TEMPLATE_PATH,
 		'../../.github/workflows/ci.yml',
@@ -80,6 +81,21 @@ describe('checkout credential hygiene in workflows that never push', () => {
 
 		expect(checkout_count).toBeGreaterThan(0)
 		expect(persist_count).toBe(checkout_count)
+	})
+
+	// The workflows that push hand the token to git per step, through the environment, so nothing
+	// writes it into .git/config (joshuafolkken/kit#4651).
+	it.each([
+		[AUTO_TAG_PATH, 2],
+		[PRODUCTION_PATH, 1],
+	])('passes the token to git only in the %s steps that fetch or push', (workflow_path, steps) => {
+		const content = read_workflow(workflow_path)
+
+		expect(
+			count_occurrences(content, 'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'),
+		).toBe(steps)
+		expect(count_occurrences(content, 'echo "::add-mask::$BASIC"')).toBe(steps)
+		expect(content).not.toContain('git config --global http.')
 	})
 })
 
