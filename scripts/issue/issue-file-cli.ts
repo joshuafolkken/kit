@@ -25,11 +25,12 @@ import { issue_release_cli } from './issue-release-cli'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
+import { size_estimate } from './size-estimate'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
 // with every filing step run in order: the third-party refusal, the body
-// lint, the `## Origin` check for another repository, the `auto-ok` decision
+// lint, the size estimate against the split guide, the `## Origin` check for another repository, the `auto-ok` decision
 // with the run label it owes, the start condition read as a pull request, the fold question against
 // the run's earlier
 // filings, the WIP cap count, the
@@ -88,6 +89,7 @@ function refusals_of(filing: Filing): ReadonlyArray<string> {
 	if (party_problem !== undefined) return [party_problem]
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
+		size_estimate.guide_problem(filing.body, filing.args.route),
 		issue_auto_ok.declaration_problem(filing.body),
 		issue_priority.problem(filing.body, filing.args.labels),
 		issue_file.origin_problem(filing.body, filing.target, filing.current),

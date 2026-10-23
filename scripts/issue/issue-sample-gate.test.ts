@@ -17,7 +17,7 @@ const NEEDED = 2
 const SOURCE_ISSUE = 4300
 
 function body_with(line: string): string {
-	return `## 背景\n\n- 種別: 非不具合\n${line}\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n`
+	return `## 背景\n\n- 種別: 非不具合\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n${line}\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n`
 }
 
 const GATED_BODY = body_with(`- 実施可能条件: #${String(PR)} のマージ後 ${String(NEEDED)} マージ`)
