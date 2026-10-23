@@ -226,12 +226,14 @@ describe('josh ship — a restart with a record', () => {
 })
 
 describe('josh ship — a restart with no record', () => {
-	it('never commits twice: a committed tree resumes with the commit skipped', async () => {
+	// joshuafolkken/kit#4708: the sync stage commits locally before the gate, so a commit not yet
+	// pushed is not the gate's output — the gate runs again before the push.
+	it('never commits twice: a committed, unpushed tree is gated again, then pushed with the commit skipped', async () => {
 		probe.read_state.mockResolvedValue(COMMITTED)
 
 		await run_ship_cli.run([TITLE])
 
-		expect(commands()[0]).toBe(`git -y --skip-commit ${TITLE}`)
+		expect(commands().slice(0, 2)).toStrictEqual(['gate', `git -y --skip-commit ${TITLE}`])
 	})
 
 	it('never pushes twice: a pushed tree resumes with the commit and push skipped', async () => {
@@ -272,7 +274,11 @@ describe('josh ship — an infrastructure retry of the commit', () => {
 			code: FAILED,
 			out: 'fatal: unable to access: Could not resolve host: github.com',
 		})
-		probe.read_state.mockResolvedValueOnce(NOTHING).mockResolvedValue(COMMITTED)
+		// Read at the start and again after the sync, then by the retry.
+		probe.read_state
+			.mockResolvedValueOnce(NOTHING)
+			.mockResolvedValueOnce(NOTHING)
+			.mockResolvedValue(COMMITTED)
 
 		expect(await run_ship_cli.run([TITLE])).toBe(OK)
 		expect(commands().slice(1, 3)).toStrictEqual([

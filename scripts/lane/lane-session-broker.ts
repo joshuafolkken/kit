@@ -49,6 +49,13 @@ const request_schema = z
 // broker's schema had never learned even on one main (joshuafolkken/kit#4489).
 const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
 const UNREADABLE_REASON = 'the broker could not read the request'
+// **A refused request is read as a version difference, never dropped silently** (joshuafolkken/kit#4714):
+// the refusal marks the supervisor's code as suspect, so its next pass re-hashes the code even where the
+// commit did not move or the hash at its start could not be read, and reloads when it differs. Only the
+// `run:wake` supervisor takes the mark: an OpenAI lane's own supervisor never re-checks its code.
+const VERSION_NOTE =
+	"the broker's code differs from the ship's; a run:wake supervisor re-checks its code at its next pass"
+const refusal = { is_pending: false }
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -103,7 +110,7 @@ function refused_field(issue: z.core.$ZodIssue): ReadonlyArray<string> {
 function unreadable(error: z.ZodError): BrokerAnswer {
 	const fields = error.issues.flatMap((issue) => refused_field(issue))
 
-	return failure(`${UNREADABLE_REASON} — ${fields.join('; ')}`)
+	return failure(`${UNREADABLE_REASON} — ${VERSION_NOTE} — ${fields.join('; ')}`)
 }
 
 // The answer of a broker on code older than the request, which the ship can still fall back from.
@@ -113,10 +120,21 @@ function is_unreadable(answer: BrokerAnswer): boolean {
 
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
 	const parsed = request_schema.safeParse(received)
+	if (parsed.success) return await lane_session_action.answer(lane, parsed.data.action)
 
-	return parsed.success
-		? await lane_session_action.answer(lane, parsed.data.action)
-		: unreadable(parsed.error)
+	refusal.is_pending = true
+
+	return unreadable(parsed.error)
+}
+
+// Whether a request was refused since the supervisor last asked, clearing the mark — the supervisor
+// re-checks its code on it (`run-wake-code.ts`).
+function take_refusal(): boolean {
+	const { is_pending } = refusal
+
+	refusal.is_pending = false
+
+	return is_pending
 }
 
 // The requests this process's servers are answering now — what the supervisor's reload waits out
@@ -385,6 +403,7 @@ const lane_session_broker = {
 	response_path,
 	review_paths: lane_session_action.review_paths,
 	serving_session,
+	take_refusal,
 	with_server,
 }
 

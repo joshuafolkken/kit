@@ -203,8 +203,10 @@ async function vitest_share(vitest_arguments: ReadonlyArray<string>): Promise<nu
 async function execute_vitest(
 	vitest_arguments: ReadonlyArray<string>,
 	recording: RecordingEnvironment,
+	directory: string,
 ): Promise<number> {
 	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
+		cwd: directory,
 		env: { ...isolated_unit_environment(), ...recording },
 		extendEnv: false,
 		stdio: 'inherit',
@@ -214,8 +216,12 @@ async function execute_vitest(
 	return result.exitCode ?? FAIL_EXIT_CODE
 }
 
-// A whole-suite run also records the test-read map `josh test:related` narrows by.
-async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+// A whole-suite run also records the test-read map `josh test:related` narrows by. `directory` is
+// where vitest runs — another checkout's for `test-no-base.ts`, this process's otherwise.
+async function run_vitest(
+	vitest_arguments: ReadonlyArray<string>,
+	directory: string = process.cwd(),
+): Promise<number> {
 	return await unit_worker_share.with_run_marker(async () => {
 		const sized = [
 			...vitest_arguments,
@@ -226,9 +232,17 @@ async function run_vitest(vitest_arguments: ReadonlyArray<string>): Promise<numb
 		return await test_read_recording.with_read_recording(
 			root,
 			sized,
-			async (recording) => await execute_vitest(sized, recording),
+			async (recording) => await execute_vitest(sized, recording, directory),
 		)
 	})
+}
+
+// The same funnel, run in another checkout of this project — whose `node_modules` is this one's.
+async function run_vitest_in(
+	directory: string,
+	vitest_arguments: ReadonlyArray<string>,
+): Promise<number> {
+	return await run_vitest(vitest_arguments, directory)
 }
 
 // The label names the command the notice is printed for, so a skipped scoped run says
@@ -297,6 +311,7 @@ const test_unit_guard = {
 	isolated_unit_environment,
 	run_guarded_unit,
 	run_guarded_vitest,
+	run_vitest_in,
 	vitest_share,
 }
 

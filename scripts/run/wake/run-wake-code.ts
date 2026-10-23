@@ -23,31 +23,73 @@ interface CodeSource {
 interface CodeState {
 	head: string | undefined
 	loaded: string | undefined
+	// A suspicion taken while the closure could not be hashed, kept for the next pass.
+	is_suspect: boolean
 }
 
 // **A hash that cannot be computed is never stale**: a supervisor that cannot tell keeps running, as
-// it did before this check existed, rather than restarting on every pass.
-function is_changed(loaded: string | undefined, current: string | undefined): boolean {
-	if (loaded === undefined || current === undefined) return false
+// it did before this check existed, rather than restarting on every pass. **A suspected supervisor whose
+// start left no baseline is stale** (joshuafolkken/kit#4714): the broker refused a request, and without
+// a baseline nothing else could ever tell it differs, so the successor reads one afresh.
+function is_changed(
+	loaded: string | undefined,
+	current: string | undefined,
+	is_suspected: boolean,
+): boolean {
+	if (current === undefined) return false
+	if (loaded === undefined) return is_suspected
 
 	return loaded !== current
 }
 
-async function is_stale(state: CodeState, source: CodeSource): Promise<boolean> {
+// **A move and a suspicion are consumed only once they were hashed**, so a closure that could not be
+// read at them is read again at the next pass (joshuafolkken/kit#4714).
+function consume(
+	state: CodeState,
+	read: { head: string | undefined; is_suspect: boolean },
+	current: string | undefined,
+): void {
+	if (current === undefined) {
+		state.is_suspect = read.is_suspect
+
+		return
+	}
+
+	state.head = read.head
+	state.is_suspect = false
+}
+
+// **A suspicion re-hashes an unmoved commit** (joshuafolkken/kit#4714).
+async function is_stale(
+	state: CodeState,
+	source: CodeSource,
+	is_suspected: () => boolean,
+): Promise<boolean> {
 	const head = await source.head()
-	if (head === state.head) return false
+	const is_suspect = is_suspected() || state.is_suspect
+	if (!is_suspect && head === state.head) return false
 
-	state.head = head
+	const current = await source.closure()
 
-	return is_changed(state.loaded, await source.closure())
+	consume(state, { head, is_suspect }, current)
+
+	return is_changed(state.loaded, current, is_suspect)
 }
 
 // The baseline is read when the watch starts — at the supervisor's start, as close to the moment its
-// modules were loaded as a reading can be.
-async function watch(source: CodeSource): Promise<() => Promise<boolean>> {
-	const state: CodeState = { head: await source.head(), loaded: await source.closure() }
+// modules were loaded as a reading can be. `is_suspected` answers, and clears, whether something has
+// seen this code differ from main's since it was last asked (`lane-session-broker.ts`).
+async function watch(
+	source: CodeSource,
+	is_suspected: () => boolean = () => false,
+): Promise<() => Promise<boolean>> {
+	const state: CodeState = {
+		head: await source.head(),
+		loaded: await source.closure(),
+		is_suspect: false,
+	}
 
-	return async () => await is_stale(state, source)
+	return async () => await is_stale(state, source, is_suspected)
 }
 
 async function read_head(): Promise<string | undefined> {

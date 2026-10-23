@@ -67,6 +67,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'lane-split-park': judgment(ANOTHER_COMMAND),
 	'lane-interactive-ask': judgment(ANOTHER_COMMAND),
 	'agent-model': judgment("which model fits the unit is the author's call"),
+	'investigator-foreground': judgment('which reads go beside the dispatch is the author’s call'),
 	'lane-carry-conflict': judgment(ANOTHER_COMMAND),
 	'lane-switch-main': judgment(ANOTHER_COMMAND),
 	'lane-direct-tool': judgment(ANOTHER_COMMAND),

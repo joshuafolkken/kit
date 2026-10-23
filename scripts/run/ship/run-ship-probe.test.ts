@@ -64,7 +64,7 @@ describe('run_ship_probe.read_state — committed', () => {
 	it('reads a dirty tree as not committed, whatever sits beneath it', async () => {
 		is_tree_dirty.mockResolvedValue(true)
 
-		expect(await run_ship_probe.read_state()).toMatchObject({ is_committed: false })
+		expect(await run_ship_probe.read_state()).toMatchObject({ is_committed: false, is_dirty: true })
 	})
 
 	it('reads a clean tree level with the default branch as not committed', async () => {
@@ -118,6 +118,7 @@ describe('run_ship_probe — unreadable answers read as not done', () => {
 			is_pushed: false,
 			is_merged: false,
 			is_review_stale: false,
+			is_dirty: false,
 		})
 	})
 

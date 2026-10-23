@@ -67,7 +67,8 @@ async function gate_stage(): Promise<StepResult> {
 const SYNC_STEP: Step = {
 	stage: STAGE.SYNC,
 	header: run_ship.SYNC_HEADER,
-	run: async (args) => await run_ship_sync.sync_stage(args.number),
+	run: async (args, state) =>
+		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
 }
 
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
