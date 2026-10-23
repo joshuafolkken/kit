@@ -43,6 +43,10 @@ const JSON_BODY = '{}'
 const CHANGED = '{ "changed": true }'
 const HEAD_BEFORE = 'aaaa'
 const HEAD_AFTER = 'bbbb'
+const LIST_FILES = ['ls-files', '--cached', '--others', '--exclude-standard']
+const NEW_MODULE = 'src/new-module.ts'
+const FILES_BEFORE = TARGET
+const FILES_AFTER = `${TARGET}\n${NEW_MODULE}`
 
 const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-'))
 
@@ -64,6 +68,13 @@ function checkout(): void {
 	}
 
 	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+}
+
+// git under one commit, listing `files` as the ones the type program can resolve.
+function answer_git(files: string): void {
+	mocked_git_read.mockImplementation((git_arguments) =>
+		git_arguments[0] === LIST_FILES[0] ? files : HEAD_BEFORE,
+	)
 }
 
 function recorded_text(): string {
@@ -147,6 +158,18 @@ describe('eslint_daemon.fingerprint', () => {
 
 		expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
 		expect(mocked_git_read).toHaveBeenCalledWith(['rev-parse', 'HEAD'], { cwd: project_root })
+	})
+
+	// joshuafolkken/kit#4701: a merge in progress brings new modules in without moving HEAD.
+	it('moves when a file is added under the same commit', () => {
+		checkout()
+		answer_git(FILES_BEFORE)
+		const before = eslint_daemon.fingerprint(project_root)
+
+		answer_git(FILES_AFTER)
+
+		expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
+		expect(mocked_git_read).toHaveBeenCalledWith(LIST_FILES, { cwd: project_root })
 	})
 })
 
@@ -262,6 +285,19 @@ describe('eslint_daemon.run — after a merge', () => {
 		mocked_git_read.mockReturnValue(HEAD_BEFORE)
 		current_checkout()
 		mocked_git_read.mockReturnValue(HEAD_AFTER)
+		mocked_execa.mockResolvedValue(answer(0, ''))
+
+		await eslint_daemon.run(PNPM_ESLINT, { project_root })
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual([CLI, '--quiet', TARGET])
+	})
+
+	// joshuafolkken/kit#4701: the daemon kept the failed lookup of a module the merge then brought in.
+	it('stops a daemon started before a new module and its import arrived, HEAD unmoved', async () => {
+		answer_git(FILES_BEFORE)
+		current_checkout()
+		answer_git(FILES_AFTER)
 		mocked_execa.mockResolvedValue(answer(0, ''))
 
 		await eslint_daemon.run(PNPM_ESLINT, { project_root })

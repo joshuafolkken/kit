@@ -1,0 +1,7 @@
+{
+	"reason": "Fingerprint the daemon's resolvable file list so a merge in progress restarts it (#4701)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}
