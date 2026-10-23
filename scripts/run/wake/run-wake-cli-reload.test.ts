@@ -185,4 +185,18 @@ describe('run_wake_cli.supervised — the code check', () => {
 
 		expect([checks, is_stale.mock.calls.length]).toStrictEqual([[false, true], 1])
 	})
+
+	// joshuafolkken/kit#4714: a request the broker refused makes the supervisor re-check its code.
+	it("watches the code with the broker's refusal mark as its suspicion", async () => {
+		const watch = vi.spyOn(run_wake_code, 'watch').mockResolvedValue(async () => false)
+
+		vi.spyOn(run_wake_supervise, 'supervise').mockResolvedValue({
+			reason: 'stopped',
+			note: undefined,
+		})
+
+		await run_wake_cli.supervised(context(), INTERVAL_MS, PROFILE)
+
+		expect(watch).toHaveBeenCalledWith(expect.anything(), lane_session_broker.take_refusal)
+	})
 })

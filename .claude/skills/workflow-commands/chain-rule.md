@@ -28,9 +28,9 @@ Review results and successful pushes are never turn boundaries.
    `run:review`'s `test:pinned` lines, run the final scoped lint/test pair and
    `pnpm josh run:review`: it runs `pnpm josh test:pinned` and stops on an `unpinned` line
    (`--unpinned-ok "<reason>"` carries on), then starts `pnpm josh gate` in the background and prints
-   the `/code-review` brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
-   agent type with that brief and its `model` (`delegation.md`) (every tool, so `--fix` applies;
-   never a guessed type name).
+   the `/code-review` brief in one call, so the two overlap. Launch the `/code-review` subagent as the `reviewer`
+   agent type (`kit:reviewer` in a consumer) with that brief and its `model` (`delegation.md`) (one
+   agent, no `Skill` / `Agent` tool — `.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
    committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check

@@ -281,7 +281,7 @@ describe('lane_session_broker — a request the broker cannot read', () => {
 	const NEWER = { ...RELAUNCH, stop: { ...RELAUNCH.stop, is_from_newer_main: true } }
 	// joshuafolkken/kit#4489: the reason names the refused field rather than guessing at the supervisor.
 	const UNREADABLE =
-		'the broker answered a failure: the broker could not read the request — unrecognized key: action.stop.is_from_newer_main'
+		"the broker answered a failure: the broker could not read the request — the broker's code differs from the ship's; a run:wake supervisor re-checks its code at its next pass — unrecognized key: action.stop.is_from_newer_main"
 
 	it('answers the unreadable request at once, naming why, and starts nothing', async () => {
 		const relaunch = vi.spyOn(lane_relaunch, 'relaunch')
@@ -299,7 +299,7 @@ describe('lane_session_broker — a request the broker cannot read', () => {
 		const unknown_cause = { ...RELAUNCH, stop } as unknown as BrokerAction
 
 		expect(reason_of(await request_review(CLAUDE_LANE, unknown_cause))).toContain(
-			'could not read the request — action.stop.cause: ',
+			're-checks its code at its next pass — action.stop.cause: ',
 		)
 	})
 
