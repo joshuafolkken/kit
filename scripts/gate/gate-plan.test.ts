@@ -37,6 +37,17 @@ const PAIRED_LANES = 2
 const PAIRED_WIDTH = 2
 // More lanes than the machine has cores, which is the arithmetic `MIN_SHARED_CORES` exists for.
 const OVERSUBSCRIBED_LANES = 99
+// The checks that reserve no core — behavior, exports, metrics, lockfile and the unit step — which
+// every plan admits however small its share (joshuafolkken/kit#4609).
+const ZERO_WEIGHT_CHECKS = gate_plan.GATE_CHECKS.filter(
+	(check) => check.reserved_cores === 0,
+).length
+// What CI's `--no-unit` gate checks: the static checks of this repository.
+const STATIC_CHECKS = gate_plan.select_gate_checks(false, true)
+
+function weighted(...checks: ReadonlyArray<[string, number]>): ReadonlyArray<GateCheck> {
+	return checks.map(([label, reserved_cores]) => ({ label, target: label, reserved_cores }))
+}
 
 describe('gate_plan.resolve_concurrency', () => {
 	it('runs every check at once on a machine that can host them', () => {
@@ -53,19 +64,20 @@ describe('gate_plan.resolve_concurrency', () => {
 
 	// Below that the checks queue instead of fighting: this is the half of the plan that keeps a
 	// small machine working rather than thrashing. CI's four-core runner is in this band.
+	// The zero-weight checks are admitted on any machine; the reserving ones fill what is left.
 	it.each([
-		[5, 2],
-		[CI_CORES, 2],
+		[5, PAIRED_WIDTH],
+		[CI_CORES, PAIRED_WIDTH],
 		[3, 1],
-		[1, 1],
-	])('admits %i cores worth of checks as %i at a time', (available, expected) => {
-		expect(gate_plan.resolve_concurrency(available)).toBe(expected)
+		[1, 0],
+	])('admits %i cores worth of checks with %i reserving ones', (available, reserving) => {
+		expect(gate_plan.resolve_concurrency(available)).toBe(ZERO_WEIGHT_CHECKS + reserving)
 	})
 
 	// A machine reporting nothing usable must still run the gate, one check at a time, rather than
 	// returning a width of zero — which would run no check at all and report a green gate.
 	it('never drops below one check at a time', () => {
-		expect(gate_plan.resolve_concurrency(0)).toBe(1)
+		expect(gate_plan.resolve_concurrency(0, 1, weighted(['heavy', 2]))).toBe(1)
 	})
 
 	// More cores never means fewer checks: a plan that dipped would be read as a measurement error
@@ -79,21 +91,40 @@ describe('gate_plan.resolve_concurrency', () => {
 	})
 })
 
+describe('gate_plan.resolve_concurrency — lightest first', () => {
+	it('counts the checks lightest first whatever order they are declared in', () => {
+		const checks = weighted(['heavy', 3], ['light', 1], ['free', 0])
+
+		expect(gate_plan.resolve_concurrency(2, 1, checks)).toBe(2)
+	})
+
+	it('keeps the declaration order among checks of one weight', () => {
+		const ordered = gate_plan.lightest_first(STATIC_CHECKS, (check) => check.reserved_cores)
+
+		expect(ordered.map((check) => check.label).slice(-3)).toEqual([
+			gate_plan.LINT_LABEL,
+			gate_plan.TYPE_CHECK_LABEL,
+			'cspell',
+		])
+	})
+})
+
 describe('gate_plan.resolve_concurrency under concurrency', () => {
 	// joshuafolkken/kit#1547: joshuafolkken/kit#1515 divided the machine for the unit suite alone,
 	// leaving each lane's other three checks unbounded — six lanes therefore put 24 checks on 11
 	// cores, where one gate took 254.1s with lint alone at 252.9s against 5.2s solo. eslint, tsc and
 	// cspell take no worker count between them, so how many run at once is the only quantity left.
-	it('narrows to one check at a time when six lanes share the machine', () => {
-		expect(gate_plan.resolve_concurrency(MEASURED_CORES, LANE_COUNT)).toBe(1)
+	// The zero-weight checks reserve nothing to narrow (joshuafolkken/kit#4609).
+	it('admits no reserving check when six lanes share the machine', () => {
+		expect(gate_plan.resolve_concurrency(MEASURED_CORES, LANE_COUNT)).toBe(ZERO_WEIGHT_CHECKS)
 	})
 
 	// The narrowing is proportional rather than a switch: two lanes each keep the reserving checks
-	// their half of the machine fits, between the solo fan-out and six lanes' one at a time.
+	// their half of the machine fits, between the solo fan-out and six lanes' none.
 	it('leaves a pair of lanes the checks half the machine fits', () => {
 		const width = gate_plan.resolve_concurrency(MEASURED_CORES, PAIRED_LANES)
 
-		expect(width).toBe(PAIRED_WIDTH)
+		expect(width).toBe(ZERO_WEIGHT_CHECKS + PAIRED_WIDTH)
 		expect(width).toBeLessThan(gate_plan.resolve_concurrency(MEASURED_CORES))
 	})
 
@@ -125,7 +156,7 @@ describe('gate_plan.resolve_concurrency under concurrency', () => {
 		)
 
 		expect(widths).toEqual([...widths].toSorted((left, right) => right - left))
-		expect(widths.at(-1)).toBe(1)
+		expect(widths.at(-1)).toBe(ZERO_WEIGHT_CHECKS)
 	})
 })
 
@@ -323,7 +354,7 @@ describe('gate_plan.format_gate_plan', () => {
 		const plan = gate_plan.resolve_gate_plan(MEASURED_CORES, LANE_COUNT)
 
 		expect(gate_plan.format_gate_plan(plan, MEASURED_CORES, LANE_COUNT)).toBe(
-			'plan: 1 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
+			'plan: 5 of 8 checks at once, test:unit at 1 workers (11 cores, 6 unit runs)',
 		)
 	})
 
@@ -371,10 +402,13 @@ describe('gate_plan without the unit suite', () => {
 		expect(gate_plan.GATE_CHECKS.slice(0, -1)).toEqual(gate_plan.STATIC_CHECKS)
 	})
 
-	it('runs the static checks two at a time on the four-core runner CI gives it', () => {
+	// joshuafolkken/kit#4609: on CI's four cores the spell check does not fit beside lint and the type
+	// check, and counted in declaration order it ended the count there — behavior, exports, metrics
+	// and lockfile queued behind it. Every check but the one over the share is admitted.
+	it('leaves only the check over the share out on the four-core runner CI gives it', () => {
 		const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, false)
 
-		expect(plan.concurrency).toBe(PAIRED_WIDTH)
+		expect(plan.concurrency).toBe(gate_plan.STATIC_CHECKS.length - 1)
 		expect(plan.checks).toEqual(gate_plan.STATIC_CHECKS)
 	})
 

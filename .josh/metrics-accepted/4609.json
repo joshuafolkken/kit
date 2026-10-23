@@ -1,0 +1,7 @@
+{
+	"reason": "#4609: lightest-first ordering helper and the pool queue that starts checks in that order",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 23
+	}
+}

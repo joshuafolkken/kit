@@ -223,6 +223,15 @@ interface GatePlan {
 // the exact opposite of what this function is for. `bounded-pool.ts` closes the same hole for the
 // same reason. A count below one is nonsense too and is read as one run, which is the direction
 // that leaves behavior where it was rather than throttling a gate on a bad input.
+// The order the gate both counts and starts its checks in. `toSorted` is stable, so checks of one
+// weight keep their declaration order.
+function lightest_first<Item>(
+	items: ReadonlyArray<Item>,
+	reserved_cores_of: (item: Item) => number,
+): Array<Item> {
+	return items.toSorted((left, right) => reserved_cores_of(left) - reserved_cores_of(right))
+}
+
 function shared_cores(available_cores: number, concurrent_runs: number): number {
 	const runs = Number.isFinite(concurrent_runs)
 		? Math.max(unit_worker_share.SOLO_RUNS, concurrent_runs)
@@ -231,7 +240,7 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 	return Math.max(MIN_SHARED_CORES, Math.floor(available_cores / runs))
 }
 
-// Admit checks in declaration order while the running set's reserved cores still fit **this run's
+// Admit checks, lightest first, while the running set's reserved cores still fit **this run's
 // share** of the machine. On a machine running one gate that share is the machine, so this bites
 // only below six cores — the three reserving checks want six between them — and there it is the
 // difference between two checks sharing a core and four fighting over it.
@@ -250,16 +259,23 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 // the gate still reports every failure in one pass — `bounded_pool` queues what it does not start,
 // and no check ever rejects (see `run_gate_steps`). What changes is how many are in flight at
 // once, which is scheduling and never coverage.
+//
+// **The checks are counted lightest first, and `run_gate_steps` starts them in the same order**
+// (joshuafolkken/kit#4609). Counted in declaration order, the first check over the share ended the
+// count, so on CI's four cores lint and the type check filled it and every zero-weight check after
+// the spell check queued behind a check that was only waiting for cores. Lightest first, the `break`
+// is exact: once one check does not fit, no heavier one after it can.
 function resolve_concurrency(
 	available_cores: number,
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
 ): number {
 	const share = shared_cores(available_cores, concurrent_runs)
+	const ordered = lightest_first(checks, (check) => check.reserved_cores)
 	let admitted = 0
 	let reserved = 0
 
-	for (const check of checks) {
+	for (const check of ordered) {
 		reserved += check.reserved_cores
 
 		if (reserved > share) break
@@ -496,6 +512,7 @@ const gate_plan = {
 	format_gate_plan,
 	format_machine,
 	has_unit_check,
+	lightest_first,
 	plan_of,
 	resolve_concurrency,
 	resolve_gate_plan,
