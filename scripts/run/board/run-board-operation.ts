@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { token_shape } from '#scripts/lib/token-shape'
 import { transcript_record, type TranscriptRecord } from '#scripts/lib/transcript-record'
 import { z } from 'zod'
 
@@ -60,12 +61,13 @@ function without_assignments(command: string): string {
 }
 
 // The first line of what the command runs, cut to the limit. A command whose variable cannot be read
-// to its end is drawn as nothing: a part of the value would stand where the command should.
+// to its end is drawn as nothing: a part of the value would stand where the command should. A
+// credential later in the line is redacted before the cut, which would leave a head no shape matches.
 function command_target(command: string): string {
 	const [first = ''] = without_assignments(command.trim()).split(NEWLINE)
 	if (UNREAD_ASSIGNMENT.test(first)) return ''
 
-	return cut(ascii_head(first.replaceAll(SPACES, ' ')))
+	return cut(ascii_head(token_shape.redact(first).replaceAll(SPACES, ' ')))
 }
 
 // The path from `root` down; a file outside it is drawn by its name alone, never by where it is.
