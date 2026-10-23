@@ -14,15 +14,20 @@ updates:
     # file only: the distributed `templates/dependabot.yml` stays ungrouped, because a consumer's
     # auto-merge holds a whole pull request that touches an upstream-managed workflow.
     #
-    # The actions the publish jobs run with publish credentials come first, in a pull request of their
-    # own: `.github/workflows/dependabot-auto-merge.yml` merges only the `github-actions` group, so a
-    # person reviews each bump of these (joshuafolkken/kit#4633). This list is the only one.
+    # The actions the publish jobs run with publish credentials, and those of the `pack` job that
+    # builds the tarball they publish, come first, in a pull request of their own:
+    # `.github/workflows/dependabot-auto-merge.yml` merges only the `github-actions` group, so a
+    # person reviews each bump of these (joshuafolkken/kit#4633, joshuafolkken/kit#4654). This list
+    # is the only one.
     groups:
       publish-actions:
         patterns:
+          - 'actions/cache'
           - 'actions/checkout'
           - 'actions/download-artifact'
           - 'actions/setup-node'
+          - 'actions/upload-artifact'
+          - 'pnpm/setup'
         update-types:
           - 'minor'
           - 'patch'
