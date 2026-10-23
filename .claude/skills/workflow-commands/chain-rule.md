@@ -76,8 +76,8 @@ These are the gate → review → PR → merge facts other documents cite; this 
   resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
 - **A single check answers once per tree** — re-run one check by name (`pnpm josh lint:related`,
   `pnpm josh cspell:dot`, `pnpm josh test:related`, or the type check) after every edit, never twice
-  over an untouched tree. In kit a detached `pnpm josh ship` also checks the metrics totals; accept a
-  grown total with its reason, as its output names.
+  over an untouched tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
+  merge-base; accept it with its reason before `pnpm josh ship`, whose pre-detach check otherwise stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
   the open pull request.

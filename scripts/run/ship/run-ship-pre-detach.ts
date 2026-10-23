@@ -4,6 +4,7 @@ import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { project_checks } from '#scripts/gate/project-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
@@ -33,7 +34,9 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // present run, and a consumer meets the static checks alone.
 //
 // In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
-// the session that grew the total writes the reason itself rather than a relaunched one. The
+// the session that grew the total writes the reason itself rather than a relaunched one —
+// `josh lint:related` has already reported the growth in the loop (`metrics-totals.ts`), so this is
+// the stop for a growth that notice did not settle. The
 // durations are left out: they read the gate ledger, stale before the detach, so they stay with the
 // supervised gate.
 
@@ -53,7 +56,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const SECTION_SEPARATOR = '\n\n'
 const PASSED = 'pre-detach checks passed'
-const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
+const { METRICS_TOTALS_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
 	{ list: ['josh', 'exports:unused'], label: gate_plan.EXPORTS_LABEL },
 	{ list: ['josh', 'cspell:dot'] },
@@ -120,14 +123,29 @@ function gate_results(runs: ReadonlyArray<PreDetachRun>): Array<GateStepResult> 
 		})
 }
 
-function verdict(results: ReadonlyArray<BufferedProcessResult>): JoshResult {
-	const failed = results.filter((result) => buffered_process.is_process_failed(result))
+// Each failure is headed by the check's own command and how it ended: a check that failed with no
+// output of its own (`ELIFECYCLE Command failed` alone, or nothing) otherwise names nothing to fix.
+function failure_heading({ check, result }: PreDetachRun): string {
+	const ending =
+		result.exit_code === undefined
+			? 'no exit code (timed out or ended by a signal)'
+			: `exit code ${String(result.exit_code)}`
+
+	return `✗ ${check.list.join(' ')} — ${ending}`
+}
+
+function failure_section(run: PreDetachRun): string {
+	return [failure_heading(run), run.result.output.trim()].filter((part) => part !== '').join('\n')
+}
+
+function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
+	const failed = runs.filter(({ result }) => buffered_process.is_process_failed(result))
 
 	if (failed.length === 0) return { code: SUCCESS_EXIT_CODE, out: PASSED }
 
 	return {
 		code: FAILURE_EXIT_CODE,
-		out: failed.map((result) => result.output.trim()).join(SECTION_SEPARATOR),
+		out: failed.map((run) => failure_section(run)).join(SECTION_SEPARATOR),
 	}
 }
 
@@ -142,7 +160,7 @@ async function checks(
 
 	await check_reuse.record_green_checks(gate_results(runs), tree, records)
 
-	return verdict(runs.map(({ result }) => result))
+	return verdict(runs)
 }
 
 const run_ship_pre_detach = {

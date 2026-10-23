@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
@@ -99,6 +100,25 @@ async function resolve_lint_scope(
 	})
 }
 
+// In kit, a metrics total grown past the merge-base is reported after the lint and changes no exit
+// code (`metrics-totals.ts`). The totals are a whole-repository pass, so only a green bare run pays
+// for it: a red lint is edited again anyway, and a run narrowed by file arguments is a spot check.
+async function exit_code_with_notice(
+	command_arguments: ReadonlyArray<string>,
+	scope: ChangedFileScope,
+	root: string,
+): Promise<number> {
+	const exit_code = await scoped_exit_code(scope, root)
+	if (exit_code !== 0 || command_arguments.length > 0) return exit_code
+
+	const notice = await metrics_totals.growth_notice(root)
+
+	// On a line of its own: a linter's buffered output need not end with a newline.
+	if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
+
+	return exit_code
+}
+
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
 // whole one, and a fallback says which of the two it was rather than looking like a narrow run
 // that found nothing.
@@ -119,7 +139,7 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 	process.stdout.write(`${lint_related_scope.describe_scope(scope, root)}\n`)
 
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await scoped_exit_code(scope, root)
+	const exit_code = await exit_code_with_notice(command_arguments, scope, root)
 
 	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
 
