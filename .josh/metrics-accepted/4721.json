@@ -1,0 +1,8 @@
+{
+	"reason": "#4721 adds the investigator-foreground guard row (new rule file) and keeps a refused Agent dispatch from resetting the investigation count (+3); delegation.md pointer (+136 on-demand bytes); the measured idle wait it removes (658 s over 7 days) outweighs the cost",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 47,
+		"ai_cost.on_demand_bytes": 136
+	}
+}
