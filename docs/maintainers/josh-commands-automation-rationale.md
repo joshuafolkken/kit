@@ -71,6 +71,8 @@ The batching guard refuses a tool call that would make a third consecutive singl
 
 Report tool calls per round trip across the recent lane sessions — the density the batching guard is measured on, as a command rather than a hand-counted `node -e`. Kit-only (it reads kit's own lane transcripts). Aggregates the ten most recent lane sessions holding at least thirty round trips, dividing summed calls by summed round trips through the same `time-round-trips.ts` the guard and the live density line read, so the three cannot disagree about what a round trip is.
 
+**`independent` / `dependent` reuse `time_bundles`' walk** (joshuafolkken/kit#4622): an independent turn could have gone out beside the single-call turn before it, a dependent one shared a target with the open sequence. A dependency held only in the earlier call's output is invisible to the target test, so `independent` over-reports — mostly in the `Bash: grep` / `sed` / `cat` kinds. `independent by kind` sums the per-tool rows across the lanes and prints the top five. Run from a lane, the command resolves to the main checkout, whose lane root holds every lane's transcript.
+
 ## The investigation guard in detail
 
 - **A refusal in a dispatched lane child too** (`JOSH_LANE_CHILD`), at the same threshold. Why: "The investigation guard refuses in a lane child" above. Decided from the one-place enumeration in `scripts/lane/lane-guard-policy.ts`.

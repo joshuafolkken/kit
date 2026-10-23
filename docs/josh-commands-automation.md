@@ -114,14 +114,15 @@ pnpm josh time:density --lanes 5   # the five most recent lanes
 **Options:**
 
 - `--lanes <n>` — average over a different count of recent qualifying lanes (default 10).
-- `--path <dir>` — read another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
+- `--path <dir>` — read another project's lane transcripts, as `josh time` does. Run from a lane, it reads its main checkout's lanes.
 
 <!-- /usage -->
 
 Kit-only.
 
 ```
-lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
+lanes=10 round_trips=505 tools/turn=1.23 batched=79/505 independent=50 dependent=46
+independent by kind: Bash: grep=19, Bash: sed=9, Write=6, Bash: cat=5, Edit=4
 ```
 
 - `tools/turn` (floor 1.5) runs a little above the Issue's per-assistant-message frame (1.04), whose denominator also counts text-only turns. Use it as a behavior-change Issue's baseline for `josh measure:rerun`.
