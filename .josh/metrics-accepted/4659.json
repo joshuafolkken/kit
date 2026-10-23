@@ -1,0 +1,7 @@
+{
+	"reason": "#4659 closes the third-party-write bypasses: GraphQL mutation and shell-expanded query refusal, gh -R / GH_REPO selector reading, session-start owner pin",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 138
+	}
+}

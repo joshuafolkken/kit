@@ -95,6 +95,63 @@ describe('writes_third_party — the owner placeholder it cannot resolve', () =>
 	})
 })
 
+// The bypasses joshuafolkken/kit#4659 closes: a GraphQL write names no repository the guard can read,
+// and a `gh <group> <action> -R` write names its repository in the selector, not an api path.
+describe('writes_third_party — a GraphQL write it cannot place', () => {
+	it.each([
+		[
+			'an inline mutation',
+			'gh api graphql -f query=\'mutation { addComment(input: {subjectId: "x", body: "y"}) { clientMutationId } }\'',
+		],
+		[
+			'a multi-line mutation',
+			'gh api graphql -f query=\'\nmutation {\n  addComment(input: {subjectId: "x"}) { clientMutationId }\n}\'',
+		],
+		['a query held in a variable', 'Q=$(cat m.graphql); gh api graphql -f query="$Q"'],
+		['an unquoted expanded query', 'gh api graphql -f query=$Q'],
+	])('refuses %s whatever the session owner', (_name, command) => {
+		expect(third_party_write.writes_third_party(command, () => undefined)).toBe(true)
+	})
+
+	it.each([
+		['a GraphQL query', "gh api graphql -f query='{ viewer { login } }'"],
+		[
+			'a single-quoted query with variables',
+			"gh api graphql -f query='query($o: String!) { repository(owner: $o) { id } }' -f o=x",
+		],
+		// `pr-merge` refuses these and names the merge; one refusal leaves the hook.
+		[
+			'a merge mutation',
+			"gh api graphql -f query='mutation { mergePullRequest(input: {}) { x } }'",
+		],
+		['a GraphQL body read from a file', 'gh api graphql -F query=@comment.graphql'],
+	])('leaves %s to its own row', (_name, command) => {
+		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(false)
+	})
+})
+
+describe('writes_third_party — a gh write with a repository selector', () => {
+	it.each([
+		['pr create', 'gh pr create -R sveltejs/svelte --title t --body b'],
+		['issue comment', 'gh issue comment 5 --repo sveltejs/svelte --body b'],
+		['a host-prefixed selector', 'gh issue close 5 -R github.com/sveltejs/svelte'],
+		['an unreadable selector', 'gh issue comment 5 -R "$REPO" --body b'],
+		['an inline GH_REPO selector', 'GH_REPO=sveltejs/svelte gh issue comment 5 -b x'],
+		['an exported GH_REPO selector', 'export GH_REPO=sveltejs/svelte; gh pr create -t t -b b'],
+	])('refuses %s against another owner', (_name, command) => {
+		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(true)
+	})
+
+	it.each([
+		['pr create to the session owner', `gh pr create -R ${SESSION}/kit --title t --body b`],
+		['pr view of another owner', 'gh pr view 5 -R sveltejs/svelte'],
+		['a variable get of another owner', 'gh variable get NAME -R sveltejs/svelte'],
+		['an attestation verify of another owner', 'gh attestation verify a.tgz -R sveltejs/svelte'],
+	])('passes %s', (_name, command) => {
+		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(false)
+	})
+})
+
 const harness = delivered_rules_harness.create_harness('rule-guard-3p-')
 const { payload_of } = harness
 const NOW_MS = 1_700_000_000_000

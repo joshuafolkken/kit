@@ -983,6 +983,6 @@ pnpm josh repo:party                     # no argument: the session's own reposi
 
 <!-- /usage -->
 
-Prints `first-party` / `third-party` / `unknown` on stdout, the two owners compared on stderr. Same owner as the session repository → `first-party`; different → `third-party`; unreadable → `unknown`, never read as `third-party`.
+Prints `first-party` / `third-party` / `unknown` on stdout, the two owners compared on stderr. Same owner as the session → `first-party`; else `third-party`; unreadable → `unknown`. The session owner is pinned at session start (`session-owner-pin.ts`), else `origin`.
 
-The test `CLAUDE.md` → "Third-party repositories are Tier C" and `prompts/collaboration-workflow/upstream-interrupt.md` describe; the `third-party-write` row of `delivered-rules.ts` uses it to refuse a `gh api` write to a repository we do not own (a read passes).
+The `third-party-write` row of `delivered-rules.ts` refuses with it a `gh api` or `gh … -R`/`GH_REPO` write to a repo we do not own; it refuses any GraphQL mutation or expanded query regardless of repo.
