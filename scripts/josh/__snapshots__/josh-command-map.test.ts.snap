@@ -32,6 +32,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
+    "lva": "lane:value",
     "lwd": "lane:withdraw",
     "mm": "main:merge",
     "ms": "main:sync",
@@ -624,6 +625,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "lane:stats": [
       "--period <days> [--limit <lane-limit>]",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "lane:value": [
+      "<metric> --since <instant>",
       "maintainer",
       [
         "none",

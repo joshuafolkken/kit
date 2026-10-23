@@ -221,6 +221,24 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" }],
 		},
 	},
+	// One lane measurement as one number on the last line, for an Issue's measurement declaration
+	// (joshuafolkken/kit#4630).
+	'lane:value': {
+		...MEASURE_ARGUMENTS,
+		description:
+			'Print one lane measurement since an instant as a single number: lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit)',
+		category: 'AI tools',
+		reference: ['<metric> --since <instant>', 'maintainer', ['none']],
+		default_script_arguments: ['value'],
+		usage: {
+			examples: [
+				{
+					arguments: 'edit --since 2026-10-23T03:29Z',
+					note: 'the median Edit time since an instant',
+				},
+			],
+		},
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

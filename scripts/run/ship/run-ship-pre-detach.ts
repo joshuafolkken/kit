@@ -123,6 +123,12 @@ function gate_results(runs: ReadonlyArray<PreDetachRun>): Array<GateStepResult> 
 		})
 }
 
+// The front of a failed check's heading — `josh lane:value metrics-stops` counts a ship output that
+// carries the metrics totals' one.
+function failure_prefix(list: ReadonlyArray<string>): string {
+	return `✗ ${list.join(' ')} — `
+}
+
 // Each failure is headed by the check's own command and how it ended: a check that failed with no
 // output of its own (`ELIFECYCLE Command failed` alone, or nothing) otherwise names nothing to fix.
 function failure_heading({ check, result }: PreDetachRun): string {
@@ -131,7 +137,7 @@ function failure_heading({ check, result }: PreDetachRun): string {
 			? 'no exit code (timed out or ended by a signal)'
 			: `exit code ${String(result.exit_code)}`
 
-	return `✗ ${check.list.join(' ')} — ${ending}`
+	return `${failure_prefix(check.list)}${ending}`
 }
 
 function failure_section(run: PreDetachRun): string {
@@ -169,6 +175,7 @@ const run_ship_pre_detach = {
 	PASSED,
 	STATIC_CHECKS,
 	checks,
+	failure_prefix,
 }
 
 export type { PreDetachCheck }
