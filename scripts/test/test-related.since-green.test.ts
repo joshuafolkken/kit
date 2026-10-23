@@ -29,8 +29,13 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
+// The reason is the real one, since the unmoved case below asserts the line it prints.
 vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(), read_moved_parts: vi.fn() },
+	since_green: {
+		UNMOVED_REASON: 'nothing moved since its last green run on this checkout',
+		describe: vi.fn(),
+		read_moved_parts: vi.fn(),
+	},
 }))
 
 const mocked_moved = vi.mocked(since_green.read_moved_parts)

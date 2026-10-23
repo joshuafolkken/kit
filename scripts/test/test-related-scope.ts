@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { test_declared_logic } from './test-declared-logic'
 import { test_read_map, type ReadMap } from './test-read-map'
@@ -53,7 +54,7 @@ const { WHOLE_SUITE_FILES } = whole_suite_files
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
-const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
+const { UNMOVED_REASON } = since_green
 const WHOLE_SUITE_SUFFIX = 'affects every test'
 const UNRECORDED_SUFFIX = 'is read by no recorded test'
 
