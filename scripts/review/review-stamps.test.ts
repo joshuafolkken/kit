@@ -5,8 +5,9 @@ import { verification_gate, type GateStepResult } from '#scripts/gate/verificati
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_stamps } from './review-stamps'
+import { review_tree } from './review-tree'
 
 // joshuafolkken/kit#1241: `josh gate` is the only thing that can honestly say the four checks passed,
 // and `josh review:brief` is what has to tell the forked review agent so. The record between them is
@@ -14,10 +15,10 @@ import { review_stamps } from './review-stamps'
 // every situation where it would be a lie, and that a temp-directory failure can never turn a green
 // gate red.
 //
-// Nothing here asserts on a record the gate wrote for itself: `record_green_gate` reads the tree
-// through git, and CI checks out a single branch at depth 1, so the read there answers differently
-// from a developer's checkout. The write is exercised through the stamp directly, and the gate is
-// exercised on the branches whose outcome is the same either way.
+// The tree `record_green_gate` reads is stubbed to an empty one (joshuafolkken/kit#4597): read
+// through git, it digested whatever this checkout's change held, and the test-read map recorded each
+// such path as read, so a later branch adding a file beside one ran the whole unit suite. The write
+// is exercised through the stamp directly, and the gate on the branches its guards decide.
 
 const FILE_A = 'a.ts'
 const STAMP_FILE = 'stamp.json'
@@ -27,8 +28,12 @@ const ABSENT_FILE = 'absent.json'
 const MISSING_DIRECTORY = 'missing'
 // A directory the suite fills, so a removal aimed at it cannot be forgiven by `force`.
 const OCCUPIED_DIRECTORY = 'occupied'
-// A path no checkout holds, so the comparison against the real tree can only differ.
+// A path the stubbed tree does not hold, so the comparison against it can only differ.
 const NEVER_ON_DISK = 'never-on-disk.ts'
+
+beforeEach(() => {
+	vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue({})
+})
 
 // The part of a stamp's file name after its prefix: the digest of the root it is keyed to.
 function key_of(stamp_path: string, prefix: string): string {

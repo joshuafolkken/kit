@@ -7,6 +7,7 @@ import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
+import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
 import { test_unit_guard } from './test-unit-guard'
@@ -52,6 +53,8 @@ const NAMING_SOURCE = path.join('scripts', 'test', 'test-related-main.ts')
 const SCOPE_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.test.ts')
 const NARROWING_LINE = 'since its last green run'
 const MAP_TREE = 'f00dcafe'
+const READER = path.join('scripts', 'review', 'review-tree.ts')
+const APPROVALS = path.join('.josh', 'metrics-accepted')
 const PRUNED_TREE = new Error('bad object')
 const NOT_A_REPOSITORY = new Error('not a git repository')
 
@@ -256,7 +259,8 @@ describe('test_related.run_related_tests — a test changed since the map', () =
 // joshuafolkken/kit#4572: a sync brought in `.josh/metrics-accepted/<N>.json`, which no recorded test
 // read, and the run went to the whole suite as if this branch had added it.
 describe('test_related.run_related_tests — a non-code file a main sync brought in', () => {
-	const accepted = path.join('.josh', 'metrics-accepted', '4527.json')
+	const accepted = path.join(APPROVALS, '4527.json')
+	const other_accepted = path.join(APPROVALS, '4516.json')
 
 	it('runs no test for it rather than the whole suite', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
@@ -267,7 +271,8 @@ describe('test_related.run_related_tests — a non-code file a main sync brought
 		expect(mocked_run).not.toHaveBeenCalled()
 	})
 
-	it('still runs the whole suite when this branch changed it too', async () => {
+	it('still runs the whole suite when this branch changed it too and a test read inside', async () => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [other_accepted]: [READER] }))
 		mocked_changed.mockResolvedValue([accepted])
 		mocked_moved.mockResolvedValue({ changed: [accepted], synced: [accepted] })
 
@@ -276,13 +281,43 @@ describe('test_related.run_related_tests — a non-code file a main sync brought
 		expect(vitest_arguments()).toEqual(['run'])
 	})
 
-	it('still runs the whole suite when the branch change cannot be read', async () => {
+	it('still runs the whole suite when the branch change cannot be read and a test read inside', async () => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [other_accepted]: [READER] }))
 		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
 		mocked_moved.mockResolvedValue({ changed: [], synced: [accepted] })
 
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toEqual(['run'])
+	})
+})
+
+// joshuafolkken/kit#4597: a lane child writes `.josh/metrics-accepted/<N>.json` on its own branch, into a
+// directory the release pruned from the map's tree, and the run went to the whole suite.
+describe('test_related.run_related_tests — a metrics approval file this branch added', () => {
+	const accepted = path.join(APPROVALS, '4597.json')
+	const metrics_reader = path.join('tools', 'metrics', 'metrics-base.ts')
+
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([accepted])
+		mocked_moved.mockResolvedValue(changed_only(accepted))
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
+	})
+
+	it('runs no test for it when no recorded test read inside its directory', async () => {
+		await test_related.run_related_tests([])
+
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+
+	it('runs the module that lists the approval directory rather than the whole suite', async () => {
+		const listing = test_read_trace.read_key(APPROVALS, 'listing')
+
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [listing]: [metrics_reader] }))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', absolute(metrics_reader), '--run'])
 	})
 })
 
