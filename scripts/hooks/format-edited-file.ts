@@ -444,15 +444,18 @@ function report_no_payload(): void {
 // its content before the formatters ran against its content after — so it too is known only once they
 // have. The rewrite, lint and spell blocks are composed together first, then
 // joined to the density line — one envelope, since a `PostToolUse` hook's stdout carries only one.
+// The spell check runs beside the formatters rather than after them, on the text as the edit left it:
+// it was the hook's largest step (joshuafolkken/kit#4596), and a formatter rewrites layout, not words.
 // A hook killed at its 15s timeout is the one case this loses the density
 // line to — a run already gone pathologically wrong, per HOOK_PROCESS_TIMEOUT_MS.
 async function run_hook(payload: string): Promise<void> {
 	const notice = time_density_hook.density_notice(payload)
 	const file_path = parse_edited_path(payload)
 	const before = rewrite_notice.read_text(file_path)
+	const pending_spelling = edited_cspell.spelling_diagnostics(file_path, process.cwd(), before)
 	const lint = await format_edited_payload(payload, process.cwd())
 	const rewrite = rewrite_notice.build(before, rewrite_notice.read_text(file_path))
-	const spelling = await edited_cspell.spelling_diagnostics(file_path, process.cwd())
+	const spelling = await pending_spelling
 	const parts = compose_context(rewrite, compose_context(lint, spelling))
 	const context = compose_context(notice, parts)
 
