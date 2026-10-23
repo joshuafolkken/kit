@@ -8,16 +8,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // never lists them, so the measurement adds them itself.
 
 vi.mock('#scripts/git/git-command', () => ({
-	git_command: { diff_main_numstat: vi.fn(), untracked_names: vi.fn() },
+	git_command: { diff_numstat_since: vi.fn(), untracked_names: vi.fn() },
 }))
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
+vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
 
+const { change_base } = await import('#scripts/git/change-base')
 const { git_command } = await import('#scripts/git/git-command')
 const { git_spawn } = await import('#scripts/git/git-spawn')
 const { split_measure } = await import('./split-measure')
 
 const NEW_FILE_COUNT = 11
 const NEW_FILE_LINES = 50
+const TREE_BASE = 'tree-base-commit'
 
 const fixture = { root: '' }
 
@@ -28,8 +31,9 @@ function lines_of(count: number): string {
 beforeEach(() => {
 	fixture.root = mkdtempSync(path.join(tmpdir(), 'split-measure-'))
 	vi.mocked(git_spawn.read).mockResolvedValue(`${fixture.root}\n`)
-	vi.mocked(git_command.diff_main_numstat).mockResolvedValue('')
+	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
+	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(TREE_BASE)
 })
 
 afterEach(async () => {
@@ -58,13 +62,29 @@ describe('read_branch', () => {
 	})
 
 	it('measures the tracked diff alone when nothing is untracked', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue('3\t2\tscripts/a.ts')
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue('3\t2\tscripts/a.ts')
 
 		expect(await split_measure.read_branch()).toStrictEqual({
 			files: 1,
 			lines: 5,
 			verdict: 'single',
 		})
+	})
+})
+
+// joshuafolkken/kit#4696: a merge stopped on a conflict holds the default branch's files in the tree,
+// so the diff is taken from the tree's base rather than `HEAD`'s.
+describe('read_branch base', () => {
+	it('measures the tracked diff from the base through a merge in progress', async () => {
+		await split_measure.read_branch()
+
+		expect(git_command.diff_numstat_since).toHaveBeenCalledWith(TREE_BASE)
+	})
+
+	it('rejects when the base cannot be resolved, so the diff reads as unmeasured', async () => {
+		vi.mocked(change_base.resolved_through_merge).mockResolvedValue(undefined)
+
+		await expect(split_measure.read_branch()).rejects.toThrow('change base')
 	})
 })
 
