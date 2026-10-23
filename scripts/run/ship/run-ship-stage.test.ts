@@ -32,8 +32,14 @@ describe('run_ship_stage.is_done — the gate', () => {
 		expect(run_ship_stage.is_done(STAGE.GATE, ALL, NOTHING)).toBe(false)
 	})
 
-	it('is passed over once its output, a commit, exists', () => {
-		expect(run_ship_stage.is_done(STAGE.GATE, NONE, COMMITTED)).toBe(true)
+	it('is passed over once its output, a pushed commit, exists', () => {
+		expect(run_ship_stage.is_done(STAGE.GATE, NONE, SHIPPED)).toBe(true)
+	})
+
+	// joshuafolkken/kit#4708: the sync stage's local commit precedes the gate, so it is not its output.
+	it('runs again over a commit not yet pushed', () => {
+		expect(run_ship_stage.is_done(STAGE.GATE, ALL, COMMITTED)).toBe(false)
+		expect(run_ship_stage.is_done(STAGE.SYNC, ALL, COMMITTED)).toBe(false)
 	})
 
 	it('is passed over once the pull request merged', () => {
@@ -304,9 +310,10 @@ describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, new Set([STAGE.REVIEW]), NOTHING)).toBe(false)
 	})
 
-	it('is passed over once a commit or a merge exists', () => {
-		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, COMMITTED)).toBe(true)
+	it('is passed over once a pushed commit or a merge exists, never on a commit alone', () => {
+		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, SHIPPED)).toBe(true)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, MERGED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.REVIEW, ALL, COMMITTED)).toBe(false)
 	})
 
 	it('runs again on a committed tree once the issue changed after its brief (joshuafolkken/kit#4221)', () => {
