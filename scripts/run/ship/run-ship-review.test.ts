@@ -14,6 +14,7 @@ const MEDIUM_FIXED = `fixed ${MEDIUM_OPEN}`
 const MEDIUM_KIND = 'bug-risks:medium'
 const MEDIUM_LOCATION = 'a.ts:3'
 const ISSUE = '3875'
+const SPECS = ['bug-risks:medium:b.ts']
 
 describe('run_ship_review.reviewer_prompt', () => {
 	it('is one launch-safe line naming the brief and the findings file', () => {
@@ -101,8 +102,6 @@ describe('run_ship_review.read_verdict — findings fixed in place', () => {
 })
 
 describe('run_ship_review — the two rounds route differently', () => {
-	const SPECS = ['bug-risks:medium:b.ts']
-
 	it.each([
 		[VERDICT.CLEAN, true],
 		[VERDICT.FIXED, true],
@@ -121,6 +120,44 @@ describe('run_ship_review — the two rounds route differently', () => {
 		const verdict = { kind, specs: SPECS, report: SPECS }
 
 		expect(run_ship_review.round_two_outcome(verdict).is_passing).toBe(is_passing)
+	})
+})
+
+// joshuafolkken/kit#4673: a fix of only the cited line left the same pattern for round 2 to stop on.
+describe('run_ship_review — every stop that hands findings back asks for the sweep', () => {
+	const BLOCKING = { kind: VERDICT.BLOCKING, specs: SPECS, report: SPECS }
+
+	it.each([
+		['round 1 blocking', run_ship_review.round_one_outcome(BLOCKING).note],
+		['round 1 fixes unverified', run_ship_review.UNVERIFIED_OUTCOME.note],
+		['round 2 blocking', run_ship_review.round_two_outcome(BLOCKING).note],
+	])('%s', (_name, note) => {
+		expect(note).toContain(run_ship_review.SWEEP_INSTRUCTION)
+	})
+
+	it('names the three ranges to search and the record to leave', () => {
+		const sweep = run_ship_review.SWEEP_INSTRUCTION
+
+		expect(sweep).toContain('the same file')
+		expect(sweep).toContain('callers of the same function')
+		expect(sweep).toContain('grep of the pattern')
+		expect(sweep).toContain('Issue fix comment')
+	})
+
+	it.each([
+		['reviewer', run_ship_review.reviewer_prompt],
+		['report', run_ship_review.report_prompt],
+		['verification', run_ship_review.verification_prompt],
+	])('the %s prompt asks a high or medium line for its other sites', (_name, prompt_of) => {
+		expect(prompt_of(BRIEF, FINDINGS, ISSUE)).toContain(run_ship_review.OTHER_SITES_CLAUSE)
+	})
+
+	it('leaves a passing round without the sweep', () => {
+		const clean = { kind: VERDICT.CLEAN, specs: [], report: [] }
+
+		expect(run_ship_review.round_one_outcome(clean).note).not.toContain(
+			run_ship_review.SWEEP_INSTRUCTION,
+		)
 	})
 })
 

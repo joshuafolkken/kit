@@ -250,6 +250,9 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 // The rows that cannot declare a compliance call, in enumeration order — asserted below.
 const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'third-party-write',
+	// Not publishing a credential is the absence of a call, and the body file a past call named may
+	// be gone by the time its transcript is scored.
+	'credential-body',
 	FILING_CAP_ID,
 	'raw-field-body',
 	'test-declared',

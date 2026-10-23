@@ -1,4 +1,5 @@
 // cspell:words xoxb xoxp xapp xoxa xoxo xoxr
+import { json_value } from './json-value'
 
 // The credential shapes a body kit sends out is refused for, and the run board hides. **One list, read
 // in-process**: every outbound body passes through here, so a regex costs microseconds where a
@@ -59,6 +60,11 @@ function find(text: string): TokenShape | undefined {
 	return SHAPES.find((shape) => shape.pattern.test(text))
 }
 
+// Whether `text` holds any shape — `find`'s test without the shape it names.
+function holds(text: string): boolean {
+	return SHAPES.some((shape) => shape.pattern.test(text))
+}
+
 // Throws when `text` holds a credential, naming the shape and never the value: `subject` is what was
 // about to be sent, so the refusal says which send stopped.
 function refuse(text: string, subject: string): void {
@@ -74,7 +80,32 @@ function redact(text: string): string {
 	return text.replaceAll(EVERY_SHAPE, () => REDACTED)
 }
 
-const token_shape = { ANTHROPIC_OAUTH_TOKEN, REDACTED, SHAPES, find, refuse, redact }
+// A JSON-encoded body puts a token starting a line after the `n` of an escaped newline, and the
+// shapes' "no letter before it" guard reads that `n` as a letter. So a body is scanned as the strings
+// its JSON decodes to — what GitHub stores — and as raw text only when it is not JSON.
+function string_leaves(value: unknown): Array<string> {
+	if (typeof value === 'string') return [value]
+	if (typeof value !== 'object' || value === null) return []
+
+	return Object.values(value).flatMap((entry: unknown) => string_leaves(entry))
+}
+
+function decoded(body: string): string {
+	const value = json_value.parse_or_undefined(body)
+
+	return value === undefined ? body : string_leaves(value).join('\n')
+}
+
+const token_shape = {
+	ANTHROPIC_OAUTH_TOKEN,
+	REDACTED,
+	SHAPES,
+	decoded,
+	find,
+	holds,
+	refuse,
+	redact,
+}
 
 export { token_shape }
 export type { TokenShape }
