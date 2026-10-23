@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
@@ -9,6 +9,7 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
@@ -203,19 +204,6 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 	)
 }
 
-function text_of(file_path: string): string {
-	try {
-		return readFileSync(file_path, 'utf8')
-	} catch {
-		return ''
-	}
-}
-
-// Each file's text is read once, however many names it is checked for.
-function names_any(text: string, names: ReadonlyArray<string>): boolean {
-	return names.some((name) => text.includes(name))
-}
-
 // **The code files of the change since the map that name a file this change moved** — read off their
 // text, the one place a file-system read added since the map's tree shows (`is_code_input` in
 // `test-related-scope.ts`, joshuafolkken/kit#4532). A file the tree no longer holds names nothing.
@@ -226,7 +214,12 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 		.map((file) => path.basename(file))
 	const code = since_map.filter((file) => related_scope.is_relatable(file))
 
-	return new Set(code.filter((file) => names_any(text_of(path.join(root, file)), names)))
+	// Each file's text is read once, however many names it is checked for.
+	return new Set(
+		code.filter((file) =>
+			test_no_base.names_any(test_no_base.text_of(path.join(root, file)), names),
+		),
+	)
 }
 
 async function scope_of(root: string, change: ChangeReading): Promise<RelatedScope> {
@@ -319,6 +312,24 @@ async function run_and_record(
 	return exit_code
 }
 
+// **The no-base pass is part of the run's verdict**, so a green record — the one `josh ship` and the
+// gate reuse — never vouches for a tree whose base-touching code fails in CI's checkout. It runs
+// only after a green first pass (`test-no-base.ts`), and only over this branch's own files: those
+// the map's tree or a main sync joined were verified by main's CI.
+async function with_no_base_pass(
+	input: RunInput,
+	command_arguments: ReadonlyArray<string>,
+	exit_code: number,
+): Promise<number> {
+	if (exit_code !== 0) return exit_code
+
+	const flags = changed_file_scope.flags_of(command_arguments)
+	const joined = new Set([...input.since_map, ...input.synced])
+	const own = (input.changed ?? []).filter((file) => !joined.has(file))
+
+	return await test_no_base.run_if_touched(input.root, own, flags)
+}
+
 async function run_related_tests(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const input = await read_run_input(root, command_arguments)
@@ -332,7 +343,11 @@ async function run_related_tests(command_arguments: ReadonlyArray<string>): Prom
 	)
 
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await run_and_record(input, command_arguments)
+	const exit_code = await with_no_base_pass(
+		input,
+		command_arguments,
+		await run_and_record(input, command_arguments),
+	)
 
 	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
 		before: conclusive_tree(before),
