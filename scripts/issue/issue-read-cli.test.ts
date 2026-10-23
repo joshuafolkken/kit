@@ -115,9 +115,21 @@ describe('issue_read_cli.read_block — the trust it carries', () => {
 		})
 	})
 
-	it('reports no trusted comment when the listing could not be read', async () => {
+	// joshuafolkken/kit#4703: a listing nobody read answers nothing, so `run:entry` names the failed read.
+	it('leaves the trusted comment unanswered when the listing could not be read', async () => {
 		classified_mock.mockResolvedValue(READ)
 		comments_mock.mockResolvedValue(undefined)
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({ trust: { has_trusted_comment: undefined } })
+	})
+
+	it('reports no trusted comment when every comment was read and none is trusted', async () => {
+		const untrusted = [{ user: { login: 'stranger' }, author_association: 'NONE', body: 'x' }]
+
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(JSON.stringify(untrusted))
 
 		const block = await issue_read_cli.read_block(ISSUE)
 

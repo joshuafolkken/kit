@@ -45,10 +45,11 @@ type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailu
 // and the dependency-update scope. It reuses this file's read and the shared
 // `format_issue` rather than reproducing either, so the two `gh` reads and the block shape stay
 // single-sourced here. `trust` carries what the read already decided about its authors, so
-// `run:entry` gates an untrusted issue without a second read (joshuafolkken/kit#4663).
+// `run:entry` gates an untrusted issue without a second read (joshuafolkken/kit#4663). `undefined` is
+// a read that failed — a write-access lookup, or the comment listing — never an untrusted author (#4703).
 interface BlockTrust {
-	is_body_trusted: boolean
-	has_trusted_comment: boolean
+	is_body_trusted: boolean | undefined
+	has_trusted_comment: boolean | undefined
 }
 
 type BlockRead = { kind: 'ok'; block: string; trust: BlockTrust } | { kind: ReadFailureKind }
@@ -91,6 +92,20 @@ async function read_issue(issue_number: string): Promise<NumberResult> {
 	return { kind: 'issue', content: { fields, comments } }
 }
 
+// A trusted comment is an answer whatever else failed; without one, a listing or a lookup that failed
+// leaves the question unanswered rather than answered no.
+function has_trusted_comment(
+	comments: ReadonlyArray<IssueComment> | undefined,
+): boolean | undefined {
+	if (comments?.some((comment) => comment.is_trusted === true) === true) return true
+
+	if (comments === undefined || comments.some((comment) => comment.is_trusted === undefined)) {
+		return undefined
+	}
+
+	return false
+}
+
 // One issue's block for a caller that wants the text rather than the printing — `run:prep` composes it
 // with the state block and the dependency-update line. A failed read is returned as its kind, never as
 // an empty block, so `issue-comments.md`'s "a comment nobody read cannot win anything" holds through the bundle too.
@@ -102,7 +117,7 @@ async function read_block(issue_number: string): Promise<BlockRead> {
 	const { fields, comments } = result.content
 	const trust = {
 		is_body_trusted: fields.is_body_trusted,
-		has_trusted_comment: issue_read.trusted_bodies(comments ?? []).length > 0,
+		has_trusted_comment: has_trusted_comment(comments),
 	}
 
 	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments), trust }

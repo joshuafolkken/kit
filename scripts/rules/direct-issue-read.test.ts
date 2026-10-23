@@ -1,14 +1,32 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { direct_issue_read } from './direct-issue-read'
 
-// joshuafolkken/kit#4663: a `gh api` read of one issue or its comments prints an untrusted author's
-// text whole, where `pnpm josh issue:read` withholds it. The refused set is a GET of the checkout's
-// own `…/issues/<N>` or `…/issues/<N>/comments`; the silent set is the josh reads, a projection that
-// leaves the body out, writes, other endpoints and another repository named outright.
+vi.mock('#scripts/issue/session-cite', () => ({
+	session_cite: { session_repo: (): string => 'joshuafolkken/kit' },
+}))
+
+// joshuafolkken/kit#4663, #4703: a `gh api` or `gh issue view` read of one issue or its comments
+// prints an untrusted author's text whole, where `pnpm josh issue:read` withholds it. The refused set
+// is a read of the checkout's own `…/issues/<N>`, its comments or its timeline, under the placeholder
+// or spelled out; the silent set is the josh reads, a projection that leaves the body out, writes,
+// other endpoints and another repository named outright.
 
 describe('direct_issue_read.is_direct_issue_read — refuses', () => {
 	it.each([
+		'gh api repos/joshuafolkken/kit/issues/4663/comments',
+		'gh api repos/JoshuaFolkken/Kit/issues/4663',
+		'gh api repos/{owner}/{repo}/issues/4663/timeline',
+		'gh issue view 4663',
+		'gh issue view 4663 --comments',
+		'gh issue view 4663 --json body,comments',
+		'gh issue view 4663 --json comments',
+		'gh issue view 4663 --json=comments',
+		'gh issue view 4663 --json=title,comments',
+		'gh issue view 4663 -R joshuafolkken/kit --comments',
+		'gh issue view 4663 -R github.com/joshuafolkken/kit --comments',
+		'gh --repo joshuafolkken/kit issue view 4663 --comments',
+		'gh issue view https://github.com/joshuafolkken/kit/issues/4663 --comments',
 		'gh api repos/{owner}/{repo}/issues/4663',
 		'gh api repos/{owner}/{repo}/issues/4663/comments',
 		'gh api repos/:owner/:repo/issues/4663/comments --paginate',
@@ -39,6 +57,13 @@ describe('direct_issue_read.is_direct_issue_read — is silent on', () => {
 		'gh api repos/{owner}/{repo}/issues',
 		'gh api repos/{owner}/{repo}/pulls/5/comments',
 		'gh api repos/joshuafolkken/other/issues/5/comments',
+		"gh api repos/{owner}/{repo}/issues/4663/timeline --jq '.[].event'",
+		'gh issue view 4663 --json state,labels',
+		'gh issue view 4663 --repo joshuafolkken/other --comments',
+		'gh issue view https://github.com/sveltejs/kit/issues/123 --comments',
+		'gh issue view 4663 --web',
+		'gh issue view --help',
+		'gh pr view 5 --comments',
 		'gh api --help repos/{owner}/{repo}/issues/5',
 		'echo "gh api repos/{owner}/{repo}/issues/4663"',
 	])('is silent on %j', (command) => {
