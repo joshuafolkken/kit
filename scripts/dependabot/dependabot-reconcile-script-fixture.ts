@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { WorkflowStep } from '#scripts/ci/ci-yml-fixture'
 import { expect } from 'vitest'
 import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 
@@ -55,6 +56,8 @@ interface Case {
 	fail_comments?: number
 	expect_failure?: boolean
 	posted_notice?: string
+	/** What the state read prints instead of `is_armed`, for a step whose query asks something else. */
+	state_answer?: string
 }
 
 // What the reconciling script did: which direction it took, and what it said about why.
@@ -67,14 +70,16 @@ function remove_workspace(): void {
 	rmSync(workspace, { recursive: true, force: true })
 }
 
-// The reconciling step's own `env`, minus the entries GitHub would have expanded. Taking the retry
-// count from the workflow rather than restating it here keeps the cases honest about what a runner
-// actually does.
-function literal_step_environment(): Record<string, string> {
+// A step's own `env` — the reconciling step's unless another is named — minus the entries GitHub
+// would have expanded. Taking the retry count from the workflow rather than restating it here keeps
+// the cases honest about what a runner actually does.
+function literal_step_environment(
+	step: WorkflowStep | undefined = find_step(template_job(), RECONCILE_STEP_ID),
+): Record<string, string> {
 	// Typed as unknown on purpose: an unquoted `RETRY_ATTEMPTS: 3` parses as a number, and calling a
 	// string method on it would take the whole suite down with a `TypeError` rather than report that
 	// the workflow declared something these guards cannot read.
-	const declared: Record<string, unknown> = find_step(template_job(), RECONCILE_STEP_ID)?.env ?? {}
+	const declared: Record<string, unknown> = step?.env ?? {}
 
 	return Object.fromEntries(
 		Object.entries(declared)
@@ -85,8 +90,8 @@ function literal_step_environment(): Record<string, string> {
 
 // Refused rather than coerced: `Number(undefined)` is `NaN`, which the stub would interpolate as the
 // string `NaN` and then never fail a call, so every retry case would pass without retrying anything.
-function withdraw_attempts(): number {
-	const declared = Number(literal_step_environment()['RETRY_ATTEMPTS'])
+function withdraw_attempts(step?: WorkflowStep): number {
+	const declared = Number(literal_step_environment(step)['RETRY_ATTEMPTS'])
 
 	if (!Number.isSafeInteger(declared)) {
 		throw new TypeError('the reconciling step declares no RETRY_ATTEMPTS')
@@ -149,6 +154,10 @@ function directions_taken(): string {
 // Answers `gh pr view` with the armed state the case describes, records every call so the assertion
 // can name which direction the script took, and fails the first `fail_reads` / `fail_merges` of each
 // so a case can model an API that is briefly, or lastingly, unavailable.
+function state_answer(scenario: Case): string {
+	return scenario.state_answer ?? String(scenario.is_armed)
+}
+
 // How the stub answers `gh pr view`, for the armed state and for the standing-notice lookup. A read
 // outage is an outage of the call, whatever it was asked for — the two go through the same API — so
 // `fail_reads` counts them together, which is why the dedup cannot help when the state read is what
@@ -171,7 +180,7 @@ function stub_reads(scenario: Case, reads: string): Array<string> {
 		`  echo x >>"${states}"`,
 		`  [ "$(wc -l <"${states}")" -le ${String(scenario.fail_state_reads ?? 0)} ] && exit 1`,
 		`  [ "$(wc -l <"${states}")" -ge ${String(scenario.fail_state_reads_from ?? LASTING_OUTAGE)} ] && exit 1`,
-		`  echo '${String(scenario.is_armed)}'`,
+		`  echo '${state_answer(scenario)}'`,
 		'  exit 0',
 		'fi',
 	]
@@ -240,20 +249,20 @@ function write_gh_stub(scenario: Case): string {
 	return bin
 }
 
-function run_reconcile(scenario: Case): Outcome {
-	const bin = write_gh_stub(scenario)
-	const script = step_run(find_step(template_job(), RECONCILE_STEP_ID))
+// Runs any step's script against the stub, so kit's own withdrawal step is exercised by the same
+// `gh` the reconciling step is. A renamed step yields the empty script, which bash runs happily and
+// which would make every "does nothing" case pass without testing anything — hence the check.
+function run_step(step: WorkflowStep | undefined, scenario: Case): Outcome {
+	const script = step_run(step)
 
-	// A renamed step yields the empty script, which bash runs happily and which would make every
-	// "does nothing" case pass without testing anything.
-	expect(script).toContain(MERGE_COMMAND)
 	expect(script).toContain(WITHDRAW_COMMAND)
 
+	const bin = write_gh_stub(scenario)
 	const result = spawnSync('bash', ['-e', '-c', script], {
 		encoding: 'utf8',
 		env: {
 			...process.env,
-			...literal_step_environment(),
+			...literal_step_environment(step),
 			PATH: `${bin}:${process.env['PATH'] ?? ''}`,
 			[DECISION_VARIABLE]: scenario.should_be_armed,
 			[ENTITLEMENT_VARIABLE]: scenario.may_arm,
@@ -269,6 +278,14 @@ function run_reconcile(scenario: Case): Outcome {
 	expect(result.status === 0).toBe(scenario.expect_failure !== true)
 
 	return { direction: directions_taken(), stderr: result.stderr }
+}
+
+function run_reconcile(scenario: Case): Outcome {
+	const step = find_step(template_job(), RECONCILE_STEP_ID)
+
+	expect(step_run(step)).toContain(MERGE_COMMAND)
+
+	return run_step(step, scenario)
 }
 
 const reconcile_script_fixture = {
@@ -292,6 +309,7 @@ const reconcile_script_fixture = {
 	posted_body,
 	remove_workspace,
 	run_reconcile,
+	run_step,
 	withdraw_attempts,
 }
 
