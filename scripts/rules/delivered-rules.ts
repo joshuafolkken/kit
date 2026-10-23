@@ -13,6 +13,7 @@ import { file_body } from './file-body'
 import { filing_cap } from './filing-cap'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
+import { investigator_foreground } from './investigator-foreground'
 import { issue_comments } from './issue-comments'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
@@ -221,6 +222,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_park.ROW,
 	lane_interactive_ask.ROW,
 	agent_model.ROW,
+	investigator_foreground.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first

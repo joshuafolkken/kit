@@ -62,6 +62,6 @@ const ROW = {
 	},
 }
 
-const agent_model = { AGENT_MODEL_REASON, ROW, is_unnamed_model }
+const agent_model = { AGENT_MODEL_REASON, ROW, SUBAGENT_TOOLS, is_unnamed_model }
 
 export { agent_model }

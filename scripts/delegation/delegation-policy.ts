@@ -46,7 +46,7 @@ const INVESTIGATOR_AGENT = 'investigator'
 // them, so a run told the step up front is told the same step the refusal would name.
 const INVESTIGATION_LIMIT = `${String(INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit`
 // Only the dispatch resets the count, so the step names no `josh delegate` call before it (#4345).
-const INVESTIGATION_STEP = `Dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text.`
+const INVESTIGATION_STEP = `Dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with \`run_in_background: false\`; it returns \`file:line\` citations, never the file text.`
 
 // The enumeration. Short on purpose: every entry had to name a verifier, and most candidates could
 // not (below).

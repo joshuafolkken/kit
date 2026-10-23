@@ -212,15 +212,20 @@ function apply_search(searches: Map<string, number>, span: Span): void {
 	if (is_read_only_search(span) && !searches.has(turn)) searches.set(turn, span.ended_ms)
 }
 
+// A refused dispatch (`investigator-foreground`, `agent-model`) ran no unit, so it resets nothing.
+function is_delegation(span: Span): boolean {
+	return DELEGATION_TOOLS.has(span.label) && !is_failed_outcome(span)
+}
+
 function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<string>): void {
-	if (DELEGATION_TOOLS.has(span.label)) {
+	if (is_failed_outcome(span)) return
+
+	if (is_delegation(span)) {
 		accumulation.pending.clear()
 		accumulation.searches.clear()
 
 		return
 	}
-
-	if (is_failed_outcome(span)) return
 
 	apply_search(accumulation.searches, span)
 
@@ -232,7 +237,7 @@ function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {
-	return delegation_instant(spans.findLast((span) => DELEGATION_TOOLS.has(span.label)))
+	return delegation_instant(spans.findLast((span) => is_delegation(span)))
 }
 
 // The window is the tail the hook read; the set clears at every delegation, so the tail suffices.
