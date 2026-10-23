@@ -1,24 +1,19 @@
-// The bare-`#N` predicate behind the `issue-citation` row of the stop guard,
-// and the printing-side formatter that keeps a bare `#N` out of session-facing output in the first
-// place.
+// The printing-side formatter that keeps a bare `#N` out of session-facing output, and the bare-`#N`
+// predicate it is checked against.
 //
 // **Session-facing output cites an Issue as a number-link, never a bare `#N`.** `CLAUDE.md` and
 // `prompts/collaboration-workflow/issue-citation.md` require `[#<N>](https://github.com/<owner>/<repo>/issues/<N>) — <short summary>`
 // in what the person reads: a bare `#123` is not clickable and does not say which repository's Issue
-// it is. The stop guard reads `last_assistant_message` — the turn's session-facing text — and this
-// predicate answers whether a bare number slipped into it.
+// it is.
 //
-// **It blocks the stop, so a false positive costs a wasted turn**. The nudge
-// now reaches the model rather than the person, so the detection is tightened to what is genuinely a
-// bare citation: a `#N` inside a fenced code block, inside an inline-code span, on a quote line, or
-// right after `PR` / `pull request` is not a citation slip and is skipped. The scan is line-based so
-// each exclusion is decided from the one line the mention sits on.
+// **The detection is what is genuinely a bare citation**: a `#N` inside a fenced code block, inside an
+// inline-code span, on a quote line, or right after `PR` / `pull request` is not a citation slip and is
+// skipped. The scan is line-based so each exclusion is decided from the one line the mention sits on.
 //
-// **`linkify` runs that same scan the other way**: a command whose stdout a
-// run copies into its reply passes the text through it, and every bare `#N` the predicate would flag
-// is rewritten to `[#N](url)` — which the predicate then reads as linked, so the material that fed the
-// duplicate reply is fixed where it is printed rather than scolded after it reaches the screen. The
-// same exclusions hold, so a `#N` in a fenced example or an already-linked reference is left untouched.
+// **`linkify` runs that same scan the other way**: a command whose stdout a run copies into its reply
+// passes the text through it, and every bare `#N` the predicate would flag is rewritten to `[#N](url)`
+// — which the predicate then reads as linked, so the reference is fixed where it is printed. The same
+// exclusions hold, so a `#N` in a fenced example or an already-linked reference is left untouched.
 
 import { issue_cite } from '#scripts/issue/issue-cite'
 
@@ -31,8 +26,8 @@ const ISSUE_NUMBER = /#\d+/gu
 // scan stays linear.
 const REFERENCE_BOUNDARY = /[\s#()[\]<>|]/u
 // A well-formed `owner/repo`: exactly one slash between two non-empty segments — the same shape
-// `issue:cite`'s parser accepts. A path-like run (`src/lib`, `a/b/c`) is not one, so it is not emitted
-// as a prefix that would make the suggested `issue:cite` call refuse the very reference it names.
+// `issue:cite`'s parser accepts. A path-like run (`src/lib`, `a/b/c`) is not one, so it is not linked
+// as a repository.
 const OWNER_REPO = /^[^\s/#]+\/[^\s/#]+$/u
 // A markdown link: `[text](target)`. Each class excludes *both* of its delimiters — no `[`/`]` in the
 // text, no `(`/`)` in the target — so neither star is ambiguous against a nested bracket and there is
@@ -94,11 +89,6 @@ function lead_token(message: string, hash_index: number): string {
 	return message.slice(start, hash_index)
 }
 
-// **The message text alone, never a GitHub-bound artifact.** An Issue body or comment is passed to
-// `gh` as a `Bash` argument, not spoken in `last_assistant_message`, so those never reach here — which
-// is exactly the "silent on GitHub-bound artifacts" behavior the issue asks for, obtained by what the
-// stop guard reads rather than by a second exclusion here.
-//
 // The `owner/repo` written immediately before a `#N`, or '' when the mention is bare — the run of
 // non-boundary characters ending at the `#`, kept only when it holds a `/`. Read backwards a
 // character at a time so a repository name of any length costs its own length and no more.
@@ -184,10 +174,9 @@ function prose_lines(message: string): ReadonlyArray<string> {
 	return lines_outside_fences(message).filter((line) => !QUOTE_LINE.test(line))
 }
 
-// The bare references in the message, in the order they appear and de-duplicated: the block reason
-// names them and turns them into `issue:cite` arguments, so a reference cited twice is not nudged
-// about twice. Fenced-code blocks and quote lines are skipped, so a `#N` shown in an example or quoted
-// from an Issue body is not read as the run's own citation.
+// The bare references in the message, in the order they appear and de-duplicated. Fenced-code blocks
+// and quote lines are skipped, so a `#N` shown in an example or quoted from an Issue body is not read
+// as the run's own citation.
 function bare_references(message: string): ReadonlyArray<string> {
 	const found: Array<string> = []
 
@@ -196,40 +185,8 @@ function bare_references(message: string): ReadonlyArray<string> {
 	return [...new Set(found)]
 }
 
-// Every reference the prompt carries, each as written — `#N` or `owner/repo#N` — with none of the
-// citation exclusions applied: a number pasted inside a fence or a quote is still the person's.
-function prompt_references(prompt: string): ReadonlySet<string> {
-	const found = new Set<string>()
-
-	for (const match of prompt.matchAll(ISSUE_NUMBER)) {
-		found.add(repo_prefix(prompt, match.index) + match[0])
-	}
-
-	return found
-}
-
-// **A number the person's prompt already carried is quoted, not cited**. A
-// pasted log from another repository holds its own `#1`…`#7`; `issue:cite` would link them to this
-// repository's unrelated Issues, so following the refusal would make the reply wrong. Only the exact
-// reference the prompt wrote is exempt, so a bare `#N` the run brought in itself is still refused.
-function unquoted_references(message: string, prompt: string): ReadonlyArray<string> {
-	const quoted = prompt_references(prompt)
-
-	return bare_references(message).filter((reference) => !quoted.has(reference))
-}
-
 function has_bare_reference(message: string): boolean {
 	return bare_references(message).length > 0
-}
-
-// The token `issue:cite` takes for one reference: a qualified `owner/repo#N` is passed as-is, a bare
-// `#N` loses its `#` so the command reads `issue:cite 123` rather than `issue:cite #123`.
-function cite_argument(reference: string): string {
-	return reference.startsWith('#') ? reference.slice(1) : reference
-}
-
-function cite_arguments(references: ReadonlyArray<string>): ReadonlyArray<string> {
-	return references.map((reference) => cite_argument(reference))
 }
 
 // One bare reference rewritten as a number-link: `[#N](url)` for a same-repo mention, or
@@ -286,11 +243,9 @@ function linkify(message: string, slug: string): string {
 
 const issue_citation = {
 	bare_references,
-	cite_arguments,
 	has_bare_reference,
 	linkify,
 	prose_lines,
-	unquoted_references,
 }
 
 export { issue_citation }

@@ -350,12 +350,6 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		expect(action_kinds({ ...pending, ...HELD_DECISION })).toEqual(['notify'])
 	})
 
-	it('still cites a bare issue number while a subagent runs', () => {
-		const pending = { background_pending: true, agent_pending: true }
-
-		expect(action_kinds({ ...pending, hold_issue: '7', message: 'See #2774.' })).toEqual(['cite'])
-	})
-
 	it('honours the loop-breaker', () => {
 		const repeated = context({ lane_child: true, background_pending: true, stop_hook_active: true })
 

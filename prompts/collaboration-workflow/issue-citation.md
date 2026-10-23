@@ -20,7 +20,3 @@
 ### 英語固定の 3 つとは衝突しない
 
 要約はタイトルではなくセッション内の散文なので、`overview.md` →「出力の言語（`JOSH_SESSION_LANG`）」の英語固定とは矛盾しない。
-
-### 停止時の担保（joshuafolkken/kit#2247）
-
-裸の `#N` は `pnpm josh stop:guard` が引用行にする。差し戻されたら、その実行形で引用し直す（[docs/josh-commands.md](https://github.com/joshuafolkken/kit/blob/main/docs/josh-commands.md) の `josh stop:guard`）。

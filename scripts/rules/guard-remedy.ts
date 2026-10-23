@@ -28,8 +28,6 @@ const NO_RUN = "the call must not run at all, or only on a person's word — ref
 // The `Stop` rows that already run their step: each blocks only on the case the hook cannot finish.
 const STOP_NOTIFY = 'the hook sends the notify itself; it blocks only when the send fails'
 const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when that release fails'
-const ISSUE_CITATION =
-	'the hook prints the citation lines itself; it blocks only on a number it cannot cite'
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
 
 function rewrite(): GuardRemedy {
@@ -86,7 +84,6 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'protected-file': judgment(NO_RUN),
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),
-	'issue-citation': judgment(ISSUE_CITATION),
 	'filing-offer': judgment(FILING_OFFER),
 	'hold-release': judgment(HOLD_RELEASE),
 }

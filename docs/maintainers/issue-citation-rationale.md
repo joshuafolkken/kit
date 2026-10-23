@@ -21,7 +21,7 @@ The correct form needs a round trip to fetch each title, which is why mentions f
 ## Why josh prints the citation form itself
 
 A run copies josh's own output — a warning, a progress line, a refusal — into its reply verbatim, so a
-bare `#N` printed by josh became a bare `#N` the Stop hook sent back (joshuafolkken/kit#3424). An Issue
+bare `#N` printed by josh became a bare `#N` in the reply (joshuafolkken/kit#3424). An Issue
 number therefore reaches a string only through `issue_cite`: `session_cite.issue` links it for what a
 session reads, using a title only when the caller already holds one and the repository from the work
 tree's `origin` rather than a `gh` call, and `issue_cite.plain` keeps `#N` for what GitHub renders or a
@@ -39,11 +39,10 @@ The rule fires the moment session output is about to name an Issue number, which
 no workflow skill has been loaded. So the trigger and the format stay in `CLAUDE.md`'s Communication
 section, short, and the body lives in the topic file.
 
-## How the Stop hook delivers it
+## Why the Stop hook does not enforce it
 
-The hook prints the citation lines itself, through the same `issue_cite_cli.cite` that `josh issue:cite`
-runs, as a `systemMessage` the person sees under the reply (joshuafolkken/kit#3919). A refusal cost a
-whole model turn to run a command whose arguments the hook already had. Only when a number cannot be
-cited does it fall back to `{"decision":"block"}` — the only path by which a `Stop` hook can hand text
-back to the model — naming the `issue:cite` call; `stop_hook_active` breaks the loop, so even a false
-positive stalls for at most one turn (joshuafolkken/kit#2247).
+The `Stop` hook once printed the citation lines for a bare `#N` in the reply (joshuafolkken/kit#3919),
+and before that sent the reply back (joshuafolkken/kit#2247). The owner judged that output unwanted:
+it repeated what the reply already said, and the chat renders the reply's own links correctly
+(joshuafolkken/kit#4626). The rule is carried by the resident trigger and by josh printing the citation
+form itself; the hook adds nothing.

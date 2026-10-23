@@ -26,7 +26,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |
 | `josh refactor:scan` | — | automation | processes | List refactoring candidates in the changed scope by category and answer clear/candidates |
 | `josh session:lang` | — | automation | none | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing) |
-| `josh stop:guard` | — | automation | none | Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin) |
+| `josh stop:guard` | — | automation | none | Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin) |
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
 | `josh test:declared` · `josh td` | `[--match]` | developer | processes | Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin |
 | `josh test:e2e` · `josh te` | `[filters...]` | developer | processes | Run E2E tests with Playwright (skips when absent or no e2e files) |
@@ -170,6 +170,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
 | `josh lane:stats` · `josh lst` | `--period <days> [--limit <lane-limit>]` | maintainer | none | Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last |
+| `josh lane:value` · `josh lva` | `<metric> --since <instant>` | maintainer | none | Print one lane measurement since an instant as a single number: lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit) |
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure |
 | `josh oracle:list` | — | automation | none | Print the decision oracles — commands that answer a rule question mechanically |
 | `josh pkg:scout` | `<keywords> [--size <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |

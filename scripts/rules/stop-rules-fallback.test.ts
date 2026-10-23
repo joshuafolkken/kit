@@ -24,22 +24,9 @@ describe('stop_rules.fallback_reason', () => {
 		)
 	})
 
-	it('names the bare numbers and the issue:cite call for a citation', () => {
-		const reason = stop_rules.fallback_reason({
-			kind: 'cite',
-			references: ['#123', 'joshuafolkken/kit#45'],
-		})
-
-		expect(reason).toContain('#123, joshuafolkken/kit#45')
-		expect(reason).toContain('pnpm josh issue:cite 123 joshuafolkken/kit#45')
-		expect(reason).toContain('issue-citation.md')
-	})
-
-	// joshuafolkken/kit#2329: the fix follows the bare copy as a correction, not a reprint of the reply.
+	// joshuafolkken/kit#2329: the fix follows the stop as a correction, not a reprint of the reply.
 	it('asks for the correction alone, not the whole reply reissued', () => {
-		const reason = stop_rules.fallback_reason({ kind: 'cite', references: ['#7'] })
-
-		expect(reason).toContain(NO_REPRINT)
+		expect(stop_rules.fallback_reason({ kind: 'release', issue: '7' })).toContain(NO_REPRINT)
 	})
 })
 

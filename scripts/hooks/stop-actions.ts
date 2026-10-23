@@ -1,12 +1,10 @@
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { issue_cite_cli } from '#scripts/issue/issue-cite-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
-import { issue_citation } from '#scripts/rules/issue-citation'
 import { stop_rules, type StopAction, type StopOutcome } from '#scripts/rules/stop-rules'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
@@ -15,9 +13,8 @@ import { run_hold_session } from '#scripts/run/hold/run-hold-session'
 type NotifyAction = Extract<StopAction, { kind: 'notify' }>
 
 // The `Stop` hook running the operations whose answer is fixed (joshuafolkken/kit#3919): the
-// `confirmation` notify, the hold release and the citation lines, through the very calls
-// `josh notify`, `josh run:release` and `josh issue:cite` make — in process, since three `pnpm`
-// launches would spend most of the hook's 20-second budget. What each did reaches the person as a
+// `confirmation` notify and the hold release, through the very calls `josh notify` and
+// `josh run:release` make — in process, since two `pnpm` launches would spend most of the hook's 20-second budget. What each did reaches the person as a
 // `systemMessage`; one that did not take falls back to the refusal it replaced (`stop_rules.fallback_reason`).
 
 const SUCCESS_EXIT_CODE = 0
@@ -109,20 +106,11 @@ async function release(issue: string): Promise<string | undefined> {
 	return code === SUCCESS_EXIT_CODE ? '🔓 stop:guard released the run:hold record.' : undefined
 }
 
-// Every line or none: a citation with a number missing is the half-fix the refusal exists to avoid.
-async function cite(references: ReadonlyArray<string>): Promise<string | undefined> {
-	const cited = await issue_cite_cli.cite(issue_citation.cite_arguments(references))
-	if (cited === undefined || cited.failures.length > 0) return undefined
-
-	return ['Issue citations:', ...cited.lines].join(NOTICE_SEPARATOR)
-}
-
 // An action's line for the person, or `undefined` when it did not take.
 async function run_action(action: StopAction): Promise<string | undefined> {
 	if (action.kind === 'notify') return await notify(action)
-	if (action.kind === 'release') return await release(action.issue)
 
-	return await cite(action.references)
+	return await release(action.issue)
 }
 
 // A throw is an action that did not take, the same as one that answered it had failed.

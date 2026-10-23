@@ -22,6 +22,7 @@ import { lane_stop_stats } from './lane-stop-stats'
 import { lane_test_related_stats } from './lane-test-related-stats'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
+import { lane_value } from './lane-value'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
 //
@@ -37,13 +38,18 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const SAMPLE_VERB = 'sample'
 const STATS_VERB = 'stats'
+const VALUE_VERB = 'value'
+// A value keeps two decimals: seconds, minutes and per-lane counts read at that grain.
+const VALUE_DIGITS = 2
 const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
+	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 ].join('\n')
 
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
 const STATS_OPTIONS = { period: { type: 'string' }, limit: { type: 'string' } } as const
+const VALUE_OPTIONS = { since: { type: 'string' } } as const
 
 function refuse(): number {
 	console.error(USAGE)
@@ -177,12 +183,87 @@ async function stats_command(
 	return 0
 }
 
+interface ValueRequest {
+	metric: string
+	since_ms: number
+}
+
+function since_of(text = ''): number | undefined {
+	const since_ms = Date.parse(text)
+
+	return Number.isNaN(since_ms) ? undefined : since_ms
+}
+
+function metric_of(positionals: ReadonlyArray<string>): string | undefined {
+	const [name] = positionals
+
+	return name !== undefined && positionals.length === 1 && lane_value.is_metric(name)
+		? name
+		: undefined
+}
+
+function request_of(
+	metric: string | undefined,
+	since_ms: number | undefined,
+): ValueRequest | undefined {
+	return metric === undefined || since_ms === undefined ? undefined : { metric, since_ms }
+}
+
+// One known metric and a readable `--since` instant, or `undefined` for a refusal.
+function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
+	const parsed = cli_flags.arguments_of(rest, VALUE_OPTIONS)
+
+	if (parsed === undefined) return undefined
+
+	return request_of(metric_of(parsed.positionals), since_of(parsed.values.since))
+}
+
+// The value alone on its line, so a measurement declaration reads it as the output's last line; a
+// period with no sample prints nothing there and fails, which the drive reads as unreadable.
+function print_value(request: ValueRequest, measured: number | undefined): number {
+	if (measured === undefined) {
+		const since = new Date(request.since_ms).toISOString()
+
+		console.error(`josh lane:value ${request.metric}: no sample since ${since}`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(measured.toFixed(VALUE_DIGITS))
+
+	return 0
+}
+
+async function value_command(
+	rest: ReadonlyArray<string>,
+	context: MeasureContext,
+): Promise<number> {
+	const request = value_request(rest)
+
+	if (request === undefined) return refuse()
+
+	const window = { since_ms: request.since_ms, until_ms: context.now_ms ?? Date.now() }
+	const records = {
+		entries: await read_ledger(context),
+		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+	}
+
+	return print_value(request, lane_value.value(request.metric, records, window))
+}
+
+type VerbCommand = (rest: ReadonlyArray<string>, context: MeasureContext) => Promise<number>
+
+const VERBS: Readonly<Record<string, VerbCommand>> = {
+	[SAMPLE_VERB]: sample_command,
+	[STATS_VERB]: stats_command,
+	[VALUE_VERB]: value_command,
+}
+
 async function run(argv: ReadonlyArray<string>, context: MeasureContext = {}): Promise<number> {
-	const [verb, ...rest] = argv
+	const [verb = '', ...rest] = argv
+	const command = Object.hasOwn(VERBS, verb) ? VERBS[verb] : undefined
 
-	if (verb === SAMPLE_VERB) return await sample_command(rest, context)
-
-	return verb === STATS_VERB ? await stats_command(rest, context) : refuse()
+	return command === undefined ? refuse() : await command(rest, context)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

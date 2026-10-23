@@ -34,8 +34,10 @@ afterAll(() => {
 function call(overrides: Partial<ToolCall>): ToolCall {
 	return {
 		session_id: 'one',
+		lane: 'lane-1',
 		started_ms: NOW - MS_PER_HOUR,
 		duration_ms: SECOND,
+		tool: 'Bash',
 		background: false,
 		command: undefined,
 		output: '',
@@ -180,6 +182,11 @@ describe('lane_transcript_stats.read_calls', () => {
 		const calls = lane_transcript_stats.read_calls([scratch], lane_stats.window_of(1, Date.now()))
 
 		expect(calls).toHaveLength(1)
-		expect(calls[0]).toMatchObject({ session_id: 'session-1', command: GATE, output: 'green' })
+		expect(calls[0]).toMatchObject({
+			session_id: 'session-1',
+			lane: scratch,
+			command: GATE,
+			output: 'green',
+		})
 	})
 })

@@ -94,7 +94,9 @@ async function run(argv: ReadonlyArray<string>, exit: EvidenceExit): Promise<num
 		: FAILURE_EXIT_CODE
 }
 
-const issue_evidence_exit = { run }
+// The writes alone, for evidence composed in process — `backlog:drive`'s measured close
+// (`backlog-measure-close.ts`), which holds no tree of the issue's, so there is nothing to release.
+const issue_evidence_exit = { run, write: write_exit }
 
-export type { EvidenceExit }
+export type { EvidenceExit, EvidenceRequest }
 export { issue_evidence_exit }

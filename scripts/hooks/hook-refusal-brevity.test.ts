@@ -23,7 +23,6 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['stop: filing offer', stop_rules.FILING_OFFER_REASON],
 	['stop: headless wait', stop_rules.HEADLESS_WAIT_REASON],
 	['stop: hold release', stop_rules.HOLD_RELEASE_REASON],
-	['stop: issue citation', stop_rules.ISSUE_CITATION_REASON],
 	['stop: lane index', stop_rules.LANE_INDEX_REASON],
 	['stop: notify', stop_rules.STOP_NOTIFY_REASON],
 	['stop: session language', stop_rules.build_language_reason('ja')],

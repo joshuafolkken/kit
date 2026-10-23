@@ -17,16 +17,15 @@
 // without a process, a network or a clock.
 
 import { issue_cite } from '#scripts/issue/issue-cite'
-import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
 import { backlog_drive_hold, type HeldWaiting } from './backlog-drive-hold'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_drive_judge } from './backlog-drive-judge'
+import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_memory } from './backlog-drive-memory'
 import { backlog_drive_paused } from './backlog-drive-paused'
-import { backlog_drive_seats } from './backlog-drive-seats'
 import { backlog_drive_token_handling } from './backlog-drive-token-handling'
 
 const { MERGE_TOKEN } = run_merge_token
@@ -44,11 +43,9 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 	'wait',
 ])
 const NO_RETRIES = 0
-const NO_FREE_LANES = 0
 const EXHAUSTED_ANSWER = 'exhausted'
 const JUDGE_REASON = 'judge'
-const LAUNCHED = 'launched'
-const UNOPENED = 'unopened'
+const { launch_all } = backlog_drive_launch_pass
 
 interface OfferRead extends HeldWaiting {
 	verdict: string
@@ -106,8 +103,9 @@ interface DrivePorts {
 	adoptable: (in_flight: ReadonlyArray<string>) => Promise<ReadonlyArray<string>>
 	// `backlog:offer`'s answer for the state, or `undefined` when it exited non-zero.
 	offer: (state: DriveState) => Promise<OfferRead | undefined>
-	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken).
-	launch: (issue: string) => Promise<LaunchOutcome['kind']>
+	// Where `lane:launch`'s chain ended — `launched`, `unopened` (no lane taken) or `failed` (one taken) —
+	// or `measured`, the issue closed by its declaration with no lane taken.
+	launch: (issue: string) => Promise<DriveLaunch>
 	// The lanes free right now — `backlog_ready.drive_free_lane_count` in production, the limit less the
 	// open lanes.
 	free_lanes: () => Promise<number>
@@ -248,58 +246,6 @@ async function collect_finished(state: DriveState, ports: DrivePorts): Promise<P
 	await backlog_drive_hold.stopped(state, current, ports)
 
 	return { kind: 'continue', state: current }
-}
-
-// A `lane:open` refused with every lane taken is a wait, not a judgement: the
-// next offer after a lane frees retries it. A step failing after the lane opened is always handed back —
-// that lane holds the last seat itself, so the free count would read the failure as a full pool.
-async function refused(
-	issue: string,
-	outcome: LaunchOutcome['kind'],
-	state: DriveState,
-	ports: DrivePorts,
-): Promise<PassResult> {
-	if (outcome !== UNOPENED) return ended('launch', state, undefined, issue)
-	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
-
-	return ended('launch', state, undefined, issue)
-}
-
-// **No more new lanes than free lanes**. `backlog:offer` lists every ready issue without reading the
-// lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran out of seats. An issue
-// that already holds a kept lane reuses its port seat but takes a place under the limit, ahead of a
-// fresh launch; the rest launch up to the free count (`backlog-drive-seats.ts`), read before the first.
-//
-// **Only a launch is activity**: a pass that started nothing — every lane taken
-// — keeps `active` where it was, or the once-a-minute offer would restart the idle budget for good.
-function launched(state: DriveState, in_flight: Array<string>, ports: DrivePorts): DriveState {
-	if (in_flight.length === state.in_flight.length) return { ...state, in_flight }
-
-	return { ...state, in_flight, active: ports.now().toISOString() }
-}
-
-async function launch_all(
-	issues: ReadonlyArray<string>,
-	state: DriveState,
-	ports: DrivePorts,
-): Promise<PassResult> {
-	const in_flight = [...state.in_flight]
-
-	const launching = await backlog_drive_seats.seated(issues, ports)
-
-	for (const issue of launching) {
-		// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
-		const outcome = await ports.launch(issue)
-
-		if (outcome !== LAUNCHED) {
-			// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
-			return await refused(issue, outcome, launched(state, in_flight, ports), ports)
-		}
-
-		in_flight.push(issue)
-	}
-
-	return { kind: 'continue', state: launched(state, in_flight, ports) }
 }
 
 // A watch with nothing in flight is the drain: `run:step` owes the retrospective there, so it is the

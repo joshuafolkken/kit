@@ -20,6 +20,8 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'lane-measure-cli-test-'))
 const NOW = Date.parse('2026-10-06T12:00:00.000Z')
 const AT = new Date(NOW).toISOString()
 const FAILURE = 1
+const SINCE = '2026-10-06T00:00Z'
+const SESSION_FILE = 'session.jsonl'
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -61,6 +63,11 @@ describe('lane_measure_cli.run — refusals', () => {
 		[['sample', '--unknown']],
 		[['stats']],
 		[['stats', '--period', '-1']],
+		[['value']],
+		[['value', 'edit']],
+		[['value', 'nope', '--since', SINCE]],
+		[['value', 'edit', 'edit', '--since', SINCE]],
+		[['value', 'edit', '--since', 'soon']],
 	])('refuses %j', async (argv) => {
 		await expect(lane_measure_cli.run(argv, fresh_context())).resolves.toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(lane_measure_cli.USAGE)
@@ -234,7 +241,7 @@ describe('lane_measure_cli.run — stats transcripts', () => {
 		const block = { type: 'tool_use', id: 't', input: { command: 'pnpm josh gate' } }
 		const line = { type: 'assistant', timestamp: AT, message: { content: [block] } }
 
-		writeFileSync(path.join(directory, 'session.jsonl'), JSON.stringify(line))
+		writeFileSync(path.join(directory, SESSION_FILE), JSON.stringify(line))
 		await lane_measure_cli.run(['stats', '--period', '2'], {
 			...context,
 			transcript_directories: [directory],
@@ -244,5 +251,42 @@ describe('lane_measure_cli.run — stats transcripts', () => {
 
 		expect(printed).toContain('| transcript metric | value |')
 		expect(printed).toContain('| verification calls, solo | 1 |')
+	})
+})
+
+// One lane session that made one `Edit` taking 1.5 seconds, at `NOW`.
+function edit_transcript(): string {
+	const directory = mkdtempSync(path.join(scratch, 'value-'))
+	const use = { type: 'tool_use', id: 'e', name: 'Edit', input: {} }
+	const result = { type: 'tool_result', tool_use_id: 'e', content: 'ok' }
+	const ended = new Date(NOW + 1500).toISOString()
+	const lines = [
+		{ timestamp: AT, message: { content: [use] } },
+		{ timestamp: ended, message: { content: [result] } },
+	]
+
+	writeFileSync(
+		path.join(directory, SESSION_FILE),
+		lines.map((line) => JSON.stringify(line)).join('\n'),
+	)
+
+	return directory
+}
+
+// joshuafolkken/kit#4630: one measurement as one number on the last line, for a measurement declaration.
+describe('lane_measure_cli.run — value', () => {
+	const argv = ['value', 'edit', '--since', SINCE]
+
+	it('prints the value alone, two decimals', async () => {
+		const context = { ...fresh_context(), transcript_directories: [edit_transcript()] }
+
+		await expect(lane_measure_cli.run(argv, context)).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith('1.50')
+	})
+
+	it('fails with no value when the period has no sample', async () => {
+		await expect(lane_measure_cli.run(argv, fresh_context())).resolves.toBe(FAILURE)
+		expect(console.info).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no sample since'))
 	})
 })
