@@ -9,6 +9,7 @@ import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { split_early_notice } from '#scripts/split/split-early-notice'
 import { lint_parallel } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
 
@@ -189,6 +190,7 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_related_lint(process.argv.slice(changed_file_scope.ARGV_START))
+	await split_early_notice.surface()
 }
 
 const lint_related = { run_related_lint }
