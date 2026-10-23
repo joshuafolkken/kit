@@ -108,6 +108,7 @@ const lane_paths = {
 	LANE_BRANCH_SUFFIX,
 	LANE_ROOT_KEY,
 	SEAT_LOCK_DIR,
+	checkout_of,
 	default_lane_root,
 	is_lane_entry,
 	lane_branch,
