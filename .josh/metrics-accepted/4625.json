@@ -1,0 +1,7 @@
+{
+	"reason": "#4625 adds the run:solo lane mark, its legend entry and the pull request link on run:board",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

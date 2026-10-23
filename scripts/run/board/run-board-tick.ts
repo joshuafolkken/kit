@@ -6,7 +6,7 @@ import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
-import { run_board_link } from './run-board-link'
+import { run_board_link, type Link } from './run-board-link'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
@@ -185,6 +185,16 @@ function local_header(local: LocalRead): LocalHeader {
 	}
 }
 
+// The issue references and pull request numbers linked into `repo`, plain before a plan is read.
+type Links = Pick<BoardHeader, 'link' | 'pull_link'>
+
+function links_of(repo: string | undefined, link: Link): Links {
+	return {
+		link: run_board_link.linker(repo, link),
+		pull_link: run_board_link.pull_linker(repo, link),
+	}
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -207,7 +217,7 @@ function header_of(
 		form: redraw.ports.form,
 		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,
-		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
+		...links_of(state.plan?.context.repo, redraw.ports.link),
 	}
 }
 

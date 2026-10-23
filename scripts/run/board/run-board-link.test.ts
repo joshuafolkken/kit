@@ -4,7 +4,7 @@ import { run_board_link } from './run-board-link'
 // joshuafolkken/kit#3450: an issue number on the board opens its GitHub issue — this repository's for a
 // bare number, the named repository's for `owner/repo#N` — and stays plain before the plan names one.
 
-const { issue_url, linker } = run_board_link
+const { issue_url, linker, pull_linker, pull_url } = run_board_link
 const REPO = 'joshuafolkken/kit'
 
 function bracketed(text: string, url: string): string {
@@ -28,5 +28,22 @@ describe('run_board_link.linker', () => {
 
 	it('leaves the reference plain while no repository is known', () => {
 		expect(linker(undefined, bracketed)('7')).toBe('7')
+	})
+})
+
+// joshuafolkken/kit#4625: a followup row's pull request number opens the pull request.
+describe('run_board_link.pull_linker', () => {
+	it('points the number at the repository’s pull request', () => {
+		expect(pull_url(4618, REPO)).toBe('https://github.com/joshuafolkken/kit/pull/4618')
+	})
+
+	it('links the number text to its pull request', () => {
+		expect(pull_linker(REPO, bracketed)(4618)).toBe(
+			'[4618](https://github.com/joshuafolkken/kit/pull/4618)',
+		)
+	})
+
+	it('leaves the number plain while no repository is known', () => {
+		expect(pull_linker(undefined, bracketed)(4618)).toBe('4618')
 	})
 })

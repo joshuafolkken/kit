@@ -70,6 +70,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		form: 'screen',
 		repo: 'joshuafolkken/app-kit',
 		link: (reference) => reference,
+		pull_link: String,
 		...extra,
 	}
 }

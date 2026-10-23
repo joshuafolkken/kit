@@ -38,7 +38,7 @@ const { time_of, time_width } = run_board_render_time
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
-const { LANE_INDENT, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
+const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
 const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, row_overrun, title_of } =
 	run_board_render_title
 const { padded } = run_board_fresh
@@ -201,10 +201,10 @@ function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldS
 // their titles end in one column and the tails after them start in one.
 function shared_overrun(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number {
 	const overruns = rows.map((row) => {
-		const fit = row_fit(LANE_INDENT, row, frame)
+		const fit = row_fit(indent_of(row), row, frame)
 
 		return fit.is_line_kept === true
-			? row_overrun(row, frame.columns, row_draw(LANE_INDENT, row, frame), fit)
+			? row_overrun(row, frame.columns, row_draw(indent_of(row), row, frame), fit)
 			: 0
 	})
 
@@ -290,7 +290,7 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(LANE_INDENT, row, { ...lane_frame, shared })),
+		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
 		cells,
 	)
 

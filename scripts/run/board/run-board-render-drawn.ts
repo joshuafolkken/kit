@@ -24,6 +24,14 @@ function has_lanes(header: BoardHeader): boolean {
 	return layout !== undefined && run_board_layout.lanes_drawn(layout).length > 0
 }
 
+// A lane row draws 🧍 in its indent (joshuafolkken/kit#4625).
+function has_solo_lane(header: BoardHeader): boolean {
+	const { layout } = header
+	const lanes = layout === undefined ? [] : run_board_layout.lanes_drawn(layout)
+
+	return lanes.some((row) => row.is_solo === true)
+}
+
 // The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
 // finish.
 function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string> {
@@ -59,6 +67,7 @@ function drawn_of(
 		named: named_of(header, icons),
 		checks: run_board_render_checks.legend_of(checks),
 		held: run_board_render_waits.legend_of(header),
+		solo: has_solo_lane(header),
 	}
 }
 
