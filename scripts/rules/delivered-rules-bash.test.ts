@@ -8,6 +8,7 @@ import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { josh_git_bare } from './josh-git-bare'
 import { pr_merge } from './pr-merge'
+import { repo_admin } from './repo-admin'
 
 // joshuafolkken/kit#2120: the three Bash-string rows fire through the real delivery path, and stay
 // silent on the safe forms — the doctrine that a relocation which does not fire is not a relocation.
@@ -181,6 +182,36 @@ describe('pr-merge — the PR merged outside pnpm josh followup', () => {
 
 	it.each(['pnpm josh followup', 'pnpm josh observations:flush'])(SILENT_TITLE, (command) => {
 		expect(delivered_for(`merge-silent-${command}`, command)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4650: a write to the repository's administration, delivered through the real
+// path and claimed by one row — a `DELETE` of the same endpoint by `destructive-command` alone.
+describe('repo-admin — the write that moves the server-side boundary', () => {
+	it.each([
+		['ruleset', 'gh api -X PUT repos/joshuafolkken/kit/rulesets/1 -f enforcement=disabled'],
+		['collaborator', 'gh api --method PUT repos/joshuafolkken/kit/collaborators/x'],
+		['secret', 'gh secret set TOKEN --body x'],
+		['visibility', 'gh repo edit --visibility public'],
+	])(DELIVERS_TITLE, (name, command) => {
+		expect(delivered_for(`admin-${name}`, command)).toBe(repo_admin.REPO_ADMIN_REASON)
+		expect(rules_claiming(command)).toBe(ONE_RULE)
+	})
+
+	it('leaves a DELETE of an administration endpoint to destructive-command alone', () => {
+		const command = 'gh api -X DELETE repos/joshuafolkken/kit/collaborators/x'
+
+		expect(delivered_for('admin-delete', command)).toBe(
+			destructive_command.DESTRUCTIVE_COMMAND_REASON,
+		)
+		expect(rules_claiming(command)).toBe(ONE_RULE)
+	})
+
+	it.each([
+		['list', 'gh secret list'],
+		['read', 'gh api repos/joshuafolkken/kit/rulesets'],
+	])(SILENT_TITLE, (name, command) => {
+		expect(delivered_for(`admin-silent-${name}`, command)).toBeUndefined()
 	})
 })
 

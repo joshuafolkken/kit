@@ -17,8 +17,8 @@ const GH_API_COMMAND = new RegExp(String.raw`^gh\s+${GH_FLAGS}api\s`, 'u')
 // The method override, and the field flags that turn a bare `gh api` into a POST. **All four field
 // spellings**, `-F` included — it is `--field`'s short form and reads as a different flag to a
 // pattern that only knows `-f`. A body passed with `--input <file>` counts as a write too: it carries
-// the fields inside the file.
-const API_METHOD = /(?:^|\s)(?:--method|-X)[= ]([A-Za-z]+)/u
+// the fields inside the file. The short flag also takes its value attached (`-XPUT`), as `gh` accepts.
+const API_METHOD = /(?:^|\s)(?:--method[= ]|-X[= ]?)([A-Za-z]+)/u
 const API_FIELD = /(?:^|\s)(?:--raw-field|--field|--input|-F|-f)(?:[= ]|$)/u
 const READ_METHOD = 'GET'
 

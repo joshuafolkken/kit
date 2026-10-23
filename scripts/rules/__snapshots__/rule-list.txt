@@ -120,6 +120,10 @@
   - fires: `pnpm josh pretool:guard` — `gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence
   - silent: `pnpm josh followup` and `pnpm josh observations:flush`, which merge in their own process
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Repository administration** (`repo-admin`, `operating-rules.md`)
+  - fires: `pnpm josh pretool:guard` — a `gh api` POST / PUT / PATCH (path or URL) to the rulesets, branch protection, collaborators, invitations, secrets, variables, hooks, keys, environments, actions permissions or transfer, a `PATCH` of the repository, the matching GraphQL mutations, `gh secret` / `gh variable` writes, `gh repo edit` / `deploy-key` writes. Every occurrence
+  - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
+  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
   - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait

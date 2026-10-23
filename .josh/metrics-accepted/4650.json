@@ -1,0 +1,7 @@
+{
+	"reason": "New repo-admin guard row closes the repository-administration write gap, incl. URL/GraphQL/selector spellings (#4650)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 82
+	}
+}

@@ -4,6 +4,7 @@ import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { hook_context_line } from './hook-context-line'
+import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
@@ -262,11 +263,8 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'git-force',
 	'worktree-mutation',
 	'file-body',
-	'index-mutation',
-	'destructive-command',
-	'protected-file',
-	'direct-pr-create',
-	'pr-merge',
+	// The permission guards declare no compliance call either, and enumerate in their own order.
+	...permission_guards.ROWS.map((row) => row.id),
 	'poll-loop',
 	INVESTIGATION,
 ]

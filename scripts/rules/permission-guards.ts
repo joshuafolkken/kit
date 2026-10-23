@@ -3,6 +3,7 @@ import { direct_pr_create } from './direct-pr-create'
 import { index_guard } from './index-guard'
 import { pr_merge } from './pr-merge'
 import { protected_files } from './protected-files'
+import { repo_admin } from './repo-admin'
 
 // The three rows that close the deny-list bypasses, gathered so
 // `delivered-rules.ts` spreads one entry. Each reads argv or a file path rather than a glob: an index
@@ -11,13 +12,16 @@ import { protected_files } from './protected-files'
 // other row's — `git restore` is split with `worktree-mutation` by `--staged` alone. The fourth row,
 // `direct-pr-create`, closes the same kind of gap for `gh pr create`, which
 // the deny list never listed: it claims `gh pr create` and a `gh api` write to the pulls collection.
-// The fifth, `pr-merge`, claims a merge in every spelling the `gh pr merge*` glob misses.
+// The fifth, `pr-merge`, claims a merge in every spelling the `gh pr merge*` glob misses. The sixth,
+// `repo-admin`, claims a non-`DELETE` write to the repository's administration, which
+// `destructive-command` leaves open.
 const ROWS = [
 	index_guard.ROW,
 	destructive_command.ROW,
 	protected_files.ROW,
 	direct_pr_create.ROW,
 	pr_merge.ROW,
+	repo_admin.ROW,
 ] as const
 
 const permission_guards = { ROWS }

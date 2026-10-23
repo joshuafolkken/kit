@@ -39,6 +39,7 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'worktree-mutation': [SUBSHELL, HEREDOC],
 	'index-mutation': ['and-chain', HEREDOC],
 	'destructive-command': [SUBSHELL, HEREDOC],
+	'repo-admin': [],
 	'protected-file': [HEREDOC],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
