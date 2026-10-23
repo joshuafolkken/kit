@@ -404,6 +404,9 @@ test file pins:
   `Bash` call in the spellings the `gh pr merge*` glob misses (`curl … /pulls/<N>/merge`, a GraphQL
   merge mutation or a file-sourced GraphQL body, joshuafolkken/kit#4038). It is delivered as the
   fifth row of `permission-guards.ts`
+- `scripts/rules/repo-admin.test.ts` — pins the predicate that stops a non-`DELETE` write to the
+  repository's administration in every `gh api` and `gh` CLI spelling (joshuafolkken/kit#4650), the
+  sixth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),

@@ -81,6 +81,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'worktree-mutation': judgment(NO_RUN),
 	'index-mutation': judgment(NO_RUN),
 	'destructive-command': judgment(NO_RUN),
+	'repo-admin': judgment(NO_RUN),
 	'protected-file': judgment(NO_RUN),
 	// The `Stop` rows: the hook judges a finished reply, so it has no call to rewrite.
 	'stop-notify': judgment(STOP_NOTIFY),

@@ -118,6 +118,6 @@ const ROW = {
 	},
 }
 
-const pr_merge = { PR_MERGE_REASON, ROW, is_pr_merge }
+const pr_merge = { PR_MERGE_REASON, ROW, is_graphql_call, is_pr_merge }
 
 export { pr_merge }
