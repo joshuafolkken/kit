@@ -12,9 +12,10 @@ import { plan_consumers_section } from './plan-consumers-section'
 // Each write takes the issue, its text and the optional `--repo` it was addressed to.
 type IssueWrite<T> = (issue_number: string, text: string, repo?: string) => Promise<T>
 
-const { issue_get_body, issue_edit_body, issue_edit_title, issue_comment, issue_add_label } =
+const { issue_view_json, issue_edit_body, issue_edit_title, issue_comment, issue_add_label } =
 	vi.hoisted(() => ({
-		issue_get_body: vi.fn<(issue_number: string, repo?: string) => Promise<string | undefined>>(),
+		issue_view_json:
+			vi.fn<(issue_number: string, fields: string, repo?: string) => Promise<string | undefined>>(),
 		issue_edit_body: vi.fn<IssueWrite<string>>(),
 		issue_edit_title: vi.fn<IssueWrite<string>>(),
 		issue_comment: vi.fn<IssueWrite<string>>(),
@@ -23,7 +24,7 @@ const { issue_get_body, issue_edit_body, issue_edit_title, issue_comment, issue_
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_get_body,
+		issue_view_json,
 		issue_edit_body,
 		issue_edit_title,
 		issue_comment,
@@ -42,6 +43,12 @@ const BODY_FILE_FLAG = '--body-file'
 const TITLE_FLAG = '--title'
 const PLANNED_FLAG = '--planned'
 const FILLED_BODY = '## Background'
+
+// The issue read `issue_body_or_comment` makes: the body, filed by the owner.
+function body_json(body: string): string {
+	return JSON.stringify({ body, author_association: 'OWNER' })
+}
+
 const work = mkdtempSync(path.join(tmpdir(), 'issue-plan-cli-'))
 const PLAN_FILE = path.join(work, 'plan.md')
 const EMPTY_FILE = path.join(work, 'empty.md')
@@ -58,7 +65,7 @@ beforeEach(() => {
 	printed.length = 0
 	errors.length = 0
 	vi.clearAllMocks()
-	issue_get_body.mockResolvedValue('')
+	issue_view_json.mockResolvedValue(body_json(''))
 	issue_edit_body.mockResolvedValue(ISSUE_URL)
 	issue_edit_title.mockResolvedValue(ISSUE_URL)
 	issue_comment.mockResolvedValue(COMMENT_URL)
@@ -90,7 +97,7 @@ describe('issue_plan_cli.run — the plan goes to a blank body, else a comment',
 	})
 
 	it('posts the plan as a comment when the body has content', async () => {
-		issue_get_body.mockResolvedValue(FILLED_BODY)
+		issue_view_json.mockResolvedValue(body_json(FILLED_BODY))
 
 		const code = await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE])
 
@@ -136,7 +143,7 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 
 describe('issue_plan_cli.run — the title goes first and the label last', () => {
 	it('renames first and never labels an issue whose plan failed to post', async () => {
-		issue_get_body.mockResolvedValue(FILLED_BODY)
+		issue_view_json.mockResolvedValue(body_json(FILLED_BODY))
 		const refusal = 'comment refused'
 
 		issue_comment.mockRejectedValue(new Error(refusal))
@@ -159,7 +166,7 @@ describe('issue_plan_cli.run — the title goes first and the label last', () =>
 
 describe('issue_plan_cli.run — --repo addresses every write to the named repository', () => {
 	it('passes the repository to the title, the plan and the label', async () => {
-		issue_get_body.mockResolvedValue(FILLED_BODY)
+		issue_view_json.mockResolvedValue(body_json(FILLED_BODY))
 
 		const code = await issue_plan_cli.run([
 			'7',
@@ -174,7 +181,7 @@ describe('issue_plan_cli.run — --repo addresses every write to the named repos
 
 		expect(code).toBe(0)
 		expect(issue_edit_title).toHaveBeenCalledWith('7', TITLE, OTHER_REPO)
-		expect(issue_get_body).toHaveBeenCalledWith('7', OTHER_REPO)
+		expect(issue_view_json).toHaveBeenCalledWith('7', expect.any(String), OTHER_REPO)
 		expect(issue_comment).toHaveBeenCalledWith('7', PLAN, OTHER_REPO)
 		expect(issue_add_label).toHaveBeenCalledWith('7', PLANNED_LABEL, OTHER_REPO)
 	})
@@ -193,7 +200,7 @@ describe('issue_plan_cli.run — refuses a call it cannot record', () => {
 
 		expect(code).toBe(1)
 		expect(errors).toContain(issue_plan_cli.USAGE)
-		expect(issue_get_body).not.toHaveBeenCalled()
+		expect(issue_view_json).not.toHaveBeenCalled()
 	})
 
 	it('refuses a plan without the existing-consumers section before any write', async () => {
@@ -201,7 +208,7 @@ describe('issue_plan_cli.run — refuses a call it cannot record', () => {
 
 		expect(code).toBe(1)
 		expect(errors.join('\n')).toContain(plan_consumers_section.HEADING)
-		expect(issue_get_body).not.toHaveBeenCalled()
+		expect(issue_view_json).not.toHaveBeenCalled()
 		expect(issue_add_label).not.toHaveBeenCalled()
 	})
 

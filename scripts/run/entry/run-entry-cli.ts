@@ -25,6 +25,7 @@ import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_stop } from './run-entry-stop'
+import { run_entry_trust } from './run-entry-trust'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
 // trip each on `run:hold`, `cost --cut`, `run:prep` and `run:step`, re-billing a lane's full context
@@ -125,6 +126,7 @@ async function check_cost(): Promise<string> {
 interface Reads {
 	report: string
 	verdict: string
+	is_untrusted: boolean
 }
 
 // The issue reads and the pre-implementation verdict, from the one gather `run:prep` and `run:next`
@@ -134,8 +136,9 @@ async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
 	const parts = run_prep_cli.to_parts(issue_number, reads)
 	const verdict = run_step.pre_verdict(run_next.to_input(parts))
+	const is_untrusted = run_entry_trust.needs_trusted_plan(reads.content, reads.state)
 
-	return { report: run_prep.format_report(parts), verdict }
+	return { report: run_prep.format_report(parts), verdict, is_untrusted }
 }
 
 function emit(parts: EntryParts): number {
@@ -144,8 +147,9 @@ function emit(parts: EntryParts): number {
 	return run_entry.exit_code(parts)
 }
 
-// The summary of a run that stopped before it read the issue: the token that stopped it, no verdict,
-// and the note that stands in for the report body.
+// The summary of a run that stopped without a report — before it read the issue, or after reading an
+// issue it will not run: the token that stopped it, no verdict, and the note that stands in for the
+// report body.
 function stop_report(issue_number: string, hold: string, cost: string, report: string): number {
 	return emit({ issue_number, hold, cost, verdict: run_entry.NO_VERDICT, report })
 }
@@ -157,14 +161,34 @@ interface StopCall {
 	command: StageCommand
 	reason: string
 	should_release: boolean
+	recommended?: string
 }
 
-async function stop_run({ parts, command, reason, should_release }: StopCall): Promise<number> {
+async function stop_run({ parts, command, ...notice }: StopCall): Promise<number> {
 	const code = stop_report(parts.issue_number, parts.hold, parts.cost, parts.report)
 
-	await run_entry_stop.stop({ issue_number: parts.issue_number, command, reason, should_release })
+	await run_entry_stop.stop({ issue_number: parts.issue_number, command, ...notice })
 
 	return code
+}
+
+// **An untrusted author's issue stops after the reads, not before the claim** — the trust is decided
+// by the read `run:prep` already makes, so the gate adds no call; the hold this call claimed is
+// released. It exits non-zero though the hold and the budget both allowed the run.
+async function stop_untrusted(
+	{ issue_number, command }: EntryRequest,
+	hold: string,
+	cost: string,
+): Promise<number> {
+	await stop_run({
+		parts: { issue_number, hold, cost, report: run_entry_trust.stop_note(issue_number) },
+		command,
+		reason: run_entry_trust.STOP_REASON,
+		should_release: true,
+		recommended: run_entry_trust.recommended(issue_number),
+	})
+
+	return FAILURE_EXIT_CODE
 }
 
 interface Resume {
@@ -252,9 +276,20 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // — the label then shows in the `labels:` line the report below carries.
-async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
+// The plan event is written only once the run passed the trust gate.
+async function proceed(
+	request: EntryRequest,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+	state: StageState,
+): Promise<number> {
+	const { issue_number } = request
+
 	await run_label.mark(issue_number)
 	const reads = await gather_reads(issue_number)
+
+	if (reads.is_untrusted) return await stop_untrusted(request, hold, cost)
+
+	await mark_planned(issue_number, state)
 
 	// The issue the report prints is the one the run has read, so it is the baseline a person's later
 	// update is measured against (`issue-watch.ts`).
@@ -269,10 +304,8 @@ async function proceed(issue_number: string, hold: string, cost: string): Promis
 	return run_step_section.print_section(run_step_section.ENTRY)
 }
 
-async function claim_run(
-	{ issue_number, command }: EntryRequest,
-	state: StageState,
-): Promise<number> {
+async function claim_run(request: EntryRequest, state: StageState): Promise<number> {
+	const { issue_number, command } = request
 	const hold = await claim_hold(issue_number, command)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
@@ -289,9 +322,7 @@ async function claim_run(
 		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
 	}
 
-	await mark_planned(issue_number, state)
-
-	return await proceed(issue_number, hold, cost)
+	return await proceed(request, { hold, cost }, state)
 }
 
 // A carried cut is asked first, before anything is read (`run:cut --resume`); `kickoff` claims and cuts

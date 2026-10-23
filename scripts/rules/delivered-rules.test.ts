@@ -151,7 +151,7 @@ describe('delivered_rules.delivery — the comments at the call that reads the b
 	// to judgement at the moment nothing else is open to read — joshuafolkken/kit#1518's failure.
 	it.each([
 		'pnpm josh issue:read <N>',
-		'gh api repos/{owner}/{repo}/issues/<N>/comments',
+		'gh api repos/<owner>/<repo>/issues/<N>/comments',
 		'a later comment supersedes the body it contradicts',
 		'`.claude/skills/workflow-commands/issue-comments.md`',
 	])(CARRIES_MARKER, (marker) => {

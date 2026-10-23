@@ -11,9 +11,9 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    budget allowed the run, and `run:release <N>` takes it back off.
 2. Read the Issue and its comments off `run:entry`'s `run:prep` report (`issue-comments.md`).
 3. **Record the agreed plan** with `pnpm josh issue:plan <N> --body-file <path>`, adding
-   `--title "<title>"` when the title is not in English or can be phrased more clearly (a blank body
-   takes the plan, otherwise it becomes a comment; its `### 影響を受ける既存の利用者` section is drafted
-   with `pnpm josh plan:consumers` — `kickoff.md` step 4).
+   `--title "<title>"` when the title is not in English or can be phrased more clearly (the plan goes
+   into the body when it is blank and its author has write access, otherwise into a comment; its
+   `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
 4. Run `pnpm josh ms`, then update dependencies only where the `run:prep` report answers
    `latest: required` — `latest-gate.md` is its single source, and on `required` load the
    `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it refuses

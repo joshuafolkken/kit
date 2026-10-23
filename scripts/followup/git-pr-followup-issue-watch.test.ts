@@ -8,7 +8,7 @@ import type { WrapupInput } from './git-pr-followup-wrapup'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_get_body: vi.fn(),
+		issue_view_json: vi.fn(),
 		issue_edit_body: vi.fn(),
 		issue_comment: vi.fn(),
 		pr_comment: vi.fn(),

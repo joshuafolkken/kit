@@ -20,6 +20,10 @@
   - fires: `pnpm josh pretool:guard` — the 11th `pnpm josh issue:file` in a run that already has 10 filings not refused; failed calls do not count. Every occurrence
   - silent: fewer than 10 filings not refused
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
+- **Direct issue read** (`direct-issue-read`, `issue-comments.md`)
+  - fires: `pnpm josh pretool:guard` — a `gh api` GET of the checkout's own `repos/{owner}/<r>/issues/<N>` or `…/issues/<N>/comments` with no projection, or one naming the body; it points at `pnpm josh issue:read`. Every occurrence
+  - silent: `pnpm josh issue:read` / `run:prep` / `run:entry`, a `--jq` / `--json` projection without the body, or another repository named outright
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Reading Issue comments** (`issue-comments`, `issue-comments.md`)
   - fires: `pnpm josh pretool:guard` — a `Bash` that reads only the Issue body (`gh issue view <N>`, or a GET ending in `…/issues/<N>`). Refused until it is re-read with the comments
   - silent: no Issue read, or a read with `--comments` / `--json comments` / `…/comments` from the start

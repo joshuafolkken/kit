@@ -19,6 +19,7 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'third-party-write': [MULTILINE_FIELD, HEREDOC],
 	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
+	'direct-issue-read': [],
 	'filing-cap': [HEREDOC],
 	'issue-comments': [],
 	'shell-body': [],

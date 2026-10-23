@@ -73,6 +73,9 @@ function issue_read(state: string, labels: ReadonlyArray<string> = []): unknown 
 	return { kind: 'state', state: { state, labels, is_human_review: false } }
 }
 
+// A read whose author has write access, so the trust gate (`run-entry-cli-trust.test.ts`) passes.
+const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trusted: true } } }
+
 function stage_line(state: string, command: string, start: string): string {
 	return `stage ${CITED} — at: ${state} · to: ${command} · start: ${start}`
 }
@@ -99,7 +102,7 @@ function reset_resume_mocks(): void {
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(false)
-	gather_mock.mockReset().mockResolvedValue({})
+	gather_mock.mockReset().mockResolvedValue(TRUSTED_READS)
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
 	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
 	reset_resume_mocks()

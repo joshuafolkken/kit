@@ -38,11 +38,14 @@ const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
 // comma list `--json state,labels` and the expression `'{state, labels}'` are read the same way.
 const FIELD_PROJECTION = /(?:--jq|--json)[= ]\s*('[^']*'|"[^"]*"|\S+)/u
 const NAMES_THE_BODY = /\bbody\b/u
+// A projection that names no field at all — `--jq .`, `--jq '.[]'` — passes every field through,
+// the body with them, so it is a body read however it is spelled.
+const NAMES_A_FIELD = /(?:^|[.{,\s'"])[A-Za-z_]/u
 
 function projects_away_body(segment: string): boolean {
-	const projection = FIELD_PROJECTION.exec(segment)
+	const value = FIELD_PROJECTION.exec(segment)?.[1]
 
-	return projection !== null && !NAMES_THE_BODY.test(projection[1] ?? '')
+	return value !== undefined && NAMES_A_FIELD.test(value) && !NAMES_THE_BODY.test(value)
 }
 
 function is_body_read_segment(segment: string): boolean {
@@ -82,7 +85,7 @@ function reads_issue_comments(command: string): boolean {
 }
 
 const RULE_DOC = '`.claude/skills/workflow-commands/issue-comments.md`'
-const COMMENTS_FALLBACK = 'gh api repos/{owner}/{repo}/issues/<N>/comments'
+const COMMENTS_FALLBACK = 'gh api repos/<owner>/<repo>/issues/<N>/comments'
 
 // **The refusal hands over the command that fixes it**, because reading is not the same as
 // obeying: a sentence saying "also read the comments" is prose that moves nothing, while a refused
@@ -180,6 +183,7 @@ const issue_comments = {
 	ROW,
 	comments_input,
 	is_body_only_issue_read,
+	projects_away_body,
 }
 
 export { issue_comments }

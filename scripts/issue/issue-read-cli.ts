@@ -44,8 +44,14 @@ type NumberResult = { kind: 'issue'; content: IssueContent } | { kind: ReadFailu
 // The formatted block for one issue, or the failure kind — what `run:prep` bundles beside the state
 // and the dependency-update scope. It reuses this file's read and the shared
 // `format_issue` rather than reproducing either, so the two `gh` reads and the block shape stay
-// single-sourced here.
-type BlockRead = { kind: 'ok'; block: string } | { kind: ReadFailureKind }
+// single-sourced here. `trust` carries what the read already decided about its authors, so
+// `run:entry` gates an untrusted issue without a second read (joshuafolkken/kit#4663).
+interface BlockTrust {
+	is_body_trusted: boolean
+	has_trusted_comment: boolean
+}
+
+type BlockRead = { kind: 'ok'; block: string; trust: BlockTrust } | { kind: ReadFailureKind }
 
 interface IssueReport {
 	issue_number: string
@@ -94,8 +100,12 @@ async function read_block(issue_number: string): Promise<BlockRead> {
 	if (result.kind !== 'issue') return { kind: result.kind }
 
 	const { fields, comments } = result.content
+	const trust = {
+		is_body_trusted: fields.is_body_trusted,
+		has_trusted_comment: issue_read.trusted_bodies(comments ?? []).length > 0,
+	}
 
-	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments) }
+	return { kind: 'ok', block: issue_read.format_issue(issue_number, fields, comments), trust }
 }
 
 async function read_all(issue_numbers: ReadonlyArray<string>): Promise<ReadonlyArray<IssueReport>> {
@@ -141,5 +151,5 @@ const issue_read_cli = {
 	run,
 }
 
-export type { BlockRead }
+export type { BlockRead, BlockTrust }
 export { issue_read_cli }
