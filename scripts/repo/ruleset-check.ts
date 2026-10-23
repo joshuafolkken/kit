@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { gh_failure } from '#scripts/gh/git-gh-failure'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -37,7 +38,7 @@ function read_default_branch(repo: string): string | undefined {
 function read_protection(repo: string, branch: string): ApiRead {
 	try {
 		const stdout = git_gh_exec.exec_gh_api_sync({
-			path: `repos/${repo}/branches/${branch}/protection/required_status_checks`,
+			path: git_gh_api_path.branch_protection_checks_api_path(branch, repo),
 			cwd: PROJECT_ROOT,
 			timeout_ms: repo_setting.GH_TIMEOUT_MS,
 		})
@@ -52,7 +53,7 @@ function read_protection(repo: string, branch: string): ApiRead {
 // there rather than letting protection alone pass for the whole answer.
 function read_source(repo: string, branch: string): RequiredSource {
 	const from_rules = required_checks_logic.parse_branch_rules(
-		read_api(`repos/${repo}/rules/branches/${branch}`),
+		read_api(git_gh_api_path.branch_rules_api_path(branch, repo)),
 	)
 	if (from_rules.kind === 'unreadable') return from_rules
 	const from_protection = required_checks_logic.parse_protection(read_protection(repo, branch))
@@ -95,7 +96,7 @@ function apply_to_ruleset(repo: string, ruleset_id: number, missing: ReadonlyArr
 
 function apply_to_protection(repo: string, branch: string, missing: ReadonlyArray<string>): void {
 	git_gh_exec.exec_gh_api_sync({
-		path: `repos/${repo}/branches/${branch}/protection/required_status_checks/contexts`,
+		path: `${git_gh_api_path.branch_protection_checks_api_path(branch, repo)}/contexts`,
 		method: 'POST',
 		body: required_checks_logic.protection_update_body(missing),
 		cwd: PROJECT_ROOT,
