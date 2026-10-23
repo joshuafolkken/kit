@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -30,6 +31,9 @@ const DAEMON_RECORD = '.eslint_d'
 const FINGERPRINT_RECORD = '.eslint_d-toolchain'
 const RECORD_SEPARATOR = '\n'
 const NO_HEAD = 'no-head'
+// Every file the type program could resolve: tracked, staged by a merge in progress, or new.
+const LIST_FILES: ReadonlyArray<string> = ['ls-files', '--cached', '--others', '--exclude-standard']
+const DIGEST_ALGORITHM = 'sha256'
 
 // Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
 // consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
@@ -91,16 +95,25 @@ function eslint_arguments_of(
 	return pnpm_arguments.slice(PNPM_ESLINT_PREFIX_LENGTH)
 }
 
+function digest_of(text: string): string {
+	return createHash(DIGEST_ALGORITHM).update(text).digest('hex')
+}
+
 // **What a daemon is current for: the toolchain's content and the commit checked out.** The daemon's
 // type program keeps every source it read but did not lint, so a merge that changes those types leaves
 // typed rules failing on the old ones (joshuafolkken/kit#4443); every merge, checkout, reset, pull and
 // commit moves HEAD, the commands that move sources under the daemon without an edit the hook sees.
 // A content digest rather than a time: a copy or a checkout rewrites every mtime and leaves the
 // content alone, and an edit can keep its old mtime. Outside a repository there is no HEAD.
+// **The files the program can resolve, too**: a merge whose conflicts are being resolved brings main's
+// new modules in without moving HEAD, and a daemon that had built its program before they arrived
+// reported their types as unresolvable until it was stopped (joshuafolkken/kit#4701).
+// The path list alone, not the content — an edit the hook lints is already read fresh.
 function fingerprint(project_root: string): string {
 	const head = git_spawn_sync.read(['rev-parse', 'HEAD'], { cwd: project_root }) ?? NO_HEAD
+	const files = git_spawn_sync.read(LIST_FILES, { cwd: project_root }) ?? NO_HEAD
 
-	return `${toolchain_inputs.digest(project_root)}:${head}`
+	return `${toolchain_inputs.digest(project_root)}:${head}:${digest_of(files)}`
 }
 
 // Where the eslint the daemon resolves keeps its record, or nothing without an installed eslint.
