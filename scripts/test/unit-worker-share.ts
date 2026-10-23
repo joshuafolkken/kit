@@ -19,8 +19,9 @@ import { unit_run_marker } from './unit-run-marker'
 // worker.
 //
 // **The division activates only under concurrency.** One run in flight — every solo run, CI included
-// — gets exactly the number the gate and the hook produced before this module existed, so a quiet
-// machine behaves bit for bit as it did and only the condition that was measured broken changes.
+// — gets no share from it; what bounds a solo run is the claim it was admitted on (`cap_to_claim`),
+// which for a direct run is vitest's own default on a small machine such as a four-core CI runner
+// (`gate_plan.direct_unit_weight`, joshuafolkken/kit#4607).
 //
 // **The run markers and their division of the machine are `unit-run-marker.ts`**, the part the vitest
 // config imports (joshuafolkken/kit#4572); the capacity and claim bounds and the flag handling are here.
@@ -86,8 +87,8 @@ interface UnitClaim {
 // **The share never exceeds the claim the run was admitted on** (joshuafolkken/kit#4235). The share is
 // read after admission, when fewer runs may be in flight than when the weight was sized, and a share
 // wider than the claim puts workers on the machine the ledger does not hold. The claim bounds a solo
-// share too: vitest's own choice is one worker per core but one, wider than any weight the ledger
-// reserves for a unit run, so leaving it in place would open workers no claim holds. The claim holds
+// share too: vitest's own choice is one worker per core but one, wider than the weight the ledger
+// reserves for a unit run from seven cores up, so leaving it in place would open workers no claim holds. The claim holds
 // vitest's own process as well, so its workers are the claim less that core.
 function cap_to_claim(share: number | undefined, claim: UnitClaim | undefined): number | undefined {
 	if (claim === undefined) return share

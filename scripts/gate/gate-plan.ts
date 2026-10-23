@@ -347,22 +347,33 @@ function check_memory(check: GateCheck, plan: GatePlan, available_cores: number)
 	return unit_memory(check_weight(check, plan, available_cores))
 }
 
+// The workers a lone direct run opens below the gate's solo weight: vitest's own default, one per core
+// but one, bounded by the gate's solo workers on the measured machine. **A direct run has no siblings**,
+// so subtracting `RESERVED_CORES` for them sized a four-core CI runner to zero and its suite to one
+// worker (joshuafolkken/kit#4607); vitest's default is what that runner ran before the claim bounded it.
+// The bound keeps a mid-sized machine from claiming more than the measured one does.
+function direct_solo_workers(available_cores: number): number {
+	const vitest_default = available_cores - unit_worker_share.MAIN_PROCESS_CORES
+	const floor = Math.min(vitest_default, solo_unit_weight(MEASURED_CORES))
+
+	return Math.max(solo_unit_weight(available_cores), floor)
+}
+
 // The cores a unit run started directly reserves: the share it will pass to
-// vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
-// machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
+// vitest while other runs are live, and otherwise `direct_solo_workers`. **Not the whole
+// machine where there is room to leave**: FIFO admission lets a claim of every core in only
 // once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
-// and hold every later claim behind it. One weight for the suite however it is started. **Floored at one
-// worker**: on a machine the static checks fill, a four-core CI runner among them, the gate's solo
-// weight is zero because its siblings hold every core — a direct run has no siblings, and vitest still
-// occupies a core. **Plus vitest's own process** (joshuafolkken/kit#4362): the workers are the share,
-// and the claim holds the process that drives them on top (`unit_worker_share.cap_to_claim` takes it
-// back off).
+// and hold every later claim behind it — the solo bound stops below the core count from seven cores up.
+// One weight for the suite however it is started. **Plus vitest's own process** (joshuafolkken/kit#4362):
+// the workers are the share, and the claim holds the process that drives them on top
+// (`unit_worker_share.cap_to_claim` takes it back off).
 function direct_unit_weight(
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
 ): number {
 	const workers =
-		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
+		unit_worker_share.current_share(available_cores, live_runs) ??
+		direct_solo_workers(available_cores)
 
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
 }
