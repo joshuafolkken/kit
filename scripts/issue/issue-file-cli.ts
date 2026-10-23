@@ -15,6 +15,7 @@ import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold_member } from '#scripts/run/hold/run-hold-member'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
@@ -254,6 +255,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+	await split_resolution.record_child({ route: filing.args.route, found_during, child: reference })
 }
 
 function is_admitted(filing: Filing): boolean {

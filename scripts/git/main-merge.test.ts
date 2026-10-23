@@ -31,6 +31,10 @@ const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
 const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
+const { split_early_notice } = await import('#scripts/split/split-early-notice')
+
+// The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
+const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
@@ -242,12 +246,22 @@ describe('the split notice before the gate', () => {
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('split notice'))
 	})
 
+	// joshuafolkken/kit#4695: the notice it prints is the one the lane ledger records.
+	it('records the notice it prints', async () => {
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
+
+		await main_merge.run(NO_ARGUMENTS)
+
+		expect(record_notice).toHaveBeenCalledWith(expect.objectContaining({ files: OVER_GUIDE_FILES }))
+	})
+
 	it('prints nothing for a diff under the guide', async () => {
 		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
 
 		await main_merge.run(NO_ARGUMENTS)
 
 		expect(console.warn).not.toHaveBeenCalled()
+		expect(record_notice).not.toHaveBeenCalled()
 	})
 
 	it('keeps a finished merge successful and says the diff was unmeasured when it cannot be read', async () => {

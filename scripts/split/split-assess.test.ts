@@ -115,7 +115,10 @@ describe('notice', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
 
 		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
-		expect(notice).toContain('record why it stays one Issue, or carve the rest out')
+		expect(notice).toContain(
+			`record why it stays one Issue in an Issue comment line \`${split_assess.REASON_PREFIX}`,
+		)
+		expect(notice).toContain('pnpm josh issue:file --route split')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 

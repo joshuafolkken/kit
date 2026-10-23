@@ -1,8 +1,10 @@
 import { git_command } from '#scripts/git/git-command'
+import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold_member } from '#scripts/run/hold/run-hold-member'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cli, type Filing } from './issue-file-cli'
 
@@ -18,6 +20,7 @@ const FINDER = '3415'
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const branch = vi.spyOn(git_command, 'branch')
 const is_run_member = vi.spyOn(run_hold_member, 'is_run_member')
+const record_child = vi.spyOn(split_resolution, 'record_child')
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -40,12 +43,34 @@ beforeEach(() => {
 	emit.mockResolvedValue()
 	branch.mockResolvedValue('main')
 	is_run_member.mockResolvedValue(false)
+	record_child.mockResolvedValue()
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.clearAllMocks()
+})
+
+// joshuafolkken/kit#4695: a split child is recorded against the lane child that found it, which is what
+// answers that lane's split notice before the gate.
+describe('issue_file_cli.record — a split child', () => {
+	it('hands the route, the finder and the filed reference to the split record', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		const filing = filing_to(HERE)
+
+		await issue_file_cli.record(
+			URL,
+			{ ...filing, args: { ...filing.args, route: SPLIT_ROUTE_LABEL } },
+			[],
+		)
+
+		expect(record_child).toHaveBeenCalledExactlyOnceWith({
+			route: SPLIT_ROUTE_LABEL,
+			found_during: FINDER,
+			child: '#3438',
+		})
+	})
 })
 
 describe('issue_file_cli.record', () => {

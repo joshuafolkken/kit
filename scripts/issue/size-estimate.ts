@@ -15,7 +15,7 @@ import { markdown_section } from './markdown-section'
 const BACKGROUND_HEADING = '## 背景'
 const EPIC_HEADING = '## Split rationale'
 const PREFIX = '- 規模見積もり:'
-const REASON_PREFIX = '- 分割しない理由:'
+const { REASON_PREFIX } = split_assess
 const DECLARATION = `${PREFIX} 約 <N> ファイル / <M> 行（テスト除く）`
 // Full- or half-width parentheses alike: the two read the same to the person typing the line.
 const VALUE_PATTERN =

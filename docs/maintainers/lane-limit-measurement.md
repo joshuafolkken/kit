@@ -235,6 +235,15 @@ first, with how many decisions fell there. A period with no decision prints a `n
 fixes reach code that runs. A frequent `open-finding`, `no-snapshot` or `base-moved` means the procedure
 is not giving the decision what it needs.
 
+## Whether the split notice led to a split
+
+Under the round-2 table, `lane:stats` prints one row: how many lanes got the split notice in the period
+(`noticed lanes`), and how many of those filed a split child (`split`), whenever it was filed.
+
+The first showing of the notice writes a `split-notice` entry with the Issue and the measured files and
+lines (`split-early-notice.ts`); `josh issue:file --route split` from a lane writes a `split-filed`
+entry (`split-resolution.ts`).
+
 ## Why a free lane stayed empty
 
 Under the stop table, `lane:stats` prints one row per reason `backlog:drive` left a free lane empty. Each
