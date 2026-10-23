@@ -1,6 +1,8 @@
 import { has_timed_out } from '#scripts/git/git-execa-error'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { error_text } from '#scripts/lib/error-message'
+import { json_value } from '#scripts/lib/json-value'
+import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 import { gh_failure } from './git-gh-failure'
@@ -298,6 +300,31 @@ function optional_flag(flag: string, value?: string): Array<string> {
 	return value === undefined ? [] : [flag, value]
 }
 
+// Every Issue and pull-request body kit writes travels through the two entries below, so a credential
+// pasted into one is refused here, once, before it reaches a public tracker.
+//
+// The writers pass the body JSON-encoded, where a token starting a line follows the `n` of an escaped
+// newline, and the shape's "no letter before it" guard reads that `n` as a letter. So the scan reads the strings the JSON decodes to — what
+// GitHub stores — and the raw text only when the body is not JSON.
+function string_leaves(value: unknown): Array<string> {
+	if (typeof value === 'string') return [value]
+	if (typeof value !== 'object' || value === null) return []
+
+	return Object.values(value).flatMap((entry: unknown) => string_leaves(entry))
+}
+
+function decoded_body(body: string): string {
+	const value = json_value.parse_or_undefined(body)
+
+	return value === undefined ? body : string_leaves(value).join('\n')
+}
+
+function refuse_credential_body(request: GhApiRequest): void {
+	if (request.body !== undefined) {
+		token_shape.refuse(decoded_body(request.body), `The gh api ${request.path} body`)
+	}
+}
+
 function to_gh_api_args(request: GhApiRequest): Array<string> {
 	const body_args = request.body === undefined ? [] : [INPUT_FLAG, BODY_FROM_STDIN]
 	const paginate_args = request.should_paginate === true ? [PAGINATE_FLAG] : []
@@ -322,6 +349,7 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 // Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
 // with gh's stderr summary *and* the JSON error body it wrote to stdout.
 async function exec_gh_api(request: GhApiRequest): Promise<string> {
+	refuse_credential_body(request)
 	const args = to_gh_api_args(request)
 
 	if (request.body === undefined) {
@@ -357,6 +385,7 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // the spawn's own failure and is reported like any other, which is what the direct spawn this
 // replaced already did.
 function exec_gh_api_sync(request: GhApiRequest): string {
+	refuse_credential_body(request)
 	const body_option = request.body === undefined ? {} : { input: request.body }
 	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
 
