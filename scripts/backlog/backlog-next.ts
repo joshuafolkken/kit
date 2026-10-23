@@ -260,10 +260,17 @@ function settled_views(
 //
 // The running set covers the standalone rows as well as every read graph, so an epic child waiting on
 // an opted-in standalone issue waits rather than stops.
-function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
+function views_from(
+	reads: ReadonlyArray<EpicRead>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): ReadonlyArray<EpicView> {
 	if (reads.length === 0) return []
 
-	const graphs = reads.map((read) => read.snapshot.children)
+	const graphs = backlog_pool.trusted_graphs(
+		reads.map((read) => read.snapshot.children),
+		untrusted,
+	)
 
 	return settled_views(
 		reads,
@@ -300,7 +307,7 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 	// `backlog:plan` shows the order the run takes. The
 	// ranking goes last: its sort is stable, so the defect order survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
-		combine(views_from(reads, context), context, untrusted),
+		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
 	)
 
