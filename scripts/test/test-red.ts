@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs'
-import { readFile, rm } from 'node:fs/promises'
+import { readFile, realpath, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execa } from 'execa'
+import { test_pinned_cache_logic } from './test-pinned-cache-logic'
 import { test_red_logic, type RedVerdict } from './test-red-logic'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
@@ -24,6 +25,11 @@ const USAGE =
 interface RedRun {
 	verdict: RedVerdict
 	files: ReadonlyArray<string>
+}
+
+interface TreeRun {
+	verdict: RedVerdict
+	tests: ReadonlyArray<string>
 }
 
 // The changed Vitest files that still exist — a deleted test has nothing to run.
@@ -47,10 +53,12 @@ async function read_report(report: string): Promise<string> {
 // all, so a file the old config excludes is `no-test` rather than a `green` that refuses a correct fix.
 // A test that ran and broke, or a file that could not load against the old code, makes it `red`. The
 // report is removed first, so a run that writes none never reads the one before it.
-async function verdict_in(
+// `tests` are the files that ran, relative to the tree — Vitest may name them under the tree's real
+// path (`/private/var` for `/var` on macOS), so both roots are tried.
+async function run_in(
 	{ parent, tree }: BaseTree,
 	selection: ReadonlyArray<string>,
-): Promise<RedVerdict> {
+): Promise<TreeRun> {
 	const report = path.join(parent, REPORT_NAME)
 	const vitest_args = [...selection, '--passWithNoTests', ...reporter_arguments(report)]
 
@@ -61,9 +69,22 @@ async function verdict_in(
 		extendEnv: true,
 		reject: false,
 	})
-	const ran = test_red_logic.ran_file_count(await read_report(report))
+	const text = await read_report(report)
+	const verdict = test_red_logic.verdict_for(
+		test_red_logic.ran_file_count(text),
+		result.exitCode !== 0,
+	)
+	const roots = [tree, await realpath(tree)]
 
-	return test_red_logic.verdict_for(ran, result.exitCode !== 0)
+	const tests = test_pinned_cache_logic.tree_relative(test_red_logic.ran_files(text), roots)
+
+	return { verdict, tests }
+}
+
+async function verdict_in(tree: BaseTree, selection: ReadonlyArray<string>): Promise<RedVerdict> {
+	const { verdict } = await run_in(tree, selection)
+
+	return verdict
 }
 
 async function verdict_on(base: string, files: ReadonlyArray<string>): Promise<RedVerdict> {
@@ -108,7 +129,7 @@ function has_runner(): boolean {
 	return existsSync(VITEST_BIN)
 }
 
-const test_red = { has_runner, main, run, verdict_in }
+const test_red = { has_runner, main, run, run_in }
 
-export type { RedRun }
+export type { RedRun, TreeRun }
 export { test_red }
