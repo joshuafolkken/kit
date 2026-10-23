@@ -7,7 +7,8 @@ const RESOLVED_BRANCH = vi.hoisted(() => 'resolved-branch')
 // realistic-looking string here would only prove the stub round-trips through `console.info`.
 const PENDING_SENTINEL = vi.hoisted(() => 'pending-release-line-sentinel')
 
-vi.mock('node:util', () => ({
+vi.mock('node:util', async (import_original) => ({
+	...(await import_original<Record<string, unknown>>()),
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
 }))
 

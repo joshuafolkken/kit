@@ -15,6 +15,7 @@ const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } 
 	await import('./josh-logic')
 const { core_budget } = await import('#scripts/gate/core-budget')
 const { gate_plan } = await import('#scripts/gate/gate-plan')
+const { OPTIONAL_ENV_FILE_FLAGS } = await import('./josh-command-types')
 
 const SPAWN_ERROR_MESSAGE = 'ENOENT: no such file or directory'
 const SCRIPT_ARGS = ['scripts/josh/josh.ts']
@@ -117,6 +118,27 @@ describe('josh_logic.run_command — composite commands reject extra arguments',
 	it('applies the refusal to the aliased form as well', async () => {
 		await expect(josh_logic.run_command('t', [WORKERS_FLAG])).resolves.toBe(USAGE_ERROR_EXIT_CODE)
 		expect(execa_sync_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4660: node's own `--env-file` loader would take a guard switch from `.env`, so the
+// dispatcher loads the file itself and the flag never reaches the spawned node.
+describe('josh_logic.run_command — the .env flag', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockClear()
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+	})
+
+	it('spawns a command declaring the flag without it', async () => {
+		const [environment_flag] = OPTIONAL_ENV_FILE_FLAGS
+		const name = Object.keys(COMMAND_MAP).find((key) =>
+			COMMAND_MAP[key]?.tsx_arguments?.includes(environment_flag ?? ''),
+		)
+
+		await josh_logic.run_command(name ?? '', [])
+
+		expect(execa_sync_mock).toHaveBeenCalledOnce()
+		expect(execa_sync_mock.mock.calls[0]?.[1]).not.toContain(environment_flag)
 	})
 })
 

@@ -1,0 +1,7 @@
+{
+	"reason": "#4660 adds the launch-only switch filter to the .env loader and the .env write detection to protected-file, reading redirect marks outside quotes and recutting a shell's quoted script",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 52
+	}
+}

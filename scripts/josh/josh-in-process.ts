@@ -31,8 +31,8 @@ function bundled_script_path(package_directory: string, script: string): string 
 
 // The file this dispatcher imports in its own process, or `undefined` to spawn tsx instead.
 // `tsx_arguments` are node flags the script needs *before* its own code runs — today every one of
-// them a form of `--env-file`, which has no in-process equivalent that reproduces node's own
-// parsing and precedence. Those commands (`doctor`, `latest:scope`, `followup`, `notify`) keep a
+// them a form of `--env-file`, which the dispatcher loads into the child's environment just before
+// it spawns (`josh_environment_file.apply_node_flags`). Those commands (`doctor`, `latest:scope`, `followup`, `notify`) keep a
 // process of their own; each runs at most a few times per run, so none of them is where the cost
 // this saves accumulates. Under plain node, which cannot load a `.ts` script at all, only a
 // pre-built command runs in-process; every other one keeps spawning tsx.
