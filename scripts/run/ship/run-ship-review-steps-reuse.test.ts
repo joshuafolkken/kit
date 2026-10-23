@@ -53,13 +53,20 @@ const FAILED = 1
 const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '4620'
 const OPEN = 'run:review'
-const REVIEWED = [
-	OPEN,
-	'run:review --join',
-	'review:attest --check',
-	`review:record --issue ${ISSUE}`,
-]
+const RECORD = `review:record --issue ${ISSUE}`
+const REVIEWED = [OPEN, 'run:review --join', 'review:attest --check', RECORD]
 const HIGH = 'bug-risks:high:a.ts:4'
+
+type JoshRun = (argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>
+
+// Every command passes except `failing`; the open prints the level and the brief.
+function josh_exits(failing?: string): JoshRun {
+	return async (argv) => {
+		const line = argv.join(' ')
+
+		return { code: line === failing ? FAILED : OK, out: line === OPEN ? 'medium\nbrief' : '' }
+	}
+}
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -70,10 +77,7 @@ function recorded_verdict(verdict: string): unknown {
 }
 
 beforeEach(() => {
-	josh_run_mock.mockReset().mockImplementation(async (argv: ReadonlyArray<string>) => ({
-		code: OK,
-		out: argv.join(' ') === OPEN ? 'medium\nbrief' : '',
-	}))
+	josh_run_mock.mockReset().mockImplementation(josh_exits())
 	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	review_in_mock.mockReset().mockReturnValue({
 		kind: 'argv',
@@ -132,6 +136,17 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
 		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+describe('run_ship_review_steps.review_stage — a round whose record failed', () => {
+	// The relaunch re-runs it, so counting this one would count the round twice.
+	it('counts no verdict when review:record itself failed', async () => {
+		unmoved_mock.mockResolvedValue(false)
+		josh_run_mock.mockImplementation(josh_exits(RECORD))
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
+		expect(record_round_one_mock).not.toHaveBeenCalled()
 	})
 })
 

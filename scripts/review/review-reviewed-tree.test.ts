@@ -6,6 +6,7 @@ const read_mock = vi.hoisted(() => vi.fn())
 const briefed_since_mock = vi.hoisted(() => vi.fn())
 const attested_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
+const remove_mock = vi.hoisted(() => vi.fn())
 const gate_tree_mock = vi.hoisted(() => vi.fn())
 const checkout_mock = vi.hoisted(() => vi.fn())
 
@@ -21,7 +22,7 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 	},
 }))
 vi.mock('./review-stamps', () => ({
-	review_stamps: { reviewed_stamp: { read: read_mock, remove: vi.fn(), write: write_mock } },
+	review_stamps: { reviewed_stamp: { read: read_mock, remove: remove_mock, write: write_mock } },
 }))
 vi.mock('./review-attest', () => ({
 	review_attest: { is_attested_on: attested_mock, is_briefed_since: briefed_since_mock },
@@ -140,4 +141,36 @@ describe('review_reviewed_tree.record', () => {
 			expect(review_reviewed_tree.is_unmoved(await recorded([unsettled]), tree)).toBe(false)
 		},
 	)
+})
+
+// joshuafolkken/kit#2964: a round 1 that stopped on a finding is reused for its own issue alone.
+describe('review_reviewed_tree stop marker', () => {
+	const issue = 4620
+
+	beforeEach(() => {
+		marker.clear()
+		remove_mock.mockReset()
+	})
+
+	it('answers stopped for the issue it marked, and for no other', () => {
+		review_reviewed_tree.mark_stopped(issue, true)
+
+		expect(review_reviewed_tree.is_stopped_on(issue)).toBe(true)
+		expect(review_reviewed_tree.is_stopped_on(issue + 1)).toBe(false)
+	})
+
+	it('clears the marker when the round ends any other way', () => {
+		review_reviewed_tree.mark_stopped(issue, true)
+		review_reviewed_tree.mark_stopped(issue, false)
+
+		expect(review_reviewed_tree.is_stopped_on(issue)).toBe(false)
+	})
+
+	it('drops both the marker and the recorded tree on discard', () => {
+		review_reviewed_tree.mark_stopped(issue, true)
+		review_reviewed_tree.discard()
+
+		expect(review_reviewed_tree.is_stopped_on(issue)).toBe(false)
+		expect(remove_mock).toHaveBeenCalledOnce()
+	})
 })

@@ -1,8 +1,8 @@
 {
-	"reason": "Reuse a pre-ship round 1 on an unmoved tree: reviewed-tree stamp module (High-cited files recorded as unsettled), the ship's round-1 stop marker that keeps the fix delta round 2's, round-one lane:stats table, and the lane child's pre-ship review step in chain-rule.md (#4620)",
+	"reason": "Round-2 fixes for #4620: stop-marker and resume-precedence tests, and the ledger skip for a failed review:record",
 	"date": "2026-10-23",
 	"growth": {
-		"scripts.code_lines": 197,
-		"ai_cost.on_demand_bytes": 314
+		"scripts.code_lines": 198,
+		"ai_cost.on_demand_bytes": 313
 	}
 }

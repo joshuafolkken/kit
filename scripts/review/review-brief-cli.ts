@@ -430,6 +430,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 }
 
 const review_brief_cli = {
+	attested_tree,
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,

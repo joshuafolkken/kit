@@ -145,9 +145,11 @@ function skipped(out: string): StepResult {
 }
 
 // How the ship's round 1 ended, for `josh lane:stats` to count the rounds that passed with no fix
-// (joshuafolkken/kit#4620). An unreadable verdict is no outcome; the round stops on it as infra.
-async function record_outcome(issue: string, verdict: string): Promise<void> {
-	if (verdict === run_ship_review.VERDICT.INVALID) return
+// (joshuafolkken/kit#4620). An unreadable verdict is no outcome; the round stops on it as infra. A
+// round whose `review:record` failed is not counted either: the relaunch re-runs it, and that run is
+// the one that ended.
+async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
+	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
 
 	await lane_ledger.record_round_one({ issue: Number(issue), verdict })
 }
@@ -160,7 +162,7 @@ async function code_round_one_record(issue: string): Promise<StepResult> {
 	const is_stopped = recorded.cause === CAUSE.FINDING
 
 	review_reviewed_tree.mark_stopped(Number(issue), is_stopped)
-	await record_outcome(issue, is_stopped ? run_ship_review.VERDICT.BLOCKING : kind)
+	await record_outcome(issue, is_stopped ? run_ship_review.VERDICT.BLOCKING : kind, recorded.cause)
 
 	return recorded
 }
