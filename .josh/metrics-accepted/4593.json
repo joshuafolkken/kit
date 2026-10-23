@@ -1,0 +1,7 @@
+{
+	"reason": "lint:related gains the since-green no-op branch (#4593), which still refreshes its green record, and its three tests",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 33
+	}
+}

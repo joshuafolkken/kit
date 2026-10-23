@@ -28,11 +28,13 @@ const DATA_SOURCE_FILE = path.join('lib', 'read-as-data.ts')
 const DATA_READER_FILE = path.join('lib', 'source-reader.test.ts')
 const PROBED_FILE = path.join('data', 'kept.json')
 const PROBER_FILE = path.join('scripts', 'data-prober.ts')
-// Files added since the recorded tree: beside the unread note, beside a file a test read, and in a
-// directory the tree did not hold.
+// Files added since the recorded tree: beside the unread note, beside a file a test read, in a
+// directory the tree did not hold but a test read a path inside, and in one nothing inside was read from.
 const NEW_UNREAD_FILE = path.join('notes', 'added.md')
 const NEW_PROBED_FILE = path.join('data', 'added.json')
 const NEW_DIRECTORY_FILE = path.join('drafts', 'added.md')
+const ABSENT_DRAFT = path.join('drafts', 'absent.md')
+const NEW_UNREAD_DIRECTORY_FILE = path.join('scratch', 'added.md')
 
 // How many files the listing has to leave unnamed for the "and N more" line to be exercised.
 const UNLISTED_FILE_COUNT = 2
@@ -47,6 +49,7 @@ const MAP: ReadMap = {
 		[path.join('docs', '*')]: [WALKER_FILE],
 		[DATA_SOURCE_FILE]: [DATA_READER_FILE],
 		[PROBED_FILE]: [PROBER_FILE],
+		[ABSENT_DRAFT]: [PROBER_FILE],
 	},
 }
 
@@ -127,13 +130,22 @@ describe('related_scope.resolve_scope — non-code files through the map', () =>
 		expect(scope.reason).toBe(`${NEW_PROBED_FILE} is read by no recorded test`)
 	})
 
-	it('falls back on a file added in a directory the recorded tree did not hold', () => {
+	it('falls back on a file added in a directory the recorded tree did not hold, a test read inside', () => {
 		const scope = related_scope.resolve_scope(
 			request([NEW_DIRECTORY_FILE], { recorded: new Set([DOCUMENT_FILE]) }),
 		)
 
 		expect(scope.mode).toBe('all')
 		expect(scope.reason).toContain(NEW_DIRECTORY_FILE)
+	})
+
+	// joshuafolkken/kit#4597: a branch's `.josh/metrics-accepted/<N>.json` lands in a directory the release
+	// pruned from the recorded tree.
+	it('runs no test for a file added in a new directory nothing inside was read from', () => {
+		const scope = related_scope.resolve_scope(request([NEW_UNREAD_DIRECTORY_FILE]))
+
+		expect(scope.mode).toBe('none')
+		expect(scope.files).toStrictEqual([at(NEW_UNREAD_DIRECTORY_FILE)])
 	})
 
 	it('falls back to the whole suite on a non-code file when there is no map', () => {

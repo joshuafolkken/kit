@@ -1,3 +1,4 @@
+import { gate_tree } from '#scripts/gate/gate-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#4276: after round 1, a change to the run tooling owes the interaction review —
@@ -71,6 +72,8 @@ beforeEach(() => {
 	record_check_mock.mockReset().mockResolvedValue({ status: MISSING })
 	interaction_status_mock.mockReset()
 	read_stamp_text.mockReset().mockReturnValue('')
+	// Read through git, the tree is this checkout's change, which no case here asserts on (joshuafolkken/kit#4597).
+	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue({ files: {}, base: undefined })
 })
 
 describe('run_ship_review_steps.review_stage — the interaction review', () => {

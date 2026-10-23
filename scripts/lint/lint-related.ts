@@ -68,11 +68,21 @@ async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<
 	return byte_check_exit_code(scope, root)
 }
 
-// **A bare run reads only what moved since its last green run** (`since-green.ts`), while a lintable file
-// is among it; otherwise the whole branch change, as before.
-async function since_green_scope(root: string): Promise<ChangedFileScope | undefined> {
-	const moved = await since_green.read_moved(review_stamps.lint_related_stamp, gate_plan.LINT_LABEL)
+// **A bare run reads only what moved since its last green run** (`since-green.ts`); explicit file
+// arguments never consult the record.
+async function read_since_green(
+	command_arguments: ReadonlyArray<string>,
+): Promise<ReadonlyArray<string> | undefined> {
+	if (command_arguments.length > 0) return undefined
 
+	return await since_green.read_moved(review_stamps.lint_related_stamp, gate_plan.LINT_LABEL)
+}
+
+// Narrowed to what moved while a lintable file is among it; otherwise the whole branch change, as before.
+function since_green_scope(
+	root: string,
+	moved: ReadonlyArray<string> | undefined,
+): ChangedFileScope | undefined {
 	if (moved === undefined) return undefined
 
 	const inputs = lint_related_scope.scope_inputs(existsSync)
@@ -88,8 +98,9 @@ async function since_green_scope(root: string): Promise<ChangedFileScope | undef
 async function resolve_lint_scope(
 	command_arguments: ReadonlyArray<string>,
 	root: string,
+	moved: ReadonlyArray<string> | undefined,
 ): Promise<ChangedFileScope> {
-	const since = command_arguments.length === 0 ? await since_green_scope(root) : undefined
+	const since = since_green_scope(root, moved)
 
 	if (since !== undefined) return since
 
@@ -122,14 +133,11 @@ async function exit_code_with_notice(
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
 // whole one, and a fallback says which of the two it was rather than looking like a narrow run
 // that found nothing.
-//
-// **A green run leaves a record of the tree it was green on**, so
-// `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
-// and the three states in which it is withheld, are `scoped-green.ts`.
-async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
-	const root = await changed_file_scope.repository_root_or_cwd()
-	const scope = await resolve_lint_scope(command_arguments, root)
-
+function report_scope(
+	command_arguments: ReadonlyArray<string>,
+	scope: ChangedFileScope,
+	root: string,
+): void {
 	changed_file_scope.report_unusable_arguments(
 		command_arguments,
 		scope,
@@ -137,9 +145,42 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 	)
 	report_ignored_flags(command_arguments)
 	process.stdout.write(`${lint_related_scope.describe_scope(scope, root)}\n`)
+}
 
+// **Nothing moved since the last green run lints nothing** (joshuafolkken/kit#4593), as
+// `josh test:related` runs no test.
+function report_unmoved(): number {
+	process.stdout.write(
+		`${lint_related_scope.COMMAND_LABEL}: ${since_green.UNMOVED_REASON} — linting nothing.\n`,
+	)
+
+	return 0
+}
+
+async function checked_exit_code(
+	command_arguments: ReadonlyArray<string>,
+	root: string,
+	moved: ReadonlyArray<string> | undefined,
+): Promise<number> {
+	if (moved?.length === 0) return report_unmoved()
+
+	const scope = await resolve_lint_scope(command_arguments, root, moved)
+
+	report_scope(command_arguments, scope, root)
+
+	return await exit_code_with_notice(command_arguments, scope, root)
+}
+
+// **A green run leaves a record of the tree it was green on**, so
+// `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
+// and the three states in which it is withheld, are `scoped-green.ts`. An unmoved run records too, as
+// `josh test:related`'s does: a main sync can move the base while moving no path, and a record left on
+// the old base would refuse `josh gate` while every re-run kept linting nothing.
+async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
+	const root = await changed_file_scope.repository_root_or_cwd()
+	const moved = await read_since_green(command_arguments)
 	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await exit_code_with_notice(command_arguments, scope, root)
+	const exit_code = await checked_exit_code(command_arguments, root, moved)
 
 	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
 
