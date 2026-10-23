@@ -37,7 +37,9 @@ const SESSION_ID_FLAG = '--session-id'
 // tool definition and every user-side claude.ai connector rides on each request's cached preamble, and
 // across the lanes measured none of Artifact, Workflow or a connector was ever called, while
 // AskUserQuestion has nobody to answer it in an unattended lane. Narrowing them cut the preamble by
-// about 16,000 tokens per request. This list is the one place the set is kept.
+// about 16,000 tokens per request. **No web tool is launched**: no role runs with a person at the keyboard, and a
+// fetched page enters the context with no trust label, past the Issue trust filter (#4664). This list
+// is the one place the set is kept.
 const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 	'Bash',
 	'Read',
@@ -50,8 +52,6 @@ const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 	'TaskStop',
 	'Monitor',
 	'TodoWrite',
-	'WebSearch',
-	'WebFetch',
 ]
 const TOOLS_FLAG = '--tools'
 // **Only the project's own MCP servers load** — the user's connectors are what the strict flag drops.
