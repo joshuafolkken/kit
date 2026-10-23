@@ -1,8 +1,0 @@
-{
-	"reason": "The backlog page's examples and flags move from hand-written prose into the usage tables the page is generated from (#3938); the generated blocks add an Options heading where the page had inline flag prose",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 470,
-		"prose.excess_bold": 2
-	}
-}

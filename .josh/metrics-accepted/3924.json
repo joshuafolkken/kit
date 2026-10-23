@@ -1,7 +1,0 @@
-{
-	"reason": "#3924: the pre-detach checks gain the unused-export, spelling and guard-test checks behind nine of ten ship gate stops, with tests pinning them",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 13
-	}
-}

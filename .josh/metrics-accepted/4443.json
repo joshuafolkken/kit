@@ -1,7 +1,0 @@
-{
-	"reason": "The ESLint daemon's staleness check reads the work tree's HEAD reflog so a merge that changes source types restarts it (#4443)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

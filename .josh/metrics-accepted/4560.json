@@ -1,9 +1,0 @@
-{
-	"reason": "run:merge keeps the epic auto-close notes off its verdict-only stdout, and a stateless child read now counts as unreadable (review round 1)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 20,
-		"ai_cost.on_demand_bytes": 169,
-		"prose.long_paragraphs": 1
-	}
-}

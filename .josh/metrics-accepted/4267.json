@@ -1,8 +1,0 @@
-{
-	"reason": "#4267 adds the run:board gathering worker (gather, gather-live, gather-thread, gather-worker), the fold memo, the frame-budget fixture and the worker handing a stream read again unchanged over without its events; the two long paragraphs are the worker and frame-budget paragraphs the Issue asks for in josh-commands-run-rationale.md",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 272,
-		"prose.long_paragraphs": 2
-	}
-}

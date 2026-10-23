@@ -1,7 +1,0 @@
-{
-	"reason": "#3998 adds the ship-stop cause classifier and the bounded infrastructure retry (two new modules), plus the lane:stats causes column",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 112
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Round 2 on a moved base carries round 1's blobs onto the new base (new review-round-one-blobs module) and keeps the comment-only arm on paths the move left alone, instead of refusing #4165",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 198
-	}
-}

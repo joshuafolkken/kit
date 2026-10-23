@@ -1,7 +1,0 @@
-{
-	"reason": "#3667: the lint recheck now reads rule meta to cover type-aware rules as well as import/no-cycle",
-	"date": "2026-10-11",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

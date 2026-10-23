@@ -1,7 +1,0 @@
-{
-	"reason": "#3738 adds three run stages (judgment session running, installing dependencies, dispatching) with their emit sites and the stage's elapsed time on the board; span_fields is shared with span_of rather than duplicated",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

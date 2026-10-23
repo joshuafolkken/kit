@@ -1,8 +1,0 @@
-{
-	"reason": "josh stash:push plus its review fixes: the ledger exclusion pathspec covers every ledger path from the repository root, and preflight/run-prep ask what stash:push would take",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 106,
-		"prose.excess_bold": 2
-	}
-}

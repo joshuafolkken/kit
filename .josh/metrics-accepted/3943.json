@@ -1,7 +1,0 @@
-{
-	"reason": "The re-briefed review of #3943 records where a waiting claim runs (checkout, lane, lanes root) so run:board never links another repository's lane to this repository's issue",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 209
-	}
-}

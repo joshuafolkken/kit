@@ -1,7 +1,0 @@
-{
-	"reason": "#3697 adds the driver's bounded re-read of the carry record (with its per-read diagnostics and the ended-run short cut), the board's stranded read, and the supervisor's failure event with the review-round-1 gate that leaves it only for a real strand a person was warned of (is_left_stranded and its tests); the review-round-2 fix adds the own-process owner and ended-run checks to that judgement (WatchedRun, run_carry_ended.has_ended) with real-record tests; none of it replaces existing code",
-	"date": "2026-10-12",
-	"growth": {
-		"scripts.code_lines": 115
-	}
-}

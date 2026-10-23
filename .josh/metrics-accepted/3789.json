@@ -1,7 +1,0 @@
-{
-	"reason": "New lane:stats table for ship-stop waits (#3789): a stop ledger entry, its writer in ship, and the per-reason reducer",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 110
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Merging main added now_icon beside the branch's estimate_legend in run_board_header; the estimate legend moved into run_board_render_drawn",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 91
-	}
-}

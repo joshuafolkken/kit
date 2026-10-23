@@ -1,7 +1,0 @@
-{
-	"reason": "Adopting lanes launched outside backlog:drive, plus a regression test that an adopted lane left unmerged after its ship is handed to run:merge (review round 2)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

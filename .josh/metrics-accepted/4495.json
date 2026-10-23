@@ -1,7 +1,0 @@
-{
-	"reason": "#4495 adds the inputs fingerprint (tool versions and declared env) and per-check input declarations in verification-inputs.ts; it absorbs toolchain-config.ts and the check-inputs scopes, and the remainder is the new capability itself",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 148
-	}
-}

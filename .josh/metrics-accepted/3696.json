@@ -1,7 +1,0 @@
-{
-	"reason": "New setup-stage feature (#3696): a setup trace event, its four emitters, the launch record's start time and the board's setup read and stage line are new behavior with no existing code to replace; the review fixes add the newest-stage keep in the stream bound and the drain-ends-the-start read",
-	"date": "2026-10-12",
-	"growth": {
-		"scripts.code_lines": 177
-	}
-}

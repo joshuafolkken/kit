@@ -1,8 +1,0 @@
-{
-	"reason": "Round-2 review fix: the poll guard now tells run:carry/run:wake/run:progress writing flags apart from state reads, so hand-offs and repeated filings are not refused as polls",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 127,
-		"ai_cost.on_demand_bytes": 276
-	}
-}

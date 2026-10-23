@@ -1,7 +1,0 @@
-{
-	"reason": "#4104 adds the start-time comparator that orders the waiting section's 📅 rows",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

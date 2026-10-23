@@ -1,7 +1,0 @@
-{
-	"reason": "#4387 adds per-round failure handling to the run board's read worker and draws the failure reason; no existing code it replaces",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 47
-	}
-}

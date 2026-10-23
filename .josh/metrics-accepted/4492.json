@@ -1,9 +1,0 @@
-{
-	"reason": "#4492 adds the owner's no-halt rule to quality-priority (the Issue's deliverable): two bullets in principles.md and a 25-byte widening of the existing CLAUDE.md pointer; no existing text restates it, so nothing can be cut to offset it",
-	"date": "2026-10-22",
-	"growth": {
-		"rules.lines": 5,
-		"ai_cost.resident_bytes": 25,
-		"ai_cost.on_demand_bytes": 354
-	}
-}

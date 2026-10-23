@@ -1,7 +1,0 @@
-{
-	"reason": "New behavior (#3729): josh backlogrun replaces an idle run when the invocation differs — the replace test (backlogrun-replace.ts) and the stop-then-start branch in backlogrun-cli.ts; the stop procedure and the lane read are reused, not copied; +6 for the retrospective-owed guard the review added to the replace test",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 70
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4362 adds the per-check CPU reader (check-cpu.ts), the measured weight table and the vitest main-process allowance; the growth is the feature itself",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 60
-	}
-}

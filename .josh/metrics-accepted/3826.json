@@ -1,9 +1,0 @@
-{
-	"reason": "Round-1 review fix: directive comments (eslint-disable, @ts-expect-error, coverage/bundler annotations, JSDoc type tags, svelte-ignore) are kept as code so a gate-silencing fix cannot read as comment-only and skip round 2; prompts/review.md names the rule",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 262,
-		"rules.lines": 4,
-		"ai_cost.on_demand_bytes": 441
-	}
-}

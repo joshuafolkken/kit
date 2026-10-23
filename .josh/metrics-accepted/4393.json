@@ -1,7 +1,0 @@
-{
-	"reason": "since-green narrowing for lint:related/test:related (#4393): new since-green.ts and moved-paths.ts shared with check-reuse, plus review-round fixes",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 75
-	}
-}

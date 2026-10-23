@@ -1,7 +1,0 @@
-{
-	"reason": "New lane state record (lane-state.ts), its one-off backfill CLI and the writer wiring in lane:open/dispatch/pause/close/withdraw and run:merge, plus review-round fixes (#4268)",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 252
-	}
-}

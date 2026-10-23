@@ -1,8 +1,0 @@
-{
-	"reason": "New josh test:pinned command (#4516): the hunk-revert runner, its CLI and parser, plus the copy_in/verdict_in extraction shared with test:red",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 236,
-		"prose.long_paragraphs": 1
-	}
-}

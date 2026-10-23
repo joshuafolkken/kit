@@ -1,7 +1,0 @@
-{
-	"reason": "New review:stops command and the durable review-stop log it reads (#4519)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 166
-	}
-}

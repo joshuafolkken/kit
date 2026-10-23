@@ -1,7 +1,0 @@
-{
-	"reason": "six new *-main.ts entries split main guards out of imported modules so commands can be bundled (#4186)",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

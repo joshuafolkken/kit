@@ -1,7 +1,0 @@
-{
-	"reason": "test:related reads which since-map source files name a moved file, so only those and since-map test files reach vitest related (#4532)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 34
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#3763: the lane cache copy now stages its temp file under node_modules/.cache (directory creation, a missing-checkout guard and the staged publish), which the root-level temp name did not need",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 20
-	}
-}

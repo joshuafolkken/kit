@@ -1,7 +1,0 @@
-{
-	"reason": "#4260 draws phase, time, usage and activity on run:board earlier-run lane rows: new run-board-earlier module and run_board_status.earlier_of fold",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 67
-	}
-}

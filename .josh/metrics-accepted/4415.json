@@ -1,7 +1,0 @@
-{
-	"reason": "Import-graph closure now follows ambient declarations, reference directives, compiler-option type packages and unresolvable relative imports so a cached verdict keeps parity with an uncached run (#4415 review round 1)",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 287
-	}
-}

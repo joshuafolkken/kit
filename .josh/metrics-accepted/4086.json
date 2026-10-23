@@ -1,7 +1,0 @@
-{
-	"reason": "#4086 adds the no-direct-pr-create behavior assertion and a shared Bash-assertion factory",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 review fix: the label scan now resolves a same-file constant passed to a label helper or labels array, and only a fixture file name (not a directory) exempts a module from the scan",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 70
-	}
-}

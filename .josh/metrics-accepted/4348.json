@@ -1,7 +1,0 @@
-{
-	"reason": "Counting the lane's uncommitted change in the trial merge needs a per-path three-way merge (merge base, working-tree blob, other lane's blob) in place of a single merge-tree call",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 81
-	}
-}

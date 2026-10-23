@@ -1,8 +1,0 @@
-{
-	"reason": "New josh auto-ok:judge command and backlog:drive judge hand-back (#3854): the pure judge, its read/write halves and CLI with a colocated test and fixture for each half, plus the judge row in backlogrun-steps.md",
-	"date": "2026-10-15",
-	"growth": {
-		"scripts.code_lines": 320,
-		"ai_cost.on_demand_bytes": 346
-	}
-}

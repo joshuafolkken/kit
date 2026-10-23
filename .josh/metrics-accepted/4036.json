@@ -1,7 +1,0 @@
-{
-	"reason": "New git-pr-merge-checked module binds merges to the checked head SHA and re-waits on a 409 (#4036)",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 88
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4135 moves the halfrun/prrun stop confirmation from skill prose into run:hold (run-stop-notify.ts), so the template becomes code; issue:already-done, which calls run:hold, now loads .env too",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 126
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "in_unread_directory: the new-file narrowing #4303 needs one predicate over the read map",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

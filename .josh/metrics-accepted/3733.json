@@ -1,8 +1,0 @@
-{
-	"reason": "#3733 adds the lane in-use / spent judgment (lane-spent.ts), the reasoned keep verdict of josh backlogrun and the lane:prune kept report, plus the review fixes: a lane the running backlogrun has in flight is kept, an unclaimed launch is compared by its own invocation, and an unanswered process probe is reported apart from a working child; the backlogrun-lanes table gains the automatic-discard row",
-	"date": "2026-10-13",
-	"growth": {
-		"scripts.code_lines": 215,
-		"ai_cost.on_demand_bytes": 363
-	}
-}

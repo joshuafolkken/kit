@@ -1,7 +1,0 @@
-{
-	"reason": "Hook bundle build neutralizes inlined modules' self-invoke so only the launched entry runs its main, and stamps the build script as an input so the change rebuilds existing bundles (#4123)",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 10
-	}
-}

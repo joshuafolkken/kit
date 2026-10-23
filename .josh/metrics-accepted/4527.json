@@ -1,7 +1,0 @@
-{
-	"reason": "Mark the change since the test-read map apart from the branch change, so another lane's map no longer sends test:related to the whole suite (#4527)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 8
-	}
-}

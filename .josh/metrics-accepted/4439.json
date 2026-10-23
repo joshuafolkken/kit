@@ -1,7 +1,0 @@
-{
-	"reason": "arm_for_run seam lets a test arm a scratch run and assert setup's teardown restores GIT_DIR (#4439 AC2) without touching the live run's guard directory",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 4
-	}
-}

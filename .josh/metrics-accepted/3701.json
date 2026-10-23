@@ -1,7 +1,0 @@
-{
-	"reason": "#3701: the supervisor's own-record check (run_carry.is_held_by_another, hoisted from run-stranded-detect) is now also read by the wake ports and the driver's claim, and ports_for is exported for the regression test",
-	"date": "2026-10-12",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

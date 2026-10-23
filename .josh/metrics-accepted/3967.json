@@ -1,7 +1,0 @@
-{
-	"reason": "#3967: the owner-aware lane occupancy (backlog-occupied.ts), the seat cap on the free count and the scoped-events read add code lines",
-	"date": "2026-10-16",
-	"growth": {
-		"scripts.code_lines": 72
-	}
-}

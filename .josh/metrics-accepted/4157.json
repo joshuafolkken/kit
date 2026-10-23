@@ -1,8 +1,0 @@
-{
-	"reason": "report:template adds a session-language label table and skeleton builder; round-1 review fixes add English abnormal cases to josh cases and a shared is_japanese helper",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 228,
-		"prose.excess_bold": 1
-	}
-}

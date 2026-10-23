@@ -1,7 +1,0 @@
-{
-	"reason": "#3820 adds is_unverified_skip and NOT_USED_MARKER so a skip of a tool the project does not use stops withholding the gate's green record",
-	"date": "2026-10-14",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

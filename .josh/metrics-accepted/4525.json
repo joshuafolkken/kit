@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 review fixes: shell-script runners (bash -c / eval) and backtick substitutions read by the direct-filing trigger, plus nohup/nice/command/exec/stdbuf wrappers",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 67
-	}
-}

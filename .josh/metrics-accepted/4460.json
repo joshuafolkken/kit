@@ -1,8 +1,0 @@
-{
-	"reason": "#4460 adds the issue:file check that refuses a start condition citing an issue number (new issue-sample-source module and its doc lines)",
-	"date": "2026-10-22",
-	"growth": {
-		"scripts.code_lines": 73,
-		"ai_cost.on_demand_bytes": 88
-	}
-}

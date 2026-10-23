@@ -1,7 +1,0 @@
-{
-	"reason": "Overloaded run queue holds the first waiter and the oldest claim on an empty ledger, plus its regression test",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

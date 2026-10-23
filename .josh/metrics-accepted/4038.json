@@ -1,7 +1,0 @@
-{
-	"reason": "pr-merge: judge GraphQL mutations against the whole line and refuse shell-computed bodies (round-2 review)",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 127
-	}
-}

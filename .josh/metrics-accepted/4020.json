@@ -1,7 +1,0 @@
-{
-	"reason": "#4020: one span formatter replaces three; the unit-carrying SpanField adds one net code line",
-	"date": "2026-10-17",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "auto-ok:judge --apply skips a closed or opted-in issue, posts the judgement comment before the labels and names the explicit retry when a label fails after it, plus the board's ranked, de-duplicated findings section and their tests",
-	"date": "2026-10-18",
-	"growth": {
-		"scripts.code_lines": 83
-	}
-}

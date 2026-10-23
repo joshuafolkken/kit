@@ -1,7 +1,0 @@
-{
-	"reason": "#4351: new branch-rules reader so the merge gate can tell a required check from an optional one (CodeQL), plus the UNSTABLE predicate it feeds",
-	"date": "2026-10-21",
-	"growth": {
-		"scripts.code_lines": 96
-	}
-}

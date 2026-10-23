@@ -1,7 +1,0 @@
-{
-	"reason": "Restores the #3612 lane-share thresholds (lane_thresholds, lane_limits, CellLimits) that #4171 dropped, so lane rows color against their share again #4283",
-	"date": "2026-10-20",
-	"growth": {
-		"scripts.code_lines": 41
-	}
-}

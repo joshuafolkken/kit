@@ -1,7 +1,0 @@
-{
-	"reason": "#4211 splits 11 main guards into their own *-main.ts entries so the imported modules can be bundled; each entry is a small guard file",
-	"date": "2026-10-19",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}
