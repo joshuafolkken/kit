@@ -87,10 +87,11 @@ function is_claimed_by_narrower_row(command: string): boolean {
 // `pr-merge.ts` takes for a GraphQL body it cannot read, which that row already refuses for a body
 // read from a file or computed by the shell. A query passes. The keyword is looked for in the whole
 // line, because the segment cut ignores quotes and a multi-line query splits across it. A query field
-// the shell expands (`query="$Q"`) hides its keyword the same way, so it is refused as a mutation;
-// a single-quoted `query='query($o: String!) {…}'` is literal and still read.
+// the shell expands (`query="$Q"`, or the whole argument quoted: `"query=$Q"`) hides its keyword the
+// same way, so it is refused as a mutation; a single-quoted `query='query($o: String!) {…}'` is
+// literal and still read. A body read from a file is `pr-merge.ts`'s, which refuses it already.
 const GRAPHQL_MUTATION = /\bmutation\b/u
-const EXPANDED_QUERY = /^(?:-[fF])?query=(?!')[\s\S]*\$/u
+const EXPANDED_QUERY = /^(?:-[fF])?"?query=(?!')[\s\S]*\$/u
 
 function is_hidden_or_mutation(command: string, args: ReadonlyArray<string>): boolean {
 	return GRAPHQL_MUTATION.test(command) || args.some((argument) => EXPANDED_QUERY.test(argument))
@@ -168,13 +169,17 @@ function writes_to_third_party_owner(
 // `resolve_placeholder_owners` are injected so the suite fixes the owners without touching the real
 // remotes, the way `file-body.ts` injects `has_file`. Each segment is judged on its own, so a `gh api`
 // write quoted inside another command's argument is read as the write it is not, exactly as every
-// other trigger here reads its own.
+// other trigger here reads its own. The cut is by program — a pipe and a background `&` cut too, a
+// quoted one does not — after joining backslash-continued lines, so `echo hi | gh pr comment …` and a
+// `gh api graphql \⏎ -f query=…` are each read as the one `gh` call they launch.
 function writes_third_party(
 	command: string,
 	resolve_owner: () => string | undefined = repo_party.current_owner,
 	resolve_placeholder_owners: () => Array<string | undefined> = repo_party.placeholder_owners,
 ): boolean {
-	const segments = shell_segments.segments_of(command)
+	const segments = shell_segments.quote_aware_commands_of(
+		shell_segments.joined_continuations(command),
+	)
 
 	if (segments.some((segment) => is_graphql_mutation(command, segment))) return true
 

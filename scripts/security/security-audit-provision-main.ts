@@ -8,8 +8,8 @@ import { security_audit_provision } from './security-audit-provision'
 // main guard there would fire for every command that carries it (joshuafolkken/kit#4186).
 //
 // Run by the session-start hook (`--session-start`), it also pins the session's owner
-// (`session-owner-pin.ts`) at no spawn of its own. A manual `josh audit:provision` does not pin, so it
-// cannot re-pin an owner after a mid-session `origin` rewrite.
+// (`session-owner-pin.ts`) at no spawn of its own. A manual `josh audit:provision` pins only when
+// passed `--session-start`, which re-pins to whatever owner `origin` names at that moment.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	const ARGV_OFFSET = 2
 	const SESSION_START_FLAG = '--session-start'

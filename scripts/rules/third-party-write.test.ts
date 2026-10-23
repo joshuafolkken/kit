@@ -109,6 +109,9 @@ describe('writes_third_party — a GraphQL write it cannot place', () => {
 		],
 		['a query held in a variable', 'Q=$(cat m.graphql); gh api graphql -f query="$Q"'],
 		['an unquoted expanded query', 'gh api graphql -f query=$Q'],
+		['a whole-argument-quoted expanded query', 'gh api graphql -f "query=$Q"'],
+		['a piped mutation', 'echo x | gh api graphql -f query="$Q"'],
+		['a backslash-continued expanded query', 'gh api graphql \\\n  -f query="$Q"'],
 	])('refuses %s whatever the session owner', (_name, command) => {
 		expect(third_party_write.writes_third_party(command, () => undefined)).toBe(true)
 	})
@@ -138,6 +141,8 @@ describe('writes_third_party — a gh write with a repository selector', () => {
 		['an unreadable selector', 'gh issue comment 5 -R "$REPO" --body b'],
 		['an inline GH_REPO selector', 'GH_REPO=sveltejs/svelte gh issue comment 5 -b x'],
 		['an exported GH_REPO selector', 'export GH_REPO=sveltejs/svelte; gh pr create -t t -b b'],
+		['a piped comment', 'echo hi | gh pr comment 5 -R sveltejs/svelte -F -'],
+		['a backslash-continued comment', 'gh pr comment 5 \\\n  -R sveltejs/svelte -b hi'],
 	])('refuses %s against another owner', (_name, command) => {
 		expect(third_party_write.writes_third_party(command, resolve_session)).toBe(true)
 	})
