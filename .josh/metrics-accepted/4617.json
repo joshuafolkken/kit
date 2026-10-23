@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 review fix: core-wait lanes_root_of reads a Claude Code worktree as its checkout, with its regression test",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 10,
+		"prose.long_paragraphs": 1
+	}
+}

@@ -27,6 +27,7 @@ const ROOT_COMMAND = 'git rev-parse --show-toplevel'
 const LEGACY_LOCATION_VARIABLES =
 	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
 const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LEGACY_LOCATION_VARIABLES}; ${ROOT_COMMAND} 2>/dev/null)"; then unset ${LEGACY_LOCATION_VARIABLES}; else project_root="$(${ROOT_COMMAND})"; fi && cd "$project_root" && `
+const PRE_WORKTREE_ROOT_PREFIX = `project_root="\${CLAUDE_PROJECT_DIR:-$( (unset ${LEGACY_LOCATION_VARIABLES}; ${ROOT_COMMAND} 2>/dev/null) || ${ROOT_COMMAND})}" && cd "$project_root" && `
 
 function hook_commands(settings_text: string): ReadonlyArray<string> {
 	const { hooks } = JSON.parse(settings_text) as ReturnType<
@@ -92,11 +93,14 @@ describe('rewrite_hook_commands', () => {
 		expect(rewrite_hook_commands(once)).toBe(once)
 	})
 
-	// A consumer's file still carries the root prefix kit wrote before joshuafolkken/kit#4187.
-	it('replaces the earlier root prefix with the current one', () => {
+	// A consumer's file still carries a root prefix kit wrote before joshuafolkken/kit#4187 or #4617.
+	it.each([
+		['#4187', LEGACY_ROOT_PREFIX],
+		['#4617', PRE_WORKTREE_ROOT_PREFIX],
+	])('replaces the root prefix from before %s with the current one', (_issue, legacy_prefix) => {
 		const once = rewrite_hook_commands(KIT_LAUNCHER_FORM)
 		const { command } = JSON.parse(once) as { command: string }
-		const legacy_command = `${LEGACY_ROOT_PREFIX}${command.slice(hook_launch.PROJECT_ROOT_PREFIX.length)}`
+		const legacy_command = `${legacy_prefix}${command.slice(hook_launch.PROJECT_ROOT_PREFIX.length)}`
 
 		expect(rewrite_hook_commands(JSON.stringify({ command: legacy_command }))).toBe(
 			JSON.stringify({ command }),

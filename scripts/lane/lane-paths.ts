@@ -57,6 +57,16 @@ function is_lane_root(directory: string, environment: LaneEnvironment): boolean 
 	return DEFAULT_LANE_ROOT_PATTERN.test(path.basename(directory))
 }
 
+// Claude Code's own worktrees (`EnterWorktree`, an `isolation: "worktree"` subagent) sit at
+// `<checkout>/.claude/worktrees/<name>`, and a hook launched in one runs there
+// (joshuafolkken/kit#4617). The session is still the one its checkout started, so a directory under
+// one reads as the checkout that holds it.
+const CLAUDE_WORKTREES_PATTERN = /[/\\]\.claude[/\\]worktrees[/\\][^/\\]+(?:[/\\].*)?$/u
+
+function checkout_of(directory: string): string {
+	return directory.replace(CLAUDE_WORKTREES_PATTERN, '')
+}
+
 // **The inverse of `lane_directory`, and the one lane test that needs no git.** `lane_registry`
 // answers the same question authoritatively by parsing `git worktree list`, but that read is
 // asynchronous and a `PreToolUse` guard is synchronous by contract — so a guard that has to know
@@ -71,7 +81,7 @@ function lane_issue_of(
 	directory: string,
 	environment: LaneEnvironment = process.env,
 ): string | undefined {
-	const resolved = path.resolve(directory)
+	const resolved = checkout_of(path.resolve(directory))
 	const issue = path.basename(resolved)
 
 	if (!issue_number_shape.ISSUE_NUMBER_PATTERN.test(issue)) return undefined
@@ -98,6 +108,7 @@ const lane_paths = {
 	LANE_BRANCH_SUFFIX,
 	LANE_ROOT_KEY,
 	SEAT_LOCK_DIR,
+	checkout_of,
 	default_lane_root,
 	is_lane_entry,
 	lane_branch,

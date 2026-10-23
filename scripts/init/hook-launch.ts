@@ -10,7 +10,9 @@
 // first without the git location variables a git hook leaks, since a relative or bare `GIT_DIR` read
 // from a subdirectory names the wrong work tree, and with them only when the checkout does not resolve
 // without them (its metadata lives outside the work tree). A lookup that fails ends the command before
-// the launcher (joshuafolkken/kit#4187).
+// the launcher (joshuafolkken/kit#4187). Inside one of Claude Code's own worktrees `CLAUDE_PROJECT_DIR`
+// still names the main checkout, so the prefix exports where the hook was launched as `JOSH_HOOK_CWD`
+// and the launcher moves the hook's working directory into that worktree (joshuafolkken/kit#4617).
 //
 // **Everything after the root is one script** (`scripts/hooks/run-hook.sh`): the git location
 // variables a git hook exports, the bundle-ready gate and the live-source fallback live there once, so
@@ -23,7 +25,7 @@ const HOOK_DIST_DIR = 'dist/hooks'
 const RUN_HOOK_SCRIPT = 'scripts/hooks/run-hook.sh'
 const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
 const CODEX_ROOT = `$( (unset ${GIT_LOCATION_VARIABLES.join(' ')}; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})`
-const PROJECT_ROOT_PREFIX = `project_root="\${CLAUDE_PROJECT_DIR:-${CODEX_ROOT}}" && cd "$project_root" && `
+const PROJECT_ROOT_PREFIX = `export JOSH_HOOK_CWD="$PWD" && project_root="\${CLAUDE_PROJECT_DIR:-${CODEX_ROOT}}" && cd "$project_root" && `
 
 // `name` is the hook's bundle under `dist/hooks` without `.js` (e.g. `pretool-guard`), followed by any
 // arguments it takes (e.g. `codex-hook-adapter pretool`).

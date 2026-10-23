@@ -102,10 +102,13 @@ function wait_line(command: string | undefined, reason: WaitReason): string {
 
 // The lanes root a checkout belongs to: a lane's parent, or the root beside a main checkout. Two
 // checkouts of one repository share it; the ledger is machine-wide, so another repository's do not.
+// A Claude Code worktree under a checkout reads as that checkout (`lane_paths.checkout_of`).
 function lanes_root_of(checkout: string): string {
-	if (lane_paths.lane_issue_of(checkout) === undefined) return lane_paths.lane_root(checkout)
+	const resolved = lane_paths.checkout_of(path.resolve(checkout))
 
-	return path.dirname(path.resolve(checkout))
+	if (lane_paths.lane_issue_of(resolved) === undefined) return lane_paths.lane_root(resolved)
+
+	return path.dirname(resolved)
 }
 
 // Where a claim runs, read by the claimer under its own environment: `JOSH_LANE_ROOT` is a
