@@ -5,6 +5,7 @@ import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 import { gh_failure } from './git-gh-failure'
+import { gh_retry } from './git-gh-retry'
 
 const BODY_FROM_STDIN = '-'
 
@@ -293,6 +294,9 @@ interface GhApiRequest {
 	// The checkout gh runs in, which is what `{owner}/{repo}` in `path` resolves against. Absent means
 	// the process's own directory.
 	cwd?: string
+	// `false` for a write that must not be sent twice: a transient failure may follow a write that
+	// already landed, and nothing reads it back (`git-gh-retry.ts`). Absent means retried.
+	should_retry?: boolean
 }
 
 function optional_flag(flag: string, value?: string): Array<string> {
@@ -330,9 +334,9 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 // `read_gh_api_sync` below.
 //
 // Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
-// with gh's stderr summary *and* the JSON error body it wrote to stdout.
-async function exec_gh_api(request: GhApiRequest): Promise<string> {
-	refuse_credential_body(request)
+// with gh's stderr summary *and* the JSON error body it wrote to stdout. A transient failure — a 5xx
+// or no answer at all — is asked again a bounded number of times first (`git-gh-retry.ts`).
+async function send_gh_api(request: GhApiRequest): Promise<string> {
 	const args = to_gh_api_args(request)
 
 	if (request.body === undefined) {
@@ -345,6 +349,14 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 		timeout_ms: request.timeout_ms,
 		cwd: request.cwd,
 	})
+}
+
+async function exec_gh_api(request: GhApiRequest): Promise<string> {
+	refuse_credential_body(request)
+
+	if (request.should_retry === false) return await send_gh_api(request)
+
+	return await gh_retry.with_retry(async () => await send_gh_api(request))
 }
 
 // The synchronous twin of `exec_gh_api`, for a caller that cannot await. `josh propagate` runs each
