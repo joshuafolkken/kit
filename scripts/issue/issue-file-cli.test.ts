@@ -324,11 +324,16 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
-	it('refuses a third-party target', async () => {
-		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', FOREIGN))).toBe(
-			FAILURE_EXIT_CODE,
-		)
-		expect(console.error).toHaveBeenCalledWith(issue_file_cli.THIRD_PARTY_MESSAGE)
+	// joshuafolkken/kit#4634: an owner that cannot be read is not known to be ours either, so the
+	// filing refuses it even though the `third-party-write` hook stays silent on `unknown`.
+	it.each([
+		{ target: FOREIGN, owner: OWNER, message: issue_file_cli.THIRD_PARTY_MESSAGE },
+		{ target: HERE, owner: undefined, message: issue_file_cli.UNKNOWN_PARTY_MESSAGE },
+	])('refuses $target when the session owner is $owner', async ({ target, owner, message }) => {
+		vi.spyOn(repo_party, 'current_owner').mockReturnValue(owner)
+
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', target))).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(message)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 		expect(ensure_labels).not.toHaveBeenCalled()
 	})

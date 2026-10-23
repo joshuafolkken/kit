@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs'
+import { chmodSync, existsSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
@@ -19,6 +19,8 @@ import { lane_paths } from './lane-paths'
 // record of a seat along with the tree that held it: there is nothing to keep in step and nothing
 // that can go stale. A counter, or a ledger beside the trees, would let a lane that was closed and
 // reopened take a seat a running lane is still using.
+
+const OWNER_ONLY_MODE = 0o600
 
 interface LaneInfo {
 	issue: string
@@ -107,6 +109,15 @@ function held_seat(content: string | undefined): SeatPorts {
  */
 function read_environment(directory: string): string | undefined {
 	return file_reader.read_if_readable(path.join(directory, ENV_FILE_NAME))
+}
+
+// The lane's `.env` carries the root's secrets (the Telegram token), so it is readable by its owner
+// alone. `mode` applies only to a file the write creates, so an existing one is narrowed after.
+function write_environment(directory: string, content: string): void {
+	const file = path.join(directory, ENV_FILE_NAME)
+
+	writeFileSync(file, content, { mode: OWNER_ONLY_MODE })
+	chmodSync(file, OWNER_ONLY_MODE)
 }
 
 function dispatched_at(directory: string): number | undefined {
@@ -307,6 +318,8 @@ const lane_registry = {
 	registered_directories,
 	unreadable_lanes,
 	used_seats,
+	write_environment,
+	OWNER_ONLY_MODE,
 }
 
 export type { LaneInfo }

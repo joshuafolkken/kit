@@ -52,7 +52,10 @@ const TOOL_BUDGETS: Readonly<Record<string, 'spell_check' | 'format' | 'eslint_s
 }
 
 const USAGE = `Usage: josh pre-commit-lint <${Object.keys(TOOL_ARGUMENTS).join('|')}> [files...]`
+const END_OF_OPTIONS = '--'
 
+// The staged files follow `--`, so a file named `--plugin=x.mjs` is read as a file, never as an
+// option that loads code (joshuafolkken/kit#4634).
 function build_arguments(
 	tool: string,
 	staged_files: ReadonlyArray<string>,
@@ -60,7 +63,7 @@ function build_arguments(
 	const tool_arguments = TOOL_ARGUMENTS[tool]
 	if (tool_arguments === undefined) return undefined
 
-	return [...tool_arguments, ...staged_files]
+	return [...tool_arguments, END_OF_OPTIONS, ...staged_files]
 }
 
 // eslint goes through the lane's warm daemon when one is reachable (joshuafolkken/kit#4358): the same

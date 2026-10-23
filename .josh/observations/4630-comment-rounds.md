@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lane/lane-value.ts:52 | 2026-10-23 | #4630

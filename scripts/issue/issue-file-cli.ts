@@ -46,6 +46,8 @@ const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
 	'✖ third-party target: a tracker we do not own is Tier C — draft the Issue for a person to post instead (`CLAUDE.md` → "Third-party repositories are Tier C").'
+const UNKNOWN_PARTY_MESSAGE =
+	'✖ unknown party: the owner of this session or of the target could not be read (`git remote` / `--repo`), so the target is not known to be ours — check `pnpm josh repo:party`.'
 // `GH_REPO` is the variable `gh` reads `{owner}/{repo}` from, so setting it points every listing the
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
@@ -68,16 +70,22 @@ async function read_body(path: string): Promise<string | undefined> {
 	}
 }
 
-function is_third_party(target: string): boolean {
+// An owner that cannot be read is refused like a third party — stricter than the `third-party-write`
+// hook, which stays silent on `unknown`: a filing is admitted only when the target is known to be ours.
+function party_refusal(target: string): string | undefined {
 	const party = repo_party.classify(repo_party.current_owner(), repo_party.target_owner(target))
 
-	return party === repo_party.THIRD_PARTY
+	if (party === repo_party.FIRST_PARTY) return undefined
+
+	return party === repo_party.THIRD_PARTY ? THIRD_PARTY_MESSAGE : UNKNOWN_PARTY_MESSAGE
 }
 
 // Every refusal the filing can meet before a request is sent, in the order the steps run — `[]` when
 // the filing may go on to the scout.
 function refusals_of(filing: Filing): ReadonlyArray<string> {
-	if (is_third_party(filing.target)) return [THIRD_PARTY_MESSAGE]
+	const party_problem = party_refusal(filing.target)
+
+	if (party_problem !== undefined) return [party_problem]
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
@@ -336,7 +344,13 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, record, run }
+const issue_file_cli = {
+	FRESH_ISSUE_POLL,
+	THIRD_PARTY_MESSAGE,
+	UNKNOWN_PARTY_MESSAGE,
+	record,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

@@ -1,11 +1,21 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
-import type { LaneInfo } from './lane-registry'
+import type { LaneInfo, lane_registry as LaneRegistryModule } from './lane-registry'
+
+type LaneRegistry = typeof LaneRegistryModule
 
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
 // project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
@@ -34,18 +44,25 @@ vi.mock('./lane-install', () => ({
 vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
-vi.mock('./lane-registry', () => ({
-	lane_registry: {
-		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
-			lanes.find((lane) => lane.issue === issue),
-		list_lanes: vi.fn(),
-		main_repository_root: vi.fn(),
-		unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
-			lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
-		used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
-			lanes.flatMap((lane) => lane.seat ?? []),
-	},
-}))
+vi.mock('./lane-registry', async (import_original) => {
+	const { lane_registry: actual } = await import_original<{ lane_registry: LaneRegistry }>()
+
+	return {
+		lane_registry: {
+			find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
+				lanes.find((lane) => lane.issue === issue),
+			list_lanes: vi.fn(),
+			main_repository_root: vi.fn(),
+			unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
+				lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
+			used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
+				lanes.flatMap((lane) => lane.seat ?? []),
+			// Real, so the `.env` this module writes lands on disk with the mode it is given.
+			write_environment: actual.write_environment,
+			OWNER_ONLY_MODE: actual.OWNER_ONLY_MODE,
+		},
+	}
+})
 
 const { git_command } = await import('#scripts/git/git-command')
 const { git_worktree } = await import('#scripts/git/git-worktree')
@@ -63,6 +80,8 @@ const ROOT_SEED_LINE = 'PORT_SEED=5'
 const SEAT_1_LINE = 'JOSH_LANE_SEAT=1'
 const SEAT_2_LINE = 'JOSH_LANE_SEAT=2'
 const ROOT_ENV = [BOT_TOKEN, CHAT_ID, ROOT_SEED_LINE, ''].join('\n')
+// The permission bits are the mode below the file-type bits, `0o777` at most.
+const PERMISSION_RANGE = 0o1000
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
 const START_POINT = 'refs/remotes/origin/main'
@@ -89,6 +108,10 @@ function root_environment_file(): string {
 
 function lane_environment_file(issue: string): string {
 	return readFileSync(path.join(LANE_ROOT, issue, '.env'), 'utf8')
+}
+
+function lane_environment_mode(issue: string): number {
+	return statSync(path.join(LANE_ROOT, issue, '.env')).mode % PERMISSION_RANGE
 }
 
 function seat_lock_path(seat: number): string {
@@ -171,6 +194,13 @@ describe('opening a lane', () => {
 		expect(written).toContain(BOT_TOKEN)
 		expect(written).toContain(CHAT_ID)
 		expect(root_environment_file()).toBe(ROOT_ENV)
+	})
+
+	// joshuafolkken/kit#4634: the copy carries the root's Telegram token, so only its owner reads it.
+	it('writes the lane .env readable by its owner only', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(lane_environment_mode(ISSUE)).toBe(lane_registry.OWNER_ONLY_MODE)
 	})
 
 	it('takes the lowest seat no open lane holds', async () => {

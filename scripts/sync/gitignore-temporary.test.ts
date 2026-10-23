@@ -13,6 +13,7 @@ const roots: Array<string> = []
 // Under the pre-push hook git exports GIT_DIR / GIT_INDEX_FILE, which beat `cwd` — cleared so each
 // call answers about the scratch repository instead of the checkout the hook is firing in.
 const SCRATCH_ENVIRONMENT = git_location_environment.location_free_environment()
+const NO_GLOBAL_EXCLUDES = ['-c', `core.excludesFile=${os.devNull}`]
 
 function is_ignored_by(gitignore_source: string, relative_path: string): boolean {
 	const root = mkdtempSync(path.join(os.tmpdir(), 'josh-gitignore-'))
@@ -22,7 +23,8 @@ function is_ignored_by(gitignore_source: string, relative_path: string): boolean
 	copyFileSync(package_path(gitignore_source), path.join(root, GITIGNORE))
 
 	return (
-		execaSync(GIT, ['check-ignore', '--quiet', relative_path], {
+		// The machine's global excludes file is pointed away, so only the file under test answers.
+		execaSync(GIT, [...NO_GLOBAL_EXCLUDES, 'check-ignore', '--quiet', relative_path], {
 			cwd: root,
 			env: SCRATCH_ENVIRONMENT,
 			reject: false,
@@ -46,6 +48,12 @@ describe.each([GITIGNORE, 'templates/gitignore'])('%s', (gitignore_source) => {
 		'.claude/tmp/nested/plan.md',
 	])('ignores %s', (relative_path) => {
 		expect(is_ignored_by(gitignore_source, relative_path)).toBe(true)
+	})
+
+	// joshuafolkken/kit#4634: the machine-local allowlist names local commands and paths, so a checkout
+	// with no global ignore must not commit it.
+	it('ignores the machine-local .claude/settings.local.json', () => {
+		expect(is_ignored_by(gitignore_source, '.claude/settings.local.json')).toBe(true)
 	})
 
 	it('keeps the rest of .claude/ tracked', () => {

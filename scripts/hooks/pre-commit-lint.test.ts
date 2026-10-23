@@ -64,6 +64,18 @@ describe('pre_commit_lint.build_arguments', () => {
 		expect(pre_commit_lint.build_arguments('eslint', STAGED)?.slice(-STAGED.length)).toEqual(STAGED)
 	})
 
+	// joshuafolkken/kit#4634: a staged file named like an option is read as a file, not as
+	// `--plugin=…`, which would load and run that file's code.
+	it.each(['cspell', 'prettier', 'eslint'])(
+		'ends the options before the staged files for %s',
+		(tool) => {
+			const option_named = ['--plugin=evil.mjs', ...STAGED]
+			const command_arguments = pre_commit_lint.build_arguments(tool, option_named) ?? []
+
+			expect(command_arguments.slice(-option_named.length - 1)).toEqual(['--', ...option_named])
+		},
+	)
+
 	it('answers nothing for a tool it does not know', () => {
 		expect(pre_commit_lint.build_arguments('stylelint', STAGED)).toBeUndefined()
 	})

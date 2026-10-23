@@ -892,7 +892,7 @@ pnpm josh pre-commit-lint eslint src/app.ts
 
 <!-- /usage -->
 
-Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded.
+Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded. Files follow `--`, so an option-like name stays a file.
 
 - `cspell` and `eslint` write `.cspellcache.commit` and `.eslintcache.commit` (separate from the gate's caches).
 - `prettier` shares `.prettiercache` with `josh lint`, so a commit right after a green gate re-checks nothing.
