@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 
 const TEMP_PATHS: Array<string> = []
-const VALID_BODY = '## 背景\n\n'
+const VALID_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n'
 const REQUIRED_SECTIONS = '## 現象\n\n## 期待結果\n\n## 受け入れ条件\n'
 const ENHANCEMENT_OUTPUT = 'labels: enhancement'
 
@@ -58,7 +58,11 @@ describe('issue:lint fenced headings', () => {
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await issue_lint_cli.run(body_path)).toBe(1)
-		expect(report).toHaveBeenCalledWith('✖ missing heading: ## 背景\n✖ missing bug classification')
+		expect(report).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/^✖ missing heading: ## 背景\n✖ missing bug classification\n✖ missing size estimate/u,
+			),
+		)
 	})
 })
 
