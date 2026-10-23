@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { file_reader } from '#scripts/lib/read-file'
 import { yaml_document } from '#scripts/lib/yaml-document'
+import { file_content } from '#scripts/sync/file-content'
 import { release_window } from '#scripts/version/release-window'
 import { dump } from 'js-yaml'
 
@@ -139,7 +140,7 @@ function sync_project_config(root: string): boolean {
 	const workspace = readFileSync(workspace_path, 'utf8')
 	const merged = merge_project_config(existing, workspace)
 	if (merged === existing) return false
-	writeFileSync(config_path, merged)
+	file_content.write_contained(config_path, merged)
 
 	return true
 }

@@ -10,7 +10,7 @@ import { test_read_trace } from './test-read-trace'
 // map it cannot trust must read as no map at all, which runs the whole suite.
 
 vi.mock('#scripts/git/git-common-directory', () => ({
-	git_common_directory: { repository: vi.fn() },
+	git_common_directory: { STATE_DIRECTORY: 'josh', repository: vi.fn() },
 }))
 
 const mocked_common = vi.mocked(git_common_directory.repository)

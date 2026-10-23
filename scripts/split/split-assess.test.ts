@@ -80,6 +80,12 @@ describe('verdict needs both guides exceeded', () => {
 		expect(split_assess.assess(runtime_numstat(11, 1)).verdict).toBe('single')
 	})
 
+	it('judges a bare file and line count by the same rule', () => {
+		expect(split_assess.verdict_for(11, 401)).toBe('split')
+		expect(split_assess.verdict_for(11, 400)).toBe('single')
+		expect(split_assess.verdict_for(10, 401)).toBe('single')
+	})
+
 	it('is single for an empty diff', () => {
 		const measurement = split_assess.assess('')
 

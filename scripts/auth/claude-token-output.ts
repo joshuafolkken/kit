@@ -1,11 +1,11 @@
 import { stripVTControlCharacters } from 'node:util'
+import { token_shape } from '#scripts/lib/token-shape'
 
 // What `claude setup-token` printed, split into the token and the text that may be shown: the token
 // is replaced, so it reaches neither the screen nor a log.
 
-const REDACTED = '[REDACTED]'
+const { REDACTED, ANTHROPIC_OAUTH_TOKEN: TOKEN_PATTERN } = token_shape
 const TOKEN_START = 'sk-ant-oat'
-const TOKEN_PATTERN = /sk-ant-oat\d+-[\w-]+/u
 const EVERY_TOKEN_PATTERN = new RegExp(TOKEN_PATTERN.source, 'gu')
 // A narrow terminal wraps the token onto lines of its own characters alone, so a continuation is a
 // whole such line and the prose after the token never joins it.

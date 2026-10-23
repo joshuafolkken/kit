@@ -9,6 +9,9 @@ const SECRETLINT_BIN = 'secretlint'
 const NO_GLOB_FLAG = '--no-glob'
 const END_OF_OPTIONS = '--'
 const ARGV_OFFSET = 2
+// Set by the CI `Secret Scan` job, where nothing provisions the binary later: there a missing
+// secretlint would turn the scan into a silent pass, so it fails instead (kit#4657).
+const REQUIRE_ENV = 'JOSH_SECRETLINT_REQUIRE'
 
 // The scan is defense in depth ahead of GitHub push protection, not the only gate, so a
 // missing binary must not block the commit. kit ships the pre-commit rule inside
@@ -22,7 +25,14 @@ const MISSING_NOTICE =
 	`   The kit pre-commit hook ships ahead of the dependency it needs.\n` +
 	`   Run \`pnpm josh sync && pnpm install\` to provision it.`
 
-type ScanDecision = { kind: 'skip'; notice?: string } | { kind: 'scan'; binary: string }
+const REQUIRED_MISSING_ERROR =
+	`❌ secretlint is not installed, and ${REQUIRE_ENV} requires the scan.\n` +
+	`   Add it to the devDependencies with \`pnpm josh sync && pnpm install\`.`
+
+type ScanDecision =
+	| { kind: 'skip'; notice?: string }
+	| { kind: 'fail'; error: string }
+	| { kind: 'scan'; binary: string }
 
 function resolve_secretlint_binary(project_root: string): string | undefined {
 	const candidate = resolve_local_bin(project_root, SECRETLINT_BIN)
@@ -38,12 +48,22 @@ function build_scan_arguments(staged_files: ReadonlyArray<string>): Array<string
 	return [NO_GLOB_FLAG, END_OF_OPTIONS, ...staged_files]
 }
 
-function plan_scan(staged_files: ReadonlyArray<string>, project_root: string): ScanDecision {
+function plan_missing(is_required: boolean): ScanDecision {
+	return is_required
+		? { kind: 'fail', error: REQUIRED_MISSING_ERROR }
+		: { kind: 'skip', notice: MISSING_NOTICE }
+}
+
+function plan_scan(
+	staged_files: ReadonlyArray<string>,
+	project_root: string,
+	is_required = false,
+): ScanDecision {
 	if (staged_files.length === 0) return { kind: 'skip' }
 
 	const binary = resolve_secretlint_binary(project_root)
 
-	if (binary === undefined) return { kind: 'skip', notice: MISSING_NOTICE }
+	if (binary === undefined) return plan_missing(is_required)
 
 	return { kind: 'scan', binary }
 }
@@ -61,10 +81,20 @@ function run_scan(binary: string, staged_files: ReadonlyArray<string>): number {
 	return resolve_spawn_exit(binary, result)
 }
 
-function main(staged_files: ReadonlyArray<string>, project_root: string): number {
-	const decision = plan_scan(staged_files, project_root)
+function main(
+	staged_files: ReadonlyArray<string>,
+	project_root: string,
+	is_required = false,
+): number {
+	const decision = plan_scan(staged_files, project_root, is_required)
 
 	if (decision.kind === 'scan') return run_scan(decision.binary, staged_files)
+
+	if (decision.kind === 'fail') {
+		console.error(decision.error)
+
+		return 1
+	}
 
 	if (decision.notice !== undefined) console.warn(decision.notice)
 
@@ -72,7 +102,8 @@ function main(staged_files: ReadonlyArray<string>, project_root: string): number
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const exit_code = main(process.argv.slice(ARGV_OFFSET), process.cwd())
+	const is_required = process.env[REQUIRE_ENV] === '1'
+	const exit_code = main(process.argv.slice(ARGV_OFFSET), process.cwd(), is_required)
 
 	if (exit_code !== 0) process.exit(exit_code)
 }
@@ -85,4 +116,4 @@ const secretlint_scan = {
 	run_scan,
 }
 
-export { MISSING_NOTICE, secretlint_scan }
+export { MISSING_NOTICE, REQUIRE_ENV, REQUIRED_MISSING_ERROR, secretlint_scan }

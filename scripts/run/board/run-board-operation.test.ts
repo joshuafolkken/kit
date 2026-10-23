@@ -1,3 +1,5 @@
+import { token_shape } from '#scripts/lib/token-shape'
+import { token_shape_fixture } from '#scripts/lib/token-shape-fixture'
 import { describe, expect, it } from 'vitest'
 import { run_board_operation, type Operation } from './run-board-operation'
 
@@ -16,6 +18,8 @@ const UNDATED = JSON.stringify({
 const DESCRIPTION = '関連するテストを実行する'
 const JAPANESE = /[぀-ヿ一-鿿]/u
 const LONG_LINE_LENGTH = 50_000
+// How much of a credential is looked for in a target: enough to tell it from the command around it.
+const TOKEN_HEAD = 8
 
 interface Call {
 	name: string
@@ -86,6 +90,21 @@ describe('run_board_operation.latest_of — what a command shows', () => {
 		const operation = latest_of(bash('GH_TOKEN=ghp_secret CI=1 gh api repos'))
 
 		expect(operation?.target).toBe('gh api repos')
+	})
+
+	// joshuafolkken/kit#4658: a credential later in the command is hidden before the cut, which would
+	// otherwise draw its head.
+	it.each([
+		['export GH_TOKEN=', ''],
+		['curl -H "Authorization: token ', '" https://api.github.com/user'],
+	])('hides a credential in `%s…`', (head, tail) => {
+		const sample = token_shape_fixture.sample_of('GitHub token')
+		const target = latest_of(bash(`${head}${sample}${tail}`))?.target ?? ''
+
+		expect(target).toContain(
+			`${head}${token_shape.REDACTED}`.slice(0, run_board_operation.TARGET_LIMIT),
+		)
+		expect(target).not.toContain(sample.slice(0, TOKEN_HEAD))
 	})
 
 	it('stops at the first character that is not ASCII, and never writes the description', () => {

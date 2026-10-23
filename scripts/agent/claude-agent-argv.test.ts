@@ -212,3 +212,22 @@ describe('Claude lane-instruction argv construction', () => {
 		expect(argv.args.at(-1)).toBe(INVOCATION)
 	})
 })
+
+// **No role runs with a person at the keyboard, so none carries a web tool** (#4664): a fetched page would enter the
+// context with no trust label. The per-role list is pinned so a re-added tool fails here.
+describe('Claude per-role launched tools', () => {
+	const PINNED_TOOLS =
+		'Bash,Read,Edit,Write,Agent,Skill,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+
+	it.each(['scheduler', 'worker', 'reviewer'] as const)(
+		'launches the %s with the pinned tool list and no web tool',
+		(role) => {
+			const profile = agent_role_profile.DEFAULT_PROFILES[role]
+			const argv = claude_agent_argv.build(INVOCATION, profile, undefined, project_directory(false))
+			const tools = argv.args[argv.args.indexOf('--tools') + 1]
+
+			expect(tools).toBe(PINNED_TOOLS)
+			expect(tools).not.toMatch(/WebFetch|WebSearch/u)
+		},
+	)
+})

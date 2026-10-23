@@ -715,7 +715,7 @@ pnpm josh ruleset:check --apply   # add the missing checks to the existing rule
 
 A distributed workflow's check gates nothing until the repository requires it. It reads the default branch's rules — rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository has:
 
-- `.github/workflows/ci.yml` — `Checks`, `Detect E2E`, `E2E`, `Security Audit`
+- `.github/workflows/ci.yml` — `Checks`, `Detect E2E`, `E2E`, `Secret Scan`, `Security Audit`
 - `.github/workflows/sonar-qube.yml` — `SonarQube`
 - `.github/workflows/pr-classification.yml` — `Release classification`
 
@@ -874,7 +874,7 @@ pnpm josh secretlint-scan src/app.ts .env.example   # the staged paths
 
 <!-- /usage -->
 
-Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths, wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. A detected secret blocks the commit (exit code forwarded); without secretlint installed the wrapper prints a notice and exits `0`.
+Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths, wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. A detected secret blocks the commit (exit code forwarded); without secretlint it prints a notice and exits `0` — `1` under `JOSH_SECRETLINT_REQUIRE=1` (CI).
 
 **Options:** always passes `--no-glob` so lefthook's literal paths (e.g. SvelteKit `(app)` / `[id]` directories) are not treated as glob patterns.
 

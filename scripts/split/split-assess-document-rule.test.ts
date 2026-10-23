@@ -31,6 +31,13 @@ describe('split-assessment.md carries the pre-gate notice steps', () => {
 	})
 })
 
+// joshuafolkken/kit#4675: a filing over the guide is refused with a pointer at the question's heading.
+describe('split-assessment.md carries the heading a filing refusal names', () => {
+	it('has the question section', () => {
+		expect(read_repo_file(SPLIT_ASSESSMENT)).toContain(`## ${split_assess.QUESTION_SECTION}`)
+	})
+})
+
 describe('split:assess is a registered decision oracle', () => {
 	it('is on the oracle list with the split | single vocabulary', () => {
 		const oracle = decision_oracle.find_oracle(COMMAND)

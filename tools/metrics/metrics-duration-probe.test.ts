@@ -1,9 +1,19 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { metrics_duration_probe } from './metrics-duration-probe'
 
@@ -12,11 +22,20 @@ vi.mock('node:child_process', async (original) => {
 
 	return { ...actual, spawnSync: vi.fn(actual.spawnSync) }
 })
+vi.mock('node:fs', async (original) => {
+	const actual = await original<{ renameSync: typeof renameSync }>()
+
+	return { ...actual, renameSync: vi.fn(actual.renameSync) }
+})
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'metrics-duration-probe-test-'))
 const baseline_file = path.join(scratch, 'durations.json')
 const FAIL = 1
 const GATE_BASELINE = '{"gate": 1000}'
+const BASELINE_NAME = 'metrics-durations.json'
+const LEGACY_BASELINE_NAME = 'josh-metrics-durations.json'
+const READ_ONLY_MODE = 0o555
+const WRITABLE_MODE = 0o755
 
 function baseline_on_disk(): unknown {
 	return JSON.parse(readFileSync(baseline_file, 'utf8'))
@@ -60,6 +79,70 @@ describe('metrics_duration_probe.accept', () => {
 		metrics_duration_probe.accept(baseline_file, { gate: undefined, josh_startup: 190 })
 
 		expect(baseline_on_disk()).toStrictEqual({ gate: 1000, josh_startup: 190 })
+	})
+})
+
+// joshuafolkken/kit#4653: josh's state sits in its own directory of the common one, not at its root.
+describe('metrics_duration_probe.baseline_path', () => {
+	it('keeps the baseline in the josh state directory of the common git directory', async () => {
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(path.join(scratch, '.git'))
+
+		expect(await metrics_duration_probe.baseline_path()).toBe(
+			path.join(scratch, '.git', 'josh', BASELINE_NAME),
+		)
+	})
+
+	it('creates the josh state directory when it records the first baseline', () => {
+		const nested = path.join(scratch, 'fresh', 'josh', BASELINE_NAME)
+
+		expect(metrics_duration_probe.check(nested, { josh_startup: 170 })).toBe(0)
+		expect(JSON.parse(readFileSync(nested, 'utf8'))).toStrictEqual({ josh_startup: 170 })
+	})
+
+	it('moves the baseline kept at the common directory root into the josh state directory', async () => {
+		const repository = mkdtempSync(path.join(scratch, 'legacy-'))
+
+		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
+
+		const file = await metrics_duration_probe.baseline_path()
+
+		expect(file === undefined ? undefined : readFileSync(file, 'utf8')).toBe(GATE_BASELINE)
+		expect(existsSync(path.join(repository, LEGACY_BASELINE_NAME))).toBe(false)
+	})
+
+	it('copies the root baseline when the root is read-only', async () => {
+		const repository = mkdtempSync(path.join(scratch, 'sandboxed-'))
+
+		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
+		mkdirSync(path.join(repository, 'josh'))
+		chmodSync(repository, READ_ONLY_MODE)
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
+
+		const file = await metrics_duration_probe.baseline_path()
+
+		chmodSync(repository, WRITABLE_MODE)
+		expect(file === undefined ? undefined : readFileSync(file, 'utf8')).toBe(GATE_BASELINE)
+	})
+})
+
+// Two lanes' gates both see the root baseline; the one whose move loses finds it already gone.
+describe('metrics_duration_probe.baseline_path under a concurrent move', () => {
+	// The move fails and the other lane's move lands before the copy, so the copy finds nothing.
+	it('takes the baseline another lane moved first rather than failing to copy it', async () => {
+		const repository = mkdtempSync(path.join(scratch, 'raced-'))
+
+		writeFileSync(path.join(repository, LEGACY_BASELINE_NAME), GATE_BASELINE)
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
+		vi.mocked(renameSync).mockImplementationOnce((from, to) => {
+			writeFileSync(to, GATE_BASELINE)
+			rmSync(from)
+			throw new Error('ENOENT: the other lane moved it first')
+		})
+
+		const file = await metrics_duration_probe.baseline_path()
+
+		expect(file === undefined ? undefined : readFileSync(file, 'utf8')).toBe(GATE_BASELINE)
 	})
 })
 

@@ -5,12 +5,14 @@ import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 import { issue_not_before } from './issue-not-before'
 import { measure_declaration } from './measure-declaration'
+import { size_estimate } from './size-estimate'
 
 // `josh issue:lint <path>` — read an Issue body from a file and print `ok`, or every template problem
 // one per line, exiting non-zero. It reads a path rather than stdin so it can
 // lint a body written to a file before the `gh api … issues` call that files it. A body that declares
 // itself a behavior-change Issue is additionally held to the firing-point, baseline and reproduction
-// rules, and one that declares a run-time-shortening aim to the expected-effect estimate.
+// rules, and one that declares a run-time-shortening aim to the expected-effect estimate. Every
+// non-epic body declares its size estimate; the guide it is judged against is `issue:file`'s check.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -30,6 +32,7 @@ function problems(body: string): ReadonlyArray<string> {
 		...issue_classification.problems(body),
 		...issue_not_before.problems(body),
 		...measure_declaration.problems(body),
+		...size_estimate.problems(body),
 	]
 }
 

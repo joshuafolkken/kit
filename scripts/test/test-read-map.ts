@@ -35,7 +35,6 @@ interface ReadMap {
 // `input-fingerprint.ts`'s digest of every changed file (joshuafolkken/kit#4497).
 const MAP_VERSION = 6
 
-const MAP_DIRECTORY = 'josh'
 const MAP_FILE_STEM = 'test-read-map'
 const RECORD_EXTENSION = '.json'
 
@@ -186,7 +185,9 @@ function map_path(root: string, version: number = MAP_VERSION): string | undefin
 	const common = git_common_directory.repository(root)
 	const name = `${MAP_FILE_STEM}.v${String(version)}${RECORD_EXTENSION}`
 
-	return common === undefined ? undefined : path.join(common, MAP_DIRECTORY, name)
+	return common === undefined
+		? undefined
+		: path.join(common, git_common_directory.STATE_DIRECTORY, name)
 }
 
 // Every version's map, the unversioned one kits before joshuafolkken/kit#4423 wrote included; a
