@@ -40,6 +40,26 @@ function unit_step_args(): string | undefined {
 		.find((text) => text.includes(UNIT_WORKER_FLAG))
 }
 
+// joshuafolkken/kit#4609: the pool starts the checks in the order `resolve_concurrency` counted them,
+// so a zero-weight check never queues behind one waiting for cores.
+describe('run_gate_steps — the start order', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+	})
+
+	it('starts the zero-weight checks first and reports in declaration order', async () => {
+		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true))
+
+		const results = await gate_run_steps.run_gate_steps(plan, UNRESERVED_BUDGET)
+		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))
+
+		expect(started[0]).toContain('behavior')
+		expect(started.at(-1)).toContain('cspell')
+		expect(results.map((result) => result.label)).toEqual(plan.checks.map((check) => check.label))
+	})
+})
+
 // joshuafolkken/kit#3903: a check whose inputs did not move since its record is reused, not run.
 describe('run_gate_steps — a reused check', () => {
 	beforeEach(() => {
