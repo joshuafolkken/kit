@@ -9,7 +9,7 @@ import { create_spawn_error } from './git-execa-error'
 vi.mock('./git-command', () => ({
 	git_command: {
 		branch: vi.fn(),
-		diff_main_numstat: vi.fn(),
+		diff_numstat_since: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 		merge_branch: vi.fn(),
@@ -17,6 +17,10 @@ vi.mock('./git-command', () => ({
 		status: vi.fn(),
 		untracked_names: vi.fn(),
 	},
+}))
+
+vi.mock('./change-base', () => ({
+	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 
 // The guard's one git read — the paths the default branch would bring in.
@@ -64,7 +68,7 @@ beforeEach(() => {
 // The split notice's diff read, empty by default so no merge below prints one.
 beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-	vi.mocked(git_command.diff_main_numstat).mockResolvedValue('')
+	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 })
 
@@ -232,14 +236,14 @@ function over_guide_numstat(): string {
 
 describe('the split notice before the gate', () => {
 	it('warns when the diff clearly exceeds the split guide', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(over_guide_numstat())
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('split notice'))
 	})
 
 	it('prints nothing for a diff under the guide', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
 
 		await main_merge.run(NO_ARGUMENTS)
 
@@ -247,7 +251,7 @@ describe('the split notice before the gate', () => {
 	})
 
 	it('keeps a finished merge successful and says the diff was unmeasured when it cannot be read', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.diff_numstat_since).mockRejectedValue(MERGE_FAILURE)
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('could not be measured'))
