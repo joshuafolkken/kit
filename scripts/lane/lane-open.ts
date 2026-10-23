@@ -4,6 +4,7 @@ import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { session_cite } from '#scripts/issue/session-cite'
 import { file_reader } from '#scripts/lib/read-file'
+import { eslint_warm } from '#scripts/lint/eslint-warm'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
@@ -176,9 +177,12 @@ function guard_install(lane: LaneInfo, result: InstallResult): void {
 
 // **The install is said on the run's stream as it starts**: it is the long part of opening a lane, and
 // `run:board` draws it apart from the work tree being made. Best-effort, as every stage is.
+// **The eslint daemon is warmed once the install lands, unawaited**, so the child's first edit hook
+// lints warm rather than paying the daemon's start (joshuafolkken/kit#4720).
 async function fill(lane: LaneInfo): Promise<void> {
 	await run_event_setup.emit(run_event_setup.installing(lane.issue))
 	guard_install(lane, await lane_install.install_dependencies(lane.directory))
+	eslint_warm.start(lane.directory)
 }
 
 function build_plan(
