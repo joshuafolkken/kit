@@ -1,0 +1,7 @@
+{
+	"reason": "Codex lanes run under a josh_lane permission profile instead of workspace-write with --add-dir: the common git directory root is writable so branch deletion and stash drop work, while hooks, config, commondir, config.worktree and each registered worktree's commondir stay read-only; tests pin the profile table; plus the legacy metrics-baseline migration race guard",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 92
+	}
+}

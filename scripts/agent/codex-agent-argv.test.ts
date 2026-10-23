@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
@@ -8,15 +8,23 @@ import { codex_agent_argv } from './codex-agent-argv'
 
 const INVOCATION = 'fullrun #2071'
 const MODEL = 'gpt-6.1-sol'
-const SANDBOX = 'workspace-write'
 const EPHEMERAL_FLAG = '--ephemeral'
-const NETWORK_CONFIG = 'sandbox_workspace_write.network_access=true'
+const PROFILE_CONFIG = 'default_permissions="josh_lane"'
+const NETWORK_CONFIG = 'permissions.josh_lane.network.enabled=true'
+const FILESYSTEM_PREFIX = 'permissions.josh_lane.filesystem='
+const BASE_FILESYSTEM_CONFIG = `${FILESYSTEM_PREFIX}{":root"="read",":workspace_roots"="write",":slash_tmp"="write",":tmpdir"="write"}`
 const LANE = '/lanes/2071'
 const FIXTURE = path.join(process.cwd(), 'node_modules', '.cache', 'codex-argv-test')
 const PRIMARY = path.join(FIXTURE, 'primary')
 const GIT_COMMON_DIRECTORY = path.join(FIXTURE, 'kit with spaces', '.git')
 // The writable root is the ledger's parent, outside `docs/` since joshuafolkken/kit#3341.
 const LEDGER_PARENT = path.dirname(OBSERVATION_LEDGER_DIRECTORY)
+const GRANT_PATTERN = /("(?:[^"\\]|\\.)*")=("(?:read|write)")/gu
+
+const WORKTREE_CONFIG = 'config.worktree'
+const OTHER_WORKTREE = path.join('worktrees', 'other-lane')
+
+type Grant = [string, string]
 
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 
@@ -27,6 +35,32 @@ beforeEach(() => {
 afterEach(() => {
 	rmSync(FIXTURE, { force: true, recursive: true })
 })
+
+function link_lane(common_directory: string): string {
+	mkdirSync(common_directory, { recursive: true })
+	resolve_common_directory.mockReturnValue(common_directory)
+
+	return realpathSync(common_directory)
+}
+
+function parse_string(literal: string): string {
+	const value: unknown = JSON.parse(literal)
+
+	return String(value)
+}
+
+function grants(args: ReadonlyArray<string>): Record<string, string> {
+	const table = args.find((argument) => argument.startsWith(FILESYSTEM_PREFIX)) ?? ''
+	const pairs = [...table.matchAll(GRANT_PATTERN)].map(
+		([, target = '""', access = '""']): Grant => [parse_string(target), parse_string(access)],
+	)
+
+	return Object.fromEntries(pairs)
+}
+
+function lane_grants(profile: AgentProfile): Record<string, string> {
+	return grants(codex_agent_argv.build(INVOCATION, profile, LANE).args)
+}
 
 function openai_worker(): AgentProfile {
 	const result = agent_role_profile.resolve(agent_role_profile.WORKER, {
@@ -50,12 +84,14 @@ describe('Codex argv construction', () => {
 			command: 'codex',
 			args: [
 				'exec',
-				'--sandbox',
-				SANDBOX,
 				'--model',
 				MODEL,
 				'-c',
 				'model_reasoning_effort="medium"',
+				'-c',
+				PROFILE_CONFIG,
+				'-c',
+				BASE_FILESYSTEM_CONFIG,
 				'-c',
 				NETWORK_CONFIG,
 				'--json',
@@ -70,8 +106,18 @@ describe('Codex argv construction', () => {
 
 		expect(argv.args.at(-1)).toBe(INVOCATION)
 		expect(argv.args.join(' ')).not.toContain('dangerously')
-		expect(argv.args).toContain(SANDBOX)
 		expect(argv.args).toContain(NETWORK_CONFIG)
+	})
+})
+
+describe('Codex sandbox selection', () => {
+	// codex-cli refuses `sandbox_mode` together with `default_permissions`.
+	it('selects the permission profile instead of a sandbox mode or added directories', () => {
+		const { args } = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
+
+		expect(args).toContain(PROFILE_CONFIG)
+		expect(args).not.toContain('--sandbox')
+		expect(args).not.toContain('--add-dir')
 	})
 })
 
@@ -96,59 +142,93 @@ describe('Codex lane runtime state', () => {
 
 		expect(argv.args).toContain(`sqlite_home=${JSON.stringify(expected)}`)
 	})
+})
 
-	it('adds the linked worktree Git and ledger directories as writable roots', () => {
-		mkdirSync(path.dirname(GIT_COMMON_DIRECTORY), { recursive: true })
-		resolve_common_directory.mockReturnValue(GIT_COMMON_DIRECTORY)
+// joshuafolkken/kit#4653: a sandbox that could write `hooks/` or `config` runs code outside it.
+describe('Codex lane common Git directory scope', () => {
+	it('writes the common Git directory root, where a ref deletion rewrites packed-refs', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
 
-		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
-		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? argv.args[index + 1] : [],
-		)
-
+		expect(lane_grants(openai_worker())[common]).toBe('write')
 		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
-		expect(additions).toStrictEqual([
-			GIT_COMMON_DIRECTORY,
-			path.join(path.dirname(GIT_COMMON_DIRECTORY), LEDGER_PARENT),
-		])
+	})
+
+	it('keeps hooks, config, commondir and config.worktree read-only', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
+		const table = lane_grants(openai_worker())
+
+		for (const entry of ['hooks', 'config', 'commondir', WORKTREE_CONFIG]) {
+			expect(table[path.join(common, entry)]).toBe('read')
+		}
+	})
+
+	it('keeps every registered work tree git directory pointing at the common one', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
+
+		mkdirSync(path.join(common, OTHER_WORKTREE), { recursive: true })
+		const table = lane_grants(openai_worker())
+
+		expect(table[path.join(common, OTHER_WORKTREE, 'commondir')]).toBe('read')
+		expect(table[path.join(common, OTHER_WORKTREE, WORKTREE_CONFIG)]).toBe('read')
+	})
+})
+
+describe('Codex lane common Git directory location', () => {
+	it('grants a common Git directory reached through a symlink at its real path', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
+		const linked = path.join(FIXTURE, 'linked.git')
+
+		symlinkSync(common, linked)
+		resolve_common_directory.mockReturnValue(linked)
+
+		expect(lane_grants(openai_worker())[common]).toBe('write')
+		expect(lane_grants(openai_worker())).not.toHaveProperty(linked)
+	})
+
+	it('grants the same Git directory to a reviewer, without the ledger', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
+		const { reviewer } = agent_role_profile.OPENAI_PROFILES
+		const worker_targets = Object.keys(lane_grants(openai_worker()))
+		const reviewer_targets = Object.keys(lane_grants(reviewer))
+
+		expect(reviewer_targets).toStrictEqual(
+			worker_targets.filter((target) => !target.endsWith(LEDGER_PARENT)),
+		)
+		expect(lane_grants(reviewer)[common]).toBe('write')
 	})
 })
 
 describe('Codex lane ledger scope', () => {
 	it('creates a missing primary ledger directory before granting worker access', () => {
-		const documents = path.join(PRIMARY, LEDGER_PARENT)
+		link_lane(path.join(PRIMARY, '.git'))
+		const table = lane_grants(openai_worker())
+		const documents = realpathSync(path.join(PRIMARY, LEDGER_PARENT))
 
-		mkdirSync(PRIMARY, { recursive: true })
-		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
-		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
-
-		expect(existsSync(documents)).toBe(true)
-		expect(argv.args).toContain(documents)
+		expect(table[documents]).toBe('write')
 	})
 
-	it('adds only the primary ledger directory for a lane worker', () => {
-		const documents = path.join(PRIMARY, LEDGER_PARENT)
+	it('grants the ledger directory, never the primary checkout root', () => {
+		link_lane(path.join(PRIMARY, '.git'))
+		const table = lane_grants(openai_worker())
 
-		mkdirSync(documents, { recursive: true })
-		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
-		const argv = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
-		const additions = argv.args.flatMap((argument, index) =>
-			argument === '--add-dir' ? argv.args[index + 1] : [],
+		expect(table).not.toHaveProperty(realpathSync(PRIMARY))
+	})
+
+	it('refuses a ledger directory that is a symlink, which would widen the grant', () => {
+		link_lane(path.join(PRIMARY, '.git'))
+		mkdirSync(path.dirname(path.join(PRIMARY, LEDGER_PARENT)), { recursive: true })
+		symlinkSync(FIXTURE, path.join(PRIMARY, LEDGER_PARENT))
+
+		expect(() => codex_agent_argv.build(INVOCATION, openai_worker(), LANE)).toThrow(
+			'Writable root must be a real directory',
 		)
-
-		expect(additions).toStrictEqual([path.join(PRIMARY, '.git'), documents])
-		expect(additions).not.toContain(PRIMARY)
 	})
 
 	it('does not expose the primary ledger directory to a reviewer', () => {
-		mkdirSync(path.join(PRIMARY, LEDGER_PARENT), { recursive: true })
-		resolve_common_directory.mockReturnValue(path.join(PRIMARY, '.git'))
-		const argv = codex_agent_argv.build(
-			INVOCATION,
-			agent_role_profile.OPENAI_PROFILES.reviewer,
-			LANE,
-		)
+		link_lane(path.join(PRIMARY, '.git'))
+		const table = lane_grants(agent_role_profile.OPENAI_PROFILES.reviewer)
 
-		expect(argv.args).not.toContain(path.join(PRIMARY, LEDGER_PARENT))
+		expect(existsSync(path.join(PRIMARY, LEDGER_PARENT))).toBe(false)
+		expect(Object.values(table).filter((access) => access === 'write')).toHaveLength(4)
 	})
 })

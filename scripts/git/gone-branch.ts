@@ -7,7 +7,10 @@ import { git_spawn } from './git-spawn'
 // **A branch is removed only when all three hold** — its upstream is gone, it is merged into the
 // default branch, and no work tree has it checked out. Gone alone is not enough: a branch whose remote
 // was deleted by hand before its work merged still holds the only copy of it. A branch with no
-// upstream at all is never gone, so a local-only branch stays.
+// upstream at all is never gone, so a local-only branch stays. A lane branch has its upstream from the
+// moment it opens (`lane-open.ts`), so an unpushed lane reads `[gone]`: the merge test keeps one with
+// commits of its own, and one with none — merged already — is kept by its work tree, then deleted with
+// nothing lost once the tree is gone.
 //
 // **One `for-each-ref` read carries the work-tree answer too** — `%(worktreepath)` is git's own
 // record of which tree holds the branch, so no `git worktree list` parse is repeated here.

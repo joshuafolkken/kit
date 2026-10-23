@@ -202,6 +202,15 @@ function build_plan(
 	}
 }
 
+async function add_worktree(lane: LaneInfo): Promise<void> {
+	mkdirSync(path.dirname(lane.directory), { recursive: true })
+
+	const start_point = await lane_start_point.resolve_for_branch(lane.branch)
+
+	await git_worktree.worktree_add(lane.directory, lane.branch, start_point)
+	await git_worktree.set_upstream(lane.branch)
+}
+
 // The `.env` is written straight after the work tree exists, because the seed is the reason the
 // lane is being opened. Nothing else is recorded anywhere: that file *is* the record.
 //
@@ -231,11 +240,7 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// genuinely broken lane. The `finally` covers a failure before the `.env`
 	// is written, where nothing was created that should hold it.
 	try {
-		mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
-
-		const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
-
-		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
+		await add_worktree(plan.lane)
 		lane_registry.write_environment(plan.lane.directory, plan.environment_content)
 		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)

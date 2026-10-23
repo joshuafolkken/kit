@@ -33,10 +33,7 @@ vi.mock('#scripts/git/git-command', () => ({
 	},
 }))
 vi.mock('#scripts/git/git-worktree', () => ({
-	git_worktree: {
-		ls_remote_branch: vi.fn(),
-		worktree_add: vi.fn(),
-	},
+	git_worktree: { ls_remote_branch: vi.fn(), set_upstream: vi.fn(), worktree_add: vi.fn() },
 }))
 vi.mock('./lane-install', () => ({
 	lane_install: { install_dependencies: vi.fn() },
@@ -180,6 +177,8 @@ describe('opening a lane', () => {
 			'1490-lane',
 			START_POINT,
 		)
+		// joshuafolkken/kit#4653: a Codex lane's sandbox cannot write the upstream its push would set.
+		expect(vi.mocked(git_worktree.set_upstream)).toHaveBeenCalledWith('1490-lane')
 	})
 
 	// The lane keeps the project's seed and adds only its seat, so the file shows the two apart and the

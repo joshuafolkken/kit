@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
@@ -138,21 +138,22 @@ describe('OpenAI lane supervisor generations', () => {
 })
 
 describe('OpenAI lane supervisor Git access', () => {
-	it('allows the linked worktree Git and ledger directories in the launched generation', async () => {
+	it('grants the common Git directory and the ledger in the launched generation', async () => {
+		mkdirSync(common_directory, { recursive: true })
 		resolve_common_directory.mockReturnValue(common_directory)
 
 		await supervise('git-common-directory')
 
-		const { args } = launched_request().argv
-		const additions = args.flatMap((argument, index) =>
-			argument === '--add-dir' ? args[index + 1] : [],
+		const filesystem = launched_request().argv.args.join(' ')
+		const ledger = path.join(
+			path.dirname(common_directory),
+			path.dirname(OBSERVATION_LEDGER_DIRECTORY),
 		)
 
 		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
-		expect(additions).toStrictEqual([
-			common_directory,
-			path.join(path.dirname(common_directory), path.dirname(OBSERVATION_LEDGER_DIRECTORY)),
-		])
+		expect(filesystem).toContain(`${JSON.stringify(realpathSync(common_directory))}="write"`)
+		expect(filesystem).toContain(`${JSON.stringify(realpathSync(ledger))}="write"`)
+		expect(filesystem).not.toContain('--add-dir')
 	})
 })
 
