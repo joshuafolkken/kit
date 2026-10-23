@@ -1,7 +1,7 @@
 {
-	"reason": "New repo-admin guard row closes the repository-administration write gap, incl. URL/GraphQL/selector spellings (#4650)",
+	"reason": "gh_api reads the method and field flags off the argv at flag positions, so a flag spelled inside a field value or a field flag with its value attached is classified correctly (round-2 review of #4650)",
 	"date": "2026-10-23",
 	"growth": {
-		"scripts.code_lines": 82
+		"scripts.code_lines": 104
 	}
 }

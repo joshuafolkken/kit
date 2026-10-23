@@ -14,6 +14,8 @@ describe('repo_admin.is_repo_admin_write — refuses a gh api write', () => {
 		['--method PUT, -F', `gh api --method PUT ${REPO}/rulesets/1 -F enforcement=disabled`],
 		['--method=PUT, --input', `gh api --method=PUT ${REPO}/rulesets/1 --input ruleset.json`],
 		['-XPUT, no body', `gh api -XPUT ${REPO}/collaborators/attacker`],
+		['an attached field', `gh api ${REPO}/rulesets -fname=x`],
+		['-X GET inside a field value', `gh api ${REPO}/rulesets -f name=x -f 'note=a -X GET'`],
 		['-X=PUT, no body', `gh api -X=PUT ${REPO}/collaborators/attacker`],
 		['implicit POST, -f', `gh api ${REPO}/rulesets -f name=x`],
 		['implicit POST, --input', `gh api ${REPO}/hooks --input hook.json`],

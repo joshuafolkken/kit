@@ -40,6 +40,13 @@ describe('gh_api read vs write', () => {
 		['DELETE method', 'gh api -X DELETE repos/o/r/issues/5/labels/x'],
 		['attached method', 'gh api -XPUT repos/o/r/collaborators/x'],
 		['method with equals', 'gh api --method=PATCH repos/o/r'],
+		['attached short field', 'gh api repos/o/r/rulesets -fname=x'],
+		['attached capital field', 'gh api repos/o/r/rulesets -Fname=x'],
+		[
+			'method spelled inside a field value',
+			"gh api repos/o/r/rulesets -f name=x -f 'note=a -X GET'",
+		],
+		['the last method winning', 'gh api repos/o/r/rulesets -X GET -X POST'],
 	])('writes: %s', (_name, command) => {
 		expect(gh_api.is_write(command)).toBe(true)
 		expect(gh_api.is_read(command)).toBe(false)

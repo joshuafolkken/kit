@@ -21,28 +21,8 @@ const HELP_FLAGS: ReadonlySet<string> = new Set(['-h', '--help'])
 // The repository selector gh accepts before `pr` or between `pr` and its action; with no `=` it
 // swallows the next word, so that word is not read as the group or the action.
 const VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set(['-R', '--repo'])
-// `gh api`'s own flags that take a value as the next word, beside the repository selector — skipped
-// so `-X POST` or `-f body=…` is not read as the endpoint.
-const API_VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set([
-	...VALUE_TAKING_FLAGS,
-	'-X',
-	'--method',
-	'-f',
-	'--raw-field',
-	'-F',
-	'--field',
-	'-H',
-	'--header',
-	'--input',
-	'-q',
-	'--jq',
-	'-t',
-	'--template',
-	'--hostname',
-	'-p',
-	'--preview',
-	'--cache',
-])
+// `gh api`'s own flags that take a value as the next word — `gh-api.ts` owns the list.
+const { API_VALUE_TAKING_FLAGS } = gh_api
 const API_SUBCOMMAND = 'api'
 // The pull-request collection itself — a write there opens a PR. Anchored on the whole endpoint
 // argument, so `…/pulls/5/comments` is not read as the collection. A full API URL names the same
