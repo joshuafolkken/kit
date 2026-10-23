@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
@@ -34,6 +35,7 @@ const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
 // sets no space after `。`, so it ends a sentence on its own.
 const SENTENCE_END = /(?<=[.!?])\s|(?<=。)/u
 const SENTENCE_LIMIT = 200
+type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
 const ELLIPSIS = '…'
 
 const VERDICT = {
@@ -109,12 +111,18 @@ function issue_read_instruction(issue: string): string {
 	].join(' ')
 }
 
+function round_one_opening(brief_path: string): string {
+	return [
+		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
+		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+	].join(' ')
+}
+
 // One line, because `detached_launch` refuses an argument carrying a control character: the multi-line
 // brief travels by path, never inline.
 function reviewer_prompt(brief_path: string, findings_path: string, issue: string): string {
 	return [
-		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
-		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+		round_one_opening(brief_path),
 		issue_read_instruction(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
@@ -122,6 +130,29 @@ function reviewer_prompt(brief_path: string, findings_path: string, issue: strin
 		'return only once both are green; revert a fix you cannot get green and report that finding unfixed.',
 		findings_instruction(findings_path, `, prefixing a finding you fixed with "${FIXED_PREFIX}"`),
 	].join(' ')
+}
+
+// The round-1 review run beside the code review: it reads only, so the two sessions never fix, verify
+// and revert in the one shared checkout at once; its findings go to the lane's one fix pass.
+function report_prompt(brief_path: string, findings_path: string, issue: string): string {
+	return [
+		round_one_opening(brief_path),
+		'Do not edit any file: the code review running beside this one fixes in this checkout.',
+		issue_read_instruction(issue),
+		findings_instruction(findings_path, ''),
+	].join(' ')
+}
+
+// **One reviewer edits the checkout** (joshuafolkken/kit#4672): a slot reviewed beside the code slot
+// reads only, and a slot reviewed alone takes the round's own prompt.
+function slot_prompt(
+	round_prompt: PromptOf,
+	slot: ReviewSlot,
+	slots: ReadonlyArray<ReviewSlot>,
+): PromptOf {
+	if (slot === review_attest.REVIEW_SLOT.CODE || slots.length === 1) return round_prompt
+
+	return report_prompt
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
@@ -286,11 +317,13 @@ const run_ship_review = {
 	has_fixes,
 	is_clean_round_one,
 	read_verdict,
+	report_prompt,
 	reviewer_prompt,
 	round_one_outcome,
 	round_two_outcome,
+	slot_prompt,
 	verification_prompt,
 }
 
-export type { ReviewVerdict, RoundOutcome, ScoredVerdict, StopFinding }
+export type { PromptOf, ReviewVerdict, RoundOutcome, ScoredVerdict, StopFinding }
 export { run_ship_review }

@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { review_attest } from '#scripts/review/review-attest'
 import { describe, expect, it } from 'vitest'
 import { run_ship_review } from './run-ship-review'
 
@@ -296,5 +297,38 @@ describe('run_ship_review — the two prompts', () => {
 		expect(prompt).toContain('round-2 verification pass')
 		expect(prompt).toContain('Do not edit any file.')
 		expect(prompt).not.toContain(run_ship_review.FIXED_PREFIX.trim())
+	})
+})
+
+// joshuafolkken/kit#4672: two reviewers fixing, verifying and reverting in one checkout at once race.
+describe('run_ship_review.slot_prompt — one reviewer edits the checkout', () => {
+	const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+	const BOTH = [CODE, INTERACTION]
+
+	it('keeps the round prompt for the code slot beside the interaction slot', () => {
+		const { reviewer_prompt, slot_prompt } = run_ship_review
+
+		expect(slot_prompt(reviewer_prompt, CODE, BOTH)).toBe(reviewer_prompt)
+	})
+
+	it('makes the interaction slot beside the code slot read only', () => {
+		const prompt_of = run_ship_review.slot_prompt(
+			run_ship_review.reviewer_prompt,
+			INTERACTION,
+			BOTH,
+		)
+		const prompt = prompt_of(BRIEF, FINDINGS, ISSUE)
+
+		expect(prompt).not.toMatch(/\n/u)
+		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
+		expect(prompt).toContain('Do not edit any file')
+		expect(prompt).not.toContain('Apply a fix')
+		expect(prompt).not.toContain(run_ship_review.FIXED_PREFIX.trim())
+	})
+
+	it('lets the interaction slot reviewed alone fix in place', () => {
+		const { reviewer_prompt, slot_prompt } = run_ship_review
+
+		expect(slot_prompt(reviewer_prompt, INTERACTION, [INTERACTION])).toBe(reviewer_prompt)
 	})
 })

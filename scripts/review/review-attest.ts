@@ -32,8 +32,20 @@ import { review_checkout, type ReviewCheckout } from './review-checkout'
 // **Absence is a failure, never a pass.** A fork that ignored the instruction leaves no attestation,
 // and `check` answers `missing` rather than `ok`: the one shape this record must never take is the
 // one the defect already had.
+//
+// **One pointer per review slot**: `/code-review` and the interaction review run side by side in a
+// ship (joshuafolkken/kit#4672), so a brief minted for one never drops the other's nonce, and `check`
+// asks every slot against its own nonce. The code slot's pointer is the one the resume narrowing and
+// the issue watch read.
 
-const POINTER_PREFIX = 'josh-review-target-'
+const REVIEW_SLOT = { CODE: 'code', INTERACTION: 'interaction' } as const
+const REVIEW_SLOTS = [REVIEW_SLOT.CODE, REVIEW_SLOT.INTERACTION] as const
+type ReviewSlot = (typeof REVIEW_SLOTS)[number]
+
+const POINTER_PREFIXES: Readonly<Record<ReviewSlot, string>> = {
+	code: 'josh-review-target-',
+	interaction: 'josh-review-interaction-target-',
+}
 const EXPECT_PREFIX = 'josh-review-expect-'
 const ATTEST_PREFIX = 'josh-review-attest-'
 
@@ -64,8 +76,8 @@ interface PointerRecord {
 	taken_at: string
 }
 
-function pointer_path(root: string = PROJECT_ROOT): string {
-	return stamp_file.stamp_path(POINTER_PREFIX, root)
+function pointer_path(root: string = PROJECT_ROOT, slot: ReviewSlot = REVIEW_SLOT.CODE): string {
+	return stamp_file.stamp_path(POINTER_PREFIXES[slot], root)
 }
 
 function expect_path(nonce: string): string {
@@ -114,8 +126,8 @@ function to_pointer(value: unknown): PointerRecord | undefined {
 	return undefined
 }
 
-function read_pointer(root?: string): PointerRecord | undefined {
-	return to_pointer(read_json(pointer_path(root)))
+function read_pointer(root?: string, slot?: ReviewSlot): PointerRecord | undefined {
+	return to_pointer(read_json(pointer_path(root, slot)))
 }
 
 function read_expectation(nonce: string): ReviewCheckout | undefined {
@@ -133,6 +145,13 @@ function drop_records(pointer: PointerRecord | undefined): void {
 
 	stamp_file.remove_stamp(expect_path(pointer.nonce))
 	stamp_file.remove_stamp(attest_path(pointer.nonce))
+}
+
+function drop_slot(root: string | undefined, slot: ReviewSlot): void {
+	const pointer = read_pointer(root, slot)
+
+	stamp_file.remove_stamp(pointer_path(root, slot))
+	drop_records(pointer)
 }
 
 // An unparseable timestamp reads as stale rather than as fresh, so a corrupted record drops the
@@ -153,13 +172,23 @@ function is_stale(taken_at: string, now: number): boolean {
 // attestation rather than accepting the one an earlier round already satisfied. Leaving the old pair
 // on disk would only be litter, but an orphaned expectation is also a nonce a fork could still attest
 // against, which is a contract nobody is checking.
-function record_target(checkout: ReviewCheckout, root?: string): string {
+//
+// **A code brief opens a new round, and closes the interaction contract with it.** Only
+// `review:brief --interaction` mints that slot, after the code brief of its round, so a contract
+// left unattested — its reviewer died, or the fix took the change out of the interaction review's
+// paths — would otherwise refuse every later round 2 and merge in the checkout.
+function record_target(
+	checkout: ReviewCheckout,
+	root?: string,
+	slot: ReviewSlot = REVIEW_SLOT.CODE,
+): string {
 	const nonce = randomBytes(NONCE_BYTES).toString('hex')
 	const taken_at = new Date().toISOString()
 
-	drop_records(read_pointer(root))
+	if (slot === REVIEW_SLOT.CODE) drop_slot(root, REVIEW_SLOT.INTERACTION)
+	drop_records(read_pointer(root, slot))
 	stamp_file.write_stamp(expect_path(nonce), { ...checkout, taken_at })
-	stamp_file.write_stamp(pointer_path(root), { nonce, taken_at })
+	stamp_file.write_stamp(pointer_path(root, slot), { nonce, taken_at })
 
 	return nonce
 }
@@ -220,8 +249,8 @@ function verdict_for(nonce: string): AttestVerdict {
 // tree, and evidence does not expire. Checked first, a mismatch older than eight hours would answer
 // `not-required` and the merge would go through on exactly the review this whole record exists to
 // catch — a run that parks, waits on CI or resumes the next morning reaches that state normally.
-function check(now: number = Date.now(), root?: string): AttestVerdict {
-	const pointer = read_pointer(root)
+function check_slot(now: number, root: string | undefined, slot: ReviewSlot): AttestVerdict {
+	const pointer = read_pointer(root, slot)
 
 	if (pointer === undefined) return not_required()
 
@@ -230,6 +259,21 @@ function check(now: number = Date.now(), root?: string): AttestVerdict {
 	if (verdict.status === 'missing' && is_stale(pointer.taken_at, now)) return not_required()
 
 	return verdict
+}
+
+function is_passing(verdict: AttestVerdict): boolean {
+	return verdict.status === 'ok' || verdict.status === not_required().status
+}
+
+// Every slot answers on its own nonce: the first refusal stands, else an `ok`, else `not-required`.
+function check(now: number = Date.now(), root?: string): AttestVerdict {
+	const verdicts = REVIEW_SLOTS.map((slot) => check_slot(now, root, slot))
+
+	return (
+		verdicts.find((verdict) => !is_passing(verdict)) ??
+		verdicts.find((verdict) => verdict.status === 'ok') ??
+		not_required()
+	)
 }
 
 function is_written_since(source: string, taken_at: string): boolean {
@@ -294,10 +338,7 @@ async function check_here(now: number = Date.now()): Promise<AttestVerdict> {
 // contract's lifetime is one run, and a record left behind would be the one the *next* run's check
 // reads. Cleared out of turn it would drop the guard, so it is called from nowhere else.
 function clear(root?: string): void {
-	const pointer = read_pointer(root)
-
-	stamp_file.remove_stamp(pointer_path(root))
-	drop_records(pointer)
+	for (const slot of REVIEW_SLOTS) drop_slot(root, slot)
 }
 
 // The counterpart to `check_here`, keyed the same way and for the same reason.
@@ -336,7 +377,6 @@ function refusal_message(verdict: AttestVerdict): string {
 
 const review_attest = {
 	attest,
-	attest_path,
 	check,
 	check_here,
 	clear,
@@ -347,14 +387,15 @@ const review_attest = {
 	is_reviewed_on,
 	MISMATCH_VERDICT,
 	MISSING_REASON,
-	pointer_path,
 	read_attestation,
 	read_expectation,
 	read_pointer,
 	record_target,
 	refusal_message,
+	REVIEW_SLOT,
+	REVIEW_SLOTS,
 	STALE_AFTER_MS,
 }
 
-export type { AttestVerdict }
+export type { AttestVerdict, ReviewSlot }
 export { review_attest }
