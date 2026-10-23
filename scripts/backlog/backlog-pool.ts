@@ -1,3 +1,4 @@
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild, type GraphAnomaly } from '#scripts/epic/epic-graph'
@@ -61,8 +62,10 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 		.some((blocker) => blocker.state === 'OPEN' && !running.has(epic_graph.blocker_key(blocker)))
 }
 
+// An issue whose author lacks write access waits on a person too: only they can vouch for its body.
 function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
 	return (
+		!auto_ok_author.is_author_trusted(issue) ||
 		has_any_label(issue.labels, DECISION_LABELS) ||
 		waits_outside(issue, context.running, context.repo)
 	)
@@ -302,15 +305,23 @@ function keys_of(children: ReadonlyArray<EpicChild>): Set<string> {
 // `runnable` — and a child offered on standard output while standard error lists it as waiting is
 // work a loop would start against a dependency that is still standing. So `human` is settled first,
 // `time` next, and `runnable` keeps only what neither claimed.
-function epic_classification(views: ReadonlyArray<EpicView>): Classification {
-	const human = unique_children(views.flatMap((view) => view.result.blocked_on_people))
-	const time = without(
-		unique_children(views.flatMap((view) => view.result.waiting)),
-		keys_of(human),
-	)
+//
+// `untrusted` names the children whose author lacks write access (`auto_ok_author.untrusted_child_keys`).
+// Each waits on a person wherever `epic:next` put it, exactly as a standalone row's does in
+// `needs_person`: only a person can vouch for its body (joshuafolkken/kit#4633).
+function epic_classification(
+	views: ReadonlyArray<EpicView>,
+	untrusted: ReadonlySet<string>,
+): Classification {
+	const waiting = views.flatMap((view) => view.result.waiting)
 	const offered = views.flatMap((view) =>
 		view.result.candidates.flatMap((bundle) => bundle.children),
 	)
+	const human = unique_children([
+		...views.flatMap((view) => view.result.blocked_on_people),
+		...[...waiting, ...offered].filter((child) => untrusted.has(epic_graph.key_of(child))),
+	])
+	const time = without(unique_children(waiting), keys_of(human))
 
 	return {
 		runnable: without(unique_children(offered), keys_of([...human, ...time])),

@@ -15,7 +15,7 @@ import { session_cite } from './session-cite'
 // a file, so the author's `author_association` arrives with the body from the same REST read, and only
 // a body written by someone with write access to the repository is run.
 
-const ISSUE_FIELDS = 'body,author_association,user'
+const ISSUE_FIELDS = `body,${gh_author_association.AUTHOR_FIELDS}`
 const UNKNOWN_ASSOCIATION = 'unknown'
 // One command's budget — the same minute `josh-harness.ts` gives one command it spawns. A measurement
 // is a count or a digest that answers in seconds, so a command still running after a minute is stuck,
@@ -23,8 +23,7 @@ const UNKNOWN_ASSOCIATION = 'unknown'
 const MEASURE_TIMEOUT_MS = 60_000
 const issue_schema = z.object({
 	body: z.string().nullish(),
-	author_association: z.string().nullish(),
-	user: z.looseObject({ login: z.string() }).nullish(),
+	...gh_author_association.author_fields_schema,
 })
 
 type IssueFields = z.infer<typeof issue_schema>
@@ -72,9 +71,9 @@ async function read_trusted_body(issue_number: string): Promise<BodyRead> {
 		return { kind: 'refused', reason: `could not read issue ${session_cite.issue(issue_number)}` }
 	}
 
-	const author = { login: issue.user?.login, association: issue.author_association }
-
-	if (!(await gh_author_association.is_trusted(author))) return untrusted(issue_number, issue)
+	if (!(await gh_author_association.is_trusted(gh_author_association.author_of(issue)))) {
+		return untrusted(issue_number, issue)
+	}
 
 	return { kind: 'trusted', body: issue.body ?? '' }
 }

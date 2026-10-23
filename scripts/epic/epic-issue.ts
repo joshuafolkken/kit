@@ -1,5 +1,5 @@
 import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
-import { blocked_by_schema } from '#scripts/git/git-schemas'
+import { author_fields_schema, blocked_by_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 import { REPOSITORY_SEGMENT_SOURCE } from './epic-parse'
@@ -36,6 +36,8 @@ const epic_issue_schema = z.object({
 	url: z.string().default(''),
 	labels: z.array(label_schema).default([]),
 	blockedBy: blocked_by_schema,
+	// Who filed the issue, for `backlog:next`'s author-trust check (joshuafolkken/kit#4633).
+	...author_fields_schema,
 })
 
 type EpicIssue = z.infer<typeof epic_issue_schema>

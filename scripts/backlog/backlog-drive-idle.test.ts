@@ -13,10 +13,18 @@ const PARKED = 4101
 const DATED = 4102
 const READY = 4103
 const STALLED = 4104
+const UNTRUSTED = 4105
 const IDLE_TEXT = 'idle body'
 
+// The pool as `auto_ok_cli.fetch_opted_in` answers it: each row's author trust already assembled.
 function issue(number: number, extra: Partial<OpenIssueData> = {}): OpenIssueData {
-	return { number, title: `Issue ${String(number)}`, createdAt: DATE, ...extra }
+	return {
+		number,
+		title: `Issue ${String(number)}`,
+		createdAt: DATE,
+		author_trusted: true,
+		...extra,
+	}
 }
 
 const POOL: ReadonlyArray<OpenIssueData> = [
@@ -96,6 +104,24 @@ describe('backlog_drive_idle.describe', () => {
 		expect(body).toContain(
 			`Stalled mechanically (run:stalled):\n- #${String(STALLED)} Issue ${String(STALLED)}\n`,
 		)
+	})
+})
+
+// joshuafolkken/kit#4633: `backlog:next` holds an issue whose author lacks write access for a person,
+// so the notice that asks for a person's hand names it.
+describe('backlog_drive_idle.describe — an author without write access', () => {
+	it('lists an issue whose author lacks write access as waiting on a person', () => {
+		const untrusted = issue(UNTRUSTED, { author_trusted: false })
+		const body = backlog_drive_idle.describe({
+			merged: 0,
+			issues: [...POOL, untrusted],
+			now_ms: NOW_MS,
+		})
+
+		expect(body).toContain(
+			`(author without write access):\n- #${String(UNTRUSTED)} Issue ${String(UNTRUSTED)}`,
+		)
+		expect(body).not.toContain(`- #${String(READY)}`)
 	})
 })
 

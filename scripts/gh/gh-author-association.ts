@@ -1,5 +1,6 @@
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { author_fields_schema } from '#scripts/git/git-schemas'
 import { parse_json } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
 
@@ -20,6 +21,9 @@ const WRITE_ROLES: ReadonlySet<string> = new Set(['admin', 'maintain', 'write'])
 // path, so anything else (a `[bot]` login, a slash) is refused before a request is made.
 const LOGIN_PATTERN = /^[\da-z](?:[\w-]*[\da-z])?$/iu
 const TRUSTED_LIST = 'OWNER, or MEMBER / COLLABORATOR with write access'
+// The REST fields that name who wrote an issue, asked beside its body by every reader that decides
+// whether to act on that body; `author_fields_schema` is the shape they parse to.
+const AUTHOR_FIELDS = 'author_association,user'
 
 const permission_schema = z.looseObject({
 	permission: z.string().nullish(),
@@ -31,6 +35,11 @@ interface Author {
 	login: string | undefined
 	association: string | null | undefined
 	timeout_ms?: number | undefined
+}
+
+interface AuthorFields {
+	author_association?: string | null | undefined
+	user?: { login: string } | null | undefined
 }
 
 const answers = new Map<string, Promise<boolean | undefined>>()
@@ -95,7 +104,19 @@ async function is_trusted(author: Author): Promise<boolean> {
 	return (await trust_of(author)) === true
 }
 
-const gh_author_association = { TRUSTED_LIST, is_trusted, trust_of }
+// The author of a row read with `AUTHOR_FIELDS`.
+function author_of(row: AuthorFields, timeout_ms?: number): Author {
+	return { login: row.user?.login, association: row.author_association, timeout_ms }
+}
 
-export type { Author }
+const gh_author_association = {
+	AUTHOR_FIELDS,
+	TRUSTED_LIST,
+	author_fields_schema,
+	author_of,
+	is_trusted,
+	trust_of,
+}
+
+export type { Author, AuthorFields }
 export { gh_author_association }

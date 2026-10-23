@@ -83,4 +83,4 @@ and refuses every other body-only read; the Codex adapter refuses them all** (`p
 ## A person's update mid-run
 
 When the hook, `review:attest --check` or `followup` shows an Issue update, read it as above, fix what it
-changes, then `pnpm josh issue:ack <N>`. The watch: `docs/josh-commands-backlog.md` → "`josh issue:ack`".
+changes, then `pnpm josh issue:ack <N>`. A withheld-body notice (author without write access) needs no ack. The watch: `docs/josh-commands-backlog.md` → "`josh issue:ack`".

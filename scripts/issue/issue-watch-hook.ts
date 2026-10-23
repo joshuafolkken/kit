@@ -22,7 +22,16 @@ const POLL_INTERVAL_MS = 180_000
 const POLL_TIMEOUT_MS = 5000
 
 function is_new_to_run(record: WatchRecord | undefined): record is WatchRecord {
-	return record?.pending !== undefined && record.pending !== record.shown
+	const news = record === undefined ? undefined : issue_watch.news_of(record)
+
+	return news !== undefined && news !== record?.shown
+}
+
+// A withheld body edit is shown as its own notice: it asks for no `josh issue:ack`.
+function message_of(record: WatchRecord): string {
+	return record.pending === undefined
+		? (record.notice ?? '')
+		: issue_watch_gate.unread_message(record)
 }
 
 async function new_update_reason(now: Date): Promise<string | undefined> {
@@ -36,7 +45,7 @@ async function new_update_reason(now: Date): Promise<string | undefined> {
 
 	issue_watch.mark_shown(record)
 
-	return issue_watch_gate.unread_message(record)
+	return message_of(record)
 }
 
 async function watch_reason(now: Date = new Date()): Promise<string | undefined> {

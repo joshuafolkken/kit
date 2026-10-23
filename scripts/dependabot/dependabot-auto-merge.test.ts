@@ -37,6 +37,10 @@ const { STEPS_CONTEXT: CONTEXT_ROOT, OUTPUTS_KEY } = workflow_expression_fixture
 // is built from so the two cannot drift apart.
 const ECOSYSTEM_REFERENCE = `${CONTEXT_ROOT}.${METADATA_STEP}.${OUTPUTS_KEY}.${ECOSYSTEM_OUTPUT}`
 
+// The groups `.github/dependabot.yml` declares for github-actions: only the second one may arm.
+const ACTIONS_GROUP = 'github-actions'
+const PUBLISH_GROUP = 'publish-actions'
+
 // kit's own gate reads no upstream-managed decision — that divergence is the point of
 // joshuafolkken/kit#836 — so a run is described here by who pushed and the metadata outputs alone;
 // the rest of the shared context is inert.
@@ -44,12 +48,14 @@ function is_merge_step_reached(
 	ecosystem: string,
 	update_type: string,
 	actor: string = DEPENDABOT_LOGIN,
+	dependency_group: string = ACTIONS_GROUP,
 ): boolean {
 	const context = build_run_context({
 		actor,
 		managed_output: NO_OUTPUT,
 		ecosystem,
 		update_type,
+		dependency_group,
 	})
 
 	return workflow_expression_fixture.evaluate_condition(merge_condition(runtime_job()), context)
@@ -117,5 +123,24 @@ describe('dependabot-auto-merge.yml — reachable updates (kit#802)', () => {
 
 	it('never auto-merges a github-actions major update', () => {
 		expect(is_merge_step_reached(ACTIONS_ECOSYSTEM, MAJOR_UPDATE)).toBe(false)
+	})
+})
+
+// The publish jobs run these actions with publish credentials, so a person reviews every bump of
+// them; a bump outside both groups is reviewed too (joshuafolkken/kit#4633).
+describe('dependabot-auto-merge.yml — publish-credential actions (kit#4633)', () => {
+	it.each([PATCH_UPDATE, MINOR_UPDATE])(
+		'never auto-merges a %s update in the publish-actions group',
+		(update_type) => {
+			expect(
+				is_merge_step_reached(ACTIONS_ECOSYSTEM, update_type, DEPENDABOT_LOGIN, PUBLISH_GROUP),
+			).toBe(false)
+		},
+	)
+
+	it('never auto-merges an ungrouped github-actions patch update', () => {
+		expect(
+			is_merge_step_reached(ACTIONS_ECOSYSTEM, PATCH_UPDATE, DEPENDABOT_LOGIN, NO_OUTPUT),
+		).toBe(false)
 	})
 })

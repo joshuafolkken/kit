@@ -37,7 +37,7 @@ pnpm josh issue:ack 3773
 
 <!-- /usage -->
 
-`josh run:entry` records the issue as the baseline; the PreToolUse hook shows a person's body edit or new comment once, and `issue:ack` makes that read the new baseline.
+`josh run:entry` records the issue as the baseline; the PreToolUse hook shows a person's body edit or new comment once, and `issue:ack` makes that read the new baseline. A body edit on an issue whose author lacks write access is shown once as a notice with the text withheld; it needs no `issue:ack`.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:ack` in detail".
 

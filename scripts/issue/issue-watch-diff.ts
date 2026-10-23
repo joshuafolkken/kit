@@ -21,6 +21,12 @@ import { z } from 'zod'
 // body withheld, costing one `josh issue:ack` rather than a missed correction, and its marker is not
 // trusted.
 //
+// **A body edit is a person's update only when the issue's author has write access.** GitHub does not
+// say who edited a body, and its author can always edit it, so a body under an author without write
+// access is never handed to a run as an update: its edit becomes a notice with the text withheld,
+// which asks for nothing and holds no merge. A `MEMBER` / `COLLABORATOR` author whose lookup failed
+// is treated like their comment: the edit is announced with its text withheld and stays pending.
+//
 // **Comment edits are out of scope.** A new comment carries an id above the baseline's; an edited
 // one keeps its id and is not seen. The body is compared whole, so its edits are.
 
@@ -32,6 +38,8 @@ const UNKNOWN_AUTHOR = '(unknown)'
 const UNKNOWN_TIME = '(undated)'
 const UNVERIFIED_BODY =
 	"(body withheld — the author's write access could not be checked; read it with `josh issue:read`)"
+
+const WITHHELD_BODY_EDIT = `The body of this run's issue was edited, but its author is not ${gh_author_association.TRUSTED_LIST}, so the edit is withheld: it is not an instruction to this run and holds nothing — carry on.`
 
 const BODY_HEADING = 'Body edited:'
 const REMOVED_PREFIX = '- '
@@ -62,6 +70,8 @@ interface WatchComment {
 
 interface WatchSnapshot {
 	body: string
+	// Whether the issue's author has write access — `undefined` when the lookup failed.
+	is_body_trusted: boolean | undefined
 	comments: ReadonlyArray<WatchComment>
 }
 
@@ -171,9 +181,20 @@ function new_person_comments(
 	)
 }
 
+function is_body_edited(baseline: WatchBaseline, snapshot: WatchSnapshot): boolean {
+	return to_lf(baseline.body) !== to_lf(snapshot.body)
+}
+
+function unread_body(baseline: WatchBaseline, snapshot: WatchSnapshot): string | undefined {
+	if (snapshot.is_body_trusted === true) return body_section(baseline.body, snapshot.body)
+	if (snapshot.is_body_trusted === false || !is_body_edited(baseline, snapshot)) return undefined
+
+	return `${BODY_HEADING}${LINE_SEPARATOR}${UNVERIFIED_BODY}`
+}
+
 // The unread update as the text a run is shown, or `undefined` when a person changed nothing.
 function unread_diff(baseline: WatchBaseline, snapshot: WatchSnapshot): string | undefined {
-	const body = body_section(baseline.body, snapshot.body)
+	const body = unread_body(baseline, snapshot)
 	const comments = new_person_comments(baseline, snapshot).map((comment) =>
 		comment_section(comment),
 	)
@@ -182,11 +203,20 @@ function unread_diff(baseline: WatchBaseline, snapshot: WatchSnapshot): string |
 	return sections.length === 0 ? undefined : sections.join(SECTION_SEPARATOR)
 }
 
+// The notice for a body edit `unread_diff` withholds, or `undefined` when there is none.
+function withheld_notice(baseline: WatchBaseline, snapshot: WatchSnapshot): string | undefined {
+	if (snapshot.is_body_trusted !== false || !is_body_edited(baseline, snapshot)) return undefined
+
+	return WITHHELD_BODY_EDIT
+}
+
 const issue_watch_diff = {
 	RUN_MARKER,
+	WITHHELD_BODY_EDIT,
 	baseline_of,
 	parse_comments,
 	unread_diff,
+	withheld_notice,
 }
 
 export type { WatchBaseline, WatchComment, WatchSnapshot }

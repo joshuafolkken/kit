@@ -9,6 +9,7 @@ import { issue_watch_hook } from './issue-watch-hook'
 const ISSUE = '3773'
 const PENDING = 'New comment by person at 2026-10-14\nplease also cover X'
 const NEXT_PENDING = `${PENDING}\n\nNew comment by person at 2026-10-15\none more`
+const NOTICE = 'The body was edited, but its author is not trusted.'
 const NOW = new Date('2026-10-14T00:00:00.000Z')
 const POLL_TIMEOUT_MS = 5000
 
@@ -19,7 +20,7 @@ function stub_record(initial: WatchRecord | undefined): { current: WatchRecord |
 
 	vi.spyOn(issue_watch, 'poll').mockImplementation(async () => state.current)
 	vi.spyOn(issue_watch, 'mark_shown').mockImplementation((shown: WatchRecord) => {
-		state.current = { ...shown, shown: shown.pending }
+		state.current = { ...shown, shown: issue_watch.news_of(shown) }
 
 		return state.current
 	})
@@ -89,6 +90,19 @@ describe('issue_watch_hook.watch_reason', () => {
 	it('fails open when the poll throws', async () => {
 		vi.spyOn(issue_watch, 'poll').mockRejectedValue(new Error('network down'))
 
+		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4633: an untrusted body edit is shown once as a notice that asks for no ack.
+describe('issue_watch_hook.watch_reason — a withheld body edit', () => {
+	it('shows the notice once, without asking for an ack', async () => {
+		stub_record({ ...record(undefined), notice: NOTICE })
+
+		const first = await issue_watch_hook.watch_reason(NOW)
+
+		expect(first).toBe(NOTICE)
+		expect(first).not.toContain('issue:ack')
 		await expect(issue_watch_hook.watch_reason(NOW)).resolves.toBeUndefined()
 	})
 })

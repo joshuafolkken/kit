@@ -1,4 +1,5 @@
 import type { IssueReference } from '#scripts/issue/issue-reference'
+import { gh_author_association } from './gh-author-association'
 import { git_gh_api_path } from './git-gh-api-path'
 import { git_gh_exec } from './git-gh-exec'
 import { gh_failure, type GhFailure } from './git-gh-failure'
@@ -284,8 +285,9 @@ async function issue_view_json(
 //
 // `body` rides along because `epic:next` holds a child until its declared start time
 // (joshuafolkken/kit#4007); the REST issue endpoint answers it in the same response, so it costs no
-// request.
-const STATE_AND_RELATIONS_FIELDS = 'number,state,labels,blockedBy,body'
+// request. The author rides along for the same reason: `backlog:next` runs a child's body only when
+// its author has write access (joshuafolkken/kit#4633), and the same response already names them.
+const STATE_AND_RELATIONS_FIELDS = `number,state,labels,blockedBy,body,${gh_author_association.AUTHOR_FIELDS}`
 
 async function issue_get_state_and_relations(
 	issue_number: string,
