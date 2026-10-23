@@ -101,6 +101,8 @@ interface BoardHeader {
 	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
 	// terminal opens one.
 	link: (reference: string) => string
+	// A pull request's number, made a link to it where the terminal opens one (joshuafolkken/kit#4625).
+	pull_link: (number: number) => string
 }
 
 interface BoardCounts {

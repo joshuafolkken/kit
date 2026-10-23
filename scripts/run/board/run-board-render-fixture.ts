@@ -40,6 +40,7 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		form: 'screen',
 		repo: undefined,
 		link: (reference) => reference,
+		pull_link: String,
 		...extra,
 	}
 }

@@ -24,6 +24,7 @@ const {
 	PHASE_WORDS,
 	STATE_ICONS,
 	WAITS_ICON,
+	WAIT_ICONS,
 	WAIT_WORDS,
 	WORDS,
 } = run_board_labels
@@ -43,6 +44,8 @@ interface LegendDrawn {
 	checks: ReadonlyArray<string>
 	// 🚧 and the reasons a held check is drawn with (joshuafolkken/kit#4052).
 	held: ReadonlyArray<string>
+	// A lane row leads with 🧍, its `run:solo` mark (joshuafolkken/kit#4625).
+	solo: boolean
 }
 
 type LeadWords = ReadonlyArray<readonly [string, keyof Words]>
@@ -100,6 +103,16 @@ function waits_legend(rows: ReadonlyArray<BoardRow>): Array<string> {
 	)
 }
 
+// 🧍 is named only while a lane row draws it, and once where a waiting row leads with it too
+// (joshuafolkken/kit#4625).
+function solo_legend(rows: ReadonlyArray<BoardRow>, drawn: LegendDrawn): Array<string> {
+	if (!drawn.solo) return []
+
+	const is_named = rows.some((row) => wait_icon(row) === WAIT_ICONS.solo)
+
+	return is_named ? [] : [`${WAIT_ICONS.solo} ${WORDS.solo}`]
+}
+
 // ✚ is named only while a row the run filed draws it (joshuafolkken/kit#4099).
 function filed_legend(
 	rows: ReadonlyArray<BoardRow>,
@@ -135,6 +148,7 @@ function others_line(
 	return [
 		...kind_named,
 		...waits_legend(rows),
+		...solo_legend(rows, drawn),
 		...filed_legend(rows, notes),
 		...drawn.held,
 		...drawn.checks,

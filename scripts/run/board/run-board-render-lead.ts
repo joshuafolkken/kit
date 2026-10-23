@@ -1,6 +1,7 @@
 import { run_board_earlier } from './run-board-earlier'
 import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
+import { run_board_labels } from './run-board-labels'
 import type { BoardRow } from './run-board-layout'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_tail } from './run-board-render-tail'
@@ -16,6 +17,7 @@ const { BUDGET_ICON, held_of, held_time } = run_board_render_waits
 const { phase_time } = run_board_render_tail
 const { state_icon } = run_board_render_icon
 const { time_of } = run_board_render_time
+const { WAIT_ICONS } = run_board_labels
 // The widest span a time column draws: `1°14′58″`.
 const TIME_WIDTH = 8
 const LANE_INDENT = '  '
@@ -60,6 +62,12 @@ function whole_of(row: BoardRow, header: BoardHeader): string {
 	return run_board_fresh.padded(time, TIME_WIDTH, fresh)
 }
 
+// A lane row's indent: 🧍 on a `run:solo` row (joshuafolkken/kit#4625), as wide as the blanks it
+// replaces, so every column after it stays put.
+function indent_of(row: BoardRow): string {
+	return row.is_solo === true ? WAIT_ICONS.solo : LANE_INDENT
+}
+
 // A lane row's lead after its indent, ending where its usage cells start less one blank.
 function lead_of(row: BoardRow, header: BoardHeader): string {
 	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
@@ -73,6 +81,7 @@ const run_board_render_lead = {
 	LANE_INDENT,
 	TIME_WIDTH,
 	USAGE_START,
+	indent_of,
 	lead_of,
 	running_fresh,
 }
