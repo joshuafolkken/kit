@@ -6,12 +6,15 @@ const exists_mock = vi.hoisted(() => vi.fn())
 const read_mock = vi.hoisted(() => vi.fn())
 const readdir_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
+const rm_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execaSync: execa_sync_mock }))
 vi.mock('node:fs', () => ({
 	existsSync: exists_mock,
+	mkdtempSync: (prefix: string): string => `${prefix}x`,
 	readdirSync: readdir_mock,
 	readFileSync: read_mock,
+	rmSync: rm_mock,
 	writeFileSync: write_mock,
 }))
 
@@ -33,15 +36,34 @@ const GITHUB_ACTIONS = '.github/actions'
 const DAST_YML = `${GITHUB_WORKFLOWS}/dast.yml`
 const UNPINNED_YML = `${GITHUB_WORKFLOWS}/release.yml`
 const UNPINNED_WORKFLOW = 'env:\n  FOO: bar\n'
+const DOWNLOAD_FAILED = 22
+const ATTESTATION_FAILED = 1
+const DOWNLOAD_FAILURE = 'could not be downloaded'
+const ATTESTATION_FAILURE = 'could not be verified against its release attestation'
+
+function answer_commands(download_exit: number, verify_exit: number): void {
+	execa_sync_mock.mockImplementation((command: string) =>
+		command === 'curl'
+			? {
+					exitCode: download_exit,
+					stdout: download_exit === 0 ? INSTALLER_BYTES : new Uint8Array(),
+				}
+			: { exitCode: verify_exit },
+	)
+}
+
+function workflow_writes(): Array<unknown> {
+	return write_mock.mock.calls.filter(([file_path]) => String(file_path).endsWith('.yml'))
+}
 
 beforeEach(() => {
-	for (const mock of [execa_sync_mock, exists_mock, read_mock, readdir_mock, write_mock]) {
+	for (const mock of [execa_sync_mock, exists_mock, read_mock, readdir_mock, write_mock, rm_mock]) {
 		mock.mockReset()
 	}
 
 	exists_mock.mockReturnValue(true)
 	read_mock.mockReturnValue(WORKFLOW)
-	execa_sync_mock.mockReturnValue({ exitCode: 0, stdout: INSTALLER_BYTES })
+	answer_commands(0, 0)
 })
 
 describe('ci_installer_pin.extract_pinned_version', () => {
@@ -66,7 +88,7 @@ describe('ci_installer_pin.rewrite_pin', () => {
 
 describe('ci_installer_pin.fetch_installer_sha256', () => {
 	it('hashes the versioned release installer', () => {
-		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toBe(INSTALLER_SHA)
+		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toEqual({ sha256: INSTALLER_SHA })
 		expect(execa_sync_mock).toHaveBeenCalledWith(
 			'curl',
 			['--proto', '=https', '-fsSL', ci_installer_pin.installer_url('2.0.0')],
@@ -74,9 +96,33 @@ describe('ci_installer_pin.fetch_installer_sha256', () => {
 		)
 	})
 
-	it('returns undefined when the download fails', () => {
-		execa_sync_mock.mockReturnValue({ exitCode: 22, stdout: new Uint8Array() })
-		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toBeUndefined()
+	it('verifies the downloaded installer against the release attestation, then removes it', () => {
+		ci_installer_pin.fetch_installer_sha256('2.0.0')
+
+		const installer_path: unknown = write_mock.mock.calls[0]?.[0]
+		const bytes: unknown = write_mock.mock.calls[0]?.[1]
+
+		expect(bytes).toBe(INSTALLER_BYTES)
+		expect(String(installer_path)).toMatch(/install-safe-chain\.sh$/u)
+		expect(execa_sync_mock).toHaveBeenCalledWith(
+			'gh',
+			['release', 'verify-asset', '2.0.0', installer_path, '--repo', 'AikidoSec/safe-chain'],
+			expect.objectContaining({ reject: false }),
+		)
+		expect(rm_mock).toHaveBeenCalledOnce()
+	})
+
+	it('reports a failure when the download fails', () => {
+		answer_commands(DOWNLOAD_FAILED, 0)
+		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toEqual({ failure: DOWNLOAD_FAILURE })
+	})
+
+	it('reports a failure, not a hash, when the attestation does not verify', () => {
+		answer_commands(0, ATTESTATION_FAILED)
+		expect(ci_installer_pin.fetch_installer_sha256('2.0.0')).toEqual({
+			failure: ATTESTATION_FAILURE,
+		})
+		expect(rm_mock).toHaveBeenCalledOnce()
 	})
 })
 
@@ -120,7 +166,7 @@ describe('ci_installer_pin.sync without a path list', () => {
 
 		ci_installer_pin.sync('2.0.0')
 
-		expect(write_mock).toHaveBeenCalledOnce()
+		expect(workflow_writes()).toHaveLength(1)
 		expect(write_mock).toHaveBeenCalledWith(DAST_YML, expect.stringContaining('2.0.0'), 'utf8')
 	})
 })
@@ -129,7 +175,7 @@ describe('ci_installer_pin.sync', () => {
 	it('writes the new release and its hash to every stale workflow', () => {
 		ci_installer_pin.sync('2.0.0', PATHS)
 
-		expect(write_mock).toHaveBeenCalledTimes(PATHS.length)
+		expect(workflow_writes()).toHaveLength(PATHS.length)
 		expect(write_mock).toHaveBeenCalledWith(
 			PATHS[0],
 			expect.stringContaining(`SAFE_CHAIN_INSTALLER_SHA256: ${INSTALLER_SHA}`),
@@ -148,18 +194,32 @@ describe('ci_installer_pin.sync', () => {
 		exists_mock.mockImplementation((workflow_path: string) => workflow_path === PATHS[1])
 		ci_installer_pin.sync('2.0.0', PATHS)
 
-		expect(write_mock).toHaveBeenCalledOnce()
+		expect(workflow_writes()).toHaveLength(1)
 		expect(write_mock).toHaveBeenCalledWith(PATHS[1], expect.any(String), 'utf8')
 	})
+})
 
+describe('ci_installer_pin.sync without a verified installer', () => {
 	it('leaves the pin as is when the installer cannot be downloaded', () => {
-		execa_sync_mock.mockReturnValue({ exitCode: 22, stdout: new Uint8Array() })
+		answer_commands(DOWNLOAD_FAILED, 0)
 		const warn_spy = vi.spyOn(console, 'warn').mockReturnValue()
 
 		ci_installer_pin.sync('2.0.0', PATHS)
 
 		expect(write_mock).not.toHaveBeenCalled()
-		expect(warn_spy).toHaveBeenCalled()
+		expect(warn_spy).toHaveBeenCalledWith(expect.stringContaining(DOWNLOAD_FAILURE))
+		warn_spy.mockRestore()
+	})
+
+	// joshuafolkken/kit#4669: a release asset swapped after publication must not become the pin.
+	it('leaves the pin as is when the installer fails its release attestation', () => {
+		answer_commands(0, ATTESTATION_FAILED)
+		const warn_spy = vi.spyOn(console, 'warn').mockReturnValue()
+
+		ci_installer_pin.sync('2.0.0', PATHS)
+
+		expect(workflow_writes()).toHaveLength(0)
+		expect(warn_spy).toHaveBeenCalledWith(expect.stringContaining(ATTESTATION_FAILURE))
 		warn_spy.mockRestore()
 	})
 })
