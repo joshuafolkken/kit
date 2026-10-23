@@ -95,7 +95,20 @@ interface BundleTotals {
 	recoverable_round_trips: number
 	by_tool: ReadonlyArray<BundleToolRow>
 	unattributed_round_trips: number
+	single_call: SingleCallSplit
 	is_measured: boolean
+}
+
+// The consecutive single-call turns alone, split by the target test — what `josh time:density` reads.
+// **The spread-apart `Agent` launch series is left out** of every field here: the walk never sees a
+// launch, so it can be neither dependent nor independent, and folding its count into one side would
+// make the two sides measure different populations.
+interface SingleCallSplit {
+	// Turns that could have gone out beside the single-call turn before them.
+	independent_round_trips: number
+	// Turns whose call shared a target with the open sequence, so needed the turn before.
+	dependent_round_trips: number
+	by_tool: ReadonlyArray<BundleToolRow>
 }
 
 const NO_BUNDLES: BundleTotals = {
@@ -104,6 +117,7 @@ const NO_BUNDLES: BundleTotals = {
 	recoverable_round_trips: 0,
 	by_tool: [],
 	unattributed_round_trips: 0,
+	single_call: { independent_round_trips: 0, dependent_round_trips: 0, by_tool: [] },
 	is_measured: false,
 }
 
@@ -191,10 +205,11 @@ interface Walk {
 	pending: Array<Span>
 	sequence: Array<Span>
 	closed: Array<Array<Span>>
+	dependent: number
 }
 
 function new_walk(): Walk {
-	return { pending: [], sequence: [], closed: [] }
+	return { pending: [], sequence: [], closed: [], dependent: NONE }
 }
 
 function flush(walk: Walk): void {
@@ -204,9 +219,13 @@ function flush(walk: Walk): void {
 }
 
 // A conflicting call does not end the run of single-call turns; it starts a new sequence at itself,
-// because everything after it may still have been bundleable with it.
+// because everything after it may still have been bundleable with it. The conflict is the one place a
+// dependent pair is seen, so it is counted here rather than by a second walk.
 function extend(walk: Walk, span: Span): void {
-	if (conflicts(span, walk.sequence)) flush(walk)
+	if (conflicts(span, walk.sequence)) {
+		walk.dependent += ONE_CALL
+		flush(walk)
+	}
 
 	walk.sequence.push(span)
 }
@@ -359,6 +378,14 @@ function with_agent_row(
 	return [...rows, row].toSorted(by_weight)
 }
 
+function single_call_split(walk: Walk, sizes: ReadonlyArray<number>): SingleCallSplit {
+	return {
+		independent_round_trips: recoverable_of(sizes),
+		dependent_round_trips: walk.dependent,
+		by_tool: tool_rows(walk.closed),
+	}
+}
+
 function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	const walk = new_walk()
 
@@ -373,8 +400,9 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 	// is never bundleable, so it cannot have entered a sequence above — so their counts simply add.
 	const sizes = sizes_of(walk.closed)
 	const agent_sizes = time_agent_bundles.agent_bundles(spans)
-	const by_tool = with_agent_row(tool_rows(walk.closed), agent_sizes)
-	const recoverable_round_trips = recoverable_of(sizes) + recoverable_of(agent_sizes)
+	const single_call = single_call_split(walk, sizes)
+	const by_tool = with_agent_row(single_call.by_tool, agent_sizes)
+	const recoverable_round_trips = single_call.independent_round_trips + recoverable_of(agent_sizes)
 
 	return {
 		sequence_count: sizes.length + agent_sizes.length,
@@ -382,6 +410,7 @@ function build_bundles(spans: ReadonlyArray<Span>): BundleTotals {
 		recoverable_round_trips,
 		by_tool,
 		unattributed_round_trips: recoverable_round_trips - attributed_of(by_tool),
+		single_call,
 		is_measured: time_spans.has_transcript_data(spans.length),
 	}
 }
@@ -524,9 +553,11 @@ const time_bundles = {
 	NO_BUNDLES,
 	build_bundles,
 	bundle_lines,
+	by_weight,
 	is_dependent,
 	open_sequence,
 	shares_target,
 }
 
+export type { BundleToolRow }
 export { time_bundles }

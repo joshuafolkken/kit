@@ -179,7 +179,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [PATH_DIR],
 					description:
-						"read another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.",
+						"read another project's lane transcripts, as `josh time` does. Run from a lane, it reads its main checkout's lanes.",
 				},
 			],
 		},

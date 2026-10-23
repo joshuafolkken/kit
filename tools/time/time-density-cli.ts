@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { transcript_cwd } from '#scripts/cost-runtime/transcript-cwd'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { time_bundles, type BundleToolRow } from '#scripts/time-runtime/time-bundles'
 import { time_round_trips } from '#scripts/time-runtime/time-round-trips'
 import { time_spans } from '#scripts/time-runtime/time-spans'
 
@@ -37,6 +38,9 @@ const MIN_ROUND_TRIPS = 30
 // A round trip that issued more than one call is a batched one — the turns the guard exists to
 // produce, counted so the summary says how many of the total actually batched.
 const BATCHED_MINIMUM = 1
+// How many kinds of independent single-call turn the second line names — the heads a fix is chosen
+// from, not the whole table `josh time` already prints per run.
+const TOP_KINDS = 5
 const NONE = 0
 
 interface Options {
@@ -55,10 +59,16 @@ const PARSE_ARGS_OPTIONS = {
 // What one transcript contributed, before the lanes are summed. Kept as counts rather than a density
 // so the aggregate divides one summed numerator by one summed denominator — averaging per-lane
 // densities would weight a short lane the same as a long one.
+// `independent` and `dependent` split the single-call turns that followed a single-call turn by the
+// target test `time_bundles` already applies — independent ones could have gone out beside the turn
+// before, dependent ones needed its result. `by_kind` names whose independent turns they were.
 interface TranscriptStats {
 	round_trips: number
 	calls: number
 	batched: number
+	independent: number
+	dependent: number
+	by_kind: ReadonlyArray<BundleToolRow>
 }
 
 interface DensitySummary {
@@ -67,6 +77,9 @@ interface DensitySummary {
 	calls: number
 	batched: number
 	density: number
+	independent: number
+	dependent: number
+	by_kind: ReadonlyArray<BundleToolRow>
 }
 
 // A misspelled or retired flag is a refusal rather than a default: a run must not read the density as
@@ -89,11 +102,15 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 function transcript_stats(text: string): TranscriptStats {
 	const { spans } = time_spans.parse_timeline(text)
 	const trips = time_round_trips.group_round_trips(spans)
+	const { single_call } = time_bundles.build_bundles(spans)
 
 	return {
 		round_trips: trips.length,
 		calls: time_round_trips.count_calls(spans),
 		batched: trips.filter((trip) => trip.length > BATCHED_MINIMUM).length,
+		independent: single_call.independent_round_trips,
+		dependent: single_call.dependent_round_trips,
+		by_kind: single_call.by_tool,
 	}
 }
 
@@ -124,6 +141,27 @@ function total(
 	return sum
 }
 
+function add_row(sums: Map<string, BundleToolRow>, row: BundleToolRow): void {
+	const sum = sums.get(row.label)
+
+	if (sum === undefined) sums.set(row.label, { ...row })
+	else {
+		sum.sequence_count += row.sequence_count
+		sum.recoverable_round_trips += row.recoverable_round_trips
+	}
+}
+
+// The per-lane kind rows summed by label, heaviest first in `time_bundles`' own order, so the top of
+// the list is the shape a batching fix is written against.
+function kinds(stats: ReadonlyArray<TranscriptStats>): Array<BundleToolRow> {
+	const sums = new Map<string, BundleToolRow>()
+	const rows = stats.flatMap((one) => one.by_kind)
+
+	for (const row of rows) add_row(sums, row)
+
+	return [...sums.values()].toSorted(time_bundles.by_weight)
+}
+
 // The aggregate density: one summed numerator over one summed denominator, so a long lane counts for
 // more than a short one. Pure over the transcript texts, so a test drives it with fixtures rather than
 // a home directory.
@@ -142,16 +180,30 @@ function summarize(
 		calls,
 		batched: total(stats, (one) => one.batched),
 		density: time_round_trips.per_round_trip(calls, round_trips),
+		independent: total(stats, (one) => one.independent),
+		dependent: total(stats, (one) => one.dependent),
+		by_kind: kinds(stats),
 	}
 }
 
+function kind_line(summary: DensitySummary): string {
+	const top = summary.by_kind
+		.slice(NONE, TOP_KINDS)
+		.map((kind) => `${kind.label}=${String(kind.recoverable_round_trips)}`)
+
+	return `independent by kind: ${top.length === NONE ? 'none' : top.join(', ')}`
+}
+
+// The first line keeps its leading fields unchanged, so a reading quoted before this split still
+// compares; the split and the kinds follow it.
 function format(summary: DensitySummary): string {
 	const density = time_round_trips.format_density(summary.density)
-
-	return (
+	const head =
 		`lanes=${String(summary.lanes)} round_trips=${String(summary.round_trips)} ` +
-		`tools/turn=${density} batched=${String(summary.batched)}/${String(summary.round_trips)}`
-	)
+		`tools/turn=${density} batched=${String(summary.batched)}/${String(summary.round_trips)} ` +
+		`independent=${String(summary.independent)} dependent=${String(summary.dependent)}`
+
+	return `${head}\n${kind_line(summary)}`
 }
 
 // The recent lane sessions' transcripts, newest first. A dispatched lane child writes its own
@@ -164,6 +216,13 @@ function lane_texts(cwd: string, home: string): Array<string> {
 		.list_sessions_across(directories)
 		.filter((file) => !file.is_delegated)
 		.map((file) => cost_transcript.read_raw(file))
+}
+
+// The checkout whose lanes are aggregated: a lane worktree resolves to its main checkout, because a
+// lane's transcript directory holds its own session alone and read from there the command — which the
+// Issue's after-merge check runs inside a lane — measured zero lanes.
+function measured_checkout(path: string | undefined, cwd: string): string {
+	return cost_transcript.session_cwd(transcript_cwd.resolve(path, cwd))
 }
 
 function run(
@@ -179,7 +238,7 @@ function run(
 		return FAILURE_EXIT_CODE
 	}
 
-	const texts = lane_texts(transcript_cwd.resolve(options.path, cwd), home)
+	const texts = lane_texts(measured_checkout(options.path, cwd), home)
 
 	console.info(format(summarize(texts, MIN_ROUND_TRIPS, options.lanes)))
 
@@ -193,6 +252,8 @@ function main(argv: ReadonlyArray<string>): void {
 const time_density_cli = {
 	DEFAULT_LANES,
 	parse_options,
+	measured_checkout,
+	run,
 	transcript_stats,
 	summarize,
 	format,

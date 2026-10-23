@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 review fixes: time_bundles exposes the single-call split (independent/dependent/by_tool) without the Agent series, and time:density sums kind rows through time_bundles' own sort instead of a renamed copy",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 63,
+		"prose.long_paragraphs": 1
+	}
+}
