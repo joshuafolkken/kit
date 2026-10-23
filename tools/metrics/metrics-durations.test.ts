@@ -187,7 +187,7 @@ describe('metrics_durations.render_regressions', () => {
 	it('says the gate median trails a fix by up to three gates', () => {
 		const text = metrics_durations.render_regressions(
 			[{ name: 'gate', baseline: BASELINE_MS, current: PAST_TOLERANCE_MS }],
-			'josh-metrics-durations.json',
+			'metrics-durations.json',
 		)
 
 		expect(text).toContain('gate  baseline 1.0s → current 1.1s')

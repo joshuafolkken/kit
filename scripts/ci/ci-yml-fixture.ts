@@ -12,6 +12,7 @@ interface WorkflowStep {
 	if?: string
 	env?: Record<string, string>
 	run?: string
+	shell?: string
 	uses?: string
 	with?: Record<string, string | number>
 	// eslint-disable-next-line @typescript-eslint/naming-convention -- GitHub workflow key

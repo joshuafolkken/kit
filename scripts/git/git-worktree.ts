@@ -19,6 +19,7 @@ import { repository_lock } from './repository-lock'
 // `lane-start-point.ts` and `release-publish.ts` both act on — so this module stops at "what git
 // printed" and the meaning of it is decided there.
 const WORKTREE = 'worktree'
+const ORIGIN = 'origin'
 
 // **Every call that writes `.git/worktrees/` runs under one repository-wide lock**.
 // `git worktree add` is not safe against itself: while one add is still
@@ -87,6 +88,17 @@ async function worktree_add(
 	return await locked([WORKTREE, ...flags, directory, start_point ?? branch_name], SUITE_TIMEOUT_MS)
 }
 
+// **A lane's upstream is written when it is opened, not by its first push**
+// (joshuafolkken/kit#4653). A Codex lane's sandbox cannot write the common directory's `config`, so the
+// `--set-upstream` its push falls back to records nothing, and every later reader of `@{upstream}`
+// would take the pushed lane for an unpushed one. Pointing it at the lane's own name on `origin` keeps
+// a bare `git push` working before the remote branch exists. Under the work-tree lock, since two lanes
+// opened at once would otherwise race on `config.lock`.
+async function set_upstream(branch_name: string): Promise<void> {
+	await locked(['config', `branch.${branch_name}.remote`, ORIGIN])
+	await locked(['config', `branch.${branch_name}.merge`, `refs/heads/${branch_name}`])
+}
+
 // A throwaway tree at one commit, on no branch — `josh test:red` checks the merge-base out here, so
 // the pre-fix tree is built without creating a branch or touching the caller's tree and index.
 async function worktree_add_detached(directory: string, commit: string): Promise<string> {
@@ -139,6 +151,7 @@ async function branch_delete(branch_name: string): Promise<string> {
 const git_worktree = {
 	branch_delete,
 	ls_remote_branch,
+	set_upstream,
 	worktree_add,
 	worktree_add_detached,
 	worktree_list,
