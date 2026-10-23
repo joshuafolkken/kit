@@ -19,13 +19,21 @@ import { git_argv } from './git-argv'
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 
 // `gh` sends a typed `\n` as the two characters, so a token after it follows the letter `n` and the
-// shapes' "no letter before it" guard would pass it. Each escape reads as a space instead.
+// shapes' "no letter before it" guard would pass it. So the text is scanned twice — as sent, and with
+// each escape read as a space — since a backslash may also sit right before the token (`\ghp_…`),
+// where the second reading loses its first letter. A non-JSON file is read the same way.
 const TYPED_ESCAPE = /\\./gu
 
 function sent_text(source: FieldSource): string {
-	if (source.kind === 'text') return source.value.replaceAll(TYPED_ESCAPE, () => ' ')
+	if (source.kind === 'text') return source.value
 
 	return token_shape.decoded(file_reader.read_if_readable(source.value) ?? '')
+}
+
+function holds_token(text: string): boolean {
+	return [text, text.replaceAll(TYPED_ESCAPE, () => ' ')].some(
+		(reading) => token_shape.find(reading) !== undefined,
+	)
 }
 
 function is_credential_segment(segment: string): boolean {
@@ -37,9 +45,7 @@ function is_credential_segment(segment: string): boolean {
 
 	if (!gh_api.is_gh_api(call)) return false
 
-	return gh_api
-		.field_sources(call)
-		.some((source) => token_shape.find(sent_text(source)) !== undefined)
+	return gh_api.field_sources(call).some((source) => holds_token(sent_text(source)))
 }
 
 function sends_credential(command: string): boolean {

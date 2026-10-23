@@ -18,10 +18,12 @@ const work = mkdtempSync(path.join(tmpdir(), 'credential-body-'))
 const TOKEN_FILE = path.join(work, 'token.md')
 const TOKEN_JSON = path.join(work, 'token.json')
 const CLEAN_FILE = path.join(work, 'clean.md')
+const TOKEN_ESCAPED = path.join(work, 'token-escaped.md')
 
 writeFileSync(TOKEN_FILE, `Ran it with\n\n    export GH_TOKEN=${SAMPLE}\n`)
 writeFileSync(TOKEN_JSON, JSON.stringify({ body: `line\n${SAMPLE}` }))
 writeFileSync(CLEAN_FILE, 'A classic token starts with `ghp_`.\n')
+writeFileSync(TOKEN_ESCAPED, String.raw`line\n${SAMPLE}`)
 
 const harness = delivered_rules_harness.create_harness('rule-guard-credential-')
 const NOW_MS = 1_700_000_000_000
@@ -42,6 +44,11 @@ describe('credential_body.sends_credential — refuses a body holding a token', 
 			String.raw`an inline body after a typed \n`,
 			String.raw`gh api ${COMMENTS} -f 'body=line\n${SAMPLE}'`,
 		],
+		[
+			'an inline body with a backslash before the token',
+			`gh api ${COMMENTS} -f 'body=\\${SAMPLE}'`,
+		],
+		[String.raw`a non-JSON file after a typed \n`, `gh api ${COMMENTS} -F body=@${TOKEN_ESCAPED}`],
 		['an attached --field file', `gh api ${COMMENTS} --field=body=@${TOKEN_FILE}`],
 		['a call behind a cd', `cd /tmp && gh api ${COMMENTS} -F body=@${TOKEN_FILE}`],
 		['a call after a semicolon', `true; gh api ${COMMENTS} -F body=@${TOKEN_FILE}`],
