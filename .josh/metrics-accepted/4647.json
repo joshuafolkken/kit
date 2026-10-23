@@ -1,0 +1,8 @@
+{
+	"reason": "Round-1 review fixes: test:pinned reports hunks unchecked without Vitest, run:review fails open when test:pinned cannot run, ship refuses a stray --unpinned-ok, plus their tests and doc lines",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 235,
+		"ai_cost.on_demand_bytes": 346
+	}
+}

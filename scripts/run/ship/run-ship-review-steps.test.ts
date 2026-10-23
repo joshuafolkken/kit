@@ -110,6 +110,12 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 		expect(launch.mock.calls[0]?.[0]).toMatchObject({ argv: ARGV })
 	})
 
+	it('hands --unpinned-ok and its reason to the round-1 review it opens', async () => {
+		await run_ship_review_steps.review_stage(ISSUE, false, ['--unpinned-ok', 'dead code'])
+
+		expect(commands()[0]).toBe(`${OPEN} --unpinned-ok dead code`)
+	})
+
 	it('records Low findings and ships on', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${LOW}\n`)
 

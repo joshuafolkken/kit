@@ -1163,7 +1163,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:review": [
-      "[--join]",
+      "[--unpinned-ok "<reason>" | --join]",
       "automation",
       [
         "processes",
@@ -1232,7 +1232,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "ship": [
-      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
+      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
       "automation",
       [
         "git",

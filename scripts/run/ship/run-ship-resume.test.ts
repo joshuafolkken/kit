@@ -142,7 +142,7 @@ describe('josh ship — a restart after a stale review', () => {
 		probe.read_state.mockResolvedValue(SHIPPED)
 
 		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
-		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true)
+		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true, [])
 		expect(commands()).toStrictEqual([`followup ${TITLE}`, REPORT])
 	})
 

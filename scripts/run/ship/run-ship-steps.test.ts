@@ -24,6 +24,7 @@ const ARGS: ShipArguments = {
 	cites: ['--cite', '#1'],
 	is_review: false,
 	is_detach: false,
+	unpinned_ok: [],
 }
 
 const FRESH: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
@@ -101,14 +102,14 @@ describe('run_ship_steps — preflight and review stages delegate', () => {
 		await step_for(STAGE.REVIEW).run(ARGS, FRESH)
 		await step_for(STAGE.ROUND_TWO).run(ARGS, FRESH)
 
-		expect(review_spy).toHaveBeenCalledWith(ISSUE, false)
+		expect(review_spy).toHaveBeenCalledWith(ISSUE, false, [])
 		expect(round_two_spy).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('hands round 1 a stale review, so a recorded round is not skipped (joshuafolkken/kit#4221)', async () => {
 		await step_for(STAGE.REVIEW).run(ARGS, { ...FRESH, is_review_stale: true })
 
-		expect(review_spy).toHaveBeenCalledWith(ISSUE, true)
+		expect(review_spy).toHaveBeenCalledWith(ISSUE, true, [])
 	})
 })
 

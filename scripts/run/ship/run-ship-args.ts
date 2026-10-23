@@ -21,6 +21,7 @@ const TRAILING_ISSUE_PATTERN = /#([1-9]\d*)\s*$/u
 // shell-body-safe `--notify-message-file` a body naming a command or path must use (`followup.md`).
 const NOTIFY_OPTIONS = ['notify-message', 'notify-message-file'] as const
 const { BODY_FILE_OPTION, body_arguments } = run_ship_body_draft
+const UNPINNED_OK_OPTION = 'unpinned-ok'
 
 type NotifyValues = Partial<Record<(typeof NOTIFY_OPTIONS)[number], string>>
 
@@ -35,6 +36,8 @@ const OPTIONS = {
 	detach: { type: 'boolean' },
 	log: { type: 'string' },
 	cite: { type: 'string', multiple: true },
+	// Forwarded to round 1's `run:review`, the only way past a change no test can pin under `--review`.
+	[UNPINNED_OK_OPTION]: { type: 'string' },
 } as const
 
 type ShipCommand = { kind: 'ship'; args: ShipArguments } | { kind: 'log'; number: string }
@@ -59,6 +62,20 @@ interface ParsedValues extends NotifyValues {
 	detach?: boolean
 	log?: string
 	cite?: Array<string>
+	[UNPINNED_OK_OPTION]?: string
+}
+
+function unpinned_arguments(reason: string | undefined): ReadonlyArray<string> {
+	return reason === undefined ? [] : [`--${UNPINNED_OK_OPTION}`, reason]
+}
+
+// `--unpinned-ok` answers round 1's `run:review` alone, so without `--review` or with a blank reason it
+// would reach nothing that reads it — refused here rather than after the earlier stages have run.
+function is_stray_unpinned_ok(values: ParsedValues): boolean {
+	const reason = values[UNPINNED_OK_OPTION]
+	if (reason === undefined) return false
+
+	return values.review !== true || reason.trim() === ''
 }
 
 // A follow-up citation passed as a trailing positional is a bare issue number, so a stray flag is
@@ -84,6 +101,7 @@ function ship_args(
 		cites,
 		is_review: values.review === true,
 		is_detach: values.detach === true,
+		unpinned_ok: unpinned_arguments(values[UNPINNED_OK_OPTION]),
 	}
 }
 
@@ -99,6 +117,7 @@ function command_of(
 	positionals: ReadonlyArray<string>,
 ): ShipCommand | undefined {
 	if (values.log !== undefined) return log_command(values.log, positionals)
+	if (is_stray_unpinned_ok(values)) return undefined
 
 	const title = positionals[FIRST]
 	const args =

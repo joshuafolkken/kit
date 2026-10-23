@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
+import { run_review_pinned } from './run-review-pinned'
 import { run_review_steps } from './run-review-steps'
 
 // `josh run:review` — one call that leaves `josh gate` running in the background and prints the whole
@@ -10,6 +11,9 @@ import { run_review_steps } from './run-review-steps'
 // It composes `josh gate` and `josh review:brief` and changes neither: the gate is the same command
 // spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
 // `review:attest --check` enforces is minted exactly as a standalone brief mints it.
+//
+// The pair opens only after `josh test:pinned` finds every changed place pinned, or the implementer
+// accepts the rest with `--unpinned-ok "<reason>"` (`run-review-pinned.ts`).
 //
 // **The default mode opens the pair; `--join` closes it.** The child runs the default, reads the brief
 // off stdout, launches the review subagent, and — once it returns — runs `--join`, which waits for the
@@ -21,7 +25,7 @@ const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:review [--join]'
+const USAGE = 'Usage: josh run:review [--unpinned-ok "<reason>" | --join]'
 
 function now_iso(): string {
 	return new Date().toISOString()
@@ -38,7 +42,7 @@ function join_exit_code(state: GateState): number {
 const JOIN_HINT =
 	'Gate is running in the background. Launch the /code-review subagent with the brief above; when it returns, run `pnpm josh run:review --join` to join the gate and check its verdict before committing.'
 
-async function run_start(): Promise<number> {
+async function start_pair(): Promise<number> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
@@ -56,6 +60,27 @@ async function run_start(): Promise<number> {
 	// has not been green on) exits non-zero, and a "gate running, launch the review" line under that
 	// refusal would send the child to review a tree there is no brief for.
 	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${JOIN_HINT}\n`)
+
+	return code
+}
+
+// `josh test:pinned` runs first, so an unpinned change stops before the gate and the brief. An accepted
+// one is printed after the brief on stdout, where the reviewer reads it; otherwise — or when the pair
+// failed to open, so no brief follows — the report goes to stderr beside the other run notes.
+async function run_start(reason?: string): Promise<number> {
+	const pinned = await run_review_pinned.check(reason)
+
+	if (pinned.kind === 'stop') {
+		process.stderr.write(pinned.text)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const code = await start_pair()
+	const is_briefed = code === SUCCESS_EXIT_CODE && pinned.kind === 'accepted'
+	const sink = is_briefed ? process.stdout : process.stderr
+
+	sink.write(pinned.text)
 
 	return code
 }
@@ -107,6 +132,8 @@ async function run_join(): Promise<number> {
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (argv.length === 0) return await run_start()
 	if (argv.length === 1 && argv[0] === JOIN_FLAG) return await run_join()
+	const reason = run_review_pinned.ok_reason_of(argv)
+	if (reason !== undefined) return await run_start(reason)
 
 	process.stderr.write(`${USAGE}\n`)
 

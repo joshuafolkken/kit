@@ -41,6 +41,7 @@ const ARGS = {
 	cites: [],
 	is_review: true,
 	is_detach: true,
+	unpinned_ok: [],
 }
 const FAILED = { body: 'FAIL gate', conflicts: ['scripts/a.ts'], cause: 'finding' } as const
 // Typed `Required`, so a field the stop gains fails the type check until it is filled here as well.

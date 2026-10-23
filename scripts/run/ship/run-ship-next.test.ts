@@ -11,6 +11,7 @@ const BODY_PATH = 'scratchpad/evidence.md'
 const BODY = ['--body-file', BODY_PATH]
 const CITE = ['--cite', '2965']
 const NOTIFY = ['--notify-message-file', 'notify body.txt']
+const UNPINNED_OK = ['--unpinned-ok', 'dead code']
 const RESUME = { title: TITLE, flags: [...BODY, ...CITE], is_review: true }
 const QUOTED = `--body-file ${BODY_PATH} --cite 2965 '${TITLE}'`
 // A lane child's commit and push belong to the detached ship, so no route may name `josh git`.
@@ -113,12 +114,13 @@ describe('run_ship_next.resume_of', () => {
 		cites: [CITE[1] ?? ''],
 		is_review: true,
 		is_detach: false,
+		unpinned_ok: UNPINNED_OK,
 	}
 
-	it('keeps the stopped ship’s notify, body and cite options', () => {
+	it('keeps the stopped ship’s --unpinned-ok, notify, body and cite options', () => {
 		expect(run_ship_next.resume_of(args)).toStrictEqual({
 			title: args.title,
-			flags: [...NOTIFY, ...BODY, ...CITE],
+			flags: [...UNPINNED_OK, ...NOTIFY, ...BODY, ...CITE],
 			is_review: true,
 		})
 	})

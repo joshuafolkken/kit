@@ -59,14 +59,14 @@ function shell_word(token: string): string {
 	return BARE_WORD.test(token) ? token : quoted(token)
 }
 
-// A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
-// or an issue number and fits the prompt.
+// A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path,
+// an issue number or the `--unpinned-ok` reason, and `shell_word` quotes the last for the prompt.
 function resume_of(args: ShipArguments): ShipResume {
 	const cites = args.cites.flatMap((cite) => ['--cite', cite])
 
 	return {
 		title: args.title,
-		flags: [...args.notify, ...args.body, ...cites],
+		flags: [...args.unpinned_ok, ...args.notify, ...args.body, ...cites],
 		is_review: args.is_review,
 	}
 }

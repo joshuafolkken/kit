@@ -92,6 +92,7 @@ interface DetachRequest {
 	body: ReadonlyArray<string>
 	cites: ReadonlyArray<string>
 	is_review: boolean
+	unpinned_ok: ReadonlyArray<string>
 	repository: string
 	cwd: string
 }
@@ -277,6 +278,7 @@ function supervisor_argv(request: DetachRequest): LaunchArgv {
 			'josh',
 			'ship',
 			...review,
+			...request.unpinned_ok,
 			...notify_arguments(request),
 			...request.body,
 			...cites,

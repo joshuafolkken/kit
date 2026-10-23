@@ -476,11 +476,12 @@ or a child could not authenticate; it keeps `in-progress`, uncounted, for `/logi
 
 <!-- usage: run:review -->
 
-Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict).
+Run test:pinned, then start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict).
 
 ```bash
-pnpm josh run:review          # detach the gate, print the brief; then launch the /code-review subagent
-pnpm josh run:review --join   # after the review returns: join the gate, check its verdict
+pnpm josh run:review                             # stop on an unpinned change; else detach the gate, print the brief, then launch the /code-review subagent
+pnpm josh run:review --unpinned-ok "only logs"   # carry on past unpinned places; the list and the reason follow the brief
+pnpm josh run:review --join                      # after the review returns: join the gate, check its verdict
 ```
 
 <!-- /usage -->
@@ -529,6 +530,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
 - `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.
+- `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
 - `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off, the checks even after a preflight refusal, so one stop reports every failure; a stop returns to the same session.
 
 <!-- /usage -->

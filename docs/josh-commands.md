@@ -305,7 +305,7 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in de
 
 <!-- usage: test:pinned -->
 
-Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on.
+Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on.
 
 ```bash
 pnpm josh test:pinned           # unpinned / unchecked <file>:<line> lines

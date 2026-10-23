@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { test_pinned } from './test-pinned'
-import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
+import { test_pinned_logic } from './test-pinned-logic'
 
 // The `josh test:pinned` entry: read `--max`, run, print one line per unpinned or unchecked hunk, and
 // exit non-zero when any checked hunk is unpinned. An unchecked hunk alone does not fail the run — it
@@ -50,21 +50,13 @@ function print_usage(argv: ReadonlyArray<string>): number {
 	return argv.some((argument) => HELP_FLAGS.has(argument)) ? CLEAN_EXIT : FAILED_EXIT
 }
 
-function output(report: PinnedReport): string {
-	const unpinned = String(report.unpinned.length)
-	const unchecked = String(report.unchecked.length)
-	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, test_pinned_logic.format(report)]
-
-	return `${lines.filter((line) => line !== '').join('\n')}\n`
-}
-
 async function main(argv: ReadonlyArray<string>): Promise<number> {
 	const max_hunks = max_hunks_of(argv)
 	if (max_hunks === undefined) return print_usage(argv)
 
 	const report = await test_pinned.run(max_hunks)
 
-	process.stdout.write(output(report))
+	process.stdout.write(test_pinned_logic.report_text(report))
 
 	return report.unpinned.length === 0 ? CLEAN_EXIT : FAILED_EXIT
 }

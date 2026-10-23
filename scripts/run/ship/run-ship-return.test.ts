@@ -59,6 +59,7 @@ const ARGS = {
 	cites: [],
 	is_review: true,
 	is_detach: true,
+	unpinned_ok: [],
 }
 const SERVER = 'server-1'
 const NEW_SERVER = 'server-2'

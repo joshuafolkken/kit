@@ -111,3 +111,20 @@ describe('the implementer self-check before review round 1', () => {
 		},
 	)
 })
+
+// joshuafolkken/kit#4647: question 1 reads the command's output rather than asking for a hand check.
+describe('the self-check question 1 and josh test:pinned', () => {
+	it('question 1 reads the test:pinned lines run:review prints', () => {
+		expect(self_check_section()).toContain(
+			'read the `unpinned` and `unchecked` lines `pnpm josh run:review` prints from `pnpm josh test:pinned`',
+		)
+	})
+
+	it('the chain rule says run:review runs test:pinned and how it carries on past it', () => {
+		const step = read_unwrapped(CHAIN_RULE)
+
+		expect(step).toContain('`pnpm josh run:review` — its `test:pinned` lines answer the self-check')
+		expect(step).toContain('it runs `pnpm josh test:pinned` and stops on an `unpinned` line')
+		expect(step).toContain('`--unpinned-ok "<reason>"` carries on')
+	})
+})

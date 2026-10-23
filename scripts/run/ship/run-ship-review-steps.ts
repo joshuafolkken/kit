@@ -188,7 +188,11 @@ async function is_reusable(issue: string, is_stale: boolean): Promise<boolean> {
 
 // The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
 // at the first that did not pass.
-async function round_one_stage(issue: string, is_stale: boolean): Promise<StepResult> {
+async function round_one_stage(
+	issue: string,
+	is_stale: boolean,
+	unpinned_ok: ReadonlyArray<string>,
+): Promise<StepResult> {
 	if (await is_reusable(issue, is_stale)) {
 		await record_outcome(issue, lane_round_one_stats.REUSED)
 
@@ -200,7 +204,7 @@ async function round_one_stage(issue: string, is_stale: boolean): Promise<StepRe
 
 	return await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed([RUN_REVIEW], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
+		...reviewed([RUN_REVIEW, ...unpinned_ok], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
 		tagged_phase(CAUSE.CHECK, join_gate),
 		attest_phase,
 		async () => await code_round_one_record(issue),
@@ -219,17 +223,21 @@ async function interaction_stage(issue: string): Promise<StepResult> {
 	])
 }
 
+async function is_interaction_owed(issue: string, first: StepResult): Promise<boolean> {
+	if (first.code !== SUCCESS_EXIT_CODE) return false
+
+	return (await review_interaction.status(Number(issue))) === 'missing'
+}
+
 // Round 1, then the interaction review where it is due and not yet recorded — so a relaunched ship
 // whose round 1 is recorded still owes it. The first stop is returned as it is.
-async function review_stage(issue: string, is_stale = false): Promise<StepResult> {
-	const first = await round_one_stage(issue, is_stale)
-
-	if (
-		first.code !== SUCCESS_EXIT_CODE ||
-		(await review_interaction.status(Number(issue))) !== 'missing'
-	) {
-		return first
-	}
+async function review_stage(
+	issue: string,
+	is_stale = false,
+	unpinned_ok: ReadonlyArray<string> = [],
+): Promise<StepResult> {
+	const first = await round_one_stage(issue, is_stale, unpinned_ok)
+	if (!(await is_interaction_owed(issue, first))) return first
 
 	const second = await interaction_stage(issue)
 

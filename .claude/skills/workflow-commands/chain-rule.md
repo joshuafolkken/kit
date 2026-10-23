@@ -6,11 +6,11 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), the scoped pair, `pnpm josh run:review` and its `/code-review`
-   subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
+   the implementer's self-check"), the scoped pair, `pnpm josh run:review` — its `test:pinned` lines
+   answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
    本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
    round's fixes with the scoped pair, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
    `metrics` leaves no record it reuses. A stop relaunches a child
@@ -24,9 +24,11 @@ Review results and successful pushes are never turn boundaries.
    rather than refused.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
-   (`prompts/review.md` → "Before round 1 — the implementer's self-check"), run the final scoped lint/test pair and
-   `pnpm josh run:review`: it starts `pnpm josh gate` in the background and prints the `/code-review`
-   brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
+   (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
+   `run:review`'s `test:pinned` lines, run the final scoped lint/test pair and
+   `pnpm josh run:review`: it runs `pnpm josh test:pinned` and stops on an `unpinned` line
+   (`--unpinned-ok "<reason>"` carries on), then starts `pnpm josh gate` in the background and prints
+   the `/code-review` brief in one call, so the two overlap. Launch the `/code-review` subagent as the `general-purpose`
    agent type with that brief and its `model` (`delegation.md`) (every tool, so `--fix` applies;
    never a guessed type name).
    Never load the review skill in the main line.

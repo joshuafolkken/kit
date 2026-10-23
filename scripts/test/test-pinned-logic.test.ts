@@ -113,7 +113,13 @@ describe('test_pinned_logic.split and format', () => {
 	})
 
 	it('prints unpinned and unchecked hunks as file:line, a line-0 deletion as line 1', () => {
-		const report = { unpinned: [{ ...first, is_green: true }], unchecked: [second], max_hunks: 1 }
+		const report = {
+			unpinned: [{ ...first, is_green: true }],
+			unchecked: [second],
+			unparsed: [],
+			max_hunks: 1,
+			has_runner: true,
+		}
 
 		expect(test_pinned_logic.format(report)).toBe(
 			'unpinned a.ts:3 — reverting it left every related test green\n' +
@@ -122,14 +128,91 @@ describe('test_pinned_logic.split and format', () => {
 	})
 
 	it('says no related test ran rather than green when nothing ran with the hunk reverted', () => {
-		const report = { unpinned: [{ ...first, is_green: false }], unchecked: [], max_hunks: 1 }
+		const report = {
+			unpinned: [{ ...first, is_green: false }],
+			unchecked: [],
+			unparsed: [],
+			max_hunks: 1,
+			has_runner: true,
+		}
 
 		expect(test_pinned_logic.format(report)).toBe(
 			'unpinned a.ts:3 — no related test ran with it reverted',
 		)
 	})
+})
+
+describe('test_pinned_logic.format with nothing left, and on an added file function', () => {
+	const first = hunk({ file: 'a.ts', new_start: 3 })
 
 	it('prints nothing when every checked hunk is pinned and none is left over', () => {
-		expect(test_pinned_logic.format({ unpinned: [], unchecked: [], max_hunks: 1 })).toBe('')
+		expect(
+			test_pinned_logic.format({
+				unpinned: [],
+				unchecked: [],
+				unparsed: [],
+				max_hunks: 1,
+				has_runner: true,
+			}),
+		).toBe('')
+	})
+
+	it('names the function and says its body was replaced, green or not run', () => {
+		const stub = { ...first, function_name: 'tree.discard' }
+		const report = {
+			unpinned: [
+				{ ...stub, is_green: true },
+				{ ...stub, is_green: false },
+			],
+			unchecked: [],
+			unparsed: [],
+			max_hunks: 1,
+			has_runner: true,
+		}
+
+		expect(test_pinned_logic.format(report)).toBe(
+			'unpinned a.ts:3 tree.discard — replacing its body with a throw left every related test green\n' +
+				'unpinned a.ts:3 tree.discard — no related test ran with its body replaced by a throw',
+		)
+	})
+})
+
+describe('test_pinned_logic.report_text', () => {
+	const one_unchecked = 'unpinned 0 · unchecked 1\n'
+
+	it('counts an added file it could not read as unchecked and lists it', () => {
+		const report = {
+			unpinned: [],
+			unchecked: [],
+			unparsed: ['added.ts'],
+			max_hunks: 1,
+			has_runner: true,
+		}
+
+		expect(test_pinned_logic.report_text(report)).toBe(
+			`${
+				one_unchecked
+			}unchecked added.ts — an added file, and typescript is not installed to read its functions\n`,
+		)
+	})
+
+	it('says no vitest ran a hunk it left unchecked for want of one, rather than naming the cap', () => {
+		const report = {
+			unpinned: [],
+			unchecked: [hunk({ file: 'a.ts', new_start: 3 })],
+			unparsed: [],
+			max_hunks: 20,
+			has_runner: false,
+		}
+
+		expect(test_pinned_logic.report_text(report)).toBe(
+			`${one_unchecked}unchecked a.ts:3 — vitest is not installed to run its related tests\n`,
+		)
+	})
+
+	it('prints only the counts when nothing is unpinned or unchecked', () => {
+		const report = { unpinned: [], unchecked: [], unparsed: [], max_hunks: 1, has_runner: true }
+
+		expect(test_pinned_logic.report_text(report)).toBe('unpinned 0 · unchecked 0\n')
 	})
 })

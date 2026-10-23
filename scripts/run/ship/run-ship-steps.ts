@@ -23,6 +23,8 @@ interface ShipArguments {
 	cites: ReadonlyArray<string>
 	is_review: boolean
 	is_detach: boolean
+	// `--unpinned-ok "<reason>"` as given, forwarded to round 1's `run:review` alone; empty when absent.
+	unpinned_ok: ReadonlyArray<string>
 }
 
 interface Step {
@@ -133,7 +135,11 @@ const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
 	run: async (args, state) =>
-		await run_ship_review_steps.review_stage(args.number, state.is_review_stale === true),
+		await run_ship_review_steps.review_stage(
+			args.number,
+			state.is_review_stale === true,
+			args.unpinned_ok,
+		),
 }
 const ROUND_TWO_STEP: Step = {
 	stage: STAGE.ROUND_TWO,

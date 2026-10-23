@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/lint/import-graph.ts:257 | 2026-10-23 | #4645
