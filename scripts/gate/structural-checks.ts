@@ -10,7 +10,8 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // The targets are the pre-detach stop's too, so the two never drift.
 //
 // `josh exports:unused` stays out: its whole-program type-checker pass is several times the lint's
-// own wall clock.
+// own wall clock. `josh lint:related` runs its narrowed members check after a green lint instead
+// (joshuafolkken/kit#4645).
 //
 // They run in kit alone: the guard tests are kit's own, and a consumer meets the pre-detach static
 // checks there. A change with no `.ts` file in it moves none of their verdicts.

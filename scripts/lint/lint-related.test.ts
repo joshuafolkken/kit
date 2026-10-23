@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -35,6 +36,10 @@ vi.mock('#scripts/gate/since-green', () => ({
 vi.mock('#scripts/document/document-byte-check', () => ({
 	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
 }))
+// Mocked so no case scans this checkout's real program; the scan is `unused-members-check.test.ts`.
+vi.mock('#scripts/exports/unused-members-check', () => ({
+	unused_members_check: { run_unused_members: vi.fn() },
+}))
 // Mocked so no case spawns this checkout's real guard tests; what they report is
 // `structural-checks.test.ts`.
 vi.mock('#scripts/gate/structural-checks', () => ({
@@ -54,6 +59,7 @@ const mocked_before = vi.mocked(scoped_green.read_before)
 const mocked_byte_all = vi.mocked(document_byte_check.check_all)
 const mocked_byte_files = vi.mocked(document_byte_check.check_files)
 const mocked_notice = vi.mocked(metrics_totals.growth_notice)
+const mocked_unused = vi.mocked(unused_members_check.run_unused_members)
 const mocked_structural = vi.mocked(structural_checks.run_structural)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
@@ -82,6 +88,13 @@ function eslint_arguments(): ReadonlyArray<string> {
 	return mocked_scoped.mock.calls[0]?.[1] ?? []
 }
 
+// The checks a green lint goes on to, each green unless a case says otherwise.
+function green_checks_after_lint(): void {
+	mocked_byte_all.mockReturnValue(0)
+	mocked_byte_files.mockReturnValue(0)
+	mocked_unused.mockResolvedValue(0)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -90,8 +103,7 @@ beforeEach(() => {
 	mocked_scoped.mockResolvedValue(0)
 	mocked_whole_tree.mockResolvedValue(0)
 	mocked_before.mockResolvedValue(BEFORE_TREE)
-	mocked_byte_all.mockReturnValue(0)
-	mocked_byte_files.mockReturnValue(0)
+	green_checks_after_lint()
 	mocked_notice.mockResolvedValue(undefined)
 })
 
@@ -225,6 +237,7 @@ describe('lint_related.run_related_lint', () => {
 })
 
 describe('lint_related.run_related_lint — the document byte check', () => {
+	// The unused member check (joshuafolkken/kit#4645) falls back with it, to the whole program.
 	it('checks every budgeted document when lint fell back to the whole tree', async () => {
 		mocked_changed.mockResolvedValue([])
 
@@ -232,6 +245,7 @@ describe('lint_related.run_related_lint — the document byte check', () => {
 
 		expect(mocked_byte_all).toHaveBeenCalledWith(REPOSITORY_ROOT)
 		expect(mocked_byte_files).not.toHaveBeenCalled()
+		expect(mocked_unused).toHaveBeenCalledWith(REPOSITORY_ROOT, undefined)
 	})
 
 	it('checks only the narrowed files when lint was narrowed', async () => {
@@ -250,14 +264,32 @@ describe('lint_related.run_related_lint — the document byte check', () => {
 		expect(mocked_byte_files).not.toHaveBeenCalled()
 	})
 
-	it('returns and records a byte-check failure after a green lint', async () => {
+	it('returns and records a byte-check failure after a green lint, skipping the unused member check', async () => {
 		mocked_byte_files.mockReturnValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(mocked_unused).not.toHaveBeenCalled()
 		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
 			before: BEFORE_TREE,
 			exit_code: FAILED,
 		})
+	})
+})
+
+// joshuafolkken/kit#4645: an unused namespace member is reported in the loop rather than first at
+// the detached ship's pre-detach gate.
+describe('lint_related.run_related_lint — the unused namespace member check', () => {
+	it('narrows the check to the changed files when lint was narrowed', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(mocked_unused.mock.calls[0]?.[0]).toBe(REPOSITORY_ROOT)
+		expect(mocked_unused.mock.calls[0]?.[1]).toContain(ABSOLUTE_SOURCE)
+	})
+
+	it('returns an unused member it found as the run’s failure', async () => {
+		mocked_unused.mockResolvedValue(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
 	})
 })
 

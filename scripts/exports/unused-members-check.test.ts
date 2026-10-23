@@ -1,0 +1,93 @@
+import { writeFileSync } from 'node:fs'
+import path from 'node:path'
+import { NOTHING_TO_CHECK_MARKER, SKIP_MARKER } from '#scripts/test/skip-marker'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
+import { unused_members_fixture } from '#tools/exports/unused-members-fixture'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { unused_members_check } from './unused-members-check'
+
+const { create_project, with_reader, READ_KEPT } = unused_members_fixture
+const PASS_EXIT_CODE = 0
+const FAIL_EXIT_CODE = 1
+const DROPPED_LINE = 'library.ts:3  library.dropped'
+const READ_ALL = 'export const value = library.kept() + library.dropped()'
+
+function capture(): { info: Array<string>; error: Array<string> } {
+	const info: Array<string> = []
+	const error: Array<string> = []
+
+	vi.spyOn(console, 'info').mockImplementation((message: string) => {
+		info.push(message)
+	})
+	vi.spyOn(console, 'error').mockImplementation((message: string) => {
+		error.push(message)
+	})
+
+	return { info, error }
+}
+
+afterEach(() => vi.restoreAllMocks())
+
+describe('unused_members_check.run_unused_members', () => {
+	it('passes and says so when every member is read', async () => {
+		const output = capture()
+		const exit_code = await unused_members_check.run_unused_members(
+			create_project(with_reader(READ_ALL)),
+		)
+
+		expect(exit_code).toBe(PASS_EXIT_CODE)
+		expect(output.info.join('\n')).toContain('no unused namespace member')
+	})
+
+	it('fails and names each unused member with its location', async () => {
+		const output = capture()
+		const exit_code = await unused_members_check.run_unused_members(
+			create_project(with_reader(READ_KEPT)),
+		)
+		const text = output.error.join('\n')
+
+		expect(exit_code).toBe(FAIL_EXIT_CODE)
+		expect(text).toContain('1 namespace member(s) nothing reads')
+		expect(text).toContain(DROPPED_LINE)
+	})
+
+	it('skips a consumer project without scanning it', async () => {
+		const output = capture()
+		const root = create_project(with_reader(READ_KEPT))
+		const manifest = { name: 'consumer', devDependencies: { [KIT_PACKAGE_NAME]: '1.0.0' } }
+
+		writeFileSync(path.join(root, 'package.json'), JSON.stringify(manifest))
+
+		expect(await unused_members_check.run_unused_members(root)).toBe(PASS_EXIT_CODE)
+		expect(output.info).toStrictEqual([unused_members_check.CONSUMER_NOTICE])
+		expect(output.error).toStrictEqual([])
+	})
+})
+
+describe('unused_members_check.run_unused_members — narrowed to files', () => {
+	it('names only the unused members the given files declare', async () => {
+		const output = capture()
+		const root = create_project(with_reader(READ_KEPT))
+		const library_exit = await unused_members_check.run_unused_members(root, [
+			path.join(root, 'library.ts'),
+		])
+		const reader_exit = await unused_members_check.run_unused_members(root, [
+			path.join(root, 'reader.ts'),
+		])
+
+		expect([library_exit, reader_exit]).toStrictEqual([FAIL_EXIT_CODE, PASS_EXIT_CODE])
+		expect(output.error.join('\n')).toContain(DROPPED_LINE)
+	})
+})
+
+describe('unused_members_check.CONSUMER_NOTICE', () => {
+	it('says a consumer is out of scope without the skip marker that withholds the green record', () => {
+		expect(unused_members_check.CONSUMER_NOTICE).toContain('nothing to check in a consumer project')
+		expect(unused_members_check.CONSUMER_NOTICE).not.toContain(SKIP_MARKER)
+	})
+
+	// The gate's verdict reads this marker to tell a check that looked at nothing from one that ran.
+	it('carries the marker the gate verdict reads a check with nothing to check by', () => {
+		expect(unused_members_check.CONSUMER_NOTICE).toContain(NOTHING_TO_CHECK_MARKER)
+	})
+})

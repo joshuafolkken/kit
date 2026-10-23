@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import { import_graph } from '#scripts/lint/import-graph'
 import ts from 'typescript'
 import { member_usage } from './member-usage'
 import { namespace_members, type Namespace, type NamespaceMember } from './namespace-members'
@@ -18,12 +19,23 @@ function root_sources(root: string): Array<string> {
 		.map((name) => path.join(root, name))
 }
 
-function load_program(root: string): ts.Program {
+interface ProjectFiles {
+	names: ReadonlyArray<string>
+	options: ts.CompilerOptions
+}
+
+function project_files(root: string): ProjectFiles {
 	const config_file = ts.readConfigFile(path.join(root, TSCONFIG), (file) => ts.sys.readFile(file))
 	const parsed = ts.parseJsonConfigFileContent(config_file.config, ts.sys, root)
-	const root_names = [...new Set([...parsed.fileNames, ...root_sources(root)])]
+	const names = [...new Set([...parsed.fileNames, ...root_sources(root)])]
 
-	return ts.createProgram({ rootNames: root_names, options: parsed.options })
+	return { names: names.map((name) => path.resolve(name)), options: parsed.options }
+}
+
+function load_program(root: string): ts.Program {
+	const { names, options } = project_files(root)
+
+	return ts.createProgram({ rootNames: names, options })
 }
 
 function is_project_source(source: ts.SourceFile): boolean {
@@ -69,6 +81,39 @@ function find_unused_members(root: string): Array<NamespaceMember> {
 	return unused_of(declared_namespaces(sources), program, sources)
 }
 
-const unused_members = { find_unused_members }
+// The readers the scan visits: the files whose imports reach a changed file, which is every file that
+// can name its namespaces — through a renaming re-export, an alias, or a namespace nesting one — so a
+// member they read is never reported unused. Undefined where no import graph can be built.
+async function readers_of(
+	root: string,
+	files: ReadonlyArray<string>,
+	project: ProjectFiles,
+): Promise<ReadonlySet<string> | undefined> {
+	const graph = await import_graph.create(root)
+
+	return graph?.importers(files, project.names)
+}
+
+// The same judgement as `find_unused_members`, limited to the namespaces the changed `files` declare:
+// the program holds only the files that can read them, and only those readers are walked — the files
+// they import in turn are there for the checker, not as readers (joshuafolkken/kit#4645).
+async function find_unused_members_in(
+	root: string,
+	files: ReadonlyArray<string>,
+): Promise<Array<NamespaceMember>> {
+	const changed = new Set(files.map((file) => path.resolve(file)))
+	const project = project_files(root)
+	const readers = await readers_of(root, [...changed], project)
+	if (readers === undefined) return find_unused_members(root)
+	const program = ts.createProgram({ rootNames: [...readers], options: project.options })
+	const sources = program
+		.getSourceFiles()
+		.filter((source) => readers.has(path.resolve(source.fileName)))
+	const declaring = sources.filter((source) => changed.has(path.resolve(source.fileName)))
+
+	return unused_of(declared_namespaces(declaring), program, sources)
+}
+
+const unused_members = { find_unused_members, find_unused_members_in }
 
 export { unused_members }
