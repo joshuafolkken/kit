@@ -135,8 +135,19 @@ describe('unused_members.find_unused_members_in — the changed files only', () 
 		])
 	})
 
-	it('reports nothing for a namespace only an unchanged file declares', async () => {
-		await expect(unused_names_in(with_reader(READ_KEPT), ['reader.ts'])).resolves.toStrictEqual([])
+	it('reports an unused member of a namespace a changed file imports directly', async () => {
+		await expect(unused_names_in(with_reader(READ_KEPT), ['reader.ts'])).resolves.toStrictEqual([
+			DROPPED,
+		])
+	})
+
+	it('reports nothing for a namespace no changed file declares or imports directly', async () => {
+		const files: Array<FixtureFile> = [
+			...with_reader(READ_KEPT),
+			['other.ts', 'export const a = 1'],
+		]
+
+		await expect(unused_names_in(files, ['other.ts'])).resolves.toStrictEqual([])
 	})
 
 	it('ignores a changed file that is no project source: a document or a deleted path', async () => {

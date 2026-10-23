@@ -68,8 +68,9 @@ function byte_check_exit_code(scope: ChangedFileScope, root: string): number {
 // than after it, so their whole-program scan costs no wall clock the lint has not already spent.
 //
 // The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
-// reported here for the namespaces the changed files declare (joshuafolkken/kit#4645), rather than at
-// ship's pre-detach gate. The fallback scans the whole program, a superset as the lint's is.
+// reported here for the namespaces the changed files declare or import directly
+// (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
+// fallback scans the whole program, a superset as the lint's is.
 async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
 	const structural = structural_checks.run_structural(scope, root)
 	const lint_exit = await lint_exit_code(scope)

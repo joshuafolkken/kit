@@ -29,7 +29,8 @@ function report(root: string, members: ReadonlyArray<NamespaceMember>): string {
 // Loaded only past the consumer skip: the scanner pulls in `typescript`, an optional peer a
 // basic-profile consumer may not have, and this check runs in every consumer's gate. For the same
 // reason the scanner is left out of the published package (`package.json` `files`); only this check
-// ships. `files` narrows the scan to the namespaces they declare; undefined scans the whole program.
+// ships. `files` narrows the scan to the namespaces they declare or import directly; undefined scans
+// the whole program.
 async function find_members(
 	root: string,
 	files: ReadonlyArray<string> | undefined,
