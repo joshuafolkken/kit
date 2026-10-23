@@ -80,15 +80,23 @@ const MISSING_NOTE = 'the reviewer wrote no findings file — the review did not
 const CLEAN_NOTE = 'review clean or Low-only — recorded; shipping on.'
 const FIXED_NOTE =
 	'review fixes applied in place — recorded; the gate re-runs on the fixed tree and round 2 follows the commit.'
-const BLOCKING_NOTE =
-	'review found High/Medium it did not fix — recorded; fix them, then take the round-2 route (`chain-rule.md`).'
+// Every stop that hands findings back for a fix: a fix of only the cited line left the same pattern
+// beside it for the next round to stop on again (joshuafolkken/kit#4673).
+const SWEEP_INSTRUCTION = [
+	'Before fixing, sweep each finding for its other sites — the same file, the callers of the same',
+	'function and a grep of the pattern — fix every site in one pass, and list each range searched on its',
+	'own line in the Issue fix comment.',
+].join(' ')
+const BLOCKING_NOTE = `review found High/Medium it did not fix — recorded. ${SWEEP_INSTRUCTION} Then take the round-2 route (\`chain-rule.md\`).`
 const UNVERIFIED_OUTCOME: RoundOutcome = {
 	is_passing: false,
-	note: 'review fixes did not pass the scoped checks — recorded as unfixed; fix them, then take the round-2 route (`chain-rule.md`).',
+	note: `review fixes did not pass the scoped checks — recorded as unfixed. ${SWEEP_INSTRUCTION} Then take the round-2 route (\`chain-rule.md\`).`,
 }
+// The findings line is all a stopped ship hands the lane, so the other sites the rubric asks the
+// reviewer to cite ride on it rather than in its prose report (joshuafolkken/kit#4673).
+const OTHER_SITES_CLAUSE = '"other sites: <file>:<line>, …" for each other site of the same pattern'
 const ROUND_TWO_CLEAN_NOTE = 'round 2 clean or Low-only — recorded; shipping on.'
-const ROUND_TWO_BLOCKING_NOTE =
-	'round 2 found High/Medium or edited the tree — recorded; round 2 is final: fix, push and gate it, then run followup (`chain-rule.md` step 4).'
+const ROUND_TWO_BLOCKING_NOTE = `round 2 found High/Medium or edited the tree — recorded; round 2 is final. ${SWEEP_INSTRUCTION} Then push and gate it, and run followup (\`chain-rule.md\` step 4).`
 
 function findings_instruction(findings_path: string, fixed_clause: string): string {
 	const categories = review_finding_ledger.CATEGORIES.join(', ')
@@ -97,6 +105,7 @@ function findings_instruction(findings_path: string, fixed_clause: string): stri
 		`Then write every finding to ${findings_path}, one per line as`,
 		`<category>:<severity>:<file>[:<line>]${DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
 		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
+		`a high or medium line ending with ${OTHER_SITES_CLAUSE},`,
 		'and an empty file when there is none.',
 	].join(' ')
 }
@@ -310,6 +319,8 @@ function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
 
 const run_ship_review = {
 	FIXED_PREFIX,
+	OTHER_SITES_CLAUSE,
+	SWEEP_INSTRUCTION,
 	UNVERIFIED_OUTCOME,
 	VERDICT,
 	blocking_details,

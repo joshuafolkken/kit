@@ -1,0 +1,2 @@
+- rf:bug-risks | low | tools/exports/unused-members.ts:99 | 2026-10-23 | #4649
+- rf:performance | low | tools/exports/unused-members.ts:122 | 2026-10-23 | #4649

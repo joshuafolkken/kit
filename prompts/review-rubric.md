@@ -88,6 +88,8 @@ For each finding:
 - Cite `file_path:line_number`
 - State severity (`high` / `medium` / `low`) by the two tests in "Severity"
 - Explain the concrete problem and the minimal fix
+- On a `high` or `medium`, cite every other site of the same pattern in the change's files and their
+  callers as `file_path:line_number`, so one fix pass closes them all
 - On a test-1 finding rated `low`, write `no failure scenario — <what you tried>`
 
 A category with no findings needs a proof statement, e.g. `No issues — checked null returns on X,
