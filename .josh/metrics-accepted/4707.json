@@ -1,0 +1,7 @@
+{
+	"reason": "#4707 counts review and mechanical ship stops against separate relaunch caps (stop-kind classifier)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
