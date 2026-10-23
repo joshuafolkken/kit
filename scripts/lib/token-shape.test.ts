@@ -61,6 +61,23 @@ describe('token_shape.refuse', () => {
 	})
 })
 
+describe('token_shape.decoded', () => {
+	const [github_token = ''] = SHAPE_NAMES
+	const plain_text = 'plain text'
+
+	it('reads a JSON body as its string values, so a token after an escaped newline is found', () => {
+		const sample = token_shape_fixture.sample_of(github_token)
+		const body = JSON.stringify({ body: `line\n${sample}`, labels: ['bug'] })
+
+		expect(token_shape.find(body)).toBeUndefined()
+		expect(token_shape.find(token_shape.decoded(body))?.name).toBe(github_token)
+	})
+
+	it('keeps a body that is not JSON as it is', () => {
+		expect(token_shape.decoded(plain_text)).toBe(plain_text)
+	})
+})
+
 describe('token_shape.redact', () => {
 	it('replaces every credential and keeps the text around it', () => {
 		const github = token_shape_fixture.sample_of('GitHub token')

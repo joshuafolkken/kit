@@ -1,0 +1,8 @@
+{
+	"reason": "credential-body rule (#4682): new rule module, gh api field parsing, typed-escape handling, and rule-delivery.md noting the one rule that reads --input files",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 91,
+		"ai_cost.on_demand_bytes": 60
+	}
+}

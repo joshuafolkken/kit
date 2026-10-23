@@ -120,6 +120,66 @@ function is_write(segment: string): boolean {
 	return !is_read(segment)
 }
 
+// What one field flag sends: the value itself, or the file `gh` reads it from — `-F key=@<path>` and
+// `--input <path>`, standard input (`-`) excepted. `-f` / `--raw-field` sends `@<path>` as text.
+interface FieldSource {
+	kind: 'text' | 'file'
+	value: string
+}
+
+const INPUT_FLAG = '--input'
+const READS_FILE_FLAGS: ReadonlySet<string> = new Set(['-F', '--field'])
+const ATTACHED_PARTS = /^(-[fF]|--(?:raw-field|field|input))=?(.+)$/u
+const ATTACHED_FLAG_GROUP = 1
+const ATTACHED_VALUE_GROUP = 2
+const FILE_PREFIX = '@'
+const STANDARD_INPUT = '-'
+const FIELD_KEY_END = '='
+
+// The flag and its value, attached (`-fname=x`, `--input=path`) or as the next word.
+function field_parts(flag: string, next: string): [string, string] | undefined {
+	if (FIELD_FLAGS.has(flag)) return [flag, next]
+
+	const match = ATTACHED_PARTS.exec(flag)
+
+	if (match === null) return undefined
+
+	return [String(match[ATTACHED_FLAG_GROUP]), String(match[ATTACHED_VALUE_GROUP])]
+}
+
+function field_value(value: string): string {
+	return value.slice(value.indexOf(FIELD_KEY_END) + NEXT)
+}
+
+// The path a field flag has `gh` read, or `undefined` when it sends its value as text.
+function file_path(flag: string, value: string): string | undefined {
+	if (flag === INPUT_FLAG) return value
+
+	const sent = field_value(value)
+
+	if (!READS_FILE_FLAGS.has(flag) || !sent.startsWith(FILE_PREFIX)) return undefined
+
+	return sent.slice(FILE_PREFIX.length)
+}
+
+function field_source(flag: string, raw: string): FieldSource | undefined {
+	const value = raw.replaceAll(QUOTES, '')
+	const path = file_path(flag, value)
+
+	if (path === undefined) return { kind: 'text', value: field_value(value) }
+
+	return path === STANDARD_INPUT ? undefined : { kind: 'file', value: path }
+}
+
+function field_sources(segment: string): Array<FieldSource> {
+	return flags_of(segment).flatMap(([flag, next]) => {
+		const parts = field_parts(flag, next)
+		const source = parts === undefined ? undefined : field_source(...parts)
+
+		return source === undefined ? [] : [source]
+	})
+}
+
 function repo_target(segment: string): RepoTarget | undefined {
 	const match = REPO_PATH.exec(segment)
 
@@ -135,6 +195,7 @@ function is_owner_placeholder(owner: string): boolean {
 const gh_api = {
 	API_VALUE_TAKING_FLAGS,
 	GH_FLAGS,
+	field_sources,
 	is_gh_api,
 	is_owner_placeholder,
 	is_read,
@@ -143,4 +204,5 @@ const gh_api = {
 	repo_target,
 }
 
+export type { FieldSource }
 export { gh_api }
