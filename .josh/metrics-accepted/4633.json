@@ -1,0 +1,8 @@
+{
+	"reason": "Round-2 fix: untrusted authors also leave the backlog running set, and siblings waiting on an untrusted epic child go to a person (#4633)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 198,
+		"ai_cost.on_demand_bytes": 67
+	}
+}

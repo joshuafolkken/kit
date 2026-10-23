@@ -1,7 +1,9 @@
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_busy } from '#scripts/epic/epic-busy'
+import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
@@ -193,14 +195,27 @@ function running_of(
 // The two halves as one result. The epic half is already classified by `epic:next`; the standalone
 // half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
 // child and nothing else says `run` exactly as one with a runnable standalone issue does.
-function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNextResult {
-	const graphs = views.map((view) => view.snapshot.children)
-	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
-	const from_epics = backlog_pool.drop_excluded(
-		backlog_pool.epic_classification(views),
+// `untrusted` is the epic children an author without write access filed (joshuafolkken/kit#4633).
+function epic_half(
+	views: ReadonlyArray<EpicView>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): Classification {
+	return backlog_pool.drop_excluded(
+		backlog_pool.epic_classification(views, untrusted),
 		context.exclude,
 		context.repo,
 	)
+}
+
+function combine(
+	views: ReadonlyArray<EpicView>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): EpicNextResult {
+	const graphs = views.map((view) => view.snapshot.children)
+	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
+	const from_epics = epic_half(views, context, untrusted)
 	const from_standalone = backlog_pool.classify_standalone(standalone, {
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
 		exclude: context.exclude,
@@ -245,10 +260,17 @@ function settled_views(
 //
 // The running set covers the standalone rows as well as every read graph, so an epic child waiting on
 // an opted-in standalone issue waits rather than stops.
-function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
+function views_from(
+	reads: ReadonlyArray<EpicRead>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): ReadonlyArray<EpicView> {
 	if (reads.length === 0) return []
 
-	const graphs = reads.map((read) => read.snapshot.children)
+	const graphs = backlog_pool.trusted_graphs(
+		reads.map((read) => read.snapshot.children),
+		untrusted,
+	)
 
 	return settled_views(
 		reads,
@@ -277,11 +299,15 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
+	const untrusted = await auto_ok_author.untrusted_child_keys(
+		reads.flatMap((read) => read.snapshot.children),
+		context.repo,
+	)
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
 	// ranking goes last: its sort is stable, so the defect order survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
-		combine(views_from(reads, context), context),
+		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
 	)
 

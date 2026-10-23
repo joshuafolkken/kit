@@ -1,3 +1,4 @@
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import type { Classification } from '#scripts/epic/epic-classify'
 import { epic_graph, type EpicChild, type GraphAnomaly } from '#scripts/epic/epic-graph'
@@ -61,11 +62,17 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 		.some((blocker) => blocker.state === 'OPEN' && !running.has(epic_graph.blocker_key(blocker)))
 }
 
-function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
+// An issue whose author lacks write access waits on a person too: only they can vouch for its body.
+function is_stuck(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
 	return (
+		!auto_ok_author.is_author_trusted(issue) ||
 		has_any_label(issue.labels, DECISION_LABELS) ||
-		waits_outside(issue, context.running, context.repo)
+		waits_outside(issue, running, repo)
 	)
+}
+
+function needs_person(issue: OpenIssueData, context: StandaloneContext): boolean {
+	return is_stuck(issue, context.running, context.repo)
 }
 
 // Each open epic's key, read off the tracking index — child number to the epics listing it.
@@ -100,10 +107,6 @@ function rooted(
 	const members = new Set([...running].filter((key) => !epics.has(key)))
 
 	return with_tracking_epics(members, tracking, repo)
-}
-
-function is_stuck(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
-	return has_any_label(issue.labels, DECISION_LABELS) || waits_outside(issue, running, repo)
 }
 
 // The running set with every standalone row a person has to resolve taken out, repeated until a pass
@@ -293,6 +296,29 @@ function keys_of(children: ReadonlyArray<EpicChild>): Set<string> {
 	return new Set(children.map((child) => epic_graph.key_of(child)))
 }
 
+// The graphs with every untrusted child taken out before the running set is built from them, so a row
+// blocked by one — standalone or in another epic — waits on a person rather than on time.
+function trusted_graphs(
+	graphs: ReadonlyArray<ReadonlyArray<EpicChild>>,
+	untrusted: ReadonlySet<string>,
+): Array<Array<EpicChild>> {
+	return graphs.map((children) => without(children, untrusted))
+}
+
+function waits_on(child: EpicChild, held: ReadonlySet<string>): boolean {
+	return child.blocked_by.some((blocker) => held.has(epic_graph.blocker_key(blocker)))
+}
+
+// The held keys and, however long the chain, every child waiting on one of them.
+function with_dependants(
+	children: ReadonlyArray<EpicChild>,
+	held: ReadonlySet<string>,
+): ReadonlySet<string> {
+	const grown = new Set([...held, ...keys_of(children.filter((child) => waits_on(child, held)))])
+
+	return grown.size === held.size ? held : with_dependants(children, grown)
+}
+
 // The epic half, already classified. `epic:next` decided each of these — the `blocked-by` graph, the
 // wave, the anomalies — so this only flattens the per-repository bundles back into one list, in the
 // order the epics' own task lists gave them.
@@ -302,15 +328,26 @@ function keys_of(children: ReadonlyArray<EpicChild>): Set<string> {
 // `runnable` — and a child offered on standard output while standard error lists it as waiting is
 // work a loop would start against a dependency that is still standing. So `human` is settled first,
 // `time` next, and `runnable` keeps only what neither claimed.
-function epic_classification(views: ReadonlyArray<EpicView>): Classification {
-	const human = unique_children(views.flatMap((view) => view.result.blocked_on_people))
-	const time = without(
-		unique_children(views.flatMap((view) => view.result.waiting)),
-		keys_of(human),
-	)
+//
+// `untrusted` names the children whose author lacks write access (`auto_ok_author.untrusted_child_keys`).
+// Each waits on a person wherever `epic:next` put it, exactly as a standalone row's does in
+// `needs_person`: only a person can vouch for its body (joshuafolkken/kit#4633). A sibling waiting on
+// one waits on that person too — `epic:next` weighs a blocker in the same graph by its own category,
+// never by the running set, so the untrusted child's absence from that set does not reach it.
+function epic_classification(
+	views: ReadonlyArray<EpicView>,
+	untrusted: ReadonlySet<string>,
+): Classification {
+	const waiting = views.flatMap((view) => view.result.waiting)
 	const offered = views.flatMap((view) =>
 		view.result.candidates.flatMap((bundle) => bundle.children),
 	)
+	const held = with_dependants(waiting, untrusted)
+	const human = unique_children([
+		...views.flatMap((view) => view.result.blocked_on_people),
+		...[...waiting, ...offered].filter((child) => held.has(epic_graph.key_of(child))),
+	])
+	const time = without(unique_children(waiting), keys_of(human))
 
 	return {
 		runnable: without(unique_children(offered), keys_of([...human, ...time])),
@@ -378,6 +415,7 @@ const backlog_pool = {
 	standalone_rows,
 	to_child,
 	to_children,
+	trusted_graphs,
 }
 
 export { backlog_pool }

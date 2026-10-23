@@ -25,7 +25,9 @@ const NODE_COMPAT_RUNTIME = 'node@${{ matrix.node }}'
 const NODE_VERSION_STEP = 'Verify Node.js version'
 const PUBLISH_YML = '.github/workflows/publish.yml'
 const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
-const PUBLISH_JOBS = ['publish-github', 'publish-npm', 'create-release']
+const PUBLISH_JOBS = ['pack', 'create-release']
+// joshuafolkken/kit#4633: the jobs holding the publish rights install nothing and run no `pnpm`.
+const CREDENTIALED_JOBS = ['publish-github', 'publish-npm']
 const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
@@ -159,6 +161,14 @@ describe.each(ACTION_CALLERS)('pnpm setup in $path', ({ path: workflow_path, job
 describe('the publish workflow', () => {
 	it.each(PUBLISH_JOBS)('installs behind safe-chain without the store cache in %s', (job_name) => {
 		expect(action_call(PUBLISH_YML, job_name)?.with).toEqual({ cache: 'false' })
+	})
+
+	it.each(CREDENTIALED_JOBS)('sets up no pnpm and runs no pnpm or tsx in %s', (job_name) => {
+		const steps = required_steps(PUBLISH_YML, job_name)
+		const commands = steps.map((step) => step.run ?? '').join('\n')
+
+		expect(action_call(PUBLISH_YML, job_name)).toBeUndefined()
+		expect(commands).not.toMatch(/\b(?:pnpm|tsx)\b/u)
 	})
 })
 

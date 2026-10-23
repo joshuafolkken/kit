@@ -13,7 +13,19 @@ updates:
     # `GITHUB_TOKEN` may not, so GitHub withdraws its auto-merge (joshuafolkken/kit#4148). kit's own
     # file only: the distributed `templates/dependabot.yml` stays ungrouped, because a consumer's
     # auto-merge holds a whole pull request that touches an upstream-managed workflow.
+    #
+    # The actions the publish jobs run with publish credentials come first, in a pull request of their
+    # own: `.github/workflows/dependabot-auto-merge.yml` merges only the `github-actions` group, so a
+    # person reviews each bump of these (joshuafolkken/kit#4633). This list is the only one.
     groups:
+      publish-actions:
+        patterns:
+          - 'actions/checkout'
+          - 'actions/download-artifact'
+          - 'actions/setup-node'
+        update-types:
+          - 'minor'
+          - 'patch'
       github-actions:
         update-types:
           - 'minor'
