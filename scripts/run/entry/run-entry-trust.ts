@@ -51,8 +51,6 @@ const UNREAD_STOP: TrustStop = {
 	recommended: UNREAD_REMEDY,
 }
 
-// The `kickoff` plan is a comment here, never the body: `issue_body_or_comment` writes no plan into a
-// body this gate would still judge by its untrusted author.
 // Not cleared, and the read that would have cleared it answered nothing — a label read that failed
 // leaves the plan unknown unless the comment listing already ruled it out.
 function is_unread(trust: BlockTrust, state: StateRead): boolean {

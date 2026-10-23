@@ -31,6 +31,16 @@ const ISSUE_GROUP = 'issue'
 const VIEW_ACTION = 'view'
 // `gh issue view --web` opens a browser and prints nothing the run reads.
 const WEB_FLAGS: ReadonlySet<string> = new Set(['-w', '--web'])
+// `gh issue view`'s flags that take a value as the next word, so `--json title,comments <url>` reads
+// the URL as the issue, not the projection.
+const VIEW_VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set([
+	...direct_pr_create.VALUE_TAKING_FLAGS,
+	'--json',
+	'-q',
+	'--jq',
+	'-t',
+	'--template',
+])
 const REPO_EQUALS = '--repo='
 const ISSUE_URL = /^https?:\/\/[^/\s]+\/(?<named>[^/\s]+\/[^/\s]+)\/issues\/\d+/u
 const OWNER_REPO_PARTS = 2
@@ -117,7 +127,7 @@ function is_printed_view(args: ReadonlyArray<string>, issue: string, call: strin
 function is_issue_view_read(args: ReadonlyArray<string>, call: string): boolean {
 	const [group, action, issue = ''] = direct_pr_create.positional_words(
 		args,
-		direct_pr_create.VALUE_TAKING_FLAGS,
+		VIEW_VALUE_TAKING_FLAGS,
 	)
 
 	const is_view = group === ISSUE_GROUP && action === VIEW_ACTION

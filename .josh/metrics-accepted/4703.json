@@ -1,8 +1,8 @@
 {
-	"reason": "direct-issue-read now refuses own-repo, gh issue view and timeline reads, and run:entry reports a failed trust read (incl. a failed label read) as its own stop; issue-comments.md names both (#4703)",
+	"reason": "Round 2 fix: gh issue view value-taking flags so a --json projection is not read as the issue URL",
 	"date": "2026-10-23",
 	"growth": {
-		"scripts.code_lines": 91,
+		"scripts.code_lines": 99,
 		"ai_cost.on_demand_bytes": 72
 	}
 }
