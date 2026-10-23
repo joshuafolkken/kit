@@ -8,11 +8,18 @@ import { z } from 'zod'
 // **A backgrounded call is kept but not timed.** Its result line is the immediate "running in the
 // background" notice, so the gap measures nothing the run waited on; `duration_ms` is `undefined` for
 // it, as for a call whose result never arrived (an interrupted turn).
+//
+// **The tool's name is kept** (`Bash`, `Edit`, …), so `josh lane:value edit` can time the edits apart
+// from the shell calls, **and so is its lane** — the transcript directory every session of one lane
+// (its child, its ship reviewer) writes under — so a per-lane value divides by lanes, not sessions
+// (joshuafolkken/kit#4630).
 
 interface ToolCall {
 	session_id: string
+	lane: string
 	started_ms: number
 	duration_ms: number | undefined
+	tool: string | undefined
 	background: boolean
 	command: string | undefined
 	output: string
@@ -20,6 +27,7 @@ interface ToolCall {
 
 interface ToolUse {
 	started_ms: number
+	tool: string | undefined
 	background: boolean
 	command: string | undefined
 }
@@ -66,6 +74,7 @@ const INPUT_SCHEMA = z.object({ command: z.unknown(), run_in_background: z.unkno
 const BLOCK_SCHEMA = z.object({
 	type: z.string(),
 	id: z.string().nullish(),
+	name: z.string().nullish(),
 	input: INPUT_SCHEMA.nullish().transform(to_input),
 	tool_use_id: z.string().nullish(),
 	content: RESULT_CONTENT_SCHEMA.optional(),
@@ -94,7 +103,7 @@ interface Pairs {
 function record_use(pairs: Pairs, block: Block, started_ms: number): void {
 	if (block.type !== 'tool_use' || !block.id) return
 
-	pairs.uses.set(block.id, { started_ms, ...block.input })
+	pairs.uses.set(block.id, { started_ms, tool: block.name ?? undefined, ...block.input })
 }
 
 function record_result(pairs: Pairs, block: Block, ended_ms: number): void {
@@ -116,13 +125,17 @@ function record_line(pairs: Pairs, line: string): void {
 	}
 }
 
-function to_call(session_id: string, use: ToolUse, result: ToolResult | undefined): ToolCall {
+// The transcript a call was read from: its session, and the lane that session belongs to.
+type CallSource = Pick<ToolCall, 'session_id' | 'lane'>
+
+function to_call(source: CallSource, use: ToolUse, result: ToolResult | undefined): ToolCall {
 	const is_timed = result !== undefined && !use.background
 
 	return {
-		session_id,
+		...source,
 		started_ms: use.started_ms,
 		duration_ms: is_timed ? result.ended_ms - use.started_ms : undefined,
+		tool: use.tool,
 		background: use.background,
 		command: use.command,
 		output: result?.output ?? '',
@@ -130,13 +143,13 @@ function to_call(session_id: string, use: ToolUse, result: ToolResult | undefine
 }
 
 // Every tool call `raw` — one transcript's text — records, in the order the calls were made.
-function parse(session_id: string, raw: string): Array<ToolCall> {
+function parse(source: CallSource, raw: string): Array<ToolCall> {
 	const pairs: Pairs = { uses: new Map(), results: new Map() }
 	const lines = raw.split('\n')
 
 	for (const line of lines) record_line(pairs, line)
 
-	return [...pairs.uses].map(([id, use]) => to_call(session_id, use, pairs.results.get(id)))
+	return [...pairs.uses].map(([id, use]) => to_call(source, use, pairs.results.get(id)))
 }
 
 const lane_transcript_calls = { parse }

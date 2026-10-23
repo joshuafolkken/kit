@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { time_shell } from '#scripts/time-runtime/time-shell'
@@ -84,11 +85,14 @@ function durations(calls: ReadonlyArray<ToolCall>): Array<number> {
 	return calls.map((call) => call.duration_ms).filter((ms) => is_timed(ms))
 }
 
+// The lane sessions that made a call among `calls`, each once.
+function sessions_of(calls: ReadonlyArray<ToolCall>): Array<string> {
+	return [...new Set(calls.map((call) => call.session_id))]
+}
+
 // Each session's summed foreground tool time, for the sessions that made a call in the period.
 function session_times(calls: ReadonlyArray<ToolCall>): Array<number> {
-	const sessions = [...new Set(calls.map((call) => call.session_id))]
-
-	return sessions.map((session) =>
+	return sessions_of(calls).map((session) =>
 		durations(calls.filter((call) => call.session_id === session)).reduce(
 			(sum, value) => sum + value,
 			0,
@@ -102,12 +106,17 @@ function share_cell(part: number, whole: number): string {
 	return `${String(part)} of ${String(whole)} (${((part / whole) * PERCENT).toFixed(1)}%)`
 }
 
-function solo_median_row(verifying: ReadonlyArray<ToolCall>, name: string): Array<string> {
-	const solo = verifying.filter((call) => {
+// The calls that ran the verification command `name` and no other, so each one's time is its own.
+function solo_calls(calls: ReadonlyArray<ToolCall>, name: string): Array<ToolCall> {
+	return calls.filter((call) => {
 		const named = verification_commands(call.command)
 
 		return named.length === 1 && named[0] === name
 	})
+}
+
+function solo_median_row(verifying: ReadonlyArray<ToolCall>, name: string): Array<string> {
+	const solo = solo_calls(verifying, name)
 
 	return [`${name} median, solo (s)`, seconds_cell(lane_stats.median(durations(solo)))]
 }
@@ -140,11 +149,15 @@ function rows_of(calls: ReadonlyArray<ToolCall>): Array<Array<string>> {
 	]
 }
 
-// The period's table: `calls` is every lane session's calls, filtered here to `window`.
-function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow): string {
-	const period = calls.filter(
+function in_period(calls: ReadonlyArray<ToolCall>, window: StatsWindow): Array<ToolCall> {
+	return calls.filter(
 		(call) => call.started_ms >= window.since_ms && call.started_ms <= window.until_ms,
 	)
+}
+
+// The period's table: `calls` is every lane session's calls, filtered here to `window`.
+function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow): string {
+	const period = in_period(calls, window)
 
 	return [
 		lane_stats.to_row(COLUMNS),
@@ -156,13 +169,26 @@ function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow): string {
 // The tool calls of every lane session under `directories` that was still written to in `window` — a
 // transcript last modified before the period holds no call in it, so it is never read. A delegated
 // unit's transcript is not a lane session, and its time is already inside the parent's wait for it.
+// A session's own transcript sits directly in its lane's directory, so that directory is its lane.
 function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Array<ToolCall> {
 	return cost_transcript
 		.list_sessions_across(directories)
 		.filter((file) => !file.is_delegated && file.modified_ms >= window.since_ms)
-		.flatMap((file) => lane_transcript_calls.parse(file.session_id, cost_transcript.read_raw(file)))
+		.flatMap((file) =>
+			lane_transcript_calls.parse(
+				{ session_id: file.session_id, lane: path.dirname(file.path) },
+				cost_transcript.read_raw(file),
+			),
+		)
 }
 
-const lane_transcript_stats = { read_calls, table, verification_commands }
+const lane_transcript_stats = {
+	durations,
+	in_period,
+	read_calls,
+	solo_calls,
+	table,
+	verification_commands,
+}
 
 export { lane_transcript_stats }

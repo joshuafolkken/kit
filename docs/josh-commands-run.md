@@ -901,6 +901,20 @@ Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample` / `josh lane:stats` in detail".
 
+#### `josh lane:value`
+
+<!-- usage: lane:value -->
+
+Print one lane measurement since an instant as a single number: lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+
+```bash
+pnpm josh lane:value edit --since 2026-10-23T03:29Z   # the median Edit time since an instant
+```
+
+<!-- /usage -->
+
+The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
+
 ## Session and documents
 
 ### `josh cost`
