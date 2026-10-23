@@ -102,7 +102,8 @@ beforeEach(() => {
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])
 	mocked_scoped.mockResolvedValue(0)
 	mocked_whole_tree.mockResolvedValue(0)
-	mocked_before.mockResolvedValue(BEFORE_TREE)
+	// As the real one: any argument reads no tree (`scoped-green.test.ts`).
+	mocked_before.mockImplementation(async (argv) => (argv.length === 0 ? BEFORE_TREE : undefined))
 	green_checks_after_lint()
 	mocked_notice.mockResolvedValue(undefined)
 })
@@ -352,7 +353,9 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		mocked_changed.mockResolvedValue([CHANGED_SOURCE, path.relative(REPOSITORY_ROOT, other_source)])
 	})
 
-	it('lints only the files moved since its own green record', async () => {
+	// joshuafolkken/kit#4655: the tree read for the record is the one handed over, so a bare run reads
+	// it once — `since-green.test.ts` pins that a handed tree is not read again.
+	it('lints only the files moved since its own green record, read on the record’s tree', async () => {
 		vi.mocked(since_green.read_moved).mockResolvedValue([CHANGED_SOURCE])
 
 		await lint_related.run_related_lint([])
@@ -360,6 +363,8 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		expect(since_green.read_moved).toHaveBeenCalledWith(
 			review_stamps.lint_related_stamp,
 			gate_plan.LINT_LABEL,
+			undefined,
+			BEFORE_TREE,
 		)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).not.toContain(other_source)
