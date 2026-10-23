@@ -1,0 +1,8 @@
+{
+	"reason": "Side-by-side round-1 reviews need per-slot attestation pointers, a brokered multi-slot request and a read-only prompt for the slot reviewed beside the code review",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 286,
+		"ai_cost.on_demand_bytes": 56
+	}
+}

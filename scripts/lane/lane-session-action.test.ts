@@ -1,4 +1,5 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_ship_stop_cause } from '#scripts/run/ship/run-ship-stop-cause'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +11,8 @@ const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const parked_mock = vi.hoisted(() => vi.fn())
 const ROUND_ONE = { kind: 'review', round: '1' } as const
+const BOTH_SLOTS = ['code', 'interaction'] as const
+const FIX_IN_PLACE = 'Apply a fix'
 const AUTH_FAILED_LOG = JSON.stringify({
 	type: 'result',
 	is_error: true,
@@ -120,6 +123,58 @@ describe('lane_session_action.answer', () => {
 		const answer = await lane_session_action.answer(LANE, RELAUNCH)
 
 		expect(reason_of(answer)).toBe('the broker failed: spawn EACCES')
+	})
+})
+
+// joshuafolkken/kit#4672: `/code-review` and the interaction review run side by side.
+describe('lane_session_action — review slots', () => {
+	it('gives each slot its own brief, findings and log', () => {
+		const code = lane_session_action.review_paths(LANE.directory, 'code')
+		const interaction = lane_session_action.review_paths(LANE.directory, 'interaction')
+
+		expect(interaction.brief).not.toBe(code.brief)
+		expect(interaction.findings).not.toBe(code.findings)
+		expect(interaction.log).not.toBe(code.log)
+	})
+
+	it('launches one reviewer per slot and answers the first failure', async () => {
+		launch_mock
+			.mockResolvedValueOnce({ kind: 'completed', pid: 1, exit_code: 0 })
+			.mockResolvedValueOnce({ kind: 'completed', pid: 2, exit_code: 3 })
+
+		const answer = await lane_session_action.answer(LANE, {
+			...ROUND_ONE,
+			slots: ['code', 'interaction'],
+		})
+
+		expect(launch_mock).toHaveBeenCalledTimes(2)
+		expect(reason_of(answer)).toBe('the reviewer exited with code 3')
+	})
+})
+
+describe('lane_session_action — slot reviewers side by side', () => {
+	it('starts every slot reviewer before any of them finishes', async () => {
+		const held = deferred_answer<{ kind: 'completed'; pid: number; exit_code: number }>()
+
+		launch_mock.mockReturnValue(held.promise)
+		const answer = lane_session_action.answer(LANE, { ...ROUND_ONE, slots: BOTH_SLOTS })
+
+		await vi.waitFor(() => {
+			expect(launch_mock).toHaveBeenCalledTimes(2)
+		})
+		held.answer({ kind: 'completed', pid: 1, exit_code: 0 })
+
+		await expect(answer).resolves.toStrictEqual(lane_session_action.SUCCESS)
+	})
+
+	it('leaves the interaction reviewer beside the code reviewer read only', async () => {
+		await lane_session_action.answer(LANE, { ...ROUND_ONE, slots: BOTH_SLOTS })
+
+		const [code, interaction] = argv_mock.mock.calls.map(([prompt]) => String(prompt))
+
+		expect(code).toContain(FIX_IN_PLACE)
+		expect(interaction).toContain('Do not edit any file')
+		expect(interaction).not.toContain(FIX_IN_PLACE)
 	})
 })
 

@@ -106,6 +106,11 @@ function unreadable(error: z.ZodError): BrokerAnswer {
 	return failure(`${UNREADABLE_REASON} — ${fields.join('; ')}`)
 }
 
+// The answer of a broker on code older than the request, which the ship can still fall back from.
+function is_unreadable(answer: BrokerAnswer): boolean {
+	return !answer.is_success && answer.reason.includes(UNREADABLE_REASON)
+}
+
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
 	const parsed = request_schema.safeParse(received)
 
@@ -374,6 +379,7 @@ async function request(
 const lane_session_broker = {
 	is_answering,
 	is_serving,
+	is_unreadable,
 	request,
 	request_path,
 	response_path,
