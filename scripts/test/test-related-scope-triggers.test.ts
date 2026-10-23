@@ -21,7 +21,11 @@ const MAP: ReadMap = {
 	commit: 'abc',
 	dirty: {},
 	directories: ['docs', SCRIPTS_DIRECTORY],
-	readers: { [DOCUMENT_FILE]: [DOCUMENT_READER] },
+	// A read inside `drafts`, which the tree did not hold, keeps a draft added there unrecorded.
+	readers: {
+		[DOCUMENT_FILE]: [DOCUMENT_READER],
+		[path.join('drafts', 'absent.md')]: [DOCUMENT_READER],
+	},
 }
 
 function at(file: string): string {

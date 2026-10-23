@@ -14,10 +14,10 @@ import { whole_suite_files } from './whole-suite-files'
 // test-read map a whole-suite run records (`test-read-map.ts`). A changed document, config or
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
-// directory or the tree did not hold it, or a file every test
+// directory, or a file every test
 // depends on — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
-// (joshuafolkken/kit#4073), and so is one added since to a directory the tree held and no test read
-// inside (joshuafolkken/kit#4303), so a change made only of those runs nothing. CI runs the whole suite
+// (joshuafolkken/kit#4073), and so is one added since to a directory no test read inside
+// (joshuafolkken/kit#4303, joshuafolkken/kit#4597), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
 // before the merge.
 //
@@ -147,9 +147,9 @@ function all_scope(reason: string, triggers: ReadonlyArray<string> = [], root = 
 	return { mode: 'all', files: triggers.map((file) => path.join(root, file)), reason }
 }
 
-// A file no recorded test read narrows only when the recorded tree held it, or held its directory and
-// no recorded test read inside that: any other file added since is one the recorder never saw, so its
-// having no reader says nothing.
+// A file no recorded test read narrows only when the recorded tree held it, or no recorded test read
+// inside its directory: any other file added since is one the recorder never saw, so its having no
+// reader says nothing.
 function resolve_through_map(others: ReadonlyArray<string>, request: ScopeRequest): MapResolution {
 	const { map, recorded } = request
 

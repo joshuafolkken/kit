@@ -184,8 +184,16 @@ describe('test_read_map.in_unread_directory', () => {
 		expect(test_read_map.in_unread_directory(MAP, path.join('docs', 'x.md'))).toBe(false)
 	})
 
-	it('rejects a directory the recorded tree did not hold', () => {
-		expect(test_read_map.in_unread_directory(MAP, path.join('scratch', 'x.md'))).toBe(false)
+	// joshuafolkken/kit#4597: a branch's `.josh/metrics-accepted/<N>.json` lands in a directory the
+	// release pruned from the recorded tree.
+	it('holds a file added to a directory new since the recording nothing inside was read from', () => {
+		expect(test_read_map.in_unread_directory(MAP, path.join('scratch', 'x.md'))).toBe(true)
+	})
+
+	it('rejects a directory new since the recording a test read a path inside', () => {
+		const map = { ...MAP, readers: { [path.join('scratch', 'y.md')]: [READER] } }
+
+		expect(test_read_map.in_unread_directory(map, path.join('scratch', 'x.md'))).toBe(false)
 	})
 })
 

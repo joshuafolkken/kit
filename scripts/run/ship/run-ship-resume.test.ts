@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gate_tree } from '#scripts/gate/gate-tree'
 import type { josh_command } from '#scripts/josh/josh-run'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -113,6 +114,8 @@ beforeEach(() => {
 	probe.record_target.mockResolvedValue(current.target)
 	probe.read_state.mockResolvedValue(NOTHING)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	// Read through git, the tree is this checkout's change, which no case here asserts on (joshuafolkken/kit#4597).
+	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue({ files: {}, base: undefined })
 	// A gate run by a detached ship supervisor inherits its mark; left set, `run` would hand control back.
 	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, undefined)
 })
