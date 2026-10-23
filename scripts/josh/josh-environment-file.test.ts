@@ -15,8 +15,8 @@ describe('josh_environment_file.load_environment_file', () => {
 		}).not.toThrow()
 	})
 
-	// Single-sourced rather than copied: two try/catches around `process.loadEnvFile` would be two
-	// places to keep node's precedence and the swallow rule correct in.
+	// Single-sourced rather than copied: two loaders would be two places to keep node's precedence,
+	// the swallow rule and the launch-only switches correct in.
 	it('is the same loader the hooks use', () => {
 		expect(hook_decision.load_environment_file).toBe(josh_environment_file.load_environment_file)
 	})

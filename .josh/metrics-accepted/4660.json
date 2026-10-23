@@ -1,0 +1,7 @@
+{
+	"reason": "Round-2 review fixes: the clobber redirect and command-substitution bodies are now read by the protected-file guard, with their tests",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 62
+	}
+}

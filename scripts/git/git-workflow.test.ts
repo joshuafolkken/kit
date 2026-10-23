@@ -14,7 +14,8 @@ const FAKE_ISSUE_INFO = vi.hoisted(() => ({
 }))
 const ALT_BRANCH_NAME = '42-short-name'
 
-vi.mock('node:util', () => ({
+vi.mock('node:util', async (import_original) => ({
+	...(await import_original<Record<string, unknown>>()),
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
 }))
 

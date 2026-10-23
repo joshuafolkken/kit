@@ -7,7 +7,10 @@ const issue_get_title_mock = vi.hoisted(() => vi.fn())
 const telegram_send_mock = vi.hoisted(() => vi.fn())
 const error_handle_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('node:util', () => ({ parseArgs: vi.fn().mockReturnValue({ values: {} }) }))
+vi.mock('node:util', async (import_original) => ({
+	...(await import_original<Record<string, unknown>>()),
+	parseArgs: vi.fn().mockReturnValue({ values: {} }),
+}))
 vi.mock('#scripts/gh/git-gh-repo', () => ({
 	git_gh_repo: { repo_get_name_with_owner: repo_get_name_with_owner_mock },
 }))

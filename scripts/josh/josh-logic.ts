@@ -16,6 +16,7 @@ import {
 	type CommandEntry,
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
+import { josh_environment_file } from './josh-environment-file'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
 import { find_package_directory } from './package-directory'
@@ -193,7 +194,7 @@ function spawn_script_entry(
 
 	return spawn_script(runner.executable, [
 		...runner.leading_arguments,
-		...(entry.tsx_arguments ?? []),
+		...josh_environment_file.apply_node_flags(entry.tsx_arguments ?? []),
 		script_path,
 		...script_arguments,
 	])

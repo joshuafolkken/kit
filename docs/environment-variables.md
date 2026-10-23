@@ -119,6 +119,8 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard off.
 
+**Set a guard switch only at launch — `JOSH_RULE_GUARD=off claude`.** A run can write `.env`, so kit ignores a `JOSH_*_GUARD`, `JOSH_*_FORCE` or `JOSH_SCOPED_GREEN` line there.
+
 | Variable                    | Required | Default | Used when                                                                                                              |
 | --------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_BATCH_GUARD`          | No       | on      | [`josh pretool:guard`](./josh-commands-automation.md#josh-pretoolguard) — calls that could have gone out together.     |

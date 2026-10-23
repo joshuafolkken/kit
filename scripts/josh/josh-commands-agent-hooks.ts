@@ -26,10 +26,10 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: { examples: [{ arguments: '', note: PRE_TOOL_USE }] },
-		// **No `tsx_arguments`, deliberately.** `JOSH_BATCH_GUARD` and the other guard switches are
-		// per-machine preferences kept in `.env`, which every other command reads through
-		// `OPTIONAL_ENV_FILE_FLAGS` — but declaring any `tsx_arguments` disqualifies a command from
-		// in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
+		// **No `tsx_arguments`, deliberately.** The guards read `.env` for their other values, as other
+		// commands do through `OPTIONAL_ENV_FILE_FLAGS`; the guard switches themselves come from the
+		// launch environment alone (`josh-environment-file.ts`). But declaring any `tsx_arguments`
+		// disqualifies a command from in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
 		// before every guarded call, where a second ~0.16 s tsx start is not affordable. Each guard it
 		// composes loads `.env` through the shared loader instead.
 	},
@@ -59,7 +59,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		},
 		// **No `tsx_arguments`, deliberately**, the same as `pretool:guard` above: this runs on every
 		// `UserPromptSubmit`, so it must stay eligible for in-process dispatch rather than pay a second
-		// tsx start each turn. It calls `process.loadEnvFile` itself through the shared loader.
+		// tsx start each turn. It loads `.env` itself through the shared loader.
 	},
 	'codex:hook-adapter': {
 		script: 'scripts/hooks/codex-hook-adapter.ts',

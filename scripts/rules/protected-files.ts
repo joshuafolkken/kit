@@ -2,6 +2,7 @@ import path from 'node:path'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
@@ -31,10 +32,22 @@ const TRACKED_VARIANTS: ReadonlySet<string> = new Set(['.env.example', '.env.tes
 const SETTINGS_FILE = path.join('.claude', 'settings.json')
 const WHITESPACE = /\s+/u
 const TOKEN_QUOTES = /["']/gu
-const INPUT_REDIRECT = '<'
-// Programs that print a named file's bytes, or run them. `cp` and `mv` are deliberately absent: they
-// write rather than print, and `cp .env.example .env` is how a checkout's `.env` is made.
-const SHELL_READERS: ReadonlySet<string> = new Set([
+// Each character of a redirect operator (`<`, `>`, `>>`, `2>`, `&>`) — and the clobber `>|` whole —
+// is spaced out to a mark, so the word after the last one is the file it reads or writes.
+const REDIRECT = />\||[<>]/gu
+const REDIRECT_MARK = '<'
+// Programs that run their quoted argument as a script.
+const SHELLS: ReadonlySet<string> = new Set(['bash', 'eval', 'sh', 'zsh'])
+// The body of a `$(…)` (innermost) or a backtick command substitution.
+const SUBSTITUTION = /\$\((?<dollar>[^()]*)\)|`(?<backtick>[^`]*)`/gu
+// Programs that print a named file's bytes or run them, and programs that write one: a write could set
+// a guard switch, so `cp .env.example .env` is refused too (kit #4660) — the person makes the file.
+const SHELL_PROGRAMS: ReadonlySet<string> = new Set([
+	'cp',
+	'install',
+	'ln',
+	'mv',
+	'tee',
 	'.',
 	'awk',
 	'base64',
@@ -88,33 +101,82 @@ function is_environment_path(token: string): boolean {
 	return SECRET_FILES.has(name) || name.startsWith(ENVIRONMENT_VARIANT_PREFIX)
 }
 
-// A shell read reaches the same bytes a `Read` does, so a segment that runs a reader (`cat .env`,
-// `source .env`) or redirects the file into a command (`< .env`) is refused too. Claude Code applies
-// the `Read` deny rules to the readers it recognizes, but `source .env.local` passes them (measured on
-// 2.1.289, kit #3602), so the variants are matched here as well.
-function is_environment_read_segment(segment: string): boolean {
-	const words = segment
-		.replaceAll(INPUT_REDIRECT, ' < ')
+// A shell read reaches the same bytes a `Read` does, and a shell write changes the file an `Edit`
+// would, so a segment that runs one of the programs (`cat .env`, `source .env`, `tee .env`) or
+// redirects the file (`< .env`, `>> .env`) is refused too. Claude Code applies the `Read` deny rules to
+// the readers it recognizes, but `source .env.local` passes them (measured on 2.1.289, kit #3602), so
+// the variants are matched here as well.
+//
+// A quoted `>` is text (`git commit -m "x >> .env"`), so the marks are read on the quote-blanked
+// segment, whose offsets match the original; a shell's quoted script (`sh -c "echo x > .env"`) runs,
+// so its marks are read as written, as is a heredoc line, which `blanked` does not cut.
+function redirect_marks_of(segment: string, program: string | undefined): string {
+	if (program !== undefined && SHELLS.has(program)) return segment
+
+	return time_shell.blanked(segment) ?? segment
+}
+
+function spaced_redirects(segment: string, program: string | undefined): string {
+	const marks = redirect_marks_of(segment, program)
+
+	return segment.replaceAll(REDIRECT, (mark, offset: number) =>
+		marks.startsWith(mark, offset) ? ` ${REDIRECT_MARK} ` : mark,
+	)
+}
+
+function is_environment_shell_segment(segment: string): boolean {
+	const call = git_argv.program_of(segment)
+	const words = spaced_redirects(segment, call?.name)
 		.split(WHITESPACE)
 		.filter((word) => word !== '')
 	const is_redirected = words.some(
-		(word, index) => word === INPUT_REDIRECT && is_environment_path(words[index + 1] ?? ''),
+		(word, index) => word === REDIRECT_MARK && is_environment_path(words[index + 1] ?? ''),
 	)
-	const call = git_argv.program_of(segment)
 
 	if (is_redirected || call === undefined) return is_redirected
 
-	return SHELL_READERS.has(call.name) && call.args.some((word) => is_environment_path(word))
+	return SHELL_PROGRAMS.has(call.name) && call.args.some((word) => is_environment_path(word))
 }
 
-function is_environment_shell_read(command: string): boolean {
-	return shell_segments.commands_of(command).some((segment) => is_environment_read_segment(segment))
+// A shell's quoted script holds commands of its own (`bash -c "true; cat .env"`), so it is cut again
+// without regard to quotes.
+function script_commands_of(segment: string): Array<string> {
+	const program = git_argv.program_of(segment)?.name
+
+	if (program === undefined || !SHELLS.has(program)) return []
+
+	return shell_segments.commands_of(segment)
 }
 
-function is_environment_read(call: GuardedCall): boolean {
-	if (call.name === READ_TOOL) return is_environment_path(file_path_of(call))
+// A command substitution runs even inside double quotes (`echo "$(echo x > .env)"`), which the
+// quote-blanked reading takes for text, so its body is cut out as commands of their own.
+function substitution_commands_of(segment: string): Array<string> {
+	return [...segment.matchAll(SUBSTITUTION)].flatMap((match) =>
+		shell_segments.commands_of(match.groups?.['dollar'] ?? match.groups?.['backtick'] ?? ''),
+	)
+}
 
-	return bash_triggers.on_bash_command(is_environment_shell_read)(call)
+function segments_of(command: string): Array<string> {
+	return shell_segments
+		.quote_aware_commands_of(command)
+		.flatMap((segment) => [
+			segment,
+			...script_commands_of(segment),
+			...substitution_commands_of(segment),
+		])
+}
+
+function is_environment_shell_access(command: string): boolean {
+	return segments_of(command).some((segment) => is_environment_shell_segment(segment))
+}
+
+// A `Read` lands the secret in the transcript; an `Edit` / `Write` could set a guard switch.
+function is_environment_access(call: GuardedCall): boolean {
+	if (call.name === READ_TOOL || EDIT_TOOLS.has(call.name)) {
+		return is_environment_path(file_path_of(call))
+	}
+
+	return bash_triggers.on_bash_command(is_environment_shell_access)(call)
 }
 
 // The repository the settings file belongs to is two levels above it (`<root>/.claude/settings.json`).
@@ -135,11 +197,12 @@ function is_protected_file_call(
 	call: GuardedCall,
 	is_kit_consumer: (root: string) => boolean = doctor_consumer.is_kit_consumer,
 ): boolean {
-	return is_environment_read(call) || is_consumer_settings_edit(call, is_kit_consumer)
+	return is_environment_access(call) || is_consumer_settings_edit(call, is_kit_consumer)
 }
 
 const PROTECTED_FILE_REASON =
-	'⛔ protected file: `.env`, a `.env.*` variant and `.dev.vars` hold secrets, and a consumer ' +
+	'⛔ protected file: `.env`, a `.env.*` variant and `.dev.vars` hold secrets and are written only ' +
+	'by the person, and a consumer ' +
 	'`.claude/settings.json` is owned by `josh sync` (a change belongs upstream in kit). Leave these ' +
 	'files alone, or ask the user. It fires on every occurrence.'
 
@@ -154,7 +217,7 @@ const ROW = {
 		title: 'Protected file',
 		topic: '`operating-rules.md`',
 		fires:
-			'a `Read` of `.env`, or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence',
+			'a `Read`, `Edit` or `Write` of `.env` (or a shell read or write of it), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence',
 		quiet: "kit itself, or the user's `~/.claude/settings.json`",
 	},
 }

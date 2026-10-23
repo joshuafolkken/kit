@@ -10,6 +10,8 @@ import { protected_files } from './protected-files'
 
 const SETTINGS_PATH = '/work/app/.claude/settings.json'
 const KIT = '@joshuafolkken/kit'
+const ENV_PATH = '/work/app/.env'
+const EXAMPLE_PATH = '/work/app/.env.example'
 
 function is_consumer(): boolean {
 	return true
@@ -29,7 +31,7 @@ function settings_path_in(manifest: string | undefined): string {
 
 describe('protected_files.is_protected_file_call — .env', () => {
 	it.each([
-		'/work/app/.env',
+		ENV_PATH,
 		'/work/app/.env.local',
 		'/work/app/apps/web/.env.production',
 		'/work/app/.dev.vars',
@@ -39,7 +41,7 @@ describe('protected_files.is_protected_file_call — .env', () => {
 		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
 	})
 
-	it.each(['/work/app/.env.example', '/work/app/.env.test', '/work/app/src/env.ts'])(
+	it.each([EXAMPLE_PATH, '/work/app/.env.test', '/work/app/src/env.ts'])(
 		'is silent on a Read of %j',
 		(file) => {
 			const call = { name: 'Read', input: { file_path: file } }
@@ -97,15 +99,75 @@ describe('protected_files.is_protected_file_call — the wider readers', () => {
 
 		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
 	})
+})
 
-	it.each(['cp .env.example .env', 'mv .env.local.bak .env.local'])(
-		'leaves the write in %j alone',
+// joshuafolkken/kit#4660: a write to `.env` could set a guard switch, so it is refused like a read.
+describe('protected_files.is_protected_file_call — writing .env', () => {
+	it.each(['Edit', 'Write'])('refuses a %s of .env', (name) => {
+		const call = { name, input: { file_path: ENV_PATH } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each(['Edit', 'Write'])('lets a %s of .env.example through', (name) => {
+		const call = { name, input: { file_path: EXAMPLE_PATH } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+})
+
+// A quoted `>` is text, except in the script a shell runs.
+describe('protected_files.is_protected_file_call — writing .env through Bash', () => {
+	it.each([
+		'echo JOSH_RULE_GUARD=off >> .env',
+		'echo JOSH_RULE_GUARD=off>.env',
+		'printf x > /work/app/.env.local',
+		'echo x | tee -a .env',
+		'cp .env.example .env',
+		'mv .env.local.bak .env.local',
+		'ln -sf /tmp/x .env',
+		'install -m 600 /tmp/x .dev.vars',
+		'cat > .env <<EOF',
+		'echo x > ".env"',
+		'sh -c "echo x > .env"',
+		'bash -c "true; cat .env"',
+		'sh -c "true && cp .env.example .env"',
+		'eval "x; tee .env"',
+	])('refuses the write in %j', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+	})
+
+	it.each([
+		'echo x > .env.example',
+		'pnpm test 2>&1',
+		'cp .env.example /tmp/copy',
+		'git commit -m "x >> .env"',
+		'gh pr create --body "Refuses echo JOSH_RULE_GUARD=off >> .env; cat .env"',
+	])('lets %j through', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+})
+
+// The clobber `>|` is a redirect, not a pipe; a command substitution runs even inside double quotes.
+describe('protected_files.is_protected_file_call — clobber and command substitution', () => {
+	it.each(['echo JOSH_RULE_GUARD=off >| .env', 'echo "$(echo x > .env)"', 'echo "`cat .env`"'])(
+		'refuses the hidden write or read in %j',
 		(command) => {
 			const call = { name: 'Bash', input: { command } }
 
-			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
 		},
 	)
+
+	it.each(['echo x >| /tmp/out', 'echo "$(date) > .env is text"'])('lets %j pass', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
 })
 
 describe('protected_files.is_protected_file_call — .claude/settings.json', () => {
