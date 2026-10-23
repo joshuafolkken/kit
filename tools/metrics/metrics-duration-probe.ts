@@ -1,6 +1,7 @@
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { file_reader } from '#scripts/lib/read-file'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
@@ -18,7 +19,8 @@ import { metrics_durations, type Durations } from './metrics-durations'
 // machine is doing — the gate runs this beside its unit check.
 
 const SAMPLES = 5
-const BASELINE_FILE = 'josh-metrics-durations.json'
+const BASELINE_FILE = 'metrics-durations.json'
+const LEGACY_BASELINE_FILE = 'josh-metrics-durations.json'
 const JOSH_COMMAND: ReadonlyArray<string> = [
 	'node_modules/.bin/tsx',
 	'scripts/josh/josh.ts',
@@ -72,12 +74,42 @@ async function measure(root: string, is_startup_timed: boolean): Promise<Duratio
 	return is_startup_timed ? { ...recorded, ...time_startups(root) } : recorded
 }
 
-// Beside the common git directory: one file per clone, so per machine, shared by every lane of it and
-// never committed.
+// The baseline kept at the common git directory's root before joshuafolkken/kit#4653 is carried into the
+// josh state directory rather than dropped. Where the root is read-only it is copied instead; the
+// leftover is never read again. A gate of another lane that moved it first — even between the check and
+// the copy — leaves nothing to copy.
+function copy_if_present(source: string, target: string): void {
+	try {
+		copyFileSync(source, target)
+	} catch (error) {
+		if (!file_reader.is_absent(error)) throw error
+	}
+}
+
+function adopt_legacy_baseline(repository: string, file: string): void {
+	const legacy = path.join(repository, LEGACY_BASELINE_FILE)
+
+	if (existsSync(file) || !existsSync(legacy)) return
+	mkdirSync(path.dirname(file), { recursive: true })
+
+	try {
+		renameSync(legacy, file)
+	} catch {
+		copy_if_present(legacy, file)
+	}
+}
+
+// In the common git directory's josh state: one file per clone, so per machine, shared by every lane of
+// it and never committed.
 async function baseline_path(): Promise<string | undefined> {
 	const repository = await run_carry.repository_directory()
 
-	return repository === undefined ? undefined : path.join(repository, BASELINE_FILE)
+	if (repository === undefined) return undefined
+	const file = path.join(repository, git_common_directory.STATE_DIRECTORY, BASELINE_FILE)
+
+	adopt_legacy_baseline(repository, file)
+
+	return file
 }
 
 function read_baseline(file: string): Durations {
@@ -87,6 +119,7 @@ function read_baseline(file: string): Durations {
 }
 
 function write_baseline(file: string, durations: Durations): void {
+	mkdirSync(path.dirname(file), { recursive: true })
 	writeFileSync(file, metrics_durations.baseline_text(durations))
 }
 

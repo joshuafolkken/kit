@@ -76,7 +76,8 @@ function non_test_changes(changes: ReadonlyArray<FileChange>): Array<FileChange>
 }
 
 // `split` only when **both** guides are exceeded together — the size condition a split has to clear,
-// per `split-assessment.md`'s conservative default. Either one alone leaves the change one Issue.
+// per `split-assessment.md`'s conservative default. Either one alone leaves the change one Issue. A
+// filing's declared estimate is judged by this same call (`issue/size-estimate.ts`).
 function verdict_for(files: number, lines: number): SplitVerdict {
 	return files > FILE_GUIDE && lines > LINE_GUIDE ? SPLIT_VERDICT : SINGLE_VERDICT
 }
@@ -107,9 +108,14 @@ function reason(measurement: SizeMeasurement): string {
 	return `${counted} (${guide}) — ${tail}`
 }
 
-// The `split-assessment.md` heading the notice points at; the document-rule test pins the document to it.
+// The `split-assessment.md` headings the notice and a filing refusal point at; the document-rule test
+// pins the document to both.
 const NOTICE_SECTION = 'Over the guide before the gate'
-const NOTICE_ACTION = `record why it stays one Issue, or carve the rest out into a new Issue — split-assessment.md → "${NOTICE_SECTION}"`
+const QUESTION_SECTION = 'The question'
+// The line that records why an Issue stays one — read the same in a filed body (`size_estimate`) and
+// in the Issue comment that answers the notice (`split_resolution`).
+const REASON_PREFIX = '- 分割しない理由:'
+const NOTICE_ACTION = `record why it stays one Issue in an Issue comment line \`${REASON_PREFIX} <理由>\`, or carve the rest out with \`pnpm josh issue:file --route split\` — split-assessment.md → "${NOTICE_SECTION}"`
 
 // The pre-gate notice `josh main:merge` prints for a diff over the guide. "Clearly" is the `split`
 // verdict — both guides exceeded — so the one bar this file draws is the one the notice fires on,
@@ -124,12 +130,15 @@ const split_assess = {
 	FILE_GUIDE,
 	LINE_GUIDE,
 	NOTICE_SECTION,
+	QUESTION_SECTION,
+	REASON_PREFIX,
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,
 	notice,
 	parse_numstat,
 	reason,
+	verdict_for,
 }
 
 export type { FileChange, SizeMeasurement, SplitVerdict }

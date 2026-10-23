@@ -197,17 +197,17 @@ async function diff_cached_names(): Promise<string> {
 	])
 }
 
-// The branch diff as `added\tdeleted\tpath` rows — the same base and flags as `diff_main_names`, so
-// the size read against and the name read agree on what "changed" is. A binary file prints `-` for
-// both counts; the parser above `josh split:assess` reads it treats those as zero changed lines.
-async function diff_main_numstat(): Promise<string> {
+// The diff since `base` as `added\tdeleted\tpath` rows — the same flags as `diff_names_since`, so the
+// size read and the name read agree on what "changed" is. A binary file prints `-` for both counts;
+// the parser above `josh split:assess` reads it treats those as zero changed lines.
+async function diff_numstat_since(base: string): Promise<string> {
 	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		'--numstat',
 		NO_RELATIVE_PATHS,
 		NO_RENAME_DETECTION,
-		await change_base(),
+		base,
 		'--',
 	])
 }
@@ -246,7 +246,7 @@ const git_diff_reads = {
 	diff_cached_names,
 	diff_main,
 	diff_main_names,
-	diff_main_numstat,
+	diff_numstat_since,
 	diff_names_since,
 	get_default_branch,
 	tree_names_at,

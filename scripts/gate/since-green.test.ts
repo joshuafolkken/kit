@@ -71,6 +71,16 @@ describe('since_green.read_moved — what it narrows to', () => {
 		expect(read_git).toHaveBeenCalledWith(expect.arrayContaining(['base-a', 'base-b']))
 	})
 
+	// joshuafolkken/kit#4655: `josh lint:related` hands the tree it already read for its green record.
+	it('reads no gate tree of its own when the caller hands one', async () => {
+		const tree = { files: { [SOURCE]: 'digest-a', [FIXED]: 'digest-b2' }, base: 'base-a' }
+
+		await expect(
+			since_green.read_moved(stamp, LINT_LABEL, record_at('handed'), tree),
+		).resolves.toStrictEqual([FIXED])
+		expect(read_tree).not.toHaveBeenCalled()
+	})
+
 	// joshuafolkken/kit#4495: each check stops only on its own declared configuration.
 	it('reads the unit step past a moved lint configuration', async () => {
 		tree_now({ ...RECORDED.files, [ESLINT_CONFIG]: 'digest-e' })

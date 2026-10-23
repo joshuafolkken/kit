@@ -3,10 +3,13 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_byte_check } from '#scripts/document/document-byte-check'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
+import type { GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { split_early_notice } from '#scripts/split/split-early-notice'
@@ -61,22 +64,45 @@ function byte_check_exit_code(scope: ChangedFileScope, root: string): number {
 // of its own — it takes the files this run already resolved, so the git contract is the lint
 // command's alone. A lint failure is reported as-is; only a green lint runs the byte check, so the
 // two never race to the exit code, and a green tree here is green on both — which is what the record
-// below then vouches for.
+// below then vouches for. The structural checks (`structural-checks.ts`) run beside the lint rather
+// than after it, so their whole-program scan costs no wall clock the lint has not already spent.
+//
+// The gate's `exports` check comes after them on the same terms: a namespace member nothing reads is
+// reported here for the namespaces the changed files declare or import directly
+// (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
+// fallback scans the whole program, a superset as the lint's is.
 async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
+	const structural = structural_checks.run_structural(scope, root)
 	const lint_exit = await lint_exit_code(scope)
-	if (lint_exit !== 0) return lint_exit
+	const structural_exit = await structural
 
-	return byte_check_exit_code(scope, root)
+	if (lint_exit !== 0) return lint_exit
+	if (structural_exit !== 0) return structural_exit
+	const byte_exit = byte_check_exit_code(scope, root)
+	if (byte_exit !== 0) return byte_exit
+	// The linters' buffered output ends without a newline; keep the check's own line apart from it.
+	process.stdout.write('\n')
+
+	return await unused_members_check.run_unused_members(
+		root,
+		scope.mode === 'all' ? undefined : scope.files,
+	)
 }
 
-// **A bare run reads only what moved since its last green run** (`since-green.ts`); explicit file
-// arguments never consult the record.
+// **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
+// its green record is read from, so one run reads the gate tree once (joshuafolkken/kit#4655).
+// Explicit file arguments read no tree, so they never consult the record.
 async function read_since_green(
-	command_arguments: ReadonlyArray<string>,
+	before: GateTree | undefined,
 ): Promise<ReadonlyArray<string> | undefined> {
-	if (command_arguments.length > 0) return undefined
+	if (before === undefined) return undefined
 
-	return await since_green.read_moved(review_stamps.lint_related_stamp, gate_plan.LINT_LABEL)
+	return await since_green.read_moved(
+		review_stamps.lint_related_stamp,
+		gate_plan.LINT_LABEL,
+		undefined,
+		before,
+	)
 }
 
 // Narrowed to what moved while a lintable file is among it; otherwise the whole branch change, as before.
@@ -179,8 +205,8 @@ async function checked_exit_code(
 // the old base would refuse `josh gate` while every re-run kept linting nothing.
 async function run_related_lint(command_arguments: ReadonlyArray<string>): Promise<number> {
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const moved = await read_since_green(command_arguments)
 	const before = await scoped_green.read_before(command_arguments)
+	const moved = await read_since_green(before)
 	const exit_code = await checked_exit_code(command_arguments, root, moved)
 
 	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { file_content } from '#scripts/sync/file-content'
 import {
 	DEFAULT_RELEASE_AGE_MINUTES,
 	release_window,
@@ -184,7 +185,7 @@ function sync_dependabot_cooldown(root: string): boolean {
 	const existing = readFileSync(config_path, 'utf8')
 	const merged = merge_cooldown(existing, release_window.read_release_window(root))
 	if (merged === existing) return false
-	writeFileSync(config_path, merged)
+	file_content.write_contained(config_path, merged)
 
 	return true
 }

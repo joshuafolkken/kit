@@ -40,25 +40,45 @@ const PUBLISH_GROUP = 'publish-actions'
 // The remaining group is named after its ecosystem.
 const ACTIONS_GROUP = ACTIONS_ECOSYSTEM
 
-// The jobs that hold publish credentials, and the composite action they set Node.js up through.
+// The jobs that hold publish credentials, and the `pack` job that builds the tarball they publish
+// byte for byte (joshuafolkken/kit#4654).
 const PUBLISH_WORKFLOW = path.join('.github', 'workflows', 'publish.yml')
-const PUBLISH_JOBS: ReadonlyArray<string> = ['publish-github', 'publish-npm']
-const SETUP_NODE_ACTION = path.join('.github', 'actions', 'setup-node', 'action.yml')
+const PUBLISH_JOBS: ReadonlyArray<string> = ['pack', 'publish-github', 'publish-npm']
 const LOCAL_ACTION_PREFIX = './'
+const ACTION_FILE = 'action.yml'
+// An action only a local composite action runs, so the resolver is shown to follow them.
+const COMPOSITE_ONLY_ACTION = 'pnpm/setup'
 
-function remote_actions(steps: ReadonlyArray<WorkflowStep>): ReadonlyArray<string> {
-	return steps
-		.filter((step) => step.uses !== undefined && !step.uses.startsWith(LOCAL_ACTION_PREFIX))
-		.map((step) => ci_yml_fixture.action_name(step))
+function by_name(left: string, right: string): number {
+	return left.localeCompare(right)
 }
 
-function credentialed_actions(): ReadonlyArray<string> {
+function local_action(step: WorkflowStep): string | undefined {
+	if (step.uses?.startsWith(LOCAL_ACTION_PREFIX) !== true) return undefined
+
+	return path.join(step.uses, ACTION_FILE)
+}
+
+// A local composite action is replaced by the steps it runs, so an action it adds is counted too.
+function resolve_steps(steps: ReadonlyArray<WorkflowStep>): ReadonlyArray<WorkflowStep> {
+	return steps.flatMap((step) => {
+		const action_file = local_action(step)
+
+		if (action_file === undefined) return [step]
+
+		return resolve_steps(ci_yml_fixture.load_action(action_file).runs.steps)
+	})
+}
+
+function publish_actions(): ReadonlyArray<string> {
 	const job_steps = PUBLISH_JOBS.flatMap(
 		(job) => ci_yml_fixture.find_job(PUBLISH_WORKFLOW, job)?.steps ?? [],
 	)
-	const action_steps = ci_yml_fixture.load_action(SETUP_NODE_ACTION).runs.steps
+	const names = resolve_steps(job_steps)
+		.filter((step) => step.uses !== undefined)
+		.map((step) => ci_yml_fixture.action_name(step))
 
-	return [...new Set(remote_actions([...job_steps, ...action_steps]))]
+	return [...new Set(names)].toSorted(by_name)
 }
 
 function find_entry(config_path: string, ecosystem: string): DependabotUpdate | undefined {
@@ -122,12 +142,17 @@ describe('github-actions grouping (kit#4148)', () => {
 		])
 	})
 
-	// A credentialed action missing from the list would fall into the auto-merged group, so every
-	// action those jobs run is required to be listed (joshuafolkken/kit#4633).
-	it('lists every action the publish jobs run in the publish group', () => {
+	// An action missing from the list would fall into the auto-merged group, and a stale one would
+	// hold a bump back from it, so the list is exactly the actions those jobs run
+	// (joshuafolkken/kit#4633, joshuafolkken/kit#4654).
+	it('lists exactly the actions the pack and publish jobs run in the publish group', () => {
 		const patterns = find_entry(KIT_PATH, ACTIONS_ECOSYSTEM)?.groups?.[PUBLISH_GROUP]?.patterns
 
-		expect(patterns).toEqual(expect.arrayContaining([...credentialed_actions()]))
+		expect(patterns?.toSorted(by_name)).toStrictEqual(publish_actions())
+	})
+
+	it('follows the local composite actions those jobs set up through', () => {
+		expect(publish_actions()).toContain(COMPOSITE_ONLY_ACTION)
 	})
 
 	// A consumer's auto-merge holds a whole pull request that touches an upstream-managed workflow,

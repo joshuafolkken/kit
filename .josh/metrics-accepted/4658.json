@@ -1,0 +1,7 @@
+{
+	"reason": "#4658 adds the in-process token-shape check for outbound bodies, the GitHub App token shape and their tests; the gh api check decodes the JSON-encoded body first, so a token after an escaped newline or tab is refused too",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 111
+	}
+}

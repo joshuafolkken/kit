@@ -7,12 +7,15 @@ import { issue_fold_cli } from './issue-fold-cli'
 // The git read is mocked so the size question can be steered — including to the failure that must fold
 // rather than separate.
 
-const { diff_main_numstat } = vi.hoisted(() => ({
-	diff_main_numstat: vi.fn<() => Promise<string>>(),
+const { diff_numstat_since } = vi.hoisted(() => ({
+	diff_numstat_since: vi.fn<() => Promise<string>>(),
 }))
 
 vi.mock('#scripts/git/git-command', () => ({
-	git_command: { diff_main_numstat, untracked_names: vi.fn().mockResolvedValue('') },
+	git_command: { diff_numstat_since, untracked_names: vi.fn().mockResolvedValue('') },
+}))
+vi.mock('#scripts/git/change-base', () => ({
+	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 
 const FILE_COUNT = 11
@@ -40,7 +43,7 @@ beforeEach(() => {
 		printed.push(String(line))
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
-	diff_main_numstat.mockReset()
+	diff_numstat_since.mockReset()
 })
 
 afterEach(() => {
@@ -53,14 +56,14 @@ function output(): string {
 
 describe('issue:fold — the size half is single-sourced from split:assess', () => {
 	it('separates two separable findings whose combined size clears the guide', async () => {
-		diff_main_numstat.mockResolvedValue(OVERSIZE_DIFF)
+		diff_numstat_since.mockResolvedValue(OVERSIZE_DIFF)
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.SEPARATE)
 	})
 
 	it('folds two findings when the size is under the guide', async () => {
-		diff_main_numstat.mockResolvedValue(SMALL_DIFF)
+		diff_numstat_since.mockResolvedValue(SMALL_DIFF)
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.FOLD)
@@ -70,11 +73,11 @@ describe('issue:fold — the size half is single-sourced from split:assess', () 
 	it('answers no-fold-needed for a single candidate without measuring', async () => {
 		expect(await issue_fold_cli.run(['only one'])).toBe(0)
 		expect(output()).toContain(issue_fold.NO_FOLD_NEEDED)
-		expect(diff_main_numstat).not.toHaveBeenCalled()
+		expect(diff_numstat_since).not.toHaveBeenCalled()
 	})
 
 	it('folds a --not-separable pair even when the size clears the guide', async () => {
-		diff_main_numstat.mockResolvedValue(OVERSIZE_DIFF)
+		diff_numstat_since.mockResolvedValue(OVERSIZE_DIFF)
 
 		expect(await issue_fold_cli.run([...TITLES, NOT_SEPARABLE])).toBe(0)
 		expect(output()).toContain(issue_fold.FOLD)
@@ -86,7 +89,7 @@ describe('issue:fold — the size half is single-sourced from split:assess', () 
 // of the findings' size, so neither folds.
 describe('issue:fold — undetermined where the diff measures nothing', () => {
 	it('answers undetermined rather than separate when the diff cannot be read', async () => {
-		diff_main_numstat.mockRejectedValue(new Error('no base'))
+		diff_numstat_since.mockRejectedValue(new Error('no base'))
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.UNDETERMINED)
@@ -94,14 +97,14 @@ describe('issue:fold — undetermined where the diff measures nothing', () => {
 	})
 
 	it('answers undetermined rather than fold when the diff is empty', async () => {
-		diff_main_numstat.mockResolvedValue('')
+		diff_numstat_since.mockResolvedValue('')
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.UNDETERMINED)
 	})
 
 	it('answers undetermined when only test files changed', async () => {
-		diff_main_numstat.mockResolvedValue('30\t2\tsrc/one.test.ts')
+		diff_numstat_since.mockResolvedValue('30\t2\tsrc/one.test.ts')
 
 		expect(await issue_fold_cli.run(TITLES)).toBe(0)
 		expect(output()).toContain(issue_fold.UNDETERMINED)
@@ -110,19 +113,19 @@ describe('issue:fold — undetermined where the diff measures nothing', () => {
 
 describe('size_verdict — no size where the diff measures nothing', () => {
 	it('returns undefined when the git read throws', async () => {
-		diff_main_numstat.mockRejectedValue(new Error('not a checkout'))
+		diff_numstat_since.mockRejectedValue(new Error('not a checkout'))
 
 		expect(await issue_fold_cli.size_verdict()).toBeUndefined()
 	})
 
 	it('returns undefined for an empty diff', async () => {
-		diff_main_numstat.mockResolvedValue('')
+		diff_numstat_since.mockResolvedValue('')
 
 		expect(await issue_fold_cli.size_verdict()).toBeUndefined()
 	})
 
 	it('returns single for a measured diff under the guide', async () => {
-		diff_main_numstat.mockResolvedValue(SMALL_DIFF)
+		diff_numstat_since.mockResolvedValue(SMALL_DIFF)
 
 		expect(await issue_fold_cli.size_verdict()).toBe(split_assess.SINGLE_VERDICT)
 	})

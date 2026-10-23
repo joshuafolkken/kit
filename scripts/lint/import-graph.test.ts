@@ -307,6 +307,30 @@ describe('import_graph.closure_hash — a file named but not resolved as a modul
 	})
 })
 
+describe('import_graph.imports', () => {
+	it('names only the files a file imports directly, not the ones they import', async () => {
+		const root = write_project(CHAIN)
+		const graph = await graph_of(root)
+
+		expect(graph.imports(path.join(root, TOP))).toStrictEqual([path.join(root, 'middle.ts')])
+	})
+
+	it('reads another text of the file in its place, resolved from where the file sits', async () => {
+		const root = write_project(CHAIN)
+		const graph = await graph_of(root)
+		const text = "import { bottom } from './bottom'\n"
+
+		expect(graph.imports(path.join(root, TOP), text)).toStrictEqual([path.join(root, 'bottom.ts')])
+	})
+
+	it("leaves out an installed package's files", async () => {
+		const root = write_package_user()
+		const graph = await graph_of(root)
+
+		expect(graph.imports(path.join(root, PACKAGE_USER))).toStrictEqual([])
+	})
+})
+
 describe('import_graph.create', () => {
 	it('answers undefined for a project with no tsconfig.json', async () => {
 		const root = write_project([['only.ts', 'export const only = 1\n']])

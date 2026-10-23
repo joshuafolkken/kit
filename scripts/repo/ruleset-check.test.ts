@@ -126,6 +126,26 @@ describe('ruleset_check.inspect', () => {
 	})
 })
 
+describe('ruleset_check.inspect branch encoding', () => {
+	// A `/` in the default branch would otherwise split the REST path into extra segments.
+	it('reads a default branch holding a slash under its encoded name', () => {
+		mocks.read.mockImplementation((request) =>
+			request.jq_filter === undefined ? '[]' : 'release/v1',
+		)
+		fail_protection_read(NOT_FOUND)
+		ruleset_check.inspect(REPO, scratch)
+
+		expect(mocks.read).toHaveBeenCalledWith(
+			expect.objectContaining({ path: `repos/${REPO}/rules/branches/release%2Fv1` }),
+		)
+		expect(mocks.exec).toHaveBeenCalledWith(
+			expect.objectContaining({
+				path: `repos/${REPO}/branches/release%2Fv1/protection/required_status_checks`,
+			}),
+		)
+	})
+})
+
 describe('ruleset_check.inspect protection failures', () => {
 	// Only GitHub's 404 means "no protection"; a 403 without admin access must not read as missing.
 	it.each([

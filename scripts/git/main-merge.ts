@@ -3,6 +3,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from '#scripts/split/split-assess'
+import { split_early_notice } from '#scripts/split/split-early-notice'
 import { split_measure } from '#scripts/split/split-measure'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
@@ -121,9 +122,18 @@ function failure_text(outcome: MergeOutcome): string | undefined {
 // advisory: a finished merge never fails on it, and an unreadable diff says so rather than reading as
 // under the guide. It sits on the command, not on `merge()`, because `josh ship` merges again past the
 // point a run can act on it.
+async function measured_notice(): Promise<string | undefined> {
+	const measurement = await split_measure.read_branch()
+	const notice = split_assess.notice(measurement)
+
+	if (notice !== undefined) await split_early_notice.record(measurement)
+
+	return notice
+}
+
 async function split_notice(): Promise<string | undefined> {
 	try {
-		return split_assess.notice(await split_measure.read_branch())
+		return await measured_notice()
 	} catch (error) {
 		return `${SPLIT_UNMEASURED}: ${error_text.message_of(error)}`
 	}

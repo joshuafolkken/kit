@@ -10,14 +10,14 @@ import { dependabot_workflow_fixture } from './dependabot-workflow-fixture'
 // undo it (joshuafolkken/kit#842).
 //
 // The group narrows that race without closing it, because cancellation is not instantaneous — so the
-// arming command also names the head this run decided about, which GitHub checks as it arms. That
-// half is template-only: kit's own copy has no withdrawal to be raced against, and its decision —
-// the ecosystem and the semver level — is a fact about the bump that no push changes.
+// arming command also names the head this run decided about, which GitHub checks as it arms. kit's
+// own copy takes it too: its decision reads the bump's metadata, which a commit pushed onto the
+// Dependabot branch before the arming does not change, so without it that commit would be armed on a
+// decision made for the bump alone (joshuafolkken/kit#4654).
 const {
 	TEMPLATE,
 	RUNTIME,
 	CONCURRENCY_GROUP,
-	MERGE_COMMAND,
 	HEAD_MATCH_FLAG,
 	HEAD_SHA_VARIABLE,
 	HEAD_SHA_EXPRESSION,
@@ -28,8 +28,8 @@ const {
 } = dependabot_workflow_fixture
 
 const WORKFLOWS = [
-	{ label: 'the distributed template', path: TEMPLATE },
-	{ label: "kit's own workflow", path: RUNTIME },
+	{ label: 'the distributed template', path: TEMPLATE, job: template_job },
+	{ label: "kit's own workflow", path: RUNTIME, job: runtime_job },
 ]
 
 describe('dependabot-auto-merge.yml concurrency', () => {
@@ -46,30 +46,18 @@ describe('dependabot-auto-merge.yml concurrency', () => {
 	})
 })
 
-describe('dependabot-auto-merge.yml stale-head guard', () => {
+describe.each(WORKFLOWS)('dependabot-auto-merge.yml stale-head guard in $label', ({ job }) => {
 	// The expected head has to come from the event. Reading the branch inside the step and passing
 	// that back would compare the current head with itself and hold on every run.
 	it('names the head the run was triggered for', () => {
-		expect(merge_step(template_job())?.env?.[HEAD_SHA_VARIABLE]).toBe(HEAD_SHA_EXPRESSION)
+		expect(merge_step(job())?.env?.[HEAD_SHA_VARIABLE]).toBe(HEAD_SHA_EXPRESSION)
 	})
 
 	// On the arming command itself rather than in a read before it: GitHub applies the expectation as
 	// it arms, so no push can land between the two.
 	it('arms only when the branch still points at that head', () => {
-		const arming = merge_step(template_job())
+		const arming = merge_step(job())
 
 		expect(step_run(arming)).toContain(`${HEAD_MATCH_FLAG} "$${HEAD_SHA_VARIABLE}"`)
-	})
-
-	// kit's own copy has no withdrawal a stale run could arm behind, and no decision a push can
-	// invalidate — so it takes the group and not the guard, the same way it takes no withdrawal.
-	// Asserted against a step that is present, so a renamed step cannot satisfy this vacuously.
-	it('is absent from kit’s own workflow, which has no withdrawal to be raced against', () => {
-		const arming = merge_step(runtime_job())
-
-		expect(arming).toBeDefined()
-		expect(step_run(arming)).toContain(MERGE_COMMAND)
-		expect(step_run(arming)).not.toContain(HEAD_MATCH_FLAG)
-		expect(arming?.env?.[HEAD_SHA_VARIABLE]).toBeUndefined()
 	})
 })

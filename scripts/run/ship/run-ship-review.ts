@@ -1,4 +1,5 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
@@ -34,6 +35,7 @@ const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
 // sets no space after `。`, so it ends a sentence on its own.
 const SENTENCE_END = /(?<=[.!?])\s|(?<=。)/u
 const SENTENCE_LIMIT = 200
+type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
 const ELLIPSIS = '…'
 
 const VERDICT = {
@@ -78,15 +80,23 @@ const MISSING_NOTE = 'the reviewer wrote no findings file — the review did not
 const CLEAN_NOTE = 'review clean or Low-only — recorded; shipping on.'
 const FIXED_NOTE =
 	'review fixes applied in place — recorded; the gate re-runs on the fixed tree and round 2 follows the commit.'
-const BLOCKING_NOTE =
-	'review found High/Medium it did not fix — recorded; fix them, then take the round-2 route (`chain-rule.md`).'
+// Every stop that hands findings back for a fix: a fix of only the cited line left the same pattern
+// beside it for the next round to stop on again (joshuafolkken/kit#4673).
+const SWEEP_INSTRUCTION = [
+	'Before fixing, sweep each finding for its other sites — the same file, the callers of the same',
+	'function and a grep of the pattern — fix every site in one pass, and list each range searched on its',
+	'own line in the Issue fix comment.',
+].join(' ')
+const BLOCKING_NOTE = `review found High/Medium it did not fix — recorded. ${SWEEP_INSTRUCTION} Then take the round-2 route (\`chain-rule.md\`).`
 const UNVERIFIED_OUTCOME: RoundOutcome = {
 	is_passing: false,
-	note: 'review fixes did not pass the scoped checks — recorded as unfixed; fix them, then take the round-2 route (`chain-rule.md`).',
+	note: `review fixes did not pass the scoped checks — recorded as unfixed. ${SWEEP_INSTRUCTION} Then take the round-2 route (\`chain-rule.md\`).`,
 }
+// The findings line is all a stopped ship hands the lane, so the other sites the rubric asks the
+// reviewer to cite ride on it rather than in its prose report (joshuafolkken/kit#4673).
+const OTHER_SITES_CLAUSE = '"other sites: <file>:<line>, …" for each other site of the same pattern'
 const ROUND_TWO_CLEAN_NOTE = 'round 2 clean or Low-only — recorded; shipping on.'
-const ROUND_TWO_BLOCKING_NOTE =
-	'round 2 found High/Medium or edited the tree — recorded; round 2 is final: fix, push and gate it, then run followup (`chain-rule.md` step 4).'
+const ROUND_TWO_BLOCKING_NOTE = `round 2 found High/Medium or edited the tree — recorded; round 2 is final. ${SWEEP_INSTRUCTION} Then push and gate it, and run followup (\`chain-rule.md\` step 4).`
 
 function findings_instruction(findings_path: string, fixed_clause: string): string {
 	const categories = review_finding_ledger.CATEGORIES.join(', ')
@@ -95,6 +105,7 @@ function findings_instruction(findings_path: string, fixed_clause: string): stri
 		`Then write every finding to ${findings_path}, one per line as`,
 		`<category>:<severity>:<file>[:<line>]${DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
 		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
+		`a high or medium line ending with ${OTHER_SITES_CLAUSE},`,
 		'and an empty file when there is none.',
 	].join(' ')
 }
@@ -109,12 +120,18 @@ function issue_read_instruction(issue: string): string {
 	].join(' ')
 }
 
+function round_one_opening(brief_path: string): string {
+	return [
+		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
+		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+	].join(' ')
+}
+
 // One line, because `detached_launch` refuses an argument carrying a control character: the multi-line
 // brief travels by path, never inline.
 function reviewer_prompt(brief_path: string, findings_path: string, issue: string): string {
 	return [
-		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
-		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+		round_one_opening(brief_path),
 		issue_read_instruction(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
@@ -122,6 +139,29 @@ function reviewer_prompt(brief_path: string, findings_path: string, issue: strin
 		'return only once both are green; revert a fix you cannot get green and report that finding unfixed.',
 		findings_instruction(findings_path, `, prefixing a finding you fixed with "${FIXED_PREFIX}"`),
 	].join(' ')
+}
+
+// The round-1 review run beside the code review: it reads only, so the two sessions never fix, verify
+// and revert in the one shared checkout at once; its findings go to the lane's one fix pass.
+function report_prompt(brief_path: string, findings_path: string, issue: string): string {
+	return [
+		round_one_opening(brief_path),
+		'Do not edit any file: the code review running beside this one fixes in this checkout.',
+		issue_read_instruction(issue),
+		findings_instruction(findings_path, ''),
+	].join(' ')
+}
+
+// **One reviewer edits the checkout** (joshuafolkken/kit#4672): a slot reviewed beside the code slot
+// reads only, and a slot reviewed alone takes the round's own prompt.
+function slot_prompt(
+	round_prompt: PromptOf,
+	slot: ReviewSlot,
+	slots: ReadonlyArray<ReviewSlot>,
+): PromptOf {
+	if (slot === review_attest.REVIEW_SLOT.CODE || slots.length === 1) return round_prompt
+
+	return report_prompt
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
@@ -279,6 +319,8 @@ function round_two_outcome(verdict: ScoredVerdict): RoundOutcome {
 
 const run_ship_review = {
 	FIXED_PREFIX,
+	OTHER_SITES_CLAUSE,
+	SWEEP_INSTRUCTION,
 	UNVERIFIED_OUTCOME,
 	VERDICT,
 	blocking_details,
@@ -286,11 +328,13 @@ const run_ship_review = {
 	has_fixes,
 	is_clean_round_one,
 	read_verdict,
+	report_prompt,
 	reviewer_prompt,
 	round_one_outcome,
 	round_two_outcome,
+	slot_prompt,
 	verification_prompt,
 }
 
-export type { ReviewVerdict, RoundOutcome, ScoredVerdict, StopFinding }
+export type { PromptOf, ReviewVerdict, RoundOutcome, ScoredVerdict, StopFinding }
 export { run_ship_review }

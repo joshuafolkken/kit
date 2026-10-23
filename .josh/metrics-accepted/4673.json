@@ -1,0 +1,9 @@
+{
+	"reason": "#4673: review stop notes, the rubric and the ship reviewer's findings line ask for the same-pattern sweep so one fix pass closes round 2's repeats",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 7,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 252
+	}
+}

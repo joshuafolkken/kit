@@ -33,7 +33,7 @@ interface StubRead {
 	unparsed: ReadonlyArray<string>
 }
 
-const NO_PROBES: StubRead = { hunks: [], unparsed: [] }
+const NO_REPORT = { unpinned: [], unchecked: [], unparsed: [] } as const
 
 // `--diff-filter=M`: an added file's one hunk is the whole file, and reverting it is a missing module
 // every importer fails on, which says nothing about the tests — its functions are probed instead
@@ -133,21 +133,40 @@ async function read_probes(base: string, targets: ReadonlyArray<string>): Promis
 	return { hunks: [...changed, ...stubs.hunks], unparsed: stubs.unparsed }
 }
 
-// No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
-// is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
-// none) no probe runs, so every one is unchecked rather than unpinned.
-async function run(max_hunks: number): Promise<PinnedReport> {
-	const base = await change_base.resolved()
-	const changed = await changed_paths.read_changed_paths(false)
-	const paths = changed.filter((file) => existsSync(file))
-	const targets = paths.filter((file) => test_pinned_logic.is_target(file))
-	const probes = base === undefined ? NO_PROBES : await read_probes(base, targets)
-	const has_runner = test_red.has_runner()
+// The work tree's files that differ from `commit`, deleted ones dropped. Read since `HEAD` they are
+// what the worktree at `HEAD` needs copied in to hold the work tree — a conflicted merge's incoming
+// files included; read since the change base they are this branch's own change.
+async function existing_since(commit: string): Promise<Array<string>> {
+	const changed = await changed_paths.read_changed_since(commit)
+
+	return changed.filter((file) => existsSync(file))
+}
+
+async function report_on(
+	base: string,
+	max_hunks: number,
+	has_runner: boolean,
+): Promise<PinnedReport> {
+	const paths = await existing_since(HEAD)
+	const changed = await existing_since(base)
+	const targets = changed.filter((file) => test_pinned_logic.is_target(file))
+	const probes = await read_probes(base, targets)
 	const cap = has_runner ? max_hunks : 0
 	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, cap)
 	const unpinned = await unpinned_on(paths, checked)
 
 	return { unpinned, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
+}
+
+// No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
+// is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
+// none) no probe runs, so every one is unchecked rather than unpinned.
+async function run(max_hunks: number): Promise<PinnedReport> {
+	const base = await change_base.resolved_through_merge()
+	const has_runner = test_red.has_runner()
+	if (base === undefined) return { ...NO_REPORT, max_hunks, has_runner }
+
+	return await report_on(base, max_hunks, has_runner)
 }
 
 const test_pinned = { run }

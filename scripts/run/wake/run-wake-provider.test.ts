@@ -1,17 +1,31 @@
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type { AgentArgv } from '#scripts/agent/agent-argv'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
-import { expect, test, vi } from 'vitest'
+import { afterAll, expect, test, vi } from 'vitest'
 import { run_wake_session } from './run-wake-session'
 
 const INVOCATION = 'backlogrun --max 5 --idle 30'
 const WORKTREE = '/projects/kit'
-const COMMON_DIRECTORY = '/projects/kit source/.git'
+// A real directory, granted at its real path; a unique one, so concurrent runs never share it.
+const FIXTURE_ROOT = mkdtempSync(path.join(tmpdir(), 'run-wake-provider kit source '))
+const COMMON_DIRECTORY = path.join(FIXTURE_ROOT, '.git')
 const SUPERVISOR_SESSION = 'run-wake-supervisor'
+
+mkdirSync(COMMON_DIRECTORY)
+
+afterAll(() => {
+	rmSync(FIXTURE_ROOT, { force: true, recursive: true })
+})
 
 function openai_argv(): AgentArgv {
 	vi.spyOn(git_common_directory, 'resolve').mockReturnValue(COMMON_DIRECTORY)
+	vi.spyOn(git_common_directory, 'own').mockReturnValue(
+		path.join(COMMON_DIRECTORY, 'worktrees', 'kit'),
+	)
 	const diagnostic = vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	const built = run_wake_session.wake_argv(
 		INVOCATION,
@@ -34,8 +48,8 @@ test('the woken scheduler uses the selected OpenAI provider', () => {
 	expect(argv.args).toContain('--json')
 	expect(argv.args).toContain('--ephemeral')
 	expect(argv.args).toContain('sqlite_home="/projects/kit/node_modules/.cache/josh/openai"')
-	expect(argv.args).toContain('--add-dir')
-	expect(argv.args).toContain(COMMON_DIRECTORY)
+	expect(argv.args).toContain('default_permissions="josh_lane"')
+	expect(argv.args.join(' ')).toContain(`${JSON.stringify(realpathSync(COMMON_DIRECTORY))}="write"`)
 	expect(argv.args.at(-1)).toBe(INVOCATION)
 })
 

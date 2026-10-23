@@ -41,6 +41,7 @@ pnpm josh run:cut <N>
 - `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
 - `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
 - `unknown` (1) — the git directory could not be read. Continue to the gate.
+- `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
 
 **`cut` is the only verdict that ends the turn.**
 

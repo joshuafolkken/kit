@@ -2,6 +2,7 @@ import type { JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_round_one_stats } from '#scripts/lane/lane-round-one-stats'
+import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_record } from '#scripts/review/review-record'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
@@ -57,6 +58,16 @@ const ROUND_ONE_RECORDED_NOTE =
 // single-sourced with the preflight and gate stages.
 const { run_phases, scoped_pair } = run_ship_scoped
 const { CAUSE } = run_ship_stop_cause
+const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+const BOTH_SLOTS: ReadonlyArray<ReviewSlot> = [CODE, INTERACTION]
+const ROUND_ONE_OPENS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
+	code: [RUN_REVIEW],
+	interaction: INTERACTION_BRIEF,
+}
+const SLOT_RECORD_FLAGS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
+	code: [],
+	interaction: [INTERACTION_FLAG],
+}
 const {
 	attest_phase,
 	current_verdict,
@@ -65,6 +76,7 @@ const {
 	note,
 	paths,
 	reviewed,
+	reviewed_together,
 	ROUND_ONE,
 	ROUND_TWO,
 	SUCCESS_EXIT_CODE,
@@ -77,15 +89,17 @@ const {
 // its end, so the gate stage that follows never races it. Any fix drains it, not only a round whose
 // every finding was fixed — a partial fix moved the tree just the same, and the round then stops on its
 // unfixed finding at the record rather than on a `Gate RED` the gate never earned.
-async function join_gate(): Promise<JoshResult> {
+// Either slot's reviewer fixing in place moved the tree.
+function has_fixes(slots: ReadonlyArray<ReviewSlot>): boolean {
+	return slots.some((slot) =>
+		run_ship_review.has_fixes(stamp_file.read_stamp_text(paths(slot).findings)),
+	)
+}
+
+async function join_gate(slots: ReadonlyArray<ReviewSlot>): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
-	if (
-		joined.code === SUCCESS_EXIT_CODE ||
-		!run_ship_review.has_fixes(stamp_file.read_stamp_text(paths().findings))
-	) {
-		return joined
-	}
+	if (joined.code === SUCCESS_EXIT_CODE || !has_fixes(slots)) return joined
 
 	note(FIXED_JOIN_NOTE)
 
@@ -100,19 +114,19 @@ function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string
 	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
 }
 
-// `kind` is the record's own flags — `--interaction` for the interaction review's `- ri:` line.
+// The interaction slot records with `--interaction`, its `- ri:` line.
 async function record_and_route(
 	issue: string,
 	round: Round,
 	outcome_of: (verdict: ScoredVerdict) => RoundOutcome,
-	kind: ReadonlyArray<string> = [],
+	slot: ReviewSlot = CODE,
 ): Promise<StepResult> {
-	const verdict = current_verdict()
+	const verdict = current_verdict(slot)
 
 	if (verdict.kind === run_ship_review.VERDICT.INVALID) return failure(verdict.note, CAUSE.INFRA)
 
 	const outcome = outcome_of(verdict)
-	const flags = [...kind, ...record_flags(round, outcome)]
+	const flags = [...SLOT_RECORD_FLAGS[slot], ...record_flags(round, outcome)]
 	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
 
 	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
@@ -124,19 +138,55 @@ async function record_and_route(
 
 // Fixes made in place are counted only once the scoped pair is green on the fixed tree. The reviewer is
 // asked to leave it green; this is the check that it did, and a fix it could not get green is routed as
-// the finding it still is — recorded, then stopped before the gate and the commit take it in.
-async function round_one_record(issue: string, kind?: ReadonlyArray<string>): Promise<StepResult> {
-	const is_fixed = current_verdict().kind === run_ship_review.VERDICT.FIXED
-	const checked = is_fixed ? await scoped_pair() : undefined
-	const is_verified = checked === undefined || checked.code === SUCCESS_EXIT_CODE
+// the finding it still is — recorded, then stopped before the gate and the commit take it in. One
+// scoped pair answers for every slot's fixes: they share the tree.
+async function is_fix_verified(slots: ReadonlyArray<ReviewSlot>): Promise<boolean> {
+	const is_fixed = slots.some(
+		(slot) => current_verdict(slot).kind === run_ship_review.VERDICT.FIXED,
+	)
 
+	if (!is_fixed) return true
+
+	const checked = await scoped_pair()
+
+	return checked.code === SUCCESS_EXIT_CODE
+}
+
+async function round_one_record(
+	issue: string,
+	slot: ReviewSlot,
+	is_verified: boolean,
+): Promise<StepResult> {
 	return await record_and_route(
 		issue,
 		ROUND_ONE,
 		(verdict) =>
 			is_verified ? run_ship_review.round_one_outcome(verdict) : run_ship_review.UNVERIFIED_OUTCOME,
-		kind,
+		slot,
 	)
+}
+
+// Both reviews' reports in one result, stopped on the first slot that stopped — so a fix answers
+// every finding at once (joshuafolkken/kit#4672).
+function merged(results: ReadonlyArray<StepResult>): StepResult {
+	const out = results.map((result) => result.out).join('\n')
+	const stopped = results.find((result) => result.code !== SUCCESS_EXIT_CODE)
+
+	return stopped === undefined ? { code: SUCCESS_EXIT_CODE, out } : { ...stopped, out }
+}
+
+async function record_slots(issue: string, slots: ReadonlyArray<ReviewSlot>): Promise<StepResult> {
+	const is_verified = await is_fix_verified(slots)
+	const results: Array<StepResult> = []
+
+	for (const slot of slots) {
+		// eslint-disable-next-line no-await-in-loop -- one `review:record` at a time: each appends to the issue's ledger
+		const result = await round_one_record(issue, slot, is_verified)
+
+		results.push(result)
+	}
+
+	return merged(results)
 }
 
 // A round that had nothing to review: it passes, and the ship does not time it as a review that ran.
@@ -154,11 +204,26 @@ async function record_outcome(issue: string, verdict: string, cause?: string): P
 	await lane_ledger.record_round_one({ issue: Number(issue), verdict })
 }
 
+// Over every slot: either slot's fix moved the tree round 1 is gated on, so the round is `fixed`, and
+// an unreadable slot leaves it uncounted.
+function round_one_kind(slots: ReadonlyArray<ReviewSlot>): string {
+	const kinds = new Set(slots.map((slot) => current_verdict(slot).kind))
+	const { FIXED, INVALID } = run_ship_review.VERDICT
+
+	if (kinds.has(INVALID)) return INVALID
+
+	return kinds.has(FIXED) ? FIXED : current_verdict().kind
+}
+
 // A round that stops on a finding — a fix the scoped pair did not get green included — is counted as
-// `blocking`, and marks its round reusable however the fix then moves the tree.
-async function code_round_one_record(issue: string): Promise<StepResult> {
-	const { kind } = current_verdict()
-	const recorded = await round_one_record(issue)
+// `blocking`, and marks its round reusable however the fix then moves the tree. Written once, over
+// every slot's result.
+async function code_round_one_record(
+	issue: string,
+	slots: ReadonlyArray<ReviewSlot>,
+): Promise<StepResult> {
+	const kind = round_one_kind(slots)
+	const recorded = await record_slots(issue, slots)
 	const is_stopped = recorded.cause === CAUSE.FINDING
 
 	review_reviewed_tree.mark_stopped(Number(issue), is_stopped)
@@ -186,11 +251,24 @@ async function is_reusable(issue: string, is_stale: boolean): Promise<boolean> {
 	)
 }
 
-// The round-1 review, beside the gate: scoped pair → open → review → join → attest → record, stopping
-// at the first that did not pass.
+// `run:review` alone takes the implementer's `--unpinned-ok "<reason>"`; the interaction brief runs no
+// `test:pinned` check for it to carry past.
+function round_one_opens(
+	slots: ReadonlyArray<ReviewSlot>,
+	unpinned_ok: ReadonlyArray<string>,
+): Array<{ open: ReadonlyArray<string>; slot: ReviewSlot }> {
+	return slots.map((slot) => ({
+		open: slot === CODE ? [...ROUND_ONE_OPENS[slot], ...unpinned_ok] : ROUND_ONE_OPENS[slot],
+		slot,
+	}))
+}
+
+// The round-1 review, beside the gate: scoped pair → open each slot's brief → their reviewers side by
+// side → join → attest → record, stopping at the first that did not pass.
 async function round_one_stage(
 	issue: string,
 	is_stale: boolean,
+	slots: ReadonlyArray<ReviewSlot>,
 	unpinned_ok: ReadonlyArray<string>,
 ): Promise<StepResult> {
 	if (await is_reusable(issue, is_stale)) {
@@ -201,42 +279,59 @@ async function round_one_stage(
 
 	// A stale record narrows nothing: the next round reads the whole change under the new specification.
 	if (is_stale) review_reviewed_tree.discard()
+	const opens = round_one_opens(slots, unpinned_ok)
 
 	return await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed([RUN_REVIEW, ...unpinned_ok], run_ship_review.reviewer_prompt, issue, ROUND_ONE),
-		tagged_phase(CAUSE.CHECK, join_gate),
+		...reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
+		tagged_phase(CAUSE.CHECK, async () => await join_gate(slots)),
 		attest_phase,
-		async () => await code_round_one_record(issue),
+		async () => await code_round_one_record(issue, slots),
 	])
 }
 
-// The interaction review (joshuafolkken/kit#4276): after round 1, over a change to the run tooling,
-// scoped pair → `review:brief --interaction` → reviewer → attest → `review:record --interaction`. Its
-// fixes are verified as round 1's are; no join, since round 1 already drained the gate.
+// The interaction review alone (joshuafolkken/kit#4276), after a reused round 1: scoped pair →
+// `review:brief --interaction` → reviewer → attest → `review:record --interaction`. Its fixes are
+// verified as round 1's are; no join, since round 1 already drained the gate.
 async function interaction_stage(issue: string): Promise<StepResult> {
+	const opens = [{ open: INTERACTION_BRIEF, slot: INTERACTION }]
+
 	return await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
-		...reviewed(INTERACTION_BRIEF, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
+		...reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
 		attest_phase,
-		async () => await round_one_record(issue, [INTERACTION_FLAG]),
+		async () => await record_slots(issue, [INTERACTION]),
 	])
 }
 
-async function is_interaction_owed(issue: string, first: StepResult): Promise<boolean> {
-	if (first.code !== SUCCESS_EXIT_CODE) return false
-
+async function is_interaction_due(issue: string): Promise<boolean> {
 	return (await review_interaction.status(Number(issue))) === 'missing'
 }
 
-// Round 1, then the interaction review where it is due and not yet recorded — so a relaunched ship
-// whose round 1 is recorded still owes it. The first stop is returned as it is.
+// Owed after a round 1 that passed and is still not recorded — so a relaunched ship whose round 1 is
+// recorded still owes it.
+async function is_interaction_owed(issue: string, first: StepResult): Promise<boolean> {
+	if (first.code !== SUCCESS_EXIT_CODE) return false
+
+	return await is_interaction_due(issue)
+}
+
+function round_one_slots(is_due: boolean): ReadonlyArray<ReviewSlot> {
+	return is_due ? BOTH_SLOTS : [CODE]
+}
+
+// **The interaction review runs beside round 1 where it is due and not yet recorded**
+// (joshuafolkken/kit#4672), so the two take one wait and one stop. **It is asked again after a round 1
+// that passed**: a reused round 1 still owes it, and a round-1 fix may be the first to touch the run
+// tooling — either way it then runs alone. The first stop is returned as it is.
 async function review_stage(
 	issue: string,
 	is_stale = false,
 	unpinned_ok: ReadonlyArray<string> = [],
 ): Promise<StepResult> {
-	const first = await round_one_stage(issue, is_stale, unpinned_ok)
+	const slots = round_one_slots(await is_interaction_due(issue))
+	const first = await round_one_stage(issue, is_stale, slots, unpinned_ok)
+
 	if (!(await is_interaction_owed(issue, first))) return first
 
 	const second = await interaction_stage(issue)

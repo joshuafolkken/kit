@@ -4,6 +4,7 @@ import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { hook_context_line } from './hook-context-line'
+import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
@@ -249,6 +250,9 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 // The rows that cannot declare a compliance call, in enumeration order — asserted below.
 const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'third-party-write',
+	// Not publishing a credential is the absence of a call, and the body file a past call named may
+	// be gone by the time its transcript is scored.
+	'credential-body',
 	FILING_CAP_ID,
 	'raw-field-body',
 	'test-declared',
@@ -262,11 +266,8 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'git-force',
 	'worktree-mutation',
 	'file-body',
-	'index-mutation',
-	'destructive-command',
-	'protected-file',
-	'direct-pr-create',
-	'pr-merge',
+	// The permission guards declare no compliance call either, and enumerate in their own order.
+	...permission_guards.ROWS.map((row) => row.id),
 	'poll-loop',
 	INVESTIGATION,
 ]

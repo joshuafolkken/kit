@@ -20,6 +20,8 @@ const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 const PORCELAIN = '--porcelain'
 
 const ADDED_FILE = 'added.js'
+const INCOMING_FILE = 'incoming.js'
+const MAIN = 'main'
 const BASE_DRIVER = `// A driver.
 export function label(code) {
 	return code === 0 ? 'ok' : 'busy'
@@ -209,6 +211,48 @@ describe('test_pinned.run without vitest', () => {
 			`${DRIVER_FILE}:6`,
 		])
 	})
+})
+
+// A lane's `josh main:merge` that stopped on a conflict leaves the default branch's files in the work
+// tree with `HEAD` still before the merge; what main brought in is not this branch's change.
+async function merge_incoming(): Promise<void> {
+	await build_change_branch()
+	await git(['switch', MAIN])
+	await write(INCOMING_FILE, 'export function incoming() {\n\treturn 1\n}\n')
+	await git(['add', INCOMING_FILE])
+	await git(['commit', '-m', 'incoming'])
+	await git(['switch', 'change'])
+	await git(['merge', '--no-commit', '--no-ff', MAIN])
+}
+
+describe('test_pinned.run while a merge of main is in progress', () => {
+	it('probes only the branch change, not the files main brings in', async () => {
+		await merge_incoming()
+
+		const report = await test_pinned.run(0)
+
+		expect(report.unchecked.map((hunk) => test_pinned_logic.location(hunk))).toEqual([
+			`${DRIVER_FILE}:3`,
+			`${DRIVER_FILE}:6`,
+		])
+	})
+
+	// The worktree at `HEAD` predates the merge, so what main brought in is copied in with the branch
+	// change: without it a changed file importing an incoming module fails every run and reads as pinned.
+	it(
+		'still lists an unpinned hunk of a file that imports a module main brings in',
+		async () => {
+			await merge_incoming()
+			await write(DRIVER_FILE, `import { incoming } from './incoming.js'\n${CHANGED_DRIVER}`)
+
+			const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+			expect(report.unpinned).toEqual(
+				expect.arrayContaining([expect.objectContaining({ file: DRIVER_FILE, new_start: 7 })]),
+			)
+		},
+		RUN_TIMEOUT,
+	)
 })
 
 describe('test_pinned.run under a user diff config', () => {

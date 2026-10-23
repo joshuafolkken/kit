@@ -27,8 +27,8 @@ afterEach(() => {
 })
 
 it('reports an added file unchecked and keeps a comment hunk when typescript is absent', async () => {
-	vi.spyOn(change_base, 'resolved').mockResolvedValue('base')
-	vi.spyOn(changed_paths, 'read_changed_paths').mockResolvedValue([CHANGED, ADDED])
+	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue('base')
+	vi.spyOn(changed_paths, 'read_changed_since').mockResolvedValue([CHANGED, ADDED])
 	vi.spyOn(changed_paths, 'read_held_at').mockResolvedValue([CHANGED])
 	vi.spyOn(git_spawn, 'read').mockResolvedValue(COMMENT_DIFF)
 	vi.spyOn(review_code_tree, 'load_typescript').mockReturnValue(undefined)

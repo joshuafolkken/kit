@@ -1,4 +1,4 @@
-import { unused_members_cli } from '#scripts/exports/unused-members-cli'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
@@ -83,7 +83,7 @@ describe('record_green_gate — a consumer exports notice does not withhold the 
 			plain(gate_plan.LINT_LABEL),
 			plain(gate_plan.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
-			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
+			green_saying(EXPORTS_LABEL, unused_members_check.CONSUMER_NOTICE),
 			plain(gate_plan.UNIT_LABEL),
 		])
 
@@ -93,7 +93,7 @@ describe('record_green_gate — a consumer exports notice does not withhold the 
 	it('still withholds the record when the unit suite passed without running', async () => {
 		await record_with([
 			plain(gate_plan.LINT_LABEL),
-			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
+			green_saying(EXPORTS_LABEL, unused_members_check.CONSUMER_NOTICE),
 			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
 		])
 

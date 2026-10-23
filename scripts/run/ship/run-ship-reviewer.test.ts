@@ -130,6 +130,46 @@ describe('run_ship_reviewer.reviewed — a session that failed after writing its
 	})
 })
 
+// joshuafolkken/kit#4672: side-by-side reviewers — a failed one is judged on its own slot's findings.
+describe('run_ship_reviewer.reviewed_together — a slot that failed after writing its findings', () => {
+	const OPENS = [
+		{ open: ['run:review'], slot: 'code' },
+		{ open: OPEN, slot: 'interaction' },
+	] as const
+
+	// The code reviewer passes; the interaction one fails with `interaction` as its findings file.
+	async function review_with(
+		code: string | undefined,
+		interaction: string | undefined,
+	): Promise<unknown> {
+		launch
+			.mockResolvedValueOnce({ kind: 'completed', pid: 1, exit_code: OK })
+			.mockResolvedValueOnce({ kind: 'completed', pid: 2, exit_code: FAILED })
+		read_stamp_text.mockImplementation((path: string) =>
+			path.includes('interaction-') ? interaction : code,
+		)
+		const phases = run_ship_reviewer.reviewed_together(
+			OPENS,
+			prompt_of,
+			ISSUE,
+			run_ship_reviewer.ROUND_ONE,
+		)
+
+		return await phases.at(-1)?.()
+	}
+
+	it('keeps it while the sibling slot is still writing', async () => {
+		expect(await review_with(undefined, 'tests:medium:src/a.test.ts:3 — misses it')).toEqual({
+			code: OK,
+			out: '',
+		})
+	})
+
+	it('books it as infrastructure when its own findings are unreadable', async () => {
+		expect(await review_with('', undefined)).toHaveProperty('cause', CAUSE.INFRA)
+	})
+})
+
 describe('run_ship_reviewer.attest_phase', () => {
 	it('tags a refused attestation with its own cause', async () => {
 		josh_run_mock.mockResolvedValue({ code: FAILED, out: 'mismatch' })

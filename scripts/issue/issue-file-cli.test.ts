@@ -34,12 +34,12 @@ const FAILURE_EXIT_CODE = 1
 const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
+const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
+const BACKGROUND = ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ESTIMATE]
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {
-	return ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ...declarations, '', SECTIONS].join(
-		'\n',
-	)
+	return [...BACKGROUND, ...declarations, '', SECTIONS].join('\n')
 }
 
 const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'

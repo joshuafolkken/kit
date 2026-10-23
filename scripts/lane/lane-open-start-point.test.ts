@@ -83,9 +83,9 @@ function lane_holds(name: string): boolean {
 	return existsSync(path.join(lane_directory(), name))
 }
 
-// `git config --get-all` exits non-zero for a key that is not set, which is the passing case here.
-async function configured_upstream(branch_name: string): Promise<string> {
-	const key = `branch.${branch_name}.merge`
+// `git config --get-all` exits non-zero for a key that is not set, which reads as empty here.
+async function branch_config(branch_name: string, field: 'merge' | 'remote'): Promise<string> {
+	const key = `branch.${branch_name}.${field}`
 
 	try {
 		return await git(fixture.repository_root, ['config', '--get-all', key])
@@ -147,16 +147,19 @@ describe('the commit a new lane starts from', () => {
 
 	// Cutting from a remote-tracking ref makes git's default `branch.autoSetupMerge` point the lane
 	// branch's upstream at the default branch, and a bare `git push` then refuses with an error
-	// `git_command.push` does not retry. `--no-track` is what keeps `pnpm josh git` working in a lane.
+	// `git_command.push` does not retry. `--no-track` is what keeps `pnpm josh git` working in a lane;
+	// the upstream is then set to the lane's own name, which a Codex lane's sandbox cannot write itself
+	// (joshuafolkken/kit#4653).
 	it(
-		'leaves the lane branch with no upstream, so a bare push cannot aim at the default branch',
+		'points the lane branch at its own name, so a bare push cannot aim at the default branch',
 		async () => {
 			const outcome = await lane_open.open_lane(ISSUE)
-
-			const configured = await configured_upstream(lane_paths.lane_branch(ISSUE))
+			const branch = lane_paths.lane_branch(ISSUE)
 
 			expect(outcome.kind).toBe('opened')
-			expect(configured).toBe('')
+			// Both halves: a merge ref without its remote is no upstream, and the push falls back again.
+			expect(await branch_config(branch, 'merge')).toBe(`refs/heads/${branch}`)
+			expect(await branch_config(branch, 'remote')).toBe('origin')
 		},
 		TIMEOUT_MS,
 	)

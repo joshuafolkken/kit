@@ -1,0 +1,10 @@
+{
+	"reason": "#4675 adds the size-estimate declaration check to issue:lint / issue:file, its template rows and the issue:file step it adds",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 57,
+		"rules.lines": 4,
+		"ai_cost.on_demand_bytes": 844,
+		"prose.long_paragraphs": 1
+	}
+}

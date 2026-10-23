@@ -3,7 +3,8 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
-import { split_assess } from './split-assess'
+import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { split_assess, type SizeMeasurement } from './split-assess'
 import { split_measure } from './split-measure'
 
 // **The split notice, shown mid-implementation** (joshuafolkken/kit#4642). `josh main:merge` prints it
@@ -49,16 +50,55 @@ async function claim(target: string): Promise<boolean> {
 	}
 }
 
+// The claim that shows the notice first also writes it to the lane ledger, so the ledger holds one
+// line per Issue, whichever command showed it (joshuafolkken/kit#4695).
+async function claim_notice(
+	target: string,
+	issue: number,
+	measurement: SizeMeasurement,
+): Promise<boolean> {
+	if (!(await claim(target))) return false
+	await lane_ledger.record_split_notice({
+		issue,
+		files: measurement.files,
+		lines: measurement.lines,
+	})
+
+	return true
+}
+
+async function branch_issue(): Promise<number | undefined> {
+	return git_branch.issue_from_branch(await git_command.branch())
+}
+
 async function pending_notice(): Promise<string | undefined> {
-	const issue_number = git_branch.issue_from_branch(await git_command.branch())
+	const issue_number = await branch_issue()
 
 	if (issue_number === undefined) return undefined
 	const target = await unclaimed_marker(issue_number)
 
 	if (target === undefined) return undefined
-	const notice = split_assess.notice(await split_measure.read_branch())
+	const measurement = await split_measure.read_branch()
+	const notice = split_assess.notice(measurement)
 
-	return notice !== undefined && (await claim(target)) ? notice : undefined
+	return notice !== undefined && (await claim_notice(target, issue_number, measurement))
+		? notice
+		: undefined
+}
+
+// `josh main:merge` prints its notice on every merge; this records the first showing, as the scoped
+// checks do, when neither of them showed it before. Advisory, as `surface` is.
+async function record(measurement: SizeMeasurement): Promise<void> {
+	try {
+		const issue_number = await branch_issue()
+		const target = issue_number === undefined ? undefined : await unclaimed_marker(issue_number)
+
+		if (issue_number !== undefined && target !== undefined) {
+			await claim_notice(target, issue_number, measurement)
+		}
+	} catch {
+		// Advisory: the notice was printed; only its record is lost.
+	}
 }
 
 async function surface(): Promise<void> {
@@ -71,6 +111,6 @@ async function surface(): Promise<void> {
 	}
 }
 
-const split_early_notice = { MARKER_PREFIX, surface }
+const split_early_notice = { MARKER_PREFIX, record, surface }
 
 export { split_early_notice }

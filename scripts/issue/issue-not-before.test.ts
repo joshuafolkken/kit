@@ -7,7 +7,7 @@ const NOW_BEFORE = Date.parse('2026-10-20T09:29Z')
 const NOW_AFTER = Date.parse('2026-10-20T09:31Z')
 
 function body_with(line: string): string {
-	return `## 背景\n\n- 種別: 非不具合\n${line}\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n`
+	return `## 背景\n\n- 種別: 非不具合\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n${line}\n\n## 現象\n\n## 期待結果\n\n## 受け入れ条件\n`
 }
 
 const DATED_BODY = body_with(`- 実施可能日: ${DATE}`)

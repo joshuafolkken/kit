@@ -72,7 +72,9 @@ lane:launch <N>`.
 
 - a design choice nobody has made;
 - a Tier B toss-up, or a Tier C action (`CLAUDE.md` → "Decision autonomy");
-- an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`).
+- an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`);
+- information only the web holds — no lane launches a web tool (`scripts/agent/claude-agent-argv.ts`),
+  so a person fetches it.
 
 It never carries:
 

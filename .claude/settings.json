@@ -54,7 +54,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision --session-start",
 						"timeout": 180
 					}
 				]

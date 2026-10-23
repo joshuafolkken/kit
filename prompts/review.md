@@ -83,7 +83,7 @@ the interaction review and prints its brief; hand it to a reviewer subagent, dis
 by the three-way disposition below, and record the pass with
 `pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]`.
 
-`pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself.
+`pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself, beside round 1, and stops once on the findings of both.
 
 ## Review round cap (2 rounds)
 

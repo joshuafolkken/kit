@@ -460,6 +460,8 @@ describe('PRE_GATE_CUT_REASON', () => {
 		// Two of the verdicts that leave this process holding the run.
 		['not-a-lane'],
 		['busy'],
+		// joshuafolkken/kit#4695: the one refusal the reissued gate, past this once-per-run row, must not skip.
+		['split-unresolved'],
 		// The pointer, and the reissue sentence every delivery needs.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['once per run'],

@@ -15,8 +15,8 @@ Review results and successful pushes are never turn boundaries.
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
    `metrics` leaves no record it reuses. A stop relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
-   the stage printed nothing) and (Anthropic lane) the re-detach to run after
-   the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
+   the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
+   directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
    round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`). Ship
    reuses the recorded round 1 on a tree unmoved since the record, else reviews only the
    delta.

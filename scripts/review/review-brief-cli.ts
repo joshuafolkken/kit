@@ -15,7 +15,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { removed_tests_check } from './removed-tests-check'
-import { review_attest } from './review-attest'
+import { review_attest, type ReviewSlot } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
@@ -187,18 +187,25 @@ function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
 	return review_reviewed_tree.resume_point(checkout) ?? findings_tree(checkout)
 }
 
-async function open_contract(): Promise<{
+function slot_of(interaction: ReadonlyArray<string> | undefined): ReviewSlot {
+	const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+
+	return interaction === undefined ? CODE : INTERACTION
+}
+
+async function open_contract(slot: ReviewSlot): Promise<{
 	checkout: ReviewCheckout
 	nonce: string
 	resumed_from: FileMapStamp | undefined
 }> {
 	const checkout = await review_checkout.read_checkout()
 	const resumed_from = attested_tree(checkout)
-
 	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
 	// merge asks git the same question, and the two hash different keys the moment one of them runs
 	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
-	return { checkout, nonce: review_attest.record_target(checkout, checkout.root), resumed_from }
+	const nonce = review_attest.record_target(checkout, checkout.root, slot)
+
+	return { checkout, nonce, resumed_from }
 }
 
 // Retaken on every round-1 brief, after the pointer it pairs with. Swallowed:
@@ -265,7 +272,7 @@ async function read_readers(
 
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile, interaction } = request
-	const opened = await open_contract()
+	const opened = await open_contract(slot_of(interaction))
 	// The interaction review reads the whole change, never a resume's narrowing (joshuafolkken/kit#4276).
 	const contract = interaction === undefined ? opened : { ...opened, resumed_from: undefined }
 	const stamps = {
@@ -398,9 +405,9 @@ async function run_review(
 // The interaction review's brief (joshuafolkken/kit#4276): `/code-review`'s round-1 brief over the
 // whole change, with the role and the run-tooling paths appended. Not due, it says so and exits 0.
 //
-// **An issue update taken in after round 1's brief refuses it**: minting this brief moves the pointer
-// `josh followup` measures that update against (`issue-watch-gate.ts`), so a round 1 that read the
-// earlier specification would merge without that refusal.
+// **An issue update taken in after round 1's brief refuses it**: this brief is minted on its own slot
+// beside round 1's (joshuafolkken/kit#4672), so it is refused here rather than briefed over an earlier
+// specification round 1 read.
 async function run_interaction(): Promise<number> {
 	const reading = await read_change()
 	const targets = review_interaction.due_paths(reading.paths)

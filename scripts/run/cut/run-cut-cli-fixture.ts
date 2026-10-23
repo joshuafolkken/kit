@@ -10,6 +10,7 @@ import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
 
@@ -65,6 +66,9 @@ const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
+// The split notice's answer is read off the repository's own lane ledger; a case that got the notice
+// says so (joshuafolkken/kit#4695).
+const split_refusal = vi.spyOn(split_resolution, 'ledger_refusal')
 const info = vi.spyOn(console, 'info').mockReturnValue()
 
 const errors = vi.spyOn(console, 'error').mockReturnValue()
@@ -121,6 +125,11 @@ function install(): void {
 		emit.mockResolvedValue(undefined)
 	})
 
+	// No case got the split notice unless it says so.
+	beforeEach(() => {
+		split_refusal.mockResolvedValue(undefined)
+	})
+
 	afterAll(() => {
 		vi.restoreAllMocks()
 		rmSync(scratch, { force: true, recursive: true })
@@ -146,6 +155,7 @@ const run_cut_cli_fixture = {
 	is_reviewer,
 	launch,
 	session_verdict,
+	split_refusal,
 	emit,
 	verdict,
 	printed_errors,

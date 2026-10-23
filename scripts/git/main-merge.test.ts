@@ -9,7 +9,7 @@ import { create_spawn_error } from './git-execa-error'
 vi.mock('./git-command', () => ({
 	git_command: {
 		branch: vi.fn(),
-		diff_main_numstat: vi.fn(),
+		diff_numstat_since: vi.fn(),
 		fetch_branch: vi.fn(),
 		get_default_branch: vi.fn(),
 		merge_branch: vi.fn(),
@@ -17,6 +17,10 @@ vi.mock('./git-command', () => ({
 		status: vi.fn(),
 		untracked_names: vi.fn(),
 	},
+}))
+
+vi.mock('./change-base', () => ({
+	change_base: { resolved_through_merge: vi.fn().mockResolvedValue('base') },
 }))
 
 // The guard's one git read — the paths the default branch would bring in.
@@ -27,6 +31,10 @@ const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
 const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
+const { split_early_notice } = await import('#scripts/split/split-early-notice')
+
+// The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
+const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
 
 const CHANGED_FILE = 'scripts/a.ts'
 const MODIFIED_STATUS = ` M ${CHANGED_FILE}`
@@ -64,7 +72,7 @@ beforeEach(() => {
 // The split notice's diff read, empty by default so no merge below prints one.
 beforeEach(() => {
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-	vi.mocked(git_command.diff_main_numstat).mockResolvedValue('')
+	vi.mocked(git_command.diff_numstat_since).mockResolvedValue('')
 	vi.mocked(git_command.untracked_names).mockResolvedValue('')
 })
 
@@ -232,22 +240,32 @@ function over_guide_numstat(): string {
 
 describe('the split notice before the gate', () => {
 	it('warns when the diff clearly exceeds the split guide', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(over_guide_numstat())
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('split notice'))
 	})
 
+	// joshuafolkken/kit#4695: the notice it prints is the one the lane ledger records.
+	it('records the notice it prints', async () => {
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(over_guide_numstat())
+
+		await main_merge.run(NO_ARGUMENTS)
+
+		expect(record_notice).toHaveBeenCalledWith(expect.objectContaining({ files: OVER_GUIDE_FILES }))
+	})
+
 	it('prints nothing for a diff under the guide', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
+		vi.mocked(git_command.diff_numstat_since).mockResolvedValue(UNDER_GUIDE_NUMSTAT)
 
 		await main_merge.run(NO_ARGUMENTS)
 
 		expect(console.warn).not.toHaveBeenCalled()
+		expect(record_notice).not.toHaveBeenCalled()
 	})
 
 	it('keeps a finished merge successful and says the diff was unmeasured when it cannot be read', async () => {
-		vi.mocked(git_command.diff_main_numstat).mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.diff_numstat_since).mockRejectedValue(MERGE_FAILURE)
 
 		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
 		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('could not be measured'))
