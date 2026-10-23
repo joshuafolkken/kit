@@ -124,6 +124,18 @@ describe('run_ship_review_steps.review_stage — the interaction review', () => 
 		expect(launch).toHaveBeenCalledTimes(2)
 		expect(interaction_status_mock).toHaveBeenCalledWith(Number(ISSUE))
 	})
+
+	// `review:brief` takes no `--unpinned-ok`; only round 1's `run:review` carries it.
+	it('hands --unpinned-ok to the round-1 review alone, not the interaction brief', async () => {
+		interaction_status_mock.mockResolvedValueOnce(MISSING).mockResolvedValue('ok')
+
+		await run_ship_review_steps.review_stage(ISSUE, false, ['--unpinned-ok', 'dead code'])
+
+		expect(commands().slice(0, 2)).toStrictEqual([
+			`${OPEN} --unpinned-ok dead code`,
+			INTERACTION_BRIEF,
+		])
+	})
 })
 
 describe('run_ship_review_steps.review_stage — the interaction review beside round 1', () => {

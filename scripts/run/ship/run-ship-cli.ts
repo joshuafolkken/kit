@@ -47,7 +47,7 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
+	'Usage: josh ship "<title> #<N>" [<follow-up-N> ...] [--cite <N> ...] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | josh ship --log <N>'
 const NO_LOG_NOTE = 'no detached ship supervisor log for this issue'
 const LANE_CHILD_DETACH_NOTE =
 	'lane child: shipping through the detached supervisor (--detach implied), so the end of this turn cannot kill it'

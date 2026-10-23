@@ -30,6 +30,7 @@ const BODY = 'Cause: x\nFix: y'
 const START_NOTE = 'pnpm not found'
 const GATE_HEADER = '=== gate ==='
 const NEWEST_HEADER = '=== 2026-09-23T02:00:00Z · started by process 2 · pnpm ==='
+const NO_FLAGS = { notify: [], body: [], cites: [], unpinned_ok: [] }
 
 function request(
 	overrides: Partial<Parameters<typeof run_ship_detach.detach>[0]> = {},
@@ -37,9 +38,7 @@ function request(
 	return {
 		title: TITLE,
 		number: NUMBER,
-		notify: [],
-		body: [],
-		cites: [],
+		...NO_FLAGS,
 		is_review: true,
 		repository: `/tmp/josh-ship-detach-test-${randomUUID()}`,
 		cwd: '/tmp',
@@ -62,10 +61,11 @@ beforeEach(() => {
 
 describe('run_ship_detach.supervisor_argv', () => {
 	it('ends the supervisor command line with the title the liveness pattern anchors on', () => {
-		const argv = run_ship_detach.supervisor_argv(request({ cites: ['2500'] }))
+		const unpinned_ok = ['--unpinned-ok', 'dead code']
+		const argv = run_ship_detach.supervisor_argv(request({ cites: ['2500'], unpinned_ok }))
 
 		expect(argv.command).toBe('pnpm')
-		expect(argv.args).toEqual(['josh', 'ship', '--review', '--cite', '2500', TITLE])
+		expect(argv.args).toEqual(['josh', 'ship', '--review', ...unpinned_ok, '--cite', '2500', TITLE])
 	})
 
 	it('moves an inline notify body into a file, since no argv element may carry its newlines', () => {

@@ -49,14 +49,18 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',
 		description:
-			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
+			'Run test:pinned, then start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
 		category: 'AI tools',
-		reference: ['[--join]', 'automation', ['processes', 'files']],
+		reference: ['[--unpinned-ok "<reason>" | --join]', 'automation', ['processes', 'files']],
 		usage: {
 			examples: [
 				{
 					arguments: '',
-					note: 'detach the gate, print the brief; then launch the /code-review subagent',
+					note: 'stop on an unpinned change; else detach the gate, print the brief, then launch the /code-review subagent',
+				},
+				{
+					arguments: '--unpinned-ok "only logs"',
+					note: 'carry on past unpinned places; the list and the reason follow the brief',
 				},
 				{ arguments: '--join', note: 'after the review returns: join the gate, check its verdict' },
 			],
@@ -91,7 +95,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',
 		reference: [
-			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
+			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
 			'automation',
 			['git', 'network'],
 		],
@@ -113,6 +117,11 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--review'],
 					description:
 						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.',
+				},
+				{
+					names: ['--unpinned-ok <reason>'],
+					description:
+						"forwarded to round 1's `run:review`, past `unpinned` places no test can pin.",
 				},
 				{
 					names: ['--detach'],

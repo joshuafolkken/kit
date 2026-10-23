@@ -103,7 +103,12 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-const test_red = { main, run, verdict_in }
+// Whether the checkout has the Vitest `verdict_in` runs; without it every run would read `no-test`.
+function has_runner(): boolean {
+	return existsSync(VITEST_BIN)
+}
+
+const test_red = { has_runner, main, run, verdict_in }
 
 export type { RedRun }
 export { test_red }

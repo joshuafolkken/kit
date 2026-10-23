@@ -3,7 +3,7 @@ import { related_scope } from './test-related-scope'
 
 // The pure half of `josh test:pinned` (joshuafolkken/kit#4516): read a `git diff -U0` into hunks, put
 // one hunk's old lines back into the changed file, and split the hunks at the run's cap. The run itself
-// is `test-pinned.ts`.
+// is `test-pinned.ts`; an added file's hunks are its functions (`test-pinned-functions.ts`).
 
 const DEFAULT_MAX_HUNKS = 20
 const HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
@@ -14,6 +14,10 @@ const OLD_FILE_HEADER = '--- '
 const LINE_BREAK = '\n'
 const GREEN_REASON = 'reverting it left every related test green'
 const NO_TEST_REASON = 'no related test ran with it reverted'
+const STUB_GREEN_REASON = 'replacing its body with a throw left every related test green'
+const STUB_NO_TEST_REASON = 'no related test ran with its body replaced by a throw'
+const UNPARSED_REASON = 'an added file, and typescript is not installed to read its functions'
+const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
 
 interface Hunk {
 	file: string
@@ -21,6 +25,9 @@ interface Hunk {
 	new_start: number
 	new_count: number
 	old_lines: Array<string>
+	// Set on an added file's probe (`test-pinned-functions.ts`): the function the old lines put back
+	// with its body replaced by a throw.
+	function_name?: string
 }
 
 interface HunkSplit {
@@ -37,7 +44,12 @@ interface UnpinnedHunk extends Hunk {
 interface PinnedReport {
 	unpinned: ReadonlyArray<UnpinnedHunk>
 	unchecked: ReadonlyArray<Hunk>
+	// Added files whose functions could not be read, so none of them was probed.
+	unparsed: ReadonlyArray<string>
 	max_hunks: number
+	// False when no Vitest is installed to run a probe, so every hunk is `unchecked` rather than run and
+	// read as a `no-test` unpinned one.
+	has_runner: boolean
 }
 
 interface DiffWalk {
@@ -117,18 +129,39 @@ function split(hunks: ReadonlyArray<Hunk>, max_hunks: number): HunkSplit {
 }
 
 function location(hunk: Hunk): string {
-	return `${hunk.file}:${String(Math.max(hunk.new_start, 1))}`
+	const line = `${hunk.file}:${String(Math.max(hunk.new_start, 1))}`
+
+	return hunk.function_name === undefined ? line : `${line} ${hunk.function_name}`
+}
+
+function reason(hunk: UnpinnedHunk): string {
+	if (hunk.function_name === undefined) return hunk.is_green ? GREEN_REASON : NO_TEST_REASON
+
+	return hunk.is_green ? STUB_GREEN_REASON : STUB_NO_TEST_REASON
+}
+
+function unchecked_reason(report: PinnedReport): string {
+	return report.has_runner ? `over the ${String(report.max_hunks)}-hunk cap` : NO_RUNNER_REASON
 }
 
 function format(report: PinnedReport): string {
-	const unpinned = report.unpinned.map(
-		(hunk) => `unpinned ${location(hunk)} — ${hunk.is_green ? GREEN_REASON : NO_TEST_REASON}`,
-	)
+	const unpinned = report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
 	const unchecked = report.unchecked.map(
-		(hunk) => `unchecked ${location(hunk)} — over the ${String(report.max_hunks)}-hunk cap`,
+		(hunk) => `unchecked ${location(hunk)} — ${unchecked_reason(report)}`,
 	)
+	const unparsed = report.unparsed.map((file) => `unchecked ${file} — ${UNPARSED_REASON}`)
 
-	return [...unpinned, ...unchecked].join(LINE_BREAK)
+	return [...unpinned, ...unchecked, ...unparsed].join(LINE_BREAK)
+}
+
+// The counts line, then one line per unpinned or unchecked place — what `josh test:pinned` prints and
+// what `josh run:review` prints before round 1.
+function report_text(report: PinnedReport): string {
+	const unpinned = String(report.unpinned.length)
+	const unchecked = String(report.unchecked.length + report.unparsed.length)
+	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, format(report)]
+
+	return `${lines.filter((line) => line !== '').join(LINE_BREAK)}${LINE_BREAK}`
 }
 
 const test_pinned_logic = {
@@ -137,6 +170,7 @@ const test_pinned_logic = {
 	is_target,
 	location,
 	parse_hunks,
+	report_text,
 	revert,
 	split,
 }

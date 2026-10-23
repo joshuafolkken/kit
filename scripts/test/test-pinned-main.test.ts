@@ -29,9 +29,17 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+const CLEAN_REPORT: PinnedReport = {
+	unpinned: [],
+	unchecked: [],
+	unparsed: [],
+	max_hunks: 20,
+	has_runner: true,
+}
+
 describe('test_pinned_main.main', () => {
 	it('runs with the default cap and exits clean when every hunk is pinned', async () => {
-		run.mockResolvedValue({ unpinned: [], unchecked: [], max_hunks: 20 })
+		run.mockResolvedValue(CLEAN_REPORT)
 
 		expect(await test_pinned_main.main([])).toBe(0)
 		expect(run).toHaveBeenCalledWith(20)
@@ -39,7 +47,7 @@ describe('test_pinned_main.main', () => {
 	})
 
 	it('passes --max through and exits non-zero on an unpinned hunk', async () => {
-		run.mockResolvedValue({ unpinned: [HUNK], unchecked: [HUNK], max_hunks: 1 })
+		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], unchecked: [HUNK], max_hunks: 1 })
 
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(1)
 		expect(run).toHaveBeenCalledWith(1)
@@ -51,7 +59,7 @@ describe('test_pinned_main.main', () => {
 	})
 
 	it('exits clean when only unchecked hunks are left', async () => {
-		run.mockResolvedValue({ unpinned: [], unchecked: [HUNK], max_hunks: 1 })
+		run.mockResolvedValue({ ...CLEAN_REPORT, unchecked: [HUNK], max_hunks: 1 })
 
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(0)
 	})

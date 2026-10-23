@@ -251,12 +251,25 @@ async function is_reusable(issue: string, is_stale: boolean): Promise<boolean> {
 	)
 }
 
+// `run:review` alone takes the implementer's `--unpinned-ok "<reason>"`; the interaction brief runs no
+// `test:pinned` check for it to carry past.
+function round_one_opens(
+	slots: ReadonlyArray<ReviewSlot>,
+	unpinned_ok: ReadonlyArray<string>,
+): Array<{ open: ReadonlyArray<string>; slot: ReviewSlot }> {
+	return slots.map((slot) => ({
+		open: slot === CODE ? [...ROUND_ONE_OPENS[slot], ...unpinned_ok] : ROUND_ONE_OPENS[slot],
+		slot,
+	}))
+}
+
 // The round-1 review, beside the gate: scoped pair → open each slot's brief → their reviewers side by
 // side → join → attest → record, stopping at the first that did not pass.
 async function round_one_stage(
 	issue: string,
 	is_stale: boolean,
 	slots: ReadonlyArray<ReviewSlot>,
+	unpinned_ok: ReadonlyArray<string>,
 ): Promise<StepResult> {
 	if (await is_reusable(issue, is_stale)) {
 		await record_outcome(issue, lane_round_one_stats.REUSED)
@@ -266,7 +279,7 @@ async function round_one_stage(
 
 	// A stale record narrows nothing: the next round reads the whole change under the new specification.
 	if (is_stale) review_reviewed_tree.discard()
-	const opens = slots.map((slot) => ({ open: ROUND_ONE_OPENS[slot], slot }))
+	const opens = round_one_opens(slots, unpinned_ok)
 
 	return await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
@@ -295,6 +308,14 @@ async function is_interaction_due(issue: string): Promise<boolean> {
 	return (await review_interaction.status(Number(issue))) === 'missing'
 }
 
+// Owed after a round 1 that passed and is still not recorded — so a relaunched ship whose round 1 is
+// recorded still owes it.
+async function is_interaction_owed(issue: string, first: StepResult): Promise<boolean> {
+	if (first.code !== SUCCESS_EXIT_CODE) return false
+
+	return await is_interaction_due(issue)
+}
+
 function round_one_slots(is_due: boolean): ReadonlyArray<ReviewSlot> {
 	return is_due ? BOTH_SLOTS : [CODE]
 }
@@ -303,11 +324,15 @@ function round_one_slots(is_due: boolean): ReadonlyArray<ReviewSlot> {
 // (joshuafolkken/kit#4672), so the two take one wait and one stop. **It is asked again after a round 1
 // that passed**: a reused round 1 still owes it, and a round-1 fix may be the first to touch the run
 // tooling — either way it then runs alone. The first stop is returned as it is.
-async function review_stage(issue: string, is_stale = false): Promise<StepResult> {
+async function review_stage(
+	issue: string,
+	is_stale = false,
+	unpinned_ok: ReadonlyArray<string> = [],
+): Promise<StepResult> {
 	const slots = round_one_slots(await is_interaction_due(issue))
-	const first = await round_one_stage(issue, is_stale, slots)
+	const first = await round_one_stage(issue, is_stale, slots, unpinned_ok)
 
-	if (first.code !== SUCCESS_EXIT_CODE || !(await is_interaction_due(issue))) return first
+	if (!(await is_interaction_owed(issue, first))) return first
 
 	const second = await interaction_stage(issue)
 

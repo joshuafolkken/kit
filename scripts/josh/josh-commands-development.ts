@@ -222,7 +222,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'test:pinned': {
 		script: 'scripts/test/test-pinned-main.ts',
 		description:
-			'Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on',
+			"Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
 		category: 'Development',
 		reference: ['[--max <n>]', 'developer', ['git', 'processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,

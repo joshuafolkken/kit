@@ -31,6 +31,7 @@ const stop_schema = z
 		title: z.string(),
 		flags: z.array(z.string()).readonly(),
 		is_review: z.boolean(),
+		unpinned_ok: z.array(z.string()).readonly().exactOptional(),
 		conflicts: z.array(z.string()).readonly().default([]),
 		cause: z.enum(run_ship_stop_cause.CAUSE).exactOptional(),
 		is_review_stale: z.boolean().exactOptional(),

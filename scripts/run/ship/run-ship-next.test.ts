@@ -11,6 +11,7 @@ const BODY_PATH = 'scratchpad/evidence.md'
 const BODY = ['--body-file', BODY_PATH]
 const CITE = ['--cite', '2965']
 const NOTIFY = ['--notify-message-file', 'notify body.txt']
+const UNPINNED_OK = ['--unpinned-ok', 'dead code']
 const RESUME = { title: TITLE, flags: [...BODY, ...CITE], is_review: true }
 const QUOTED = `--body-file ${BODY_PATH} --cite 2965 '${TITLE}'`
 // A lane child's commit and push belong to the detached ship, so no route may name `josh git`.
@@ -101,32 +102,70 @@ describe('run_ship_next.next_step after the review rounds', () => {
 	)
 })
 
+// The stopped ship's own options, as `run-ship-args.ts` parsed them.
+const STARTED = {
+	title: `Carry the options #${ISSUE}`,
+	number: ISSUE,
+	notify: NOTIFY,
+	body: BODY,
+	body_path: BODY_PATH,
+	cites: [CITE[1] ?? ''],
+	is_review: true,
+	is_detach: false,
+	unpinned_ok: UNPINNED_OK,
+}
+const STARTED_RESUME = run_ship_next.resume_of(STARTED)
+const UNPINNED_FLAG = UNPINNED_OK[0] ?? ''
+
 // The reviewer's failure: a preflight stopped on missing evidence re-ran without `--body-file` and
 // stopped on the same evidence again.
 describe('run_ship_next.resume_of', () => {
-	const args = {
-		title: `Carry the options #${ISSUE}`,
-		number: ISSUE,
-		notify: NOTIFY,
-		body: BODY,
-		body_path: BODY_PATH,
-		cites: [CITE[1] ?? ''],
-		is_review: true,
-		is_detach: false,
-	}
-
 	it('keeps the stopped ship’s notify, body and cite options', () => {
-		expect(run_ship_next.resume_of(args)).toStrictEqual({
-			title: args.title,
+		expect(STARTED_RESUME).toStrictEqual({
+			title: STARTED.title,
 			flags: [...NOTIFY, ...BODY, ...CITE],
 			is_review: true,
+			unpinned_ok: UNPINNED_OK,
 		})
 	})
 
 	it('quotes only the tokens the shell would split or expand', () => {
-		const step = run_ship_next.next_step(ISSUE, STAGE.PREFLIGHT, run_ship_next.resume_of(args))
+		const step = run_ship_next.next_step(ISSUE, STAGE.PREFLIGHT, STARTED_RESUME)
 
 		expect(step).toContain(`${NOTIFY[0] ?? ''} '${NOTIFY[1] ?? ''}' ${BODY.join(' ')}`)
+	})
+})
+
+// `josh ship` refuses `--unpinned-ok` without `--review`, so only a reviewing re-run repeats it.
+describe('run_ship_next.next_step with --unpinned-ok', () => {
+	it.each([STAGE.PREFLIGHT, STAGE.GATE])('repeats it with the review for %s', (stage: Stage) => {
+		const step = run_ship_next.next_step(ISSUE, stage, STARTED_RESUME)
+
+		expect(step).toContain(`${COMMAND.DETACH_REVIEW} ${UNPINNED_FLAG} '${UNPINNED_OK[1] ?? ''}' `)
+	})
+
+	it.each([STAGE.ROUND_TWO, STAGE.FOLLOWUP, STAGE.REPORT])(
+		'drops it from the review-less re-run for %s',
+		(stage: Stage) => {
+			const step = run_ship_next.next_step(ISSUE, stage, STARTED_RESUME)
+
+			expect(step).toContain(`${COMMAND.DETACH} ${NOTIFY[0] ?? ''}`)
+			expect(step).not.toContain(UNPINNED_FLAG)
+		},
+	)
+
+	it('drops it from a ship started without a review', () => {
+		const resume = { ...STARTED_RESUME, is_review: false }
+
+		expect(run_ship_next.next_step(ISSUE, STAGE.PREFLIGHT, resume)).not.toContain(UNPINNED_FLAG)
+	})
+
+	it('repeats it when a stale review is reviewed again', () => {
+		const stale = { ...STARTED_RESUME, is_review_stale: true }
+
+		expect(run_ship_next.next_step(ISSUE, STAGE.FOLLOWUP, stale)).toContain(
+			`${COMMAND.DETACH_REVIEW} ${UNPINNED_FLAG}`,
+		)
 	})
 })
 

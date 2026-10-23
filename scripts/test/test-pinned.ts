@@ -5,6 +5,9 @@ import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { review_code_tree } from '#scripts/review/review-code-tree'
+import { test_pinned_emit } from './test-pinned-emit'
+import { test_pinned_functions } from './test-pinned-functions'
 import {
 	test_pinned_logic,
 	type Hunk,
@@ -25,9 +28,17 @@ import type { RedVerdict } from './test-red-logic'
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
 
+interface StubRead {
+	hunks: ReadonlyArray<Hunk>
+	unparsed: ReadonlyArray<string>
+}
+
+const NO_REPORT = { unpinned: [], unchecked: [], unparsed: [] } as const
+
 // `--diff-filter=M`: an added file's one hunk is the whole file, and reverting it is a missing module
-// every importer fails on, which says nothing about the tests. The prefixes are pinned: a user's
-// `diff.mnemonicPrefix` writes `+++ w/<file>`, which would read as no hunk at all.
+// every importer fails on, which says nothing about the tests — its functions are probed instead
+// (`stub_hunks_of`). The prefixes are pinned: a user's `diff.mnemonicPrefix` writes `+++ w/<file>`,
+// which would read as no hunk at all.
 async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<Array<Hunk>> {
 	if (files.length === 0) return []
 	const diff_args = ['diff', '-U0', '--no-color', '--no-ext-diff', '--diff-filter=M']
@@ -83,16 +94,79 @@ async function unpinned_on(
 	})
 }
 
-// No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does.
-async function run(max_hunks: number): Promise<PinnedReport> {
-	const base = await change_base.resolved()
-	const changed = await changed_paths.read_changed_paths(false)
-	const paths = changed.filter((file) => existsSync(file))
-	const targets = paths.filter((file) => test_pinned_logic.is_target(file))
-	const hunks = base === undefined ? [] : await read_hunks(base, targets)
-	const { checked, unchecked } = test_pinned_logic.split(hunks, max_hunks)
+// A target the base's tree does not hold is added — committed on the branch or still untracked.
+async function added_scripts(base: string, targets: ReadonlyArray<string>): Promise<Array<string>> {
+	const held = new Set(await changed_paths.read_held_at(base, targets))
 
-	return { unpinned: await unpinned_on(paths, checked), unchecked, max_hunks }
+	return targets.filter((file) => !held.has(file) && test_pinned_functions.is_script(file))
+}
+
+// Without `typescript` (an optional peer in a consumer) no function can be read, so every added file
+// is reported unchecked rather than passed as pinned.
+async function stub_hunks_of(added: ReadonlyArray<string>): Promise<StubRead> {
+	const api = review_code_tree.load_typescript(process.cwd())
+	if (api === undefined) return { hunks: [], unparsed: added }
+	const contents = await Promise.all(added.map(async (file) => await readFile(file, 'utf8')))
+	const hunks = added.flatMap((file, index) =>
+		test_pinned_functions.stub_hunks(api, file, contents[index] ?? ''),
+	)
+
+	return { hunks, unparsed: [] }
+}
+
+// A changed hunk whose revert emits the same JavaScript is dropped before the cap (`test-pinned-emit.ts`);
+// without `typescript` every hunk is kept, so the run checks more rather than less.
+async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<Array<Hunk>> {
+	const api = review_code_tree.load_typescript(process.cwd())
+	if (api === undefined) return [...hunks]
+	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
+
+	return hunks.filter((hunk, index) =>
+		test_pinned_emit.changes_runtime(api, contents[index] ?? '', hunk),
+	)
+}
+
+async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<StubRead> {
+	const stubs = await stub_hunks_of(await added_scripts(base, targets))
+	const changed = await runtime_hunks(await read_hunks(base, targets))
+
+	return { hunks: [...changed, ...stubs.hunks], unparsed: stubs.unparsed }
+}
+
+// The work tree's files that differ from `commit`, deleted ones dropped. Read since `HEAD` they are
+// what the worktree at `HEAD` needs copied in to hold the work tree — a conflicted merge's incoming
+// files included; read since the change base they are this branch's own change.
+async function existing_since(commit: string): Promise<Array<string>> {
+	const changed = await changed_paths.read_changed_since(commit)
+
+	return changed.filter((file) => existsSync(file))
+}
+
+async function report_on(
+	base: string,
+	max_hunks: number,
+	has_runner: boolean,
+): Promise<PinnedReport> {
+	const paths = await existing_since(HEAD)
+	const changed = await existing_since(base)
+	const targets = changed.filter((file) => test_pinned_logic.is_target(file))
+	const probes = await read_probes(base, targets)
+	const cap = has_runner ? max_hunks : 0
+	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, cap)
+	const unpinned = await unpinned_on(paths, checked)
+
+	return { unpinned, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
+}
+
+// No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
+// is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
+// none) no probe runs, so every one is unchecked rather than unpinned.
+async function run(max_hunks: number): Promise<PinnedReport> {
+	const base = await change_base.resolved_through_merge()
+	const has_runner = test_red.has_runner()
+	if (base === undefined) return { ...NO_REPORT, max_hunks, has_runner }
+
+	return await report_on(base, max_hunks, has_runner)
 }
 
 const test_pinned = { run }
