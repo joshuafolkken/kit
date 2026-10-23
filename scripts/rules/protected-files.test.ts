@@ -152,6 +152,24 @@ describe('protected_files.is_protected_file_call — writing .env through Bash',
 	})
 })
 
+// The clobber `>|` is a redirect, not a pipe; a command substitution runs even inside double quotes.
+describe('protected_files.is_protected_file_call — clobber and command substitution', () => {
+	it.each(['echo JOSH_RULE_GUARD=off >| .env', 'echo "$(echo x > .env)"', 'echo "`cat .env`"'])(
+		'refuses the hidden write or read in %j',
+		(command) => {
+			const call = { name: 'Bash', input: { command } }
+
+			expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(true)
+		},
+	)
+
+	it.each(['echo x >| /tmp/out', 'echo "$(date) > .env is text"'])('lets %j pass', (command) => {
+		const call = { name: 'Bash', input: { command } }
+
+		expect(protected_files.is_protected_file_call(call, is_not_consumer)).toBe(false)
+	})
+})
+
 describe('protected_files.is_protected_file_call — .claude/settings.json', () => {
 	it.each(['Edit', 'Write'])('refuses a consumer %s', (name) => {
 		const call = { name, input: { file_path: SETTINGS_PATH } }

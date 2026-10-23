@@ -32,12 +32,14 @@ const TRACKED_VARIANTS: ReadonlySet<string> = new Set(['.env.example', '.env.tes
 const SETTINGS_FILE = path.join('.claude', 'settings.json')
 const WHITESPACE = /\s+/u
 const TOKEN_QUOTES = /["']/gu
-// Each character of a redirect operator (`<`, `>`, `>>`, `2>`, `&>`) is spaced out to a mark, so the
-// word after the last one is the file it reads or writes.
-const REDIRECT = /[<>]/gu
+// Each character of a redirect operator (`<`, `>`, `>>`, `2>`, `&>`) — and the clobber `>|` whole —
+// is spaced out to a mark, so the word after the last one is the file it reads or writes.
+const REDIRECT = />\||[<>]/gu
 const REDIRECT_MARK = '<'
 // Programs that run their quoted argument as a script.
 const SHELLS: ReadonlySet<string> = new Set(['bash', 'eval', 'sh', 'zsh'])
+// The body of a `$(…)` (innermost) or a backtick command substitution.
+const SUBSTITUTION = /\$\((?<dollar>[^()]*)\)|`(?<backtick>[^`]*)`/gu
 // Programs that print a named file's bytes or run them, and programs that write one: a write could set
 // a guard switch, so `cp .env.example .env` is refused too (kit #4660) — the person makes the file.
 const SHELL_PROGRAMS: ReadonlySet<string> = new Set([
@@ -118,7 +120,7 @@ function spaced_redirects(segment: string, program: string | undefined): string 
 	const marks = redirect_marks_of(segment, program)
 
 	return segment.replaceAll(REDIRECT, (mark, offset: number) =>
-		marks[offset] === mark ? ` ${REDIRECT_MARK} ` : mark,
+		marks.startsWith(mark, offset) ? ` ${REDIRECT_MARK} ` : mark,
 	)
 }
 
@@ -146,10 +148,22 @@ function script_commands_of(segment: string): Array<string> {
 	return shell_segments.commands_of(segment)
 }
 
+// A command substitution runs even inside double quotes (`echo "$(echo x > .env)"`), which the
+// quote-blanked reading takes for text, so its body is cut out as commands of their own.
+function substitution_commands_of(segment: string): Array<string> {
+	return [...segment.matchAll(SUBSTITUTION)].flatMap((match) =>
+		shell_segments.commands_of(match.groups?.['dollar'] ?? match.groups?.['backtick'] ?? ''),
+	)
+}
+
 function segments_of(command: string): Array<string> {
 	return shell_segments
 		.quote_aware_commands_of(command)
-		.flatMap((segment) => [segment, ...script_commands_of(segment)])
+		.flatMap((segment) => [
+			segment,
+			...script_commands_of(segment),
+			...substitution_commands_of(segment),
+		])
 }
 
 function is_environment_shell_access(command: string): boolean {

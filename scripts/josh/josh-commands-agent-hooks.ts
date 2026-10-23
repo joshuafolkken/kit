@@ -26,10 +26,10 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: { examples: [{ arguments: '', note: PRE_TOOL_USE }] },
-		// **No `tsx_arguments`, deliberately.** The guards read `.env` for their other values (the guard
-		// switches themselves come from the launch environment alone, `josh-environment-file.ts`),
-		// which other commands read through `OPTIONAL_ENV_FILE_FLAGS` — but declaring any `tsx_arguments` disqualifies a command from
-		// in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
+		// **No `tsx_arguments`, deliberately.** The guards read `.env` for their other values, as other
+		// commands do through `OPTIONAL_ENV_FILE_FLAGS`; the guard switches themselves come from the
+		// launch environment alone (`josh-environment-file.ts`). But declaring any `tsx_arguments`
+		// disqualifies a command from in-process dispatch (`josh-in-process.ts`), and this is the one PreToolUse hook consumers run
 		// before every guarded call, where a second ~0.16 s tsx start is not affordable. Each guard it
 		// composes loads `.env` through the shared loader instead.
 	},
