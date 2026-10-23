@@ -55,6 +55,8 @@ interface Case {
 	fail_comments?: number
 	expect_failure?: boolean
 	posted_notice?: string
+	/** What the state read prints instead of `is_armed`, for a step whose query asks something else. */
+	state_answer?: string
 }
 
 // What the reconciling script did: which direction it took, and what it said about why.
@@ -149,6 +151,10 @@ function directions_taken(): string {
 // Answers `gh pr view` with the armed state the case describes, records every call so the assertion
 // can name which direction the script took, and fails the first `fail_reads` / `fail_merges` of each
 // so a case can model an API that is briefly, or lastingly, unavailable.
+function state_answer(scenario: Case): string {
+	return scenario.state_answer ?? String(scenario.is_armed)
+}
+
 // How the stub answers `gh pr view`, for the armed state and for the standing-notice lookup. A read
 // outage is an outage of the call, whatever it was asked for — the two go through the same API — so
 // `fail_reads` counts them together, which is why the dedup cannot help when the state read is what
@@ -171,7 +177,7 @@ function stub_reads(scenario: Case, reads: string): Array<string> {
 		`  echo x >>"${states}"`,
 		`  [ "$(wc -l <"${states}")" -le ${String(scenario.fail_state_reads ?? 0)} ] && exit 1`,
 		`  [ "$(wc -l <"${states}")" -ge ${String(scenario.fail_state_reads_from ?? LASTING_OUTAGE)} ] && exit 1`,
-		`  echo '${String(scenario.is_armed)}'`,
+		`  echo '${state_answer(scenario)}'`,
 		'  exit 0',
 		'fi',
 	]
@@ -240,15 +246,13 @@ function write_gh_stub(scenario: Case): string {
 	return bin
 }
 
-function run_reconcile(scenario: Case): Outcome {
-	const bin = write_gh_stub(scenario)
-	const script = step_run(find_step(template_job(), RECONCILE_STEP_ID))
-
-	// A renamed step yields the empty script, which bash runs happily and which would make every
-	// "does nothing" case pass without testing anything.
-	expect(script).toContain(MERGE_COMMAND)
+// Runs any step's script against the stub, so kit's own withdrawal step is exercised by the same
+// `gh` the reconciling step is. A renamed step yields the empty script, which bash runs happily and
+// which would make every "does nothing" case pass without testing anything — hence the check.
+function run_step(script: string, scenario: Case): Outcome {
 	expect(script).toContain(WITHDRAW_COMMAND)
 
+	const bin = write_gh_stub(scenario)
 	const result = spawnSync('bash', ['-e', '-c', script], {
 		encoding: 'utf8',
 		env: {
@@ -269,6 +273,14 @@ function run_reconcile(scenario: Case): Outcome {
 	expect(result.status === 0).toBe(scenario.expect_failure !== true)
 
 	return { direction: directions_taken(), stderr: result.stderr }
+}
+
+function run_reconcile(scenario: Case): Outcome {
+	const script = step_run(find_step(template_job(), RECONCILE_STEP_ID))
+
+	expect(script).toContain(MERGE_COMMAND)
+
+	return run_step(script, scenario)
 }
 
 const reconcile_script_fixture = {
@@ -292,6 +304,7 @@ const reconcile_script_fixture = {
 	posted_body,
 	remove_workspace,
 	run_reconcile,
+	run_step,
 	withdraw_attempts,
 }
 

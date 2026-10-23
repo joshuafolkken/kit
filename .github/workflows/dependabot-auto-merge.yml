@@ -4,9 +4,10 @@ on: pull_request
 
 # One run per pull request, superseded ones cancelled. `ci.yml` groups its pull-request runs the
 # same way but no longer its pushes: since joshuafolkken/kit#1481 it appends the commit sha on a
-# `push` event, which this workflow — triggered by `pull_request` alone — has no use for. kit's own
-# copy has no withdrawal for a stale run to arm behind (joshuafolkken/kit#842 is about the
-# distributed copy), so here the group only keeps a force-pushed bump from paying for two runs.
+# `push` event, which this workflow — triggered by `pull_request` alone — has no use for. A stale run
+# cannot arm behind the withdrawal below: its `--match-head-commit` is refused once the branch moved
+# (joshuafolkken/kit#842 is about the distributed copy), so here the group only keeps a
+# force-pushed bump from paying for two runs.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -60,7 +61,7 @@ jobs:
       #
       # `--match-head-commit` refuses to arm when the branch moved after the event this run was
       # triggered for, so a commit pushed before the arming does not merge on the bump's metadata. A
-      # push after the arming leaves auto-merge on (joshuafolkken/kit#4654).
+      # push after the arming is the withdrawal step's (joshuafolkken/kit#4654).
       - name: Enable auto-merge for github-actions patch and minor updates
         if: >-
           github.actor == 'dependabot[bot]'
@@ -73,3 +74,37 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           GH_TOKEN: ${{ github.token }}
         run: gh pr merge --auto --merge --match-head-commit "$HEAD_SHA" "$PR_URL"
+
+      # The arming only binds the head it was made on: GitHub keeps auto-merge on through a later push,
+      # so a commit a collaborator pushes to the branch would merge on the bump's metadata. A push by
+      # anyone but Dependabot therefore withdraws the arming this workflow made (joshuafolkken/kit#4691).
+      # Only that one: an auto-merge a maintainer enabled by hand — before their push or after it — is
+      # their decision, and the step reads who enabled it to leave it alone.
+      #
+      # `--disable-auto` is an error on a pull request with nothing armed, so the state is read first;
+      # a read that fails falls through to the withdrawal rather than past it, and a withdrawal that
+      # fails leaves the run red. GraphQL names the token's identity `github-actions`; the REST
+      # spelling is accepted too.
+      - name: Withdraw this workflow's auto-merge after a push by anyone but Dependabot
+        id: withdraw
+        if: github.actor != 'dependabot[bot]'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          enabler="$(gh pr view "$PR_URL" --json autoMergeRequest \
+            --jq '.autoMergeRequest.enabledBy.login // ""')" || enabler=unknown
+
+          case "$enabler" in
+            '')
+              echo 'Auto-merge is not enabled — nothing to withdraw.'
+              exit 0
+              ;;
+            github-actions | 'github-actions[bot]' | unknown) ;;
+            *)
+              echo "Auto-merge was enabled by $enabler — leaving their decision as it is."
+              exit 0
+              ;;
+          esac
+
+          gh pr merge --disable-auto "$PR_URL"

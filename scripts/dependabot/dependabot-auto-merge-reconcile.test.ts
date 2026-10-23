@@ -175,16 +175,14 @@ describe('dependabot-auto-merge.yml reconcile — reachability', () => {
 	})
 })
 
-// In kit `.github/workflows/*` IS the source of truth, so there is no bump to hold back and nothing
-// to withdraw — the divergence joshuafolkken/kit#836 introduced, kept intact. Reconciling there would
-// newly withdraw an auto-merge a human enabled by hand, for a decision kit's own copy does not even
-// make, so it keeps a plain arming step (joshuafolkken/kit#845).
+// In kit `.github/workflows/*` IS the source of truth, so there is no upstream-managed bump to hold
+// back — the divergence joshuafolkken/kit#836 introduced, kept intact. Reconciling there would newly
+// withdraw an auto-merge a human enabled by hand, for a decision kit's own copy does not even make,
+// so it keeps a plain arming step (joshuafolkken/kit#845); its one withdrawal keys on the pusher
+// alone (joshuafolkken/kit#4691), held by `dependabot-auto-merge-runtime-withdrawal.test.ts`.
 describe('dependabot-auto-merge.yml reconcile is template-only', () => {
-	it('leaves kit’s own workflow with nothing that withdraws', () => {
-		const runs = runtime_job()?.steps?.map((step) => step_run(step)) ?? []
-
-		expect(runs.length).toBeGreaterThan(0)
-		expect(runs.some((run) => run.includes(WITHDRAW_COMMAND))).toBe(false)
+	it('leaves kit’s own workflow without the reconciling step', () => {
+		expect(runtime_job()?.steps?.length).toBeGreaterThan(0)
 		expect(find_step(runtime_job(), RECONCILE_STEP_ID)).toBeUndefined()
 	})
 
