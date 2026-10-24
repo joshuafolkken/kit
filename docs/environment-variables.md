@@ -111,9 +111,10 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Unit tests
 
-| Variable              | Required | Default | Used when                                                                                                                                                         |
-| --------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_UNIT_DURATIONS` | No       | off     | `record` writes each run file's duration into `tools/test/unit-durations.json`, which `josh test:unit --shard=<index>/<count>` balances the shards by (kit only). |
+| Variable                | Required | Default | Used when                                                                                                                                                                                                       |
+| ----------------------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_UNIT_DURATIONS`   | No       | off     | `record` writes each run file's duration into `tools/test/unit-durations.json`, which `josh test:unit --shard=<index>/<count>` balances the shards by (kit only).                                               |
+| `JOSH_VITEST_CACHE_DIR` | No       | Vite's  | The Vite cache directory the vitest config uses; `josh test:red` and `josh test:pinned` set it beside their throwaway tree, so its run never rewrites the dependency cache a gate beside it imports (kit only). |
 
 ### Agent guards
 

@@ -31,7 +31,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
 | `josh test:declared` · `josh td` | `[--match]` | developer | processes | Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin |
 | `josh test:e2e` · `josh te` | `[filters...]` | developer | processes | Run E2E tests with Playwright (skips when absent or no e2e files) |
-| `josh test:pinned` · `josh tpn` | `[--max <n>]` | developer | git, processes | Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on |
+| `josh test:pinned` · `josh tpn` | `[--max <n>] [--record <token>]` | developer | git, processes | Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on |
 | `josh test:red` · `josh trd` | — | developer | git, processes | Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only |
 | `josh test:related` · `josh tr` | `[files...]` | developer | processes | Run only the unit tests related to the changed files (full suite on fallback) |
 | `josh test:unit` · `josh tu` | `[filters...]` | developer | processes | Run unit tests with Vitest (without Vitest: a basic project runs its own test script, others skip; fails when Vitest has no tests) |
@@ -206,7 +206,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff]` | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
-| `josh run:review` | `[--unpinned-ok "<reason>" \| --join]` | automation | processes, files | Run test:pinned, then start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict) |
+| `josh run:review` | `[--unpinned-ok "<reason>" \| --join]` | automation | processes, files | Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change) |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |
 | `josh run:tail` | `[<issue> ...]` | automation | git, network | Close a run in one call: return to the default branch, commit the observation ledger, read the citations, decide the release scope |

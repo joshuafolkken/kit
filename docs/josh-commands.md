@@ -323,8 +323,9 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in de
 Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on.
 
 ```bash
-pnpm josh test:pinned           # unpinned / unchecked <file>:<line> lines
-pnpm josh test:pinned --max 5   # check at most 5 hunks; the rest print as unchecked
+pnpm josh test:pinned                    # unpinned / unchecked <file>:<line> lines
+pnpm josh test:pinned --max 5            # check at most 5 hunks; the rest print as unchecked
+pnpm josh test:pinned --record <token>   # also leave the answer, under the launch token, for run:review --join
 ```
 
 <!-- /usage -->

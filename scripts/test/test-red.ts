@@ -7,6 +7,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execa } from 'execa'
 import { test_red_logic, type RedVerdict } from './test-red-logic'
+import { vitest_cache_directory } from './vitest-cache-directory'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
 // `green`, `no-test` or `test-only`.
@@ -17,6 +18,9 @@ import { test_red_logic, type RedVerdict } from './test-red-logic'
 
 const TREE_PREFIX = 'josh-test-red-'
 const REPORT_NAME = 'report.json'
+// Beside the tree, so the run's dependency optimizer never rewrites the borrowed `node_modules/.vite`
+// a gate beside it imports from (`vitest-cache-directory.ts`).
+const CACHE_NAME = 'vite-cache'
 const VITEST_BIN = path.join(base_tree.NODE_MODULES, '.bin', 'vitest')
 const USAGE =
 	'Usage: josh test:red — prints red / green / no-test / test-only for the changed tests on the merge-base'
@@ -57,7 +61,10 @@ async function verdict_in(
 	await rm(report, { force: true })
 	const result = await execa(path.join(tree, VITEST_BIN), vitest_args, {
 		cwd: tree,
-		env: git_location_environment.location_free_environment(),
+		env: {
+			...git_location_environment.location_free_environment(),
+			[vitest_cache_directory.CACHE_DIRECTORY_KEY]: path.join(parent, CACHE_NAME),
+		},
 		extendEnv: true,
 		reject: false,
 	})

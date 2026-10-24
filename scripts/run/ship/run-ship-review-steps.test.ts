@@ -220,6 +220,15 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
 	})
 
+	// joshuafolkken/kit#4770: the background `test:pinned` answers at the join; a fix moved the tree,
+	// not that answer.
+	it('stops at a join that found an unpinned change, even past a reviewer fix', async () => {
+		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
+		answer_with(JOIN, 3)
+
+		expect(await stage()).toMatchObject({ cause: 'check', code: 3 })
+	})
+
 	it('still stops at a red join when nothing was fixed', async () => {
 		stamps.read_stamp_text.mockReturnValue(LOW)
 		answer_with(JOIN)

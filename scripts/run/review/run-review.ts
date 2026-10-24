@@ -54,6 +54,9 @@ function gate_state(is_green: boolean, is_running: boolean, is_moved = false): G
 
 // The `--join` exit code of a `moved` gate, read by `josh ship` (`run-ship-review-steps.ts`).
 const MOVED_EXIT_CODE = 2
+// The `--join` exit code of an unpinned change the background `test:pinned` found
+// (joshuafolkken/kit#4770). `josh ship` never drains it, whatever the reviewer fixed.
+const UNPINNED_EXIT_CODE = 3
 
 function is_gate_settled(state: GateState): boolean {
 	return state !== GATE_RUNNING
@@ -116,6 +119,7 @@ const run_review = {
 	GATE_RED,
 	GATE_RUNNING,
 	MOVED_EXIT_CODE,
+	UNPINNED_EXIT_CODE,
 	adopt_verdict,
 	format_timing,
 	gate_state,

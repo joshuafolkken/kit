@@ -1,0 +1,11 @@
+{
+	"reason": "Isolate the throwaway tree's vitest dependency cache from the gate's (vitest-cache-directory), which the background test:pinned beside the round-1 gate raced on",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 217,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 75,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}

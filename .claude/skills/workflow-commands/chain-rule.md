@@ -6,7 +6,7 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus dotfile spelling), `pnpm josh run:review` — its `test:pinned` lines
+   the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
    本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
    round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
@@ -27,15 +27,15 @@ Review results and successful pushes are never turn boundaries.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
-   `run:review`'s `test:pinned` lines, run the final scoped lint/test pair with `pnpm josh check:related` and
-   `pnpm josh run:review`: it runs `pnpm josh test:pinned` and stops on an `unpinned` line
-   (`--unpinned-ok "<reason>"` carries on), then starts `pnpm josh gate` in the background and prints
-   the `/code-review` brief in one call, so the two overlap. Launch the `/code-review` subagent as the `reviewer`
+   `run:review --join`, run the final scoped lint/test pair with `pnpm josh check:related` and
+   `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
+   and prints the `/code-review` brief in one call, so they overlap (`--unpinned-ok "<reason>"`
+   carries on). Launch the `/code-review` subagent as the `reviewer`
    agent type (`kit:reviewer` in a consumer) with that brief and its `model` (`delegation.md`) (one
    agent, no `Skill` / `Agent` tool — `.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
-   committing; it exits non-zero on a red gate. Fix any red check, then rerun the affected scoped check
+   committing; it exits non-zero on a red gate, `3` on an `unpinned` line. Fix any red check, then rerun the affected scoped check
    and gate. Never version-bump a child (`pnpm josh release` decides).
 3. Before acting on any review round, run `pnpm josh review:attest --check`. `missing` or `mismatch`
    discards it without counting; rerun against the brief's checkout. A review error receives a
