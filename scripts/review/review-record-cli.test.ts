@@ -35,6 +35,14 @@ vi.mock('./review-reviewed-tree', () => ({
 	review_reviewed_tree: { record: reviewed_record_mock },
 }))
 
+// The reuse answer reads this checkout's tree and the issue; `review-record-cli-reuse.test.ts` owns it.
+vi.mock('./review-round-reuse', () => ({
+	review_round_reuse: {
+		is_reusable: vi.fn().mockResolvedValue(false),
+		is_stale_here: vi.fn().mockResolvedValue(false),
+	},
+}))
+
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
 const COMMENT_URL = 'https://example.test/comment\n'

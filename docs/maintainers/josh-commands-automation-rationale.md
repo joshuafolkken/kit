@@ -146,6 +146,13 @@ Record a `/code-review` round's findings so they survive the run. It appends one
 
 **Behavior:** each positional is `<category>:<severity>:<file>`, split on its first two colons so a `:line` citation stays in the file field. A category outside the nine review-rubric ones or a severity other than `high` / `medium` / `low` is refused with the usage and the accepted values. A call with no findings writes a single `- rf:none | none | - | <date> | #<issue>` line, so a clean round differs from an unreviewed one. `--comment` posts the same lines as a comment on the issue and appends nothing — for a round after the pull request opened, where a line in the tree would be pushed onto it and restart its CI. Once the issue closes, the next ledger round carries those lines into `.josh/observations/<N>-comment-rounds.md` on its own commit, for `josh review:findings` and the retrospective, from `OWNER` / `MEMBER` / `COLLABORATOR` comments only; a carry that cannot read GitHub only warns. Both the append and `--check` use the running work tree's ledger — a lane's inside a lane. `pnpm josh observations:flush` commits them like any ledger change.
 
+A recorded code round also says whether `josh ship` reuses it as its round 1 (joshuafolkken/kit#4763), from the ship's own predicate (`scripts/review/review-round-reuse.ts`):
+
+- `Reused`: this tree holds still since the record, or the ship's own round 1 stopped on a finding.
+- `Not reused`: the tree moved (a `main:merge` included), the round was not attested on this branch, or the issue changed after its brief — run `pnpm josh run:review` and the round-1 `/code-review` in the session.
+
+The answer is for this tree: the ship's sync merges the default branch before its review, so run `pnpm josh main:merge` before the check. A reuse question git cannot answer reads as `Not reused`; an issue that cannot be read reads as fresh, as in the ship, and `josh followup` still refuses a stale review. The exit code does not change.
+
 ## `josh release` in detail
 
 Release everything main has taken since the version last changed — one command, run by a person. It counts merges on `origin/<default>`'s first-parent line since the last version change, raises the version by that many minors, opens and merges a `release/v<version>` pull request, then polls for the `v<version>` tag, the npm publish and the GitHub Release. Each stage reached prints one line, with a link where there is one; the completion line prints only when every stage is reached:
