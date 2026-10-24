@@ -140,12 +140,14 @@ describe('a request that ran out of time', () => {
 	})
 
 	// The label belongs to a killed spawn only; an ordinary non-zero exit must read as it always did.
+	// Asked of the transport, which `exec_gh_api` shares, because a failure carrying no status is one
+	// `exec_gh_api` asks again (`git-gh-retry.ts`).
 	it('leaves an ordinary failure unlabelled', async () => {
 		mocked_execa.mockRejectedValueOnce(
 			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n`, timedOut: false }),
 		)
 
-		await expect(git_gh_exec.exec_gh_api({ path: API_PATH })).rejects.toThrow(
+		await expect(git_gh_exec.exec_gh_command(['api', API_PATH])).rejects.toThrow(
 			new Error(NOT_FOUND_STDERR),
 		)
 	})

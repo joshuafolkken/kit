@@ -47,4 +47,16 @@ describe('issue writes — naming another repository', () => {
 
 		expect(first_request().path).toBe(`${OTHER_ISSUE_PATH}/comments`)
 	})
+
+	// joshuafolkken/kit#4717: a 502 can follow an issue GitHub already opened, so a retried creation
+	// could open a second one.
+	it('creates that repository issue without the transient-error retry', () => {
+		const request = git_gh_issue_write.issue_create_request({
+			title: TITLE,
+			body: BODY,
+			repo: OTHER_REPO,
+		})
+
+		expect(request.should_retry).toBe(false)
+	})
 })
