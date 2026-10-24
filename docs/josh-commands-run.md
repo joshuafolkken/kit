@@ -548,7 +548,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 - `--notify-message <text>` — forwarded to `followup` alone.
 - `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
-- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and, with `--review`, `test:pinned` run before hand-off, the checks even after a preflight refusal, so one stop reports every failure and returns to the same session.
+- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok` if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 
 <!-- /usage -->
 

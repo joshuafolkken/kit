@@ -19,6 +19,7 @@ vi.mock('#scripts/issue/issue-watch-gate', () => ({
 }))
 
 const ISSUE = 4763
+const REFUSAL = 'the issue changed after the brief'
 
 describe('review_round_reuse.is_reusable', () => {
 	beforeEach(() => {
@@ -58,7 +59,7 @@ describe('review_round_reuse.is_reusable', () => {
 
 describe('review_round_reuse.is_stale_here', () => {
 	it('is stale when josh followup would refuse the review', async () => {
-		refusal_mock.mockResolvedValue('the issue changed after the brief')
+		refusal_mock.mockResolvedValue(REFUSAL)
 
 		expect(await review_round_reuse.is_stale_here()).toBe(true)
 	})
@@ -73,5 +74,25 @@ describe('review_round_reuse.is_stale_here', () => {
 		refusal_mock.mockRejectedValue(new Error('gh unavailable'))
 
 		expect(await review_round_reuse.is_stale_here()).toBe(false)
+	})
+})
+
+describe('review_round_reuse.is_reusable_here', () => {
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(true)
+		unmoved_mock.mockReset().mockResolvedValue(true)
+	})
+
+	it('reuses a recorded round on a fresh issue', async () => {
+		refusal_mock.mockResolvedValue(undefined)
+
+		expect(await review_round_reuse.is_reusable_here(ISSUE)).toBe(true)
+	})
+
+	it('reads the staleness here, so a round the issue changed after is not reused', async () => {
+		refusal_mock.mockResolvedValue(REFUSAL)
+
+		expect(await review_round_reuse.is_reusable_here(ISSUE)).toBe(false)
 	})
 })
