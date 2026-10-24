@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/merge/run-merge-cli.ts:62 | 2026-10-24 | #4734
