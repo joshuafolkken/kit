@@ -28,8 +28,8 @@ answer turns up (about four in five of 100 sampled High/Medium findings that sto
 fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
 tests and the round cap are unchanged.
 
-1. **Tests pin the change** — read the `unpinned` and `unchecked` lines `pnpm josh run:review` prints
-   from `pnpm josh test:pinned` (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
+1. **Tests pin the change** — read the `unpinned` and `unchecked` lines `pnpm josh run:review --join`
+   prints from `pnpm josh test:pinned` (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
    never draws, no comparison against a literal copy).
 2. **Prose matches the code** — grep docs, prompts and comments for the old wording of every behavior,
    constant, command and heading you changed, moved or removed, `"the table above"` and rewritten

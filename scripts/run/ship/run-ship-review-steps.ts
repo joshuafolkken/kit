@@ -99,8 +99,11 @@ function has_fixes(slots: ReadonlyArray<ReviewSlot>): boolean {
 
 // **The tree is asked first, the findings file second** (joshuafolkken/kit#4774): a gate that passed on
 // a tree that has since moved exits the join with its own code, which drains it whatever the reviewer
-// wrote, or failed to write, at its findings path.
+// wrote, or failed to write, at its findings path. An unpinned change is never drained
+// (joshuafolkken/kit#4770): a reviewer's fix moved the tree, not the probe's answer.
 function is_drained(code: number, slots: ReadonlyArray<ReviewSlot>): boolean {
+	if (code === run_review.UNPINNED_EXIT_CODE) return false
+
 	return code === run_review.MOVED_EXIT_CODE || has_fixes(slots)
 }
 

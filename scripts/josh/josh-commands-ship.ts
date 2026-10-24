@@ -49,20 +49,23 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',
 		description:
-			'Run test:pinned, then start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
+			'Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: ['[--unpinned-ok "<reason>" | --join]', 'automation', ['processes', 'files']],
 		usage: {
 			examples: [
 				{
 					arguments: '',
-					note: 'stop on an unpinned change; else detach the gate, print the brief, then launch the /code-review subagent',
+					note: 'detach test:pinned and the gate, print the brief, then launch the /code-review subagent',
 				},
 				{
 					arguments: '--unpinned-ok "only logs"',
-					note: 'carry on past unpinned places; the list and the reason follow the brief',
+					note: 'check in place first, carry on past unpinned places; the list and the reason follow the brief',
 				},
-				{ arguments: '--join', note: 'after the review returns: join the gate, check its verdict' },
+				{
+					arguments: '--join',
+					note: 'after the review returns: join the gate and test:pinned; exit 3 on an unpinned change',
+				},
 			],
 		},
 	},

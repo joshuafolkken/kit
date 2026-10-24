@@ -4,7 +4,12 @@ import { test_pinned_main } from './test-pinned-main'
 
 const { run } = vi.hoisted(() => ({ run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>() }))
 
+const { write_stamp } = vi.hoisted(() => ({ write_stamp: vi.fn() }))
+
 vi.mock('./test-pinned', () => ({ test_pinned: { run } }))
+vi.mock('#scripts/josh/stamp-file', () => ({
+	stamp_file: { stamp_path: (prefix: string) => prefix, write_stamp },
+}))
 
 const HUNK = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
@@ -23,6 +28,7 @@ beforeEach(() => {
 	vi.spyOn(process.stdout, 'write').mockImplementation(capture(output.stdout))
 	vi.spyOn(process.stderr, 'write').mockImplementation(capture(output.stderr))
 	run.mockReset()
+	write_stamp.mockReset()
 })
 
 afterEach(() => {
@@ -76,5 +82,40 @@ describe('test_pinned_main.main', () => {
 	it('prints the usage clean on --help', async () => {
 		expect(await test_pinned_main.main(['--help'])).toBe(0)
 		expect(run).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4770: `--record` leaves the answer `josh run:review --join` waits on.
+describe('test_pinned_main.main --record', () => {
+	const RECORD = 'josh-test-pinned-record-'
+
+	it('records the report and its unpinned count', async () => {
+		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK] })
+
+		expect(await test_pinned_main.main(['--record'])).toBe(1)
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
+			text: output.stdout.join(''),
+			unpinned_count: 1,
+		})
+	})
+
+	it('records a check that could not run as one with nothing unpinned, and still throws', async () => {
+		const reason = 'worktree add failed'
+
+		run.mockRejectedValue(new Error(reason))
+
+		await expect(test_pinned_main.main(['--record'])).rejects.toThrow(reason)
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
+			text: `\`josh test:pinned\` could not run, so nothing was checked: ${reason}\n`,
+			unpinned_count: 0,
+		})
+	})
+
+	it('records nothing without --record', async () => {
+		run.mockResolvedValue(CLEAN_REPORT)
+
+		await test_pinned_main.main([])
+
+		expect(write_stamp).not.toHaveBeenCalled()
 	})
 })

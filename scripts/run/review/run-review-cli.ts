@@ -2,8 +2,10 @@
 import { fileURLToPath } from 'node:url'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_pinned } from './run-review-pinned'
+import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_steps } from './run-review-steps'
 
 // `josh run:review` — one call that leaves `josh gate` running in the background and prints the whole
@@ -12,12 +14,13 @@ import { run_review_steps } from './run-review-steps'
 // spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
 // `review:attest --check` enforces is minted exactly as a standalone brief mints it.
 //
-// The pair opens only after `josh test:pinned` finds every changed place pinned, or the implementer
-// accepts the rest with `--unpinned-ok "<reason>"` (`run-review-pinned.ts`).
+// `josh test:pinned` runs in the background beside the pair, and the join stops on an unpinned change;
+// `--unpinned-ok "<reason>"` checks in place before the pair instead (`run-review-pinned.ts`).
 //
 // **The default mode opens the pair; `--join` closes it.** The child runs the default, reads the brief
 // off stdout, launches the review subagent, and — once it returns — runs `--join`, which waits for the
-// gate to finish, records the overlap, and exits non-zero if the gate came back red. That exit code is
+// gate and the check to finish, records the overlap, and exits non-zero if the gate came back red or
+// the check found an unpinned change. That exit code is
 // what makes "a red gate is not adopted over" a mechanical guarantee rather than an ordering
 // (`run-review.ts` → `adopt_verdict`).
 
@@ -68,18 +71,23 @@ async function start_pair(): Promise<number> {
 	return code
 }
 
-// `josh test:pinned` runs first, so an unpinned change stops before the gate and the brief. An accepted
-// one is printed after the brief on stdout, where the reviewer reads it; otherwise — or when the pair
-// failed to open, so no brief follows — the report goes to stderr beside the other run notes.
-async function run_start(reason?: string): Promise<number> {
-	const pinned = await run_review_pinned.check(reason)
+// `josh test:pinned` runs in the background beside the pair, and the join stops on what it finds. A
+// check that could not be launched fails open, as one that could not run does.
+async function start_beside(): Promise<number> {
+	const launched = run_review_pinned_steps.launch()
 
-	if (pinned.kind === 'stop') {
-		process.stderr.write(pinned.text)
-
-		return FAILURE_EXIT_CODE
+	if (launched.kind === 'failed') {
+		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
 
+	return await start_pair()
+}
+
+// `--unpinned-ok` checks in place first, because the accepted list follows the brief on stdout, where
+// the reviewer reads it; when the pair failed to open, so no brief follows — or nothing was unpinned —
+// the report goes to stderr beside the other run notes.
+async function start_after_check(reason: string): Promise<number> {
+	const pinned = await run_review_pinned.check(reason)
 	const code = await start_pair()
 	const is_briefed = code === SUCCESS_EXIT_CODE && pinned.kind === 'accepted'
 	const sink = is_briefed ? process.stdout : process.stderr
@@ -87,6 +95,25 @@ async function run_start(reason?: string): Promise<number> {
 	sink.write(pinned.text)
 
 	return code
+}
+
+async function run_start(reason?: string): Promise<number> {
+	run_review_pinned_steps.clear()
+
+	return reason === undefined ? await start_beside() : await start_after_check(reason)
+}
+
+// The background check's answer, on stderr where the start printed it before it ran beside the pair.
+async function join_pinned(): Promise<boolean> {
+	const summary = await run_review_pinned_steps.wait_for_answer()
+
+	if (summary === undefined) return false
+
+	const verdict = run_review_pinned.verdict_of(summary, undefined)
+
+	process.stderr.write(verdict.text)
+
+	return verdict.kind === 'stop'
 }
 
 // The gate's own green stamp carries the moment it finished; a red gate leaves none, so the join's own
@@ -142,7 +169,10 @@ async function run_join(): Promise<number> {
 	report_gate(state)
 	report_timing(timing)
 
-	return join_exit_code(state)
+	// An unpinned change stops the round whatever the gate answered.
+	const is_unpinned = await join_pinned()
+
+	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

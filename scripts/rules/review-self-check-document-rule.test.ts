@@ -113,18 +113,22 @@ describe('the implementer self-check before review round 1', () => {
 })
 
 // joshuafolkken/kit#4647: question 1 reads the command's output rather than asking for a hand check.
+// joshuafolkken/kit#4770: the check runs beside the gate, so its lines arrive at `--join`.
 describe('the self-check question 1 and josh test:pinned', () => {
-	it('question 1 reads the test:pinned lines run:review prints', () => {
+	it('question 1 reads the test:pinned lines run:review --join prints', () => {
 		expect(self_check_section()).toContain(
-			'read the `unpinned` and `unchecked` lines `pnpm josh run:review` prints from `pnpm josh test:pinned`',
+			'read the `unpinned` and `unchecked` lines `pnpm josh run:review --join` prints from `pnpm josh test:pinned`',
 		)
 	})
 
-	it('the chain rule says run:review runs test:pinned and how it carries on past it', () => {
+	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
 		const step = read_unwrapped(CHAIN_RULE)
 
-		expect(step).toContain('`pnpm josh run:review` — its `test:pinned` lines answer the self-check')
-		expect(step).toContain('it runs `pnpm josh test:pinned` and stops on an `unpinned` line')
+		expect(step).toContain("its `--join`'s `test:pinned` lines answer the self-check")
+		expect(step).toContain(
+			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
+		)
+		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
 		expect(step).toContain('`--unpinned-ok "<reason>"` carries on')
 	})
 })

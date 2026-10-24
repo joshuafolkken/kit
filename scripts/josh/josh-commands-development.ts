@@ -231,12 +231,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Revert each changed non-test hunk, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
 		category: 'Development',
-		reference: ['[--max <n>]', 'developer', ['git', 'processes']],
+		reference: ['[--max <n>] [--record]', 'developer', ['git', 'processes']],
 		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: {
 			examples: [
 				{ arguments: '', note: 'unpinned / unchecked <file>:<line> lines' },
 				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest print as unchecked' },
+				{ arguments: '--record', note: 'also leave the answer for run:review --join' },
 			],
 		},
 	},

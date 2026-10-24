@@ -3,17 +3,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
 
-// joshuafolkken/kit#4647: `josh run:review` runs `josh test:pinned` before round 1, so an unpinned
-// change stops before the gate and the brief are started, and `--unpinned-ok "<reason>"` carries on
-// with the reason printed after the brief for the reviewer.
+// joshuafolkken/kit#4647: `josh run:review` runs `josh test:pinned` for round 1, and
+// `--unpinned-ok "<reason>"` carries on with the reason printed after the brief for the reviewer.
+// joshuafolkken/kit#4770: without a reason the check runs in the background, so the gate and the brief
+// start without waiting on it; `--join` stops on its answer (`run-review-cli-join.test.ts`).
 
-const { pinned_run, launch_gate, brief_run } = vi.hoisted(() => ({
+const { pinned_run, launch_gate, brief_run, launch_pinned, clear_pinned } = vi.hoisted(() => ({
 	pinned_run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>(),
 	launch_gate: vi.fn<() => { kind: string; note?: string }>(),
 	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
+	launch_pinned: vi.fn<() => { kind: string; note?: string }>(),
+	clear_pinned: vi.fn(),
 }))
 
 vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }))
+vi.mock('./run-review-pinned-steps', () => ({
+	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned },
+}))
 vi.mock('#scripts/review/review-brief-cli', () => ({ review_brief_cli: { run: brief_run } }))
 vi.mock('./run-review-steps', () => ({
 	run_review_steps: {
@@ -52,6 +58,9 @@ beforeEach(() => {
 	output.stdout = []
 	output.stderr = []
 	launch_gate.mockReturnValue({ kind: 'launched' })
+	launch_pinned.mockReset().mockReturnValue({ kind: 'launched' })
+	clear_pinned.mockReset()
+	pinned_run.mockReset()
 	brief_run.mockImplementation(async () => {
 		process.stdout.write('BRIEF\n')
 
@@ -66,22 +75,30 @@ afterEach(() => {
 })
 
 describe('run:review before round 1', () => {
-	it('stops before the gate and the brief when a change is unpinned, listing it', async () => {
-		pinned_run.mockResolvedValue(UNPINNED_REPORT)
-
-		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
-		expect(launch_gate).not.toHaveBeenCalled()
-		expect(brief_run).not.toHaveBeenCalled()
-		expect(output.stderr.join('')).toContain(UNPINNED_LINE)
-		expect(output.stderr.join('')).toContain(run_review_pinned.STOP_NOTE)
+	it('launches test:pinned in the background and starts the gate and the brief beside it', async () => {
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(clear_pinned).toHaveBeenCalledOnce()
+		expect(launch_pinned).toHaveBeenCalledOnce()
+		expect(launch_gate).toHaveBeenCalledOnce()
+		expect(pinned_run).not.toHaveBeenCalled()
+		expect(output.stdout.join('')).toBe('BRIEF\n')
 	})
 
-	it('starts the gate and prints the brief when every changed place is pinned', async () => {
-		pinned_run.mockResolvedValue(PINNED_REPORT)
+	it('starts the gate and the brief before an in-place check would have resolved', async () => {
+		pinned_run.mockReturnValue(new Promise<PinnedReport>(() => undefined))
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(launch_gate).toHaveBeenCalledOnce()
+		expect(brief_run).toHaveBeenCalledOnce()
+	})
+
+	it('carries on to the gate and the brief when the background check cannot be launched', async () => {
+		launch_pinned.mockReturnValue({ kind: 'failed', note: 'spawn refused' })
 
 		expect(await run_review_cli.run([])).toBe(0)
 		expect(launch_gate).toHaveBeenCalledOnce()
 		expect(output.stdout.join('')).toBe('BRIEF\n')
+		expect(output.stderr.join('')).toContain('could not run, so nothing was checked: spawn refused')
 	})
 
 	it('carries on under --unpinned-ok and prints the list and the reason after the brief', async () => {
@@ -89,6 +106,7 @@ describe('run:review before round 1', () => {
 
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(0)
 		expect(launch_gate).toHaveBeenCalledOnce()
+		expect(launch_pinned).not.toHaveBeenCalled()
 		expect(output.stdout.join('')).toBe(
 			`BRIEF\nunpinned 1 · unchecked 0\n${UNPINNED_LINE}\n` +
 				`Unpinned accepted by the implementer: ${REASON}\n`,
@@ -108,10 +126,10 @@ describe('run:review when no brief follows', () => {
 		expect(output.stderr.join('')).toContain(`Unpinned accepted by the implementer: ${REASON}\n`)
 	})
 
-	it('carries on to the gate and the brief when test:pinned itself cannot run', async () => {
+	it('carries on under --unpinned-ok when test:pinned itself cannot run', async () => {
 		pinned_run.mockRejectedValue(new Error('worktree add failed'))
 
-		expect(await run_review_cli.run([])).toBe(0)
+		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(0)
 		expect(launch_gate).toHaveBeenCalledOnce()
 		expect(output.stdout.join('')).toBe('BRIEF\n')
 		expect(output.stderr.join('')).toContain(
@@ -124,6 +142,23 @@ describe('run:review when no brief follows', () => {
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stderr.join('')).toBe(
 			'Usage: josh run:review [--unpinned-ok "<reason>" | --join]\n',
+		)
+	})
+})
+
+describe('run_review_pinned.verdict_of — the answer the join reads', () => {
+	it('stops on an unpinned change with the list and the stop note, without a reason', () => {
+		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned_count: 1 }, undefined)
+
+		expect(verdict).toStrictEqual({
+			kind: 'stop',
+			text: `LIST\n${run_review_pinned.STOP_NOTE}\n`,
+		})
+	})
+
+	it('stays clear when nothing is unpinned', () => {
+		expect(run_review_pinned.verdict_of({ text: 'L\n', unpinned_count: 0 }, undefined).kind).toBe(
+			'clear',
 		)
 	})
 })

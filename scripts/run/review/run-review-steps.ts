@@ -12,7 +12,7 @@ import { detached_launch, type LaunchArgv, type LaunchResult } from '#scripts/ru
 import { run_review, type GateState, type ReviewTiming, type TimingStart } from './run-review'
 
 // The side effects `josh run:review` performs, kept out of `run-review.ts` the way `run-merge-steps.ts`
-// is kept out of `run-merge.ts`. Three of them: launch the gate detached so
+// is kept out of `run-merge.ts`. Three of them (the `test:pinned` check's are `run-review-pinned-steps.ts`): launch the gate detached so
 // one command leaves it running in the background, read back the state the join waits on from the
 // stamps a real `josh gate` writes, and keep the four timestamps the overlap is measured from.
 
@@ -46,23 +46,33 @@ function timing_path(target: string = PROJECT_ROOT): string {
 // The argv is composed from constants and the validated checkout root, never interpolated into a
 // shell string — `detached_launch.launch` refuses one carrying anything a command line has no business
 // holding, and there is no shell on the path to escape from.
-function gate_argv(root: string): LaunchArgv {
+function josh_argv(root: string, josh_args: ReadonlyArray<string>): LaunchArgv {
 	return {
 		command: PNPM,
-		args: [DIRECTORY_FLAG, root, JOSH_SCRIPT, GATE_COMMAND],
+		args: [DIRECTORY_FLAG, root, JOSH_SCRIPT, ...josh_args],
 	}
 }
 
-function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
+// A `josh` command left running in the background, its output kept at `log_path`: the gate, and the
+// `test:pinned` check beside it (`run-review-pinned-steps.ts`).
+function launch_josh(
+	josh_args: ReadonlyArray<string>,
+	log_path: string,
+	root: string = PROJECT_ROOT,
+): LaunchResult {
 	return detached_launch.launch(
 		{
-			argv: gate_argv(root),
+			argv: josh_argv(root, josh_args),
 			cwd: root,
-			log_path: gate_log_path(root),
+			log_path,
 			env: git_location_environment.location_free_environment(),
 		},
 		(note) => process.stderr.write(`${note}\n`),
 	)
+}
+
+function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
+	return launch_josh([GATE_COMMAND], gate_log_path(root), root)
 }
 
 function to_timing(value: unknown): TimingStart | undefined {
@@ -168,9 +178,12 @@ function complete_timing(
 }
 
 const run_review_steps = {
+	MAX_JOIN_WAIT_MS,
+	POLL_INTERVAL_MS,
 	complete_timing,
 	gate_log_path,
 	launch_gate,
+	launch_josh,
 	mark_gate_starting,
 	read_gate_log,
 	read_gate_state,
