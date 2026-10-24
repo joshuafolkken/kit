@@ -28,9 +28,11 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: async () => undefined },
-}))
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: async () => undefined } }
+})
 vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_round_one: record_round_one_mock, record_round_two: vi.fn() },
 }))
@@ -52,7 +54,7 @@ const OK = 0
 const FAILED = 1
 const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '4620'
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const RECORD = `review:record --issue ${ISSUE}`
 const REVIEWED = [OPEN, 'run:review --join', 'review:attest --check', RECORD]
 const HIGH = 'bug-risks:high:a.ts:4'

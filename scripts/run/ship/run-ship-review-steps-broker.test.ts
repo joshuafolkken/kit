@@ -28,9 +28,11 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
 // Never `missing` unless a case says so, so the rest run no interaction review (joshuafolkken/kit#4276).
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: interaction_status },
-}))
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: interaction_status } }
+})
 vi.mock('#scripts/review/review-record', () => ({
 	review_record: { check: vi.fn(async () => ({ status: 'missing' })) },
 }))
@@ -46,7 +48,7 @@ const broker_serving = vi.spyOn(lane_session_broker, 'is_serving')
 const OK = 0
 const FAILED = 1
 const ISSUE = '2427'
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
 const ROUND_ONE = { kind: 'review', round: '1' }
 const UNSERVED = 'no broker serves this lane'

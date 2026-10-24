@@ -2,6 +2,7 @@ import { project_checks } from '#scripts/gate/project-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { review_attest, type ReviewSlot } from './review-attest'
 import { review_finding_ledger } from './review-finding-ledger'
 
 // The interaction review — one adversarial pass after `/code-review`, over a change to the run
@@ -65,6 +66,15 @@ async function status(issue: number, root?: string): Promise<InteractionStatus> 
 	return await status_of(issue, await changed_paths.read_changed_paths(false), root)
 }
 
+// **Round 1's slots — the interaction review beside `/code-review`'s where it is due and not yet
+// recorded** (joshuafolkken/kit#4672, joshuafolkken/kit#4802), so it takes round 1's wait and stop.
+// `josh ship` and `josh run:review` both open round 1 from it.
+function round_one_slots(answer: InteractionStatus | undefined): ReadonlyArray<ReviewSlot> {
+	const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+
+	return answer === 'missing' ? [CODE, INTERACTION] : [CODE]
+}
+
 const MISSING_REASON =
 	'This change touches the run tooling, and no interaction review is recorded for its issue — the pass that looks for the existing features a change breaks, which `/code-review` does not (joshuafolkken/kit#4276).'
 
@@ -86,6 +96,7 @@ const review_interaction = {
 	NOT_DUE_LINE,
 	refusal,
 	refusal_message,
+	round_one_slots,
 	status,
 	status_of,
 }

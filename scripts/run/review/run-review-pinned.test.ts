@@ -21,6 +21,12 @@ vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned },
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({ review_brief_cli: { run: brief_run } }))
+// Code's brief alone: the interaction brief beside it is `run-review-cli-interaction.test.ts`'s.
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: async () => 'not-required' } }
+})
 vi.mock('./run-review-steps', () => ({
 	run_review_steps: {
 		launch_gate,
@@ -141,7 +147,7 @@ describe('run:review when no brief follows', () => {
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG])).toBe(FAILURE_EXIT_CODE)
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stderr.join('')).toBe(
-			'Usage: josh run:review [--unpinned-ok "<reason>" | --join]\n',
+			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join\n',
 		)
 	})
 })
