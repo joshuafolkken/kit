@@ -1,0 +1,7 @@
+{
+	"reason": "The commit stage merges and gates a default branch that moved since the sync, and the followup re-merges on a red check or conflict (not a review blocker), not only a conflict",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 34
+	}
+}

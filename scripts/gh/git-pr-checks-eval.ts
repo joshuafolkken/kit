@@ -288,6 +288,8 @@ class PrConflictError extends Error {
 
 export {
 	FAILURE_MESSAGE_PREFIX,
+	FAILURE_REASON_CHECKS,
+	FAILURE_REASON_CONFLICT,
 	PrConflictError,
 	evaluate_pr_state,
 	is_auto_merge_blocked,

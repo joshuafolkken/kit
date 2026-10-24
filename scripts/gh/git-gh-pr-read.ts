@@ -80,7 +80,7 @@ interface PullMergeState {
 	is_merged: boolean
 	merged_at: string | undefined
 	head_sha: string | undefined
-	// `josh ship` reads `DIRTY` here to re-merge a conflicting pull request.
+	// GitHub's merge state (`DIRTY` on a conflict).
 	merge_state_status: string | undefined
 }
 
@@ -100,8 +100,8 @@ const pending_pr_number_by_branch = new Map<string, Promise<PullNumberRead>>()
 // same `GET /pulls/{N}` each time. The promise is stored, so readers in one tick share the request as
 // well as its answer; a read that fails is dropped and re-tried, the rule the number memo holds.
 // **Every write to a pull request clears it** through `forget_pr_numbers`, and the two state readers
-// never read it: `pr_get_merge_state` answers where the pull request stands *now*, which `josh ship`
-// asks again after every merge it pushes, and `pr_view` decides whether `josh git -y` writes onto the
+// never read it: `pr_get_merge_state` answers where the pull request stands *now*, which `josh followup`
+// asks again after every merge `josh ship` pushes, and `pr_view` decides whether `josh git -y` writes onto the
 // pull request — after a commit and a push its preflight read would otherwise outlast.
 const pull_by_number = new Map<number, Promise<RestPull>>()
 

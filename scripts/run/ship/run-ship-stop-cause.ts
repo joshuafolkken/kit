@@ -84,6 +84,14 @@ function infra_text({ body, out = body }: StoppedOutput): string {
 	return out
 }
 
+// A gate an infrastructure stage ran itself tags its red as a check: its output is test output, where
+// a title naming a rate limit is no outage (joshuafolkken/kit#4825).
+function stage_cause(stage: Stage, failed: StoppedOutput): Cause {
+	if (failed.cause === CAUSE.CHECK || !INFRA_STAGES.has(stage)) return CAUSE.CHECK
+
+	return is_infra(infra_text(failed)) ? CAUSE.INFRA : CAUSE.CHECK
+}
+
 function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	const { body, conflicts, cause } = failed
 	const reason = run_ship_stage.stop_reason(stage, conflicts)
@@ -91,7 +99,7 @@ function cause_of(stage: Stage, failed: StoppedOutput): Cause {
 	if (reason === run_ship_stage.CONFLICT) return CAUSE.CONFLICT
 	if (is_review(stage)) return review_cause(body, cause)
 
-	return INFRA_STAGES.has(stage) && is_infra(infra_text(failed)) ? CAUSE.INFRA : CAUSE.CHECK
+	return stage_cause(stage, failed)
 }
 
 // Whether a finding decided the stop — false on any other stop, and on a review stop no finding decided
