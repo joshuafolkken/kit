@@ -1,8 +1,8 @@
 {
 	"reason": "New josh ship:wait command (waiter heartbeat with timed offers + CLI, attempt-scoped commit check) so a stopped round-1 ship returns to the waiting lane session; chain-rule step 0 gains the ship:wait instruction #4711",
-	"date": "2026-10-23",
+	"date": "2026-10-24",
 	"growth": {
 		"scripts.code_lines": 179,
-		"ai_cost.on_demand_bytes": 186
+		"ai_cost.on_demand_bytes": 188
 	}
 }
