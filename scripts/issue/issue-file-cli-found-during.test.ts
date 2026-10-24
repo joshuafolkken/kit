@@ -10,6 +10,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
+import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
 
@@ -104,6 +105,7 @@ describe('issue_file_cli.run — the --found-during origin as a scout candidate'
 		scout.mockResolvedValue({ report: 'Duplicates: 1', candidates: [ORIGIN] })
 		vi.spyOn(repository_labels, 'ensure_labels').mockReturnValue([])
 		vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+		vi.spyOn(issue_file_deferral, 'note_finder').mockResolvedValue()
 		exec_gh_api.mockResolvedValue('')
 	})
 

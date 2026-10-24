@@ -47,7 +47,10 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair } }
+	// The commit stage's catch-up reads a green record here, so it re-gates only a tree it merged.
+	const is_gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(true)
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair, is_gate_green } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.

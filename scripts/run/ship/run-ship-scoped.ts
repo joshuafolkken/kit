@@ -50,8 +50,8 @@ async function scoped_pair(): Promise<JoshResult> {
 	)
 }
 
-// The scoped pair and then `josh gate` — the gate stage, and the followup's gate over a merged tree
-// before its push, so both leave the record the pre-push hook reuses.
+// The scoped pair and then `josh gate` — the gate stage, and the commit stage's and the followup's gate
+// over a merged tree before their push, so each leaves the record the pre-push hook reuses.
 async function scoped_gate(): Promise<JoshResult> {
 	return await run_phases([
 		scoped_pair,

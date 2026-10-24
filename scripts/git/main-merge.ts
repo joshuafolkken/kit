@@ -52,7 +52,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 }
 
 // What one merge of the default branch came to. `josh ship` merges it again
-// before the commit and on a conflicting pull request, and branches on the answer rather than on an
+// before the gate, before the push and on a followup failed on its checks, and branches on the answer rather than on an
 // exit code: `current` brought nothing in, so the tree is unchanged; `merged` changed it; `refused`
 // is the guard's answer, nothing attempted; `conflict` names the paths git left unmerged, so a resumed
 // session goes straight to them instead of asking git again.

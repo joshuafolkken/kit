@@ -3,18 +3,11 @@ import { run_ship_overlap } from './run-ship-overlap'
 
 const merge_mock = vi.hoisted(() => vi.fn())
 const josh_run_mock = vi.hoisted(() => vi.fn())
-const merge_state_mock = vi.hoisted(() => vi.fn())
 const scoped_mock = vi.hoisted(() => vi.fn())
 const overlap_mock = vi.spyOn(run_ship_overlap, 'await_overlap')
 
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('#scripts/gh/git-gh-pr-read', () => ({
-	git_gh_pr_read: { pr_get_merge_state: merge_state_mock },
-}))
-vi.mock('#scripts/git/git-command', () => ({
-	git_command: { branch: vi.fn().mockResolvedValue('3221-lane') },
-}))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
 const { run_ship_sync } = await import('./run-ship-sync')
 
@@ -32,13 +25,10 @@ const CONFLICTED = ['scripts/a.ts', 'scripts/b.ts']
 const CURRENT = { kind: 'current', branch: 'main' }
 const MERGED = { kind: 'merged', branch: 'main' }
 const CONFLICT = { kind: 'conflict', files: CONFLICTED }
-const DIRTY = {
-	is_merged: false,
-	merged_at: undefined,
-	head_sha: 'abc',
-	merge_state_status: 'DIRTY',
-}
 const FOLLOWUP_FAILED = { code: FAILED, out: 'PR checks failed: merge conflict' }
+const CHECKS_RED = { code: FAILED, out: 'PR checks failed (failed checks: Checks).' }
+const PREFLIGHT_REFUSED = { code: FAILED, out: 'followup refused: the branch is behind its remote' }
+const REVIEW_BLOCKED = { code: FAILED, out: 'PR checks failed (review requested changes).' }
 const SCOPED_GREEN = { code: OK, out: 'scoped green' }
 const GATE_RED = { code: FAILED, out: 'gate red' }
 const PUSH_REJECTED = { code: FAILED, out: 'push rejected' }
@@ -50,6 +40,7 @@ const MERGED_NOTE = 'merged main'
 const tree = { is_dirty: false }
 const FOLLOWUP = ['followup', TITLE, ...NOTIFY]
 const SPAWN_FAILED = 'spawn failed'
+const FETCH_FAILED = 'fetch failed'
 
 function commands(): ReadonlyArray<ReadonlyArray<string>> {
 	return josh_run_mock.mock.calls.map((call) => call[0] as ReadonlyArray<string>)
@@ -58,7 +49,6 @@ function commands(): ReadonlyArray<ReadonlyArray<string>> {
 beforeEach(() => {
 	merge_mock.mockReset().mockResolvedValue(CURRENT)
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
-	merge_state_mock.mockReset().mockResolvedValue(DIRTY)
 	scoped_mock.mockReset().mockResolvedValue(SCOPED_GREEN)
 	overlap_mock.mockReset().mockResolvedValue(undefined)
 	tree.is_dirty = false
@@ -131,7 +121,7 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	})
 
 	it('defers a merge that could not be attempted rather than throwing', async () => {
-		merge_mock.mockRejectedValue(new Error('fetch failed'))
+		merge_mock.mockRejectedValue(new Error(FETCH_FAILED))
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toMatchObject({ code: OK })
 	})
@@ -206,14 +196,15 @@ describe('run_ship_sync.sync_stage — the local commit: no stash, nothing on a 
 	})
 })
 
-describe('run_ship_sync.followup_stage — a pull request that turned conflicting', () => {
+describe('run_ship_sync.followup_stage — a default branch that moved since the push', () => {
 	it('returns a green followup as it is, merging nothing', async () => {
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toMatchObject({ code: OK })
 		expect(merge_mock).not.toHaveBeenCalled()
 	})
 
-	it('merges again on DIRTY, gates and pushes the clean merge and waits again', async () => {
-		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
+	// joshuafolkken/kit#4825: a red CI on a pull request that is not conflicting merges again too.
+	it('merges again on a failed followup, gates and pushes the clean merge and waits again', async () => {
+		josh_run_mock.mockResolvedValueOnce(CHECKS_RED)
 		merge_mock.mockResolvedValue(MERGED)
 
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toMatchObject({ code: OK })
@@ -224,12 +215,16 @@ describe('run_ship_sync.followup_stage — a pull request that turned conflictin
 		)
 	})
 
-	it('stops before the push when the gate over the merged tree is red', async () => {
+	it('stops before the push when the gate over the merged tree is red, saying main moved', async () => {
 		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
 		merge_mock.mockResolvedValue(MERGED)
 		scoped_mock.mockResolvedValue(GATE_RED)
 
-		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(GATE_RED)
+		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual({
+			code: FAILED,
+			out: `${run_ship_sync.MERGED_GATE_NOTE}\n${GATE_RED.out}`,
+			cause: 'check',
+		})
 		expect(commands()).toStrictEqual([FOLLOWUP])
 	})
 
@@ -246,17 +241,28 @@ describe('run_ship_sync.followup_stage — a pull request that turned conflictin
 })
 
 describe('run_ship_sync.followup_stage — failures that are not merged again', () => {
-	it('leaves a failure that is not a conflict as it was', async () => {
+	it('leaves the failure as it was when the default branch has not moved', async () => {
 		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
-		merge_state_mock.mockResolvedValue({ ...DIRTY, merge_state_status: 'BLOCKED' })
 
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(FOLLOWUP_FAILED)
-		expect(merge_mock).not.toHaveBeenCalled()
+		expect(scoped_mock).not.toHaveBeenCalled()
+		expect(commands()).toStrictEqual([FOLLOWUP])
 	})
 
-	it('leaves the failure as it was when the pull request cannot be read', async () => {
+	it.each([PREFLIGHT_REFUSED, REVIEW_BLOCKED])(
+		'leaves a failure that is not on the checks as it was, merging nothing: $out',
+		async (failed) => {
+			josh_run_mock.mockResolvedValueOnce(failed)
+			merge_mock.mockResolvedValue(MERGED)
+
+			expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(failed)
+			expect(merge_mock).not.toHaveBeenCalled()
+		},
+	)
+
+	it('leaves the failure as it was when the merge could not be attempted', async () => {
 		josh_run_mock.mockResolvedValueOnce(FOLLOWUP_FAILED)
-		merge_state_mock.mockRejectedValue(new Error('rate limited'))
+		merge_mock.mockRejectedValue(new Error(FETCH_FAILED))
 
 		expect(await run_ship_sync.followup_stage(TITLE, NOTIFY)).toStrictEqual(FOLLOWUP_FAILED)
 	})

@@ -168,13 +168,3 @@ describe('run_ship_next.next_step with --unpinned-ok', () => {
 		)
 	})
 })
-
-describe('run_ship_next.quoted', () => {
-	it('single-quotes a title so the shell expands nothing in it', () => {
-		expect(run_ship_next.quoted('Fix `$HOME` #1')).toBe("'Fix `$HOME` #1'")
-	})
-
-	it('escapes a single quote inside the title', () => {
-		expect(run_ship_next.quoted("Don't #1")).toBe(String.raw`'Don'\''t #1'`)
-	})
-})

@@ -350,10 +350,11 @@ describe('run_ship_cli.run — --cite is a follow-up citation like a trailing po
 })
 
 // joshuafolkken/kit#3234: the sync stage merged the default branch into the checkout the suite ran in.
+// joshuafolkken/kit#4825: the commit stage asks once more before the push.
 describe('run_ship_cli.run — a foreground ship merges the default branch through the stub', () => {
-	it('asks the stubbed merge once, before the commit, and reports it as current', async () => {
+	it('asks the stubbed merge at the sync and before the push, each reported as current', async () => {
 		expect(await run_ship_cli.run([TITLE])).toBe(OK)
-		expect(merge_mock).toHaveBeenCalledOnce()
+		expect(merge_mock).toHaveBeenCalledTimes(2)
 	})
 })
 

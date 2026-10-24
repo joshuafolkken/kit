@@ -1,3 +1,4 @@
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 import type { Cause } from './run-ship-stop-cause'
@@ -30,9 +31,6 @@ const COMMAND = {
 	DETACH_REVIEW: 'pnpm josh ship --detach --review',
 } as const
 
-// A single quote cannot appear inside single quotes, so it closes the quote, escapes one, and reopens.
-const ESCAPED_QUOTE = String.raw`'\''`
-
 // A token of only these characters means the same to the shell quoted or not, so it is left bare.
 const BARE_WORD = /^[\w%+,./:=@-]+$/u
 
@@ -54,12 +52,8 @@ interface ShipResume {
 }
 
 // Single quotes, so a `$` or a backtick in a title is never expanded by the shell that runs it.
-function quoted(title: string): string {
-	return `'${title.split("'").join(ESCAPED_QUOTE)}'`
-}
-
 function shell_word(token: string): string {
-	return BARE_WORD.test(token) ? token : quoted(token)
+	return BARE_WORD.test(token) ? token : shell_quote.single_quoted(token)
 }
 
 // A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
@@ -150,6 +144,6 @@ function next_step(issue: string, stage: Stage, resume: ShipResume, is_excerpted
 	return `${fix_step(issue, stage, is_excerpted)}, then ${after_fix(stage, resume)}`
 }
 
-const run_ship_next = { COMMAND, next_step, quoted, resume_of }
+const run_ship_next = { COMMAND, next_step, resume_of }
 
 export { run_ship_next, type ShipResume }
