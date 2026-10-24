@@ -152,6 +152,8 @@ describe('run_ship_cli.run — --detach hands the region to a supervisor', () =>
 		)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 		expect(info_lines).toEqual(['launched'])
+		// joshuafolkken/kit#4785: a `--review` ship hands the pre-detach checks its `test:pinned` check.
+		expect(pre_detach_mock.mock.calls[0]?.[2]).toBeTypeOf('function')
 	})
 
 	it('exits non-zero on a refused launch', async () => {
@@ -303,7 +305,7 @@ describe('run_ship_cli.run — the type check and document tests run before the 
 
 	it('detaches once both pass under an explicit --detach', async () => {
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
-		expect(pre_detach_mock).toHaveBeenCalledOnce()
+		expect(pre_detach_mock).toHaveBeenCalledWith()
 		expect(detach_mock).toHaveBeenCalledOnce()
 	})
 

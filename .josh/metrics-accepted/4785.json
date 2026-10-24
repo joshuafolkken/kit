@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned joins the pre-detach checks of a --review ship (new module run-ship-pre-detach-pinned.ts and its wiring)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
