@@ -7,6 +7,13 @@ import { run_review_steps } from './run-review-steps'
 // joshuafolkken/kit#4647: `--unpinned-ok "<reason>"` is a start, not a usage error — its reason reaches
 // the pinned check in place. joshuafolkken/kit#4770: that run launches no background check.
 
+// Code's brief alone: the interaction brief beside it is `run-review-cli-interaction.test.ts`'s.
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: async () => 'not-required' } }
+})
+
 const FAILURE_EXIT_CODE = 1
 
 afterEach(() => {

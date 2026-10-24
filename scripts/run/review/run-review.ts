@@ -57,6 +57,8 @@ const MOVED_EXIT_CODE = 2
 // The `--join` exit code of an unpinned change the background `test:pinned` found
 // (joshuafolkken/kit#4770). `josh ship` never drains it, whatever the reviewer fixed.
 const UNPINNED_EXIT_CODE = 3
+// `josh ship` opens the interaction brief itself, so its `run:review` opens code's alone.
+const CODE_ONLY_FLAG = '--code-only'
 
 function is_gate_settled(state: GateState): boolean {
 	return state !== GATE_RUNNING
@@ -114,6 +116,7 @@ function format_timing(timing: ReviewTiming): string {
 const run_review = {
 	ADOPT,
 	BLOCKED,
+	CODE_ONLY_FLAG,
 	GATE_GREEN,
 	GATE_MOVED,
 	GATE_RED,

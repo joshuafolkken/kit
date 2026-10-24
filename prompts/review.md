@@ -78,8 +78,8 @@ pnpm josh review:brief --level-only --staged   # the staged diff
 
 ## Interaction review
 
-After round 1 and its record, `pnpm josh review:brief --interaction` answers whether the change takes
-the interaction review and prints its brief; hand it to a reviewer subagent, dispose of the findings
+`pnpm josh run:review` prints its brief beside round 1's where it is due; one still owed after round 1
+takes `pnpm josh review:brief --interaction`. Hand it to a reviewer subagent, dispose of the findings
 by the three-way disposition below, and record the pass with
 `pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]`.
 

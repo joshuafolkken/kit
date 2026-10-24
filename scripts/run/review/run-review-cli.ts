@@ -1,6 +1,10 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { git_branch } from '#scripts/git/git-branch'
+import { git_command } from '#scripts/git/git-command'
+import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
+import { review_interaction } from '#scripts/review/review-interaction'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
@@ -23,12 +27,19 @@ import { run_review_steps } from './run-review-steps'
 // the check found an unpinned change. That exit code is
 // what makes "a red gate is not adopted over" a mechanical guarantee rather than an ordering
 // (`run-review.ts` → `adopt_verdict`).
+//
+// **Where the interaction review is due and not yet recorded, its brief follows code's**
+// (joshuafolkken/kit#4802), so the child's round 1 reviews both and `josh ship` reuses both rather than
+// running the interaction pass alone after it. `--code-only` is the ship's own open, which mints the
+// interaction brief itself.
 
 const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
+const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:review [--unpinned-ok "<reason>" | --join]'
+const USAGE = 'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join'
+const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
 	return new Date().toISOString()
@@ -49,7 +60,50 @@ function join_exit_code(state: GateState): number {
 const JOIN_HINT =
 	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer) with the brief above; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
-async function start_pair(): Promise<number> {
+const INTERACTION_HEADER =
+	'=== Interaction review brief — a second `reviewer`, launched beside the first with the brief below ==='
+const INTERACTION_HINT =
+	'Two briefs above: launch one `reviewer` per brief side by side, and once both are attested record the interaction pass with `pnpm josh review:record --interaction --issue <N> [<finding> ...]` beside round 1.'
+
+// The slots this branch's issue owes round 1. A branch that names no issue, or the ship's own open,
+// briefs code alone.
+async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewSlot>> {
+	if (is_code_only) return [CODE]
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+	if (issue === undefined) return [CODE]
+
+	return review_interaction.round_one_slots(await review_interaction.status(issue))
+}
+
+function no_note(): void {
+	// Nothing follows code's brief unless `--unpinned-ok` has an accepted list for its reviewer.
+}
+
+// Code's brief, `after_code`'s note for its reviewer, then the interaction brief under its header —
+// never after a code brief that refused.
+async function print_briefs(
+	slots: ReadonlyArray<ReviewSlot>,
+	after_code: () => void,
+): Promise<number> {
+	const code = await review_brief_cli.run([])
+
+	if (code !== SUCCESS_EXIT_CODE) return code
+	after_code()
+	if (!slots.includes(INTERACTION)) return code
+
+	process.stdout.write(`${INTERACTION_HEADER}\n`)
+
+	return await review_brief_cli.run([INTERACTION_FLAG])
+}
+
+function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
+	return slots.includes(INTERACTION) ? `${JOIN_HINT}\n${INTERACTION_HINT}` : JOIN_HINT
+}
+
+async function start_pair(
+	slots: ReadonlyArray<ReviewSlot>,
+	after_code: () => void = no_note,
+): Promise<number> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
@@ -61,46 +115,55 @@ async function start_pair(): Promise<number> {
 
 	await run_review_steps.mark_gate_starting()
 	run_review_steps.write_timing_start({ gate_started_at, review_started_at: now_iso() })
-	const code = await review_brief_cli.run([])
+	const code = await print_briefs(slots, after_code)
 
 	// The hint follows a printed brief and nothing else: a brief that refused (a tree the scoped pair
 	// has not been green on) exits non-zero, and a "gate running, launch the review" line under that
 	// refusal would send the child to review a tree there is no brief for.
-	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${JOIN_HINT}\n`)
+	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${join_hint(slots)}\n`)
 
 	return code
 }
 
 // `josh test:pinned` runs in the background beside the pair, and the join stops on what it finds. A
 // check that could not be launched fails open, as one that could not run does.
-async function start_beside(): Promise<number> {
+async function start_beside(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
 	const launched = run_review_pinned_steps.launch()
 
 	if (launched.kind === 'failed') {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
 
-	return await start_pair()
+	return await start_pair(slots)
 }
 
-// `--unpinned-ok` checks in place first, because the accepted list follows the brief on stdout, where
-// the reviewer reads it; when the pair failed to open, so no brief follows — or nothing was unpinned —
-// the report goes to stderr beside the other run notes.
-async function start_after_check(reason: string): Promise<number> {
+// `--unpinned-ok` checks in place first, because the accepted list follows code's brief on stdout —
+// before the interaction header — where the code reviewer reads it; when no code brief printed, or
+// nothing was unpinned, the report goes to stderr beside the other run notes.
+async function start_after_check(
+	slots: ReadonlyArray<ReviewSlot>,
+	reason: string,
+): Promise<number> {
 	const pinned = await run_review_pinned.check(reason)
-	const code = await start_pair()
-	const is_briefed = code === SUCCESS_EXIT_CODE && pinned.kind === 'accepted'
-	const sink = is_briefed ? process.stdout : process.stderr
+	const shown = { is: false }
 
-	sink.write(pinned.text)
+	function show_accepted(): void {
+		if (pinned.kind !== 'accepted') return
+		process.stdout.write(pinned.text)
+		shown.is = true
+	}
+
+	const code = await start_pair(slots, show_accepted)
+
+	if (!shown.is) process.stderr.write(pinned.text)
 
 	return code
 }
 
-async function run_start(reason?: string): Promise<number> {
+async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Promise<number> {
 	run_review_pinned_steps.clear()
 
-	return reason === undefined ? await start_beside() : await start_after_check(reason)
+	return reason === undefined ? await start_beside(slots) : await start_after_check(slots, reason)
 }
 
 // The background check's answer, on stderr where the start printed it before it ran beside the pair.
@@ -175,15 +238,24 @@ async function run_join(): Promise<number> {
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv.length === 0) return await run_start()
-	if (argv.length === 1 && argv[0] === JOIN_FLAG) return await run_join()
+// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`.
+async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
 	const reason = run_review_pinned.ok_reason_of(argv)
-	if (reason !== undefined) return await run_start(reason)
 
-	process.stderr.write(`${USAGE}\n`)
+	if (reason === undefined && argv.length > 0) {
+		process.stderr.write(`${USAGE}\n`)
 
-	return FAILURE_EXIT_CODE
+		return FAILURE_EXIT_CODE
+	}
+
+	return await run_start(await brief_slots(is_code_only), reason)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	if (argv.length === 1 && argv[0] === JOIN_FLAG) return await run_join()
+	const is_code_only = argv[0] === run_review.CODE_ONLY_FLAG
+
+	return await run_open(is_code_only, argv.slice(is_code_only ? 1 : 0))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
@@ -191,6 +263,8 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_review_cli = {
+	INTERACTION_HEADER,
+	INTERACTION_HINT,
 	JOIN_HINT,
 	join_exit_code,
 	run,

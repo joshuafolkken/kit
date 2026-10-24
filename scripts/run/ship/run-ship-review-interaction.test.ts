@@ -42,9 +42,11 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: () => false },
 }))
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: interaction_status_mock },
-}))
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: interaction_status_mock } }
+})
 // A recorded round 1 stands on this tree, so an `ok` record is reused (joshuafolkken/kit#4620).
 vi.mock('#scripts/review/review-reviewed-tree', () => ({
 	review_reviewed_tree: {
@@ -61,7 +63,7 @@ const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const OK = 0
 const FAILED = 1
 const ISSUE = '4276'
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const JOIN = 'run:review --join'
 const ATTEST = 'review:attest --check'
 const RECORD = `review:record --issue ${ISSUE}`

@@ -60,9 +60,9 @@ const ROUND_ONE_RECORDED_NOTE =
 const { run_phases, scoped_pair } = run_ship_scoped
 const { CAUSE } = run_ship_stop_cause
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
-const BOTH_SLOTS: ReadonlyArray<ReviewSlot> = [CODE, INTERACTION]
+// `run:review` opens code's brief alone here: the interaction slot's is the ship's own open beside it.
 const ROUND_ONE_OPENS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
-	code: [RUN_REVIEW],
+	code: [RUN_REVIEW, run_review.CODE_ONLY_FLAG],
 	interaction: INTERACTION_BRIEF,
 }
 const SLOT_RECORD_FLAGS: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
@@ -315,8 +315,14 @@ async function interaction_stage(issue: string): Promise<StepResult> {
 	])
 }
 
+async function due_slots(issue: string): Promise<ReadonlyArray<ReviewSlot>> {
+	return review_interaction.round_one_slots(await review_interaction.status(Number(issue)))
+}
+
 async function is_interaction_due(issue: string): Promise<boolean> {
-	return (await review_interaction.status(Number(issue))) === 'missing'
+	const slots = await due_slots(issue)
+
+	return slots.includes(INTERACTION)
 }
 
 // Owed after a round 1 that passed and is still not recorded — so a relaunched ship whose round 1 is
@@ -325,10 +331,6 @@ async function is_interaction_owed(issue: string, first: StepResult): Promise<bo
 	if (first.code !== SUCCESS_EXIT_CODE) return false
 
 	return await is_interaction_due(issue)
-}
-
-function round_one_slots(is_due: boolean): ReadonlyArray<ReviewSlot> {
-	return is_due ? BOTH_SLOTS : [CODE]
 }
 
 // **The interaction review runs beside round 1 where it is due and not yet recorded**
@@ -340,7 +342,7 @@ async function review_stage(
 	is_stale = false,
 	unpinned_ok: ReadonlyArray<string> = [],
 ): Promise<StepResult> {
-	const slots = round_one_slots(await is_interaction_due(issue))
+	const slots = await due_slots(issue)
 	const first = await round_one_stage(issue, is_stale, slots, unpinned_ok)
 
 	if (!(await is_interaction_owed(issue, first))) return first
