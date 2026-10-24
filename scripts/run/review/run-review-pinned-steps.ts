@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { core_budget } from '#scripts/gate/core-budget'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -26,9 +27,11 @@ const STOP_SIGNAL = 'SIGTERM'
 
 // The join waits here only once the gate has settled and the review has returned, so the grace is
 // counted from the end of the pair (joshuafolkken/kit#4794). A check this far behind it is one the
-// CPU starved, and a longer wait would end in the same not-run answer, minutes later.
+// CPU starved, and a longer wait would end in the same not-run answer, minutes later. A check still
+// queued for its cores gets no grace at all (joshuafolkken/kit#4808): it could not finish within it.
 const GRACE_MS = 120_000
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
+const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
 
 type Clock = () => number
 
@@ -111,9 +114,32 @@ function stop({ pid }: Launch): void {
 	}
 }
 
-// The check usually settles while the review is still running; the grace only bounds one that fell
-// far behind the pair, which fails open and is stopped rather than left burning the cores.
-async function poll_answer(root: string, launched: Launch, now: Clock): Promise<PinnedSummary> {
+// The dispatcher's claim in the core ledger (`core-budget.ts`) carries `admitted_at` from the moment
+// the check is granted its cores, before its script even boots, so a claim from this checkout not yet
+// admitted is a check still queued. A check that claimed nothing (a parent held the cores) is not one.
+function is_queued(root: string): boolean {
+	return core_budget
+		.live_reservations()
+		.some(
+			({ reservation }) =>
+				reservation.command === PINNED_COMMAND &&
+				reservation.checkout === root &&
+				reservation.admitted_at === undefined,
+		)
+}
+
+// A check given up on fails open and is stopped rather than left burning the cores.
+function stopped(launched: Launch, note: string): PinnedSummary {
+	stop(launched)
+
+	return test_pinned_record.not_run_summary(new Error(note))
+}
+
+async function poll_within_grace(
+	root: string,
+	launched: Launch,
+	now: Clock,
+): Promise<PinnedSummary | undefined> {
 	const started = now()
 	let summary = read_answer(root, launched)
 
@@ -123,10 +149,18 @@ async function poll_answer(root: string, launched: Launch, now: Clock): Promise<
 		summary = read_answer(root, launched)
 	}
 
-	if (summary !== undefined) return summary
-	stop(launched)
+	return summary
+}
 
-	return test_pinned_record.not_run_summary(new Error(TIMED_OUT_NOTE))
+// The check usually settles while the review is still running; the grace only bounds one that fell
+// far behind the pair while running its tests.
+async function poll_answer(root: string, launched: Launch, now: Clock): Promise<PinnedSummary> {
+	const summary = read_answer(root, launched)
+
+	if (summary !== undefined) return summary
+	if (is_queued(root)) return stopped(launched, QUEUED_NOTE)
+
+	return (await poll_within_grace(root, launched, now)) ?? stopped(launched, TIMED_OUT_NOTE)
 }
 
 // `undefined` when no check was launched.

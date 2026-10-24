@@ -1,0 +1,7 @@
+{
+	"reason": "The join reads the core ledger to stop a test:pinned check still queued for cores at once, instead of waiting out the 120s grace (#4808)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
