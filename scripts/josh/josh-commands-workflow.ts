@@ -188,7 +188,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
-			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>',
+			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>',
 			'automation',
 			['files', 'network'],
 		],
