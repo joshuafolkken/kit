@@ -1,0 +1,7 @@
+{
+	"reason": "Approval-path predicate single-sourced in release_approval_prune and the reviewed-tree comparison skips settled approval rewrites (#4788)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

@@ -65,6 +65,32 @@ describe('review_reviewed_tree.is_unmoved', () => {
 	})
 })
 
+// joshuafolkken/kit#4788: the ship's pre-detach `josh metrics --rerecord` rewrites the branch's
+// approval after `review:record`.
+describe('review_reviewed_tree.is_unmoved after the approval was re-recorded', () => {
+	const APPROVAL = '.josh/metrics-accepted/4788.json'
+	const recorded: FileMapStamp = { ...STAMP, files: { [FILE]: 'x', [APPROVAL]: 'old' } }
+
+	it('answers true when only the approval changed', async () => {
+		const tree = { files: { [FILE]: 'x', [APPROVAL]: 'new' }, base: BASE }
+
+		expect(await review_reviewed_tree.is_unmoved(recorded, tree)).toBe(true)
+	})
+
+	it('answers false when the approval is one a recorded High cites', async () => {
+		const unsettled: FileMapStamp = { ...STAMP, files: { [FILE]: 'x', [APPROVAL]: 'unsettled' } }
+		const tree = { files: { [FILE]: 'x', [APPROVAL]: 'new' }, base: BASE }
+
+		expect(await review_reviewed_tree.is_unmoved(unsettled, tree)).toBe(false)
+	})
+
+	it('answers false when a file besides the approval changed too', async () => {
+		const tree = { files: { [FILE]: 'y', [APPROVAL]: 'new' }, base: BASE }
+
+		expect(await review_reviewed_tree.is_unmoved(recorded, tree)).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#4829: the ship's sync moves the base under a recorded round.
 describe('review_reviewed_tree.is_unmoved on a base the sync moved', () => {
 	const moved = { files: { [FILE]: 'x' }, base: 'new-base' }

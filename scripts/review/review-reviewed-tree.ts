@@ -3,6 +3,7 @@ import { moved_paths } from '#scripts/gate/moved-paths'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { review_attest } from './review-attest'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_stamps } from './review-stamps'
@@ -53,10 +54,19 @@ async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 // **A base the ship's sync moved is unmoved for every path the default branch left alone**
 // (joshuafolkken/kit#4829): with every recorded digest matching, only a synced path the round covers
 // changes what it read. Main's other paths are the scoped pair's, the gate's and CI's to check.
+//
+// **A `josh metrics` approval the branch rewrote is no move** (joshuafolkken/kit#4788): the ship's
+// pre-detach re-record writes it after `review:record`, and it is data `josh metrics` derives and the
+// gate's own metrics step checks, never what the round reviewed. An approval a recorded High cites
+// stays unsettled, so it still reads as moved.
+function is_rerecorded_approval(stamp: FileMapStamp, path: string): boolean {
+	return release_approval_prune.is_approval(path) && stamp.files[path] !== UNSETTLED_DIGEST
+}
+
 async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
 	const parts = await moved_paths.moved_parts(stamp, tree)
 
-	if (parts === undefined || parts.changed.length > 0) return false
+	if (!parts?.changed.every((path) => is_rerecorded_approval(stamp, path))) return false
 
 	return parts.synced.every((path) => !Object.hasOwn(stamp.files, path))
 }
