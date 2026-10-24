@@ -28,7 +28,7 @@ import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversatio
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import type { StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
-import { run_merge } from './run-merge'
+import { run_merge, type EndingSignals } from './run-merge'
 import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
 
@@ -56,8 +56,12 @@ const GIT_ENTRY = '.git'
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
-// One returned child's context, gathered from the command line by the CLI.
-interface MergeContext {
+// One returned child's context, gathered from the command line by the CLI, and the ending signals its
+// handlers act on — each one's meaning is `EndingSignals`'s.
+interface MergeContext extends Pick<
+	EndingSignals,
+	'merged_pr' | 'is_streak_exempt' | 'capped_note' | 'resume_ms'
+> {
 	child: string
 	epic: string | undefined
 	repo: string | undefined
@@ -69,14 +73,6 @@ interface MergeContext {
 	// ending apart from a genuine child failure; absent leaves outage detection off, so the child is
 	// classified from its GitHub state alone.
 	output?: string | undefined
-	// The merged pull request that closes the child, when GitHub left the child OPEN after the merge —
-	// the one `merged` child whose issue this command still has to close.
-	merged_pr?: string | undefined
-	// The outage is not an API outage (`EndingSignals.is_streak_exempt`): re-dispatched, but not added
-	// to the streak.
-	is_streak_exempt?: boolean | undefined
-	// The per-child cap's park line (`EndingSignals.capped_note`).
-	capped_note?: string | undefined
 }
 
 interface FailedResult {

@@ -1,5 +1,6 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { api_outage } from '#scripts/agent/api-outage'
+import { api_usage_limit } from '#scripts/agent/api-usage-limit'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import type { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -93,6 +94,15 @@ async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolea
 	return is_merged === undefined ? undefined : !is_merged
 }
 
+// When a usage limit that stopped the child resets — off without `--output`, as the outage read is. The
+// reset is read from the transcript's last write, not from this late collection of it.
+function read_resume_ms(output: string | undefined): number | undefined {
+	if (output === undefined) return undefined
+	const transcript = run_ending.read_transcript(output)
+
+	return api_usage_limit.transcript_resume_ms(transcript, Date.now(), run_ending.written_at(output))
+}
+
 async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
 	const [is_cut, merged_pr, retryable, is_withdrawn] = await Promise.all([
 		run_merge_steps.has_resumable_cut(ctx.child),
@@ -102,8 +112,9 @@ async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingS
 	])
 
 	const is_auth_failure = read_is_auth_failure(ctx.output)
+	const resume_ms = read_resume_ms(ctx.output)
 
-	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_auth_failure }
+	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_auth_failure, resume_ms }
 }
 
 // An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally;

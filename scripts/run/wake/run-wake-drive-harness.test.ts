@@ -62,6 +62,7 @@ function drive_ports(world: World): DrivePorts {
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
+		usage_limited: async () => false,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,

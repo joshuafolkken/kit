@@ -1,0 +1,8 @@
+{
+	"reason": "#4745 adds the usage-limit outcome, its reset parser and the backlog:drive hold (+code lines); the run:merge doc bolds the new **usage-limit** child as it bolds outage and failed (+1 bold span)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 214,
+		"prose.excess_bold": 1
+	}
+}

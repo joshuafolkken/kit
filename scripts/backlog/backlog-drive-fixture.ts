@@ -59,6 +59,8 @@ interface Script {
 	judgement_owed?: number
 	// The memory-hold answers in order, the last repeating; unset reads as memory to spare.
 	memory_held?: ReadonlyArray<boolean>
+	// The usage-limit answers in order, the last repeating; unset reads as no limit in force.
+	usage_limited?: ReadonlyArray<boolean>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -162,13 +164,16 @@ function room_ports(script: Script): Pick<LoopPorts, 'free_lanes' | 'limit_room'
 	}
 }
 
-// The memory hold, answered from the script's queue, the last answer repeating.
-function memory_port(script: Script): Pick<LoopPorts, 'memory_held'> {
-	const memory = [...(script.memory_held ?? [false])]
+// One scripted answer queue, the last answer repeating.
+function queued(answers: ReadonlyArray<boolean> | undefined): () => Promise<boolean> {
+	const queue = [...(answers ?? [false])]
 
-	return {
-		memory_held: async () => (memory.length > 1 ? memory.shift() : memory[0]) ?? false,
-	}
+	return async () => (queue.length > 1 ? queue.shift() : queue[0]) ?? false
+}
+
+// The memory and usage-limit holds, answered from the script's queues.
+function memory_port(script: Script): Pick<LoopPorts, 'memory_held' | 'usage_limited'> {
+	return { memory_held: queued(script.memory_held), usage_limited: queued(script.usage_limited) }
 }
 
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.

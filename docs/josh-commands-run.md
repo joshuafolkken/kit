@@ -443,7 +443,7 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
-- `--output <path>` — the transcript the outage split reads; absent, it is off.
+- `--output <path>` — the transcript the outage and usage-limit splits read; absent, they are off.
 - `--driver` — the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.
 
 <!-- /usage -->
@@ -455,6 +455,8 @@ logged once at confirmation, then `lane:close <N>` and the epic counters; a merg
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`); a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
+a **usage-limit** child (OPEN, unparked, exit record shows a Claude usage limit stopped it) has it dropped, unparked and counted
+against no streak, and a `usage-limit` event names the reset (unreadable or past: 30 minutes on); `backlog:drive` launches nothing before it;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
@@ -466,7 +468,7 @@ re-dispatch count and its newest `relaunch-failed` line.
 A **cut** child (OPEN, unparked, its lane holding a declared cut no successor adopted) is neither
 parked nor counted: its successor is relaunched in its lane once
 per cut; a relaunch that cannot start, or a second unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
-A parked, failed, waiting or outage child's lane is closed when vacant (no commit past the default
+A parked, failed, waiting, outage or usage-limit child's lane is closed when vacant (no commit past the default
 branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
@@ -611,14 +613,14 @@ Keyed to the common git directory `run:carry` uses, so parent and lane children 
 `--follow` is `--from` that waits, returning at an event or else at the interval. Events go to stdout and the next position to stderr — the same before
 and after a cut. `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
-`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `usage-limit`, `cut`,
 `resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
 `lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
 `pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.
 `setup` is one stage the run works through (`planning`, `dispatching #<N>`, …) — a trace `run:board` times, never a position.
 `filed` is an Issue `issue:file` created, and `note` a one-line
-observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`
-and `outage`; other steps call `--append`. The stream is bounded.
+observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`,
+`outage` and `usage-limit`; other steps call `--append`. The stream is bounded.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:event` in detail".
 

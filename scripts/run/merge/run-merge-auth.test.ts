@@ -34,6 +34,7 @@ vi.mock('#scripts/run/run-ending', async () => {
 			ended_mid_turn: mid_turn_mock,
 			read_exit: (): unknown => agent_exit_record.read_exit_record(transcript_mock()),
 			read_transcript: transcript_mock,
+			written_at: vi.fn(),
 		},
 	}
 })

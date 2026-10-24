@@ -45,6 +45,8 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 const NO_RETRIES = 0
 const EXHAUSTED_ANSWER = 'exhausted'
 const JUDGE_REASON = 'judge'
+// The `hold` reason a pass held by a Claude usage limit records.
+const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
 
 interface OfferRead extends HeldWaiting {
@@ -120,6 +122,9 @@ interface DrivePorts {
 	// Whether the machine has no memory for one more lane — `backlog_drive_memory.gauge()` in production,
 	// which carries its hysteresis between calls.
 	memory_held: () => Promise<boolean>
+	// Whether a Claude usage limit that stopped a child has yet to reset — `run_merge_usage_limit.is_held`
+	// in production (joshuafolkken/kit#4745).
+	usage_limited: () => Promise<boolean>
 	// Why an offered pass started nothing (`backlog-drive-hold.ts`). Production records it in the lane
 	// ledger only while a lane is free. `undefined` is the run's stop, which owes no lane a child.
 	hold: (reason: string | undefined, waiting?: ReadonlyArray<number>) => Promise<void>
@@ -274,12 +279,21 @@ function on_verdict(read: OfferRead, state: DriveState): PassResult {
 	return { kind: 'continue', state }
 }
 
-// An offer answered `run`: launched while the machine has memory to spare, held until it does otherwise.
+async function usage_held(state: DriveState, ports: DrivePorts): Promise<PassResult> {
+	await ports.hold(USAGE_LIMIT_REASON)
+
+	return { kind: 'continue', state }
+}
+
+// An offer answered `run`: launched while the machine has memory to spare and no usage limit is in
+// force, held until both hold otherwise. A usage-limited pass polls on as a held one does.
 async function run_offered(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
+	if (await ports.usage_limited()) return await usage_held(state, ports)
+
 	if (await ports.memory_held()) return await backlog_drive_memory.held(state, ports)
 
 	return await launch_all(issues, state, ports)
@@ -410,6 +424,7 @@ async function run_loop(
 const backlog_drive = {
 	HANDOFF_TOKENS,
 	TOKEN_HANDLING,
+	USAGE_LIMIT_REASON,
 	initial_state,
 	merge_stopped,
 	run_loop,

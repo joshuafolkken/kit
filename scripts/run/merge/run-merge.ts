@@ -50,6 +50,9 @@ const ONE = 1
 // - `unauthenticated` — OPEN and carrying neither, but the exit record shows the session could not
 //                   authenticate; no child can run until a person runs `/login`, so the run stops with
 //                   the child left `in-progress` and nothing counted (joshuafolkken/kit#4216).
+// - `usage-limit` — OPEN and carrying neither, but the exit record shows a Claude usage limit stopped
+//                   it; nothing is counted or parked, and the run dispatches again once the limit
+//                   resets (joshuafolkken/kit#4745).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
 //                   GitHub state: left OPEN for the next run, it is neither merged nor failed.
@@ -71,6 +74,9 @@ interface EndingSignals {
 	is_streak_exempt?: boolean | undefined
 	// The exit record shows the session could not authenticate (`api-auth.ts`).
 	is_auth_failure?: boolean | undefined
+	// When a usage limit that stopped the session lets the run dispatch again, in epoch milliseconds
+	// (`api-usage-limit.ts`); absent when no usage limit stopped it.
+	resume_ms?: number | undefined
 	// A re-dispatchable ending the per-child cap turned into `failed`: the line its park leads with
 	// (`run-merge-cap.ts`).
 	capped_note?: string | undefined
@@ -88,6 +94,16 @@ function is_parked(state: IssueState): boolean {
 	return has_parked_label(state.labels)
 }
 
+// An unfinished child its environment ended: it could not authenticate, a usage limit stopped it, or it
+// could not reach the API — read in that order, each more specific than the next.
+function environment_outcome(signals: EndingSignals): ChildOutcome {
+	if (signals.is_auth_failure === true) return 'unauthenticated'
+
+	if (signals.resume_ms !== undefined) return 'usage-limit'
+
+	return signals.is_outage ? 'outage' : 'failed'
+}
+
 // **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
 // `needs-human-review` a person put on it, so that label is read only on an OPEN child
 // (`backlogrun-progress.md` → "Running a named epic's children").
@@ -101,9 +117,7 @@ function unfinished_outcome(signals: EndingSignals): ChildOutcome {
 
 	if (signals.is_cut) return 'cut'
 
-	if (signals.is_auth_failure === true) return 'unauthenticated'
-
-	return signals.is_outage ? 'outage' : 'failed'
+	return environment_outcome(signals)
 }
 
 function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {

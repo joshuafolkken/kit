@@ -34,6 +34,16 @@ it('restores only live lanes launched by this invocation', () => {
 	expect(backlog_drive_restore.restore(['2504', CHILD, '2509'], events, [])).toStrictEqual([CHILD])
 })
 
+// joshuafolkken/kit#4745: a child a usage limit stopped was released, so its lane is not restored.
+it('does not restore a lane whose child a usage limit stopped', () => {
+	const events = [
+		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(2, 'usage-limit', '#2508 usage limit — resumes at 2026-09-24T01:00:00.000Z'),
+	]
+
+	expect(backlog_drive_restore.restore([CHILD], events, [])).toStrictEqual([])
+})
+
 it('restores a dispatched lane carried in from an earlier invocation', () => {
 	const events = [event(1, CHILD_LAUNCH, CHILD_DISPATCHED), event(2, 'park', PARKED_2509)]
 	const restored = backlog_drive_restore.restore(

@@ -17,6 +17,7 @@ import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
+import { run_merge_usage_limit } from './run-merge-usage-limit'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event. The parent's context is
 // the largest and its per-turn cost the highest, so it calls this once at a child's return and reads
@@ -321,6 +322,14 @@ async function on_unauthenticated(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
 }
 
+// A child a usage limit stopped: released uncounted, its reset recorded (`run-merge-usage-limit.ts`).
+async function on_usage_limit(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_steps.release_child(ctx.child)
+	await run_merge_usage_limit.record(ctx.child, ctx.resume_ms ?? Date.now())
+
+	return await offered(ctx)
+}
+
 // A child that ended its session with a cut no successor adopted: its successor is relaunched,
 // nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
 // again rather than dispatch into it. A successor that could not be started — or a cut the
@@ -398,6 +407,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	merged: on_merged,
 	outage: on_outage,
 	unauthenticated: on_unauthenticated,
+	'usage-limit': on_usage_limit,
 	parked: on_parked,
 	split: on_skipped,
 	unresolved: on_unresolved,
@@ -417,8 +427,8 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	const signals = await run_merge_signals.read_signals(ctx, read)
 	const outcome = run_merge_signals.outcome_of(read, signals)
 
-	const { merged_pr, is_streak_exempt, capped_note } = signals
-	const handled = { ...ctx, merged_pr, is_streak_exempt, capped_note }
+	const { merged_pr, is_streak_exempt, capped_note, resume_ms } = signals
+	const handled = { ...ctx, merged_pr, is_streak_exempt, capped_note, resume_ms }
 
 	return { outcome, ...(await HANDLERS[outcome](handled)) }
 }

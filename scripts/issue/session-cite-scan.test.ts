@@ -65,6 +65,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['lane/lane-overrun.ts', 1],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
+	['run/merge/run-merge-usage-limit.ts', 1],
 	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
 	// resolve the link is the one that just failed.
 	['backlog/backlog-drive-unread.ts', 1],

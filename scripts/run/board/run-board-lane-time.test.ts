@@ -82,6 +82,17 @@ describe('run_board_lane_time -- a relaunched child', () => {
 		expect(time_after(RELAUNCHED, MERGE_AT)).toBe(IN_LANE)
 	})
 
+	it('leaves the wait out of a row a usage limit stopped, as it does an outage', () => {
+		const limited = [
+			event_at(T0, KIND.CHILD_LAUNCH),
+			event_at(OUTAGE_AT, KIND.USAGE_LIMIT),
+			event_at(RELAUNCH_AT, KIND.CHILD_LAUNCH),
+			event_at(MERGE_AT, KIND.MERGE),
+		]
+
+		expect(time_after(limited, LATER)).toBe(IN_LANE)
+	})
+
 	it('ends a row closed on GitHub at its close', () => {
 		const statuses = new Map([[ISSUE, status_of(RELAUNCHED)]])
 		const settled = run_board_status.settle_closed(statuses, CLOSED_READ).get(ISSUE)
