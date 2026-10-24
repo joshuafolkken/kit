@@ -345,9 +345,14 @@ function has_label_name(labels: ReadonlyArray<string>, wanted: string): boolean 
 	return label_name_of(labels, wanted) !== undefined
 }
 
-// Whether label names carry any park label (`PARKED_LABELS`), compared as `has_label_name` does.
+// The park label (`PARKED_LABELS`) label names carry, compared as `has_label_name` does.
+function parked_label_of(labels: ReadonlyArray<string>): string | undefined {
+	return [...PARKED_LABELS].find((label) => has_label_name(labels, label))
+}
+
+// Whether label names carry any park label (`PARKED_LABELS`).
 function has_parked_label(labels: ReadonlyArray<string>): boolean {
-	return [...PARKED_LABELS].some((label) => has_label_name(labels, label))
+	return parked_label_of(labels) !== undefined
 }
 
 // Every workflow label this package manages. The label-reference scan
@@ -415,6 +420,7 @@ export {
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
 	OTHER_CHANGE_LABEL,
+	parked_label_of,
 	PARKED_LABELS,
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,

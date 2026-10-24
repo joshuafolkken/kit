@@ -39,7 +39,8 @@ runs in a delegated unit"), read back with `pnpm josh issue:state <N>`. `pnpm jo
 #N2 …` renders the order (`scripts/backlog/backlog-named.ts`).
 
 **A named issue that cannot finish parks, and the rest of the named list is skipped**; the run drains
-the pool and reports what was not started (`backlog_named.after_failure`). A `needs-human-review` named
+the pool and reports what was not started (`backlog_named.after_failure`). One already closed or parked
+when offered is booked done alone and skips nothing. A `needs-human-review` named
 issue stops the whole run. **`--only` runs the named list and stops there, draining no pool** — a
 failure ends the run, and `--only` with no named issues is refused (`backlog_named.startup`).
 

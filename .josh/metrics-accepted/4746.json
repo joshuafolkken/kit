@@ -1,0 +1,9 @@
+{
+	"reason": "#4746: a named issue settled before dispatch is booked done alone (mark_settled), the --only stop waits for in-flight lanes, and the stop names each unmerged issue's reason; backlogrun-steps.md documents the settled-alone rule beside the skip rule",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 26,
+		"ai_cost.on_demand_bytes": 82,
+		"prose.long_paragraphs": 1
+	}
+}
