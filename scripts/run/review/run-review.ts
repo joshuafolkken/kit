@@ -29,20 +29,31 @@ function adopt_verdict(is_gate_green: boolean): AdoptVerdict {
 const GATE_GREEN = 'green'
 const GATE_RUNNING = 'running'
 const GATE_RED = 'red'
+const GATE_MOVED = 'moved'
 
-type GateState = typeof GATE_GREEN | typeof GATE_RUNNING | typeof GATE_RED
+type GateState = typeof GATE_GREEN | typeof GATE_RUNNING | typeof GATE_RED | typeof GATE_MOVED
 
-// The three states the join waits on, decided from two readings the steps take of the stamps a real
-// `josh gate` writes: a green stamp covering this tree, and the in-flight marker's writer still alive.
+// The four states the join waits on, decided from three readings the steps take of the stamps a real
+// `josh gate` writes: a green stamp covering this tree, the in-flight marker's writer still alive, and
+// a green stamp this pair's gate recorded since it started.
 // Green wins over running, because a gate that has already recorded green is done however the marker
 // reads; a marker whose writer is gone with no green stamp is a gate that finished red or died, which
 // is the safe direction — the join reports red and the verdict is blocked.
-function gate_state(is_green: boolean, is_running: boolean): GateState {
+//
+// **A gate that finished green on a tree that has since moved is not red** (joshuafolkken/kit#4774): a
+// round-1 reviewer fixing in place moves the tree after the gate recorded green, so the stamp no longer
+// covers it. That is `moved` — still not adoptable, but the gate never failed, and the gate that
+// follows re-runs on the moved tree.
+function gate_state(is_green: boolean, is_running: boolean, is_moved = false): GateState {
 	if (is_green) return GATE_GREEN
 	if (is_running) return GATE_RUNNING
+	if (is_moved) return GATE_MOVED
 
 	return GATE_RED
 }
+
+// The `--join` exit code of a `moved` gate, read by `josh ship` (`run-ship-review-steps.ts`).
+const MOVED_EXIT_CODE = 2
 
 function is_gate_settled(state: GateState): boolean {
 	return state !== GATE_RUNNING
@@ -101,8 +112,10 @@ const run_review = {
 	ADOPT,
 	BLOCKED,
 	GATE_GREEN,
+	GATE_MOVED,
 	GATE_RED,
 	GATE_RUNNING,
+	MOVED_EXIT_CODE,
 	adopt_verdict,
 	format_timing,
 	gate_state,
@@ -115,4 +128,4 @@ export type { AdoptVerdict, GateState, ReviewTiming, TimingStart }
 // object their literal types widen to `string`, so a test passing `run_review.GATE_RED` to a
 // `GateState` parameter would not type-check — the same reason `run-liveness.ts` exports its verdicts
 // by name.
-export { GATE_GREEN, GATE_RED, GATE_RUNNING, run_review }
+export { GATE_GREEN, GATE_MOVED, GATE_RED, GATE_RUNNING, run_review }

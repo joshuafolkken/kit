@@ -61,6 +61,41 @@ function launch_gate(root: string = PROJECT_ROOT): LaunchResult {
 	)
 }
 
+function to_timing(value: unknown): TimingStart | undefined {
+	if (typeof value !== 'object' || value === null) return undefined
+
+	const { gate_started_at, review_started_at } = value as Record<string, unknown>
+
+	if (typeof gate_started_at !== 'string' || typeof review_started_at !== 'string') return undefined
+
+	return { gate_started_at, review_started_at }
+}
+
+function read_timing_start(target: string = PROJECT_ROOT): TimingStart | undefined {
+	const raw = stamp_file.read_stamp_text(timing_path(target))
+
+	if (raw === undefined) return undefined
+
+	try {
+		return to_timing(JSON.parse(raw))
+	} catch {
+		return undefined
+	}
+}
+
+// **This pair's gate recorded green, on whatever tree** (joshuafolkken/kit#4774): a red gate writes no
+// stamp and leaves an earlier run's in place, so only a stamp taken after this pair's gate started is
+// this gate's own green. Read beside a stamp that no longer covers the tree, it is the tree that moved
+// after the gate passed — a round-1 reviewer's fix in place — and not a red gate.
+function is_green_since_start(): boolean {
+	const started = read_timing_start()?.gate_started_at
+	const taken = review_stamps.gate_stamp.read()?.taken_at
+
+	if (started === undefined || taken === undefined) return false
+
+	return Date.parse(taken) >= Date.parse(started)
+}
+
 // Green wins over the marker: a gate that has recorded a green result on this tree is done however its
 // in-flight marker reads. `reusable_green_gate` is the gate's own reuse test rather than a second copy
 // of it, so the join calls a gate green on exactly the trees the gate would skip.
@@ -74,7 +109,7 @@ async function read_gate_state(): Promise<GateState> {
 	const tree = await gate_tree.read_gate_tree()
 	const is_green = gate_skip.reusable_green_gate(tree.files, tree.base) !== undefined
 
-	return run_review.gate_state(is_green, is_running)
+	return run_review.gate_state(is_green, is_running, is_green_since_start())
 }
 
 // The brief has to report the gate as in-flight, or it says `Not verified` and sends the review agent
@@ -109,28 +144,6 @@ function read_gate_log(root: string = PROJECT_ROOT): string | undefined {
 
 function write_timing_start(start: TimingStart, target: string = PROJECT_ROOT): void {
 	stamp_file.write_stamp(timing_path(target), start)
-}
-
-function to_timing(value: unknown): TimingStart | undefined {
-	if (typeof value !== 'object' || value === null) return undefined
-
-	const { gate_started_at, review_started_at } = value as Record<string, unknown>
-
-	if (typeof gate_started_at !== 'string' || typeof review_started_at !== 'string') return undefined
-
-	return { gate_started_at, review_started_at }
-}
-
-function read_timing_start(target: string = PROJECT_ROOT): TimingStart | undefined {
-	const raw = stamp_file.read_stamp_text(timing_path(target))
-
-	if (raw === undefined) return undefined
-
-	try {
-		return to_timing(JSON.parse(raw))
-	} catch {
-		return undefined
-	}
 }
 
 // The two ends are stamped at the join: the review ended when the child returned from the subagent and
