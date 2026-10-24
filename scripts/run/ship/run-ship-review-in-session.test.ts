@@ -5,7 +5,7 @@ import { run_ship_review } from './run-ship-review'
 // agent that read the same diff and brief again.
 
 const BRIEF = 'stamps/josh-ship-review-brief-x.md'
-const FINDINGS = 'stamps/josh-ship-review-findings-x.txt'
+const SLOT = 'code'
 const ISSUE = '4715'
 
 describe('run_ship_review prompts — the review runs in the launched session', () => {
@@ -16,7 +16,7 @@ describe('run_ship_review prompts — the review runs in the launched session', 
 	])(
 		'asks the %s session to review in itself, never through a nested agent',
 		(_name, prompt_of) => {
-			const prompt = prompt_of(BRIEF, FINDINGS, ISSUE)
+			const prompt = prompt_of(BRIEF, SLOT, ISSUE)
 
 			expect(prompt).toContain('Review it yourself in this session')
 			expect(prompt).not.toContain('Run a /code-review')

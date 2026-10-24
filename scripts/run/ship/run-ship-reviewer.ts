@@ -166,12 +166,7 @@ function session_for(
 	slots: { slot: ReviewSlot; all: ReadonlyArray<ReviewSlot> },
 ): SlotSession {
 	const { slot, all } = slots
-	const target = paths(slot)
-	const prompt = run_ship_review.slot_prompt(prompt_of, slot, all)(
-		target.brief,
-		target.findings,
-		issue,
-	)
+	const prompt = run_ship_review.slot_prompt(prompt_of, slot, all)(paths(slot).brief, slot, issue)
 
 	return { slot, built: agent_argv.review_in(prompt, Number(round), PROJECT_ROOT) }
 }
