@@ -112,7 +112,7 @@ async function merge(): Promise<MergeOutcome> {
 // the sanctioned commit rather than a request for `git add`.
 function failure_text(outcome: MergeOutcome): string | undefined {
 	if (outcome.kind === 'refused') return outcome.message
-	if (outcome.kind === 'conflict') return main_merge_guard.CONFLICT_HINT
+	if (outcome.kind === 'conflict') return main_merge_guard.conflict_hint()
 
 	return undefined
 }

@@ -1,0 +1,7 @@
+{
+	"reason": "#4769: the lane-aware commit command in main-merge-guard and the unresolved-path refusal in stash:push (one guard, one git read)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}

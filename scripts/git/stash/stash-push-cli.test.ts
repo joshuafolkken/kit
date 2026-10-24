@@ -161,6 +161,41 @@ describe('josh stash:push refusals', () => {
 	})
 })
 
+// joshuafolkken/kit#4769: `run:pause` stashed over a merge left unresolved and failed inside
+// `git stash`; the push is refused first and points at closing the merge.
+async function conflict_on_tracked(): Promise<void> {
+	const git = git_fixture_workspace.git.bind(undefined, fixture.workspace)
+
+	await git(['checkout', '-b', 'side'])
+	write(TRACKED, 'side\n')
+	await git(['commit', '-am', 'side'])
+	await git(['checkout', '-'])
+	write(TRACKED, EDITED)
+	await git(['commit', '-am', 'main'])
+
+	try {
+		await git(['merge', 'side'])
+	} catch {
+		// The conflicted merge exits non-zero, and the conflict it leaves is the fixture.
+	}
+}
+
+describe('josh stash:push over unresolved paths', () => {
+	it(
+		'refuses before stashing and points at closing the merge',
+		async () => {
+			await conflict_on_tracked()
+
+			await expect(
+				stash_push_cli.set_aside({ message: MESSAGE, dir: fixture.workspace }),
+			).rejects.toThrow(/unresolved paths \(tracked\.ts\).*pnpm josh git -y/u)
+			expect(await push()).toBe(FAILURE_EXIT_CODE)
+			expect(await stash_count()).toBe(0)
+		},
+		TIMEOUT_MS,
+	)
+})
+
 describe('josh stash:push with stash:pop', () => {
 	it(
 		'restores what it stashed by the same message',

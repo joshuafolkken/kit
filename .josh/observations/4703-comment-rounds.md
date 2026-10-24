@@ -1,0 +1,1 @@
+- rf:tests | low | scripts/rules/issue-comments-rule.test.ts | 2026-10-24 | #4703

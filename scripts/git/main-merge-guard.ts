@@ -1,3 +1,4 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { git_spawn } from './git-spawn'
 
 // What `josh main:merge` refuses before it merges, and what it tells the run to do instead.
@@ -18,8 +19,12 @@ const UNMERGED_CODES = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 const UNSTAGED_INDEX_CODES = new Set([' ', '?', '!'])
 const DIRECTORY_SUFFIX = '/'
 const COMMIT_COMMAND = '`pnpm josh git -y`'
+// A lane child's push is `josh ship`'s, so the lane-background row refuses a pushing `git -y` there;
+// this is the commit-only form ship's own sync closes a merge with (`run-ship-sync.ts`).
+const LANE_COMMIT_COMMAND = '`pnpm josh git -y --skip-push --skip-pr "<title> #<N>"`'
 const PROCEDURE_POINTER =
 	'`.claude/skills/workflow-commands/chain-rule.md` → "origin/main is merged in before the gate"'
+const MERGE_RERUN = '`pnpm josh main:merge`'
 
 function status_lines(status: string): Array<string> {
 	return status.split('\n').filter((line) => line.length > STATUS_PREFIX_LENGTH)
@@ -57,55 +62,85 @@ function overlapping_paths(status: string, incoming: ReadonlyArray<string>): Arr
 	return uncommitted.filter((path) => incoming.some((changed) => covers(path, changed)))
 }
 
-function unmerged_message(paths: ReadonlyArray<string>): string {
+function commit_command(is_lane_child = lane_child_marker.is_child_of(process.cwd())): string {
+	return is_lane_child ? LANE_COMMIT_COMMAND : COMMIT_COMMAND
+}
+
+// `prefix` names the refusing command, `rerun` what to run once the merge is closed — `josh stash:push`
+// refuses the same index, since `git stash` cannot set unresolved paths aside.
+function unresolved_message(
+	prefix: string,
+	paths: ReadonlyArray<string>,
+	rerun: string,
+	commit = commit_command(),
+): string {
 	return (
-		`main:merge: the index still holds unresolved paths (${paths.join(', ')}). Remove the conflict ` +
-		`markers, then finish through ${COMMIT_COMMAND} — it stages and commits them, so no \`git add\` ` +
-		`permission is needed, and inside a lane this is Tier A. Rerun \`pnpm josh main:merge\` after it ` +
+		`${prefix}: the index still holds unresolved paths (${paths.join(', ')}). Remove the conflict ` +
+		`markers, then finish through ${commit} — it stages and commits them, so no \`git add\` ` +
+		`permission is needed, and inside a lane this is Tier A. Rerun ${rerun} after it ` +
 		`(${PROCEDURE_POINTER}).`
 	)
 }
 
-function staged_message(paths: ReadonlyArray<string>): string {
+function staged_message(paths: ReadonlyArray<string>, commit: string): string {
 	return (
 		`main:merge: the index holds staged changes (${paths.join(', ')}), which git refuses to merge ` +
-		`over. Commit them first through ${COMMIT_COMMAND}, then rerun \`pnpm josh main:merge\` ` +
+		`over. Commit them first through ${commit}, then rerun \`pnpm josh main:merge\` ` +
 		`(${PROCEDURE_POINTER}).`
 	)
 }
 
-function overlap_message(default_branch: string, paths: ReadonlyArray<string>): string {
+function overlap_message(
+	default_branch: string,
+	paths: ReadonlyArray<string>,
+	commit: string,
+): string {
 	return (
 		`main:merge: uncommitted changes touch files origin/${default_branch} also changed ` +
-		`(${paths.join(', ')}). Commit the work first through ${COMMIT_COMMAND}, then rerun ` +
+		`(${paths.join(', ')}). Commit the work first through ${commit}, then rerun ` +
 		`\`pnpm josh main:merge\`. Never stash around the merge — a stash reapplied over it leaves the ` +
 		`conflict half-recorded in the index (${PROCEDURE_POINTER}).`
 	)
 }
 
 // Appended to git's own report when the merge itself stops on a conflict.
-const CONFLICT_HINT =
-	`main:merge: finish a conflicted merge by removing the conflict markers, then ${COMMIT_COMMAND} ` +
-	`records the merge commit — no \`git add\` permission is needed (${PROCEDURE_POINTER}).`
+function conflict_hint(commit = commit_command()): string {
+	return (
+		`main:merge: finish a conflicted merge by removing the conflict markers, then ${commit} ` +
+		`records the merge commit — no \`git add\` permission is needed (${PROCEDURE_POINTER}).`
+	)
+}
 
-function refusal(
+function merge_refusal(
 	status: string,
 	incoming: ReadonlyArray<string>,
 	default_branch: string,
+	commit: string,
 ): string | undefined {
-	const unmerged = unmerged_paths(status)
-
-	if (unmerged.length > 0) return unmerged_message(unmerged)
 	// Nothing incoming means git answers "Already up to date" whatever the index holds.
 	if (incoming.length === 0) return undefined
 
 	const staged = staged_paths(status)
 
-	if (staged.length > 0) return staged_message(staged)
+	if (staged.length > 0) return staged_message(staged, commit)
 
 	const overlap = overlapping_paths(status, incoming)
 
-	return overlap.length > 0 ? overlap_message(default_branch, overlap) : undefined
+	return overlap.length > 0 ? overlap_message(default_branch, overlap, commit) : undefined
+}
+
+// `commit` is the command the message names, resolved from the lane mark unless a caller passes it.
+function refusal(
+	status: string,
+	incoming: ReadonlyArray<string>,
+	default_branch: string,
+	commit = commit_command(),
+): string | undefined {
+	const unmerged = unmerged_paths(status)
+
+	if (unmerged.length > 0) return unresolved_message('main:merge', unmerged, MERGE_RERUN, commit)
+
+	return merge_refusal(status, incoming, default_branch, commit)
 }
 
 // The paths the default branch changed since this branch left it — what the merge would bring in.
@@ -122,12 +157,14 @@ async function incoming_paths(default_branch: string): Promise<Array<string>> {
 }
 
 const main_merge_guard = {
-	CONFLICT_HINT,
+	commit_command,
+	conflict_hint,
 	incoming_paths,
 	overlapping_paths,
 	refusal,
 	staged_paths,
 	unmerged_paths,
+	unresolved_message,
 }
 
 export { main_merge_guard }
