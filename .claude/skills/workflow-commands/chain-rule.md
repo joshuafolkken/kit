@@ -9,7 +9,7 @@ Review results and successful pushes are never turn boundaries.
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1), not backgrounded — a turn end kills it — then steps 2–3, the
-   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
+   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 — never reopen `run:review`), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
@@ -22,8 +22,7 @@ Review results and successful pushes are never turn boundaries.
    round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`). Ship
    reuses the recorded round 1 on a tree unmoved since the record, else reviews only the
    delta.
-   `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
-   rather than refused.
+   `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
@@ -48,7 +47,7 @@ Review results and successful pushes are never turn boundaries.
      `pnpm josh review:brief --round 2` beside CI.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
-   Any round-1 fix runs its affected scoped check and the gate before `git -y`.
+   Outside step 0, a round-1 fix runs its scoped check and the gate before `git -y`.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
    ['<category>:<severity>:<file> — <reason>' ...]` (each one quoted argument; none if clean). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").

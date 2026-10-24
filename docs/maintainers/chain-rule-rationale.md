@@ -7,7 +7,11 @@ Rationale behind `.claude/skills/workflow-commands/chain-rule.md`.
 - The lane child's single `pnpm josh ship --detach` hand-off (step 0) — joshuafolkken/kit#2428.
 - The Anthropic lane's stop prompt naming the re-detach to run after the fix — joshuafolkken/kit#2964.
 - A backgrounded `ship` issued alone being moved to the foreground by the hook rather than refused —
-  joshuafolkken/kit#3154.
+  joshuafolkken/kit#3154; the hook states it itself, so step 0 no longer restates it —
+  joshuafolkken/kit#4830.
+- A lane child recording round 1 after its fix and shipping, never reopening `run:review`, and the
+  round-1 fix gate before `git -y` scoped to runs outside step 0 (a lane child whose ship failed
+  falls to step 1 and still owes it) — joshuafolkken/kit#4830.
 - A foreground `ship` given the 600000 ms cap, so the Bash timeout never moves it aside —
   joshuafolkken/kit#4101.
 - The pre-gate cut `pnpm josh run:cut <N>` — joshuafolkken/kit#2177.
