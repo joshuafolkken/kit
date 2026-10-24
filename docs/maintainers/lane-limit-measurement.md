@@ -9,7 +9,7 @@ throughput, gate duration and machine load side by side.
 
 ## Where the numbers come from
 
-One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in the josh temp root, keyed
+One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in `<common git dir>/josh/run-state/`, keyed
 on the common git directory so every lane, the parent and the sampler write to the same file.
 
 | Entry       | Written by                                                    | Fields                                                               |

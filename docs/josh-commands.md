@@ -1010,7 +1010,8 @@ pnpm josh lane:resume --all   # every open lane
 - `lane:close` ends the same set and prints how many it ended: SIGTERM, then SIGKILL. A process alive after both leaves the close `incomplete`, with no `ended` record. `lane:withdraw` and `lane:restart` end it too.
 - The supervisor retries such a close on every pass; `run:board` marks its leftover row `↻` (being ended) or `⚠ <reason> (pid <pid>)`.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
-- Each lane has one state record, `josh-lane-state-<key>-<N>.json` in the temp directory, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it): the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
+- Each lane has one state record, `josh-lane-state-<key>-<N>.json` in `<common git dir>/josh/run-state/`, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it), so it survives a reboot.
+- The record holds the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
 - Only the lane commands write it: `lane:open` and `lane:adopt` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
 - A lane with no record is never guessed at from its processes: it is counted in use, its state unknown. `lane:adopt` gives it a record again.
 

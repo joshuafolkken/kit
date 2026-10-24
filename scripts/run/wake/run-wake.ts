@@ -1,5 +1,6 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -16,7 +17,7 @@ import { z } from 'zod'
 
 const WAKE_PREFIX = 'josh-run-wake-'
 // The output of every session this starts, appended per repository so a silent death is diagnosable.
-const WAKE_LOG_PREFIX = 'josh-run-wake-log-'
+const WAKE_LOG_PREFIX = durable_state.PREFIX.WAKE_LOG
 const WAKE_LOG_SUFFIX = '.log'
 // How long a woken session has to claim the carry record — the only launch-failure detector, since a
 // claim also catches a session that dies in boot or never picks the run up. It covers a slow cold start.
@@ -153,7 +154,7 @@ function wake_path(git_directory: string): string {
 }
 
 function wake_log_path(git_directory: string): string {
-	return stamp_file.stamp_path(WAKE_LOG_PREFIX, git_directory, WAKE_LOG_SUFFIX)
+	return durable_state.path(WAKE_LOG_PREFIX, git_directory, WAKE_LOG_SUFFIX)
 }
 
 function parse_wake(raw: string): RunWake | undefined {

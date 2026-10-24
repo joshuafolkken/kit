@@ -1,0 +1,8 @@
+{
+	"reason": "Run records move to the common git directory (#4743): durable-state module, marker-gated one-time /tmp migration and log pruning, prefix registry, and their tests",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 138,
+		"ai_cost.on_demand_bytes": 56
+	}
+}

@@ -6,6 +6,7 @@ import {
 	type AgentProvider,
 } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
@@ -27,8 +28,8 @@ import { z } from 'zod'
 // session can still start a Codex parent. The same choice is handed to the parent as
 // `JOSH_AGENT_PROVIDER`, the key a detached child with no session of its own resolves from.
 
-const LAUNCH_PREFIX = 'josh-backlogrun-launch-'
-const LOG_PREFIX = 'josh-backlogrun-log-'
+const LAUNCH_PREFIX = durable_state.PREFIX.BACKLOGRUN_LAUNCH
+const LOG_PREFIX = durable_state.PREFIX.BACKLOGRUN_LOG
 const LOG_SUFFIX = '.log'
 
 const launch_schema = z.object({
@@ -64,11 +65,11 @@ interface Launched {
 type StartResult = { kind: 'launched'; launched: Launched } | { kind: 'failed'; note: string }
 
 function launch_path(git_directory: string): string {
-	return stamp_file.stamp_path(LAUNCH_PREFIX, git_directory)
+	return durable_state.path(LAUNCH_PREFIX, git_directory)
 }
 
 function log_path(git_directory: string): string {
-	return stamp_file.stamp_path(LOG_PREFIX, git_directory, LOG_SUFFIX)
+	return durable_state.path(LOG_PREFIX, git_directory, LOG_SUFFIX)
 }
 
 function read_launch(target: string): LaunchRecord | undefined {

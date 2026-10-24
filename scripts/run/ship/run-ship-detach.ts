@@ -3,6 +3,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
+import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
@@ -33,7 +34,7 @@ import { z } from 'zod'
 // probe cannot momentarily read is the opposite case: the pid is alive and was verified once, so it is
 // kept running rather than read as a crash that would license a second supervisor.
 
-const LOG_PREFIX = 'josh-ship-log-'
+const LOG_PREFIX = durable_state.PREFIX.SHIP_LOG
 const PID_PREFIX = 'josh-ship-pid-'
 const BODY_PREFIX = 'josh-ship-notify-'
 const KEY_SEPARATOR = '-'
@@ -51,7 +52,7 @@ const SUPERVISED_VALUE = '1'
 const LAUNCHED = 'launched'
 const BUSY = 'busy'
 const FAILED = 'failed'
-const RESULT_PREFIX = 'josh-ship-result-'
+const RESULT_PREFIX = durable_state.PREFIX.SHIP_RESULT
 const RECORD_POLL_MS = 25
 const RECORD_WAIT_ATTEMPTS = 200
 // How long a bare launched pid is believed before the supervisor must have claimed the record: far above
@@ -107,11 +108,11 @@ function key(prefix: string, request: Pick<DetachRequest, 'number' | 'repository
 }
 
 function log_path(repository: string, number: string): string {
-	return stamp_file.stamp_path(`${LOG_PREFIX}${number}${KEY_SEPARATOR}`, repository, LOG_SUFFIX)
+	return durable_state.path(`${LOG_PREFIX}${number}${KEY_SEPARATOR}`, repository, LOG_SUFFIX)
 }
 
 function result_path(repository: string, number: string): string {
-	return stamp_file.stamp_path(`${RESULT_PREFIX}${number}${KEY_SEPARATOR}`, repository)
+	return durable_state.path(`${RESULT_PREFIX}${number}${KEY_SEPARATOR}`, repository)
 }
 
 function read_record(repository: string, number: string): ShipRecord | undefined {
