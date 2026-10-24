@@ -5,7 +5,7 @@ import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
@@ -267,7 +267,7 @@ async function net_command(rest: ReadonlyArray<string>, context: MeasureContext)
 	if (rest.length !== 1 || !issue_number_shape.is_issue_number(issue)) return refuse()
 
 	const events = await read_events(context)
-	const net = lane_net_time.net_ms(await read_ledger(context), events, Number(issue))
+	const net = lane_net_time.net_minutes(await read_ledger(context), events, Number(issue))
 
 	if (net === undefined) {
 		console.error(
@@ -277,7 +277,7 @@ async function net_command(rest: ReadonlyArray<string>, context: MeasureContext)
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(String(Math.ceil(net / MS_PER_MINUTE)))
+	console.info(String(net))
 
 	return 0
 }

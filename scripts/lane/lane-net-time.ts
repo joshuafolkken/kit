@@ -1,3 +1,4 @@
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { LedgerEntry } from './lane-ledger'
 import type { IssueAt } from './lane-spans'
@@ -71,6 +72,17 @@ function net_ms(
 	return waits.reduce((left, wait) => left - wait, span.to_ms - span.from_ms)
 }
 
-const lane_net_time = { net_ms }
+// The net time in whole minutes, rounded up — the number a causing-lane line declares.
+function net_minutes(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+): number | undefined {
+	const net = net_ms(entries, events, issue)
+
+	return net === undefined ? undefined : Math.ceil(net / MS_PER_MINUTE)
+}
+
+const lane_net_time = { net_minutes, net_ms }
 
 export { lane_net_time }

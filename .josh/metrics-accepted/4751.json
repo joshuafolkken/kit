@@ -1,0 +1,7 @@
+{
+	"reason": "lane-overrun.ts: post-merge investigation of lanes over 40 minutes of net time (#4751)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 114
+	}
+}

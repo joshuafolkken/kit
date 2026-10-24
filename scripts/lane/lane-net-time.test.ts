@@ -102,3 +102,15 @@ describe('lane_net_time.net_ms — where a wait ends', () => {
 		expect(net_minutes([dispatch(0), stop(10)])).toBeUndefined()
 	})
 })
+
+describe('lane_net_time.net_minutes', () => {
+	it('rounds a part minute up', () => {
+		const entries = [dispatch(0), { kind: 'merge', at: at(40.5), issue: ISSUE } as const]
+
+		expect(lane_net_time.net_minutes(entries, [], ISSUE)).toBe(41)
+	})
+
+	it('has no minutes before the lane merged', () => {
+		expect(lane_net_time.net_minutes([dispatch(0)], [], ISSUE)).toBeUndefined()
+	})
+})
