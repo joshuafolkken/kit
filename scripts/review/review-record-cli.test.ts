@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
+import type { review_record_interaction } from './review-record-interaction'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
 	const actual = await original<{ observation_ledger_home: typeof observation_ledger_home }>()
@@ -42,6 +43,22 @@ vi.mock('./review-round-reuse', () => ({
 		is_stale_here: vi.fn().mockResolvedValue(false),
 	},
 }))
+
+const report_due_mock = vi.hoisted(() => vi.fn())
+
+// The due answer reads this checkout's change; `review-record-interaction.test.ts` owns it.
+vi.mock('./review-record-interaction', async (original) => {
+	const actual = await original<{
+		review_record_interaction: typeof review_record_interaction
+	}>()
+
+	return {
+		review_record_interaction: {
+			...actual.review_record_interaction,
+			report_due: report_due_mock,
+		},
+	}
+})
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
@@ -347,5 +364,24 @@ describe('review_record_cli.run — the reviewed tree', () => {
 		)
 
 		expect(reviewed_record_mock).toHaveBeenCalledExactlyOnceWith(['a.ts:12'])
+	})
+})
+
+// joshuafolkken/kit#4835: a round-1 fix can make the interaction review due after its brief opened.
+describe('review_record_cli.run — an interaction review the round made due', () => {
+	it('asks after a recorded code round, and not after an interaction or comment round', async () => {
+		const root = root_of('interaction-due')
+
+		report_due_mock.mockClear()
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
+		await quietly(async () => await review_record_cli.run(['--issue', '4835'], NOW, root))
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4835', '--interaction'], NOW, root),
+		)
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4835', '--comment'], NOW, root),
+		)
+
+		expect(report_due_mock).toHaveBeenCalledExactlyOnceWith(4835, root)
 	})
 })

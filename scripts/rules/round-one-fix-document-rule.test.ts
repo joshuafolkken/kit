@@ -23,6 +23,13 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		expect(step).toContain('never reopen `run:review`')
 	})
 
+	// joshuafolkken/kit#4835: a round-1 fix that reaches the run tooling makes the interaction review due.
+	it('step 0 runs the interaction brief the record prints before the ship', () => {
+		expect(lane_step()).toContain(
+			'on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1',
+		)
+	})
+
 	// Step 0 alone is exempt: a lane child whose ship failed falls to step 1 and may reach `git -y`.
 	it('scopes the round-1 fix gate before git -y to runs outside step 0', () => {
 		const content = read_unwrapped(CHAIN_RULE)
