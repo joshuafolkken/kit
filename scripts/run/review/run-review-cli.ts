@@ -10,6 +10,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_pinned } from './run-review-pinned'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_steps } from './run-review-steps'
 
@@ -139,7 +140,10 @@ async function join_pinned(): Promise<boolean> {
 
 	if (summary === undefined) return false
 
-	const verdict = run_review_pinned.verdict_of(summary, run_review_pinned_steps.launched_reason())
+	const verdict = await run_review_pinned_accepted.judge(
+		summary,
+		run_review_pinned_steps.launched_reason(),
+	)
 
 	process.stderr.write(verdict.text)
 

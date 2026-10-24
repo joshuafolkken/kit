@@ -15,7 +15,7 @@ const { FRESH_STATE, tick } = run_board_tick
 const ISSUE = 4067
 const TITLE = 'Measure the gate unit leg'
 const REPO = 'joshuafolkken/kit'
-const FUTURE = '2026-10-24T23:29Z'
+const FUTURE = '2999-01-01T00:00Z'
 const RELEASED_LABELS = ['auto-ok', 'run:lane']
 
 function event_of(pos: number, at: string, kind: string, verb: string): RunEvent {

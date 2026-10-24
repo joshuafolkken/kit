@@ -507,8 +507,10 @@ The default waits only for the gate to _start_ and prints the brief;
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
-never drains (`--unpinned-ok`: above). A scoped refusal launches neither; a reopen stops the last
-check. The overlap's reader is `chain-rule.md`.
+never drains (`--unpinned-ok`: above). The reason and places `--unpinned-ok` accepted stay for the
+branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
+while every place, keyed by file, function and the lines replaced and put in, is recorded. A scoped refusal launches
+neither; a reopen stops the last check. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 
