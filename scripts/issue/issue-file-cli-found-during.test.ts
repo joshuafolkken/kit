@@ -13,8 +13,9 @@ import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
 
-// joshuafolkken/kit#4750: `josh issue:file` asks the filing cap first, for the origin the filing
-// names. The count itself is `issue-file-cap.test.ts`'s; here only the filing's wiring is asserted.
+// The wiring of the origin `josh issue:file --found-during` names.
+// joshuafolkken/kit#4750: the filing asks the cap first, for that origin. The count itself is
+// `issue-file-cap.test.ts`'s; here only the filing's wiring is asserted.
 // joshuafolkken/kit#4762: the same origin is never held as its own duplicate candidate.
 
 const HERE = 'joshuafolkken/kit'
@@ -23,7 +24,7 @@ const FOUND_DURING_FLAG = '--found-during'
 const ORIGIN = 4717
 const HELD_MESSAGE = 'duplicate candidate'
 
-const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-cap-'))
+const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-found-during-'))
 const body_path = path.join(work, 'body.md')
 
 writeFileSync(
