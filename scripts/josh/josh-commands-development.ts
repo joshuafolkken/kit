@@ -160,7 +160,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'check:related': {
 		script: 'scripts/gate/check-related.ts',
-		description: 'Run related lint, unit and dotfile spelling checks in parallel',
+		description: 'Run related lint, unit, type and dotfile spelling checks in parallel',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		usage: { examples: [{ arguments: '' }] },

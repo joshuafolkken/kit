@@ -48,6 +48,8 @@ interface GateCheck {
 
 const LINT_LABEL = 'lint'
 const TYPE_CHECK_LABEL = 'check'
+// The `josh` command the gate's type check runs, shared with `check:related` so the scoped check runs the same one.
+const TYPE_CHECK_TARGET = 'check'
 const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
 const BEHAVIOR_LABEL = 'behavior'
@@ -96,7 +98,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	},
 	{
 		label: TYPE_CHECK_LABEL,
-		target: 'check',
+		target: TYPE_CHECK_TARGET,
 		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
 		memory_mb: core_budget.MEMORY_MB.type_check,
 	},
@@ -503,6 +505,7 @@ const gate_plan = {
 	RESERVED_CORES,
 	STATIC_CHECKS,
 	TYPE_CHECK_LABEL,
+	TYPE_CHECK_TARGET,
 	UNIT_LABEL,
 	UNIT_TARGET,
 	WARNING_CHECKER_LABELS,

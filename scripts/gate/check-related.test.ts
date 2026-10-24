@@ -6,10 +6,13 @@ const execa_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execa: execa_mock }))
 
-const CHECK_COMMANDS = ['lint:related', 'test:related', 'cspell:dot'] as const
+const CHECK_COMMANDS = ['lint:related', 'test:related', 'check', 'cspell:dot'] as const
 const [LINT_COMMAND] = CHECK_COMMANDS
-const [, TEST_COMMAND] = CHECK_COMMANDS
+const [, TEST_COMMAND, TYPE_CHECK_COMMAND] = CHECK_COMMANDS
 const TEST_FAILURE = 'test failed'
+const TYPE_ERROR_OUTPUT =
+	"src/a.ts(1,7): error TS2322: Type 'number' is not assignable to type 'string'."
+const TYPE_CHECK_EXIT_CODE = 2
 const LINT_OUTPUT = 'lint output'
 const EXECA_OUTPUT = 'version output'
 
@@ -17,6 +20,18 @@ async function rejecting_check(command: string): Promise<CheckResult> {
 	if (command === TEST_COMMAND) throw new Error(TEST_FAILURE)
 
 	return { command, exit_code: 0, output: `${command} output` }
+}
+
+async function passing_check(command: string): Promise<CheckResult> {
+	return { command, exit_code: 0, output: '' }
+}
+
+async function type_error_check(command: string): Promise<CheckResult> {
+	if (command === TYPE_CHECK_COMMAND) {
+		return { command, exit_code: TYPE_CHECK_EXIT_CODE, output: TYPE_ERROR_OUTPUT }
+	}
+
+	return { command, exit_code: 0, output: '' }
 }
 
 describe('check_related.run_checks', () => {
@@ -58,6 +73,35 @@ describe('check_related.run_checks', () => {
 			output: TEST_FAILURE,
 		})
 		expect(check_related.exit_code(results)).toBe(1)
+	})
+})
+
+describe('check_related type check', () => {
+	it('runs the type check and fails with its output when the tree has a type error', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const results = await check_related.run_checks(type_error_check)
+
+		check_related.report_results(results)
+
+		const report = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(check_related.exit_code(results)).toBe(1)
+		expect(report).toContain(
+			`=== ${TYPE_CHECK_COMMAND}: failed (${String(TYPE_CHECK_EXIT_CODE)}) ===`,
+		)
+		expect(report).toContain(TYPE_ERROR_OUTPUT)
+	})
+
+	it('passes with the type check reported green when the tree has no type error', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const results = await check_related.run_checks(passing_check)
+
+		check_related.report_results(results)
+
+		const report = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(check_related.exit_code(results)).toBe(0)
+		expect(report).toContain(`=== ${TYPE_CHECK_COMMAND}: passed ===`)
 	})
 })
 

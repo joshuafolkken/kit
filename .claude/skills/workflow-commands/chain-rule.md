@@ -6,7 +6,7 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
+   the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
    本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
    round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
@@ -82,7 +82,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
   merge**. A merge stopped on a conflict: remove the markers, then `pnpm josh git -y` stages the
   resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
 - **One related-check command answers once per tree** — run `pnpm josh check:related` after every
-  edit; it runs `lint:related`, `test:related` and `cspell:dot` together, never twice over an untouched
+  edit; it runs `lint:related`, `test:related`, `check` and `cspell:dot` together, never twice over an untouched
   tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
   merge-base; accept it with its reason before `pnpm josh ship`, whose pre-detach check otherwise stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
