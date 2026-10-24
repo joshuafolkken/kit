@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { repository_labels } from '#scripts/repo/repository-labels'
+import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -12,10 +15,13 @@ import { issue_scout_cli } from './issue-scout-cli'
 
 // joshuafolkken/kit#4750: `josh issue:file` asks the filing cap first, for the origin the filing
 // names. The count itself is `issue-file-cap.test.ts`'s; here only the filing's wiring is asserted.
+// joshuafolkken/kit#4762: the same origin is never held as its own duplicate candidate.
 
 const HERE = 'joshuafolkken/kit'
 const FAILURE_EXIT_CODE = 1
 const FOUND_DURING_FLAG = '--found-during'
+const ORIGIN = 4717
+const HELD_MESSAGE = 'duplicate candidate'
 
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-cap-'))
 const body_path = path.join(work, 'body.md')
@@ -42,6 +48,7 @@ const scout = vi.spyOn(issue_scout_cli, 'scout')
 const cap_clear = vi.spyOn(issue_file_cap, 'is_cap_clear')
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear')
 const issue_list = vi.spyOn(git_gh_issue_list, 'issue_list')
+const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 
 beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -81,5 +88,28 @@ describe('issue_file_cli.run — the filing cap', () => {
 	it('names --found-during in the usage a malformed call prints', async () => {
 		expect(await issue_file_cli.run(argv_of(FOUND_DURING_FLAG, 'x'))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('[--found-during <N>]')
+	})
+})
+
+describe('issue_file_cli.run — the --found-during origin as a scout candidate', () => {
+	// The create answers no URL, so a filing the scout lets through fails there, after one call.
+	beforeEach(() => {
+		scout.mockResolvedValue({ report: 'Duplicates: 1', candidates: [ORIGIN] })
+		vi.spyOn(repository_labels, 'ensure_labels').mockReturnValue([])
+		vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
+		exec_gh_api.mockResolvedValue('')
+	})
+
+	it('goes on to the create past the origin it names', async () => {
+		await issue_file_cli.run(argv_of(FOUND_DURING_FLAG, String(ORIGIN)))
+
+		expect(exec_gh_api).toHaveBeenCalledOnce()
+		expect(vi.mocked(console.error).mock.calls.join('\n')).not.toContain(HELD_MESSAGE)
+	})
+
+	it('still holds the same candidate when no origin is named', async () => {
+		expect(await issue_file_cli.run(argv_of())).toBe(FAILURE_EXIT_CODE)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(HELD_MESSAGE)
 	})
 })
