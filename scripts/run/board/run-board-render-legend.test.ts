@@ -144,6 +144,7 @@ describe('run_board_render_legend.legend_of wait icons', () => {
 		['📋', 'named order'],
 		['✋', 'held by triage'],
 		['🧠', 'memory headroom'],
+		['🪫', 'usage limit'],
 		['📅', 'not before'],
 	])('names %s as "%s"', (icon, word) => {
 		expect(legend_of([row(1, { reason: { icon } })])).toStrictEqual([`${icon} ${word}`])
