@@ -207,7 +207,7 @@ filed with `auto-ok` and `run:lane`, and `pnpm josh backlogrun`. It passes when
 `dispatching` event shows a lane opened within fifteen minutes; it then waits up to twenty minutes
 for the lane's child to open a pull request, prints `pnpm josh run:board --chat` and stops the run
 with `pnpm josh backlogrun --stop`. Its probes print the end of the parent's log and of the lane
-child's (`/tmp/josh-lane-dispatch-*.log`), how many commands in each asked for an approval, and the
+child's (`<common git dir>/josh/run-state/josh-lane-dispatch-*.log`), how many commands in each asked for an approval, and the
 repository's pull requests.
 
 - **kit is installed from a copy of the tarball inside the project**, which the first commit

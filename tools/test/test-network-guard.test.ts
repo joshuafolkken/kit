@@ -392,7 +392,7 @@ describe('test_network_guard — the records this run writes', () => {
 	it('keys the run event stream under the armed temp root', () => {
 		const stream = run_event_stream.target_of(process.cwd())
 
-		expect(path.dirname(stream)).toBe(PLATFORM_TEMP_ROOT)
+		expect(path.dirname(stream)).toBe(path.join(PLATFORM_TEMP_ROOT, 'josh-state'))
 		expect(path.basename(PLATFORM_TEMP_ROOT).startsWith(test_network_guard.GUARD_PREFIX)).toBe(true)
 		expect(path.dirname(PLATFORM_TEMP_ROOT)).toBe(
 			platform_temporary.resolve_temporary_root(process.platform),

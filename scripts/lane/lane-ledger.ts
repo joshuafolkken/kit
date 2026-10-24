@@ -1,4 +1,5 @@
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
@@ -31,11 +32,10 @@ import {
 // never lose each other's lines to a read-modify-write race.
 //
 // **Keyed on the common git directory, the event stream's key**, so a lane child's gate, the parent's
-// merge and the sampler all land in one ledger per repository. It sits in the temp root beside every
-// other josh record; a reboot clears it, which is why `docs/maintainers/lane-limit-measurement.md`
-// closes a period with `josh lane:stats` before one.
+// merge and the sampler all land in one ledger per repository. It is a durable record
+// (`durable-state.ts`), so a period runs across a reboot.
 
-const LEDGER_PREFIX = 'josh-lane-ledger-'
+const LEDGER_PREFIX = durable_state.PREFIX.LANE_LEDGER
 const LEDGER_SUFFIX = '.jsonl'
 const LINE_SEPARATOR = '\n'
 // `followup`'s wait for CI — a stage of a lane's run that no `josh ship` stage is the whole of.
@@ -56,7 +56,7 @@ const APPEND_FLAGS = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW
 const { KIND, entry_schema } = lane_ledger_schema
 
 function target_of(repository: string): string {
-	return stamp_file.stamp_path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
+	return durable_state.path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
 }
 
 // The ledger of the repository this checkout belongs to, or `undefined` outside one. `git rev-parse`

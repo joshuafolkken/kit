@@ -1,4 +1,5 @@
 import { repository_lock } from '#scripts/git/repository-lock'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -24,7 +25,7 @@ import { z } from 'zod'
 // must never fail the work it reports on, so `run-event-stream-emit.ts` wraps
 // every append in a swallow; this module is free to throw on a genuinely broken write.
 
-const EVENT_PREFIX = 'josh-run-events-'
+const EVENT_PREFIX = durable_state.PREFIX.EVENTS
 // `.jsonl` rather than `.json`: the file is one JSON event per line, appended to, and the suffix tells
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
@@ -239,7 +240,7 @@ function is_event_kind(value: string): value is EventKind {
 // The stream's path, keyed on the run's identity the caller resolved. `.jsonl` so the append surface is
 // named for what it is.
 function target_of(repository: string): string {
-	return stamp_file.stamp_path(EVENT_PREFIX, repository, EVENT_SUFFIX)
+	return durable_state.path(EVENT_PREFIX, repository, EVENT_SUFFIX)
 }
 
 function is_present(event: RunEvent | undefined): event is RunEvent {

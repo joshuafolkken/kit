@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
@@ -35,7 +36,7 @@ import { run_carry_conversation } from './run-carry-conversation'
 // reaches, so only a cut the run itself took is carried without anyone deciding. Everything else is
 // an explicit carry-or-discard: `--resume` adopts the standing record, `--end` discards it.
 
-const CARRY_PREFIX = 'josh-run-carry-'
+const CARRY_PREFIX = durable_state.PREFIX.CARRY
 const REPOSITORY_DIRECTORY_INDEX = 1
 const NO_INCREMENT = 0
 
@@ -212,7 +213,7 @@ const run_carry_schema = z.object({
 })
 
 function carry_path(git_directory: string): string {
-	return stamp_file.stamp_path(CARRY_PREFIX, git_directory)
+	return durable_state.path(CARRY_PREFIX, git_directory)
 }
 
 // The common git directory: `.git` in the main work tree and the same `.git` from inside a lane, so

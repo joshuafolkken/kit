@@ -69,14 +69,22 @@ function account_key(): string {
 // **`suffix` is what the file is, not decoration.** Every record here was JSON until `josh gate`
 // needed to keep another tool's output verbatim, and a log named `.json`
 // tells every reader — a person, an editor, a `less` — that it is something it is not.
-function stamp_path(
+function stamp_name(
 	prefix: string,
 	root: string = PACKAGE_DIR,
 	suffix: string = STAMP_SUFFIX,
 ): string {
 	const key = digest(`${account_key()}${ACCOUNT_KEY_SEPARATOR}${root}`).slice(0, STAMP_KEY_LENGTH)
 
-	return path.join(PLATFORM_TEMP_ROOT, `${prefix}${key}${suffix}`)
+	return `${prefix}${key}${suffix}`
+}
+
+function stamp_path(
+	prefix: string,
+	root: string = PACKAGE_DIR,
+	suffix: string = STAMP_SUFFIX,
+): string {
+	return path.join(PLATFORM_TEMP_ROOT, stamp_name(prefix, root, suffix))
 }
 
 // **The write unlinks first, then creates exclusively.** `rmSync` removes a symlink rather than
@@ -199,6 +207,7 @@ const stamp_file = {
 	replace_stamp,
 	replace_text_stamp,
 	remove_stamp,
+	stamp_name,
 	stamp_path,
 	write_stamp,
 	write_text_stamp,
