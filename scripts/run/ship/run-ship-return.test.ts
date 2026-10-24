@@ -121,12 +121,33 @@ describe('run_ship_return.return_control', () => {
 		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe('recorded')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
+})
 
-	it('still records the stop when the relaunch could not start', async () => {
+// joshuafolkken/kit#4765: a relaunch that started nothing was written only to the ship log, and the dispatch
+// log's header — written before the spawn — made its mtime read the stop as answered.
+describe('run_ship_return.return_control when no relaunch started', () => {
+	const RELAUNCH_FAILED = 'relaunch-failed'
+
+	it('records the stop and the failed relaunch when the relaunch could not start', async () => {
 		relaunch_mock.mockReturnValue({ kind: 'failed', note: 'no claude' })
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
-		expect(emit_mock).toHaveBeenCalledTimes(1)
+		expect(emit_mock).toHaveBeenCalledTimes(2)
+		expect(emit_mock).toHaveBeenLastCalledWith(
+			RELAUNCH_FAILED,
+			`#${ISSUE} could not be relaunched: no claude`,
+		)
+	})
+
+	it('records the re-dispatch with the broker reason for run:merge', async () => {
+		serving_mock.mockReturnValue(SERVER)
+		request_mock.mockResolvedValue({ is_success: false, reason: 'the broker refused it' })
+		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
+
+		expect(emit_mock).toHaveBeenLastCalledWith(
+			RELAUNCH_FAILED,
+			`#${ISSUE} could not be relaunched: the driver re-dispatches the issue — the broker refused it`,
+		)
 	})
 })
 

@@ -103,6 +103,38 @@ describe('run_merge_signals — children a host restart killed', () => {
 	})
 })
 
+// joshuafolkken/kit#4765: a child re-dispatched up to the cap was parked as its ship's stop alone.
+describe('run_merge_signals — a child the re-dispatch cap stopped', () => {
+	const OUTAGES = Array.from({ length: run_merge.CONSECUTIVE_OUTAGE_LIMIT }, (_, index) =>
+		event(index, 'outage'),
+	)
+	const RELAUNCH_FAILED = {
+		...(event(OUTAGES.length, 'relaunch-failed') as object),
+		text: `#${CHILD} could not be relaunched: the broker refused it`,
+	}
+
+	it('reads a capped child as failed with the cap, the count and the last relaunch failure', async () => {
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue([...OUTAGES, RELAUNCH_FAILED])
+
+		const signals = (await signals_of(OPEN_READ)) as { is_outage: boolean; capped_note: string }
+
+		expect(signals.is_outage).toBe(false)
+		expect(signals.capped_note).toContain('re-dispatch cap (3) after 3 re-dispatches')
+		expect(signals.capped_note).toContain(RELAUNCH_FAILED.text)
+	})
+
+	it('leaves a child under the cap re-dispatchable with no cap line', async () => {
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue(OUTAGES.slice(1))
+
+		const signals = await signals_of(OPEN_READ)
+
+		expect(signals).toMatchObject({ is_outage: true })
+		expect(signals).not.toHaveProperty('capped_note')
+	})
+})
+
 describe('run_merge_signals.read_signals — the readings beside the GitHub state', () => {
 	it('reads a withdrawal that is the newest word on the child', async () => {
 		events_mock.mockResolvedValue([event(1, LAUNCH), event(2, WITHDRAW)])

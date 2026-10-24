@@ -169,6 +169,28 @@ describe('run_merge_steps.do_failed — a child whose detached ship ended', () =
 	})
 })
 
+// joshuafolkken/kit#4765: a child the per-child re-dispatch cap stopped names the cap in its park.
+describe('run_merge_steps.do_failed — a child the re-dispatch cap stopped', () => {
+	const SHIP_CAUSE = {
+		short: 'followup failed',
+		why: 'its detached ship stopped and was not fixed.',
+	}
+
+	it('leads the park with the re-dispatch cap line where the cap stopped the child', async () => {
+		const capped_note = 'it reached the re-dispatch cap (3) after 3 re-dispatches.'
+
+		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
+
+		const result = await run_merge_steps.do_failed({ ...CONTEXT, capped_note })
+
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`- Why: ${capped_note} ${SHIP_CAUSE.why}`),
+		)
+		expect(result.cause).toBe(SHIP_CAUSE.short)
+	})
+})
+
 // joshuafolkken/kit#3502: a child whose order is already recorded as an open `blocked-by` waits for its
 // blocker — nothing for a person to decide, so no `needs-decision` and no failure counted.
 const KIT = 'joshuafolkken/kit'
