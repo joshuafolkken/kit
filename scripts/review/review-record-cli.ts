@@ -1,12 +1,14 @@
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_interaction } from './review-interaction'
 import { review_record, type RecordVerdict } from './review-record'
 import { review_reviewed_tree } from './review-reviewed-tree'
+import { review_round_reuse } from './review-round-reuse'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings. It appends a `- rf:` line per finding to
@@ -22,7 +24,8 @@ import { review_reviewed_tree } from './review-reviewed-tree'
 //
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
 // merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
-// merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
+// merge is refused until the round is recorded. It mirrors `josh review:attest --check`. A recorded
+// code round adds whether the ship reuses it (`review-round-reuse.ts`); the exit code does not change.
 //
 // **`--interaction` records and checks the interaction review's pass instead** (`review-interaction.ts`):
 // the same grammar under `- ri:`. It takes no `--comment` — the pass runs before the pull request, and
@@ -34,6 +37,10 @@ const USAGE =
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
 const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
+const REUSED_LINE =
+	'Reused: josh ship takes this round as its round 1 — this tree holds still since the record, or the ship’s own round 1 stopped on it. A default branch the ship’s sync merges in still moves it: run `pnpm josh main:merge` before this check.'
+const REVIEW_AGAIN_LINE =
+	'Not reused: josh ship reviews round 1 again — this tree is not the one the round was recorded and attested on (moved since, a `main:merge` included), or the issue changed after its brief. Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
 const INTERACTION_NOT_REQUIRED_LINE =
@@ -159,8 +166,35 @@ type CheckStatus = RecordVerdict['status']
 
 interface CheckMode {
 	status: (issue: number, root: string) => Promise<CheckStatus>
+	recorded: (issue: number) => Promise<string>
 	refusal: (issue: number) => string
 	not_required: string
+}
+
+// A reuse question git could not answer reads as not reused: the lane then reviews the round itself,
+// which costs one review, rather than leaving it to a ship that may review it again detached.
+// The stale read inside it fails open in `review_round_reuse.is_stale_here`, as the ship's probe reads it.
+async function is_reused_here(issue: number): Promise<boolean> {
+	try {
+		return await review_round_reuse.is_reusable(issue, await review_round_reuse.is_stale_here())
+	} catch (error) {
+		error_text.trace_swallowed('review_record_cli.is_reused_here', error)
+
+		return false
+	}
+}
+
+// **A recorded code round also says whether `josh ship` reuses it** (joshuafolkken/kit#4763), from the
+// ship's own predicate: a round recorded before the tree moved — a `main:merge` included — is
+// reviewed again by the ship, so the lane runs it itself rather than reading "recorded" as "done".
+async function code_recorded(issue: number): Promise<string> {
+	const is_reused = await is_reused_here(issue)
+
+	return [RECORDED_LINE, is_reused ? REUSED_LINE : REVIEW_AGAIN_LINE].join('\n')
+}
+
+async function interaction_recorded(): Promise<string> {
+	return RECORDED_LINE
 }
 
 async function code_status(issue: number, root: string): Promise<CheckStatus> {
@@ -173,11 +207,13 @@ async function code_status(issue: number, root: string): Promise<CheckStatus> {
 const CHECK_MODES: Record<LineKind, CheckMode> = {
 	code: {
 		status: code_status,
+		recorded: code_recorded,
 		refusal: review_record.refusal_message,
 		not_required: NOT_REQUIRED_LINE,
 	},
 	interaction: {
 		status: review_interaction.status,
+		recorded: interaction_recorded,
 		refusal: review_interaction.refusal_message,
 		not_required: INTERACTION_NOT_REQUIRED_LINE,
 	},
@@ -196,7 +232,7 @@ async function report_check(issue: number, mode: CheckMode, root: string): Promi
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(status === 'ok' ? RECORDED_LINE : mode.not_required)
+	console.info(status === 'ok' ? await mode.recorded(issue) : mode.not_required)
 
 	return 0
 }

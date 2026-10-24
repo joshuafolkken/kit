@@ -1,7 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
-import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { error_text } from '#scripts/lib/error-message'
+import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_hold } from '#scripts/run/hold/run-hold'
 import { run_preflight } from '#scripts/run/run-preflight'
 import { run_ship_stage, type ShipState } from './run-ship-stage'
@@ -61,10 +61,9 @@ async function read_merged(branch_name: string): Promise<boolean> {
 	return (await git_command.commit_count_beyond(base, HEAD_REFERENCE)) === 0
 }
 
-// The issue changed after the recorded review was briefed — the refusal `josh followup` would make
-// (joshuafolkken/kit#4221) — so the review stage re-runs instead of the followup failing again.
+// A stale review re-runs the review stage instead of the followup failing again.
 async function read_review_stale(): Promise<boolean> {
-	return await or_false(async () => (await issue_watch_gate.review_refusal_here()) !== undefined)
+	return await review_round_reuse.is_stale_here()
 }
 
 const NOTHING_DONE: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
