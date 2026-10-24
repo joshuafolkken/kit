@@ -8,6 +8,7 @@ import { test_pinned_record } from './test-pinned-record'
 
 const ROOT = `/nonexistent/test-pinned-record-${randomUUID()}`
 const TOKEN = 'launch-1'
+const EARLIER_TOKEN = 'launch-0'
 const HUNK = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const REPORT: PinnedReport = {
 	unpinned: [HUNK],
@@ -18,7 +19,8 @@ const REPORT: PinnedReport = {
 }
 
 afterEach(() => {
-	test_pinned_record.clear(ROOT)
+	test_pinned_record.clear(TOKEN, ROOT)
+	test_pinned_record.clear(EARLIER_TOKEN, ROOT)
 })
 
 describe('test_pinned_record', () => {
@@ -39,22 +41,31 @@ describe('test_pinned_record', () => {
 	})
 
 	it("reads nothing of another launch's answer", () => {
-		test_pinned_record.write('launch-0', test_pinned_record.summary_of(REPORT), ROOT)
+		test_pinned_record.write(EARLIER_TOKEN, test_pinned_record.summary_of(REPORT), ROOT)
 
 		expect(test_pinned_record.read(TOKEN, ROOT)).toBeUndefined()
 	})
 
+	it("keeps this launch's answer when an earlier launch's check writes after it", () => {
+		const summary = test_pinned_record.summary_of(REPORT)
+
+		test_pinned_record.write(TOKEN, summary, ROOT)
+		test_pinned_record.write(EARLIER_TOKEN, test_pinned_record.not_run_summary('late'), ROOT)
+
+		expect(test_pinned_record.read(TOKEN, ROOT)).toStrictEqual(summary)
+	})
+
 	it('reads nothing once cleared, or from a record that is not a summary', () => {
 		test_pinned_record.write(TOKEN, test_pinned_record.not_run_summary('gone'), ROOT)
-		test_pinned_record.clear(ROOT)
+		test_pinned_record.clear(TOKEN, ROOT)
 
 		expect(test_pinned_record.read(TOKEN, ROOT)).toBeUndefined()
 
-		writeFileSync(test_pinned_record.record_path(ROOT), `{"token":"${TOKEN}","text":1}`)
+		writeFileSync(test_pinned_record.record_path(TOKEN, ROOT), `{"token":"${TOKEN}","text":1}`)
 
 		expect(test_pinned_record.read(TOKEN, ROOT)).toBeUndefined()
 
-		writeFileSync(test_pinned_record.record_path(ROOT), 'not json')
+		writeFileSync(test_pinned_record.record_path(TOKEN, ROOT), 'not json')
 
 		expect(test_pinned_record.read(TOKEN, ROOT)).toBeUndefined()
 	})

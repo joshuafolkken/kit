@@ -93,6 +93,30 @@ describe('run_review_pinned_steps.wait_for_answer', () => {
 	})
 })
 
+describe('run_review_pinned_steps.wait_for_answer — late writes', () => {
+	it("keeps this launch's answer when the last start's check writes after it", async () => {
+		run_review_pinned_steps.launch(ROOT)
+		const earlier = launched_token()
+
+		run_review_pinned_steps.clear(ROOT)
+		run_review_pinned_steps.launch(ROOT)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+		test_pinned_record.write(earlier, test_pinned_record.not_run_summary('late'), ROOT)
+
+		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toStrictEqual(ANSWER)
+		test_pinned_record.clear(earlier, ROOT)
+	})
+
+	it('reads the answer a check wrote just before its process was found gone', async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(false)
+		run_review_pinned_steps.launch(ROOT)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+		vi.spyOn(test_pinned_record, 'read').mockReturnValueOnce(undefined)
+
+		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toStrictEqual(ANSWER)
+	})
+})
+
 describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 	it('fails open on a check whose process ended without an answer', async () => {
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(false)

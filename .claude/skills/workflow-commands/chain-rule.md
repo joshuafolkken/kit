@@ -27,7 +27,7 @@ Review results and successful pushes are never turn boundaries.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
-   `run:review`'s `test:pinned` lines, run the final scoped lint/test pair with `pnpm josh check:related` and
+   `run:review --join`, run the final scoped lint/test pair with `pnpm josh check:related` and
    `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
    and prints the `/code-review` brief in one call, so they overlap (`--unpinned-ok "<reason>"`
    carries on). Launch the `/code-review` subagent as the `reviewer`

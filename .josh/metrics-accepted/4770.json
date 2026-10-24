@@ -1,9 +1,11 @@
 {
-	"reason": "test:pinned beside the gate: background launch, launch token, settled re-check",
+	"reason": "Review fix: the test:pinned answer is filed per launch token so a superseded check cannot overwrite it, with tests for the late write and the re-read; the self-check and chain-rule prose say question 1 is answered at --join",
 	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 201,
-		"ai_cost.on_demand_bytes": 3,
+		"scripts.code_lines": 204,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 75,
+		"prose.long_paragraphs": 1,
 		"prose.excess_bold": 1
 	}
 }

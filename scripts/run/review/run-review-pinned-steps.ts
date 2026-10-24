@@ -39,12 +39,6 @@ function log_path(root: string = PROJECT_ROOT): string {
 	return stamp_file.stamp_path(LOG_PREFIX, root, '.log')
 }
 
-// Every start clears the last pair's records first, so a join never reads an earlier tree's answer.
-function clear(root: string = PROJECT_ROOT): void {
-	test_pinned_record.clear(root)
-	stamp_file.remove_stamp(launch_path(root))
-}
-
 // The token ties the answer to this launch (`test-pinned-record.ts`).
 function launch(root: string = PROJECT_ROOT): LaunchResult {
 	const token = randomUUID()
@@ -74,6 +68,14 @@ function read_launch(root: string): Launch | undefined {
 	} catch {
 		return undefined
 	}
+}
+
+// Every start clears the last pair's records first, so a join never reads an earlier tree's answer.
+function clear(root: string = PROJECT_ROOT): void {
+	const last = read_launch(root)
+
+	if (last !== undefined) test_pinned_record.clear(last.token, root)
+	stamp_file.remove_stamp(launch_path(root))
 }
 
 // One read: the answer, `undefined` while the check is still running, or a not-run answer once its

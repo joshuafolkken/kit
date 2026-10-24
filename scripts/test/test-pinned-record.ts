@@ -6,11 +6,13 @@ import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 // the printed report and its unpinned count, keyed to the checkout. `run:review` starts the check in
 // the background beside the gate and the brief, so the join — a later process — reads it here.
 //
-// **Each answer carries its launch's token**, and a read answers only for the token it asks with: a
-// check an earlier start left running can still write after the next start cleared the record, and its
-// answer is about a tree the join never asked about.
+// **Each answer is filed under its launch's token**, so a read answers only for the token it asks
+// with: a check an earlier start left running can still write after the next start cleared the record,
+// and its answer — about a tree the join never asked about — lands in its own file rather than over
+// this launch's. The token comes from the command line, so the file name carries its digest.
 
 const RECORD_PREFIX = 'josh-test-pinned-record-'
+const TOKEN_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
 
 interface PinnedSummary {
@@ -29,12 +31,14 @@ function not_run_summary(error: unknown): PinnedSummary {
 	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned_count: 0 }
 }
 
-function record_path(root: string = PROJECT_ROOT): string {
-	return stamp_file.stamp_path(RECORD_PREFIX, root)
+function record_path(token: string, root: string = PROJECT_ROOT): string {
+	const key = stamp_file.digest(token).slice(0, TOKEN_KEY_LENGTH)
+
+	return stamp_file.stamp_path(`${RECORD_PREFIX}${key}-`, root)
 }
 
 function write(token: string, summary: PinnedSummary, root: string = PROJECT_ROOT): void {
-	stamp_file.write_stamp(record_path(root), { token, ...summary })
+	stamp_file.write_stamp(record_path(token, root), { token, ...summary })
 }
 
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
@@ -58,7 +62,7 @@ function parsed(raw: string): Record<string, unknown> | undefined {
 }
 
 function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
-	const raw = stamp_file.read_stamp_text(record_path(root))
+	const raw = stamp_file.read_stamp_text(record_path(token, root))
 	const record = raw === undefined ? undefined : parsed(raw)
 
 	if (record?.['token'] !== token) return undefined
@@ -66,8 +70,8 @@ function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undef
 	return to_summary(record)
 }
 
-function clear(root: string = PROJECT_ROOT): void {
-	stamp_file.remove_stamp(record_path(root))
+function clear(token: string, root: string = PROJECT_ROOT): void {
+	stamp_file.remove_stamp(record_path(token, root))
 }
 
 const test_pinned_record = { clear, not_run_summary, read, record_path, summary_of, write }

@@ -12,7 +12,11 @@ const { read_changed_tree } = vi.hoisted(() => ({
 
 vi.mock('./test-pinned', () => ({ test_pinned: { run } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
-	stamp_file: { stamp_path: (prefix: string) => prefix, write_stamp },
+	stamp_file: {
+		digest: (content: string) => content,
+		stamp_path: (prefix: string) => prefix,
+		write_stamp,
+	},
 }))
 vi.mock('#scripts/review/review-tree', () => ({ review_tree: { read_changed_tree } }))
 
@@ -94,8 +98,9 @@ describe('test_pinned_main.main', () => {
 })
 
 // joshuafolkken/kit#4770: `--record` leaves the answer `josh run:review --join` waits on.
-const RECORD = 'josh-test-pinned-record-'
 const TOKEN = 'launch-4770'
+// The record is filed under the token, which the mocked digest passes through.
+const RECORD = `josh-test-pinned-record-${TOKEN}-`
 
 describe('test_pinned_main.main --record', () => {
 	it('records the report and its unpinned count under the launch token', async () => {
