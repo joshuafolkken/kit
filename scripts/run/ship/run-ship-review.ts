@@ -1,6 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
+import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
@@ -26,16 +27,6 @@ const HIGH = 'high'
 const MEDIUM = 'medium'
 const FIXED_PREFIX = 'fixed '
 const KIND_FIELDS = 2
-// What a finding line carries after its spec: one sentence saying what is wrong, so a stopped ship's
-// log tells the resumed lane child the defect rather than only its location.
-const DESCRIPTION_SEPARATOR = ' — '
-// Where the spec ends on read: a reviewer that types the dash as `-`, `--` or `–` still ends it there,
-// so its sentence never lands in the ledger's file field.
-const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
-// Where a description's first sentence ends, and the cap that keeps a run-on one a line. Japanese
-// sets no space after `。`, so it ends a sentence on its own.
-const SENTENCE_END = /(?<=[.!?])\s|(?<=。)/u
-const SENTENCE_LIMIT = 200
 // `findings_path` is set only for a lane whose josh predates `review:submit`
 // (`lane-session-action.ts`).
 type PromptOf = (
@@ -44,7 +35,6 @@ type PromptOf = (
 	issue: string,
 	findings_path?: string,
 ) => string
-const ELLIPSIS = '…'
 
 const VERDICT = {
 	CLEAN: 'clean',
@@ -146,7 +136,7 @@ function findings_instruction(
 	return [
 		opening,
 		'one per line as',
-		`<category>:<severity>:<file>[:<line>]${DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
+		`<category>:<severity>:<file>[:<line>]${review_finding_text.DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
 		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
 		`a high or medium line ending with ${OTHER_SITES_CLAUSE},`,
 		closing,
@@ -250,28 +240,12 @@ function verification_prompt(
 
 // The spec is what `review:record` reads; the description after it travels in the stage output and,
 // for a finding that stopped the ship, its first sentence in the durable stop log.
-function split_description(unmarked: string): { spec: string; description: string } {
-	const boundary = DESCRIPTION_BOUNDARY.exec(unmarked)
-
-	if (boundary === null) return { spec: unmarked.trim(), description: '' }
-
-	const rest = unmarked.slice(boundary.index + boundary[0].length)
-
-	return { spec: unmarked.slice(0, boundary.index).trim(), description: rest.trim() }
-}
-
 function finding_of(line: string): Finding {
 	const is_fixed = line.startsWith(FIXED_PREFIX)
 
-	return { ...split_description(is_fixed ? line.slice(FIXED_PREFIX.length) : line), is_fixed, line }
-}
+	const unmarked = is_fixed ? line.slice(FIXED_PREFIX.length) : line
 
-function first_sentence(description: string): string {
-	const [sentence = ''] = description.split(SENTENCE_END, 1)
-
-	if (sentence.length <= SENTENCE_LIMIT) return sentence
-
-	return `${sentence.slice(0, SENTENCE_LIMIT - ELLIPSIS.length)}${ELLIPSIS}`
+	return { ...review_finding_text.split_description(unmarked), is_fixed, line }
 }
 
 function spec_findings(text: string): ReadonlyArray<Finding> {
@@ -305,7 +279,11 @@ function kinds_of(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
 function stop_finding_of(finding: Finding): StopFinding {
 	const location = review_record_cli.parse_finding(finding.spec)?.file ?? ''
 
-	return { kind: kind_of(finding), location, sentence: first_sentence(finding.description) }
+	return {
+		kind: kind_of(finding),
+		location,
+		sentence: review_finding_text.first_sentence(finding.description),
+	}
 }
 
 // `bug-risks:medium` — each kind of finding that decided a stopped stage, once per kind (the stop

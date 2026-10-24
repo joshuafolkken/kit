@@ -9,7 +9,9 @@ import { z } from 'zod'
 
 // The durable record of every review finding that stopped a `josh ship` — one JSON line per finding,
 // with its kind, the `<file>[:<line>]` it cites and its first sentence, read back by
-// `josh review:stops` (joshuafolkken/kit#4519). The lane ledger's stop line keeps only the kinds, and
+// `josh review:stops` (joshuafolkken/kit#4519). The findings a round did not stop on — a ship round's
+// fixes made in place, and a `review:record` round's findings written with a reason
+// (joshuafolkken/kit#4817) — are in it too, marked fixed, which `review:stops` leaves out. The lane ledger's stop line keeps only the kinds, and
 // the finding's text was only in the ship log in the temp root, which a reboot clears.
 //
 // **It lives in the git common directory**, beside the test-read map: every lane worktree of one clone

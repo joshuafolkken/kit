@@ -575,7 +575,7 @@ pnpm josh review:record --issue 2325 --interaction                              
 
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings.
 
-**Behavior:** each positional is `<category>:<severity>:<file>`.
+**Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

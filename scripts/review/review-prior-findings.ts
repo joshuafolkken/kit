@@ -7,9 +7,9 @@ import { review_stop_log, type StopLine } from './review-stop-log'
 // constraint an earlier one set on the same line, and came back as a new Medium round after round.
 //
 // **The durable stop log is the source** — the one record that keeps a finding's `<file>[:<line>]` and
-// its reason. A ship round that passed on fixes made in place is in it too, marked fixed. The
-// `review:record` ledger keeps only the file, so a finding only an agent's own `review:record` round
-// recorded carries no reason to show and is not carried.
+// its reason. A ship round that passed on fixes made in place is in it too, marked fixed, and so is an
+// agent's own `review:record` round whose findings carry their reason (joshuafolkken/kit#4817). The
+// ledger keeps only the file, so a finding recorded without a reason is not carried.
 
 const PRIOR_LIMIT = 5
 // Each entry is bounded, so five of them never push a reviewer prompt past `MAX_VALUE_LENGTH`.

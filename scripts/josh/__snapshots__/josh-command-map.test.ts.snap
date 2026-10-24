@@ -1019,7 +1019,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:record": [
-      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>",
+      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>",
       "automation",
       [
         "files",
