@@ -62,3 +62,15 @@ describe('review_stop_log.record and read', () => {
 		expect(review_stop_log.read()).toStrictEqual([])
 	})
 })
+
+describe('review_stop_log.record — a round that passed on fixes made in place', () => {
+	it('marks each of its findings fixed', () => {
+		const log = fresh_log()
+
+		review_stop_log.record({ issue: 7, stage: REVIEW, findings: [FINDING], is_fixed: true }, log)
+
+		expect(review_stop_log.read(log).map(({ at: _at, ...rest }) => rest)).toStrictEqual([
+			{ issue: 7, stage: REVIEW, ...FINDING, fixed: true },
+		])
+	})
+})

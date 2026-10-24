@@ -7,10 +7,13 @@ import { review_stop_log, type StopLine } from './review-stop-log'
 // constraint an earlier one set on the same line, and came back as a new Medium round after round.
 //
 // **The durable stop log is the source** — the one record that keeps a finding's `<file>[:<line>]` and
-// its reason. The `review:record` ledger keeps only the file, so a finding no ship stopped on is not
-// carried.
+// its reason. A ship round that passed on fixes made in place is in it too, marked fixed. The
+// `review:record` ledger keeps only the file, so a finding only an agent's own `review:record` round
+// recorded carries no reason to show and is not carried.
 
 const PRIOR_LIMIT = 5
+// Each entry is bounded, so five of them never push a reviewer prompt past `MAX_VALUE_LENGTH`.
+const ENTRY_LENGTH_LIMIT = 400
 const LINE_SUFFIX = /:\d.*$/u
 const KEY_SEPARATOR = ' — '
 const LINE_BREAKS = /[\n\r]+/gu
@@ -24,11 +27,15 @@ function key_of(finding: Pick<StopFinding, 'location' | 'sentence'>): string {
 }
 
 // An entry is one line of a prompt, so it never carries a line break or a control character
-// `is_safe_prompt` refuses.
+// `is_safe_prompt` refuses. Its parenthetical holds no `; `, the separator the reviewer prompt joins
+// entries with.
 function entry_text(line: StopLine): string {
-	const text = `${key_of(line)} (${line.kind}; stopped the ${line.stage} stage)`
+	const disposition = line.fixed === true ? 'fixed in place' : 'stopped'
+	const text = `${key_of(line)} (${line.kind}, ${disposition} in the ${line.stage} stage)`
 
-	return agent_role_profile.printable(text.replaceAll(LINE_BREAKS, ' '))
+	return agent_role_profile
+		.printable(text.replaceAll(LINE_BREAKS, ' '))
+		.slice(0, ENTRY_LENGTH_LIMIT)
 }
 
 // The latest findings of the lane's issue that `is_kept` admits, oldest first.
@@ -78,11 +85,17 @@ function prompt_clauses(issue: string, log_path?: string): ReadonlyArray<string>
 	if (entries.length === 0) return []
 
 	return [
-		`Earlier review rounds in this lane stopped on these findings: ${entries.join('; ')}.`,
+		`Earlier review rounds in this lane recorded these findings: ${entries.join('; ')}.`,
 		'Check that the change still meets each of them, and report a change that breaks one as a finding.',
 	]
 }
 
-const review_prior_findings = { PRIOR_LIMIT, fix_lines, on_files, prompt_clauses }
+const review_prior_findings = {
+	ENTRY_LENGTH_LIMIT,
+	PRIOR_LIMIT,
+	fix_lines,
+	on_files,
+	prompt_clauses,
+}
 
 export { review_prior_findings }

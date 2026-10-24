@@ -31,7 +31,7 @@ const CURRENT = {
 	sentence: 'a sync ps per redraw.',
 }
 const EPERM_ENTRY =
-	'tick.ts:187 — is_live_pid reads EPERM as dead. (bug-risks:medium; stopped the review stage)'
+	'tick.ts:187 — is_live_pid reads EPERM as dead. (bug-risks:medium, stopped in the review stage)'
 
 function fresh_log(): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'review-prior-findings-'))
@@ -111,6 +111,35 @@ describe('review_prior_findings.on_files — citation and text shape', () => {
 
 		expect(entry).toContain('reads EPERM as dead. Twice.')
 		expect(agent_role_profile.is_safe_prompt(entry ?? '')).toBe(true)
+	})
+})
+
+describe('review_prior_findings.on_files — disposition and bound', () => {
+	it('marks a finding a passing round fixed in place, apart from one that stopped', () => {
+		const log = fresh_log()
+
+		review_stop_log.record(
+			{ issue: Number(ISSUE), stage: REVIEW, findings: [EPERM], is_fixed: true },
+			log,
+		)
+
+		expect(review_prior_findings.on_files(ISSUE, [CURRENT], log)).toStrictEqual([
+			EPERM_ENTRY.replace('stopped in', 'fixed in place in'),
+		])
+	})
+
+	it('bounds an entry whose citation runs long', () => {
+		const log = fresh_log()
+		const long = {
+			...EPERM,
+			location: `tick.ts:187${'x'.repeat(review_prior_findings.ENTRY_LENGTH_LIMIT)}`,
+		}
+
+		review_stop_log.record({ issue: Number(ISSUE), stage: REVIEW, findings: [long] }, log)
+
+		const [entry] = review_prior_findings.on_files(ISSUE, [CURRENT], log)
+
+		expect(entry).toHaveLength(review_prior_findings.ENTRY_LENGTH_LIMIT)
 	})
 })
 

@@ -29,15 +29,19 @@ const stop_line_schema = z.object({
 	kind: z.string(),
 	location: z.string(),
 	sentence: z.string(),
+	fixed: z.boolean().optional(),
 })
 
 type StopLine = z.infer<typeof stop_line_schema>
 
-// One stopped review: the issue, the stage that stopped and the findings that decided it.
+// One stopped review: the issue, the stage that stopped and the findings that decided it. A round that
+// passed on fixes made in place is recorded too, marked `is_fixed`, so the lane's next review still sees
+// the constraint each fix met (joshuafolkken/kit#4780); `review:stops` leaves those lines out.
 interface ReviewStop {
 	issue: number
 	stage: string
 	findings: ReadonlyArray<StopFinding>
+	is_fixed?: boolean
 }
 
 function target(): string | undefined {
@@ -52,11 +56,18 @@ function target(): string | undefined {
 
 function write(destination: string, stop: ReviewStop): void {
 	const at = new Date().toISOString()
+	const mark = stop.is_fixed === true ? { fixed: true } : {}
 
 	mkdirSync(path.dirname(destination), { recursive: true })
 
 	for (const finding of stop.findings) {
-		lane_ledger.append(destination, { at, issue: stop.issue, stage: stop.stage, ...finding })
+		lane_ledger.append(destination, {
+			at,
+			issue: stop.issue,
+			stage: stop.stage,
+			...finding,
+			...mark,
+		})
 	}
 }
 

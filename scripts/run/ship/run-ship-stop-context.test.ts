@@ -34,7 +34,7 @@ const LINE_PADDING = 100
 const BUDGET = 1000
 // Room for the tail line, the heading and two padded earlier findings, not three.
 const PRIOR_BUDGET = 450
-const PRIOR_ENTRY = 'a.ts:3 — reads EPERM as dead. (bug-risks:medium; stopped the review stage)'
+const PRIOR_ENTRY = 'a.ts:3 — reads EPERM as dead. (bug-risks:medium, stopped in the review stage)'
 const STOP_FINDING = { kind: 'performance:medium', location: 'a.ts:3', sentence: 'a sync ps.' }
 const PRIOR_LINE = {
 	at: '2026-10-25T00:00:00.000Z',

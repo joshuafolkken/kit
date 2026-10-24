@@ -331,6 +331,14 @@ function blocking_details(text: string): ReadonlyArray<StopFinding> {
 	return deciding_findings(text).map((finding) => stop_finding_of(finding))
 }
 
+// The findings a passing round 1 fixed in place — the stop log's only chance to see them, since no stop
+// follows (joshuafolkken/kit#4780); none for any other round.
+function passing_fixes(verdict: ScoredVerdict, outcome: RoundOutcome): ReadonlyArray<StopFinding> {
+	if (!outcome.is_passing || verdict.kind !== VERDICT.FIXED) return []
+
+	return blocking_details(verdict.report.join('\n'))
+}
+
 function scored_kind(findings: ReadonlyArray<Finding>): ScoredVerdict['kind'] {
 	if (findings.some((finding) => is_blocking(finding))) return VERDICT.BLOCKING
 
@@ -400,6 +408,7 @@ const run_ship_review = {
 	blocking_kinds,
 	has_fixes,
 	is_clean_round_one,
+	passing_fixes,
 	read_verdict,
 	report_prompt,
 	reviewer_prompt,

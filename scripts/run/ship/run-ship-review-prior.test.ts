@@ -50,3 +50,29 @@ describe('run_ship_review prompts — the earlier findings', () => {
 		expect(before).not.toContain('Earlier review rounds')
 	})
 })
+
+describe('run_ship_review.passing_fixes — what a round that stopped nothing leaves the stop log', () => {
+	const FIXED_LINE = 'fixed bug-risks:medium:a.ts:3 — reads EPERM as dead.'
+	const PASSING = { is_passing: true, note: '' }
+
+	it('keeps the findings a passing round 1 fixed in place', () => {
+		const verdict = run_ship_review.read_verdict(FIXED_LINE)
+
+		if (verdict.kind === run_ship_review.VERDICT.INVALID) throw new Error(verdict.note)
+
+		expect(run_ship_review.passing_fixes(verdict, PASSING)).toStrictEqual([
+			{ kind: PRIOR_LINE.kind, location: 'a.ts:3', sentence: 'reads EPERM as dead.' },
+		])
+		expect(run_ship_review.passing_fixes(verdict, { ...PASSING, is_passing: false })).toStrictEqual(
+			[],
+		)
+	})
+
+	it('keeps nothing from a clean round', () => {
+		const verdict = run_ship_review.read_verdict('tests:low:a.ts — a Low.')
+
+		if (verdict.kind === run_ship_review.VERDICT.INVALID) throw new Error(verdict.note)
+
+		expect(run_ship_review.passing_fixes(verdict, PASSING)).toStrictEqual([])
+	})
+})
