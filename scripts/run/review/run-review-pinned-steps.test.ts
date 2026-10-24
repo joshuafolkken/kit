@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { core_budget, type LiveReservation } from '#scripts/gate/core-budget'
 import { process_identity } from '#scripts/josh/process-identity'
 import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +11,8 @@ import { run_review_steps } from './run-review-steps'
 
 const ROOT = `/nonexistent/run-review-pinned-${randomUUID()}`
 const PID = 4770
+const PINNED_COMMAND = 'test:pinned'
+const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned_count: 1 }
 // The join's grace after the pair, in milliseconds.
 const GRACE_MS = 120_000
@@ -33,7 +36,15 @@ function launched_token(): string {
 	return String(argv.at(-1))
 }
 
+// A `test:pinned` claim in the core ledger, admitted or still queued.
+function pinned_claim(checkout: string, admitted_at?: number): LiveReservation {
+	const reservation = { pid: PID, weight: 1, claimed_at: 0, command: PINNED_COMMAND, checkout }
+
+	return { key: 'claim', reservation: { ...reservation, admitted_at } }
+}
+
 beforeEach(() => {
+	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	vi.spyOn(run_review_steps, 'launch_josh').mockReturnValue({ kind: 'launched', pid: PID })
 	// A wait that passes the grace signals `PID`'s group; no test may reach a real process.
 	vi.spyOn(process, 'kill').mockReturnValue(true)
@@ -49,7 +60,7 @@ describe('run_review_pinned_steps.launch', () => {
 		run_review_pinned_steps.launch(ROOT)
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			['test:pinned', '--record', expect.any(String)],
+			[PINNED_COMMAND, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,
 		)
@@ -139,7 +150,7 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
 
 		expect(answer?.unpinned_count).toBe(0)
-		expect(answer?.text).toContain('no answer within 120s of the gate and the review')
+		expect(answer?.text).toContain(TIMED_OUT_NOTE)
 	})
 })
 
@@ -172,6 +183,49 @@ describe('run_review_pinned_steps.wait_for_answer — stopping a late check', ()
 
 		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
 
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4808: a check still queued for its cores when the pair ends could not finish
+// within the grace, so the join stops it at once.
+describe('run_review_pinned_steps.wait_for_answer — a check still queued for cores', () => {
+	it('stops it without waiting out the grace and fails open', async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		vi.mocked(core_budget.live_reservations).mockReturnValue([pinned_claim(ROOT)])
+		const now = vi.fn(() => 0)
+
+		run_review_pinned_steps.launch(ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, now)
+
+		expect(now).not.toHaveBeenCalled()
+		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+		expect(answer).toStrictEqual({
+			text: '`josh test:pinned` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended\n',
+			unpinned_count: 0,
+		})
+	})
+
+	it.each([
+		['admitted, so already booting or running', pinned_claim(ROOT, 1)],
+		["another checkout's, still queued", pinned_claim(`${ROOT}-other`)],
+	])('waits out the grace on a claim %s', async (_kind, claim) => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		vi.mocked(core_budget.live_reservations).mockReturnValue([claim])
+		run_review_pinned_steps.launch(ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(answer?.text).toContain(TIMED_OUT_NOTE)
+	})
+
+	it('reads the answer of a check that answered before the join, queued claim or not', async () => {
+		vi.mocked(core_budget.live_reservations).mockReturnValue([pinned_claim(ROOT)])
+		run_review_pinned_steps.launch(ROOT)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toStrictEqual(ANSWER)
 		expect(process.kill).not.toHaveBeenCalled()
 	})
 })
