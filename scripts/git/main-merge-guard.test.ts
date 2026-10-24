@@ -1,3 +1,4 @@
+import { lane_background } from '#scripts/rules/lane-background'
 import { describe, expect, it } from 'vitest'
 import { main_merge_guard } from './main-merge-guard'
 
@@ -10,6 +11,7 @@ const OLD_NAME = 'old.ts'
 const CONFLICTED = 'UU scripts/run/event/run-event-stream.ts\n M scripts/other.ts'
 const DIRTY = ` M ${CHANGED_FILE}\n?? scripts/new.ts`
 const COMMIT_COMMAND = 'pnpm josh git -y'
+const LANE_COMMIT_COMMAND = 'pnpm josh git -y --skip-push --skip-pr "<title> #<N>"'
 const UNTOUCHED_FILE = 'elsewhere.ts'
 
 describe('main_merge_guard.unmerged_paths', () => {
@@ -87,5 +89,47 @@ describe('main_merge_guard.refusal', () => {
 
 	it('lets a clean tree through', () => {
 		expect(main_merge_guard.refusal('', [CHANGED_FILE], 'main')).toBeUndefined()
+	})
+})
+
+function guided_command(is_lane_child: boolean): string {
+	const commit = main_merge_guard.commit_command(is_lane_child)
+	const refusal = main_merge_guard.refusal(CONFLICTED, [], 'main', commit) ?? ''
+
+	return /`(?<command>pnpm josh git -y[^`]*)`/u.exec(refusal)?.groups?.['command'] ?? ''
+}
+
+// joshuafolkken/kit#4769: a lane child told to close the merge through a pushing `git -y` was refused
+// by the lane-background row, so a lane child is told the commit-only form `josh ship` closes it with.
+describe('main_merge_guard.refusal in a lane child', () => {
+	it('routes a lane child through the commit-only form', () => {
+		expect(guided_command(true)).toBe(LANE_COMMIT_COMMAND)
+	})
+
+	it('keeps the pushing form outside a lane child', () => {
+		expect(guided_command(false)).toBe(COMMIT_COMMAND)
+	})
+
+	it('guides a lane child to a command the lane-background row lets through', () => {
+		const call = { name: 'Bash', input: { command: guided_command(true) } }
+
+		expect(lane_background.is_background_long_run(call, () => true)).toBe(false)
+	})
+
+	it.each([
+		['staged changes', `M  ${UNTOUCHED_FILE}`],
+		['an overlap', DIRTY],
+	])('tells a lane child the commit-only form over %s too', (_label, status) => {
+		const commit = main_merge_guard.commit_command(true)
+
+		expect(main_merge_guard.refusal(status, [CHANGED_FILE], 'main', commit)).toContain(
+			LANE_COMMIT_COMMAND,
+		)
+	})
+
+	it('tells a lane child the commit-only form for a conflicted merge too', () => {
+		const commit = main_merge_guard.commit_command(true)
+
+		expect(main_merge_guard.conflict_hint(commit)).toContain(LANE_COMMIT_COMMAND)
 	})
 })

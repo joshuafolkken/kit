@@ -112,7 +112,7 @@ describe('merging the default branch into the current branch', () => {
 
 		await main_merge.run(NO_ARGUMENTS)
 
-		expect(console.error).toHaveBeenCalledWith(main_merge_guard.CONFLICT_HINT)
+		expect(console.error).toHaveBeenCalledWith(main_merge_guard.conflict_hint())
 	})
 })
 
