@@ -26,16 +26,18 @@ import { prose_density, type ProseTotals } from './prose-density'
 // **It is kit-only.** The rule documents and the guard commands it counts are kit's own; a consumer
 // has no root `prompts/` to read, and the gate leaves the step out there.
 //
-// `--totals-only` is the form a detached `josh ship` runs before the hand-off, and `josh lint:related`
-// reports in the loop (`scripts/gate/metrics-totals.ts`): the totals alone, so a grown total stops the
-// session that knows why it grew. The durations stay with
-// the supervised gate — before the detach the gate ledger they read is stale.
+// `--totals-only` is the form `josh lint:related` reports in the loop (`scripts/gate/metrics-totals.ts`):
+// the totals alone, so a grown total stops the session that knows why it grew. `--totals-only
+// --rerecord` is the form a detached `josh ship` runs before the hand-off: it also re-records the
+// growth a recorded reason names at what it measures now (`check_totals_only`). The durations stay
+// with the supervised gate — before the detach the gate ledger they read is stale.
 //
 // `--json` is the form this command runs on the merge-base's tree: the totals alone, as JSON, held
 // to nothing.
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh metrics [--no-startup | --totals-only | --accept --reason "<why>"]'
+const USAGE =
+	'Usage: josh metrics [--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]'
 const ACCEPT_FLAG = '--accept'
 const REASON_FLAG = '--reason'
 const ACCEPT_ARGUMENT_COUNT = 3
@@ -63,7 +65,7 @@ const SETTLED_LINE: Record<Exclude<Verdict['kind'], 'regressed'>, string> = {
 	unchanged: NOT_GROWN,
 }
 
-type MetricsForm = 'full' | 'totals' | 'json'
+type MetricsForm = 'full' | 'totals' | 'rerecord' | 'json'
 
 interface GrowthToAccept {
 	base: Metrics
@@ -84,6 +86,7 @@ const CHECK_FORMS: ReadonlyMap<string, MetricsArguments> = new Map([
 	['', { reason: undefined, is_startup_timed: true, form: 'full' }],
 	['--no-startup', { reason: undefined, is_startup_timed: false, form: 'full' }],
 	['--totals-only', { reason: undefined, is_startup_timed: false, form: 'totals' }],
+	['--totals-only --rerecord', { reason: undefined, is_startup_timed: false, form: 'rerecord' }],
 	[metrics_base.JSON_FLAG, { reason: undefined, is_startup_timed: false, form: 'json' }],
 ])
 
@@ -208,25 +211,63 @@ function settle(commit: string, verdict: Verdict): number {
 	return say(SETTLED_LINE[verdict.kind])
 }
 
+// Re-records the issue's own approval at the growth measured now, once a reason is recorded, and
+// returns the reading with the file it wrote (`metrics_ratchet.refresh`).
+function rerecord(root: string, issue: number, base: Reading, current: Reading): Reading {
+	const name = metrics_base.approval_name(issue)
+	const own = metrics_ratchet.own_approval(name, current.approvals, base.approvals)
+	const fresh =
+		own === undefined
+			? undefined
+			: metrics_ratchet.refresh(own, base.metrics, current.metrics, today())
+
+	if (fresh === undefined) return current
+
+	const file = metrics_base.write_approval(root, issue, fresh)
+
+	say(`josh metrics: the growth re-recorded in ${file} — ${fresh.reason}`)
+
+	return { ...current, approvals: metrics_base.approval_texts(root) }
+}
+
+async function rerecorded(root: string, base: Reading, current: Reading): Promise<Reading> {
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+
+	return issue === undefined ? current : rerecord(root, issue, base, current)
+}
+
 // No commit to measure from — not a repository, no default branch — holds the totals to nothing,
 // the way every guard that asks for the merge-base fails open there. CI names its commit, and a name
 // that does not resolve throws (`metrics-base.ts`).
-async function check_totals(root: string, metrics: Metrics): Promise<number> {
+async function check_totals(
+	root: string,
+	metrics: Metrics,
+	is_rerecorded = false,
+): Promise<number> {
 	const commit = await metrics_base.resolve_commit()
 
 	if (commit === undefined) return say('josh metrics: no merge-base, so no total is held to one')
 
-	const current: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
-	const base = await metrics_base.read(commit, current)
+	const measured: Reading = { metrics, approvals: metrics_base.approval_texts(root) }
+	const base = await metrics_base.read(commit, measured)
+	const current = is_rerecorded ? await rerecorded(root, base, measured) : measured
 	const approvals = metrics_ratchet.fresh_approvals(current.approvals, base.approvals)
 
 	return settle(commit, metrics_ratchet.compare(base.metrics, metrics, approvals))
 }
 
-async function check_totals_only(root: string, metrics: Metrics): Promise<number> {
+// Ship's pre-detach form is the one that re-records: an approval re-accepted after every small edit
+// cost a lane six accepts and a pre-detach stop (joshuafolkken/kit#4716). Every other form only
+// compares — `josh lint:related` reads the tree before and after its run, and a file written in
+// between would withhold its green record.
+async function check_totals_only(
+	root: string,
+	metrics: Metrics,
+	form: MetricsForm,
+): Promise<number> {
 	process.stdout.write(`${metrics_logic.render(metrics)}\n`)
 
-	return await check_totals(root, metrics)
+	return await check_totals(root, metrics, form === 'rerecord')
 }
 
 // Both halves always run, so one failing gate names every total and every duration that grew.
@@ -298,7 +339,7 @@ async function run_metrics(argv: ReadonlyArray<string>): Promise<number> {
 	const metrics = await measure(root)
 
 	if (parsed.form === 'json') return say(JSON.stringify(metrics))
-	if (parsed.form === 'totals') return await check_totals_only(root, metrics)
+	if (parsed.form !== 'full') return await check_totals_only(root, metrics, parsed.form)
 
 	return await run_full(root, metrics, parsed)
 }

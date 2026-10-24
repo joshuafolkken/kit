@@ -50,9 +50,9 @@ first sighting.
 **Two reasons, and a child can solve neither for itself.** It holds one Issue's worth of context, so
 **it cannot tell its observation from the one a sibling filed twenty minutes earlier** — the 15
 filings of 2026-09-09 were collapsed to 12 within that same day, which means they were collapsible
-at the moment they were made. And **the 10-per-run ceiling for this route is the parent's to
-count**: six children counting two or three filings each never reach it, which is why it did not
-fire once on the run that filed fifteen.
+at the moment they were made. And **a run's sprawl is the parent's to count**: six children filing
+two or three each stay far under their own ten-per-origin ceilings, which is why the filing ceiling
+did not fire once on the run that filed fifteen.
 
 ## Where each rule came from
 

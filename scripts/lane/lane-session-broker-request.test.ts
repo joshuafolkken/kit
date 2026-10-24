@@ -14,6 +14,7 @@ const resolve_mock = vi.hoisted(() => vi.fn())
 const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
+const reread_mock = vi.hoisted(() => vi.fn())
 const ISSUE = '4714'
 const SUCCESS = { is_success: true }
 const NEWER = {
@@ -50,6 +51,7 @@ vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: async () => false } 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
 }))
+vi.mock('./lane-session-reread', () => ({ lane_session_reread: { reread: reread_mock } }))
 
 const state = { directory: '' }
 
@@ -64,6 +66,7 @@ beforeEach(() => {
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
 	emit_mock.mockReset().mockResolvedValue(undefined)
+	reread_mock.mockReset().mockResolvedValue(undefined)
 	lane_session_broker.take_refusal()
 })
 
@@ -100,6 +103,33 @@ describe('lane_session_broker — the request ship sends for its brokered review
 		)
 
 		expect(lane_session_broker.take_refusal()).toBe(false)
+		expect(reread_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane_session_broker — a refused request is read again by the code on disk', () => {
+	it("answers with the fresh process's answer, and still marks the supervisor", async () => {
+		reread_mock.mockResolvedValue(SUCCESS)
+
+		const answer = await served(
+			async () => await lane_session_broker.request(LANE.directory, ISSUE, NEWER),
+		)
+
+		expect(answer).toStrictEqual(SUCCESS)
+		expect(reread_mock).toHaveBeenCalledWith(ISSUE, expect.objectContaining({ action: NEWER }))
+		expect(lane_session_broker.take_refusal()).toBe(true)
+	})
+
+	it("passes on the fresh process's failure as the answer", async () => {
+		const reason = 'the issue is parked'
+
+		reread_mock.mockResolvedValue({ is_success: false, reason })
+
+		const answer = await served(
+			async () => await lane_session_broker.request(LANE.directory, ISSUE, NEWER),
+		)
+
+		expect(answer.is_success ? '' : answer.reason).toContain(reason)
 	})
 })
 

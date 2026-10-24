@@ -213,6 +213,10 @@ async function preserve_uncommitted(child: string): Promise<boolean> {
 	}
 }
 
+async function close_preserved_lane(child: string): Promise<void> {
+	if (await preserve_uncommitted(child)) await close_lane(child)
+}
+
 function kept_lane_comment(directory: string): string {
 	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
 }
@@ -251,27 +255,53 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
 }
 
-// A merged child: close it if GitHub left it OPEN and close the epics it completed
-// (`run-merge-close.ts`), count the merge (which resets the failure streak), return to the default branch,
-// stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
-// fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child.
-// Returns `undefined` on success.
-async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
+// Both steps run to their end before either's failure is thrown, so neither is left half-done behind
+// the other's failure.
+async function settled_together(first: Promise<void>, second: Promise<void>): Promise<void> {
+	const [result, other] = await Promise.allSettled([first, second])
+
+	if (result.status === 'rejected') throw result.reason
+	if (other.status === 'rejected') throw other.reason
+}
+
+// Count the merge, which resets the failure streak.
+async function count_merged(ctx: MergeContext): Promise<ApplyCarryResult> {
+	return await apply_carry(ctx, {
+		...run_merge.change_of('merged'),
+		merged_issue: Number(ctx.child),
+	})
+}
+
+// A merged child: closed if GitHub left it OPEN, with the epics it completed (`run-merge-close.ts`),
+// while the primary checkout returns to the default branch; then counted and put on record by `record`,
+// dated to the moment the ownership check passed (joshuafolkken/kit#4734); then the lane — stashed of
+// any uncommitted work — is closed while the counters are mirrored onto the epic. **A failed sync
+// leaves neither the count nor the record**, so the run's next pass (a restored drive, `run:carry
+// --end`) still reads the child as unsettled and collects it again. **What the next offer reads ends
+// before this returns**: the closed issue and epics, the count, the lane's freed seat, and the default
+// branch whose code the next `josh` runs. Returns the carry when the ownership check fails — the caller
+// treats a non-undefined return as a hard refusal and must not offer a next child. Returns `undefined`
+// on success.
+async function do_merged(
+	ctx: MergeContext,
+	record: (child: string, at: Date) => Promise<void>,
+): Promise<RunCarry | undefined> {
 	const refused = await refused_carry(ctx)
 
 	if (refused !== undefined) return refused
 
-	await run_merge_close.close_merged(ctx)
-	await sync_main()
-	const result = await apply_carry(ctx, {
-		...run_merge.change_of('merged'),
-		merged_issue: Number(ctx.child),
-	})
+	const confirmed_at = new Date()
+
+	await settled_together(run_merge_close.close_merged(ctx), sync_main())
+	const result = await count_merged(ctx)
 
 	if (result.kind === 'refused') return result.carry
 
-	if (await preserve_uncommitted(ctx.child)) await close_lane(ctx.child)
-	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
+	await record(ctx.child, confirmed_at)
+
+	const carry = result.kind === 'applied' ? result.carry : undefined
+
+	await Promise.all([close_preserved_lane(ctx.child), post_counters(ctx, carry)])
 
 	return undefined
 }

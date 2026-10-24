@@ -1,6 +1,12 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
-import { lane_ledger, type DispatchEntry, type LedgerEntry, type StageEntry } from './lane-ledger'
+import {
+	lane_ledger,
+	type DispatchEntry,
+	type LedgerEntry,
+	type MergeEntry,
+	type StageEntry,
+} from './lane-ledger'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Where a lane's time goes: the ledger's `stage` and `dispatch` entries of one period reduced to one
@@ -51,6 +57,10 @@ function is_stage(entry: LedgerEntry): entry is StageEntry {
 
 function is_dispatch(entry: LedgerEntry): entry is DispatchEntry {
 	return entry.kind === lane_ledger.KIND.DISPATCH
+}
+
+function is_merge(entry: LedgerEntry): entry is MergeEntry {
+	return entry.kind === lane_ledger.KIND.MERGE
 }
 
 function is_number(value: number | undefined): value is number {
@@ -154,6 +164,7 @@ const lane_stage_stats = {
 	STAGES,
 	cell,
 	is_dispatch,
+	is_merge,
 	is_number,
 	is_stage,
 	medians,

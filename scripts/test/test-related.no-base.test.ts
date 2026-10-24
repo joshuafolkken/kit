@@ -5,7 +5,7 @@ import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_no_base } from './test-no-base'
-import { test_read_map } from './test-read-map'
+import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
 
@@ -54,6 +54,15 @@ beforeEach(() => {
 	mocked_run.mockResolvedValue(0)
 })
 
+const EMPTY_MAP: ReadMap = {
+	version: test_read_map.MAP_VERSION,
+	commit: MAP_TREE,
+	dirty: {},
+	change: [],
+	directories: [],
+	readers: {},
+}
+
 describe('test_related.run_related_tests — the no-base pass', () => {
 	it('hands the changed files and the vitest flags to the no-base pass after a green run', async () => {
 		await test_related.run_related_tests(['--silent'])
@@ -66,13 +75,7 @@ describe('test_related.run_related_tests — the no-base pass', () => {
 	})
 
 	it('hands only the branch’s own files, never those the map’s tree joined', async () => {
-		vi.spyOn(test_read_map, 'read_map').mockReturnValue({
-			version: test_read_map.MAP_VERSION,
-			commit: MAP_TREE,
-			dirty: {},
-			directories: [],
-			readers: {},
-		})
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(EMPTY_MAP)
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([CHANGED_SOURCE, JOINED_SOURCE])
 
 		await test_related.run_related_tests([])

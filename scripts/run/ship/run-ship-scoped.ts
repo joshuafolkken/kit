@@ -1,5 +1,6 @@
 import { gate_skip } from '#scripts/gate/gate-skip'
-import { gate_tree } from '#scripts/gate/gate-tree'
+import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 
@@ -25,12 +26,21 @@ async function run_phases(phases: ReadonlyArray<Phase>): Promise<JoshResult> {
 	return last
 }
 
+// The tree after the branch's metrics approval is re-recorded (`metrics-totals.ts`): every review fix
+// and the gate stage meet the pair here, so a rewrite lands before any record is written for the tree.
+async function rerecorded_tree(): Promise<GateTree> {
+	const tree = await gate_tree.read_gate_tree()
+	const is_rerecorded = await metrics_totals.rerecord(process.cwd(), tree.files)
+
+	return is_rerecorded ? await gate_tree.read_gate_tree() : tree
+}
+
 // Only the checks with no green record for this tree run — the same question `review:brief` and the
 // local gate refuse on — so a fresh record costs nothing and a stale or absent one costs a scoped run
 // instead of a stop and a relaunched session. A check that genuinely fails still stops the ship, its
 // output forwarded to the ship log.
 async function scoped_pair(): Promise<JoshResult> {
-	const tree = await gate_tree.read_gate_tree()
+	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
 
 	return await run_phases(

@@ -48,7 +48,7 @@ const COUNT_WORDS: ReadonlyArray<string> = [
 // The two chain-rule entries — each its numbered item's opening, and the words its scoped pair is
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
-	['0. **A lane child**', 'the scoped pair, `pnpm josh run:review`'],
+	['0. **A lane child**', '`pnpm josh check:related`'],
 	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
 ]
 

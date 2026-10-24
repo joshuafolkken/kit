@@ -68,9 +68,16 @@ describe('lane_measure_cli.run — refusals', () => {
 		[['value', 'nope', '--since', SINCE]],
 		[['value', 'edit', 'edit', '--since', SINCE]],
 		[['value', 'edit', '--since', 'soon']],
+		[['net']],
+		[['net', '#4695']],
+		[['net', '4695', '4696']],
 	])('refuses %j', async (argv) => {
 		await expect(lane_measure_cli.run(argv, fresh_context())).resolves.toBe(FAILURE)
 		expect(console.error).toHaveBeenCalledWith(lane_measure_cli.USAGE)
+	})
+
+	it('names the net verb in the usage it prints', () => {
+		expect(lane_measure_cli.USAGE).toContain('josh lane:net <issue>')
 	})
 })
 

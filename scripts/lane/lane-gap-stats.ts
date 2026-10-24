@@ -29,7 +29,7 @@ const PARK = 'park → offer'
 const MERGE = 'followup → merge'
 const FOLLOWUP_STAGE = 'followup'
 const IMPLEMENTATION_CUT = `cut (${agent_role_profile.IMPLEMENTATION_PHASE})`
-const { NOT_MEASURED, is_dispatch, is_number, is_stage } = lane_stage_stats
+const { NOT_MEASURED, is_dispatch, is_merge, is_number, is_stage } = lane_stage_stats
 const { EVENT_KIND } = run_event_stream
 // The offer answers that are not a dispatch: a free lane held, or the pool found full.
 const OFFER_ANSWERS: ReadonlySet<string> = new Set([
@@ -79,10 +79,6 @@ function park_spans(
 	return lane_stop_stats
 		.events_of(events, EVENT_KIND.PARK)
 		.map((park) => ({ from_ms: park.at_ms, end_ms: offers.find((at) => at > park.at_ms) }))
-}
-
-function is_merge(entry: LedgerEntry): entry is MergeEntry {
-	return entry.kind === lane_ledger.KIND.MERGE
 }
 
 function is_followup_of(entry: LedgerEntry, merge: MergeEntry): boolean {

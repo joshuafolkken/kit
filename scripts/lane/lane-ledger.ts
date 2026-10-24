@@ -114,8 +114,8 @@ async function record_gate(path: string, gate: GateRecord): Promise<void> {
 	await record({ kind: KIND.GATE, at: now_iso(), ...gate }, path)
 }
 
-async function record_merge(issue: number): Promise<void> {
-	await record({ kind: KIND.MERGE, at: now_iso(), issue })
+async function record_merge(issue: number, at: Date = new Date()): Promise<void> {
+	await record({ kind: KIND.MERGE, at: at.toISOString(), issue })
 }
 
 async function record_dispatch(issue: number, path?: string): Promise<void> {
