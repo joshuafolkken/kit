@@ -1,6 +1,7 @@
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
+import { moved_paths } from '#scripts/gate/moved-paths'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
+import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_attest } from './review-attest'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
@@ -48,13 +49,16 @@ async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 }
 
 // An empty tree or an unresolved base is git not answering, never "nothing moved".
-function is_unmoved(stamp: FileMapStamp, tree: GateTree): boolean {
-	if (Object.keys(tree.files).length === 0) return false
+//
+// **A base the ship's sync moved is unmoved for every path the default branch left alone**
+// (joshuafolkken/kit#4829): with every recorded digest matching, only a synced path the round covers
+// changes what it read. Main's other paths are the scoped pair's, the gate's and CI's to check.
+async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
+	const parts = await moved_paths.moved_parts(stamp, tree)
 
-	return (
-		file_map_stamp.describes_base(stamp, tree.base) &&
-		file_map_stamp.changed_since(stamp, tree.files).length === 0
-	)
+	if (parts === undefined || parts.changed.length > 0) return false
+
+	return parts.synced.every((path) => !Object.hasOwn(stamp.files, path))
 }
 
 // **Only a review attested on this branch is reused**, as `resume_point` narrows from no other: the
@@ -69,7 +73,7 @@ async function is_unmoved_here(): Promise<boolean> {
 
 	if (!review_attest.is_attested_on(checkout, checkout.root)) return false
 
-	return is_unmoved(stamp, await gate_tree.read_gate_tree())
+	return await is_unmoved(stamp, await gate_tree.read_gate_tree())
 }
 
 // The record a resumed brief narrows from: written after the brief the pointer names, whose review was

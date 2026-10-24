@@ -9,10 +9,12 @@ const write_mock = vi.hoisted(() => vi.fn())
 const remove_mock = vi.hoisted(() => vi.fn())
 const gate_tree_mock = vi.hoisted(() => vi.fn())
 const checkout_mock = vi.hoisted(() => vi.fn())
+const git_read_mock = vi.hoisted(() => vi.fn())
 
 const marker = vi.hoisted(() => new Map<string, string>())
 
 vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: gate_tree_mock } }))
+vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: git_read_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: {
 		read_stamp_text: (path: string) => marker.get(path),
@@ -44,18 +46,50 @@ const STAMP: FileMapStamp = {
 const CHECKOUT: ReviewCheckout = { root: '/lanes/4620', branch: '4620-lane', head: 'head' }
 
 describe('review_reviewed_tree.is_unmoved', () => {
-	it('answers true for the same files on the same base', () => {
-		expect(review_reviewed_tree.is_unmoved(STAMP, { files: { [FILE]: 'x' }, base: BASE })).toBe(
-			true,
-		)
+	beforeEach(() => {
+		git_read_mock.mockReset()
+	})
+
+	it('answers true for the same files on the same base', async () => {
+		expect(
+			await review_reviewed_tree.is_unmoved(STAMP, { files: { [FILE]: 'x' }, base: BASE }),
+		).toBe(true)
 	})
 
 	it.each([
 		['a changed file', { files: { [FILE]: 'y' }, base: BASE }],
-		['another base', { files: { [FILE]: 'x' }, base: 'other' }],
+		['an unresolved base', { files: { [FILE]: 'x' }, base: undefined }],
 		['an empty tree', { files: {}, base: BASE }],
-	])('answers false on %s', (_case, tree) => {
-		expect(review_reviewed_tree.is_unmoved(STAMP, tree)).toBe(false)
+	])('answers false on %s', async (_case, tree) => {
+		expect(await review_reviewed_tree.is_unmoved(STAMP, tree)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4829: the ship's sync moves the base under a recorded round.
+describe('review_reviewed_tree.is_unmoved on a base the sync moved', () => {
+	const moved = { files: { [FILE]: 'x' }, base: 'new-base' }
+
+	beforeEach(() => {
+		git_read_mock.mockReset()
+	})
+
+	it('answers true when the default branch changed no recorded file', async () => {
+		git_read_mock.mockResolvedValue('main.ts\0docs/main.md\0')
+
+		expect(await review_reviewed_tree.is_unmoved(STAMP, moved)).toBe(true)
+		expect(git_read_mock).toHaveBeenCalledWith(expect.arrayContaining([BASE, moved.base]))
+	})
+
+	it('answers false when the default branch changed a recorded file', async () => {
+		git_read_mock.mockResolvedValue(`main.ts\0${FILE}\0`)
+
+		expect(await review_reviewed_tree.is_unmoved(STAMP, moved)).toBe(false)
+	})
+
+	it('answers false when the recorded base is not in the history', async () => {
+		git_read_mock.mockRejectedValue(new Error('fatal: bad revision'))
+
+		expect(await review_reviewed_tree.is_unmoved(STAMP, moved)).toBe(false)
 	})
 })
 
@@ -131,14 +165,14 @@ describe('review_reviewed_tree.record', () => {
 	}
 
 	it('records the tree as it stands when no finding is unsettled', async () => {
-		expect(review_reviewed_tree.is_unmoved(await recorded([]), tree)).toBe(true)
+		expect(await review_reviewed_tree.is_unmoved(await recorded([]), tree)).toBe(true)
 	})
 
 	// The second case is a reader outside the change, which a High cites at the reader's line.
 	it.each([`${other}:12`, 'outside.ts:3'])(
 		'records a tree that reads as moved while a High cites %s',
 		async (unsettled) => {
-			expect(review_reviewed_tree.is_unmoved(await recorded([unsettled]), tree)).toBe(false)
+			expect(await review_reviewed_tree.is_unmoved(await recorded([unsettled]), tree)).toBe(false)
 		},
 	)
 })
