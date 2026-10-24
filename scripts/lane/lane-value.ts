@@ -19,7 +19,11 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 const LINT_RELATED = 'lint:related'
 const SHIP = 'ship'
 const EDIT_TOOL = 'Edit'
-const METRICS_STOP = run_ship_pre_detach.failure_prefix(metrics_totals.METRICS_TOTALS_COMMAND)
+// Both pre-detach forms: a `--since` window from before joshuafolkken/kit#4716 holds the bare form's.
+const METRICS_STOPS: ReadonlyArray<string> = [
+	metrics_totals.METRICS_RERECORD_COMMAND,
+	metrics_totals.METRICS_TOTALS_COMMAND,
+].map((list) => run_ship_pre_detach.failure_prefix(list))
 
 interface LaneRecords {
 	entries: ReadonlyArray<LedgerEntry>
@@ -53,7 +57,7 @@ function metrics_stops({ calls }: LaneRecords): number | undefined {
 	const stops = calls.filter(
 		(call) =>
 			lane_transcript_stats.verification_commands(call.command).includes(SHIP) &&
-			call.output.includes(METRICS_STOP),
+			METRICS_STOPS.some((stop) => call.output.includes(stop)),
 	)
 
 	return per_lane(stops.length, calls)

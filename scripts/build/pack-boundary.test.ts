@@ -37,10 +37,12 @@ interface PackageManifest {
 
 // Runtime entries a consumer reaches by file path rather than by a static import
 // (joshuafolkken/kit#2899): `init` writes `fix-gh-packages.ts` into the consumer's `prepare`, and the lane
-// supervisor spawns its CLI, `run:board` its gathering worker and `lane:open` its eslint warm-up by
-// URL. The hook sources (the Codex adapter's fallback included) are seeded from `HOOK_BUNDLES`.
+// supervisor spawns its CLI, the lane broker its request reread, `run:board` its gathering worker and
+// `lane:open` its eslint warm-up by URL. The hook sources (the Codex adapter's fallback included) are
+// seeded from `HOOK_BUNDLES`.
 const PATH_LAUNCHED_ENTRIES = [
 	'scripts/gh/fix-gh-packages.ts',
+	'scripts/lane/lane-session-reread-main.ts',
 	'scripts/lane/openai-lane-supervisor-cli.ts',
 	'scripts/lint/eslint-warm-cli.ts',
 	'scripts/run/board/run-board-gather-worker.ts',

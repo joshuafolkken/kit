@@ -120,6 +120,12 @@ A `preflight` stage runs first: it asks every pull-request precondition at once 
 
 `--review` runs review round 1 beside the gate, after any scoped check not yet green. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed `, counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer, attest and record — anything but a clean or Low-only round 2 stops before `followup`.
 
+## `josh ship:wait` in detail
+
+The lane session that detached a ship waits instead of ending its turn, so a stop in the gate or review round 1 comes back to the session that already holds the run rather than to a fresh one that re-reads it (joshuafolkken/kit#4711).
+
+Each poll refreshes a heartbeat; the stopped supervisor hands its note to a session whose heartbeat is fresh, and relaunches a fresh session where none takes it within two minutes. A chunk ends `pending` after nine minutes, below the Bash tool's ceiling, and the heartbeat outlives it long enough for the next wait.
+
 ## `josh run:event` in detail
 
 `setup` is one stage the run itself works through — `starting session`, `planning`, `handing off`, `waiting on judgment`, `judgment session running`, `no child launched`, `opening lane #<N>`, `installing dependencies #<N>`, `dispatching #<N>` — written by the step that enters it, and its `at` is the moment `run:board` counts the stage's elapsed time from; it is a trace, so it never moves the run's position.
@@ -178,6 +184,10 @@ Open and close a lane: one linked git work tree with its own branch and its own 
 ## `josh lane:sample` / `josh lane:stats` in detail
 
 Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./lane-limit-measurement.md).
+
+## `josh lane:net` in detail
+
+Each wait runs from the park or outage to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop leaves no record yet, so its wait is not taken out (joshuafolkken/kit#4753).
 
 ## `josh cost` in detail
 

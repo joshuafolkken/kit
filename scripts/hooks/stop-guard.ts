@@ -10,7 +10,6 @@ import { session_language } from '#scripts/josh/session-language'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
-import { filing_cap } from '#scripts/rules/filing-cap'
 import { lane_background } from '#scripts/rules/lane-background'
 import { lane_park } from '#scripts/rules/lane-park'
 import { last_prompt } from '#scripts/rules/last-prompt'
@@ -18,6 +17,7 @@ import { pre_gate_cut } from '#scripts/rules/pre-gate-cut'
 import { stop_decision } from '#scripts/rules/stop-decision'
 import { stop_rules, type StopContext, type StopOutcome } from '#scripts/rules/stop-rules'
 import { tail_commands } from '#scripts/rules/tail-commands'
+import { turn_filings } from '#scripts/rules/turn-filings'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
@@ -82,10 +82,10 @@ function transcript_tail(transcript_path: string): string {
 	return time_density_hook.read_tail(transcript)
 }
 
-// An Issue was filed on this turn — the tail from the last prompt on. The count is `filing_cap`'s, so a
-// filing a guard refused is not counted, and one an earlier turn made does not stand this turn down.
+// An Issue was filed on this turn — the tail from the last prompt on. The count is `turn_filings`', so
+// a filing a guard refused is not counted, and one an earlier turn made does not stand this turn down.
 function was_filed(tail: string): boolean {
-	return filing_cap.turn_filing_count(tail) > 0
+	return turn_filings.turn_filing_count(tail) > 0
 }
 
 // This turn ended at a cut — a record still `carried`, or this turn's `run:cut` relaunching a successor.
@@ -95,7 +95,7 @@ function is_cut_stop(tail: string): boolean {
 	if (run_cut.carried_cut_sync() !== undefined) return true
 
 	return tail_commands.answered(
-		filing_cap.current_turn(tail),
+		turn_filings.current_turn(tail),
 		pre_gate_cut.takes_the_cut,
 		run_cut_report.RELAUNCHED_CUT_MARKER,
 	)

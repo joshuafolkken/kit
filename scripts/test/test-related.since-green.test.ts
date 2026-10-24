@@ -65,6 +65,7 @@ function map_with(
 		version: test_read_map.MAP_VERSION,
 		commit: MAP_TREE,
 		dirty: {},
+		change: [],
 		directories: [],
 		readers,
 	}

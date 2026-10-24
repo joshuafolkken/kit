@@ -65,7 +65,7 @@ is **the entry point for the `Stop` event**. It is wired as a **single entry** w
 **It shares the foundation and reuses the verdicts.** The switch (`JOSH_STOP_GUARD`) and the `.env`
 read come from `hook-decision.ts`; whether a message is a stop notice comes from the pattern in
 `lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
-mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
+mechanism is built**. Whether anything was filed uses the count in `turn-filings.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
 payload carries no tool call. A row that needs the model answers with `{"decision":"block","reason":…}`,
 the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
@@ -99,8 +99,6 @@ The implementation reuse and verdict details taken out of the procedure's list.
 
 - **The direct-filing refusal** — `issue:file` runs the duplicate search, the body check and type
   label, the `## Origin` check and `epic:bundle`, so none of them is watched by a row of its own
-- **The 10-filings-per-run cap** — reuses `is_issue_filing` rather than a new predicate; an
-  `issue:file` that exits non-zero is not counted as a filing
 - **The early progress report** — a waiting-only `Bash` is one that is `sleep` throughout, or `sleep`
   beside nothing but `echo` / `:` / `date`
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
@@ -117,7 +115,7 @@ The implementation reuse and verdict details taken out of the procedure's list.
 - **The stop notice / releasing the hold** — the hold is read off the `run:hold` record, and a clean
   tree as an empty `git status --porcelain`
 - **The offer to file** — reads `last_assistant_message`; whether
-  anything was filed uses `filing_cap`'s count, a third party is judged by `repo_party.classify`, and
+  anything was filed uses `turn_filings`' count, a third party is judged by `repo_party.classify`, and
   the row stays silent while `stop_hook_active` is set
 - **Appending to a rule body** — the stand-down came with joshuafolkken/kit#2324: it stands down once the transcript tail records both `oracle:list` and
   `run:step` having run (it passes on "were the questions answered", not on a reminder)
@@ -356,11 +354,10 @@ test file pins:
   a lane, without the marker, for a non-edit, after the cut and under the threshold)
 - `scripts/rules/delivered-rules-filing.test.ts` — a direct filing (`gh issue create`, a POST with a
   `title` to `…/issues`) is refused every time and pointed to `pnpm josh issue:file`, and the
-  `issue:file` call itself is not refused. The same suite pins that the cap and fold rows fire on an
-  `issue:file` call, and that a failed `issue:file` call is not counted as a filing
-- `scripts/rules/filing-cap.test.ts` — pins the filing count (a refused filing is not counted).
-  `scripts/rules/delivered-rules.test.ts` pins firing and silence (silent through the tenth, refused at
-  the eleventh, every time)
+  `issue:file` call itself is not refused — not even past ten filings on the transcript, since the
+  filing cap is `issue:file`'s own step per originating work item (joshuafolkken/kit#4750)
+- `scripts/rules/turn-filings.test.ts` — pins the turn's filing count the `Stop` hook reads (a refused
+  filing is not counted)
 - `scripts/rules/lane-park-rule.test.ts` — the lane child's park procedure exists as its single source
   in `.claude/skills/workflow-commands/pre-gate-cut.md`, and the message points at that section.
   `scripts/rules/lane-park.test.ts` pins firing and silence (it refuses only a lane child's stop

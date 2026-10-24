@@ -6,14 +6,16 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), the scoped pair, `pnpm josh run:review` — its `test:pinned` lines
+   the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus dotfile spelling), `pnpm josh run:review` — its `test:pinned` lines
    answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
    本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
-   round's fixes with the scoped pair, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it), then **end the turn** on `launched`/`busy`. No `pnpm josh gate`,
+   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
+   `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
+   it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
    and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
-   `metrics` leaves no record it reuses. A stop relaunches a child
+   `metrics` leaves no record it reuses. A stop no session waits on relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
    directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
@@ -22,10 +24,10 @@ Review results and successful pushes are never turn boundaries.
    delta.
    `failed` → step 1. A backgrounded `ship` issued alone is moved to the foreground by the hook
    rather than refused.
-1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before the scoped pair and
+1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
-   `run:review`'s `test:pinned` lines, run the final scoped lint/test pair and
+   `run:review`'s `test:pinned` lines, run the final scoped lint/test pair with `pnpm josh check:related` and
    `pnpm josh run:review`: it runs `pnpm josh test:pinned` and stops on an `unpinned` line
    (`--unpinned-ok "<reason>"` carries on), then starts `pnpm josh gate` in the background and prints
    the `/code-review` brief in one call, so the two overlap. Launch the `/code-review` subagent as the `reviewer`
@@ -79,9 +81,9 @@ These are the gate → review → PR → merge facts other documents cite; this 
   unresolved or staged paths — commit first with `pnpm josh git -y`, rerun, and **never stash around the
   merge**. A merge stopped on a conflict: remove the markers, then `pnpm josh git -y` stages the
   resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
-- **A single check answers once per tree** — re-run one check by name (`pnpm josh lint:related`,
-  `pnpm josh cspell:dot`, `pnpm josh test:related`, or the type check) after every edit, never twice
-  over an untouched tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
+- **One related-check command answers once per tree** — run `pnpm josh check:related` after every
+  edit; it runs `lint:related`, `test:related` and `cspell:dot` together, never twice over an untouched
+  tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
   merge-base; accept it with its reason before `pnpm josh ship`, whose pre-detach check otherwise stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against

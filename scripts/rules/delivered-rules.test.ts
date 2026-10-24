@@ -40,7 +40,6 @@ const LANE_ISSUE = '2138'
 const LANE_DIRECTORY = path.join(LANE_ROOT, LANE_ISSUE)
 const ISSUE_COMMENTS = 'issue-comments'
 const DIRECT_FILING = 'direct-filing'
-const FILING_CAP_ID = 'filing-cap'
 // A hand-built filing whose body carries a backtick is claimed by `direct-filing` and `shell-body`
 // (joshuafolkken/kit#2808).
 const DIRECT_FILING_WITH_BODY_RULE_COUNT = 2
@@ -369,7 +368,7 @@ describe('DELIVERED_RULES — the enumeration', () => {
 		expect(new Set(ids).size).toBe(ids.length)
 	})
 
-	it.each([DIRECT_FILING, FILING_CAP_ID, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION, RUN_TAIL])(
+	it.each([DIRECT_FILING, ISSUE_COMMENTS, SHELL_BODY, PIPED_VERIFICATION, RUN_TAIL])(
 		'names %j',
 		(id) => {
 			expect(delivered_rules.DELIVERED_RULES.map((rule) => rule.id)).toContain(id)
@@ -382,10 +381,13 @@ describe('DELIVERED_RULES — the enumeration', () => {
 })
 
 describe('DELIVERED_RULES — trigger overlap', () => {
-	// An `issue:file` filing is among them since joshuafolkken/kit#3423 took the WIP cap and the fold
-	// question into the command: only the per-run cap still claims it.
+	// joshuafolkken/kit#4750 took the filing cap into `issue:file`, the last rule that claimed a filing
+	// after joshuafolkken/kit#3423 took the WIP cap and the fold question there.
+	it('leaves an `issue:file` filing to the command, claimed by no rule', () => {
+		expect(rules_claiming(FILING_COMMAND)).toBe(0)
+	})
+
 	it.each([
-		FILING_COMMAND,
 		BODY_READ_COMMAND,
 		BODY_READ_API_COMMAND,
 		EVALUATED_BODY_COMMAND,

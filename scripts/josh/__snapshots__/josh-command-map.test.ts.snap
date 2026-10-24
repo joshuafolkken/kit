@@ -12,6 +12,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "by": "bytes",
     "c": "check",
     "ca": "cost:audit",
+    "cr": "check:related",
     "dr": "doctor",
     "eu": "exports:unused",
     "ev": "eval",
@@ -25,6 +26,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lc": "latest:corepack",
     "lli": "lane:limit",
     "ln": "lines",
+    "lnt": "lane:net",
     "lps": "lane:pause",
     "lr": "lint:related",
     "lrs": "lane:restart",
@@ -199,6 +201,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "check:related": [
+      "",
+      "developer",
+      [
+        "processes",
       ],
     ],
     "clone:scan": [
@@ -453,7 +462,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
+      "<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]",
       "automation",
       [
         "network",
@@ -565,6 +574,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lane:list": [
       "",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "lane:net": [
+      "<issue>",
+      "maintainer",
       [
         "none",
       ],
@@ -749,7 +765,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "metrics": [
-      "[--no-startup | --totals-only | --accept --reason "<why>"]",
+      "[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]",
       "developer",
       [
         "files",
@@ -1237,6 +1253,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "git",
         "network",
+      ],
+    ],
+    "ship:wait": [
+      "<N>",
+      "automation",
+      [
+        "files",
+        "processes",
       ],
     ],
     "sonar:hotspots": [

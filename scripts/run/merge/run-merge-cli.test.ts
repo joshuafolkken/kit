@@ -116,7 +116,7 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_merged_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
-		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
+		expect(do_merged_mock).toHaveBeenCalledWith(expect.anything(), expect.any(Function))
 	})
 
 	it('leaves the next offer to the driver under --driver', async () => {

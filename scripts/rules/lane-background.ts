@@ -35,10 +35,14 @@ import { run_tail_rule } from './run-tail-rule'
 
 // The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
-const SHIP_COMMAND = `${time_shell.JOSH_PREFIX}ship`
+// `ship` and `ship:wait` are run in the foreground at the cap rather than refused: a `ship:wait` left at
+// the two-minute default is moved aside mid-chunk and dies with the turn, its verdict unread.
+const FOREGROUND_COMMANDS: ReadonlySet<string> = new Set(
+	['ship', 'ship:wait'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
+)
 const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set([
 	...['gate', 'git', 'followup'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
-	SHIP_COMMAND,
+	...FOREGROUND_COMMANDS,
 ])
 
 const BACKGROUND_KEY = 'run_in_background'
@@ -57,13 +61,13 @@ function long_commands_of(command: string): Array<string> {
 	return time_shell.josh_commands_of(command).filter((name) => LONG_RUNNING_COMMANDS.has(name))
 }
 
-// A call whose long-running work is `ship` alone. In a child a foreground `ship` already detaches
-// itself after its preflight (`run-ship-cli.ts` → `should_detach`), so the only fault in backgrounding
-// it is the flag — and the flag is what the hook rewrites.
+// A call whose long-running work is `ship` or `ship:wait` alone. In a child a foreground `ship` already
+// detaches itself after its preflight (`run-ship-cli.ts` → `should_detach`), so the only fault in
+// backgrounding it is the flag — and the flag is what the hook rewrites.
 function ships_alone(command: string): boolean {
 	const names = long_commands_of(command)
 
-	return names.length > 0 && names.every((name) => name === SHIP_COMMAND)
+	return names.length > 0 && names.every((name) => FOREGROUND_COMMANDS.has(name))
 }
 
 function backgrounded_bash_command(call: GuardedCall): string | undefined {
@@ -135,10 +139,10 @@ function foreground_input(
 }
 
 const FOREGROUND_NOTE =
-	"lane background: a lane child's `josh ship` backgrounded, by its flag or by outrunning the Bash " +
-	'timeout, dies with the headless turn before its supervisor exists — so it was run in the ' +
-	'foreground at the 600000 ms cap, where it detaches itself after the preflight. End the turn on ' +
-	'`launched` / `busy`.'
+	"lane background: a lane child's `josh ship` or `josh ship:wait` backgrounded, by its flag or by " +
+	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
+	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
+	'`chain-rule.md` step 0 (`josh ship:wait` on `launched`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -185,8 +189,8 @@ function pending_agent_ids(tail: string): ReadonlyArray<string> {
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'process whose background tasks die when the turn ends. Hand over to ' +
-	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then end the turn on ' +
-	'`launched` / `busy`. It fires on every occurrence ' +
+	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then `josh ship:wait <N>` on ' +
+	'`launched` or end the turn. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =

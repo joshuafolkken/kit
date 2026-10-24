@@ -127,6 +127,12 @@ function ship_stop_invocation(issue: string, stop?: ShipStop): string {
 	return [opening, ...middle, closing].join(LINE_BREAK)
 }
 
+// The same stop for the session that launched the ship and still waits on it (`run-ship-waiter.ts`):
+// the next command and the context alone, since that session has the run in front of it already.
+function ship_stop_note(issue: string, stop: ShipStop): string {
+	return known_stop_lines(issue, stop, []).join(LINE_BREAK)
+}
+
 const lane_child_invocation = {
 	child_invocation,
 	outage_resume_invocation,
@@ -135,6 +141,7 @@ const lane_child_invocation = {
 	review_invocation,
 	ship_pattern,
 	ship_stop_invocation,
+	ship_stop_note,
 }
 
 export type { ShipStop }

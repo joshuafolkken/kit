@@ -1,0 +1,1 @@
+- rf:tests | low | tools/document/review-agent-type-document-rule.test.ts:17 | 2026-10-23 | #4715

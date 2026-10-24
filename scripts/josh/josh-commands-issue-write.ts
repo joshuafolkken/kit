@@ -127,10 +127,10 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:
-			'File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle',
+			'File an Issue with every filing step: lint, Origin, filing cap, fold, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]',
+			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]',
 			'automation',
 			['network'],
 		],
@@ -160,8 +160,13 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'duplicate candidates you read and judged distinct.',
 				},
 				{
+					names: ['--found-during <N>'],
+					description:
+						'the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 5); step 7 never holds it as a candidate here.',
+				},
+				{
 					names: ['--over-cap'],
-					description: 'the run is blocked by this filing; the cap lets it through.',
+					description: 'the run is blocked by this filing; the WIP cap lets it through.',
 				},
 				{
 					names: ['--no-auto-ok'],

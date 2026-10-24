@@ -23,7 +23,7 @@ report. Drop an observation nobody would act on.
 `pnpm josh run:event --append note "#<N> <text>"`, shown by `pnpm josh run:board`
 (`docs/josh-commands-run.md` → "`josh run:board`").
 
-**The filing ceilings still apply.** It counts toward the per-run cap (`prerequisite.md`); above the target
+**The filing ceilings still apply.** It counts toward the per-origin cap of ten (`prerequisite.md`); above the target
 repository's WIP cap, close one first or do not file (`prompts/collaboration-workflow/wip-cap.md`).
 File with `pnpm josh issue:file` (`issue-scout.md`): it lints the body, applies the classification
 labels, scans for duplicates and runs `epic:bundle` (an `auto-ok` epic adds it to the backlog pool —

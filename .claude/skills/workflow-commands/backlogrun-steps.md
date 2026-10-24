@@ -26,7 +26,7 @@ judgement** — a Tier B toss-up or a Tier C action inside it; `--no-auto-ok` wi
 | --- | --- | --- |
 | `--max` | merges per invocation — a run's own filing competes for it | `run:carry --merged` |
 | `--idle` (8 hours unless typed) | how long the run waits once nothing can proceed | `--active`, the moment its hands became free |
-| **Ten filings per run** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `scripts/rules/filing-cap.ts` |
+| **Ten filings per originating work item** | additions to the pool on **every** filing route (`prerequisite.md`) — `route:tier-a`, `route:interrupt` and a review branch-2 filing are exempt from the depth test (`observation-filing.md`), never from this ceiling | `scripts/issue/issue-file-cap.ts` |
 | The WIP cap on open issues | the pool across invocations | `prompts/collaboration-workflow/wip-cap.md` |
 
 **This section is the single source of how the `epic:bundle` obligation and this boundary meet.**

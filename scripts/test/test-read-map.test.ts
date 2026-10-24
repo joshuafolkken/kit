@@ -34,6 +34,7 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'abc',
 	dirty: { [DIRTY]: DIGEST_THEN },
+	change: [DIRTY],
 	directories: [
 		'.josh',
 		path.dirname(DEEP_DOCUMENT),
@@ -97,6 +98,7 @@ describe('test_read_map.parse_map', () => {
 		['no commit', JSON.stringify({ ...MAP, commit: undefined })],
 		['a dirty list without digests', JSON.stringify({ ...MAP, dirty: [DIRTY] })],
 		['a dirty digest that is not a string', JSON.stringify({ ...MAP, dirty: { [DIRTY]: 1 } })],
+		['no change list', JSON.stringify({ ...MAP, change: undefined })],
 	])('reads %s as no map', (_case, text) => {
 		expect(test_read_map.parse_map(text)).toBeUndefined()
 	})
@@ -194,6 +196,43 @@ describe('test_read_map.in_unread_directory', () => {
 		const map = { ...MAP, readers: { [path.join('scratch', 'y.md')]: [READER] } }
 
 		expect(test_read_map.in_unread_directory(map, path.join('scratch', 'x.md'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4734: a test reading the recording checkout's change through git read that lane's
+// own approval, so the next lane's approval beside it ran the whole suite. The approval is committed
+// on the recording branch, so `dirty` (the change since HEAD) does not hold it and `change` does.
+describe('test_read_map.in_unread_directory — a read of the recording tree’s change', () => {
+	const APPROVALS = path.join('.josh', 'metrics-accepted')
+	const RECORDED_APPROVAL = path.join(APPROVALS, '4714.json')
+	const NEW_APPROVAL = path.join(APPROVALS, '4734.json')
+	const RECORDED: ReadMap = {
+		...MAP,
+		dirty: {},
+		change: [RECORDED_APPROVAL],
+		readers: { [RECORDED_APPROVAL]: [READER] },
+	}
+
+	it('holds a file added there', () => {
+		expect(test_read_map.in_unread_directory(RECORDED, NEW_APPROVAL)).toBe(true)
+	})
+
+	it('rejects it once a test also listed it', () => {
+		const listing = test_read_trace.read_key(APPROVALS, 'listing')
+		const map = { ...RECORDED, readers: { ...RECORDED.readers, [listing]: [LISTER] } }
+
+		expect(test_read_map.in_unread_directory(map, NEW_APPROVAL)).toBe(false)
+	})
+
+	it('rejects it once a test also read a file there the tree did not change', () => {
+		const held = path.join(APPROVALS, '4593.json')
+		const map = { ...RECORDED, readers: { ...RECORDED.readers, [held]: [READER] } }
+
+		expect(test_read_map.in_unread_directory(map, NEW_APPROVAL)).toBe(false)
+	})
+
+	it('still names the test that read the changed file as its reader', () => {
+		expect(test_read_map.readers_of(RECORDED, RECORDED_APPROVAL)).toEqual([READER])
 	})
 })
 

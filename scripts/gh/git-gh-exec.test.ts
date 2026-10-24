@@ -365,9 +365,11 @@ describe('exec_gh_api — output and failure handling', () => {
 
 	// Unchanged from the `gh <noun> <verb>` calls this replaces: `to_gh_error` makes gh's stderr the
 	// thrown message, and converting a call site must not change what its caller catches.
+	// The summary carries gh's own `(HTTP 404)` suffix: without a status, the failure would read as a
+	// request that got no answer, which `exec_gh_api` asks again (`git-gh-retry.ts`).
 	it(THROWS_STDERR_CASE, async () => {
 		mocked_execa.mockRejectedValueOnce(
-			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n` }),
+			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR} (HTTP 404)\n` }),
 		)
 
 		await expect(git_gh_exec.exec_gh_api({ path: API_PATH })).rejects.toThrow(NOT_FOUND_STDERR)
@@ -376,7 +378,7 @@ describe('exec_gh_api — output and failure handling', () => {
 	// The stdin path throws through the same converter, which a body-carrying call must not bypass.
 	it('throws with the stderr text when a request carrying a body fails', async () => {
 		mocked_execa.mockRejectedValueOnce(
-			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR}\n` }),
+			Object.assign(new Error(GH_FAILED), { stderr: `${NOT_FOUND_STDERR} (HTTP 404)\n` }),
 		)
 
 		await expect(

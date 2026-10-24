@@ -131,6 +131,21 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'ship:wait': {
+		script: 'scripts/run/ship/run-ship-wait-cli.ts',
+		description:
+			'Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending)',
+		category: 'AI tools',
+		reference: ['<N>', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '<N>',
+					note: 're-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix',
+				},
+			],
+		},
+	},
 	'run:event': {
 		script: 'scripts/run/event/run-event-cli.ts',
 		description:

@@ -20,7 +20,12 @@ vi.mock('#scripts/lane/lane-session-broker', () => ({
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => ['scripts/changed.ts'] },
 }))
-vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: async () => true } }))
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: {
+		read_review_stale: async () => true,
+		repository_directory: async () => undefined,
+	},
+}))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: async () => false },
 }))

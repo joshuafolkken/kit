@@ -219,7 +219,7 @@ describe('third-party-write — delivered through the guard', () => {
 
 describe('third-party-write — which rows claim a command', () => {
 	// One refusal can leave a PreToolUse hook, so a non-filing third-party write must be claimed by
-	// this row alone — the filing overlap with wip-cap/issue-scout/filing-cap is the intended one.
+	// this row alone — the filing overlap with the filing rows is the intended one.
 	it('claims a non-filing third-party write alone', () => {
 		expect(claiming_ids(THIRD_PARTY_COMMENT)).toStrictEqual([ROW_ID])
 	})
