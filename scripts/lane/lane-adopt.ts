@@ -1,5 +1,6 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
+import { git_gh_pr_read, read_pull as read_rest_pull } from '#scripts/gh/git-gh-pr-read'
+import { git_gh_pr_rest } from '#scripts/gh/git-gh-pr-rest'
 import { git_command } from '#scripts/git/git-command'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -7,7 +8,13 @@ import { PROCESS_ALIVE, PROCESS_NONE, type ProcessTrace } from '#scripts/run/run
 import { lane_await } from './lane-await'
 import type { LaneInfo } from './lane-registry'
 import { lane_spent } from './lane-spent'
-import { lane_state, type LaneChange, type LaneRecords, type RecordOutcome } from './lane-state'
+import {
+	lane_state,
+	type LaneChange,
+	type LaneRecords,
+	type LaneState,
+	type RecordOutcome,
+} from './lane-state'
 
 // `josh lane:adopt` (joshuafolkken/kit#4744): give a lane whose state record was lost — a restart, a
 // usage limit, an interrupted run — a record again, from what can be read off it, without touching its
@@ -25,16 +32,23 @@ const ADOPT_COMMAND = 'lane:adopt'
 const ISSUE_FIELDS = 'state,labels'
 const SEPARATOR = ' · '
 
-// A pull request read: the open one's number, or none.
+// The branch's pull request — the open one, else the newest (`git_gh_pr_rest.select_pull`) — with its
+// gh state, since a reopened lane's branch can still carry the merged one.
+interface Pull {
+	number: number
+	state: string
+}
+
+// A pull request read: the branch's pull request, or none.
 interface PullRead {
-	number: number | undefined
+	pull: Pull | undefined
 }
 
 interface LaneFacts {
 	branch: string
 	is_dirty: boolean
 	unpushed: number
-	pull: number | undefined
+	pull: Pull | undefined
 	issue: IssueState
 }
 
@@ -48,7 +62,10 @@ interface AdoptPorts {
 	record: (change: LaneChange) => Promise<RecordOutcome>
 }
 
-type Adoption = { kind: 'adopted'; facts: LaneFacts } | { kind: 'left'; reason: string }
+type Adoption =
+	| { kind: 'adopted'; facts: LaneFacts }
+	| { kind: 'kept'; state: LaneState }
+	| { kind: 'left'; reason: string }
 
 async function read_tree_status(directory: string): Promise<string | undefined> {
 	try {
@@ -58,11 +75,25 @@ async function read_tree_status(directory: string): Promise<string | undefined> 
 	}
 }
 
+async function read_pull(branch: string): Promise<Pull | undefined> {
+	const number = await git_gh_pr_read.pr_get_number(branch)
+
+	if (number === undefined) return undefined
+
+	const state = git_gh_pr_rest.to_pr_state(await read_rest_pull(number))
+
+	return state === undefined ? undefined : { number, state }
+}
+
+// `undefined` when anything could not be read, including a pull request that exists but whose number
+// or state did not resolve.
 async function read_pull_request(branch: string): Promise<PullRead | undefined> {
 	try {
-		if (!(await git_gh_pr_read.pr_exists(branch))) return { number: undefined }
+		if (!(await git_gh_pr_read.pr_exists(branch))) return { pull: undefined }
 
-		return { number: await git_gh_pr_read.pr_get_number(branch) }
+		const pull = await read_pull(branch)
+
+		return pull === undefined ? undefined : { pull }
 	} catch {
 		return undefined
 	}
@@ -121,7 +152,7 @@ async function facts_of(lane: LaneInfo, ports: AdoptPorts): Promise<LaneFacts | 
 		return `could not read its ${unread_names(reads)}`
 	}
 
-	return { branch: lane.branch, is_dirty: status.trim() !== '', unpushed, pull: pull.number, issue }
+	return { branch: lane.branch, is_dirty: status.trim() !== '', unpushed, pull: pull.pull, issue }
 }
 
 async function written(issue: string, facts: LaneFacts, ports: AdoptPorts): Promise<Adoption> {
@@ -138,7 +169,7 @@ async function adopt(
 ): Promise<Adoption> {
 	const recorded = records.get(lane.issue)
 
-	if (recorded !== undefined) return left(`already recorded ${recorded.state}`)
+	if (recorded !== undefined) return { kind: 'kept', state: recorded.state }
 
 	const blocked = process_reason(lane, ports)
 
@@ -149,7 +180,7 @@ async function adopt(
 	return typeof facts === 'string' ? left(facts) : await written(lane.issue, facts, ports)
 }
 
-/** `branch 4744-lane · uncommitted changes · 2 unpushed commit(s) · PR [#4801](…) · issue OPEN (in-progress)` */
+/** `branch 4744-lane · uncommitted changes · 2 unpushed commit(s) · PR [#4801](…) OPEN · issue OPEN (in-progress)` */
 function facts_text(facts: LaneFacts): string {
 	const labels = facts.issue.labels.length > 0 ? ` (${facts.issue.labels.join(', ')})` : ''
 
@@ -157,7 +188,9 @@ function facts_text(facts: LaneFacts): string {
 		`branch ${facts.branch}`,
 		facts.is_dirty ? 'uncommitted changes' : 'clean tree',
 		`${String(facts.unpushed)} unpushed commit(s)`,
-		facts.pull === undefined ? 'no PR' : `PR ${session_cite.issue(facts.pull)}`,
+		facts.pull === undefined
+			? 'no PR'
+			: `PR ${session_cite.issue(facts.pull.number)} ${facts.pull.state}`,
 		`issue ${facts.issue.state}${labels}`,
 	].join(SEPARATOR)
 }

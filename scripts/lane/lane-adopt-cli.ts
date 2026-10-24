@@ -10,8 +10,8 @@ import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_state, type LaneRecords } from './lane-state'
 
 // `josh lane:adopt <issue> | --all` — write a state record for each open lane that lost its own
-// (`lane-adopt.ts`), one line per lane. A named lane left unknown exits non-zero; under `--all` a lane
-// left unknown, or one already recorded, is no failure.
+// (`lane-adopt.ts`), one line per lane. A named lane left unknown exits non-zero; one already recorded
+// had nothing to adopt and exits zero. Under `--all` neither is a failure.
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -37,6 +37,7 @@ async function lanes_of(target: ReadonlyArray<string>): Promise<Array<LaneInfo> 
 
 function outcome_text(adoption: Adoption): string {
 	if (adoption.kind === 'left') return `left unknown — ${adoption.reason}`
+	if (adoption.kind === 'kept') return `already recorded ${adoption.state}`
 
 	return `recorded open — ${lane_adopt.facts_text(adoption.facts)}`
 }

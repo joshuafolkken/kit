@@ -190,7 +190,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched',
 		category: 'AI tools',
-		reference: [ISSUE_OR_ALL, 'developer', ['git', 'processes', 'network']],
+		reference: [ISSUE_OR_ALL, 'developer', ['files', 'git', 'processes', 'network']],
 		usage: {
 			examples: [
 				{ arguments: '4744' },

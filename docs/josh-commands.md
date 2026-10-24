@@ -1031,11 +1031,12 @@ pnpm josh lane:adopt --all   # every open lane with no record
 
 - For a lane whose record was lost (a restart, a usage limit, an interrupted run). Its branch, work tree, stash and pull request are never touched.
 - A lane is recorded `open` only when every fact reads: its process probe answers that no child is there, and its work tree status, unpushed commits, pull request and issue all read. Any one unread leaves it unknown, counted in use as before. A lane with a record is left as it is.
+- The pull request is the branch's open one, else its newest, printed with its state — a reopened lane's branch can still carry the merged one.
 - `open`, not `paused`: nobody suspended it. The next launch moves it to `running`, and the next `backlogrun` takes the lane back while its issue still carries `in-progress`.
 - It still holds its port seat, as every open lane does.
 - An adoption adds one `lane-state` line to the run's event stream (`#<N> adopted by lane:adopt`).
 
-**Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> · issue OPEN (<labels>)`, or `left unknown — <reason>`. Exit 0. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.
+**Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> <OPEN|MERGED|CLOSED> · issue OPEN (<labels>)`, `already recorded <state>`, or `left unknown — <reason>`. Exit 0, also for a lane already recorded. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.
 
 ### `josh rule:value`
 

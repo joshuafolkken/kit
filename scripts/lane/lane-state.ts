@@ -180,9 +180,10 @@ async function outcome_of(change: LaneChange, options: StateOptions): Promise<Re
 	return apply(change, directory, options.now ?? new Date())
 }
 
-async function settled_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
+// A write that threw is a write skipped for that reason, never an error out of the lane command.
+async function settled(write: () => Promise<RecordOutcome>): Promise<RecordOutcome> {
 	try {
-		return await outcome_of(change, options)
+		return await write()
 	} catch (error: unknown) {
 		return { kind: 'skipped', reason: error instanceof Error ? error.message : String(error) }
 	}
@@ -192,7 +193,7 @@ async function record_change(
 	change: LaneChange,
 	options: StateOptions = {},
 ): Promise<RecordOutcome> {
-	const outcome = await settled_outcome(change, options)
+	const outcome = await settled(async () => await outcome_of(change, options))
 
 	if (outcome.kind === 'skipped') warn(change, outcome.reason)
 
@@ -267,10 +268,7 @@ function adopted_held(change: LaneChange, directory: string, now: Date): RecordO
  * Write `change` for a lane that has no record, and only then: a record that appeared since the caller
  * read none is the lane command's, and is never overwritten (`lane:adopt`).
  */
-async function record_adopted(
-	change: LaneChange,
-	options: StateOptions = {},
-): Promise<RecordOutcome> {
+async function adopted_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
 	const directory = await resolve_directory(options.directory)
 
 	if (directory === undefined) return NO_DIRECTORY
@@ -278,6 +276,13 @@ async function record_adopted(
 	const now = options.now ?? new Date()
 
 	return locked(directory, change.issue, () => adopted_held(change, directory, now))
+}
+
+async function record_adopted(
+	change: LaneChange,
+	options: StateOptions = {},
+): Promise<RecordOutcome> {
+	return await settled(async () => await adopted_outcome(change, options))
 }
 
 /** Each of `issues`' records, by issue; an issue with none is left out. */

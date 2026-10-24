@@ -36,7 +36,7 @@ const FACTS: LaneFacts = {
 	branch: LANE.branch,
 	is_dirty: true,
 	unpushed: UNPUSHED,
-	pull: PULL,
+	pull: { number: PULL, state: 'OPEN' },
 	issue: OPEN_ISSUE,
 }
 
@@ -55,7 +55,7 @@ function ports_of(overrides: Partial<AdoptPorts> = {}): AdoptPorts {
 		process_trace: vi.fn((): ProcessTrace => PROCESS_NONE),
 		tree_status: vi.fn(async () => DIRTY_STATUS),
 		unpushed_commits: vi.fn(async () => UNPUSHED),
-		pull_request: vi.fn(async () => ({ number: PULL })),
+		pull_request: vi.fn(async () => ({ pull: { number: PULL, state: 'OPEN' } })),
 		issue: vi.fn(async () => OPEN_ISSUE),
 		record: vi.fn(written),
 		...overrides,
@@ -95,23 +95,31 @@ describe('lane_adopt.adopt — every fact read', () => {
 		expect(ports.pull_request).toHaveBeenCalledWith(LANE.branch)
 	})
 
-	it('says what it read', () => {
-		const text = lane_adopt.facts_text(FACTS)
-
-		expect(text).toContain('branch 4744-lane · uncommitted changes · 2 unpushed commit(s) · PR ')
-		expect(text).toContain('4801')
-		expect(text).toContain(' · issue OPEN (in-progress)')
-		expect(lane_adopt.facts_text({ ...FACTS, is_dirty: false, pull: undefined })).toContain(
-			'clean tree · 2 unpushed commit(s) · no PR',
-		)
-	})
-
 	it('leaves the lane unknown when the record is not written', async () => {
 		const record = vi.fn(async () => ({ kind: 'skipped' as const, reason: RECORD_EXISTS }))
 
 		const adoption = await lane_adopt.adopt(LANE, NO_RECORDS, ports_of({ record }))
 
 		expect(adoption).toStrictEqual({ kind: 'left', reason: RECORD_EXISTS })
+	})
+})
+
+describe('lane_adopt.facts_text', () => {
+	it('says what it read', () => {
+		const text = lane_adopt.facts_text(FACTS)
+
+		expect(text).toContain('branch 4744-lane · uncommitted changes · 2 unpushed commit(s) · PR ')
+		expect(text).toContain('4801')
+		expect(text).toContain(' OPEN · issue OPEN (in-progress)')
+		expect(lane_adopt.facts_text({ ...FACTS, is_dirty: false, pull: undefined })).toContain(
+			'clean tree · 2 unpushed commit(s) · no PR',
+		)
+	})
+
+	it('names a merged pull request as merged, not as the lane’s open one', () => {
+		const merged = { ...FACTS, pull: { number: PULL, state: 'MERGED' } }
+
+		expect(lane_adopt.facts_text(merged)).toContain(' MERGED · issue OPEN')
 	})
 })
 
@@ -142,20 +150,26 @@ describe('lane_adopt.adopt — nothing guessed', () => {
 		expect(await left_by(ports_of({ issue: unread }))).toBe('could not read its issue')
 	})
 
-	it('leaves a lane that already has a record', async () => {
+	it('leaves a stranded lane', async () => {
+		expect(await left_by(ports_of(), NO_RECORDS, { ...LANE, is_stranded: true })).toBe(
+			'its work tree is gone',
+		)
+	})
+})
+
+describe('lane_adopt.adopt — a lane already recorded', () => {
+	it('keeps a lane that already has a record, as known rather than unknown', async () => {
 		const record: LaneStateRecord = {
 			issue: ISSUE,
 			state: 'running',
 			changed_at: '',
 			changed_by: 'lane:dispatch',
 		}
+		const ports = ports_of()
 
-		expect(await left_by(ports_of(), new Map([[ISSUE, record]]))).toBe('already recorded running')
-	})
+		const adoption = await lane_adopt.adopt(LANE, new Map([[ISSUE, record]]), ports)
 
-	it('leaves a stranded lane', async () => {
-		expect(await left_by(ports_of(), NO_RECORDS, { ...LANE, is_stranded: true })).toBe(
-			'its work tree is gone',
-		)
+		expect(adoption).toStrictEqual({ kind: 'kept', state: 'running' })
+		expect(ports.record).not.toHaveBeenCalled()
 	})
 })

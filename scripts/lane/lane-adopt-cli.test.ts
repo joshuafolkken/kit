@@ -82,6 +82,14 @@ describe('lane_adopt_cli.run — one lane', () => {
 		expect(emit).not.toHaveBeenCalled()
 	})
 
+	it('exits zero for a named lane already recorded, and records no event', async () => {
+		adopt.mockResolvedValue({ kind: 'kept', state: 'running' })
+
+		expect(await lane_adopt_cli.run([ISSUE])).toBe(SUCCESS)
+		expect(info).toHaveBeenCalledWith(expect.stringContaining(': already recorded running'))
+		expect(emit).not.toHaveBeenCalled()
+	})
+
 	it('exits non-zero when the issue has no open lane', async () => {
 		find_open_lane.mockResolvedValue(undefined)
 

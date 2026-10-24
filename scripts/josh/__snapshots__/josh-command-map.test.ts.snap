@@ -537,6 +537,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "<issue> | --all",
       "developer",
       [
+        "files",
         "git",
         "processes",
         "network",

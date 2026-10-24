@@ -296,4 +296,16 @@ describe('lane_state.record_adopted', () => {
 			changed_by: CLOSE,
 		})
 	})
+
+	it('answers a write that threw as skipped, not as an error', async () => {
+		vi.spyOn(repository_lock, 'with_lock_sync').mockImplementation(() => {
+			throw new Error('ENOSPC')
+		})
+
+		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
+			directory: state.directory,
+		})
+
+		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'ENOSPC' })
+	})
 })
