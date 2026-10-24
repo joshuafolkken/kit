@@ -98,6 +98,7 @@ function stub_hunk(file: string, source: ts.SourceFile, site: FunctionSite): Hun
 		new_start: first + 1,
 		new_count: last - first + 1,
 		old_lines: stubbed.split(LINE_BREAK),
+		new_lines: lines.split(LINE_BREAK),
 		function_name: site.name,
 	}
 }

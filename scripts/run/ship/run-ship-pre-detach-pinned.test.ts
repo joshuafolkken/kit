@@ -1,5 +1,6 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
+import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,6 +32,8 @@ vi.mock('#scripts/review/review-round-reuse', () => ({
 	review_round_reuse: { is_reusable_here: reusable_mock },
 }))
 vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_checks } }))
+// No git directory, so no accepted reason is recorded or read (`run-review-pinned-accepted.ts`).
+vi.mock('#scripts/git/git-command', () => ({ git_command: { git_directories: async () => [] } }))
 
 const { run_ship_pre_detach_pinned } = await import('./run-ship-pre-detach-pinned')
 
@@ -43,8 +46,11 @@ const ISSUE = '4833'
 const REASON = 'a log line no test can observe'
 const UNPINNED_OK = [run_review_pinned.UNPINNED_OK_FLAG, REASON]
 const UNPINNED_TEXT = 'unpinned 1 · unchecked 0\nunpinned scripts/issue/issue-file-cli.ts:49\n'
-const UNPINNED: PinnedSummary = { text: UNPINNED_TEXT, unpinned_count: 1 }
-const CLEAR: PinnedSummary = { text: 'unpinned 0 · unchecked 0\n', unpinned_count: 0 }
+const UNPINNED: PinnedSummary = {
+	text: UNPINNED_TEXT,
+	unpinned: ['scripts/issue/issue-file-cli.ts 0123456789abcdef'],
+}
+const CLEAR: PinnedSummary = { text: 'unpinned 0 · unchecked 0\n', unpinned: [] }
 const PASSED: JoshResult = { code: OK, out: 'pre-detach checks passed' }
 
 function launched_token(): string | undefined {
@@ -124,6 +130,16 @@ describe('run_ship_pre_detach_pinned.pinned_check under --unpinned-ok', () => {
 			out: `${UNPINNED_TEXT}Unpinned accepted by the implementer: ${REASON}\n`,
 		})
 		expect(run_mock).toHaveBeenCalledOnce()
+	})
+
+	// joshuafolkken/kit#4775: a reused round 1 joins no run:review, so this check records the places.
+	it('hands the answer and the reason to the record of accepted places', async () => {
+		reusable_mock.mockResolvedValue(true)
+		const judge = vi.spyOn(run_review_pinned_accepted, 'judge')
+
+		await check(UNPINNED_OK)
+
+		expect(judge).toHaveBeenCalledWith(UNPINNED, REASON)
 	})
 
 	it('probes when the reuse question could not be answered', async () => {

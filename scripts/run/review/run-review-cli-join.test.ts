@@ -1,8 +1,10 @@
+import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GATE_GREEN, GATE_MOVED, run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_steps } from './run-review-steps'
 
@@ -20,6 +22,8 @@ beforeEach(() => {
 	vi.spyOn(run_review_steps, 'complete_timing').mockReturnValue(undefined)
 	vi.spyOn(review_stamps.gate_stamp, 'read').mockReturnValue({ taken_at: GATE_TAKEN_AT, files: {} })
 	vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+	// No git directory, so no accepted reason is recorded or read (`run-review-pinned-accepted.ts`).
+	vi.spyOn(git_command, 'git_directories').mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -54,6 +58,7 @@ describe('run --join on a gate that passed before the tree moved', () => {
 // change stops the round whatever the gate answered.
 
 const LIST = 'Unpinned: scripts/a.ts:3\n'
+const SITE = 'scripts/a.ts 0123456789abcdef'
 
 function errored(): string {
 	return vi
@@ -71,7 +76,7 @@ describe('run --join on the background test:pinned', () => {
 		vi.mocked(run_review_steps.wait_for_gate_finish).mockResolvedValue(GATE_GREEN)
 		vi.mocked(run_review_pinned_steps.wait_for_answer).mockResolvedValue({
 			text: LIST,
-			unpinned_count: 1,
+			unpinned: [SITE],
 		})
 
 		expect(await run_review_cli.run(['--join'])).toBe(run_review.UNPINNED_EXIT_CODE)
@@ -81,7 +86,7 @@ describe('run --join on the background test:pinned', () => {
 	it('exits with the unpinned code on a moved gate too', async () => {
 		vi.mocked(run_review_pinned_steps.wait_for_answer).mockResolvedValue({
 			text: LIST,
-			unpinned_count: 1,
+			unpinned: [SITE],
 		})
 
 		expect(await run_review_cli.run(['--join'])).toBe(run_review.UNPINNED_EXIT_CODE)
@@ -91,7 +96,7 @@ describe('run --join on the background test:pinned', () => {
 		vi.mocked(run_review_steps.wait_for_gate_finish).mockResolvedValue(GATE_GREEN)
 		vi.mocked(run_review_pinned_steps.wait_for_answer).mockResolvedValue({
 			text: LIST,
-			unpinned_count: 0,
+			unpinned: [],
 		})
 
 		expect(await run_review_cli.run(['--join'])).toBe(0)
@@ -110,7 +115,7 @@ describe('run --join on a test:pinned launched under --unpinned-ok', () => {
 		vi.mocked(run_review_pinned_steps.launched_reason).mockReturnValue(REASON)
 		vi.mocked(run_review_pinned_steps.wait_for_answer).mockResolvedValue({
 			text: LIST,
-			unpinned_count: 1,
+			unpinned: [SITE],
 		})
 	})
 
@@ -123,5 +128,14 @@ describe('run --join on a test:pinned launched under --unpinned-ok', () => {
 
 	it("keeps a moved gate's exit code", async () => {
 		expect(await run_review_cli.run(['--join'])).toBe(run_review.MOVED_EXIT_CODE)
+	})
+
+	// joshuafolkken/kit#4775: the join is where the reason and its places are recorded for the branch.
+	it('hands the answer and the reason to the record of accepted places', async () => {
+		const judge = vi.spyOn(run_review_pinned_accepted, 'judge')
+
+		await run_review_cli.run(['--join'])
+
+		expect(judge).toHaveBeenCalledWith({ text: LIST, unpinned: [SITE] }, REASON)
 	})
 })

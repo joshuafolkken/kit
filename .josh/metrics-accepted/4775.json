@@ -1,0 +1,7 @@
+{
+	"reason": "Carrying an accepted --unpinned-ok reason adds run-review-pinned-accepted.ts and the place keys it compares (#4775)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 111
+	}
+}

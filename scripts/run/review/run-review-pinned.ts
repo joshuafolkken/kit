@@ -35,7 +35,7 @@ function ok_reason_of(argv: ReadonlyArray<string>): string | undefined {
 function verdict_of(summary: PinnedSummary, reason: string | undefined): PinnedVerdict {
 	const { text } = summary
 
-	if (summary.unpinned_count === 0) return { kind: 'clear', text }
+	if (summary.unpinned.length === 0) return { kind: 'clear', text }
 	if (reason === undefined) return { kind: 'stop', text: `${text}${STOP_NOTE}\n` }
 
 	return { kind: 'accepted', text: `${text}Unpinned accepted by the implementer: ${reason}\n` }

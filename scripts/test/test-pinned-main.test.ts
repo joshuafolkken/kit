@@ -110,7 +110,7 @@ describe('test_pinned_main.main --record', () => {
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
 			token: TOKEN,
 			text: output.stdout.join(''),
-			unpinned_count: 1,
+			unpinned: [expect.stringMatching(/^a\.ts /u)],
 		})
 	})
 
@@ -123,7 +123,7 @@ describe('test_pinned_main.main --record', () => {
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
 			token: TOKEN,
 			text: `\`josh test:pinned\` could not run, so nothing was checked: ${reason}\n`,
-			unpinned_count: 0,
+			unpinned: [],
 		})
 	})
 
@@ -150,7 +150,7 @@ describe('test_pinned_main.main --record on a moving tree', () => {
 
 		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(0)
 		expect(run).toHaveBeenCalledTimes(2)
-		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned_count: 0 }))
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned: [] }))
 	})
 
 	it('records nothing checked when the tree keeps moving', async () => {
@@ -165,7 +165,7 @@ describe('test_pinned_main.main --record on a moving tree', () => {
 
 		await expect(test_pinned_main.main(['--record', TOKEN])).rejects.toThrow('kept moving')
 		expect(run).toHaveBeenCalledTimes(3)
-		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned_count: 0 }))
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned: [] }))
 	})
 
 	it('checks the tree once without --record', async () => {

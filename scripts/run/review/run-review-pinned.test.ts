@@ -42,6 +42,7 @@ vi.mock('./run-review-steps', () => ({
 
 const FAILURE_EXIT_CODE = 1
 const REASON = 'the branch only logs'
+const SITE = 'scripts/a.ts 0123456789abcdef'
 
 const output = { stdout: [] as Array<string>, stderr: [] as Array<string> }
 
@@ -123,7 +124,7 @@ describe('run:review when no brief follows', () => {
 
 describe('run_review_pinned.verdict_of — the answer the join reads', () => {
 	it('stops on an unpinned change with the list and the stop note, without a reason', () => {
-		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned_count: 1 }, undefined)
+		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned: [SITE] }, undefined)
 
 		expect(verdict).toStrictEqual({
 			kind: 'stop',
@@ -132,7 +133,7 @@ describe('run_review_pinned.verdict_of — the answer the join reads', () => {
 	})
 
 	it('accepts an unpinned change with the list and the reason it was launched with', () => {
-		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned_count: 1 }, REASON)
+		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned: [SITE] }, REASON)
 
 		expect(verdict).toStrictEqual({
 			kind: 'accepted',
@@ -141,7 +142,7 @@ describe('run_review_pinned.verdict_of — the answer the join reads', () => {
 	})
 
 	it('stays clear when nothing is unpinned', () => {
-		expect(run_review_pinned.verdict_of({ text: 'L\n', unpinned_count: 0 }, undefined).kind).toBe(
+		expect(run_review_pinned.verdict_of({ text: 'L\n', unpinned: [] }, undefined).kind).toBe(
 			'clear',
 		)
 	})

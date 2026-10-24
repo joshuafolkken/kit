@@ -24,13 +24,38 @@ afterEach(() => {
 })
 
 describe('test_pinned_record', () => {
-	it('reduces a report to its printed text and its unpinned count', () => {
+	it('reduces a report to its printed text and its unpinned places', () => {
 		expect(test_pinned_record.summary_of(REPORT)).toStrictEqual({
 			text: 'unpinned 1 · unchecked 0\nunpinned a.ts:4 — reverting it left every related test green\n',
-			unpinned_count: 1,
+			unpinned: [expect.stringMatching(/^a\.ts [\da-f]{16}$/u)],
 		})
 	})
+})
 
+function site(hunk: PinnedReport['unpinned'][number]): string | undefined {
+	return test_pinned_record.summary_of({ ...REPORT, unpinned: [hunk] }).unpinned[0]
+}
+
+// joshuafolkken/kit#4775: a place keeps its key when merging the default branch in moves its line.
+describe('test_pinned_record — the key of an unpinned place', () => {
+	it('keys a place by its file, function and replaced lines, not its line', () => {
+		const moved = site({ ...HUNK, new_start: 40 })
+
+		expect(moved).toBe(site(HUNK))
+		expect(site({ ...HUNK, old_lines: ['const a = 1'] })).not.toBe(moved)
+		expect(site({ ...HUNK, function_name: 'run' })).toMatch(/^a\.ts run [\da-f]{16}$/u)
+	})
+
+	it('keys two insertions of one length apart by the lines they put in', () => {
+		const inserted = { ...HUNK, new_lines: ['console.log(x)'] }
+		const logged = site(inserted)
+
+		expect(site({ ...inserted, new_start: 40 })).toBe(logged)
+		expect(site({ ...HUNK, new_lines: ['if (x === undefined) return'] })).not.toBe(logged)
+	})
+})
+
+describe('test_pinned_record — the record', () => {
 	it('reads back what it wrote, keyed to the checkout', () => {
 		const summary = test_pinned_record.summary_of(REPORT)
 

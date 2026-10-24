@@ -13,22 +13,40 @@ import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 
 const RECORD_PREFIX = 'josh-test-pinned-record-'
 const TOKEN_KEY_LENGTH = 16
+const SITE_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
 
+type UnpinnedHunk = PinnedReport['unpinned'][number]
+
+// `unpinned` holds one key per unpinned place (`site_of`).
 interface PinnedSummary {
 	text: string
-	unpinned_count: number
+	unpinned: ReadonlyArray<string>
+}
+
+// A place's key leaves out its line, so merging the default branch in, which moves the line, keeps the
+// key (joshuafolkken/kit#4775): the file, the function, and a digest of the lines the change replaced
+// and the lines it put in their place.
+function site_of(hunk: UnpinnedHunk): string {
+	const body = JSON.stringify([hunk.new_count, hunk.old_lines, hunk.new_lines ?? []])
+	const key = stamp_file.digest(body).slice(0, SITE_KEY_LENGTH)
+	const place = hunk.function_name === undefined ? hunk.file : `${hunk.file} ${hunk.function_name}`
+
+	return `${place} ${key}`
 }
 
 function summary_of(report: PinnedReport): PinnedSummary {
-	return { text: test_pinned_logic.report_text(report), unpinned_count: report.unpinned.length }
+	return {
+		text: test_pinned_logic.report_text(report),
+		unpinned: report.unpinned.map((hunk) => site_of(hunk)),
+	}
 }
 
 // A check that could not run checked nothing, so it names no unpinned place and the run fails open.
 function not_run_summary(error: unknown): PinnedSummary {
 	const message = error instanceof Error ? error.message : String(error)
 
-	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned_count: 0 }
+	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned: [] }
 }
 
 function record_path(token: string, root: string = PROJECT_ROOT): string {
@@ -41,12 +59,16 @@ function write(token: string, summary: PinnedSummary, root: string = PROJECT_ROO
 	stamp_file.write_stamp(record_path(token, root), { token, ...summary })
 }
 
+function is_text_list(value: unknown): value is Array<string> {
+	return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
-	const { text, unpinned_count } = record
+	const { text, unpinned } = record
 
-	if (typeof text !== 'string' || typeof unpinned_count !== 'number') return undefined
+	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
 
-	return { text, unpinned_count }
+	return { text, unpinned }
 }
 
 function parsed(raw: string): Record<string, unknown> | undefined {
@@ -74,7 +96,16 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 	stamp_file.remove_stamp(record_path(token, root))
 }
 
-const test_pinned_record = { clear, not_run_summary, read, record_path, summary_of, write }
+const test_pinned_record = {
+	clear,
+	is_text_list,
+	not_run_summary,
+	parsed,
+	read,
+	record_path,
+	summary_of,
+	write,
+}
 
 export type { PinnedSummary }
 export { test_pinned_record }

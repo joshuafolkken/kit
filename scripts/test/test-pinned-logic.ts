@@ -11,6 +11,8 @@ const FILE_HEADER = '+++ b/'
 const SECTION_HEADER = 'diff --git '
 const OLD_LINE = '-'
 const OLD_FILE_HEADER = '--- '
+const NEW_LINE = '+'
+const FILE_HEADER_MARK = '+++ '
 const LINE_BREAK = '\n'
 const GREEN_REASON = 'reverting it left every related test green'
 const NO_TEST_REASON = 'no related test ran with it reverted'
@@ -25,6 +27,10 @@ interface Hunk {
 	new_start: number
 	new_count: number
 	old_lines: Array<string>
+	// The working file's lines the hunk spans (`+` lines; an added file's probe, the function's): a revert
+	// never reads them, but an unpinned place's key does (`test-pinned-record.ts`), since two changes of one
+	// length share the rest.
+	new_lines?: Array<string>
 	// Set on an added file's probe (`test-pinned-functions.ts`): the function the old lines put back
 	// with its body replaced by a throw.
 	function_name?: string
@@ -77,11 +83,22 @@ function hunk_from(file: string, line: string): Hunk | undefined {
 		new_start: Number(groups['start']),
 		new_count: count_of(groups['count']),
 		old_lines: [],
+		new_lines: [],
 	}
 }
 
 function is_old_line(line: string): boolean {
 	return line.startsWith(OLD_LINE) && !line.startsWith(OLD_FILE_HEADER)
+}
+
+function is_new_line(line: string): boolean {
+	return line.startsWith(NEW_LINE) && !line.startsWith(FILE_HEADER_MARK)
+}
+
+function record_line(hunk: Hunk | undefined, line: string): void {
+	if (hunk === undefined) return
+	if (is_old_line(line)) hunk.old_lines.push(line.slice(OLD_LINE.length))
+	else if (is_new_line(line)) hunk.new_lines?.push(line.slice(NEW_LINE.length))
 }
 
 // Each file section starts unnamed, so a `+++` line this does not read (a quoted path with a space)
@@ -96,12 +113,12 @@ function step(walk: DiffWalk, line: string): void {
 	walk.file = file_after(walk.file, line)
 	const hunk = hunk_from(walk.file, line)
 
-	if (hunk !== undefined) walk.hunks.push(hunk)
-	else if (is_old_line(line)) walk.hunks.at(-1)?.old_lines.push(line.slice(OLD_LINE.length))
+	if (hunk === undefined) record_line(walk.hunks.at(-1), line)
+	else walk.hunks.push(hunk)
 }
 
-// One `-U0` diff into its hunks, in diff order. The `+` lines are not kept: the working file already
-// holds them, at `new_start` for `new_count` lines.
+// One `-U0` diff into its hunks, in diff order. A revert puts the old lines back over the working file's
+// `new_count` lines at `new_start`.
 function parse_hunks(diff: string): Array<Hunk> {
 	const walk: DiffWalk = { file: '', hunks: [] }
 

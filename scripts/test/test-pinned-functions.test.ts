@@ -71,6 +71,17 @@ describe('test_pinned_functions.stub_hunks', () => {
 	it('probes nothing in a module of constants and types', () => {
 		expect(probes('const A = 1\ntype B = string\nexport { A, type B }\n')).toEqual([])
 	})
+
+	// joshuafolkken/kit#4775: an unpinned function's key reads its body, which the stub replaced.
+	it('keeps the lines the function spans as the lines the probe replaces', () => {
+		const [first] = test_pinned_functions.stub_hunks(ts, FILE, MODULE)
+
+		expect(first?.new_lines).toEqual([
+			'function mark_stopped(issue: number): void {',
+			'\tx(issue)',
+			'}',
+		])
+	})
 })
 
 describe('test_pinned_functions.is_script', () => {

@@ -19,6 +19,25 @@ const MODIFIED_DIFF = [
 	'+three',
 ].join('\n')
 
+// joshuafolkken/kit#4775: each hunk keeps the lines it put in, for an unpinned place's key.
+const MODIFIED_HUNKS: Array<Hunk> = [
+	{
+		file: DRIVER,
+		new_start: 57,
+		new_count: 1,
+		old_lines: ['\treturn result.token'],
+		new_lines: ['\treturn argv.includes(DRIVER_FLAG) ? print(result) : result.token'],
+	},
+	{
+		file: DRIVER,
+		new_start: 69,
+		new_count: 0,
+		old_lines: ['const A = 1', 'const B = 2'],
+		new_lines: [],
+	},
+	{ file: DRIVER, new_start: 79, new_count: 3, old_lines: [], new_lines: ['one', 'two', 'three'] },
+]
+
 const ONE_LINE_HUNK = ['@@ -1 +1 @@', '-old', '+new']
 
 const SKIPPED_DIFF = [
@@ -40,21 +59,7 @@ function hunk(overrides: Partial<Hunk>): Hunk {
 
 describe('test_pinned_logic.parse_hunks', () => {
 	it('reads each hunk with its working-file range and the base lines it replaced', () => {
-		expect(test_pinned_logic.parse_hunks(MODIFIED_DIFF)).toEqual([
-			{
-				file: DRIVER,
-				new_start: 57,
-				new_count: 1,
-				old_lines: ['\treturn result.token'],
-			},
-			{
-				file: DRIVER,
-				new_start: 69,
-				new_count: 0,
-				old_lines: ['const A = 1', 'const B = 2'],
-			},
-			{ file: DRIVER, new_start: 79, new_count: 3, old_lines: [] },
-		])
+		expect(test_pinned_logic.parse_hunks(MODIFIED_DIFF)).toEqual(MODIFIED_HUNKS)
 	})
 
 	it('leaves a quoted-path section on no file rather than on the file before it', () => {
