@@ -22,9 +22,9 @@ Use harness detachment so completion returns to the run. Foreground timeouts sta
 
 **Background it from the first, then end the turn.** A `run_in_background` command re-invokes the run
 when it *exits* — that completion notification is what ends the wait, not a regex match or the block
-limit.
+limit. A backgrounded `Agent` → the same; in a lane child → the `lane-background` row of `pnpm josh rule:list`.
 
-**Never hand-write a `while`/`until` … `sleep` loop over the output file** — a regex that never matches
+**Never hand-write a `while`/`until` … `sleep` loop over the output file, or a counted `for` that sleeps** — a regex that never matches
 waits to the block limit, one that matches a mid-run line exits early. the `poll-loop` row of `pnpm josh rule:list` refuses it
 (`prompts/collaboration-workflow/rule-delivery.md`).
 

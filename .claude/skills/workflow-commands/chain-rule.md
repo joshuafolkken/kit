@@ -7,8 +7,8 @@ Review results and successful pushes are never turn boundaries.
 
 0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
-   answer the self-check's question 1 — and its `/code-review` subagent (step 1), the ship body draft filled in while it runs (`report-format.md` → "PR
-   本文の受け入れ条件の対応表") — a turn end kills the subagent, so wait for it — then steps 2–3, the
+   answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
+   本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1), not backgrounded — a turn end kills it — then steps 2–3, the
    round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
