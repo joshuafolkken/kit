@@ -116,8 +116,13 @@ async function start_pair(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
 
 // `josh test:pinned` runs in the background beside the pair, `--unpinned-ok` or not, so the pair never
 // waits on it (joshuafolkken/kit#4793); the join judges its answer by the reason it was launched with.
-// A check that could not be launched fails open, as one that could not run does.
+// A check that could not be launched fails open, as one that could not run does. A tree the scoped
+// pair has not been green on is refused before either is launched, so a refused start leaves nothing
+// running (joshuafolkken/kit#4828).
 async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Promise<number> {
+	const refusal = await review_brief_cli.scoped_refusal()
+
+	if (refusal !== undefined) return review_brief_cli.report_error(refusal)
 	run_review_pinned_steps.clear()
 	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason)
 

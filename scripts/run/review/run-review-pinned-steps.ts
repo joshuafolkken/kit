@@ -36,10 +36,13 @@ const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review
 
 type Clock = () => number
 
+// `start` is the launched pid's start time, so a pid the OS has since reissued is told apart from the
+// check (joshuafolkken/kit#4828).
 interface Launch {
 	pid: number
 	token: string
-	reason?: string
+	reason?: string | undefined
+	start?: string | undefined
 }
 
 function launch_path(root: string = PROJECT_ROOT): string {
@@ -57,17 +60,28 @@ function launch(root: string = PROJECT_ROOT, reason?: string): LaunchResult {
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
 
 	if (launched.kind === 'launched') {
-		stamp_file.write_stamp(launch_path(root), { pid: launched.pid, token, reason })
+		const { pid } = launched
+
+		stamp_file.write_stamp(launch_path(root), {
+			pid,
+			token,
+			reason,
+			start: process_identity.read_start(pid),
+		})
 	}
 
 	return launched
 }
 
+function optional_text(value: unknown): string | undefined {
+	return typeof value === 'string' ? value : undefined
+}
+
 function to_launch(value: unknown): Launch | undefined {
-	const { pid, token, reason } = value as Record<string, unknown>
+	const { pid, token, reason, start } = value as Record<string, unknown>
 	if (typeof pid !== 'number' || typeof token !== 'string') return undefined
 
-	return typeof reason === 'string' ? { pid, token, reason } : { pid, token }
+	return { pid, token, reason: optional_text(reason), start: optional_text(start) }
 }
 
 function read_launch(root: string): Launch | undefined {
@@ -82,22 +96,14 @@ function read_launch(root: string): Launch | undefined {
 	}
 }
 
-// Every start clears the last pair's records first, so a join never reads an earlier tree's answer.
-function clear(root: string = PROJECT_ROOT): void {
-	const last = read_launch(root)
-
-	if (last !== undefined) test_pinned_record.clear(last.token, root)
-	stamp_file.remove_stamp(launch_path(root))
-}
-
 // One read: the answer, `undefined` while the check is still running, or a not-run answer once its
 // process is gone without one. The record is read again after the pid is found gone, because the
 // check writes its answer before it exits.
-function read_answer(root: string, { pid, token }: Launch): PinnedSummary | undefined {
+function read_answer(root: string, { pid, token, start }: Launch): PinnedSummary | undefined {
 	const summary = test_pinned_record.read(token, root)
 
 	if (summary !== undefined) return summary
-	if (process_identity.is_same_process(pid, undefined) !== false) return undefined
+	if (process_identity.is_same_process(pid, start) !== false) return undefined
 
 	return (
 		test_pinned_record.read(token, root) ?? test_pinned_record.not_run_summary(new Error(LOST_NOTE))
@@ -105,16 +111,39 @@ function read_answer(root: string, { pid, token }: Launch): PinnedSummary | unde
 }
 
 // The launch is detached, so its pid leads a process group holding the `josh` process and its Vitest
-// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held. A pid
-// already gone is left alone, so a reissued one is never signalled.
-function stop({ pid }: Launch): void {
-	if (process_identity.is_same_process(pid, undefined) === false) return
-
+// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held.
+function signal_group(pid: number): void {
 	try {
 		process.kill(-pid, STOP_SIGNAL)
 	} catch {
 		// It ended between the check and the signal; there is nothing left to stop.
 	}
+}
+
+// A stale stamp can outlive its check by days, so the start signals only a pid whose start time
+// matches the launch's: a reissued pid, or one whose start could not be read, may lead another
+// lane's group.
+function stop_last({ pid, start }: Launch): void {
+	if (process_identity.is_same_process(pid, start) === true) signal_group(pid)
+}
+
+// The join's stamp is this pair's, minutes old, so the join signals any pid not proven gone: one whose
+// start could not be read (no `/proc`, no `ps`) is the check it has just been waiting on.
+function stop_current({ pid, start }: Launch): void {
+	if (process_identity.is_same_process(pid, start) !== false) signal_group(pid)
+}
+
+// Every start stops the last pair's check and clears its records first, so a join never reads an
+// earlier tree's answer and a reopened pair leaves no check running unowned (joshuafolkken/kit#4828).
+function clear(root: string = PROJECT_ROOT): void {
+	const last = read_launch(root)
+
+	if (last !== undefined) {
+		stop_last(last)
+		test_pinned_record.clear(last.token, root)
+	}
+
+	stamp_file.remove_stamp(launch_path(root))
 }
 
 // The dispatcher's claim in the core ledger (`core-budget.ts`) carries `admitted_at` from the moment
@@ -133,7 +162,7 @@ function is_queued(root: string): boolean {
 
 // A check given up on fails open and is stopped rather than left burning the cores.
 function stopped(launched: Launch, note: string): PinnedSummary {
-	stop(launched)
+	stop_current(launched)
 
 	return test_pinned_record.not_run_summary(new Error(note))
 }

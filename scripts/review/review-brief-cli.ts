@@ -425,6 +425,14 @@ async function run_interaction(): Promise<number> {
 	return await run_review(FIRST_ROUND, reading, targets)
 }
 
+// The scoped-green refusal a brief on this tree would print, read without composing one — so
+// `josh run:review` refuses before it launches anything beside the brief (joshuafolkken/kit#4828).
+async function scoped_refusal(): Promise<string | undefined> {
+	const { tree, commit } = await read_change()
+
+	return scoped_green.refusal_for(tree, commit)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
 	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction()
@@ -446,6 +454,7 @@ const review_brief_cli = {
 	record_round_one,
 	report_error,
 	run,
+	scoped_refusal,
 }
 
 export { review_brief_cli }
