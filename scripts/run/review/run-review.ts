@@ -35,7 +35,7 @@ type GateState = typeof GATE_GREEN | typeof GATE_RUNNING | typeof GATE_RED | typ
 
 // The four states the join waits on, decided from three readings the steps take of the stamps a real
 // `josh gate` writes: a green stamp covering this tree, the in-flight marker's writer still alive, and
-// a green stamp this pair's gate recorded since it started.
+// a green stamp covering the tree this pair's gate started on.
 // Green wins over running, because a gate that has already recorded green is done however the marker
 // reads; a marker whose writer is gone with no green stamp is a gate that finished red or died, which
 // is the safe direction — the join reports red and the verdict is blocked.
