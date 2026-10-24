@@ -487,7 +487,7 @@ Start test:pinned and the gate in the background and print the /code-review brie
 ```bash
 pnpm josh run:review                             # detach test:pinned and the gate, print the brief (the interaction brief after it where due), then launch a reviewer per brief
 pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
-pnpm josh run:review --unpinned-ok "only logs"   # check in place first, carry on past unpinned places; the list and the reason follow the brief
+pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 ```
 
@@ -505,8 +505,9 @@ The default waits only for the gate to _start_ and prints the brief;
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
-never drains. `--unpinned-ok` keeps the check in place before the pair, so the accepted list follows
-the brief. The overlap's reader is `chain-rule.md`.
+never drains. Under `--unpinned-ok` the check runs beside the pair too, launched with the reason, and
+`--join` prints the list with the reason and keeps the gate's exit code. The overlap's reader is
+`chain-rule.md`.
 
 ### `josh run:tail`
 

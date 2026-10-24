@@ -2,17 +2,16 @@ import type { InteractionStatus } from '#scripts/review/review-interaction'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
-import type { PinnedVerdict } from './run-review-pinned'
 
 // joshuafolkken/kit#4802: where the interaction review is due and not yet recorded, `josh run:review`
 // prints its brief after code's, so the child's round 1 reviews both and `josh ship` reruns neither.
 // `--code-only` is the ship's own open, which mints the interaction brief itself.
 
-const { branch, brief_run, interaction_status, pinned_check } = vi.hoisted(() => ({
+const { branch, brief_run, interaction_status, launch_pinned } = vi.hoisted(() => ({
 	branch: vi.fn<() => Promise<string>>(),
 	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
 	interaction_status: vi.fn<(issue: number) => Promise<InteractionStatus>>(),
-	pinned_check: vi.fn<(reason: string | undefined) => Promise<PinnedVerdict>>(),
+	launch_pinned: vi.fn<(root: string, reason?: string) => { kind: string }>(),
 }))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
@@ -22,13 +21,8 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 	return { review_interaction: { ...review_interaction, status: interaction_status } }
 })
-vi.mock('./run-review-pinned', async (import_original) => {
-	const { run_review_pinned } = await import_original<Record<'run_review_pinned', object>>()
-
-	return { run_review_pinned: { ...run_review_pinned, check: pinned_check } }
-})
 vi.mock('./run-review-pinned-steps', () => ({
-	run_review_pinned_steps: { launch: () => ({ kind: 'launched' }), clear: vi.fn() },
+	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn() },
 }))
 vi.mock('./run-review-steps', () => ({
 	run_review_steps: {
@@ -48,7 +42,6 @@ const INTERACTION_BRIEF = 'INTERACTION BRIEF\n'
 const FAILURE_EXIT_CODE = 1
 const UNPINNED_OK = '--unpinned-ok'
 const REASON = 'a doc-only change'
-const ACCEPTED_LIST = `unpinned 1 · unchecked 0\nUnpinned accepted by the implementer: ${REASON}\n`
 
 const output = { stdout: [] as Array<string>, stderr: [] as Array<string> }
 
@@ -69,7 +62,7 @@ beforeEach(() => {
 	output.stderr = []
 	branch.mockResolvedValue(LANE_BRANCH)
 	interaction_status.mockReset().mockResolvedValue('missing')
-	pinned_check.mockReset().mockResolvedValue({ kind: 'accepted', text: ACCEPTED_LIST })
+	launch_pinned.mockReset().mockReturnValue({ kind: 'launched' })
 	brief_run.mockReset().mockImplementation(async (argv) => {
 		process.stdout.write(brief_of(argv))
 
@@ -109,20 +102,12 @@ describe('run:review where the interaction review is due', () => {
 		expect(output.stderr.join('')).not.toContain(run_review_cli.JOIN_HINT)
 	})
 
-	it('puts the --unpinned-ok accepted list under code’s brief, before the interaction header', async () => {
+	it('prints both briefs unchanged under --unpinned-ok, its reason riding on the launch', async () => {
 		expect(await run_review_cli.run([UNPINNED_OK, REASON])).toBe(0)
-		expect(pinned_check).toHaveBeenCalledWith(REASON)
+		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
 		expect(output.stdout.join('')).toBe(
-			`${CODE_BRIEF}${ACCEPTED_LIST}${run_review_cli.INTERACTION_HEADER}\n${INTERACTION_BRIEF}`,
+			`${CODE_BRIEF}${run_review_cli.INTERACTION_HEADER}\n${INTERACTION_BRIEF}`,
 		)
-	})
-
-	it('sends the accepted list to stderr when code’s brief refused', async () => {
-		brief_run.mockResolvedValue(FAILURE_EXIT_CODE)
-
-		expect(await run_review_cli.run([UNPINNED_OK, REASON])).toBe(FAILURE_EXIT_CODE)
-		expect(output.stdout.join('')).not.toContain(ACCEPTED_LIST)
-		expect(output.stderr.join('')).toContain(ACCEPTED_LIST)
 	})
 })
 
@@ -153,10 +138,11 @@ describe('run:review that briefs code alone', () => {
 		expect(brief_run.mock.calls).toStrictEqual([[[]]])
 	})
 
-	it('accepts --unpinned-ok after --code-only, with code’s brief and the accepted list', async () => {
+	it('accepts --unpinned-ok after --code-only, with code’s brief and the reason on the launch', async () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG, UNPINNED_OK, REASON])).toBe(0)
 		expect(brief_run.mock.calls).toStrictEqual([[[]]])
-		expect(output.stdout.join('')).toBe(`${CODE_BRIEF}${ACCEPTED_LIST}`)
+		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
+		expect(output.stdout.join('')).toBe(CODE_BRIEF)
 	})
 
 	it('refuses an argument after --code-only that is not --unpinned-ok', async () => {
