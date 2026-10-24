@@ -1,6 +1,7 @@
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { json_value } from '#scripts/lib/json-value'
+import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { z } from 'zod'
 import { review_level } from './review-level'
 
@@ -13,7 +14,8 @@ import { review_level } from './review-level'
 // because round 1's *fix code* is unreviewed, and that is structural. Arm A applies where there is no fix code — the findings closed without an edit — so
 // the premise is absent rather than overridden. Arm B applies where the fix leaves what executes
 // unchanged: `review-level.ts`'s inert set, documentation under `docs/` and the root `README.md`,
-// `prompts/`, and source files whose only change is in comments (`review-code-tree.ts`).
+// `prompts/`, `josh metrics` approvals, and source files whose only change is in comments
+// (`review-code-tree.ts`).
 //
 // **Arm B is wider than the review level's inert set, on purpose** (joshuafolkken/kit#3787). Round 1
 // still reviews a documentation or prompt change in full, and the fix to its findings is still made;
@@ -57,7 +59,7 @@ const NO_SNAPSHOT_REASON =
 const EMPTY_DELTA_REASON_PREFIX =
 	'the fix delta is empty: round 1 wrote no fix code, so there is no unreviewed fix for a verification pass to read'
 const INERT_DELTA_REASON_PREFIX =
-	'every path round 1 fixed leaves what executes unchanged — inert, documentation, a prompt, or a comment-only edit'
+	'every path round 1 fixed leaves what executes unchanged — inert, documentation, a prompt, a metrics approval, or a comment-only edit'
 const README_PATH = 'README.md'
 const DOCUMENTATION_PREFIX = 'docs/'
 const MARKDOWN_EXTENSION = '.md'
@@ -130,8 +132,17 @@ function is_documentation(relative: string): boolean {
 	return relative.startsWith(DOCUMENTATION_PREFIX) && relative.endsWith(MARKDOWN_EXTENSION)
 }
 
+// **A `josh metrics` approval is data, not code** (joshuafolkken/kit#4842): the ship's pre-detach
+// re-record rewrites it after round 1, and the gate's own metrics step checks it — the same reason
+// `review-reviewed-tree.ts` reads it as no move.
 function is_unexecuted(relative: string, comment_only: ReadonlyArray<string>): boolean {
-	if (review_level.is_inert(relative) || is_documentation(relative)) return true
+	if (
+		review_level.is_inert(relative) ||
+		is_documentation(relative) ||
+		release_approval_prune.is_approval(relative)
+	) {
+		return true
+	}
 
 	return comment_only.includes(relative)
 }

@@ -115,7 +115,7 @@ An open carry record supplies the start time, merged count and remaining named i
 
 ## `josh review:round2` in detail
 
-`skip` on **Arm A** (the fix delta is empty) or Arm B (every path in the fix delta is inert by [`josh review:brief --level-only`](../josh-commands-backlog.md#josh-reviewbrief)'s classification, `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file outside `.claude/` whose only change is in comments); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one path outside Arm B. Full reasoning: `prompts/review.md`.
+`skip` on **Arm A** (the fix delta is empty) or Arm B (every path in the fix delta is inert by [`josh review:brief --level-only`](../josh-commands-backlog.md#josh-reviewbrief)'s classification, `docs/**/*.md`, the root `README.md`, under `prompts/`, a `josh metrics` approval under `.josh/metrics-accepted/`, or a `.ts` / `.js` / `.svelte` file outside `.claude/` whose only change is in comments); `required` for anything else, including a missing `--round-1-closed`, a missing round-1 snapshot, a snapshot against a different change base, and one path outside Arm B. Full reasoning: `prompts/review.md`.
 
 ## `josh review:attest` in detail
 
