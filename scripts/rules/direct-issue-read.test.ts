@@ -30,6 +30,8 @@ describe('direct_issue_read.is_direct_issue_read — refuses', () => {
 		'gh issue view 4663 --json comments',
 		'gh issue view 4663 --json=comments',
 		'gh issue view 4663 --json=title,comments',
+		"gh issue view 4663 --json 'title,comments'",
+		'gh issue view 4663 --json "title,comments"',
 		'gh issue view 4663 -R joshuafolkken/kit --comments',
 		'gh issue view 4663 -R github.com/joshuafolkken/kit --comments',
 		'gh --repo joshuafolkken/kit issue view 4663 --comments',
