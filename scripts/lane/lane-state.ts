@@ -180,9 +180,10 @@ async function outcome_of(change: LaneChange, options: StateOptions): Promise<Re
 	return apply(change, directory, options.now ?? new Date())
 }
 
-async function settled_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
+// A write that threw is a write skipped for that reason, never an error out of the lane command.
+async function settled(write: () => Promise<RecordOutcome>): Promise<RecordOutcome> {
 	try {
-		return await outcome_of(change, options)
+		return await write()
 	} catch (error: unknown) {
 		return { kind: 'skipped', reason: error instanceof Error ? error.message : String(error) }
 	}
@@ -192,7 +193,7 @@ async function record_change(
 	change: LaneChange,
 	options: StateOptions = {},
 ): Promise<RecordOutcome> {
-	const outcome = await settled_outcome(change, options)
+	const outcome = await settled(async () => await outcome_of(change, options))
 
 	if (outcome.kind === 'skipped') warn(change, outcome.reason)
 
@@ -255,6 +256,35 @@ async function record_stuck(
 	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
+function adopted_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
+	if (read_record(directory, change.issue) !== undefined) {
+		return { kind: 'skipped', reason: 'a record exists' }
+	}
+
+	return apply_held(change, directory, now)
+}
+
+/**
+ * Write `change` for a lane that has no record, and only then: a record that appeared since the caller
+ * read none is the lane command's, and is never overwritten (`lane:adopt`).
+ */
+async function adopted_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
+	const directory = await resolve_directory(options.directory)
+
+	if (directory === undefined) return NO_DIRECTORY
+
+	const now = options.now ?? new Date()
+
+	return locked(directory, change.issue, () => adopted_held(change, directory, now))
+}
+
+async function record_adopted(
+	change: LaneChange,
+	options: StateOptions = {},
+): Promise<RecordOutcome> {
+	return await settled(async () => await adopted_outcome(change, options))
+}
+
 /** Each of `issues`' records, by issue; an issue with none is left out. */
 async function read_states(
 	issues: ReadonlyArray<string>,
@@ -293,6 +323,7 @@ const lane_state = {
 	read_records,
 	read_state,
 	read_states,
+	record_adopted,
 	record_change,
 	record_stuck,
 	state_path,

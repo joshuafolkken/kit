@@ -73,6 +73,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-plan.ts', 1],
 	['epic/epic-parse.ts', 1],
 	['issue/issue-file-cli.ts', 1],
+	['lane/lane-adopt-cli.ts', 1],
 	['lane/lane-child-invocation.ts', 7],
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-pause-cli.ts', 2],

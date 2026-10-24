@@ -94,6 +94,7 @@ const ALIASES: Record<string, string> = {
 	lwd: 'lane:withdraw',
 	lps: 'lane:pause',
 	lru: 'lane:resume',
+	lad: 'lane:adopt',
 	blr: 'backlogrun',
 }
 

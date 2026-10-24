@@ -203,7 +203,7 @@ function idle_lanes(
 	return issues_traced(traced_of(lanes, probes), PROCESS_NONE)
 }
 
-const lane_spent = { idle_lanes, kept_reason, lanes_in_use, sort_lanes }
+const lane_spent = { idle_lanes, kept_reason, lanes_in_use, read_unpushed_commits, sort_lanes }
 
 export type { KeptLane, LaneUse, SpentProbes, SpentSort }
 export { lane_spent }
