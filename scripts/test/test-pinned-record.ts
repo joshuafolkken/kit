@@ -5,6 +5,10 @@ import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
 // the printed report and its unpinned count, keyed to the checkout. `run:review` starts the check in
 // the background beside the gate and the brief, so the join — a later process — reads it here.
+//
+// **Each answer carries its launch's token**, and a read answers only for the token it asks with: a
+// check an earlier start left running can still write after the next start cleared the record, and its
+// answer is about a tree the join never asked about.
 
 const RECORD_PREFIX = 'josh-test-pinned-record-'
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
@@ -29,30 +33,37 @@ function record_path(root: string = PROJECT_ROOT): string {
 	return stamp_file.stamp_path(RECORD_PREFIX, root)
 }
 
-function write(summary: PinnedSummary, root: string = PROJECT_ROOT): void {
-	stamp_file.write_stamp(record_path(root), summary)
+function write(token: string, summary: PinnedSummary, root: string = PROJECT_ROOT): void {
+	stamp_file.write_stamp(record_path(root), { token, ...summary })
 }
 
-function to_summary(value: unknown): PinnedSummary | undefined {
-	if (typeof value !== 'object' || value === null) return undefined
-
-	const { text, unpinned_count } = value as Record<string, unknown>
+function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
+	const { text, unpinned_count } = record
 
 	if (typeof text !== 'string' || typeof unpinned_count !== 'number') return undefined
 
 	return { text, unpinned_count }
 }
 
-function read(root: string = PROJECT_ROOT): PinnedSummary | undefined {
-	const raw = stamp_file.read_stamp_text(record_path(root))
-
-	if (raw === undefined) return undefined
-
+function parsed(raw: string): Record<string, unknown> | undefined {
 	try {
-		return to_summary(JSON.parse(raw))
+		const value: unknown = JSON.parse(raw)
+
+		return typeof value === 'object' && value !== null
+			? (value as Record<string, unknown>)
+			: undefined
 	} catch {
 		return undefined
 	}
+}
+
+function read(token: string, root: string = PROJECT_ROOT): PinnedSummary | undefined {
+	const raw = stamp_file.read_stamp_text(record_path(root))
+	const record = raw === undefined ? undefined : parsed(raw)
+
+	if (record?.['token'] !== token) return undefined
+
+	return to_summary(record)
 }
 
 function clear(root: string = PROJECT_ROOT): void {

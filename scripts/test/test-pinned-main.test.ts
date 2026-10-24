@@ -6,12 +6,18 @@ const { run } = vi.hoisted(() => ({ run: vi.fn<(max_hunks: number) => Promise<Pi
 
 const { write_stamp } = vi.hoisted(() => ({ write_stamp: vi.fn() }))
 
+const { read_changed_tree } = vi.hoisted(() => ({
+	read_changed_tree: vi.fn<() => Promise<Record<string, string>>>(),
+}))
+
 vi.mock('./test-pinned', () => ({ test_pinned: { run } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: { stamp_path: (prefix: string) => prefix, write_stamp },
 }))
+vi.mock('#scripts/review/review-tree', () => ({ review_tree: { read_changed_tree } }))
 
-const HUNK = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
+const FILE = 'a.ts'
+const HUNK = { file: FILE, new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
 
 function capture(sink: Array<string>): (chunk: string | Uint8Array) => boolean {
@@ -29,6 +35,8 @@ beforeEach(() => {
 	vi.spyOn(process.stderr, 'write').mockImplementation(capture(output.stderr))
 	run.mockReset()
 	write_stamp.mockReset()
+	read_changed_tree.mockReset()
+	read_changed_tree.mockResolvedValue({ [FILE]: 'one' })
 })
 
 afterEach(() => {
@@ -86,14 +94,16 @@ describe('test_pinned_main.main', () => {
 })
 
 // joshuafolkken/kit#4770: `--record` leaves the answer `josh run:review --join` waits on.
-describe('test_pinned_main.main --record', () => {
-	const RECORD = 'josh-test-pinned-record-'
+const RECORD = 'josh-test-pinned-record-'
+const TOKEN = 'launch-4770'
 
-	it('records the report and its unpinned count', async () => {
+describe('test_pinned_main.main --record', () => {
+	it('records the report and its unpinned count under the launch token', async () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK] })
 
-		expect(await test_pinned_main.main(['--record'])).toBe(1)
+		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(1)
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
+			token: TOKEN,
 			text: output.stdout.join(''),
 			unpinned_count: 1,
 		})
@@ -104,11 +114,17 @@ describe('test_pinned_main.main --record', () => {
 
 		run.mockRejectedValue(new Error(reason))
 
-		await expect(test_pinned_main.main(['--record'])).rejects.toThrow(reason)
+		await expect(test_pinned_main.main(['--record', TOKEN])).rejects.toThrow(reason)
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
+			token: TOKEN,
 			text: `\`josh test:pinned\` could not run, so nothing was checked: ${reason}\n`,
 			unpinned_count: 0,
 		})
+	})
+
+	it('refuses --record without a token', async () => {
+		expect(await test_pinned_main.main(['--record'])).toBe(1)
+		expect(run).not.toHaveBeenCalled()
 	})
 
 	it('records nothing without --record', async () => {
@@ -117,5 +133,42 @@ describe('test_pinned_main.main --record', () => {
 		await test_pinned_main.main([])
 
 		expect(write_stamp).not.toHaveBeenCalled()
+	})
+})
+
+describe('test_pinned_main.main --record on a moving tree', () => {
+	it('checks again when the tree moved under the check, and records the settled answer', async () => {
+		read_changed_tree
+			.mockResolvedValueOnce({ [FILE]: 'one' })
+			.mockResolvedValueOnce({ [FILE]: 'two' })
+		run.mockResolvedValueOnce({ ...CLEAN_REPORT, unpinned: [HUNK] }).mockResolvedValue(CLEAN_REPORT)
+
+		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(0)
+		expect(run).toHaveBeenCalledTimes(2)
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned_count: 0 }))
+	})
+
+	it('records nothing checked when the tree keeps moving', async () => {
+		let reads = 0
+
+		read_changed_tree.mockImplementation(async () => {
+			reads += 1
+
+			return { [FILE]: String(reads) }
+		})
+		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK] })
+
+		await expect(test_pinned_main.main(['--record', TOKEN])).rejects.toThrow('kept moving')
+		expect(run).toHaveBeenCalledTimes(3)
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ unpinned_count: 0 }))
+	})
+
+	it('checks the tree once without --record', async () => {
+		read_changed_tree.mockResolvedValueOnce({ [FILE]: 'two' })
+		run.mockResolvedValue(CLEAN_REPORT)
+
+		await test_pinned_main.main([])
+
+		expect(run).toHaveBeenCalledTimes(1)
 	})
 })

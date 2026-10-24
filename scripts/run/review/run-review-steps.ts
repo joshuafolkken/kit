@@ -12,9 +12,10 @@ import { detached_launch, type LaunchArgv, type LaunchResult } from '#scripts/ru
 import { run_review, type GateState, type ReviewTiming, type TimingStart } from './run-review'
 
 // The side effects `josh run:review` performs, kept out of `run-review.ts` the way `run-merge-steps.ts`
-// is kept out of `run-merge.ts`. Three of them (the `test:pinned` check's are `run-review-pinned-steps.ts`): launch the gate detached so
-// one command leaves it running in the background, read back the state the join waits on from the
-// stamps a real `josh gate` writes, and keep the four timestamps the overlap is measured from.
+// is kept out of `run-merge.ts`. Three of them (the `test:pinned` check's are in
+// `run-review-pinned-steps.ts`): launch the gate detached so one command leaves it running in the
+// background, read back the state the join waits on from the stamps a real `josh gate` writes, and
+// keep the four timestamps the overlap is measured from.
 
 // Resolve `josh` through the target checkout's package script. Consumer lanes have no source entry.
 const PNPM = 'pnpm'

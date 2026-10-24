@@ -47,7 +47,7 @@ function join_exit_code(state: GateState): number {
 }
 
 const JOIN_HINT =
-	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer) with the brief above; when it returns, run `pnpm josh run:review --join` to join the gate and check its verdict before committing.'
+	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer) with the brief above; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
 async function start_pair(): Promise<number> {
 	const gate_started_at = now_iso()

@@ -1,0 +1,9 @@
+{
+	"reason": "test:pinned beside the gate: background launch, launch token, settled re-check",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 201,
+		"ai_cost.on_demand_bytes": 3,
+		"prose.excess_bold": 1
+	}
+}
