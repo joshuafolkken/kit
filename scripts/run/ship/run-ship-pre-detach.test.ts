@@ -24,12 +24,13 @@ vi.mock('#scripts/gate/project-checks', () => ({
 
 const record_mock = vi.hoisted(() => vi.fn())
 const READ_TREE = vi.hoisted(() => ({ files: { digest_of: 'digest-a' }, base: 'base-a' }))
+const read_tree_mock = vi.hoisted(() => vi.fn(async () => READ_TREE))
 
 vi.mock('#scripts/gate/check-reuse', () => ({
 	check_reuse: { DEFAULT_RECORDS: (): string => '', record_green_checks: record_mock },
 }))
 vi.mock('#scripts/gate/gate-tree', () => ({
-	gate_tree: { read_gate_tree: vi.fn(async () => READ_TREE) },
+	gate_tree: { read_gate_tree: read_tree_mock },
 }))
 
 const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
@@ -223,7 +224,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 
 // joshuafolkken/kit#3568: the metrics totals, in kit only, so a grown total stops the session that grew it.
 describe('run_ship_pre_detach.checks — the metrics totals', () => {
-	const metrics = run_ship_pre_detach.METRICS_TOTALS_COMMAND.join(' ')
+	const metrics = run_ship_pre_detach.METRICS_RERECORD_COMMAND.join(' ')
 	const grown = `josh metrics: 1 total(s) grew past the baseline\n${ACCEPT_HINT}`
 
 	it('runs no metrics outside kit', async () => {
@@ -239,7 +240,23 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			code: OK,
 			out: run_ship_pre_detach.PASSED,
 		})
-		expect(commands()).toStrictEqual([...STATIC, metrics])
+		expect(commands()).toStrictEqual([metrics, ...STATIC])
+	})
+
+	// joshuafolkken/kit#4716: the totals may re-record the approval file, so they finish before the tree
+	// the gate records are written for is read.
+	it('runs the totals alone, before the tree is read and the other checks start', async () => {
+		is_kit_mock.mockReturnValue(true)
+		read_tree_mock.mockClear()
+
+		await run_ship_pre_detach.checks(tree.directory)
+
+		const [metrics_order = 0, ...others] = run_mock.mock.invocationCallOrder
+		const [tree_order = 0] = read_tree_mock.mock.invocationCallOrder
+
+		expect(commands()[0]).toBe(metrics)
+		expect(metrics_order).toBeLessThan(tree_order)
+		expect(others.every((order) => order > tree_order)).toBe(true)
 	})
 
 	it('fails in kit with the accept hint when a total grew', async () => {
