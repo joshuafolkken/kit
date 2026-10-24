@@ -95,6 +95,7 @@ const WORDS = {
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
+	overrun: 'overrun investigation',
 	// What the run is doing now, where no stage of its own says it.
 	watching: 'watching',
 	pool_empty: 'pool empty',
@@ -188,6 +189,9 @@ const NOTES_ICON = '📌'
 // A plan row the run filed leads its title with it, in place of a findings line naming it again
 // (joshuafolkken/kit#4099).
 const FILED_RUN_MARK = '✚'
+// A done row whose overrun investigation is running ends on it where no spinner turns
+// (joshuafolkken/kit#4772): the investigate phase's own icon, for the same work.
+const OVERRUN_MARK = PHASE_ICONS.investigate
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
@@ -366,6 +370,7 @@ const run_board_labels = {
 	NOTES_ICON,
 	NOTE_ICONS,
 	NOW_ICONS,
+	OVERRUN_MARK,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	SPINNER_INTERVAL_MS,

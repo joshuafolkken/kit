@@ -1,0 +1,7 @@
+{
+	"reason": "Show a done row's filed issue numbers and an overrun-investigation spinner; the session probe answers from the read's own ps snapshot, once per read, with tests",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 159
+	}
+}

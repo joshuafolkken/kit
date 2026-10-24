@@ -452,7 +452,7 @@ Confirms the child from GitHub and does its post-merge steps: a **merged**
 child (CLOSED) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
-event (`lane-overrun.ts`); a failed sync logs nothing; a **parked** child (`needs-decision`,
+event (`lane-overrun.ts`, its wording `run-event-overrun.ts`); a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
