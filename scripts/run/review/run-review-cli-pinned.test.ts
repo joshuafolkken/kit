@@ -1,5 +1,6 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { review_brief_cli } from '#scripts/review/review-brief-cli'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_steps } from './run-review-steps'
@@ -17,6 +18,11 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 const FAILURE_EXIT_CODE = 1
 const REASON = 'only logs'
+const REFUSAL = 'scoped checks not green on this tree'
+
+beforeEach(() => {
+	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
+})
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -43,5 +49,22 @@ describe('run with --unpinned-ok', () => {
 		expect(await run_review_cli.run(['--unpinned-ok', REASON])).toBe(FAILURE_EXIT_CODE)
 		expect(launch).toHaveBeenCalledWith(PROJECT_ROOT, REASON)
 		expect(order).toStrictEqual(['pinned', 'gate'])
+	})
+})
+
+// joshuafolkken/kit#4828: a start the brief refuses leaves no check and no gate running.
+describe('run on a tree the scoped pair has not been green on', () => {
+	it('refuses before launching the check or the gate, and keeps the last check', async () => {
+		vi.mocked(review_brief_cli.scoped_refusal).mockResolvedValue(REFUSAL)
+		const error = vi.spyOn(console, 'error').mockReturnValue(undefined)
+		const started = [
+			vi.spyOn(run_review_pinned_steps, 'clear').mockReturnValue(undefined),
+			vi.spyOn(run_review_pinned_steps, 'launch'),
+			vi.spyOn(run_review_steps, 'launch_gate'),
+		]
+
+		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(error).toHaveBeenCalledWith(REFUSAL)
+		expect(started.filter((spy) => spy.mock.calls.length > 0)).toStrictEqual([])
 	})
 })
