@@ -34,6 +34,8 @@ const ISSUE = '4711'
 const ROOT = '/repository'
 const NOTE = 'fix the review failure, then ship again'
 const { VERDICT } = run_ship_wait_cli
+// Long enough for `poll` to read the stage record at least once (the sleep is mocked), short enough to end fast.
+const SHORT_CHUNK_MS = 20
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -72,9 +74,10 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 		done_mock.mockReturnValue(new Set(['review', 'gate', 'commit']))
 		started_mock.mockReturnValue(['gate'])
 
-		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, 0)).resolves.toStrictEqual({
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, SHORT_CHUNK_MS)).resolves.toStrictEqual({
 			verdict: VERDICT.PENDING,
 		})
+		expect(started_mock).toHaveBeenCalled()
 	})
 
 	it('passes once the attempt is past a commit it skipped as already shipped', async () => {
@@ -94,9 +97,10 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 	})
 
 	it('keeps the heartbeat past a chunk that ran out, so the next wait is still seen', async () => {
-		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, 0)).resolves.toStrictEqual({
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, SHORT_CHUNK_MS)).resolves.toStrictEqual({
 			verdict: VERDICT.PENDING,
 		})
+		expect(beat_mock).toHaveBeenCalledWith(ROOT, ISSUE)
 		expect(leave_mock).not.toHaveBeenCalled()
 	})
 })

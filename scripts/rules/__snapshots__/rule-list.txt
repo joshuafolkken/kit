@@ -76,6 +76,10 @@
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `general-purpose` type with no `model`. Every occurrence
   - silent: a named agent type, or a `model` set
   - not automated: which model fits the unit is the author's call
+- **Investigator dispatched in the foreground** (`investigator-foreground`, `.claude/skills/workflow-commands/delegation.md` → "The pre-implementation reading — what goes to a unit, and from which file")
+  - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
+  - silent: another agent type, or `run_in_background: false` set
+  - not automated: which reads go beside the dispatch is the author’s call
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
   - silent: not a lane child — the parent owns the run budget

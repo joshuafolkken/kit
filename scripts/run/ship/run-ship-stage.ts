@@ -14,7 +14,7 @@ import { z } from 'zod'
 // the state, and a stale one is overruled by it. Neither can produce a second commit, push or merge.
 //
 // **The gate is never skipped on the record's word.** It is passed over only once its output — a
-// commit — exists; otherwise it runs, and `josh gate`'s own tree-keyed green record is what makes a
+// pushed commit — exists; otherwise it runs, and `josh gate`'s own tree-keyed green record is what makes a
 // re-run on an unchanged tree a reuse rather than a second execution. No quality gate is folded away.
 
 const STAGE = {
@@ -47,6 +47,8 @@ interface ShipState {
 	// The issue changed after the recorded review's brief (`issue-watch-gate.ts`), so the review re-runs
 	// even on a committed tree (joshuafolkken/kit#4221).
 	is_review_stale?: boolean
+	// The tree holds uncommitted work, which the sync stage commits locally before it merges.
+	is_dirty?: boolean
 }
 
 const RECORD_PREFIX = 'josh-ship-stages-'
@@ -166,17 +168,17 @@ function is_shipped(state: ShipState): boolean {
 
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
 	// The preflight asks what the commit stage would refuse on, so a commit is
-	// its output as it is the gate's; a resumed commit stage still asks `git -y`'s own preflight.
+	// its output; a resumed commit stage still asks `git -y`'s own preflight.
 	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
-	// The `--review` round precedes the commit, so a commit is its output as it
-	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
-	// the recorded round, and only a commit pins the tree that round read — unless the issue changed since.
+	// The sync stage commits locally before the review round and the gate, without pushing
+	// (`run-ship-sync.ts`), so a commit is neither's output: a pushed one on a clean tree is, as only the
+	// commit stage after the gate pushes — unless the issue changed since.
 	[STAGE.REVIEW]: (_done, state) =>
-		state.is_merged || (state.is_committed && state.is_review_stale !== true),
-	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
-	// The merge of the default branch before the commit: once committed, a
+		state.is_merged || (is_shipped(state) && state.is_review_stale !== true),
+	[STAGE.GATE]: (_done, state) => state.is_merged || is_shipped(state),
+	// The merge of the default branch before the gate: once pushed, a
 	// conflicting pull request is the followup's to merge again.
-	[STAGE.SYNC]: (_done, state) => state.is_merged || state.is_committed,
+	[STAGE.SYNC]: (_done, state) => state.is_merged || is_shipped(state),
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// The round-2 pass reads the pushed fix delta, so its record is honored only
 	// while that push still stands — new work pushed on top reruns it.

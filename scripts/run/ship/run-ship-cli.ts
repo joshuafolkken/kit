@@ -64,6 +64,7 @@ interface ShipContext {
 }
 
 const { PHASE, STAGE } = run_ship_stage
+const REREAD_AFTER: ReadonlySet<Stage> = new Set([STAGE.SYNC, STAGE.REVIEW])
 
 // Every stage that ran is timed into the lane ledger, failed ones included — a stage that stopped the
 // ship cost the lane its time as well. The append is local and best-effort, so it adds no wait.
@@ -163,8 +164,9 @@ async function run_stage(
 	const section = await run_step(step, args, context.state)
 
 	await settle(step, args, context, section.code)
-	// A review may fix the tree and refreshes the brief, so the stages after it read the state anew.
-	if (step.stage === STAGE.REVIEW) set_state(context, await run_ship_probe.read_state())
+	// The sync commits locally and a review may fix the tree, so the stages after either read the state
+	// anew — the commit stage then pushes the sync's commit rather than making it again.
+	if (REREAD_AFTER.has(step.stage)) set_state(context, await run_ship_probe.read_state())
 
 	return section
 }

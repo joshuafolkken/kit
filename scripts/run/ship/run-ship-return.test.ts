@@ -272,6 +272,7 @@ describe('run_ship_return.return_control past the ship-stop cap', () => {
 		is_over_mock.mockResolvedValue(true)
 
 		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()
@@ -310,6 +311,18 @@ describe('run_ship_return.return_control on a merge conflict', () => {
 			`#${ISSUE} conflict failed (conflict) — pnpm josh ship --log ${ISSUE}`,
 		)
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(conflicted)
+	})
+
+	// joshuafolkken/kit#4707: a review-stage conflict counts against the mechanical cap.
+	it('asks the cap for the conflict, not the stage', async () => {
+		await run_ship_return.return_control(
+			ISSUE,
+			'review',
+			{ ...RESUME, conflicts: [conflicted] },
+			OUTPUT,
+		)
+
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'conflict')
 	})
 })
 

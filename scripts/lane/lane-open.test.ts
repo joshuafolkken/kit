@@ -38,6 +38,7 @@ vi.mock('#scripts/git/git-worktree', () => ({
 vi.mock('./lane-install', () => ({
 	lane_install: { install_dependencies: vi.fn() },
 }))
+vi.mock('#scripts/lint/eslint-warm', () => ({ eslint_warm: { start: vi.fn() } }))
 vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
@@ -64,6 +65,7 @@ vi.mock('./lane-registry', async (import_original) => {
 const { git_command } = await import('#scripts/git/git-command')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_install } = await import('./lane-install')
+const { eslint_warm } = await import('#scripts/lint/eslint-warm')
 const { lane_leftover } = await import('./lane-leftover')
 const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
@@ -290,13 +292,16 @@ describe('claiming a lane seat atomically', () => {
 describe('opening a lane — its dependencies', () => {
 	// The work tree is the container and this is its contents: without them the first `pnpm josh …`
 	// typed in the lane fails with `tsx: command not found` (joshuafolkken/kit#1554). It is asked for
-	// the lane's own directory, never the one `lane:open` was typed in.
-	it('installs the dependencies into the lane it just created', async () => {
+	// the lane's own directory, never the one `lane:open` was typed in. Its eslint daemon is warmed
+	// after it, so the child's first edit hook lints warm (joshuafolkken/kit#4720).
+	it('installs the dependencies into the lane it just created, then warms its eslint', async () => {
 		await lane_open.open_lane(ISSUE)
 
-		expect(vi.mocked(lane_install.install_dependencies)).toHaveBeenCalledWith(
-			path.join(LANE_ROOT, ISSUE),
-		)
+		const install = vi.mocked(lane_install.install_dependencies)
+
+		expect(install).toHaveBeenCalledWith(path.join(LANE_ROOT, ISSUE))
+		expect(eslint_warm.start).toHaveBeenCalledWith(path.join(LANE_ROOT, ISSUE))
+		expect(install).toHaveBeenCalledBefore(vi.mocked(eslint_warm.start))
 	})
 
 	// joshuafolkken/kit#3738: the install is the long part of an open, so it is a stage of its own.

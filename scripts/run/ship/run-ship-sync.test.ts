@@ -16,10 +16,9 @@ vi.mock('#scripts/git/git-command', () => ({
 	git_command: { branch: vi.fn().mockResolvedValue('3221-lane') },
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
-
 const { run_ship_sync } = await import('./run-ship-sync')
 
-// joshuafolkken/kit#3221: `josh ship` merges the default branch again before the commit and on a
+// joshuafolkken/kit#3221: `josh ship` merges the default branch again before the gate and on a
 // conflicting pull request, and stops as `conflict` only on a merge git cannot finish.
 
 const OK = 0
@@ -44,6 +43,11 @@ const SCOPED_GREEN = { code: OK, out: 'scoped green' }
 const GATE_RED = { code: FAILED, out: 'gate red' }
 const PUSH_REJECTED = { code: FAILED, out: 'push rejected' }
 const PUSH = ['git', '-y', '--skip-commit', '--skip-pr', TITLE]
+const LOCAL_COMMIT = ['git', '-y', '--skip-push', '--skip-pr', TITLE]
+const COMMIT_REFUSED = { code: FAILED, out: 'commit refused' }
+const MERGED_NOTE = 'merged main'
+// tree dirtiness as the probe read it
+const tree = { is_dirty: false }
 const FOLLOWUP = ['followup', TITLE, ...NOTIFY]
 const SPAWN_FAILED = 'spawn failed'
 
@@ -57,6 +61,7 @@ beforeEach(() => {
 	merge_state_mock.mockReset().mockResolvedValue(DIRTY)
 	scoped_mock.mockReset().mockResolvedValue(SCOPED_GREEN)
 	overlap_mock.mockReset().mockResolvedValue(undefined)
+	tree.is_dirty = false
 })
 
 // joshuafolkken/kit#3901: the sync waits out an overlapping open pull request first, so the merge that
@@ -70,7 +75,7 @@ describe('run_ship_sync.sync_stage — the wait for an overlapping lane', () => 
 		})
 		merge_mock.mockResolvedValue(MERGED)
 
-		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
 			code: OK,
 			out: `${run_ship_overlap.note(WAITED)}\nmerged main`,
 		})
@@ -81,7 +86,7 @@ describe('run_ship_sync.sync_stage — the wait for an overlapping lane', () => 
 		overlap_mock.mockResolvedValue(WAITED)
 		merge_mock.mockResolvedValue(CONFLICT)
 
-		const result = await run_ship_sync.sync_stage(ISSUE)
+		const result = await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
 
 		expect(result.out.startsWith(run_ship_overlap.note(WAITED))).toBe(true)
 	})
@@ -89,7 +94,7 @@ describe('run_ship_sync.sync_stage — the wait for an overlapping lane', () => 
 
 describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('goes on when the default branch brings nothing in', async () => {
-		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
 			code: OK,
 			out: 'main brings nothing in',
 		})
@@ -101,7 +106,10 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('leaves the merged tree to the gate stage that follows, and goes on without stopping', async () => {
 		merge_mock.mockResolvedValue(MERGED)
 
-		expect(await run_ship_sync.sync_stage(ISSUE)).toStrictEqual({ code: OK, out: 'merged main' })
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
+			code: OK,
+			out: MERGED_NOTE,
+		})
 		expect(scoped_mock).not.toHaveBeenCalled()
 		expect(josh_run_mock).not.toHaveBeenCalled()
 	})
@@ -109,23 +117,92 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 	it('stops on a conflict, naming the unmerged paths', async () => {
 		merge_mock.mockResolvedValue(CONFLICT)
 
-		const result = await run_ship_sync.sync_stage(ISSUE)
+		const result = await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
 
 		expect(result.code).toBe(FAILED)
 		expect(result.conflicts).toStrictEqual(CONFLICTED)
 		expect(result.out).toContain(run_ship_sync.CONFLICT_NOTE)
 	})
 
-	it('defers a refused merge to the followup rather than stopping the commit', async () => {
-		merge_mock.mockResolvedValue({ kind: 'refused', message: 'uncommitted overlap' })
+	it('defers a refused merge to the followup rather than stopping the ship', async () => {
+		merge_mock.mockResolvedValue({ kind: 'refused', message: 'fetch refused' })
 
-		expect(await run_ship_sync.sync_stage(ISSUE)).toMatchObject({ code: OK })
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toMatchObject({ code: OK })
 	})
 
 	it('defers a merge that could not be attempted rather than throwing', async () => {
 		merge_mock.mockRejectedValue(new Error('fetch failed'))
 
-		expect(await run_ship_sync.sync_stage(ISSUE)).toMatchObject({ code: OK })
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toMatchObject({ code: OK })
+	})
+})
+
+// joshuafolkken/kit#4708: uncommitted work is committed locally before the merge, so a merge the guard
+// would refuse is not deferred past the gate and the reviews to the followup.
+describe('run_ship_sync.sync_stage — the local commit before the merge', () => {
+	it('commits uncommitted work without pushing, then merges in the sync stage', async () => {
+		tree.is_dirty = true
+		merge_mock.mockResolvedValue(MERGED)
+
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
+			code: OK,
+			out: MERGED_NOTE,
+		})
+		expect(commands()).toStrictEqual([LOCAL_COMMIT])
+		expect(josh_run_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			merge_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('stops in the sync stage on a conflict after the local commit', async () => {
+		tree.is_dirty = true
+		merge_mock.mockResolvedValue(CONFLICT)
+
+		const result = await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
+
+		expect(result.code).toBe(FAILED)
+		expect(result.conflicts).toStrictEqual(CONFLICTED)
+		expect(commands()).toStrictEqual([LOCAL_COMMIT])
+	})
+
+	it('stops before the merge when the local commit fails', async () => {
+		tree.is_dirty = true
+		josh_run_mock.mockResolvedValue(COMMIT_REFUSED)
+
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual(
+			COMMIT_REFUSED,
+		)
+		expect(merge_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_sync.sync_stage — a failed local commit after an overlap wait', () => {
+	it('keeps the overlap wait note ahead of a failed local commit', async () => {
+		tree.is_dirty = true
+		overlap_mock.mockResolvedValue(WAITED)
+		josh_run_mock.mockResolvedValue(COMMIT_REFUSED)
+
+		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
+			...COMMIT_REFUSED,
+			out: `${run_ship_overlap.note(WAITED)}\n${COMMIT_REFUSED.out}`,
+		})
+	})
+})
+
+describe('run_ship_sync.sync_stage — the local commit: no stash, nothing on a clean tree', () => {
+	it('never stashes around the merge', async () => {
+		tree.is_dirty = true
+
+		await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
+
+		expect(commands().flat()).not.toContain('stash')
+	})
+
+	it('commits nothing on a clean tree', async () => {
+		await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
+
+		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(merge_mock).toHaveBeenCalledOnce()
 	})
 })
 

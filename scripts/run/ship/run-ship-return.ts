@@ -151,9 +151,7 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 
 // A child that stopped more often than the cap allows is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
-async function parked(issue: string, stage: Stage, resume: ShipResume): Promise<ReturnOutcome> {
-	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
-
+async function parked(issue: string, reason: string): Promise<ReturnOutcome> {
 	if (await run_ship_relaunch_cap.park(issue, reason)) return 'parked'
 
 	note('the lane child was not relaunched past the ship-stop cap, and the park label was refused')
@@ -178,7 +176,9 @@ async function stopped(
 
 	if (lane === undefined) return 'recorded'
 
-	if (await run_ship_relaunch_cap.is_over(issue)) return await parked(issue, stage, resume)
+	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+
+	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason)
 
 	const context = await run_ship_stop_context.build(issue, output.body)
 	const stop = { stage, ...resume, context }

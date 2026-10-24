@@ -535,7 +535,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 
 <!-- /usage -->
 
-It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate never reaches the commit, and the report closes with the name of the stopped step.
+It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate never reaches the push (the sync before it commits locally), and the report closes with the name of the stopped step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run (branch-2 filing runs before `ship`), forwarded to `run:tail` after the closed issue.
 
