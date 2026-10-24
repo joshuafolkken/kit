@@ -1,7 +1,7 @@
 {
 	"reason": "The bounded retry for transient GitHub 5xx and connection failures in exec_gh_api is new behavior (#4717): the classifier, the backoff loop and their tests",
-	"date": "2026-10-23",
+	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 75
+		"scripts.code_lines": 79
 	}
 }

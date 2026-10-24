@@ -90,6 +90,14 @@ describe('gh_retry.is_transient', () => {
 		expect(is_transient(gh_error('error connecting to api.github.com'))).toBe(true)
 	})
 
+	it('does not retry a GraphQL error, which GitHub answered with a body and no status', () => {
+		const answered = Object.assign(new Error('failed'), { stdout: '{"errors":[{"message":"x"}]}' })
+
+		expect(
+			is_transient(gh_error('GraphQL: x (enablePullRequestAutoMerge)', undefined, answered)),
+		).toBe(false)
+	})
+
 	it('does not retry a 4xx read from the summary line', () => {
 		expect(is_transient(gh_error('gh: Validation Failed (HTTP 422)'))).toBe(false)
 	})

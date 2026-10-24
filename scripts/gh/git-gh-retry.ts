@@ -9,9 +9,11 @@ import { gh_failure } from './git-gh-failure'
 //
 // **Transient is a 5xx or a request that got no answer at all** — a dropped connection writes no
 // error document, so its status is `undefined`. A 4xx is the request's own fault and answers the same
-// the next time. Two failures without a status are still not retried: a timeout (it has already spent
-// a minute, and a write it killed may have landed — `GH_REQUEST_TIMEOUT_MS`'s note) and an error
-// `to_gh_error` never built (gh missing, a refused body), which no wait can change.
+// the next time. Three failures without a status are still not retried: a timeout (it has already
+// spent a minute, and a write it killed may have landed — `GH_REQUEST_TIMEOUT_MS`'s note), an error
+// `to_gh_error` never built (gh missing, a refused body), which no wait can change, and one that wrote
+// a body anyway — a GraphQL `errors` document is served with a 200, so it names no status and is
+// still GitHub's answer.
 //
 // **A retried write can land twice** when the first attempt reached GitHub before it failed. The
 // writes on this path tolerate it: a duplicate pull request is refused with the 422 the creator reads
@@ -54,8 +56,17 @@ function summary_status(error: Error): number | undefined {
 	return status === undefined ? undefined : Number(status)
 }
 
-function is_transient_status(status: number | undefined): boolean {
-	return status === undefined || status >= SERVER_ERROR_FLOOR
+// Whether the failed spawn wrote a response body: a request that got no answer at all wrote none.
+function has_answer(spawn_error: unknown): boolean {
+	if (!(spawn_error instanceof Error) || !('stdout' in spawn_error)) return false
+
+	return typeof spawn_error.stdout === 'string' && spawn_error.stdout.trim().length > 0
+}
+
+function is_transient_status(status: number | undefined, spawn_error: unknown): boolean {
+	if (status === undefined) return !has_answer(spawn_error)
+
+	return status >= SERVER_ERROR_FLOOR
 }
 
 // A spawn no wait can change: one it killed on its budget, or one gh refused before asking.
@@ -68,9 +79,9 @@ function is_transient(error: unknown): boolean {
 
 	if (failure === undefined || !(error instanceof Error)) return false
 
-	return (
-		!is_final_spawn(error.cause) && is_transient_status(failure.status ?? summary_status(error))
-	)
+	const status = failure.status ?? summary_status(error)
+
+	return !is_final_spawn(error.cause) && is_transient_status(status, error.cause)
 }
 
 function first_line(error: unknown): string {
