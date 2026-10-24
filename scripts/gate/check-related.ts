@@ -2,8 +2,14 @@
 import { fileURLToPath } from 'node:url'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
+import { gate_plan } from './gate-plan'
 
-const CHECKS: ReadonlyArray<string> = ['lint:related', 'test:related', 'cspell:dot']
+const CHECKS: ReadonlyArray<string> = [
+	'lint:related',
+	'test:related',
+	gate_plan.TYPE_CHECK_TARGET,
+	'cspell:dot',
+]
 
 interface CheckResult {
 	command: string

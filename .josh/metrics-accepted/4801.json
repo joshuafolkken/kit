@@ -1,0 +1,8 @@
+{
+	"reason": "check:related now runs the gate's type check: one shared TYPE_CHECK_TARGET constant, one CHECKS entry, and the chain-rule wording naming it",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 8,
+		"ai_cost.on_demand_bytes": 28
+	}
+}

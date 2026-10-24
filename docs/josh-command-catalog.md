@@ -10,7 +10,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh behavior` · `josh bh` | — | developer | files | Check the current run's recorded transcript against the behavior assertions (no model call) |
 | `josh bytes` · `josh by` | `<files...>` | developer | none | Print an agent-read document's byte size against its ceiling and the headroom left |
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
-| `josh check:related` · `josh cr` | — | developer | processes | Run related lint, unit and dotfile spelling checks in parallel |
+| `josh check:related` · `josh cr` | — | developer | processes | Run related lint, unit, type and dotfile spelling checks in parallel |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |

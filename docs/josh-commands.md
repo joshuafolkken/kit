@@ -181,7 +181,7 @@ pnpm josh cspell:dot   # includes dotfiles
 
 <!-- usage: check:related -->
 
-Run related lint, unit and dotfile spelling checks in parallel.
+Run related lint, unit, type and dotfile spelling checks in parallel.
 
 ```bash
 pnpm josh check:related
