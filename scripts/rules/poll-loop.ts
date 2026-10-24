@@ -23,8 +23,7 @@ import { bash_triggers } from './bash-triggers'
 // back on the run's self-restraint — the thing that let these loops through in the first place.
 
 // A `while` or `until` header, in either spelling a poll loop reaches for. The trailing whitespace is
-// what separates the keyword from a path that merely begins with it (`until.txt`); a `for` loop is out
-// by omission — it iterates a fixed list rather than probing a state.
+// what separates the keyword from a path that merely begins with it (`until.txt`).
 const LOOP_KEYWORD = /\b(?:while|until)\s/u
 // A `sleep` command with any argument — the pause between probes that makes a loop a poll rather than
 // a stream reader. Read anywhere in the line rather than at a command position, because the loop body
@@ -52,8 +51,36 @@ const PROBE_HEADERS: ReadonlyArray<RegExp> = [
 	String.raw`grep\s+-[A-Za-z]*q`,
 ].map((probe) => new RegExp(`${WHILE_HEADER}${probe}`, 'u'))
 
+// **A counted `for` that sleeps is a poll with a deadline** (joshuafolkken/kit#4800). A lane child
+// waited out a backgrounded reviewer with `for i in $(seq 1 30); do sleep 10; done`, and the
+// completion notification sat queued until the loop returned — the same held-back exit a `while` poll
+// costs, spelled as a count. A header that counts — `$(seq …)`, a `{1..N}` range, or `((…))` — has no
+// list to work through, so its `sleep` is the whole point. A `for` over a real list (`for f in *.ts`)
+// is ordinary work and passes, sleep or not. The `sleep` is read in the loop's body only — from the
+// header to its first `done` — so a counted loop beside an unrelated `sleep` is not a wait (review
+// round 1); a nested loop's inner `done` cuts the body short, which under-refuses and so fails safe.
+const COUNTED_FOR = new RegExp(
+	String.raw`${COMMAND_POSITION}for(?:\s*\(\(|\s+\w+\s+in\s+(?:\$\(\s*seq\b|\{\d+\.\.))`,
+	'u',
+)
+const THROUGH_FIRST_DONE = /^[\s\S]*?\bdone\b/u
+
 function is_state_wait(plain: string): boolean {
 	return UNTIL_HEADER.test(plain) || PROBE_HEADERS.some((header) => header.test(plain))
+}
+
+function is_counted_sleep(plain: string): boolean {
+	const header = COUNTED_FOR.exec(plain)
+
+	if (header === null) return false
+
+	const rest = plain.slice(header.index)
+
+	return SLEEP_COMMAND.test(THROUGH_FIRST_DONE.exec(rest)?.[0] ?? rest)
+}
+
+function is_sleeping_loop(plain: string): boolean {
+	return (LOOP_KEYWORD.test(plain) && SLEEP_COMMAND.test(plain)) || is_counted_sleep(plain)
 }
 
 // **A `while read … done < file` is a stream reader, not a poll**, even when its body sleeps to
@@ -80,18 +107,17 @@ function is_poll_loop(command: string): boolean {
 	if (is_stream_reader(plain)) return false
 	if (is_state_wait(plain)) return true
 
-	return LOOP_KEYWORD.test(plain) && SLEEP_COMMAND.test(plain)
+	return is_sleeping_loop(plain)
 }
 
 // The instruction in the shape a refusal can carry: why the command's exit is the thing to wait on,
 // and the one route that delivers that exit. The measurement behind it is in
 // `docs/maintainers/rule-delivery-rationale.md`.
 const POLL_LOOP_REASON =
-	"⛔ output poll loop: this hand-writes a `while`/`until` wait loop over a command's output, a " +
-	'marker file or a process, and the loop does not know when the command finished. Issue the long ' +
-	'command with `run_in_background` set and end the turn — its exit re-invokes you; for CI, ' +
-	'`pnpm josh followup` (`.claude/skills/workflow-commands/background-commands.md`). It fires on ' +
-	'every occurrence.'
+	'⛔ output poll loop: a `while`/`until` or counted `for` wait loop does not know when the command ' +
+	'finished. Use `run_in_background` and end the turn — its exit re-invokes you; a background ' +
+	'`Agent` is waited on by its completion notification (a lane child: single `sleep 20` calls); CI ' +
+	'by `pnpm josh followup` (`background-commands.md`). It fires on every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — waiting on the task exit is the *absence* of a loop, not a
@@ -106,7 +132,7 @@ const ROW = {
 		title: 'Output poll loop',
 		topic: '`.claude/skills/workflow-commands/background-commands.md`',
 		fires:
-			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process. Every occurrence",
+			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, or a counted `for` that sleeps. Every occurrence",
 		quiet: 'the command started with `run_in_background` — its exit ends the wait',
 	},
 }
