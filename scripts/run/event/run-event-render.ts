@@ -40,6 +40,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	heartbeat: { ja: '生存確認', en: 'heartbeat' },
 	'ship-launch': { ja: '出荷を開始', en: 'ship launched' },
 	'ship-stop': { ja: '出荷が停止', en: 'ship stopped' },
+	'relaunch-failed': { ja: '再起動に失敗', en: 'relaunch failed' },
 	filed: { ja: '起票', en: 'filed' },
 	note: { ja: '意見', en: 'note' },
 	'lane-phase': { ja: 'レーンの段階', en: 'lane phase' },

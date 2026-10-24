@@ -75,18 +75,28 @@ function cause(child: string, directory: string = process.cwd()): StallCause | u
 	return cause_of(run_ship_detach.read_result(repository, child), events, child)
 }
 
+function is_relaunch_failed(event: RunEvent): boolean {
+	return event.kind === run_event_stream.EVENT_KIND.RELAUNCH_FAILED
+}
+
 // Whether the ended ship was never answered: a session relaunched to fix a stop writes to the
 // transcript after it, so a transcript last written before the newest stop means no fix-up ran — its
-// broker or relaunch could not start. A ship with no stop at all ended abnormally only when its supervisor
-// died before reaching a stage.
+// broker or relaunch could not start. **A `relaunch-failed` after the stop reads it unanswered whatever the
+// mtime says** (joshuafolkken/kit#4765): the dispatch log's header is written before a spawn that may fail.
+// A ship with no stop at all ended abnormally only when its supervisor died before reaching a stage.
 function is_stop_unanswered(
 	ending: ShipEnding,
 	attempt: Events,
 	written_at: number | undefined,
 ): boolean {
-	const stop = attempt.findLast((event) => event.kind === run_event_stream.EVENT_KIND.SHIP_STOP)
+	const index = attempt.findLastIndex(
+		(event) => event.kind === run_event_stream.EVENT_KIND.SHIP_STOP,
+	)
+	const stop = attempt[index]
 
 	if (stop === undefined) return ending?.result === 'abnormal'
+
+	if (attempt.slice(index + 1).some((event) => is_relaunch_failed(event))) return true
 
 	return written_at !== undefined && written_at < Date.parse(stop.at)
 }

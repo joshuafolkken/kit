@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
+import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
@@ -59,6 +60,12 @@ type ReturnOutcome = 'relaunched' | 'returned' | 'recorded' | 'parked' | 'redisp
 // started nothing.
 type BrokerReply = 'started' | 'unreadable' | 'failed'
 
+// The broker's reply and, where it started nothing, the reason it gave.
+interface BrokerResult {
+	reply: BrokerReply
+	reason: string
+}
+
 // The failed stage's output, and its standard output alone where the stage kept it apart.
 type StageOutput = Pick<ShipSection, 'body' | 'out'>
 
@@ -85,14 +92,25 @@ function note(text: string): void {
 	process.stderr.write(`${text}\n`)
 }
 
-function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
+// **A relaunch that started nothing is recorded where `run:merge` reads it** (joshuafolkken/kit#4765): the
+// transcript's mtime cannot tell it from an answered stop, since the dispatch log's header is written
+// before the spawn. The reason is kept for the park a re-dispatch cap may end in.
+async function record_failed_relaunch(issue: string, reason: string): Promise<void> {
+	note(`the lane child could not be relaunched: ${reason}`)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.RELAUNCH_FAILED,
+		`${issue_cite.plain(issue)} could not be relaunched: ${reason}`,
+	)
+}
+
+async function relaunched(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
 	const phase = agent_role_profile.IMPLEMENTATION_PHASE
 	const result = lane_relaunch.relaunch(lane, invocation, phase, note)
 
 	if (result.kind === 'launched') return 'relaunched'
 
-	note(`the lane child could not be relaunched: ${result.note}`)
+	await record_failed_relaunch(lane.issue, result.note)
 
 	return 'recorded'
 }
@@ -100,17 +118,19 @@ function relaunched(lane: LaneInfo, stop: ShipStop): ReturnOutcome {
 // **A served lane's child is relaunched by its broker, not from here**: this supervisor descends from the
 // child's Bash tool, which Claude Code starts without the token, so a child started here could not sign
 // in where the token is the only credential (joshuafolkken/kit#3817).
-async function ask_broker(lane: LaneInfo, stop: ShipStop): Promise<BrokerReply> {
+async function ask_broker(lane: LaneInfo, stop: ShipStop): Promise<BrokerResult> {
 	const answer = await lane_session_broker.request(lane.directory, lane.issue, {
 		kind: 'relaunch',
 		stop,
 	})
 
-	if (answer.is_success) return 'started'
+	if (answer.is_success) return { reply: 'started', reason: '' }
 
 	note(`the lane broker did not start the lane child — ${answer.reason}`)
 
-	return lane_session_broker.is_unreadable(answer) ? 'unreadable' : 'failed'
+	const reply = lane_session_broker.is_unreadable(answer) ? 'unreadable' : 'failed'
+
+	return { reply, reason: answer.reason }
 }
 
 // The session of a broker serving the lane within `polls` seconds, other than `previous` — one that stopped
@@ -135,10 +155,10 @@ function polls_after(reply: BrokerReply): number {
 	return reply === 'unreadable' ? RELOAD_POLLS : SERVING_POLLS
 }
 
-function redispatch_note(reply: BrokerReply): string {
-	const cause = reply === 'unreadable' ? `${VERSION_MISMATCH_NOTE}: ` : ''
+function redispatch_reason(last: BrokerResult): string {
+	const cause = last.reply === 'unreadable' ? `${VERSION_MISMATCH_NOTE}: ` : ''
 
-	return `the lane child could not be relaunched: ${cause}the driver re-dispatches the issue`
+	return `${cause}the driver re-dispatches the issue — ${last.reason}`
 }
 
 // **A relaunch the broker failed is asked once more, of a new broker only, then handed to the driver**: a
@@ -149,15 +169,15 @@ function redispatch_note(reply: BrokerReply): string {
 // (joshuafolkken/kit#4733): its successor on the current code is waited for over a whole supervisor pass, and a
 // re-dispatch past that wait names the version mismatch.
 async function brokered(lane: LaneInfo, stop: ShipStop, server: string): Promise<ReturnOutcome> {
-	const reply = await ask_broker(lane, stop)
-	if (reply === 'started') return 'relaunched'
+	const first = await ask_broker(lane, stop)
+	if (first.reply === 'started') return 'relaunched'
 
-	const next = await await_server(lane, server, polls_after(reply))
+	const next = await await_server(lane, server, polls_after(first.reply))
 	// The reply the issue is handed to the driver on: the new broker's where one served the lane.
-	const last = next === undefined ? reply : await ask_broker(lane, stop)
-	if (last === 'started') return 'relaunched'
+	const last = next === undefined ? first : await ask_broker(lane, stop)
+	if (last.reply === 'started') return 'relaunched'
 
-	note(redispatch_note(last))
+	await record_failed_relaunch(lane.issue, redispatch_reason(last))
 
 	return 'redispatch'
 }
@@ -181,7 +201,7 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 	// the lane unserved at the stop, and a child started here cannot sign in on a token (joshuafolkken/kit#4344).
 	const server = await await_server(lane)
 
-	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
+	return server === undefined ? await relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
 // A child that stopped more often than the cap allows is parked instead of relaunched

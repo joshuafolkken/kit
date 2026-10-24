@@ -4,10 +4,10 @@ import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import type { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
-import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
 import { run_merge, type ChildOutcome, type EndingSignals } from './run-merge'
+import { run_merge_cap } from './run-merge-cap'
 import { run_merge_restart } from './run-merge-restart'
 import { run_merge_ship } from './run-merge-ship'
 import { run_merge_steps, type MergeContext } from './run-merge-steps'
@@ -36,16 +36,6 @@ function read_is_auth_failure(output: string | undefined): boolean {
 	return api_auth.is_auth_failed_transcript(run_ending.read_transcript(output))
 }
 
-async function child_outages(child: string): Promise<number> {
-	const events = await run_event_stream_emit.current_events()
-
-	return events.filter(
-		(event) =>
-			event.kind === run_event_stream.EVENT_KIND.OUTAGE &&
-			run_event_scope.issue_named(event) === child,
-	).length
-}
-
 // Why an unfinished child is re-dispatchable, or `undefined` when it is not. **Only an API outage adds
 // to the run-wide streak**: a host restart is over by the time the child is read (joshuafolkken/kit#4540),
 // and an unanswered ship stop reached the API (joshuafolkken/kit#3974).
@@ -61,18 +51,24 @@ async function retry_cause(
 }
 
 // An outage child is re-dispatched only so many times: one that ends the same way on every dispatch is
-// parked, since merges in other lanes reset the run-wide outage streak and would never stop it.
+// parked, since merges in other lanes reset the run-wide outage streak and would never stop it. Its park
+// says so (`run-merge-cap.ts`).
 async function read_retryable(
 	child: string,
 	output: string | undefined,
-): Promise<{ is_outage: boolean; is_streak_exempt: boolean }> {
+): Promise<Pick<EndingSignals, 'is_outage' | 'is_streak_exempt' | 'capped_note'>> {
 	const cause = await retry_cause(child, output)
 
 	if (cause === undefined) return { is_outage: false, is_streak_exempt: false }
 
-	const is_outage = (await child_outages(child)) < run_merge.CONSECUTIVE_OUTAGE_LIMIT
+	const events = await run_event_stream_emit.current_events()
+	const limit = run_merge.CONSECUTIVE_OUTAGE_LIMIT
 
-	return { is_outage, is_streak_exempt: is_outage && cause === 'exempt' }
+	if (run_merge_cap.outages(events, child) >= limit) {
+		return { is_outage: false, capped_note: run_merge_cap.note_of(events, child, limit) }
+	}
+
+	return { is_outage: true, is_streak_exempt: cause === 'exempt' }
 }
 
 // The timeline is read only for an OPEN, unparked child — the one classification a merged closing pull

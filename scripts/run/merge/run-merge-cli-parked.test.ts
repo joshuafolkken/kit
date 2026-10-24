@@ -12,6 +12,11 @@ const do_failed_mock = vi.hoisted(() => vi.fn())
 const do_merged_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
+const restart_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-merge-restart', () => ({
+	run_merge_restart: { is_host_restart: restart_mock },
+}))
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -85,6 +90,7 @@ beforeEach(() => {
 	do_merged_mock.mockReset().mockImplementation(run_merge_steps_fixture.record_merged)
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
+	restart_mock.mockReset().mockResolvedValue(false)
 })
 
 // joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
@@ -148,6 +154,24 @@ describe('run_merge_cli.merge_child — a park that gave no cause', () => {
 			'park',
 			`#${CHILD} parked (run:stalled: session unfinished)`,
 		)
+	})
+})
+
+// joshuafolkken/kit#4765: the cap's line reaches the park only when merge_child hands it to do_failed.
+describe('run_merge_cli.merge_child — a child the re-dispatch cap stopped', () => {
+	it('hands the cap line to the failed step', async () => {
+		const outage = { at: '2026-10-24T00:00:00.000Z', kind: 'outage', text: `#${CHILD} outage` }
+
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue([1, 2, 3].map((pos) => ({ ...outage, pos })))
+		do_failed_mock.mockResolvedValue({ carry: undefined, is_parked: true, waits: [] })
+
+		await run_merge_cli.merge_child(context())
+
+		const [handed] = do_failed_mock.mock.lastCall as [{ capped_note?: string }]
+
+		expect(handed.capped_note).toContain('re-dispatch cap (3) after 3 re-dispatches')
 	})
 })
 

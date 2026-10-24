@@ -103,6 +103,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/ship/run-ship-detach.ts', 1],
 	// The ship-stop cap's Telegram warning.
 	['run/ship/run-ship-relaunch-cap.ts', 1],
+	// The `relaunch-failed` event `run:merge` reads.
+	['run/ship/run-ship-return.ts', 1],
 	// The reviewer child's prompt, which an agent reads.
 	['run/ship/run-ship-review.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],

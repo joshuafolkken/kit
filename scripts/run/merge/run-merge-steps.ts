@@ -26,11 +26,11 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
-import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
+import type { StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
 import { run_merge } from './run-merge'
+import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
-import { run_merge_ship } from './run-merge-ship'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -75,6 +75,8 @@ interface MergeContext {
 	// The outage is not an API outage (`EndingSignals.is_streak_exempt`): re-dispatched, but not added
 	// to the streak.
 	is_streak_exempt?: boolean | undefined
+	// The per-child cap's park line (`EndingSignals.capped_note`).
+	capped_note?: string | undefined
 }
 
 interface FailedResult {
@@ -409,9 +411,7 @@ async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedR
 
 	if (waits.length > 0) return await do_waiting(ctx, waits)
 
-	const judged = cause ?? run_merge_ship.cause(ctx.child) ?? run_stalled.SESSION_UNFINISHED
-
-	return await park_failed(ctx, judged)
+	return await park_failed(ctx, run_merge_cap.park_cause(ctx.child, cause, ctx.capped_note))
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
