@@ -128,12 +128,13 @@ function report_under_threshold(): number {
 }
 
 // **A ship reviewer takes no cut, of either phase** (joshuafolkken/kit#3623). Its supervisor is waiting
-// on the findings file it has yet to write, so a relaunch would stand a second child in the lane beside
+// on the findings it has yet to submit, so a relaunch would stand a second child in the lane beside
 // the one the supervisor repairs with. Answered `not-a-lane`, the verdict that already means "nothing
-// was cut and this process carries on".
+// was cut and this process carries on". The message names no sink: its review prompt says whether it
+// submits through `review:submit` or, on a lane that predates it, writes a path (joshuafolkken/kit#4799).
 function report_reviewer(): number {
 	console.error(
-		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Write the findings file and finish the review in this process.',
+		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Finish the review in this process and submit its findings the way your review prompt says.',
 	)
 
 	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
