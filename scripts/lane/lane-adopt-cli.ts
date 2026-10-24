@@ -42,7 +42,9 @@ function outcome_text(adoption: Adoption): string {
 	return `recorded open — ${lane_adopt.facts_text(adoption.facts)}`
 }
 
-// Adopt one lane, report it, and put an adoption on the run's event stream as `lane:pause` puts a pause.
+// Adopt one lane, report it, and put an adoption on the run's event stream as a note, as
+// `backlog-drive-adopt.ts` does: a `lane-state` line would reset the once-per-episode paused-lanes
+// notice (`backlog-drive-paused.ts`) though no paused lane changed.
 async function settle(lane: LaneInfo, records: LaneRecords): Promise<Adoption> {
 	const adoption = await lane_adopt.adopt(lane, records)
 	const { ADOPT_COMMAND } = lane_adopt
@@ -51,7 +53,7 @@ async function settle(lane: LaneInfo, records: LaneRecords): Promise<Adoption> {
 	if (adoption.kind !== 'adopted') return adoption
 
 	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.LANE_STATE,
+		run_event_stream.EVENT_KIND.NOTE,
 		`${issue_cite.plain(lane.issue)} adopted by ${ADOPT_COMMAND}`,
 	)
 

@@ -67,7 +67,7 @@ describe('lane_adopt_cli.run — one lane', () => {
 			),
 		)
 		expect(emit).toHaveBeenCalledWith(
-			run_event_stream.EVENT_KIND.LANE_STATE,
+			run_event_stream.EVENT_KIND.NOTE,
 			'#4744 adopted by lane:adopt',
 		)
 	})
