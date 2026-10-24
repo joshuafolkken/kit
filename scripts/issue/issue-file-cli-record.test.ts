@@ -1,5 +1,6 @@
 import { git_command } from '#scripts/git/git-command'
-import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
+import { issue_file_interrupt } from '#scripts/issue/issue-file-interrupt'
+import { INTERRUPT_ROUTE_LABEL, SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -21,6 +22,7 @@ const emit = vi.spyOn(run_event_stream_emit, 'emit')
 const branch = vi.spyOn(git_command, 'branch')
 const is_run_member = vi.spyOn(run_hold_member, 'is_run_member')
 const record_child = vi.spyOn(split_resolution, 'record_child')
+const block_finder = vi.spyOn(issue_file_interrupt, 'block_finder')
 
 function filing_to(target: string): Filing {
 	const args = {
@@ -35,6 +37,7 @@ function filing_to(target: string): Filing {
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,
+		is_blocking_finder: false,
 	}
 
 	return { args, body: '', target, current: HERE }
@@ -45,6 +48,7 @@ beforeEach(() => {
 	branch.mockResolvedValue('main')
 	is_run_member.mockResolvedValue(false)
 	record_child.mockResolvedValue()
+	block_finder.mockResolvedValue()
 	vi.stubEnv(lane_child_marker.KEY, undefined)
 })
 
@@ -70,6 +74,25 @@ describe('issue_file_cli.record — a split child', () => {
 			route: SPLIT_ROUTE_LABEL,
 			found_during: FINDER,
 			child: '#3438',
+		})
+	})
+})
+
+// joshuafolkken/kit#4768: an interrupt filing hands its finder to the blocked-by record.
+describe('issue_file_cli.record — an interrupt', () => {
+	it('hands the route, the flag, the finder and the filed number to the blocked-by record', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		const filing = filing_to(HERE)
+		const args = { ...filing.args, route: INTERRUPT_ROUTE_LABEL, is_blocking_finder: true }
+
+		await issue_file_cli.record(URL, { ...filing, args }, [])
+
+		expect(block_finder).toHaveBeenCalledExactlyOnceWith({
+			route: INTERRUPT_ROUTE_LABEL,
+			is_blocking_finder: true,
+			found_during: FINDER,
+			blocker: 3438,
+			is_here: true,
 		})
 	})
 })

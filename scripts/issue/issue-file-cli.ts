@@ -21,6 +21,7 @@ import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_fold } from './issue-file-fold'
+import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
@@ -31,20 +32,21 @@ import { size_estimate } from './size-estimate'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
-// [--release]` — file an Issue with every filing step run in order: the third-party refusal, the body
+// [--release] [--blocks-finder]` — file an Issue with every filing step run in order: the third-party refusal, the body
 // lint, the size estimate against the split guide, the `## Origin` check for another repository, the `auto-ok` decision
 // with the run label it owes, the start condition read as a pull request, the filing cap per origin,
 // the fold question against the run's earlier
 // filings, the WIP cap count, the
 // duplicate scout, the missing workflow labels created, the create call
-// carrying every label, the release link on `--release`, and `epic:bundle`.
+// carrying every label, a blocking interrupt's finder recorded as blocked by it, the release link on
+// `--release`, and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -258,6 +260,13 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 	await split_resolution.record_child({ route: filing.args.route, found_during, child: reference })
+	await issue_file_interrupt.block_finder({
+		route: filing.args.route,
+		is_blocking_finder: filing.args.is_blocking_finder,
+		found_during,
+		blocker: issue_number_of(url),
+		is_here: issue_file.is_same_repository(filing.target, filing.current),
+	})
 }
 
 function is_admitted(filing: Filing): boolean {

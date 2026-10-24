@@ -47,6 +47,9 @@ interface FileArguments {
 	// `--release`: the change reaches a consumer only once published, so the Issue is linked to the
 	// repository's release Issue as a blocker (`issue-release-cli.ts`).
 	is_release: boolean
+	// `--blocks-finder`: an interrupt the finder cannot go on without, so the finder is recorded as
+	// blocked by it (`issue-file-interrupt.ts`). An interrupt that blocks nobody omits it (`wip-cap.md`).
+	is_blocking_finder: boolean
 }
 
 const OPTIONS = {
@@ -59,6 +62,7 @@ const OPTIONS = {
 	'over-cap': { type: 'boolean' },
 	'no-auto-ok': { type: 'boolean' },
 	release: { type: 'boolean' },
+	'blocks-finder': { type: 'boolean' },
 } as const
 
 // The label a `--route` value names, or `undefined` when it names none — read against the route
@@ -138,6 +142,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		is_over_cap: values['over-cap'] === true,
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,
 		is_release: values.release === true,
+		is_blocking_finder: values['blocks-finder'] === true,
 	}
 }
 
