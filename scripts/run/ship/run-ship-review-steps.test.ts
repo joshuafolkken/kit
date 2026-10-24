@@ -66,7 +66,6 @@ const DECIDE = 'review:round2 --round-1-closed --json'
 const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
-const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
@@ -90,7 +89,7 @@ async function stage(): Promise<unknown> {
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	answer_with(undefined)
-	launch.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
+	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	review_in_mock.mockReset().mockReturnValue({
 		kind: 'argv',
 		argv: ARGV,
