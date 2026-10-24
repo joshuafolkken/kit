@@ -1,12 +1,12 @@
 import { json_value } from '#scripts/lib/json-value'
 import { time_reported_failure } from '#scripts/time-runtime/time-reported-failure'
 import { z } from 'zod'
-import { filing_cap } from './filing-cap'
+import { turn_filings } from './turn-filings'
 
 // The person's prompts on a transcript tail — what the stop guard reads to tell a question it answers
 // and the pause a recorded notify belongs to.
 //
-// **A prompt is `filing_cap`'s prompt line, minus what the harness wrote there.** A skill's body is a
+// **A prompt is `turn_filings`' prompt line, minus what the harness wrote there.** A skill's body is a
 // `user` line with no tool result too, but it carries `isMeta`; a background task's completion notice
 // and a subagent's hand-back carry an `origin` whose `kind` is not `human`. Each is the harness
 // speaking, not the person, so only a line with no `origin` (an SDK prompt) or a `human` one is read.
@@ -51,7 +51,7 @@ function person_text(line: string): string | undefined {
 // notification, a subagent's hand-back), so a question asked turns ago does not answer for a stop the
 // run reached on its own since (`stop-decision.ts` → `is_question`).
 function turn_prompt(tail: string): string {
-	const opener = tail.split('\n').findLast((line) => filing_cap.is_prompt_line(line))
+	const opener = tail.split('\n').findLast((line) => turn_filings.is_prompt_line(line))
 	if (opener === undefined) return NO_PROMPT
 
 	return person_text(opener) ?? NO_PROMPT
@@ -61,7 +61,7 @@ function turn_prompt(tail: string): string {
 function prompt_time(tail: string): string | undefined {
 	return tail
 		.split('\n')
-		.filter((line) => filing_cap.is_prompt_line(line))
+		.filter((line) => turn_filings.is_prompt_line(line))
 		.map((line) => person_line(line)?.timestamp ?? undefined)
 		.findLast((time) => time !== undefined)
 }

@@ -44,7 +44,7 @@ with `pnpm josh issue:file`, which scouts first — an **open** candidate coveri
 `- 人の判断: 不要`, so `issue:file` applies the label (with the run label
 `prompts/collaboration-workflow/issue-template.md` requires). **`backlogrun-steps.md` → "What one
 invocation approves" is that judgement's single source.** Every brake still counts these filings: the
-ten-per-run ceiling, the WIP cap, `--max` and the 135,000-token session budget.
+ten-per-origin ceiling (one retrospective is one origin), the WIP cap, `--max` and the 135,000-token session budget.
 
 **Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the
 carry record so `run:step` prints `stop` from then on; the mark survives a session cut and is removed at

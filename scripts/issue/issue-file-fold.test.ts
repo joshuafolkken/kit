@@ -20,7 +20,7 @@ const HERE = ''
 const THERE = 'owner/dep'
 const CURRENT = 'joshuafolkken/kit'
 const NONE: ReadonlyArray<number> = []
-const PLAIN = { route: undefined, distinct: NONE }
+const PLAIN = { route: undefined, distinct: NONE, found_during: undefined }
 
 function state_read(state: string): StateRead {
 	return { kind: 'state', state: { state, labels: [], is_human_review: false } }
@@ -105,6 +105,11 @@ describe('issue_file_fold.finder — whose work turned the finding up', () => {
 		expect(await issue_file_fold.finder()).toBe(FINDER)
 	})
 
+	// joshuafolkken/kit#4750: `--found-during` names the origin over the mark.
+	it('is the Issue the filing names over the lane child’s mark', async () => {
+		expect(await issue_file_fold.finder('77')).toBe('77')
+	})
+
 	it('is the Issue the branch names outside a lane', async () => {
 		vi.stubEnv(lane_child_marker.KEY, undefined)
 		branch.mockResolvedValue('3423-let-issue-file-fold')
@@ -149,9 +154,7 @@ describe('issue_file_fold.is_fold_clear — the verdict at the call that files',
 	})
 
 	it('clears a second filing that declares the earlier one distinct', async () => {
-		expect(
-			await issue_file_fold.is_fold_clear(HERE, { route: undefined, distinct: [EARLIER] }),
-		).toBe(true)
+		expect(await issue_file_fold.is_fold_clear(HERE, { ...PLAIN, distinct: [EARLIER] })).toBe(true)
 	})
 })
 
@@ -173,7 +176,7 @@ describe('issue_file_fold.is_fold_clear — which earlier filings it reads', () 
 	})
 
 	it('clears a split child without reading the stream, as the split assessment decided it', async () => {
-		const split = { route: SPLIT_ROUTE_LABEL, distinct: NONE }
+		const split = { ...PLAIN, route: SPLIT_ROUTE_LABEL }
 
 		expect(await issue_file_fold.is_fold_clear(HERE, split)).toBe(true)
 		expect(all_events).not.toHaveBeenCalled()

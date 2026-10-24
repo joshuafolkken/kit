@@ -31,6 +31,7 @@ function filing_to(target: string): Filing {
 		labels: [],
 		repo: target,
 		distinct: [],
+		found_during: undefined,
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,

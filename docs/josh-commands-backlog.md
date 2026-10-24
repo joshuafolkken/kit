@@ -113,7 +113,7 @@ Duplicates are scored by title token overlap: ≥2 significant shared words and 
 
 <!-- usage: issue:file -->
 
-File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle.
+File an Issue with every filing step: lint, Origin, filing cap, fold, WIP cap, duplicate scout, labels, then epic:bundle.
 
 ```bash
 pnpm josh issue:file "<title>" --body-file body.md
@@ -128,7 +128,8 @@ pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
-- `--over-cap` — the run is blocked by this filing; the cap lets it through.
+- `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 5).
+- `--over-cap` — the run is blocked by this filing; the WIP cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 
@@ -143,7 +144,7 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
    A `- 規模見積もり:` over the split guide on both axes ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件:` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
 4. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
-5. On a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
+5. Refuse an origin's eleventh filing (origin: `--found-during <N>`, else the lane or branch issue; none: the run invocation), counted from its `filed` events. Then, on a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. File nothing until every candidate is named in `--distinct`; a duplicate is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the search and the epic decision run there.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
@@ -151,7 +152,7 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
 
-A refusal in steps 1–7 files nothing and exits 1. The per-run filing cap (`filing-cap`) applies to calls of this command; a refused call is not counted. No delivered rule refuses the call ahead of the WIP cap and fold steps.
+A refusal in steps 1–7 files nothing and exits 1, and a filing that files nothing is never counted toward the cap. No delivered rule refuses the call ahead of the filing cap, WIP cap and fold steps.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:file` in detail".
 

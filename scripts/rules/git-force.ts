@@ -15,7 +15,7 @@ import { shell_segments } from './shell-segments'
 //
 // **It fires on every occurrence, not once per run.** A force push is destructive every time it is
 // issued, so refused-once-and-free-after would put the second one back on the run's self-restraint —
-// the disposition `run-tail-rule.ts` and `filing-cap.ts` take for the same reason.
+// the disposition `run-tail-rule.ts` takes for the same reason.
 
 // A force push. The long forms all open with `--force` (`--force`, `--force-with-lease[=ref]`,
 // `--force-if-includes`); `-f` and any cluster carrying `f` are the short forms; a bare `--delete` and
@@ -84,7 +84,7 @@ const GIT_FORCE_REASON =
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — not force-pushing is the absence of a call, not a call, so the
-// row is reported unmeasured rather than scored on an act that does not exist (`filing-cap.ts`).
+// row is reported unmeasured rather than scored on an act that does not exist.
 const ROW = {
 	id: 'git-force',
 	is_trigger: bash_triggers.on_bash_command(is_force_or_delete),

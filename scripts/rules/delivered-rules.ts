@@ -10,7 +10,6 @@ import { direct_issue_comment } from './direct-issue-comment'
 import { direct_issue_read } from './direct-issue-read'
 import { early_heartbeat } from './early-heartbeat'
 import { file_body } from './file-body'
-import { filing_cap } from './filing-cap'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
@@ -121,13 +120,12 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// Before every first-party row: a credential is refused whatever the call's other faults, and the
 	// commands those rows point at run the same scan in-process.
 	credential_body.ROW,
-	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
-	// question are `issue:file`'s own steps, so no row gates them.
+	// The direct call only. The filing cap, the WIP cap and the fold question are `issue:file`'s own
+	// steps, so no row gates them.
 	direct_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
 	direct_issue_comment.ROW,
-	filing_cap.ROW,
 	// Before `issue-comments`, whose rewrite would add the unfiltered comments to the same read.
 	direct_issue_read.ROW,
 	issue_comments.ROW,
@@ -377,7 +375,6 @@ const delivered_rules = {
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
 	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
 	DIRECT_FILING_REASON: direct_filing.DIRECT_FILING_REASON,
-	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,

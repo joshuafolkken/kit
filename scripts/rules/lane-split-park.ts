@@ -17,7 +17,7 @@ import { tail_commands } from './tail-commands'
 // carries `epic` as a split (`run-merge.ts`), so the label is never what tells it.
 //
 // **The material is the run's own calls.** The promotion is a `josh epic --promote <N>` this run issued,
-// read off the transcript tail as `filing-cap.ts` reads its filings — a tool call, never prose, so a
+// read off the transcript tail as `turn-filings.ts` reads its filings — a tool call, never prose, so a
 // child that merely read a document quoting the command is not mistaken for one that ran it. Only a
 // promotion of the dispatched issue counts: the epic a mid-run split promotes is the child's own Issue.
 

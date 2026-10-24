@@ -81,7 +81,6 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'parent-cut': judgment(ANOTHER_COMMAND),
 	'issue-watch': judgment(ANOTHER_COMMAND),
 	'third-party-write': judgment(NO_RUN),
-	'filing-cap': judgment(NO_RUN),
 	'git-force': judgment(NO_RUN),
 	'worktree-mutation': judgment(NO_RUN),
 	'index-mutation': judgment(NO_RUN),
