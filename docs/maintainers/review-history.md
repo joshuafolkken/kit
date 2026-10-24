@@ -70,7 +70,9 @@ edits to `.ts` / `.js` / `.svelte` (joshuafolkken/kit#3826). Round 2 ran in 41 o
 a median 4.8 minutes to a lane's critical path. **What goes unread is only the fix**: round 1 still
 reviews the documentation or prompt change in full, and its findings are still fixed. A comment-only
 edit is measured, not judged — the round-1 brief also records a comment-free digest of each source file,
-and equal digests mean equal code.
+and equal digests mean equal code. joshuafolkken/kit#4842 added the metrics approvals under
+`.josh/metrics-accepted/`: the ship's pre-detach re-record rewrites them after round 1, and the gate's
+metrics step checks them.
 
 ## The rejected wider skips
 

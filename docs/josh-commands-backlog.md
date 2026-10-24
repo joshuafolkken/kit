@@ -875,7 +875,7 @@ pnpm josh review:round2 --json             # the verdict and the reason, machine
 
 <!-- /usage -->
 
-Run it after round 1's fixes. `skip` when the fix delta is empty or touches only inert paths (docs, prompts, comment-only code); `required` otherwise. Full reasoning: `prompts/review.md`.
+Run it after round 1's fixes. `skip` when the fix delta is empty or touches only inert paths (docs, prompts, `josh metrics` approvals, comment-only code); `required` otherwise. Full reasoning: `prompts/review.md`.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:round2` in detail".
 
