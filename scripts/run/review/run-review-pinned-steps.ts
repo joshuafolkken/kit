@@ -22,7 +22,13 @@ const LAUNCH_PREFIX = 'josh-run-review-pinned-launch-'
 const LOG_PREFIX = 'josh-run-review-pinned-log-'
 const MS_PER_SECOND = 1000
 const LOST_NOTE = 'its process ended without an answer'
-const TIMED_OUT_NOTE = `no answer within ${String(run_review_steps.MAX_JOIN_WAIT_MS / MS_PER_SECOND)}s`
+const STOP_SIGNAL = 'SIGTERM'
+
+// The join waits here only once the gate has settled and the review has returned, so the grace is
+// counted from the end of the pair (joshuafolkken/kit#4794). A check this far behind it is one the
+// CPU starved, and a longer wait would end in the same not-run answer, minutes later.
+const GRACE_MS = 120_000
+const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 
 type Clock = () => number
 
@@ -92,19 +98,35 @@ function read_answer(root: string, { pid, token }: Launch): PinnedSummary | unde
 	)
 }
 
-// The check usually settles while the review is still running; the cap only bounds one that hung,
-// which fails open rather than blocking for ever.
+// The launch is detached, so its pid leads a process group holding the `josh` process and its Vitest
+// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held. A pid
+// already gone is left alone, so a reissued one is never signalled.
+function stop({ pid }: Launch): void {
+	if (process_identity.is_same_process(pid, undefined) === false) return
+
+	try {
+		process.kill(-pid, STOP_SIGNAL)
+	} catch {
+		// It ended between the check and the signal; there is nothing left to stop.
+	}
+}
+
+// The check usually settles while the review is still running; the grace only bounds one that fell
+// far behind the pair, which fails open and is stopped rather than left burning the cores.
 async function poll_answer(root: string, launched: Launch, now: Clock): Promise<PinnedSummary> {
 	const started = now()
 	let summary = read_answer(root, launched)
 
-	while (summary === undefined && now() - started < run_review_steps.MAX_JOIN_WAIT_MS) {
+	while (summary === undefined && now() - started < GRACE_MS) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(run_review_steps.POLL_INTERVAL_MS)
 		summary = read_answer(root, launched)
 	}
 
-	return summary ?? test_pinned_record.not_run_summary(new Error(TIMED_OUT_NOTE))
+	if (summary !== undefined) return summary
+	stop(launched)
+
+	return test_pinned_record.not_run_summary(new Error(TIMED_OUT_NOTE))
 }
 
 // `undefined` when no check was launched.

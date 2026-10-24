@@ -1,0 +1,7 @@
+{
+	"reason": "#4794: the join's test:pinned grace stops a late check, and base-tree removes its trees when that stop terminates it",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 29
+	}
+}

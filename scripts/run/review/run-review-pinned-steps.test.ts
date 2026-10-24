@@ -11,9 +11,11 @@ import { run_review_steps } from './run-review-steps'
 const ROOT = `/nonexistent/run-review-pinned-${randomUUID()}`
 const PID = 4770
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned_count: 1 }
-const CAP_PASSED = run_review_steps.MAX_JOIN_WAIT_MS + 1
+// The join's grace after the pair, in milliseconds.
+const GRACE_MS = 120_000
+const CAP_PASSED = GRACE_MS + 1
 
-// A clock that reads 0 when the wait starts and past the cap on every read after it.
+// A clock that reads 0 when the wait starts and past the grace on every read after it.
 function capped_clock(): () => number {
 	let reads = 0
 
@@ -33,6 +35,8 @@ function launched_token(): string {
 
 beforeEach(() => {
 	vi.spyOn(run_review_steps, 'launch_josh').mockReturnValue({ kind: 'launched', pid: PID })
+	// A wait that passes the grace signals `PID`'s group; no test may reach a real process.
+	vi.spyOn(process, 'kill').mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -128,13 +132,46 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 		})
 	})
 
-	it('fails open on a check still running past the cap', async () => {
+	it('fails open on a check still running past the grace after the pair', async () => {
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
 		run_review_pinned_steps.launch(ROOT)
 
 		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
 
 		expect(answer?.unpinned_count).toBe(0)
-		expect(answer?.text).toContain('no answer within 600s')
+		expect(answer?.text).toContain('no answer within 120s of the gate and the review')
+	})
+})
+
+describe('run_review_pinned_steps.wait_for_answer — stopping a late check', () => {
+	it("stops the check's whole process group once the grace has passed", async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		run_review_pinned_steps.launch(ROOT)
+
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+	})
+
+	it('stops nothing when the check answered within the grace', async () => {
+		run_review_pinned_steps.launch(ROOT)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(answer).toStrictEqual(ANSWER)
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+
+	it('signals nothing once the check is gone, so a reissued pid is never hit', async () => {
+		const is_same = vi.spyOn(process_identity, 'is_same_process').mockReturnValue(false)
+
+		is_same.mockReturnValueOnce(undefined)
+		vi.spyOn(test_pinned_record, 'read').mockReturnValue(undefined)
+		run_review_pinned_steps.launch(ROOT)
+
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(process.kill).not.toHaveBeenCalled()
 	})
 })
