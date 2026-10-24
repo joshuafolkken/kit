@@ -51,6 +51,9 @@ const action_schema = z.discriminatedUnion('kind', [
 		.strict(),
 	z.object({ kind: z.literal('relaunch'), stop: stop_schema }).strict(),
 ])
+const request_schema = z
+	.object({ session: z.uuid(), nonce: z.uuid(), action: action_schema })
+	.strict()
 type ReviewRound = Extract<z.infer<typeof action_schema>, { kind: 'review' }>['round']
 
 interface ReviewAction {
@@ -206,7 +209,14 @@ async function answer(lane: LaneInfo, action: BrokerAction): Promise<BrokerAnswe
 	}
 }
 
-const lane_session_action = { SUCCESS, action_schema, answer, failure, review_paths }
+const lane_session_action = {
+	SUCCESS,
+	action_schema,
+	answer,
+	failure,
+	request_schema,
+	review_paths,
+}
 
 export type { BrokerAction, BrokerAnswer, ReviewRound }
 export { lane_session_action }

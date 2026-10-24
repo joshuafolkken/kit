@@ -1,0 +1,7 @@
+{
+	"reason": "#4732 adds the fresh-process reread of a request the lane broker's loaded schema refuses (new lane-session-reread module and its entry)",
+	"date": "2026-10-23",
+	"growth": {
+		"scripts.code_lines": 50
+	}
+}
