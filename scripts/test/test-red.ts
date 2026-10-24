@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs'
-import { readFile, rm } from 'node:fs/promises'
+import { readFile, realpath, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_location_environment } from '#scripts/git/git-location-environment'
 import { execa } from 'execa'
-import { test_red_logic, type RedVerdict } from './test-red-logic'
+import { test_red_logic, type RedProbe, type RedVerdict } from './test-red-logic'
 import { vitest_cache_directory } from './vitest-cache-directory'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
@@ -49,12 +49,13 @@ async function read_report(report: string): Promise<string> {
 // `josh test:pinned`. `--passWithNoTests` keeps "the filter matched nothing" from reading as a
 // failure, and the JSON report — written beside the tree, never into it — says whether anything ran at
 // all, so a file the old config excludes is `no-test` rather than a `green` that refuses a correct fix.
-// A test that ran and broke, or a file that could not load against the old code, makes it `red`. The
-// report is removed first, so a run that writes none never reads the one before it.
-async function verdict_in(
+// A test that ran and broke, or a file that could not load against the old code, makes it `red`, and
+// the files it broke in come back beside the verdict. The report is removed first, so a run that writes
+// none never reads the one before it.
+async function probe_in(
 	{ parent, tree }: BaseTree,
 	selection: ReadonlyArray<string>,
-): Promise<RedVerdict> {
+): Promise<RedProbe> {
 	const report = path.join(parent, REPORT_NAME)
 	const vitest_args = [...selection, '--passWithNoTests', ...reporter_arguments(report)]
 
@@ -68,16 +69,22 @@ async function verdict_in(
 		extendEnv: true,
 		reject: false,
 	})
-	const ran = test_red_logic.ran_file_count(await read_report(report))
+	const text = await read_report(report)
+	const ran = test_red_logic.ran_file_count(text)
 
-	return test_red_logic.verdict_for(ran, result.exitCode !== 0)
+	return {
+		verdict: test_red_logic.verdict_for(ran, result.exitCode !== 0),
+		failed: test_red_logic.failed_files(text, [tree, await realpath(tree)]),
+	}
 }
 
 async function verdict_on(base: string, files: ReadonlyArray<string>): Promise<RedVerdict> {
 	return await base_tree.with_tree(TREE_PREFIX, base, async (pre_fix) => {
 		await base_tree.copy_in(pre_fix.tree, files)
 
-		return await verdict_in(pre_fix, ['run', ...files])
+		const probe = await probe_in(pre_fix, ['run', ...files])
+
+		return probe.verdict
 	})
 }
 
@@ -110,12 +117,12 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	return 0
 }
 
-// Whether the checkout has the Vitest `verdict_in` runs; without it every run would read `no-test`.
+// Whether the checkout has the Vitest `probe_in` runs; without it every run would read `no-test`.
 function has_runner(): boolean {
 	return existsSync(VITEST_BIN)
 }
 
-const test_red = { has_runner, main, run, verdict_in }
+const test_red = { has_runner, main, probe_in, run }
 
 export type { RedRun }
 export { test_red }

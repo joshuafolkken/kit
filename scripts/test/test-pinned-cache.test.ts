@@ -9,9 +9,9 @@ import { test_red } from './test-red'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4706: `josh test:pinned` (and `josh run:review`, which calls the same `run`) reuses
-// a hunk's stored verdict — a pinned one while the whole change is the same, an unpinned one while no
-// test file changed — and spreads the rest over as many trees as the worker budget allows, with the
-// verdicts a serial run gives.
+// a hunk's stored verdict — a pinned one while the code change and the test it failed in are the same
+// (joshuafolkken/kit#4790), an unpinned one while no test file changed — and spreads the rest over as
+// many trees as the worker budget allows, with the verdicts a serial run gives.
 
 const RUN_TIMEOUT = 240_000
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'
@@ -81,7 +81,7 @@ describe('test_pinned.run with a stored verdict', () => {
 		async () => {
 			await build_change_branch()
 			const first = await run_report()
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			const second = await run_report()
 
@@ -98,7 +98,7 @@ describe('test_pinned.run with a stored verdict', () => {
 			const first = await run_report()
 
 			await write(OUTSIDE_FILE, 'export const outside = 1\n')
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			const report = await run_report()
 
@@ -116,7 +116,7 @@ describe('test_pinned.run after a hunk changed', () => {
 			await build_change_branch()
 			await run_report()
 			await write(DRIVER_FILE, CHANGED_DRIVER.replace("'--driver'", "'--drive'"))
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			const report = await run_report()
 
@@ -138,7 +138,7 @@ describe('test_pinned.run after a source between the test and the hunk changed',
 
 			expect(locations(first)).toEqual([UNPINNED_HUNK])
 
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			expect(await run_report()).toEqual(first)
 			expect(runs).not.toHaveBeenCalled()
@@ -154,12 +154,35 @@ describe('test_pinned.run after a source between the test and the hunk changed',
 
 describe('test_pinned.run after a test file is added', () => {
 	it(
+		'checks the unpinned hunk again but keeps the pinned one, whose failed test is unchanged',
+		async () => {
+			await build_change_branch()
+			const first = await run_report()
+
+			await write(EXTRA_TEST, extra_test('runs'))
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			const report = await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(1)
+			expect(report).toEqual(first)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#4790: a pinned hunk rests on the test file it failed in.
+describe('test_pinned.run after the test a pinned hunk failed in changed', () => {
+	it(
 		'checks every hunk again',
 		async () => {
 			await build_change_branch()
 			await run_report()
-			await write(EXTRA_TEST, extra_test('runs'))
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			await write(
+				test_pinned_fixture.TEST_FILE,
+				`${test_pinned_fixture.DEFAULT_PATH_TEST}\nit('runs', () => {})\n`,
+			)
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()
 
@@ -192,19 +215,19 @@ describe('test_pinned.run over parallel trees', () => {
 
 describe('test_pinned.run after an existing test file changed', () => {
 	it(
-		'checks every hunk again, the unpinned one included, which any test may have come to reach',
+		'checks the unpinned hunk again, which any test may have come to reach, but keeps the pinned one',
 		async () => {
 			await build_change_branch()
 			await write(EXTRA_TEST, extra_test('runs'))
 			const first = await run_report()
 
 			await write(EXTRA_TEST, extra_test('runs again'))
-			const runs = vi.spyOn(test_red, 'verdict_in')
+			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()
 
 			expect(first.unpinned).toHaveLength(1)
-			expect(runs).toHaveBeenCalledTimes(2)
+			expect(runs).toHaveBeenCalledTimes(1)
 		},
 		RUN_TIMEOUT,
 	)

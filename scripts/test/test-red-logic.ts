@@ -1,3 +1,4 @@
+import node_path from 'node:path'
 import { issue_bug_label } from '#scripts/issue/issue-bug-label'
 import { json_value } from '#scripts/lib/json-value'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
@@ -12,6 +13,12 @@ import { test_declared_logic } from './test-declared-logic'
 // of them has to fail there.
 
 type RedVerdict = 'red' | 'green' | 'no-test' | 'test-only'
+
+// One run's verdict and the test files that failed in it.
+interface RedProbe {
+	verdict: RedVerdict
+	failed: ReadonlyArray<string>
+}
 
 // The declaration a bug-fix Issue carries under its background heading, in the same slot as the
 // behavior-change declaration (`behavior-change-lint.ts`). Read from the declaration, never inferred,
@@ -55,6 +62,33 @@ function ran_file_count(report: string): number {
 	return json_value.parse_with(report, REPORT_SCHEMA)?.testResults.length ?? 0
 }
 
+// The test files a run failed in, as `josh test:pinned` stores them beside a `red` verdict
+// (joshuafolkken/kit#4790). Vitest names each by its absolute path, under the tree's own path or its real
+// one — a macOS temporary directory sits behind `/var` → `/private/var` — so each is read relative to the
+// first of `roots` it sits under. An unreadable report fails none.
+const RESULT_SCHEMA = z.object({ name: z.string(), status: z.string() })
+const RESULTS_SCHEMA = z.object({ testResults: z.array(RESULT_SCHEMA) })
+const FAILED_STATUS = 'failed'
+const PARENT_PREFIX = '..'
+
+function is_inside(name: string): boolean {
+	return !name.startsWith(PARENT_PREFIX) && !node_path.isAbsolute(name)
+}
+
+function relative_in(roots: ReadonlyArray<string>, file: string): Array<string> {
+	const relatives = roots.map((root) => node_path.relative(root, file))
+
+	return relatives.filter((name) => is_inside(name)).slice(0, 1)
+}
+
+function failed_files(report: string, roots: ReadonlyArray<string>): Array<string> {
+	const results = json_value.parse_with(report, RESULTS_SCHEMA)?.testResults ?? []
+
+	return results
+		.filter((result) => result.status === FAILED_STATUS)
+		.flatMap((result) => relative_in(roots, result.name))
+}
+
 // `no-test` when nothing ran; otherwise a failing run is `red` — the test caught the pre-fix tree — and
 // a passing one is `green`.
 function verdict_for(test_count: number, is_failed: boolean): RedVerdict {
@@ -72,6 +106,7 @@ function is_refused(body: string, verdict: RedVerdict): boolean {
 
 const test_red_logic = {
 	BUG_DECLARATION_LINE,
+	failed_files,
 	is_bug_fix,
 	is_refused,
 	is_test_only,
@@ -80,5 +115,5 @@ const test_red_logic = {
 	verdict_for,
 }
 
-export type { RedVerdict }
+export type { RedProbe, RedVerdict }
 export { test_red_logic }
