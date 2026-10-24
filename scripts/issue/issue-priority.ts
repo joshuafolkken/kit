@@ -187,7 +187,7 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 	return [...labels, label]
 }
 
-const issue_priority = { declared_level, floor_of, problem, with_label }
+const issue_priority = { HIGH_LANE_MINUTES, declared_level, floor_of, problem, with_label }
 
 export type { PriorityLevel }
 export { issue_priority }

@@ -5,6 +5,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_overrun } from '#scripts/lane/lane-overrun'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -239,6 +240,8 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	const refused = await record_merged(ctx)
 
 	if (refused !== undefined) return report_count_refused(refused)
+
+	await lane_overrun.investigate(Number(ctx.child))
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) {
 		return emit(MERGE_TOKEN.OVER, SUCCESS_EXIT_CODE)
