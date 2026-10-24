@@ -265,3 +265,35 @@ describe('lane_state.record_stuck', () => {
 		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#4744: `lane:adopt` writes a lane a record only while it has none.
+describe('lane_state.record_adopted', () => {
+	const ADOPT = 'lane:adopt'
+
+	it('writes the change for a lane with no record', async () => {
+		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
+			directory: state.directory,
+			now: OPENED_AT,
+		})
+
+		expect(outcome.kind).toBe('written')
+		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toMatchObject({
+			state: 'open',
+			changed_by: ADOPT,
+		})
+	})
+
+	it('leaves a lane that has a record as it is', async () => {
+		await record_at(change_of('ended', CLOSE), PAUSED_AT)
+
+		const outcome = await lane_state.record_adopted(change_of('open', ADOPT), {
+			directory: state.directory,
+		})
+
+		expect(outcome).toStrictEqual({ kind: 'skipped', reason: 'a record exists' })
+		await expect(lane_state.read_state(ISSUE, state.directory)).resolves.toMatchObject({
+			state: 'ended',
+			changed_by: CLOSE,
+		})
+	})
+})

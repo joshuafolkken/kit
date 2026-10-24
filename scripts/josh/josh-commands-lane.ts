@@ -16,6 +16,7 @@ const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
 // has to read `.env` to see them — without this the two are documented and unreachable.
 const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 const ISSUE_WITH_OPTIONS = '<issue> [options]'
+const ISSUE_OR_ALL = '<issue> | --all'
 const MEASURE_ARGUMENTS = {
 	script: 'scripts/lane/lane-measure-cli.ts',
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
@@ -25,7 +26,7 @@ const PAUSE_ARGUMENTS = {
 	script: 'scripts/lane/lane-pause-cli.ts',
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	category: 'AI tools',
-	reference: ['<issue> | --all', 'developer', ['processes']],
+	reference: [ISSUE_OR_ALL, 'developer', ['processes']],
 } satisfies Partial<CommandEntry>
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -181,6 +182,21 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Let a paused lane child carry on from where it stopped (SIGCONT)',
 		default_script_arguments: ['resume'],
 		usage: { examples: LANE_SIGNAL_EXAMPLES },
+	},
+	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
+	'lane:adopt': {
+		script: 'scripts/lane/lane-adopt-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched',
+		category: 'AI tools',
+		reference: [ISSUE_OR_ALL, 'developer', ['git', 'processes', 'network']],
+		usage: {
+			examples: [
+				{ arguments: '4744' },
+				{ arguments: '--all', note: 'every open lane with no record' },
+			],
+		},
 	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.

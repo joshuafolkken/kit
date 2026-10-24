@@ -122,3 +122,19 @@ describe('backlog_occupied.unknown_lanes', () => {
 		expect(backlog_occupied.unknown_lanes(lanes, records_of([WORKING]))).toStrictEqual([BLOCKED])
 	})
 })
+
+// joshuafolkken/kit#4744: after a restart lost every record, eight lanes with no child read
+// `no lane state — counted in use`; `lane:adopt` writes each an `open` record.
+describe('backlog_occupied — a lane `lane:adopt` recorded open', () => {
+	const ADOPTED = '4744'
+	const lanes = [lane(WORKING), lane(ADOPTED)]
+	const records = new Map([...records_of([WORKING]), ...records_of([ADOPTED], 'open')])
+
+	it('holds no place while no child is in it', () => {
+		expect(occupied(lanes, () => [ADOPTED], records)).toStrictEqual([WORKING])
+	})
+
+	it('is no longer unknown', () => {
+		expect(backlog_occupied.unknown_lanes(lanes, records)).toStrictEqual([])
+	})
+})

@@ -255,6 +255,31 @@ async function record_stuck(
 	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
+function adopted_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
+	if (read_record(directory, change.issue) !== undefined) {
+		return { kind: 'skipped', reason: 'a record exists' }
+	}
+
+	return apply_held(change, directory, now)
+}
+
+/**
+ * Write `change` for a lane that has no record, and only then: a record that appeared since the caller
+ * read none is the lane command's, and is never overwritten (`lane:adopt`).
+ */
+async function record_adopted(
+	change: LaneChange,
+	options: StateOptions = {},
+): Promise<RecordOutcome> {
+	const directory = await resolve_directory(options.directory)
+
+	if (directory === undefined) return NO_DIRECTORY
+
+	const now = options.now ?? new Date()
+
+	return locked(directory, change.issue, () => adopted_held(change, directory, now))
+}
+
 /** Each of `issues`' records, by issue; an issue with none is left out. */
 async function read_states(
 	issues: ReadonlyArray<string>,
@@ -293,6 +318,7 @@ const lane_state = {
 	read_records,
 	read_state,
 	read_states,
+	record_adopted,
 	record_change,
 	record_stuck,
 	state_path,

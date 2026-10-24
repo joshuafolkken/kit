@@ -1010,10 +1010,31 @@ pnpm josh lane:resume --all   # every open lane
 - The supervisor retries such a close on every pass; `run:board` marks its leftover row `↻` (being ended) or `⚠ <reason> (pid <pid>)`.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
 - Each lane has one state record, `josh-lane-state-<key>-<N>.json` in the temp directory, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it): the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
-- Only the lane commands write it: `lane:open` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
-- A lane with no record is never guessed at from its processes: it is counted in use, its state unknown.
+- Only the lane commands write it: `lane:open` and `lane:adopt` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
+- A lane with no record is never guessed at from its processes: it is counted in use, its state unknown. `lane:adopt` gives it a record again.
 
 **Output / exit codes:** one line per lane (`paused N process(es)`), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
+
+### `josh lane:adopt`
+
+<!-- usage: lane:adopt -->
+
+Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched.
+
+```bash
+pnpm josh lane:adopt 4744
+pnpm josh lane:adopt --all   # every open lane with no record
+```
+
+<!-- /usage -->
+
+- For a lane whose record was lost (a restart, a usage limit, an interrupted run). Its branch, work tree, stash and pull request are never touched.
+- A lane is recorded `open` only when every fact reads: its process probe answers that no child is there, and its work tree status, unpushed commits, pull request and issue all read. Any one unread leaves it unknown, counted in use as before. A lane with a record is left as it is.
+- `open`, not `paused`: nobody suspended it. The next launch moves it to `running`, and the next `backlogrun` takes the lane back while its issue still carries `in-progress`.
+- It still holds its port seat, as every open lane does.
+- An adoption adds one `lane-state` line to the run's event stream (`#<N> adopted by lane:adopt`).
+
+**Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> · issue OPEN (<labels>)`, or `left unknown — <reason>`. Exit 0. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.
 
 ### `josh rule:value`
 
