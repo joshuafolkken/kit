@@ -6,10 +6,15 @@ import {
 	WATCH_CONFIRMED_STABLE_READS,
 	type SnapshotObserver,
 } from '#scripts/gh/git-pr-checks'
-import { is_coderabbit_check } from '#scripts/gh/git-pr-checks-eval'
+import {
+	FAILURE_MESSAGE_PREFIX,
+	is_coderabbit_check,
+	PrConflictError,
+} from '#scripts/gh/git-pr-checks-eval'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { json_value } from '#scripts/lib/json-value'
+import { followup_job_rerun } from './followup-job-rerun'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
 // reached its line limit. `git-pr-followup` re-exports each name it always
@@ -102,11 +107,13 @@ async function watch_before_polling(
 // caught: the poll evaluates the full merge gate and throws on failure before any stable read counts.
 // `observe` is shown each poll's snapshot, the watch's included — the run's `pr-checks` line
 // (joshuafolkken/kit#3770).
-async function run_checks(input: {
+interface RunChecksInput {
 	branch_name: string
 	is_skip_watch: boolean
 	observe?: SnapshotObserver
-}): Promise<PrStateSnapshot> {
+}
+
+async function wait_for_checks(input: RunChecksInput): Promise<PrStateSnapshot> {
 	const is_watch_confirmed =
 		!input.is_skip_watch && (await watch_before_polling(input.branch_name, input.observe))
 	const stable_reads = is_watch_confirmed ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
@@ -117,6 +124,35 @@ async function run_checks(input: {
 		issue_watch_gate.assert_read_here,
 		input.observe,
 	)
+}
+
+// A merge conflict is not a check, so no rerun can clear it.
+function is_checks_failure(error: unknown): boolean {
+	if (error instanceof PrConflictError) return false
+
+	return error instanceof Error && error.message.startsWith(FAILURE_MESSAGE_PREFIX)
+}
+
+// **A job the runner stopped after every step passed is rerun once and the wait judged again**
+// (`followup-job-rerun.ts`). The second wait has no rerun of its own, so a job that stops the same way
+// twice — or any other failure — ends the run as before.
+async function rejudge_after_rerun(
+	input: RunChecksInput,
+	error: unknown,
+): Promise<PrStateSnapshot> {
+	if (!is_checks_failure(error)) throw error
+	const rerun = await followup_job_rerun.rerun_stalled_jobs(input.branch_name)
+	if (rerun.length === 0) throw error
+
+	return await wait_for_checks(input)
+}
+
+async function run_checks(input: RunChecksInput): Promise<PrStateSnapshot> {
+	try {
+		return await wait_for_checks(input)
+	} catch (error) {
+		return await rejudge_after_rerun(input, error)
+	}
 }
 
 // Temporary: record every CodeRabbit check that was not passing when the merge gate

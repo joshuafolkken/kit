@@ -1,0 +1,7 @@
+{
+	"reason": "#4813 adds the one-time rerun of a CI job the runner stopped after every step passed, with its tests",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 154
+	}
+}
