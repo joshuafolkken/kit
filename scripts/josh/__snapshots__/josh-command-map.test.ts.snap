@@ -1040,6 +1040,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "review:submit": [
+      "[--interaction] < findings | [--interaction] --none",
+      "automation",
+      [
+        "files",
+      ],
+    ],
     "rule:list": [
       "",
       "automation",

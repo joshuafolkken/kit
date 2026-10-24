@@ -124,6 +124,7 @@ const distributed_paths = {
 	ensure_claude_md_import,
 	remove_claude_md_import,
 	CLAUDE_MD_IMPORT_LINE,
+	KIT_PACKAGE_PATH_PREFIX,
 }
 
 export { distributed_paths }

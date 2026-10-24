@@ -1,6 +1,9 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
 import { api_auth } from '#scripts/agent/api-auth'
+import { distributed_paths } from '#scripts/init/distributed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
@@ -24,6 +27,7 @@ import { lane_relaunch } from './lane-relaunch'
 const BRIEF_PREFIX = 'josh-ship-review-brief-'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 const LOG_PREFIX = 'josh-ship-review-log-'
+const SUBMIT_SCRIPT = 'scripts/review/review-submit-cli.ts'
 const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
 const stop_schema = z
 	.object({
@@ -108,14 +112,23 @@ function action_slots(action: ReviewAction): ReadonlyArray<ReviewSlot> {
 	return action.slots ?? [review_attest.REVIEW_SLOT.CODE]
 }
 
+// **A lane branched before `review:submit` is handed its findings path** (joshuafolkken/kit#4799): the
+// reviewer runs the lane's own josh, and a supervisor reloaded onto main serves lanes that predate it.
+function has_submit(directory: string): boolean {
+	return [SUBMIT_SCRIPT, `${distributed_paths.KIT_PACKAGE_PATH_PREFIX}${SUBMIT_SCRIPT}`].some(
+		(script) => existsSync(path.join(directory, script)),
+	)
+}
+
 function review_prompt(lane: LaneInfo, action: ReviewAction, slot: ReviewSlot): string {
-	const target = review_paths(lane.directory, slot)
+	const { brief, findings } = review_paths(lane.directory, slot)
 	const round_prompt =
 		action.round === '1' ? run_ship_review.reviewer_prompt : run_ship_review.verification_prompt
 	const prompt_of = run_ship_review.slot_prompt(round_prompt, slot, action_slots(action))
 	const tail = lane_child_invocation.review_invocation(lane.issue)
+	const findings_path = has_submit(lane.directory) ? undefined : findings
 
-	return `${prompt_of(target.brief, target.findings, lane.issue)} This is ${tail}`
+	return `${prompt_of(brief, slot, lane.issue, findings_path)} This is ${tail}`
 }
 
 // **A reviewer that could not authenticate names it** with `api_auth.AUTH_FAILURE_NOTE`, read off its

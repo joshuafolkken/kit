@@ -127,7 +127,7 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 		expect(commands()).toContain(`${RECORD} ${LOW}`)
 	})
 
-	it('launches under the round-1 reviewer, handed the brief and findings paths', async () => {
+	it('launches under the round-1 reviewer, handed the brief path and the submit command', async () => {
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
 
 		await run_ship_review_steps.review_stage(ISSUE)
@@ -140,7 +140,8 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 
 		expect(round).toBe(1)
 		expect(prompt).toContain('josh-ship-review-brief-')
-		expect(prompt).toContain(FINDINGS_PREFIX)
+		expect(prompt).toContain(run_ship_review.submit_command('code'))
+		expect(prompt).not.toContain(FINDINGS_PREFIX)
 	})
 })
 

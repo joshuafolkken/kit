@@ -560,6 +560,26 @@ A re-run resumes: a per-issue stage record, honored only where the actual state 
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
 
+### `josh review:submit`
+
+<!-- usage: review:submit -->
+
+Write a ship reviewer's findings, read from stdin, where the ship reads them.
+
+```bash
+pnpm josh review:submit < findings.txt                 # the /code-review slot
+pnpm josh review:submit --interaction < findings.txt   # the interaction review slot
+pnpm josh review:submit --none                         # a review with no findings
+```
+
+**Options:**
+
+- `--none` — a review with no findings; empty stdin without it is refused.
+
+<!-- /usage -->
+
+The reviewer `josh ship --review` launches pipes its findings here, one `review:record` line each. The command writes them to the slot's findings file, where the ship reads them, so the reviewer never copies a path. A line outside the grammar is refused, and nothing is written.
+
 ### `josh ship:wait`
 
 <!-- usage: ship:wait -->

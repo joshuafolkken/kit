@@ -187,6 +187,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
 | `josh review:round2` | `[--round-1-closed] [--json]` | automation | none | Say whether the second /code-review round is due, or may be skipped entirely |
+| `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a ship reviewer's findings, read from stdin, where the ship reads them |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
