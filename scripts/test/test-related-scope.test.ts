@@ -43,6 +43,7 @@ const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: {},
+	change: [],
 	directories: ['data', 'docs', 'lib', 'notes', 'scripts'],
 	readers: {
 		[DOCUMENT_FILE]: [READER_FILE],
@@ -153,6 +154,18 @@ describe('related_scope.resolve_scope — non-code files through the map', () =>
 
 		expect(scope.mode).toBe('all')
 		expect(scope.reason).toContain(related_scope.NO_MAP_REASON)
+	})
+})
+
+// joshuafolkken/kit#4734: the recording lane's own approval, read through git as its change.
+describe('related_scope.resolve_scope — a read of the recording tree’s change', () => {
+	it('runs no test for an approval added beside the one the recording tree changed', () => {
+		const recorded = path.join('approvals', '1.json')
+		const added = path.join('approvals', '2.json')
+		const map = { ...MAP, change: [recorded], readers: { [recorded]: [READER_FILE] } }
+		const scope = related_scope.resolve_scope(request([added], { map }))
+
+		expect(scope.mode).toBe('none')
 	})
 })
 
