@@ -12,11 +12,12 @@ import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight (whatever it
-// answered) and before the hand-off:a type error in a file the related-only checks never touched, an export nothing reads,
+// answered) and before the hand-off: a type error in a file the related-only checks never touched, an export nothing reads,
 // an unknown word, or a guard test (a SKILL.md pointer, a byte budget, the command list, a source with
 // no colocated test, a bare issue citation) that only the full suite runs, would otherwise first
 // surface after the detach and cost a relaunched session. They answer in seconds, so the same session
-// fixes what they find and ships again.
+// fixes what they find and ships again. A `--review` ship adds `test:pinned`, which probes the hunks
+// its verdict cache does not hold (`run-ship-pre-detach-pinned.ts`).
 //
 // **Nothing moves out of the gate, and the gate reuses what these already answered**: a check that is
 // the gate's own check passed silently here is recorded with the gate's per-check record
@@ -134,6 +135,21 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 	}
 }
 
+// The `test:pinned` check a `--review` ship adds (`run-ship-pre-detach-pinned.ts`); none is asked by default.
+type PinnedCheck = () => Promise<JoshResult>
+
+async function not_asked(): Promise<JoshResult> {
+	return { code: SUCCESS_EXIT_CODE, out: PASSED }
+}
+
+// The pinned check's stop joins the others' rather than hiding them.
+function with_pinned(result: JoshResult, pinned: JoshResult): JoshResult {
+	if (pinned.code === SUCCESS_EXIT_CODE) return result
+	if (result.code === SUCCESS_EXIT_CODE) return pinned
+
+	return { code: FAILURE_EXIT_CODE, out: [result.out, pinned.out].join(SECTION_SEPARATOR) }
+}
+
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
 // The tree is read before they start, so a record is written only for the tree they read. **The
 // metrics totals run first, alone**: they may re-record the branch's approval file
@@ -142,16 +158,20 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 async function checks(
 	directory: string = process.cwd(),
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
+	pinned: PinnedCheck = not_asked,
 ): Promise<JoshResult> {
 	const metrics = await Promise.all(
 		kit_only(directory).map(async (check) => await run_in(directory, check)),
 	)
 	const [lists, tree] = await Promise.all([command_lists(directory), gate_tree.read_gate_tree()])
-	const runs = await Promise.all(lists.map(async (check) => await run_in(directory, check)))
+	const [runs, pinned_result] = await Promise.all([
+		Promise.all(lists.map(async (check) => await run_in(directory, check))),
+		pinned(),
+	])
 
 	await check_reuse.record_green_checks(gate_results(runs), tree, records)
 
-	return verdict([...runs, ...metrics])
+	return with_pinned(verdict([...runs, ...metrics]), pinned_result)
 }
 
 const run_ship_pre_detach = {
@@ -163,5 +183,5 @@ const run_ship_pre_detach = {
 	failure_prefix,
 }
 
-export type { PreDetachCheck }
+export type { PinnedCheck, PreDetachCheck }
 export { run_ship_pre_detach }

@@ -10,6 +10,7 @@ import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
+import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
@@ -298,7 +299,8 @@ function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
 // checks (`run-ship-pre-detach.ts`) follow it here for the same reason; they are not a stage, so the
 // supervisor's gate runs them again rather than passing over them. They run even when the preflight
 // refused, so one ship reports every failure there is to fix (joshuafolkken/kit#4305); the preflight's
-// refusal still comes before its own scoped pair, the one heavy check here.
+// refusal still comes before its own scoped pair, the one heavy check here beside a `--review` ship's
+// `test:pinned`.
 //
 // **The refusal is printed last**: a lane child reading the report through `tail` saw only the red
 // metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
@@ -306,7 +308,10 @@ function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
 // unmet kinds, so the ledger shows which refusals came with one.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
-	const result = await run_ship_pre_detach_timed.checks(args.number)
+	const result = await run_ship_pre_detach_timed.checks(
+		args.number,
+		run_ship_pre_detach_pinned.checks_for(args),
+	)
 	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
 	if (preflight.code !== SUCCESS_EXIT_CODE) {
