@@ -56,6 +56,10 @@ const EVENT_KIND = {
 	PARK: 'park',
 	SPLIT: 'split',
 	OUTAGE: 'outage',
+	// A Claude usage limit stopped a lane child (joshuafolkken/kit#4745). Its text names the reset time,
+	// which `backlog:drive` reads to hold launches until then; it counts against no streak, so it is not an
+	// `OUTAGE`.
+	USAGE_LIMIT: 'usage-limit',
 	CUT: 'cut',
 	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`. The
 	// resume clears the cut record, so without this the `cut` would stay the newest position and

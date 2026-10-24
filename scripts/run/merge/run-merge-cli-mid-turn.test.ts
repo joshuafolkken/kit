@@ -25,9 +25,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 	issue_closing_pr: { read_closing_pr: vi.fn().mockResolvedValue(undefined) },
 }))
 
-vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn(), read_transcript: vi.fn() },
-}))
+vi.mock('#scripts/run/run-ending')
 
 vi.mock('./run-merge-ship', () => ({ run_merge_ship: { is_unanswered: vi.fn() } }))
 

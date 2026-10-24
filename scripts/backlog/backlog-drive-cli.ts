@@ -14,6 +14,7 @@ import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
+import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { z } from 'zod'
 import { backlog_budget } from './backlog-budget'
 import {
@@ -203,12 +204,16 @@ function reporters(holds: HoldRecorder): Pick<LoopPorts, 'hold' | 'idle' | 'paus
 }
 
 // What a launch is weighed against: the free lanes, a kept lane, and the memory for one more.
-function room_ports(): Pick<LoopPorts, 'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held'> {
+function room_ports(): Pick<
+	LoopPorts,
+	'free_lanes' | 'has_lane' | 'limit_room' | 'memory_held' | 'usage_limited'
+> {
 	return {
 		free_lanes: backlog_ready.drive_free_lane_count,
 		limit_room: backlog_ready.drive_limit_room,
 		has_lane: backlog_drive_seats.has_kept_lane,
 		memory_held: backlog_drive_memory.gauge(),
+		usage_limited: async () => await run_merge_usage_limit.is_held(Date.now()),
 	}
 }
 

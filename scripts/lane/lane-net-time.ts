@@ -6,10 +6,11 @@ import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stop_stats } from './lane-stop-stats'
 
 // A lane's net time (joshuafolkken/kit#4749): from its issue's first dispatch to its merge, less the
-// waits no fix in the lane shortens — a park (the issue waits on a person's decision) and an outage,
-// each until the issue's next ship stage, re-dispatch or another of the two, the wait `josh lane:stats`
-// derives for a stop (`lane-stop-stats.ts`). A ship stop is not taken out: a relaunched child works
-// through its wait. `josh lane:net` prints it, and a causing-lane line declares it (`issue-priority.ts`).
+// waits no fix in the lane shortens — a park (the issue waits on a person's decision), an outage and a
+// usage-limit stop (joshuafolkken/kit#4745), each until the issue's next ship stage, re-dispatch or
+// another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`). A ship
+// stop is not taken out: a relaunched child works through its wait. `josh lane:net` prints it, and a
+// causing-lane line declares it (`issue-priority.ts`).
 
 const { EVENT_KIND } = run_event_stream
 
@@ -33,6 +34,7 @@ function holds_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
 	return [
 		...lane_stop_stats.events_of(events, EVENT_KIND.PARK),
 		...lane_stop_stats.events_of(events, EVENT_KIND.OUTAGE),
+		...lane_stop_stats.events_of(events, EVENT_KIND.USAGE_LIMIT),
 	]
 }
 

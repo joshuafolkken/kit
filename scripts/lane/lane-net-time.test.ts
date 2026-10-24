@@ -65,6 +65,13 @@ describe('lane_net_time.net_ms', () => {
 		expect(net_minutes(entries, [outage])).toBe(25)
 	})
 
+	it('takes out a usage-limit stop until the re-dispatch after the reset', () => {
+		const entries = [dispatch(0), dispatch(40), merge(55)]
+		const text = `#${String(ISSUE)} usage limit — resumes at ${at(38)}`
+
+		expect(net_minutes(entries, [event(10, 'usage-limit', text)])).toBe(25)
+	})
+
 	it('keeps a ship stop, whose wait the relaunched child spends on the fix', () => {
 		expect(net_minutes([dispatch(0), stop(10), stage(18), merge(30)])).toBe(30)
 	})

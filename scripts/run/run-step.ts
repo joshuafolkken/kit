@@ -160,6 +160,8 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.MERGE]: merge_command,
 	[KIND.OUTAGE]: merge_command,
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
+	// The child was released; `backlog:drive` holds the next launch until the limit resets.
+	[KIND.USAGE_LIMIT]: () => command(OFFER_BACKLOG),
 	[KIND.CUT]: (issue_number) => command(`pnpm josh run:cut --resume ${issue_number}`),
 	// A stall is undispatched ready work with a free lane, so its next step is exactly a park's: offer
 	// the backlog. The detector only reports the stall; reading it here as a dispatch is what turns the
@@ -177,7 +179,7 @@ const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 // budget command — a child that ran it would read the `busy` it got back as a competing session and
 // park its Issue unimplemented. A merge or an outage is the parent's to classify, so a child at one
 // has nothing to run and stops rather than being handed `run:merge`.
-const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE])
+const PARENT_ONLY_EVENTS: ReadonlySet<string> = new Set([KIND.MERGE, KIND.OUTAGE, KIND.USAGE_LIMIT])
 
 // A stopped run's last owed step is the end-of-run retrospective. When it is not owed the position stops
 // with no command to run.

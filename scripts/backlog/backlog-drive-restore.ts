@@ -9,6 +9,7 @@ const SETTLED_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.SPLIT,
 	run_event_stream.EVENT_KIND.WITHDRAW,
 	run_event_stream.EVENT_KIND.OUTAGE,
+	run_event_stream.EVENT_KIND.USAGE_LIMIT,
 ])
 const DONE_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,

@@ -1,0 +1,8 @@
+{
+	"reason": "Usage-limit reset parsing, backlog hold and lane net-time accounting; round 2 split a named date's nearest-year choice from an undated hour's next-day roll",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 223,
+		"prose.excess_bold": 1
+	}
+}

@@ -36,7 +36,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: [OUTPUT],
-					description: 'the transcript the outage split reads; absent, it is off.',
+					description:
+						'the transcript the outage and usage-limit splits read; absent, they are off.',
 				},
 				{
 					names: ['--driver'],
