@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned stores each red verdict's failed test files with their digests so a test-only rerun keeps it (#4790)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 68
+	}
+}

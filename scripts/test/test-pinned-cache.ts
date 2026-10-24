@@ -9,7 +9,7 @@ import {
 	type Freshness,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
-import type { RedVerdict } from './test-red-logic'
+import type { RedProbe } from './test-red-logic'
 
 // The reads and writes of `josh test:pinned`'s verdict cache (joshuafolkken/kit#4706); what a key is and
 // when an entry holds is `test-pinned-cache-logic.ts`. `josh run:review` calls the same `test_pinned.run`,
@@ -24,10 +24,10 @@ const NUL = '\0'
 // Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
 const AS_COMMIT = '^{commit}'
 
-interface LoadedCache extends Omit<VerdictCache, 'entries'> {
+interface LoadedCache extends VerdictCache {
 	file: string
-	entries: Record<string, RedVerdict>
 	freshness: Freshness
+	test_digests: ReadonlyMap<string, string>
 }
 
 async function read_text(file: string): Promise<string> {
@@ -51,54 +51,61 @@ async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, str
 	return new Map(existing.map((file, index) => [file, digests[index] ?? '']))
 }
 
-// One digest over every test file's path and content.
-async function contents_digest(files: ReadonlyArray<string>): Promise<string> {
-	const digests = await digests_of(files)
+// Each test file's content digest, keyed by its path.
+async function test_digests_of(): Promise<Map<string, string>> {
+	return await digests_of(await test_files())
+}
 
+// One digest over every test file's path and content.
+function contents_digest(digests: ReadonlyMap<string, string>): string {
 	return test_pinned_cache_logic.test_set_of(
 		[...digests].map(([file, digest]) => `${file} ${digest}`),
 	)
 }
 
-// The whole change: `base` as a commit, and every path changed since it with its content.
+// The code change: `base` as a commit, and every non-test path changed since it with its content. A
+// test file is left out — a `red` rests on the test files it failed in, not on every test.
 async function change_digest(base: string): Promise<string> {
 	const [commit, paths] = await Promise.all([
 		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
 	])
+	const code = paths.filter((file) => !test_declared_logic.is_test_file(file))
 
-	return test_pinned_cache_logic.change_of(commit.trim(), paths, await digests_of(paths))
+	return test_pinned_cache_logic.change_of(commit.trim(), code, await digests_of(code))
 }
 
 async function load(base: string): Promise<LoadedCache> {
 	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
-	const files = await test_files()
-	const [text, test_contents, change] = await Promise.all([
+	const [text, test_digests, change] = await Promise.all([
 		read_text(file),
-		contents_digest(files),
+		test_digests_of(),
 		change_digest(base),
 	])
-	const test_set = test_pinned_cache_logic.test_set_of(files)
-	const entries = test_pinned_cache_logic.entries_of(text, test_set)
+	const test_contents = contents_digest(test_digests)
+	const entries = test_pinned_cache_logic.entries_of(text)
 	const freshness = test_pinned_cache_logic.freshness_of(text, { change, test_contents })
 
-	return { file, test_set, test_contents, change, entries, freshness }
+	return { file, test_contents, change, entries, freshness, test_digests }
 }
 
 // The verdict stored under each key, or `undefined` where none is stored or what it rests on changed.
-function known(cache: LoadedCache, keys: ReadonlyArray<string>): Array<RedVerdict | undefined> {
+function known(cache: LoadedCache, keys: ReadonlyArray<string>): Array<RedProbe | undefined> {
 	return keys.map((key) =>
-		test_pinned_cache_logic.fresh_verdict(cache.entries[key], cache.freshness),
+		test_pinned_cache_logic.fresh_verdict(cache.entries[key], cache.freshness, cache.test_digests),
 	)
 }
 
 // Only the verdicts this run used are written, so the file never holds a hunk the branch has left behind.
-async function save(cache: LoadedCache, entries: Record<string, RedVerdict>): Promise<void> {
+async function save(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	probes: ReadonlyArray<RedProbe | undefined>,
+): Promise<void> {
 	const content: VerdictCache = {
-		test_set: cache.test_set,
 		test_contents: cache.test_contents,
 		change: cache.change,
-		entries,
+		entries: test_pinned_cache_logic.stored(keys, probes, cache.test_digests),
 	}
 
 	await mkdir(path.dirname(cache.file), { recursive: true })
