@@ -25,7 +25,12 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
-	lane_session_broker: { serving_session: serving_mock, request: request_mock },
+	lane_session_broker: {
+		serving_session: serving_mock,
+		request: request_mock,
+		is_unreadable: (answer: { reason?: string }): boolean =>
+			answer.reason?.includes('could not read the request') === true,
+	},
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
