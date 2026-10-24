@@ -12,9 +12,8 @@ Review policy: the level, the round count, and what happens to a finding after t
 ## When to run
 
 When: `CLAUDE.md` → "Pre-commit Self-Review"; inside a workflow, round 1 runs before the commit and
-round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Pass the review subagent the
-`reviewer` profile's model and effort that `pnpm josh review:brief` prints; never substitute the review
-level for effort.
+round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Launch the `reviewer` agent
+type, never nested, with the model and effort `pnpm josh review:brief` prints; never the level for effort.
 
 Re-run after fixes until **no high or medium findings remain or the round cap below is reached** (the
 first review counts), whichever comes first. Round 2 is a verification pass over the fixes

@@ -177,6 +177,20 @@ pnpm josh cspell:dot   # includes dotfiles
 
 - Runs with `--no-progress`: only the unknown-word lines and the summary print.
 
+### `josh check:related`
+
+<!-- usage: check:related -->
+
+Run related lint, unit and dotfile spelling checks in parallel.
+
+```bash
+pnpm josh check:related
+```
+
+<!-- /usage -->
+
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all three and exits non-zero if any fails.
+
 ### `josh behavior`
 
 <!-- usage: behavior -->

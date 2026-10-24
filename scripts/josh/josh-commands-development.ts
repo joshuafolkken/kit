@@ -158,6 +158,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		memory_mb: core_budget.MEMORY_MB.spell_check,
 		usage: { examples: [{ arguments: '', note: 'includes dotfiles' }] },
 	},
+	'check:related': {
+		script: 'scripts/gate/check-related.ts',
+		description: 'Run related lint, unit and dotfile spelling checks in parallel',
+		category: 'Development',
+		reference: ['', 'developer', ['processes']],
+		usage: { examples: [{ arguments: '' }] },
+	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',
 		description:

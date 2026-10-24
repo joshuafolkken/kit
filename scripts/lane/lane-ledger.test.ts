@@ -351,6 +351,28 @@ describe('lane_ledger.target', () => {
 	})
 })
 
+// joshuafolkken/kit#4734: the merge is dated to its confirmation, not to whenever the sync ended.
+describe('lane_ledger.record_merge', () => {
+	const repository = path.join(scratch, 'merge-repo')
+
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.restoreAllMocks()
+		rmSync(lane_ledger.target_of(repository), { force: true })
+	})
+
+	it('records the merge at the date it is handed', async () => {
+		vi.stubEnv('VITEST', undefined)
+		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(repository)
+
+		await lane_ledger.record_merge(9, new Date(AT))
+
+		expect(lane_ledger.read_entries(lane_ledger.target_of(repository))).toMatchObject([
+			{ kind: 'merge', at: AT, issue: 9 },
+		])
+	})
+})
+
 describe('lane_ledger.target_of', () => {
 	it('names one ledger per repository', () => {
 		expect(lane_ledger.target_of('/repo/a')).not.toBe(lane_ledger.target_of('/repo/b'))

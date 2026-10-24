@@ -62,6 +62,7 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: MAP_COMMIT,
 	dirty: { [DIRTY_DOCUMENT]: 'digest-then' },
+	change: [DIRTY_DOCUMENT],
 	directories: [],
 	readers: { [DOCUMENT]: [CHANGED_SOURCE], [DIRTY_DOCUMENT]: [CHANGED_SOURCE] },
 }

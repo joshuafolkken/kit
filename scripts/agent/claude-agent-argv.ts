@@ -53,6 +53,10 @@ const LAUNCHED_TOOLS: ReadonlyArray<string> = [
 	'Monitor',
 	'TodoWrite',
 ]
+// **A reviewer is the review, not a launcher of one** (joshuafolkken/kit#4715): with `Skill` it ran
+// `/code-review`, which forked a second agent that read the same diff and brief again. Without the two
+// tools that open a nested agent, the review stays in the one session.
+const NESTING_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Skill'])
 const TOOLS_FLAG = '--tools'
 // **Only the project's own MCP servers load** — the user's connectors are what the strict flag drops.
 // A project with no `.mcp.json` gets the strict flag alone, which loads no server at all: that is
@@ -77,16 +81,22 @@ function session_id_flags(session_id: string | undefined): ReadonlyArray<string>
 	return session_id === undefined ? [] : [SESSION_ID_FLAG, session_id]
 }
 
+function launched_tools(role: AgentRole): ReadonlyArray<string> {
+	if (role !== agent_role_profile.REVIEWER) return LAUNCHED_TOOLS
+
+	return LAUNCHED_TOOLS.filter((tool) => !NESTING_TOOLS.has(tool))
+}
+
 // The config is named by absolute path, resolved against the directory the child is launched in, so
 // the flag means the same file whatever the child's own working directory turns out to be. The pair
 // sits ahead of the model flags: `--mcp-config` takes several values, and the next flag is what ends it.
-function tool_flags(cwd: string = process.cwd()): ReadonlyArray<string> {
+function tool_flags(role: AgentRole, cwd: string = process.cwd()): ReadonlyArray<string> {
 	const mcp_config = path.join(cwd, PROJECT_MCP_FILE)
 	const mcp_flags = existsSync(mcp_config)
 		? [STRICT_MCP_FLAG, MCP_CONFIG_FLAG, mcp_config]
 		: [STRICT_MCP_FLAG]
 
-	return [TOOLS_FLAG, LAUNCHED_TOOLS.join(','), ...mcp_flags]
+	return [TOOLS_FLAG, launched_tools(role).join(','), ...mcp_flags]
 }
 
 // **A lane child and a review session start from the lane instruction set** (`lane-instructions.ts`);
@@ -107,7 +117,7 @@ function build(
 		command: AGENT_COMMAND,
 		args: [
 			...AGENT_FLAGS,
-			...tool_flags(cwd),
+			...tool_flags(profile.role, cwd),
 			...instruction_flags(profile, cwd),
 			...session_id_flags(session_id),
 			MODEL_FLAG,
@@ -132,7 +142,7 @@ function build_resume(
 		command: AGENT_COMMAND,
 		args: [
 			...AGENT_FLAGS,
-			...tool_flags(cwd),
+			...tool_flags(profile.role, cwd),
 			...instruction_flags(profile, cwd),
 			RESUME_FLAG,
 			session_id,

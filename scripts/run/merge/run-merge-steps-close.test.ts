@@ -53,7 +53,7 @@ describe('run_merge_steps.do_merged — an incomplete lane close', () => {
 			async ([command]) => await run_with(command),
 		)
 
-		await expect(run_merge_steps.do_merged(CONTEXT)).resolves.toBeUndefined()
+		await expect(run_merge_steps.do_merged(CONTEXT, vi.fn())).resolves.toBeUndefined()
 		expect(error).toHaveBeenCalledWith(REASON)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining('lane:close is incomplete'))
 	})

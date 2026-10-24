@@ -20,6 +20,7 @@ const MAP: ReadMap = {
 	version: 1,
 	commit: 'abc',
 	dirty: {},
+	change: [],
 	directories: ['docs', SCRIPTS_DIRECTORY],
 	// A read inside `drafts`, which the tree did not hold, keeps a draft added there unrecorded.
 	readers: {

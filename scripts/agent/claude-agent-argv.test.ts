@@ -2,8 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { agent_role_profile } from './agent-role-profile'
-import { claude_agent_argv } from './claude-agent-argv'
+import { agent_role_profile, type AgentRole } from './agent-role-profile'
+import { claude_agent_argv, type ClaudeArgv } from './claude-agent-argv'
 
 const INVOCATION = 'fullrun #2070'
 const CLAUDE_ENV = { CLAUDE_CODE_SESSION_ID: 'session' }
@@ -213,21 +213,46 @@ describe('Claude lane-instruction argv construction', () => {
 	})
 })
 
+function tools_of(argv: ClaudeArgv): string | undefined {
+	return argv.args[argv.args.indexOf('--tools') + 1]
+}
+
+function launched_tools(role: AgentRole): string | undefined {
+	const profile = agent_role_profile.DEFAULT_PROFILES[role]
+
+	return tools_of(claude_agent_argv.build(INVOCATION, profile, undefined, project_directory(false)))
+}
+
 // **No role runs with a person at the keyboard, so none carries a web tool** (#4664): a fetched page would enter the
 // context with no trust label. The per-role list is pinned so a re-added tool fails here.
 describe('Claude per-role launched tools', () => {
 	const PINNED_TOOLS =
 		'Bash,Read,Edit,Write,Agent,Skill,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
+	// joshuafolkken/kit#4715: a reviewer carries no tool that opens a nested agent, so its review never
+	// forks a second reader of the same diff and brief.
+	const PINNED_REVIEWER_TOOLS =
+		'Bash,Read,Edit,Write,ToolSearch,SendMessage,TaskStop,Monitor,TodoWrite'
 
-	it.each(['scheduler', 'worker', 'reviewer'] as const)(
-		'launches the %s with the pinned tool list and no web tool',
-		(role) => {
-			const profile = agent_role_profile.DEFAULT_PROFILES[role]
-			const argv = claude_agent_argv.build(INVOCATION, profile, undefined, project_directory(false))
-			const tools = argv.args[argv.args.indexOf('--tools') + 1]
+	it.each([
+		['scheduler', PINNED_TOOLS],
+		['worker', PINNED_TOOLS],
+		['reviewer', PINNED_REVIEWER_TOOLS],
+	] as const)('launches the %s with the pinned tool list and no web tool', (role, pinned) => {
+		const tools = launched_tools(role)
 
-			expect(tools).toBe(PINNED_TOOLS)
-			expect(tools).not.toMatch(/WebFetch|WebSearch/u)
-		},
-	)
+		expect(tools).toBe(pinned)
+		expect(tools).not.toMatch(/WebFetch|WebSearch/u)
+	})
+
+	it('resumes a reviewer without the Agent and Skill tools as well', () => {
+		const profile = agent_role_profile.DEFAULT_PROFILES.reviewer
+		const argv = claude_agent_argv.build_resume(
+			INVOCATION,
+			profile,
+			'session',
+			project_directory(false),
+		)
+
+		expect(tools_of(argv)).toBe(PINNED_REVIEWER_TOOLS)
+	})
 })
