@@ -1,6 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
+import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
 // The pure half of `josh ship --review`: the one-line prompts the supervised reviewers are launched
@@ -187,6 +188,7 @@ function reviewer_prompt(
 	return [
 		round_one_opening(brief_path),
 		issue_read_instruction(issue),
+		...review_prior_findings.prompt_clauses(issue),
 		'Apply a fix only for a Medium finding whose fix is small and local — a one-function refactor, an',
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
 		'commit, stage or push. After any fix, run `pnpm josh lint:related && pnpm josh test:related` and',
@@ -211,6 +213,7 @@ function report_prompt(
 		round_one_opening(brief_path),
 		'Do not edit any file: the code review running beside this one fixes in this checkout.',
 		issue_read_instruction(issue),
+		...review_prior_findings.prompt_clauses(issue),
 		findings_instruction(slot, '', findings_path),
 	].join(' ')
 }
@@ -240,6 +243,7 @@ function verification_prompt(
 		'names, the checkout it pins and its review:attest step. Do not edit any file.',
 		IN_SESSION_CLAUSE,
 		issue_read_instruction(issue),
+		...review_prior_findings.prompt_clauses(issue),
 		findings_instruction(slot, '', findings_path),
 	].join(' ')
 }

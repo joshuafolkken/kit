@@ -1,0 +1,7 @@
+{
+	"reason": "New review-prior-findings module plus its wiring into the stop context and reviewer prompts (#4780)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 90
+	}
+}

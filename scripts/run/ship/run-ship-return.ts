@@ -235,7 +235,8 @@ async function stopped(
 
 	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason)
 
-	const context = await run_ship_stop_context.build(issue, output.body)
+	const findings = run_ship_stop_cause.details_of(stage, { ...resume, ...output })
+	const context = await run_ship_stop_context.build(issue, output.body, findings)
 	const stop = { stage, ...resume, context }
 
 	return (await is_returned(issue, stop)) ? 'returned' : await relaunched_or_brokered(lane, stop)
