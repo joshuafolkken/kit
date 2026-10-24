@@ -49,9 +49,9 @@ const RECORD_STAGE = 'review:record'
 const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
 const REUSED_LINE =
-	'Reused: josh ship takes this round as its round 1 — this tree holds still since the record, or the ship’s own round 1 stopped on it. A default branch the ship’s sync merges in still moves it: run `pnpm josh main:merge` before this check.'
+	'Reused: josh ship takes this round as its round 1 — the files this round covers hold still since the record, or the ship’s own round 1 stopped on it. A default branch the ship’s sync merges in moves them only where it changed a file this round covers: run `pnpm josh main:merge` before this check for the answer the ship reaches.'
 const REVIEW_AGAIN_LINE =
-	'Not reused: josh ship reviews round 1 again — this tree is not the one the round was recorded and attested on (moved since, a `main:merge` included), or the issue changed after its brief. Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
+	'Not reused: josh ship reviews round 1 again — this tree is not the one the round was recorded and attested on (moved since, a `main:merge` that changed a file it covers included), or the issue changed after its brief. Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
 const INTERACTION_NOT_REQUIRED_LINE =
@@ -197,7 +197,8 @@ async function is_reused_here(issue: number): Promise<boolean> {
 }
 
 // **A recorded code round also says whether `josh ship` reuses it** (joshuafolkken/kit#4763), from the
-// ship's own predicate: a round recorded before the tree moved — a `main:merge` included — is
+// ship's own predicate: a round recorded before the tree moved — a `main:merge` that changed a file
+// the round covers included (joshuafolkken/kit#4829) — is
 // reviewed again by the ship, so the lane runs it itself rather than reading "recorded" as "done".
 async function code_recorded(issue: number): Promise<string> {
 	const is_reused = await is_reused_here(issue)
