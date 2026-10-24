@@ -87,7 +87,7 @@ Everything else is unchanged; `pnpm josh followup` releases the lane's hold at t
 **The child is started as a process of its own, not as a subagent of this session** (`lane:dispatch`,
 `lane:launch`'s final step):
 
-- **It records where the child writes** — `<temp>/josh-lane-dispatch-<N>.log`.
+- **It records where the child writes** — `<common git dir>/josh/run-state/josh-lane-dispatch-<N>-<key>.log`, which survives a reboot.
 - **A refusal is an empty capture beside a non-zero exit**, with a `warning` Telegram. **Park that
   child and name the log the message carries**; never re-dispatch into the same lane without reading it.
 - **A child that started with nowhere to write exits zero and warns** — **wait on that lane with

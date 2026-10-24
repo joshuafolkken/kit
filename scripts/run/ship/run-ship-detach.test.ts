@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -51,7 +52,7 @@ function pid_path(repository: string): string {
 }
 
 function result_path(repository: string): string {
-	return stamp_file.stamp_path(`josh-ship-result-${NUMBER}-`, repository)
+	return durable_state.path(`${durable_state.PREFIX.SHIP_RESULT}${NUMBER}-`, repository)
 }
 
 beforeEach(() => {

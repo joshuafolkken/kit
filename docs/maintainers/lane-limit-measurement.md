@@ -9,7 +9,7 @@ throughput, gate duration and machine load side by side.
 
 ## Where the numbers come from
 
-One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in the josh temp root, keyed
+One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in `<common git dir>/josh/run-state/`, keyed
 on the common git directory so every lane, the parent and the sampler write to the same file.
 
 | Entry       | Written by                                                    | Fields                                                               |
@@ -51,9 +51,6 @@ measures. Test suites never write to it.
 **Nobody starts a sampler.** `josh backlog:drive` takes a `load` sample every minute for as long as it
 runs and stops with it, so a period holds the load of the runs themselves. `pnpm josh lane:sample` is
 still there for a reading outside a run.
-
-**Close the period before a reboot.** The ledger lives in the temp root, which a reboot clears; a
-period that has to span one is closed before it and continued as a second row.
 
 ## The columns
 

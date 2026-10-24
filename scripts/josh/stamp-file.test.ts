@@ -41,6 +41,13 @@ describe('stamp_file.stamp_path', () => {
 		)
 	})
 
+	// The durable run-state directory reuses the name, so a record moved out of the temp root keeps it.
+	it('is the stamp name in the temp directory', () => {
+		expect(path.basename(stamp_file.stamp_path(EXAMPLE_PREFIX))).toBe(
+			stamp_file.stamp_name(EXAMPLE_PREFIX),
+		)
+	})
+
 	it('answers with the same path every time', () => {
 		expect(stamp_file.stamp_path(EXAMPLE_PREFIX)).toBe(stamp_file.stamp_path(EXAMPLE_PREFIX))
 	})

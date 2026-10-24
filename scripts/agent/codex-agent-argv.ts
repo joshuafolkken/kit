@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { durable_state } from '#scripts/josh/durable-state'
 import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
 
@@ -60,12 +61,12 @@ function persistence_arguments(profile: AgentProfile): ReadonlyArray<string> {
 	return profile.role === agent_role_profile.WORKER ? [] : [EPHEMERAL_FLAG]
 }
 
-// The ledger directory is created up front — git would otherwise create it in a directory the sandbox
+// A granted directory is created up front — it would otherwise be created in a directory the sandbox
 // cannot write — and refused when it is not a real directory, so a symlink cannot widen the grant.
-function ensure_writable_directory(directory: string): void {
+function ensure_writable_directory(directory: string, mode?: number): void {
 	const current = lstatSync(directory, { throwIfNoEntry: false })
 
-	if (current === undefined) mkdirSync(directory, { recursive: true })
+	if (current === undefined) mkdirSync(directory, { recursive: true, mode })
 	else if (!current.isDirectory() || current.isSymbolicLink()) {
 		throw new Error(`Writable root must be a real directory: ${directory}`)
 	}
@@ -127,10 +128,26 @@ function filesystem_config(grants: ReadonlyArray<Grant>): string {
 	return `${FILESYSTEM_KEY}={${pairs.join(',')}}`
 }
 
+// A `backlogrun` parent runs in the primary checkout, where no common git directory grant is given,
+// so the run-state directory its lanes write through that grant is granted on its own — without it the
+// parent's records would fall back to the temp root, apart from its lanes'.
+function state_grants(cwd: string): ReadonlyArray<Grant> {
+	const repository = git_common_directory.repository(cwd)
+	if (repository === undefined) return []
+
+	const state = durable_state.root_for(repository)
+
+	ensure_writable_directory(state, durable_state.STATE_DIRECTORY_MODE)
+
+	return [[realpathSync(state), WRITE]]
+}
+
 function lane_grants(cwd: string | undefined, profile: AgentProfile): ReadonlyArray<Grant> {
 	if (cwd === undefined) return []
 
 	const common_directory = git_common_directory.resolve(cwd)
+
+	if (common_directory === undefined) return state_grants(cwd)
 
 	return [...git_grants(common_directory), ...ledger_grants(common_directory, profile)]
 }

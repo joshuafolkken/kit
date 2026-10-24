@@ -7,7 +7,9 @@ const COMMAND = 'pnpm exec josh-app init'
 const NAME = 'app-kit-test-html-init'
 const CONFIG_FILE = 'josh-app.config.json'
 const STOP_COMMAND = 'pnpm josh backlogrun --stop'
-const LANE_CHILD_APPROVAL_PROBE = "cat /tmp/josh-lane-dispatch-*.log | grep -c 'requires approval'"
+const LANE_CHILD_APPROVAL_PROBE =
+	'cat "$(git rev-parse --path-format=absolute --git-common-dir)"/josh/run-state/josh-lane-dispatch-*.log' +
+	" | grep -c 'requires approval'"
 const IN_PROJECT_TARBALL_INSTALL =
 	'cp "$PACKAGE_TARBALL" . && pnpm add -D --allow-build=esbuild --allow-build=unrs-resolver "./$(basename "$PACKAGE_TARBALL")"'
 
