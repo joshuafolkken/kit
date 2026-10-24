@@ -169,6 +169,31 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 	})
 })
 
+// joshuafolkken/kit#4785: a `--review` ship's `test:pinned` stop joins the other checks' report.
+describe('run_ship_pre_detach.checks — the pinned check', () => {
+	const PINNED_STOP = 'unpinned scripts/a.ts:3\n'
+
+	async function pinned_stop(): Promise<{ code: number; out: string }> {
+		return { code: FAILED, out: PINNED_STOP }
+	}
+
+	it('stops on the pinned check alone when every other check passed', async () => {
+		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
+			code: FAILED,
+			out: PINNED_STOP,
+		})
+	})
+
+	it('reports the pinned stop after the other failures', async () => {
+		answer(new Map([[TYPE_CHECK, { exit_code: FAILED, output: TYPE_ERROR }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
+			code: FAILED,
+			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}\n\n${PINNED_STOP}`,
+		})
+	})
+})
+
 // joshuafolkken/kit#4594: a failure that printed nothing still names its check and how it ended.
 describe('run_ship_pre_detach.checks — the failed check is named', () => {
 	const NO_OUTPUT_EXIT = 2
