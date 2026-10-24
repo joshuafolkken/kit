@@ -24,6 +24,7 @@ const should_forward_stderr = true
 const ATTEST_CHECK = ['review:attest', '--check']
 const KEPT_REVIEW_NOTE =
 	'the reviewer wrote its findings before it failed — its review is kept; attest and record judge it.'
+const MISSING_FINDINGS_NOTE = 'the reviewer wrote no findings file at the expected path:'
 type Round = '1' | '2'
 
 const ROUND_ONE: Round = '1'
@@ -82,6 +83,25 @@ function current_verdict(slot?: ReviewSlot): ReturnType<typeof run_ship_review.r
 	return run_ship_review.read_verdict(stamp_file.read_stamp_text(paths(slot).findings))
 }
 
+// **A session that ended with no findings file names the path it was told to write**
+// (joshuafolkken/kit#4774): a reviewer that wrote its findings elsewhere otherwise stops the round
+// later, on a join or a record that never says the file is missing.
+function missing_findings(slots: ReadonlyArray<ReviewSlot>): string | undefined {
+	const missing = slots
+		.map((slot) => paths(slot).findings)
+		.filter((findings) => stamp_file.read_stamp_text(findings) === undefined)
+
+	return missing.length === 0 ? undefined : `${MISSING_FINDINGS_NOTE} ${missing.join(', ')}`
+}
+
+function finished_session(slots: ReadonlyArray<ReviewSlot>): JoshResult {
+	const missing = missing_findings(slots)
+
+	return missing === undefined
+		? { code: SUCCESS_EXIT_CODE, out: '' }
+		: failure(missing, CAUSE.INFRA)
+}
+
 // **A session that ran and then failed keeps the review it wrote** (joshuafolkken/kit#4562). The
 // findings file is removed before the launch and written as the reviewer's last step, so a readable one
 // is this session's finished review — a late auth failure or a lost broker reply then costs nothing,
@@ -89,7 +109,9 @@ function current_verdict(slot?: ReviewSlot): ReturnType<typeof run_ship_review.r
 // A broker answers for every slot it ran at once, so each slot's file must be readable.
 function ended_session(failed_note: string, slots: ReadonlyArray<ReviewSlot> = [CODE]): JoshResult {
 	if (slots.some((slot) => current_verdict(slot).kind === run_ship_review.VERDICT.INVALID)) {
-		return failure(failed_note, CAUSE.INFRA)
+		const missing = missing_findings(slots)
+
+		return failure(missing === undefined ? failed_note : `${failed_note}\n${missing}`, CAUSE.INFRA)
 	}
 
 	note(`${failed_note}\n${KEPT_REVIEW_NOTE}`)
@@ -119,7 +141,7 @@ async function run_direct_session(
 
 	if (result.exit_code !== SUCCESS_EXIT_CODE) return ended_session(exited_note(log_path), [slot])
 
-	return { code: SUCCESS_EXIT_CODE, out: '' }
+	return finished_session([slot])
 }
 
 // A lane child's reviewer is started by the lane's broker: an OpenAI lane's always, since a nested Codex
@@ -172,7 +194,7 @@ async function run_brokered(
 	const answer = await run_ship_brokered_review.request(PROJECT_ROOT, issue, round, slots)
 
 	return answer.is_success
-		? { code: SUCCESS_EXIT_CODE, out: '' }
+		? finished_session(slots)
 		: ended_session(`isolated reviewer failed: ${answer.reason}`, slots)
 }
 

@@ -1,0 +1,8 @@
+{
+	"reason": "A distinct moved join state and a named missing-findings stop for josh ship --review (#4774)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 42,
+		"prose.long_paragraphs": 1
+	}
+}

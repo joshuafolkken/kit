@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GATE_GREEN, GATE_RED, GATE_RUNNING } from './run-review'
+import { GATE_GREEN, GATE_MOVED, GATE_RED, GATE_RUNNING, run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
 
 // joshuafolkken/kit#2179: the CLI seam — that `--join` turns a red gate into a non-zero exit, which is
@@ -20,6 +20,11 @@ describe('join_exit_code', () => {
 
 	it('exits non-zero on a gate that never settled, rather than adopting over it', () => {
 		expect(run_review_cli.join_exit_code(GATE_RUNNING)).toBe(FAILURE_EXIT_CODE)
+	})
+
+	it('exits with its own code on a gate that passed before the tree moved', () => {
+		expect(run_review_cli.join_exit_code(GATE_MOVED)).toBe(run_review.MOVED_EXIT_CODE)
+		expect(run_review.MOVED_EXIT_CODE).not.toBe(FAILURE_EXIT_CODE)
 	})
 })
 

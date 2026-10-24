@@ -491,8 +491,9 @@ It composes `josh gate` and `josh review:brief` and changes neither, so `review:
 
 The default waits only for the gate to _start_ and prints the brief;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
-"a review verdict is not adopted over a red gate". The overlap's reader is
-`chain-rule.md`.
+"a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
+(a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
+and its gate stage re-runs on the moved tree. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 
