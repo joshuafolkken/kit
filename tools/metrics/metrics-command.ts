@@ -10,7 +10,7 @@ import { skill_meta } from '#tools/claude/skill-meta'
 import { z } from 'zod'
 import { metrics_base, type Reading } from './metrics-base'
 import { metrics_code_lines } from './metrics-code-lines'
-import { metrics_duration_probe } from './metrics-duration-probe'
+import { metrics_duration_probe, type Measurement } from './metrics-duration-probe'
 import { metrics_durations, type Durations } from './metrics-durations'
 import { metrics_logic, type AiCostTotals, type Metrics, type ScriptFile } from './metrics-logic'
 import { metrics_ratchet, type Verdict } from './metrics-ratchet'
@@ -230,11 +230,11 @@ async function check_totals_only(root: string, metrics: Metrics): Promise<number
 }
 
 // Both halves always run, so one failing gate names every total and every duration that grew.
-async function check(root: string, metrics: Metrics, durations: Durations): Promise<number> {
+async function check(root: string, metrics: Metrics, measurement: Measurement): Promise<number> {
 	const totals_exit = await check_totals(root, metrics)
 	const durations_file = await metrics_duration_probe.baseline_path()
 	const durations_exit =
-		durations_file === undefined ? 0 : metrics_duration_probe.check(durations_file, durations)
+		durations_file === undefined ? 0 : metrics_duration_probe.check(durations_file, measurement)
 
 	return Math.max(totals_exit, durations_exit)
 }
@@ -279,14 +279,14 @@ async function accept(
 }
 
 async function run_full(root: string, metrics: Metrics, parsed: MetricsArguments): Promise<number> {
-	const durations = await metrics_duration_probe.measure(root, parsed.is_startup_timed)
-	const shown = metrics_durations.render(durations, parsed.is_startup_timed)
+	const measurement = await metrics_duration_probe.measure(root, parsed.is_startup_timed)
+	const shown = metrics_durations.render(measurement.durations, parsed.is_startup_timed)
 
 	process.stdout.write(`${metrics_logic.render(metrics)}\n${shown}\n`)
 
-	if (parsed.reason === undefined) return await check(root, metrics, durations)
+	if (parsed.reason === undefined) return await check(root, metrics, measurement)
 
-	return await accept(root, metrics, durations, parsed.reason)
+	return await accept(root, metrics, measurement.durations, parsed.reason)
 }
 
 async function run_metrics(argv: ReadonlyArray<string>): Promise<number> {
