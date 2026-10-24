@@ -227,10 +227,13 @@ async function span_events_here(
 	table: TableRead | undefined,
 ): Promise<Pick<LocalRead, 'events' | 'found'>> {
 	const spanned = run_board_span.events_of(events, span)
+	// An overrun session outlives the run that launched it, so its notes and filings are read past the
+	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.
+	const since = run_board_span.events_of(events, { ...span, ended_ms: undefined })
 
 	return {
 		events: spanned,
-		found: run_board_found.found_of(spanned, await run_board_found.live_in(table)),
+		found: run_board_found.found_of(since, await run_board_found.live_in(table)),
 	}
 }
 

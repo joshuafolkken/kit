@@ -1,18 +1,35 @@
+import { stripVTControlCharacters } from 'node:util'
+import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import { describe, expect, it } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { Found } from './run-board-found'
 import type { BoardHeader } from './run-board-header'
 import type { BoardRow } from './run-board-layout'
+import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
 
-// joshuafolkken/kit#4772: a done row ends on the numbers of the Issues filed during its child, and on
-// the spinner — 🔍 where none turns — while its overrun investigation runs.
+// joshuafolkken/kit#4772, joshuafolkken/kit#4818: a merged row ends on its lane's net minutes and what
+// its overrun investigation came to — the numbers of the Issues filed during its child among it, the
+// spinner (🔍 where none turns) while the investigation runs.
 
 const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, lines_of } = run_board_render_fixture
 const DONE = 4711
 const SPINNER = '⠋'
 const STILL = '🔍'
 const FILED = ['4768', '4769', '4770']
+const MINUTES = 52
+const RECURRED = 'recurred #4790'
+const NARROW = 90
+const PANE_ROWS = 60
+const WITHIN: OverrunNote = { kind: 'within', issue: DONE, minutes: 18 }
+const STARTED_NOTE: OverrunNote = {
+	kind: 'started',
+	issue: DONE,
+	minutes: MINUTES,
+	pid: 1,
+	start: undefined,
+}
 
 function row_of(status: ItemStatus): BoardRow {
 	return {
@@ -27,6 +44,16 @@ function row_of(status: ItemStatus): BoardRow {
 }
 
 const MERGED: ItemStatus = { state: 'merged', started_ms: STARTED, ended_ms: NOW - MINUTE }
+
+function found_of(overrun: OverrunNote | undefined, extra: Partial<Found> = {}): Found {
+	const minutes = overrun !== undefined && 'minutes' in overrun ? overrun.minutes : undefined
+
+	return { filed: [], minutes, overrun, is_investigating: false, ...extra }
+}
+
+function ended(result: string): Found {
+	return found_of({ kind: 'ended', issue: DONE, result }, { minutes: MINUTES })
+}
 
 function board(
 	found: Found | undefined,
@@ -48,62 +75,155 @@ function done_line(found: Found | undefined, extra: Partial<BoardHeader> = {}): 
 	return row_line(board(found, extra))
 }
 
-describe('run_board_render — a done row’s filings', () => {
-	it('ends on the filed numbers with no `#`', () => {
-		const line = done_line({ filed: FILED, is_investigating: false })
+describe('run_board_render — a merged row’s net minutes', () => {
+	it('ends on the minutes alone at or under the threshold', () => {
+		expect(done_line(found_of(WITHIN))).toMatch(/\S \s*18′$/u)
+	})
 
-		expect(line).toMatch(/4768, 4769, 4770$/u)
+	it('says `?′ ⏭` and why the investigation was skipped', () => {
+		const skipped = found_of({ kind: 'skipped', issue: DONE, reason: 'ledger split' })
+
+		expect(done_line(skipped)).toMatch(/ {2}\?′ ⏭ ledger split$/u)
+	})
+
+	it('says `?′ ⏭ no record` where its merge left no note', () => {
+		expect(done_line(undefined)).toMatch(/ {2}\?′ ⏭ no record$/u)
+	})
+
+	it('draws none on a board that read no stream', () => {
+		expect(done_line(undefined, { found: undefined })).toMatch(/Issue 4711\s+\S+$/u)
+	})
+})
+
+describe('run_board_render — a merged row’s finished investigation', () => {
+	it('ends on 🔍 and the filed numbers, with no `#`', () => {
+		const line = done_line({ ...ended(run_event_overrun.FILED_RESULT), filed: FILED })
+
+		expect(line).toMatch(/52′ 🔍 4768, 4769, 4770$/u)
 		expect(line).not.toContain('#4768')
 	})
 
-	it('draws each number through the header’s link', () => {
-		const line = done_line(
-			{ filed: FILED, is_investigating: false },
-			{ link: (reference) => `<${reference}>` },
-		)
-
-		expect(line).toMatch(/<4768>, <4769>, <4770>$/u)
+	it('says `∅` and the reason none was filed', () => {
+		expect(done_line(ended('none: CI wait'))).toMatch(/52′ 🔍 ∅ CI wait$/u)
 	})
 
-	it('draws them on a 🏁 done row too', () => {
-		const status: ItemStatus = { ...MERGED, state: 'done' }
-		const line = row_line(board({ filed: FILED, is_investigating: false }, {}, status))
+	it('cuts a long reason', () => {
+		expect(done_line(ended('none: waited on a slow CI run'))).toMatch(/52′ 🔍 ∅ waited on a slo…$/u)
+	})
 
-		expect(line).toMatch(/4768, 4769, 4770$/u)
+	it('says `∅ ↻#N` for a recurrence commented on', () => {
+		expect(done_line(ended(RECURRED))).toMatch(/52′ 🔍 ∅ ↻#4790$/u)
+	})
+
+	it('says 💥 for a launch that failed', () => {
+		const failed = found_of({ kind: 'failed', issue: DONE, minutes: MINUTES })
+
+		expect(done_line(failed)).toMatch(/52′ 🔍 💥$/u)
+	})
+
+	it('says 💥 for a session gone without its end note', () => {
+		expect(done_line(found_of(STARTED_NOTE))).toMatch(/52′ 🔍 💥$/u)
+	})
+
+	it('stands still on 🔍 for a session whose start token was never read', () => {
+		const unknown = found_of(STARTED_NOTE, { is_investigating: undefined })
+
+		expect(done_line(unknown, { spinner: SPINNER })).toMatch(/52′ 🔍$/u)
+	})
+
+	it('turns no spinner once it ended', () => {
+		const line = done_line(
+			{ ...ended(run_event_overrun.FILED_RESULT), filed: FILED },
+			{ spinner: SPINNER },
+		)
+
+		expect(line).toMatch(/52′ 🔍 4768, 4769, 4770$/u)
+	})
+})
+
+// joshuafolkken/kit#4818: the outcome takes its columns from the title, so the row stays one line.
+describe('run_board_render — a merged row’s width', () => {
+	it('cuts the title so the row fits a narrow pane', () => {
+		const found = { ...ended('none: waited on CI'), filed: FILED }
+		const size = { rows: PANE_ROWS, columns: NARROW }
+		const line = run_board_render
+			.render({ header: board(found), notes: [], size })
+			.map((drawn) => stripVTControlCharacters(drawn))
+			.find((drawn) => drawn.includes(String(DONE)))
+
+		expect(run_board_fit.width_of(line ?? '')).toBeLessThanOrEqual(NARROW)
+		expect(line).toMatch(/…\s.*52′ 🔍 ∅ waited on CI 4768, 4769, 4770$/u)
+	})
+})
+
+// joshuafolkken/kit#4818: the child's own filings follow whatever the investigation came to.
+describe('run_board_render — a merged row’s filings after its outcome', () => {
+	it('keeps them after ⏭', () => {
+		const skipped = found_of(
+			{ kind: 'skipped', issue: DONE, reason: 'no ledger' },
+			{ filed: FILED },
+		)
+
+		expect(done_line(skipped)).toMatch(/\?′ ⏭ no ledger 4768, 4769, 4770$/u)
+	})
+
+	it('keeps them after ⏭ no record', () => {
+		expect(done_line(found_of(undefined, { filed: FILED }))).toMatch(
+			/\?′ ⏭ no record 4768, 4769, 4770$/u,
+		)
+	})
+
+	it('keeps them after 💥', () => {
+		const failed = found_of({ kind: 'failed', issue: DONE, minutes: MINUTES }, { filed: FILED })
+
+		expect(done_line(failed)).toMatch(/52′ 🔍 💥 4768, 4769, 4770$/u)
+	})
+
+	it('says the recurrence before them', () => {
+		const line = done_line({ ...ended(RECURRED), filed: FILED })
+
+		expect(line).toMatch(/52′ 🔍 ∅ ↻#4790 4768, 4769, 4770$/u)
+	})
+})
+
+describe('run_board_render — a done row’s filings', () => {
+	it('draws each number through the header’s link', () => {
+		const line = done_line(found_of(WITHIN, { filed: FILED }), {
+			link: (reference) => `<${reference}>`,
+		})
+
+		expect(line).toMatch(/18′ <4768>, <4769>, <4770>$/u)
+	})
+
+	it('draws only them on a 🏁 done row', () => {
+		const status: ItemStatus = { ...MERGED, state: 'done' }
+		const line = row_line(board(found_of(undefined, { filed: FILED }), {}, status))
+
+		expect(line).toMatch(/″ +4768, 4769, 4770$/u)
+		expect(line).not.toContain('′ ')
 	})
 
 	it('draws none on a row still running', () => {
 		const status: ItemStatus = { state: 'running', started_ms: STARTED }
-		const line = row_line(board({ filed: FILED, is_investigating: true }, {}, status))
+		const running = found_of(STARTED_NOTE, { filed: FILED, is_investigating: true })
+		const line = row_line(board(running, {}, status))
 
 		expect(line).not.toContain('4768')
 		expect(line).not.toContain(STILL)
 	})
-
-	it('draws a row with nothing filed and no investigation as before', () => {
-		expect(done_line({ filed: [], is_investigating: false })).toBe(done_line(undefined))
-		expect(done_line(undefined)).toMatch(/Issue 4711\s+\S+$/u)
-	})
 })
 
-describe('run_board_render — a done row’s running investigation', () => {
-	it('ends on the spinner after the numbers where one turns', () => {
-		const line = done_line({ filed: FILED, is_investigating: true }, { spinner: SPINNER })
+describe('run_board_render — a merged row’s running investigation', () => {
+	const running = found_of(STARTED_NOTE, { filed: FILED, is_investigating: true })
 
-		expect(line).toMatch(new RegExp(`4770 ${SPINNER}$`, 'u'))
+	it('ends on the spinner and the numbers where one turns', () => {
+		expect(done_line(running, { spinner: SPINNER })).toMatch(/52′ ⠋ 4768, 4769, 4770$/u)
 	})
 
 	it('ends on 🔍 where no spinner turns, and the legend names it', () => {
-		const lines = lines_of(board({ filed: [], is_investigating: true }))
+		const lines = lines_of(board(found_of(STARTED_NOTE, { is_investigating: true })))
 
-		expect(lines.find((line) => line.includes(String(DONE)))).toMatch(new RegExp(`${STILL}$`, 'u'))
+		expect(lines.find((line) => line.includes(String(DONE)))).toMatch(/52′ 🔍$/u)
 		expect(lines.join('\n')).toContain(`${STILL} overrun investigation`)
-	})
-
-	it('draws neither once the investigation is over', () => {
-		const line = done_line({ filed: FILED, is_investigating: false }, { spinner: SPINNER })
-
-		expect(line).not.toContain(SPINNER)
-		expect(line).not.toContain(STILL)
 	})
 })

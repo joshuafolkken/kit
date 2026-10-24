@@ -121,3 +121,18 @@ describe('lane_net_time.net_minutes', () => {
 		expect(lane_net_time.net_minutes([dispatch(0)], [], ISSUE)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#4818: a merged lane with no net time says why on its board row.
+describe('lane_net_time.missing_reason', () => {
+	it('names a missing dispatch', () => {
+		expect(lane_net_time.missing_reason([dispatch(0, OTHER), merge(30)], ISSUE)).toBe('no dispatch')
+	})
+
+	it('names a missing merge', () => {
+		expect(lane_net_time.missing_reason([dispatch(0)], ISSUE)).toBe('no merge')
+	})
+
+	it('names neither when the merge precedes the dispatch', () => {
+		expect(lane_net_time.missing_reason([merge(0), dispatch(10)], ISSUE)).toBe('cause unknown')
+	})
+})

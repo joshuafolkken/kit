@@ -179,8 +179,9 @@ function row_draw(indent: string, row: BoardRow, frame: RowFrame): (cut: RowCut)
 
 // A row drawn with lane cells keeps its head on one line, its title giving up their columns where the
 // pane is narrow. A row that draws a tail keeps its whole line, giving up the columns its section's
-// rows give up together (joshuafolkken/kit#4226). A done row that ends on what was filed during it keeps
-// its line too, its title giving up the columns alone.
+// rows give up together (joshuafolkken/kit#4226). A done row that ends on what was filed during it, and
+// every merged row on a board that read the stream (its minutes, joshuafolkken/kit#4818), keeps its line
+// too, its title giving up the columns alone.
 function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 	const is_tailed = run_board_render_tail.tail_of(row, frame.header).length > 0
 	const is_found = run_board_render_found.found_text(row, frame.header) !== ''

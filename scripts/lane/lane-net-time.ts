@@ -19,9 +19,13 @@ interface LaneSpan {
 	to_ms: number
 }
 
+function entries_of(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<LedgerEntry> {
+	return entries.filter((entry) => 'issue' in entry && entry.issue === issue)
+}
+
 // The first dispatch of `issue` to its merge, or `undefined` while either is missing.
 function span_of(entries: ReadonlyArray<LedgerEntry>, issue: number): LaneSpan | undefined {
-	const of_issue = entries.filter((entry) => 'issue' in entry && entry.issue === issue)
+	const of_issue = entries_of(entries, issue)
 	const from = of_issue.find((entry) => lane_stage_stats.is_dispatch(entry))
 	const to = of_issue.findLast((entry) => lane_stage_stats.is_merge(entry))
 
@@ -85,6 +89,17 @@ function net_minutes(
 	return net === undefined ? undefined : Math.ceil(net / MS_PER_MINUTE)
 }
 
-const lane_net_time = { net_minutes, net_ms }
+// Why `net_ms` has no answer for `issue` (joshuafolkken/kit#4818): the ledger lacks its dispatch or its
+// merge, or holds both with the merge first.
+function missing_reason(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
+	const of_issue = entries_of(entries, issue)
+
+	if (of_issue.every((entry) => !lane_stage_stats.is_dispatch(entry))) return 'no dispatch'
+	if (of_issue.every((entry) => !lane_stage_stats.is_merge(entry))) return 'no merge'
+
+	return 'cause unknown'
+}
+
+const lane_net_time = { missing_reason, net_minutes, net_ms }
 
 export { lane_net_time }

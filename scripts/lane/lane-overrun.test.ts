@@ -83,14 +83,14 @@ beforeEach(() => {
 })
 
 describe('lane_overrun.investigate — a lane at or under 40 minutes', () => {
-	it('stops before reading any record of a 40-minute lane', async () => {
+	it('records the net minutes of a 40-minute lane before reading any record of it', async () => {
 		mocks.read_entries.mockReturnValue(lane(40))
 
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.transcripts).not.toHaveBeenCalled()
 		expect(mocks.launch).not.toHaveBeenCalled()
-		expect(mocks.emit).not.toHaveBeenCalled()
+		expect(notes()).toStrictEqual([`#${String(ISSUE)} net: 40 min`])
 	})
 
 	it('stops on a lane long only for its wait on a person', async () => {
@@ -101,13 +101,33 @@ describe('lane_overrun.investigate — a lane at or under 40 minutes', () => {
 
 		expect(mocks.launch).not.toHaveBeenCalled()
 	})
+})
 
-	it('stops where no ledger is kept', async () => {
+// joshuafolkken/kit#4818: a lane whose net time cannot be read was passed by with no trace.
+describe('lane_overrun.investigate — a lane with no net time', () => {
+	it('records the skip where no ledger is kept', async () => {
 		mocks.target.mockResolvedValue(undefined)
 
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.launch).not.toHaveBeenCalled()
+		expect(notes()).toStrictEqual([`#${String(ISSUE)} overrun skipped: no ledger`])
+	})
+
+	it('records the skip of a lane the ledger holds no dispatch of', async () => {
+		mocks.read_entries.mockReturnValue(lane(41).slice(1))
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(notes()).toStrictEqual([`#${String(ISSUE)} overrun skipped: no dispatch`])
+	})
+
+	it('records the skip of a lane the ledger holds no merge of', async () => {
+		mocks.read_entries.mockReturnValue(lane(41).slice(0, 1))
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(notes()).toStrictEqual([`#${String(ISSUE)} overrun skipped: no merge`])
 	})
 })
 
@@ -181,6 +201,20 @@ describe('lane_overrun.investigate — what the session does with a cause', () =
 	})
 })
 
+// joshuafolkken/kit#4818: the merged row says the result, so it comes in a shape the board reads.
+describe('lane_overrun.investigate — the result the session records', () => {
+	beforeEach(async () => {
+		mocks.read_entries.mockReturnValue(lane(41))
+		await lane_overrun.investigate(ISSUE)
+	})
+
+	it('asks for a result the board reads', () => {
+		expect(launched_prompt()).toContain(`"#${String(ISSUE)} overrun: <result>"`)
+		expect(launched_prompt()).toContain('`filed` when you filed any, `recurred #<N>`')
+		expect(launched_prompt()).toContain('`none: <why, in about 15 characters>`')
+	})
+})
+
 describe('lane_overrun.investigate — the record of an overrun', () => {
 	beforeEach(() => {
 		mocks.read_entries.mockReturnValue(lane(41))
@@ -226,6 +260,25 @@ describe('lane_overrun.investigate — the record of an overrun', () => {
 	})
 })
 
+// joshuafolkken/kit#4818: a pass that threw left only its failure, so the next collection retries it.
+describe('lane_overrun.investigate — a lane whose earlier pass threw', () => {
+	it('is investigated again', async () => {
+		mocks.read_entries.mockReturnValue(lane(41))
+		mocks.all_events.mockResolvedValue([
+			{
+				pos: 1,
+				at: at(41),
+				kind: 'note',
+				text: `#${String(ISSUE)} overrun investigation failed: no profile`,
+			},
+		])
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(mocks.launch).toHaveBeenCalledOnce()
+	})
+})
+
 describe('lane_overrun.investigate — a lane already investigated or refused a session', () => {
 	beforeEach(() => {
 		mocks.read_entries.mockReturnValue(lane(41))
@@ -244,6 +297,21 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.launch).not.toHaveBeenCalled()
+		expect(mocks.emit).not.toHaveBeenCalled()
+	})
+
+	it('records once for a lane whose net minutes are on the stream', async () => {
+		const note: RunEvent = {
+			pos: 1,
+			at: at(41),
+			kind: 'note',
+			text: `#${String(ISSUE)} net: 9 min`,
+		}
+
+		mocks.all_events.mockResolvedValue([note])
+
+		await lane_overrun.investigate(ISSUE)
+
 		expect(mocks.emit).not.toHaveBeenCalled()
 	})
 
