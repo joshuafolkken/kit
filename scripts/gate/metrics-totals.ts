@@ -13,7 +13,6 @@ const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--tot
 // The form ship runs before the detach and before each scoped pair: it also re-records a growth the
 // branch's approval names (joshuafolkken/kit#4716).
 const METRICS_RERECORD_COMMAND: ReadonlyArray<string> = [...METRICS_TOTALS_COMMAND, '--rerecord']
-const APPROVAL_PREFIX = `${release_approval_prune.APPROVAL_DIRECTORY}/`
 // Neutral on the cause: a growth and a run that never finished both stop the pre-detach check.
 const NOTICE_HEADING =
 	'⚠ josh metrics --totals-only did not pass — settle it before `josh ship`, or the pre-detach check stops the ship (a total the branch approval names is re-recorded there):'
@@ -31,7 +30,7 @@ async function growth_notice(directory: string): Promise<string | undefined> {
 }
 
 function carries_approval(files: Readonly<Record<string, string>>): boolean {
-	return Object.keys(files).some((file) => file.startsWith(APPROVAL_PREFIX))
+	return Object.keys(files).some((file) => release_approval_prune.is_approval(file))
 }
 
 // Re-records the branch's approval before a scoped pair reads the tree, so a review fix that grows a

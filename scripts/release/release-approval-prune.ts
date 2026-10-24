@@ -8,11 +8,17 @@ import { git_spawn } from '#scripts/git/git-spawn'
 // no verdict. `--ignore-unmatch` makes a repository with no approvals a no-op.
 
 const APPROVAL_DIRECTORY = '.josh/metrics-accepted'
+const APPROVAL_PREFIX = `${APPROVAL_DIRECTORY}/`
 
 async function prune(): Promise<void> {
 	await git_spawn.read(['rm', '-r', '-q', '--ignore-unmatch', '--', APPROVAL_DIRECTORY])
 }
 
-const release_approval_prune = { APPROVAL_DIRECTORY, prune }
+// A repository-relative path under the approval directory.
+function is_approval(file: string): boolean {
+	return file.startsWith(APPROVAL_PREFIX)
+}
+
+const release_approval_prune = { APPROVAL_DIRECTORY, is_approval, prune }
 
 export { release_approval_prune }
