@@ -69,6 +69,36 @@ describe('test_red_logic.ran_file_count', () => {
 	})
 })
 
+describe('test_red_logic.failed_files', () => {
+	const TREE = '/var/folders/tree'
+	const REAL_TREE = '/private/var/folders/tree'
+
+	it('lists each failed file relative to the root it sits under, the real path included', () => {
+		const report = JSON.stringify({
+			testResults: [
+				{ name: `${TREE}/a.test.ts`, status: 'failed' },
+				{ name: `${TREE}/b.test.ts`, status: 'passed' },
+				{ name: `${REAL_TREE}/sub/c.test.ts`, status: 'failed' },
+			],
+		})
+
+		expect(test_red_logic.failed_files(report, [TREE, REAL_TREE])).toEqual([
+			'a.test.ts',
+			'sub/c.test.ts',
+		])
+	})
+
+	it('leaves out a file under no root, and fails none from an unreadable report', () => {
+		const outside = JSON.stringify({
+			testResults: [{ name: '/elsewhere/a.test.ts', status: 'failed' }],
+		})
+
+		expect(test_red_logic.failed_files(outside, [TREE])).toEqual([])
+		expect(test_red_logic.failed_files('', [TREE])).toEqual([])
+		expect(test_red_logic.failed_files(JSON.stringify({ testResults: [{}] }), [TREE])).toEqual([])
+	})
+})
+
 describe('test_red_logic.verdict_for', () => {
 	it('answers no-test when nothing ran, red on a failure and green on a pass', () => {
 		expect(test_red_logic.verdict_for(0, false)).toBe('no-test')

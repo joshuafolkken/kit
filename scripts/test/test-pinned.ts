@@ -18,7 +18,7 @@ import {
 } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_red } from './test-red'
-import type { RedVerdict } from './test-red-logic'
+import type { RedProbe } from './test-red-logic'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -56,7 +56,7 @@ async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<A
 
 // The verdict with this one hunk reverted. The file is put back before the next hunk runs, or that
 // hunk's tests would also see this revert.
-async function verdict_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<RedVerdict> {
+async function verdict_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<RedProbe> {
 	const target = path.join(tree.tree, hunk.file)
 	const content = await readFile(target, 'utf8')
 	const selection = [
@@ -69,7 +69,7 @@ async function verdict_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<
 	await writeFile(target, test_pinned_logic.revert(content, hunk))
 
 	try {
-		return await test_red.verdict_in(tree, selection)
+		return await test_red.probe_in(tree, selection)
 	} finally {
 		await writeFile(target, content)
 	}
@@ -80,8 +80,8 @@ async function verdicts_in(
 	tree: BaseTree,
 	hunks: ReadonlyArray<Hunk>,
 	workers: number,
-): Promise<Array<RedVerdict>> {
-	const verdicts: Array<RedVerdict> = []
+): Promise<Array<RedProbe>> {
+	const verdicts: Array<RedProbe> = []
 
 	for (const hunk of hunks) {
 		// eslint-disable-next-line no-await-in-loop -- the hunks share one tree, so each revert waits for the last restore
@@ -95,7 +95,7 @@ async function verdicts_in(
 async function checked_on(
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
-): Promise<Array<RedVerdict>> {
+): Promise<Array<RedProbe>> {
 	if (hunks.length === 0) return []
 	const plan = test_pinned_pool.lane_plan(hunks.length, await test_unit_guard.vitest_share([]))
 
@@ -124,8 +124,8 @@ async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
 async function verdicts_on(
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
-	known: ReadonlyArray<RedVerdict | undefined>,
-): Promise<Array<RedVerdict | undefined>> {
+	known: ReadonlyArray<RedProbe | undefined>,
+): Promise<Array<RedProbe | undefined>> {
 	const fresh = await checked_on(
 		paths,
 		hunks.filter((_hunk, index) => known[index] === undefined),
@@ -135,10 +135,10 @@ async function verdicts_on(
 }
 
 // Green and no-test both leave a hunk unpinned: either way nothing went red when it was reverted.
-function unpinned_of(hunk: Hunk, verdict: RedVerdict | undefined): Array<UnpinnedHunk> {
-	if (verdict === undefined || verdict === 'red') return []
+function unpinned_of(hunk: Hunk, probe: RedProbe | undefined): Array<UnpinnedHunk> {
+	if (probe === undefined || probe.verdict === 'red') return []
 
-	return [{ ...hunk, is_green: verdict === 'green' }]
+	return [{ ...hunk, is_green: probe.verdict === 'green' }]
 }
 
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
@@ -153,7 +153,7 @@ async function unpinned_on(
 	const keys = await keys_of(hunks)
 	const verdicts = await verdicts_on(paths, hunks, test_pinned_cache.known(cache, keys))
 
-	await test_pinned_cache.save(cache, test_pinned_cache_logic.stored(keys, verdicts))
+	await test_pinned_cache.save(cache, keys, verdicts)
 
 	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
 }
