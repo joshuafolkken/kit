@@ -176,8 +176,8 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	[STAGE.REVIEW]: (_done, state) =>
 		state.is_merged || (is_shipped(state) && state.is_review_stale !== true),
 	[STAGE.GATE]: (_done, state) => state.is_merged || is_shipped(state),
-	// The merge of the default branch before the gate: once pushed, a
-	// conflicting pull request is the followup's to merge again.
+	// The merge of the default branch before the gate: once pushed, a default branch that
+	// moved is the followup's to merge again.
 	[STAGE.SYNC]: (_done, state) => state.is_merged || is_shipped(state),
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// The round-2 pass reads the pushed fix delta, so its record is honored only
@@ -256,6 +256,7 @@ const run_ship_stage = {
 	end_attempt,
 	event_text,
 	is_done,
+	is_shipped,
 	mark_done,
 	mark_merge_waiting,
 	mark_place_waiting,

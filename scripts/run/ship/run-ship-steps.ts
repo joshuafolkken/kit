@@ -71,6 +71,17 @@ const SYNC_STEP: Step = {
 		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
 }
 
+// A default branch that moved since the sync stage is merged and gated again before the push
+// (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
+// that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+async function commit_stage(args: ShipArguments, state: ShipState): Promise<StepResult> {
+	const stop = run_ship_stage.is_shipped(state) ? undefined : await run_ship_sync.catch_up()
+
+	if (stop !== undefined) return stop
+
+	return await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title])
+}
+
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
 // first: a round-1 reviewer may have edited the tree since the preflight, and `josh gate` refuses a tree
 // with no green record. The commit step carries the `--skip-*` flags a resumed ship needs, so an
@@ -84,8 +95,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.COMMIT,
 		header: run_ship.COMMIT_HEADER,
-		run: async (args, state) =>
-			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]),
+		run: async (args, state) => await commit_stage(args, state),
 	},
 ]
 

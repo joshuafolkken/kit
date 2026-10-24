@@ -43,6 +43,16 @@ describe('run_ship_stop_cause.cause_of — the standard output a stage kept', ()
 	})
 })
 
+// joshuafolkken/kit#4825: the commit and followup stages gate a merged tree themselves.
+describe('run_ship_stop_cause.cause_of — a stop tagged as a check', () => {
+	it.each(['commit', 'followup'] as const)(
+		'reads a %s stop tagged as a check as one, whatever its output names',
+		(stage) => {
+			expect(cause_of(stage, { body: RATE_LIMITED, cause: CAUSE.CHECK })).toBe(CAUSE.CHECK)
+		},
+	)
+})
+
 describe('run_ship_stop_cause.cause_of — every stop that is not the infrastructure', () => {
 	it('reads a followup on a red check as a check', () => {
 		expect(cause_of('followup', { body: RED_CHECK })).toBe(CAUSE.CHECK)

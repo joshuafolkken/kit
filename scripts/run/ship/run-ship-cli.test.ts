@@ -44,9 +44,10 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	// No green record: the gate stage runs its checks, so no test reads this checkout's own record.
-	const gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(false)
-	const mocked = { scoped_gate, scoped_pair: scoped_mock, is_gate_green: gate_green }
+	// Green once a josh step ran — the gate is the first: the gate stage runs its checks and the commit
+	// stage's catch-up reuses them, so no test reads this checkout's own record.
+	const is_gate_green = vi.fn(async () => josh_run_mock.mock.calls.length > 0)
+	const mocked = { scoped_gate, scoped_pair: scoped_mock, is_gate_green }
 
 	return { run_ship_scoped: { ...actual.run_ship_scoped, ...mocked } }
 })

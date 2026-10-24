@@ -38,9 +38,11 @@ const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
 const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
 const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
+const catch_up_spy = vi.spyOn(run_ship_sync, 'catch_up')
 const remove_draft_spy = vi.spyOn(run_ship_body_draft, 'remove')
 
 beforeEach(() => {
+	catch_up_spy.mockReset().mockResolvedValue(undefined)
 	remove_draft_spy.mockReset().mockResolvedValue(undefined)
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
@@ -169,6 +171,37 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		expect(await step_for(STAGE.SYNC).run(ARGS, FRESH)).toBe(OK)
 		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(OK)
 		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify, expect.any(Function))
+	})
+})
+
+// joshuafolkken/kit#4825: a default branch that moved since the sync is merged and gated before the push.
+describe('run_ship_steps — the catch-up before the push', () => {
+	it('catches up with the default branch before the push', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, FRESH)
+
+		expect(catch_up_spy).toHaveBeenCalledOnce()
+		expect(catch_up_spy.mock.invocationCallOrder[0]).toBeLessThan(
+			josh_spy.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('stops on the catch-up before committing or pushing', async () => {
+		catch_up_spy.mockResolvedValue(FAILED)
+
+		expect(await step_for(STAGE.COMMIT).run(ARGS, FRESH)).toBe(FAILED)
+		expect(josh_spy).not.toHaveBeenCalled()
+	})
+
+	it('leaves the catch-up to the followup once a resumed ship already pushed', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, { ...FRESH, is_committed: true, is_pushed: true })
+
+		expect(catch_up_spy).not.toHaveBeenCalled()
+	})
+
+	it('catches up on a pushed branch that carries new work still to push', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, { ...FRESH, is_dirty: true, is_pushed: true })
+
+		expect(catch_up_spy).toHaveBeenCalledOnce()
 	})
 })
 
