@@ -53,3 +53,39 @@ describe('metrics_totals.growth_notice', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#4716: the branch's approval re-recorded before a scoped pair reads the tree.
+describe('metrics_totals.rerecord', () => {
+	const SOURCE = 'a.ts'
+	const WITHOUT_APPROVAL = Object.fromEntries([[SOURCE, 'digest']])
+	const WITH_APPROVAL = Object.fromEntries([
+		['.josh/metrics-accepted/4716.json', 'digest'],
+		[SOURCE, 'digest'],
+	])
+
+	it('runs the re-record form when the changed tree carries an approval', async () => {
+		await expect(metrics_totals.rerecord(DIRECTORY, WITH_APPROVAL)).resolves.toBe(true)
+		expect(run_mock).toHaveBeenCalledWith(
+			[...metrics_totals.METRICS_TOTALS_COMMAND, '--rerecord'],
+			{ cwd: DIRECTORY },
+		)
+	})
+
+	it('answers that it ran even when a total still grew, leaving the verdict to the gate', async () => {
+		run_mock.mockResolvedValue({ exit_code: 1, output: GROWN })
+
+		await expect(metrics_totals.rerecord(DIRECTORY, WITH_APPROVAL)).resolves.toBe(true)
+	})
+
+	it('runs nothing when the changed tree carries no approval', async () => {
+		await expect(metrics_totals.rerecord(DIRECTORY, WITHOUT_APPROVAL)).resolves.toBe(false)
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+
+	it('runs nothing outside kit', async () => {
+		is_kit_mock.mockReturnValue(false)
+
+		await expect(metrics_totals.rerecord(DIRECTORY, WITH_APPROVAL)).resolves.toBe(false)
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+})

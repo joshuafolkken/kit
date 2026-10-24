@@ -13,12 +13,16 @@ import { test_read_trace } from './test-read-trace'
 // entry is read as "nothing else reads this file".
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { head_commit: vi.fn() } }))
-vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_since: vi.fn() } }))
+vi.mock('#scripts/git/changed-paths', () => ({
+	changed_paths: { read_changed_paths: vi.fn(), read_changed_since: vi.fn() },
+}))
 vi.mock('#scripts/git/git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
 const ROOT = path.resolve('/repo')
 const HEAD = 'cafe1234'
 const DIRTY = 'notes.md'
+// A file the branch committed: in the change a test reads through git, not in `dirty`.
+const CHANGED = path.join('.josh', 'metrics-accepted', '1.json')
 const DIRECTORY = 'docs'
 const DOCUMENT = path.join(DIRECTORY, 'a.md')
 const READER = 'reader.ts'
@@ -30,10 +34,18 @@ function write_worker_record(environment: RecordingEnvironment): void {
 	writeFileSync(path.join(directory, '1-1-1.json'), JSON.stringify({ [DOCUMENT]: [READER] }))
 }
 
+async function run_recording(environment: RecordingEnvironment): Promise<number> {
+	await Promise.resolve()
+	write_worker_record(environment)
+
+	return 0
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.mocked(git_command.head_commit).mockResolvedValue(HEAD)
 	vi.mocked(changed_paths.read_changed_since).mockResolvedValue([DIRTY])
+	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED])
 	vi.mocked(git_spawn.read).mockResolvedValue(`${DIRECTORY}\0`)
 	vi.spyOn(test_read_map, 'write_map').mockImplementation(() => {
 		// The real map is this checkout's; the test reads what would have been written.
@@ -70,6 +82,7 @@ describe('test_read_recording.with_read_recording', () => {
 			version: test_read_map.MAP_VERSION,
 			commit: HEAD,
 			dirty: { [DIRTY]: review_tree.ABSENT_DIGEST },
+			change: [CHANGED],
 			directories: [DIRECTORY],
 			readers: { [DOCUMENT]: [READER] },
 		})
@@ -102,6 +115,17 @@ describe('test_read_recording.with_read_recording', () => {
 // joshuafolkken/kit#4425: a dirty file's digest is what lets a later run skip it, so it must be the
 // content the tests read — an edit made while they ran is a change they never saw.
 describe('test_read_recording.with_read_recording — a tree that moves during the run', () => {
+	it('records the map with no change when the checkout has no change base', async () => {
+		vi.mocked(changed_paths.read_changed_paths).mockRejectedValue(new Error('bad revision'))
+
+		await test_read_recording.with_read_recording(ROOT, ['run'], run_recording)
+
+		expect(test_read_map.write_map).toHaveBeenCalledWith(
+			ROOT,
+			expect.objectContaining({ commit: HEAD, change: [] }),
+		)
+	})
+
 	it('records the tree the run started on, not the one an edit during it left', async () => {
 		const run = vi.fn(async (environment: RecordingEnvironment) => {
 			write_worker_record(environment)

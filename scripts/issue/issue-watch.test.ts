@@ -5,9 +5,11 @@ import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_conditional, type ConditionalRead } from '#scripts/gh/git-gh-conditional'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { review_attest } from '#scripts/review/review-attest'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { issue_watch, type WatchRecord } from './issue-watch'
 import { issue_watch_diff } from './issue-watch-diff'
+import { issue_watch_gate } from './issue-watch-gate'
 
 // joshuafolkken/kit#3773: the per-checkout record of what a run last read of its issue. The poll has
 // to stay quiet inside its interval, keep an unread update across a 304, raise a new one, end with a
@@ -26,6 +28,8 @@ const COMMENT_ID = 7
 const INTERVAL_MS = 180_000
 const BASE_TIME = '2026-10-14T00:00:00.000Z'
 const LATER_TIME = '2026-10-14T01:00:00.000Z'
+const BRIEFED_AT = '2026-10-14T00:30:00.000Z'
+const OTHER_ISSUE = '4703'
 const COMMENTS = JSON.stringify([{ id: COMMENT_ID, user: { login: 'person' }, body: 'hi' }])
 
 const EARLIER_UPDATE = 'earlier update'
@@ -117,6 +121,53 @@ describe('issue_watch.record_baseline', () => {
 
 		await expect(issue_watch.record_baseline(ISSUE, root())).resolves.toBe(false)
 		expect(issue_watch.read_record(root())).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4736: a `josh run:entry` re-run that takes nothing in must not move
+// `acknowledged_at`, or the run's own review, briefed before it, reads as stale.
+async function rerun_baseline(body: string): Promise<string | undefined> {
+	stub_issue(changed(body))
+	await issue_watch.record_baseline(ISSUE, root(), new Date(LATER_TIME))
+
+	return issue_watch.read_record(root())?.acknowledged_at
+}
+
+// The real record and poll behind the gate; only the brief pointer and the GitHub reads are stubbed.
+async function refusal_after_rerun(body: string): Promise<string | undefined> {
+	vi.spyOn(review_attest, 'read_pointer').mockReturnValue({ nonce: 'n', taken_at: BRIEFED_AT })
+	seed()
+	stub_issue(changed(body), { kind: 'unchanged' })
+	await issue_watch.record_baseline(ISSUE, root(), new Date(LATER_TIME))
+
+	return await issue_watch_gate.review_refusal(root())
+}
+
+describe('issue_watch.record_baseline — a re-run over an existing record', () => {
+	it('keeps acknowledged_at for the same issue with no update', async () => {
+		seed()
+
+		await expect(rerun_baseline(BODY)).resolves.toBe(BASE_TIME)
+	})
+
+	it('advances acknowledged_at over another issue’s record or an update', async () => {
+		seed({ issue: OTHER_ISSUE })
+
+		await expect(rerun_baseline(BODY)).resolves.toBe(LATER_TIME)
+
+		seed()
+
+		await expect(rerun_baseline(EDITED_BODY)).resolves.toBe(LATER_TIME)
+	})
+})
+
+describe('issue_watch.record_baseline — the review brief across a re-run', () => {
+	it('keeps a review briefed before a re-run that took nothing in', async () => {
+		await expect(refusal_after_rerun(BODY)).resolves.toBeUndefined()
+	})
+
+	it('refuses a review briefed before a re-run that took an update in', async () => {
+		await expect(refusal_after_rerun(EDITED_BODY)).resolves.toContain(`briefed at ${BRIEFED_AT}`)
 	})
 })
 

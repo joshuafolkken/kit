@@ -1,0 +1,7 @@
+{
+	"reason": "The no-base checkout copies the source origin URL so origin-dependent tests match CI (#4738); the 7 lines are the fix itself",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

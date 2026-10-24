@@ -35,7 +35,7 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 
 ## `josh issue:ack` in detail
 
-`josh run:entry` records the issue as the run's baseline per checkout, so a lane child and a `fullrun` in your own checkout behave alike. The PreToolUse hook polls at most every three minutes with a conditional request and shows a person's body edit or new comment once; josh's own `<!-- josh:run -->`-marked comments and bot comments do not count. `issue:ack` prints what it takes in and makes that read the new baseline. A body edit on an issue whose author lacks write access is shown once as a notice without its text and never held for `issue:ack`, so an outsider's edit cannot instruct the run (#4633). Not detected: comment edits, and the seconds between `josh followup`'s last check and the merge.
+`josh run:entry` records the issue as the run's baseline per checkout, so a lane child and a `fullrun` in your own checkout behave alike. The PreToolUse hook polls at most every three minutes with a conditional request and shows a person's body edit or new comment once; josh's own `<!-- josh:run -->`-marked comments and bot comments do not count. `issue:ack` prints what it takes in and makes that read the new baseline. A `run:entry` re-run on the same issue that takes nothing in keeps the time the last update was taken in, so a review briefed before it stays valid (#4736). A body edit on an issue whose author lacks write access is shown once as a notice without its text and never held for `issue:ack`, so an outsider's edit cannot instruct the run (#4633). Not detected: comment edits, and the seconds between `josh followup`'s last check and the merge.
 
 ## `josh issue:release` in detail
 

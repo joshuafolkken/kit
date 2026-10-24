@@ -74,6 +74,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
 	{ path: 'docs/josh-commands-automation.md', bytes: 45_056 },
+	// `josh lane:net` (joshuafolkken/kit#4749) crossed the 69632 block.
 	{ path: 'docs/josh-commands-run.md', bytes: 73_728 },
 	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
 	{ path: 'docs/josh-commands.md', bytes: 53_248 },
@@ -84,8 +85,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
-	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block.
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 12_288 },
+	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
+	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one.
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 8192 },

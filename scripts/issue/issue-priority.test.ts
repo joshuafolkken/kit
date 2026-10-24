@@ -13,10 +13,22 @@ function body(declaration: string, extra = ''): string {
 	return `## 背景\n\n- 種別: 非不具合\n${extra}${declaration}\n\n## 期待効果\n\n`
 }
 
-function shortening(declaration: string, percent: string): string {
-	const line = `- 1 マージあたりの短縮: 4 分（レーン中央値 40 分 の ${percent}）`
+const CRITICAL_FLOOR = '`critical`'
 
-	return `${body(declaration, SHORTENING_LINE)}${line}\n`
+function reduction_line(percent: string): string {
+	return `- 1 マージあたりの短縮: 4 分（レーン中央値 40 分 の ${percent}）\n`
+}
+
+function shortening(declaration: string, percent: string, extra = ''): string {
+	return body(declaration, `${SHORTENING_LINE}${extra}`) + reduction_line(percent)
+}
+
+function lane_line(minutes: string): string {
+	return `- 原因のレーン: ${minutes} 分（#4695）\n`
+}
+
+function lane(minutes: string, declaration = ''): string {
+	return body(declaration, lane_line(minutes))
 }
 
 describe('issue_priority.declared_level', () => {
@@ -79,9 +91,17 @@ describe('issue_priority.floor_of', () => {
 describe('issue_priority.problem', () => {
 	it('refuses a declaration below the stated reduction', () => {
 		expect(issue_priority.problem(shortening('- 優先度: 高（短縮 10%）', '10%'), [])).toContain(
-			'`critical`',
+			CRITICAL_FLOOR,
 		)
-		expect(issue_priority.problem(shortening('', '3%'), [])).toContain('`high`')
+		expect(issue_priority.problem(shortening('- 優先度: 通常', '3%'), [])).toContain('`high`')
+	})
+
+	it('files a body that declares no priority at its reduction floor', () => {
+		expect(issue_priority.problem(shortening('', '3%'), [])).toBeUndefined()
+		expect(issue_priority.with_label(BASE, shortening('', '3%'))).toStrictEqual([
+			...BASE,
+			PRIORITY_HIGH_LABEL,
+		])
 	})
 
 	it('accepts a declaration at or above the stated reduction', () => {
@@ -103,6 +123,57 @@ describe('issue_priority.problem', () => {
 	it('does not judge the body when a priority label was typed', () => {
 		expect(issue_priority.problem(body('- 優先度: 高'), [PRIORITY_CRITICAL_LABEL])).toBeUndefined()
 	})
+})
+
+describe('issue_priority causing lane (joshuafolkken/kit#4749)', () => {
+	it.each([
+		['64', [PRIORITY_CRITICAL_LABEL]],
+		['60.5', [PRIORITY_CRITICAL_LABEL]],
+		['60', [PRIORITY_HIGH_LABEL]],
+		['45', [PRIORITY_HIGH_LABEL]],
+		['40', []],
+	])('files a %s-minute causing lane with no declaration at %j', (minutes, labels) => {
+		expect(issue_priority.problem(lane(minutes), [])).toBeUndefined()
+		expect(issue_priority.with_label(BASE, lane(minutes))).toStrictEqual([...BASE, ...labels])
+	})
+
+	it('refuses a declaration below the causing lane, naming the critical floor', () => {
+		const filed = issue_priority.problem(lane('64', HIGH_WITH_DEADLINE), [])
+
+		expect(filed).toContain(CRITICAL_FLOOR)
+		expect(filed).toContain('緊急')
+		expect(filed).toContain('causing lane')
+		expect(filed).toContain('原因のレーン …')
+	})
+
+	it('accepts an urgent declaration that names the causing lane as its basis', () => {
+		expect(
+			issue_priority.problem(lane('64', '- 優先度: 緊急（原因のレーン 64 分）'), []),
+		).toBeUndefined()
+	})
+
+	it.each([
+		['- 原因のレーン: 長い 分（#4695）'],
+		['- 原因のレーン: 64 分'],
+		['- 原因のレーン: 64 分（4695）'],
+	])('refuses the malformed line %j', (line) => {
+		expect(issue_priority.problem(body('', `${line}\n`), [])).toContain('lane:net')
+	})
+})
+
+describe('issue_priority.floor_of with a causing lane', () => {
+	it.each([
+		['10%', '45', 'critical'],
+		['3%', '64', 'critical'],
+		['3%', '30', 'high'],
+	])(
+		'takes the higher floor of a %s reduction and a %s-minute lane: %s',
+		(percent, minutes, level) => {
+			const filed = shortening('', percent, lane_line(minutes))
+
+			expect(issue_priority.floor_of(filed)).toBe(level)
+		},
+	)
 })
 
 describe('issue_priority.with_label', () => {

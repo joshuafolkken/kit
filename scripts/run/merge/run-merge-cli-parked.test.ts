@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_merge_steps_fixture } from './run-merge-steps-fixture'
 
 // joshuafolkken/kit#3017: a child that parked itself has its `in-progress` dropped, as a failed child's
 // is — left on, it outlived the `needs-decision` a person lifted and held the backlog.
@@ -8,6 +9,7 @@ const release_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const record_change_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
+const do_merged_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
 
@@ -27,7 +29,11 @@ vi.mock('#scripts/issue/issue-merged', () => ({
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock, current_events: events_mock },
+	run_event_stream_emit: {
+		emit: emit_mock,
+		current_events: events_mock,
+		invocation_or_all_events: events_mock,
+	},
 }))
 
 vi.mock('#scripts/lane/lane-ledger', () => ({
@@ -43,7 +49,7 @@ vi.mock('./run-merge-steps', () => ({
 		ask_next: vi.fn().mockResolvedValue('2039'),
 		do_failed: do_failed_mock,
 		release_child: release_mock,
-		do_merged: vi.fn().mockResolvedValue(undefined),
+		do_merged: do_merged_mock,
 		has_resumable_cut: vi.fn().mockResolvedValue(false),
 		is_over_budget: vi.fn().mockResolvedValue(false),
 		refused_carry: vi.fn().mockResolvedValue(undefined),
@@ -76,6 +82,7 @@ beforeEach(() => {
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
 	record_change_mock.mockReset().mockResolvedValue({ kind: 'skipped', reason: 'test' })
 	do_failed_mock.mockReset()
+	do_merged_mock.mockReset().mockImplementation(run_merge_steps_fixture.record_merged)
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
 })
@@ -172,7 +179,10 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 
 		await run_merge_cli.merge_child(context())
 
-		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD))
+		expect(record_merge_mock).toHaveBeenCalledWith(
+			Number(CHILD),
+			run_merge_steps_fixture.CONFIRMED_AT,
+		)
 	})
 
 	it('records nothing for a parked child', async () => {

@@ -19,6 +19,7 @@ import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
+import { issue_file_cap } from './issue-file-cap'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
@@ -29,11 +30,11 @@ import { issue_wip } from './issue-wip'
 import { size_estimate } from './size-estimate'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
-// with every filing step run in order: the third-party refusal, the body
+// [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
+// [--release]` — file an Issue with every filing step run in order: the third-party refusal, the body
 // lint, the size estimate against the split guide, the `## Origin` check for another repository, the `auto-ok` decision
-// with the run label it owes, the start condition read as a pull request, the fold question against
-// the run's earlier
+// with the run label it owes, the start condition read as a pull request, the filing cap per origin,
+// the fold question against the run's earlier
 // filings, the WIP cap count, the
 // duplicate scout, the missing workflow labels created, the create call
 // carrying every label, the release link on `--release`, and `epic:bundle`.
@@ -43,7 +44,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
@@ -248,7 +249,7 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		number,
 		issue_file_fold.reference_prefix(filing.target, filing.current),
 	)
-	const found_during = await issue_file_fold.finder()
+	const found_during = await issue_file_fold.finder(filing.args.found_during)
 	const kind = run_event_filed.kind_of(labels)
 	const is_run = await run_hold_member.is_run_member()
 	const { title } = filing.args
@@ -293,12 +294,17 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 	return SUCCESS_EXIT_CODE
 }
 
-// The holds that read the run and the backlog, in the order they cost: the fold reads the local event
-// stream and diff, the WIP count one listing, the scout a search.
+// The holds that read the run and the backlog, in the order they cost: the filing cap reads the local
+// event stream, the fold the stream and diff, the WIP count one listing, the scout a search.
 async function is_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 
-	if (!(await issue_file_fold.is_fold_clear(prefix, filing.args))) return false
+	if (
+		!(await issue_file_cap.is_cap_clear(filing.args.found_during)) ||
+		!(await issue_file_fold.is_fold_clear(prefix, filing.args))
+	) {
+		return false
+	}
 
 	return (await is_wip_clear(filing)) && (await is_scout_clear(filing))
 }

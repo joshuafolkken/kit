@@ -20,7 +20,6 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
 	'direct-issue-read': [],
-	'filing-cap': [HEREDOC],
 	'issue-comments': [],
 	'shell-body': [],
 	'raw-field-body': [QUOTED, HEREDOC],

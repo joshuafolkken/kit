@@ -10,9 +10,9 @@ const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
-const place_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: place_mock } }))
+// The lane-place wait is covered in `run-ship-return-waiter.test.ts`.
+vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: vi.fn() } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -25,7 +25,12 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
-	lane_session_broker: { serving_session: serving_mock, request: request_mock },
+	lane_session_broker: {
+		serving_session: serving_mock,
+		request: request_mock,
+		is_unreadable: (answer: { reason?: string }): boolean =>
+			answer.reason?.includes('could not read the request') === true,
+	},
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
@@ -35,10 +40,7 @@ vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => 
 
 // No session waits on the ship here: `run-ship-return-waiter.test.ts` covers the one that does.
 vi.mock('./run-ship-probe', () => ({
-	run_ship_probe: {
-		read_review_stale: stale_mock,
-		repository_directory: async (): Promise<undefined> => undefined,
-	},
+	run_ship_probe: { read_review_stale: stale_mock, repository_directory: vi.fn() },
 }))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
@@ -82,10 +84,6 @@ beforeEach(() => {
 	park_mock.mockReset().mockResolvedValue(true)
 	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-})
-
-beforeEach(() => {
-	place_mock.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_ship_return.return_control', () => {
@@ -147,28 +145,6 @@ describe('run_ship_return.return_control on a merge wait that needs judgement', 
 
 		expect(invocation).toContain(output)
 		expect(invocation.endsWith(`fullrun #${ISSUE}`)).toBe(true)
-	})
-})
-
-// joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
-// place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
-describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
-	it('waits for a place for its lane before it relaunches the stop with its output', async () => {
-		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
-			'relaunched',
-		)
-		expect(place_mock).toHaveBeenCalledWith(LANE, 'followup')
-		expect(place_mock.mock.invocationCallOrder[0]).toBeLessThan(
-			relaunch_mock.mock.invocationCallOrder[0] ?? 0,
-		)
-		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
-	})
-
-	it('waits for no place past the ship-stop cap', async () => {
-		is_over_mock.mockResolvedValue(true)
-		await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)
-
-		expect(place_mock).not.toHaveBeenCalled()
 	})
 })
 

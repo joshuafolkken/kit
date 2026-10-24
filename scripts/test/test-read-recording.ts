@@ -36,16 +36,28 @@ async function commit_directories(commit: string): Promise<Array<string>> {
 	return output.split('\0').filter((listed) => listed.length > 0)
 }
 
-type TreeSnapshot = Pick<ReadMap, 'commit' | 'dirty' | 'directories'>
+type TreeSnapshot = Pick<ReadMap, 'commit' | 'dirty' | 'change' | 'directories'>
 
-// The tree the run read: the commit, every file that differed from it with its content's digest, and
-// the directories it holds. **Read before the run starts**: a digest taken after it would vouch for
-// an edit made while the tests ran as content they read.
+// A checkout with no change base (no default-branch ref) still records its map, with no change to
+// discount: every read then counts, which narrows less, never wrongly.
+async function own_change(): Promise<Array<string>> {
+	try {
+		return await changed_paths.read_changed_paths(false)
+	} catch {
+		return []
+	}
+}
+
+// The tree the run read: the commit, every file that differed from it with its content's digest, the
+// checkout's change from its change base, and the directories it holds. **Read before the run
+// starts**: a digest taken after it would vouch for an edit made while the tests ran as content they
+// read.
 async function tree_snapshot(root: string): Promise<TreeSnapshot> {
 	const commit = await git_command.head_commit()
 	const dirty = input_fingerprint.of_files(root, await changed_paths.read_changed_since(commit))
+	const change = await own_change()
 
-	return { commit, dirty, directories: await commit_directories(commit) }
+	return { commit, dirty, change, directories: await commit_directories(commit) }
 }
 
 // A map that cannot be written — no git, a read-only common directory — leaves the previous map in

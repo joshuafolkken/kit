@@ -7,6 +7,7 @@ const place_mock = vi.hoisted(() => vi.fn())
 const is_over_mock = vi.hoisted(() => vi.fn())
 const REPOSITORY = vi.hoisted(() => '/repository')
 const ISSUE = vi.hoisted(() => '4711')
+const LANE = vi.hoisted(() => ({ issue: ISSUE, directory: `/lanes/${ISSUE}` }))
 
 vi.mock('./run-ship-waiter', () => ({ run_ship_waiter: { offer: offer_mock } }))
 vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: place_mock } }))
@@ -26,9 +27,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: (): boolean => true },
 }))
 vi.mock('#scripts/lane/lane-registry', () => ({
-	lane_registry: {
-		find_open_lane: async (): Promise<object> => ({ issue: ISSUE, directory: '/lanes/4711' }),
-	},
+	lane_registry: { find_open_lane: async (): Promise<object> => LANE },
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
@@ -86,5 +85,27 @@ describe('run_ship_return.return_control — a waiting session', () => {
 
 		expect(await run_ship_return.return_control(ISSUE, STAGE, RESUME, OUTPUT)).toBe('parked')
 		expect(offer_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
+// place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
+describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
+	it('waits for a place for its lane before it relaunches the stop with its output', async () => {
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
+			'relaunched',
+		)
+		expect(place_mock).toHaveBeenCalledWith(LANE, 'followup')
+		expect(place_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			relaunch_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
+	})
+
+	it('waits for no place past the ship-stop cap', async () => {
+		is_over_mock.mockResolvedValue(true)
+		await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)
+
+		expect(place_mock).not.toHaveBeenCalled()
 	})
 })

@@ -10,6 +10,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh behavior` · `josh bh` | — | developer | files | Check the current run's recorded transcript against the behavior assertions (no model call) |
 | `josh bytes` · `josh by` | `<files...>` | developer | none | Print an agent-read document's byte size against its ceiling and the headroom left |
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
+| `josh check:related` · `josh cr` | — | developer | processes | Run related lint, unit and dotfile spelling checks in parallel |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |
@@ -20,7 +21,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
 | `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |
-| `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
+| `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
 | `josh port` · `josh pt` | `<dev\|preview>` | developer | none | Print the PORT_SEED-resolved dev or preview port |
 | `josh pr:classification` | — | automation | none | Require one release classification on a pull request |
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |
@@ -146,7 +147,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
-| `josh issue:file` | `<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` | automation | network | File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle |
+| `josh issue:file` | `<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]` | automation | network | File an Issue with every filing step: lint, Origin, filing cap, fold, WIP cap, duplicate scout, labels, then epic:bundle |
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
 | `josh issue:fold-existing` | `<assessment.json> [--json]` | automation | none | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
@@ -162,6 +163,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lane:launch` | `<issue> [--stash <message>]` | automation | files, git, processes | Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child |
 | `josh lane:limit` · `josh lli` | `[<limit>] [--reset]` | developer | files | Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes |
 | `josh lane:list` | — | automation | none | List the open lanes: which issue, which ports, and where each one is |
+| `josh lane:net` · `josh lnt` | `<issue>` | maintainer | none | Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks and outages stood |
 | `josh lane:open` | `<issue> [options]` | automation | files, git | Open a lane: a linked work tree with its own branch and its own port seed |
 | `josh lane:output` | `<issue> [path]` | automation | files | Record, or read back, where the unit running a lane’s child writes |
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |

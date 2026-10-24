@@ -1,0 +1,7 @@
+{
+	"reason": "record_baseline keeps acknowledged_at on a re-read that takes nothing in (#4736)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}

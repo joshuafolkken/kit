@@ -4,6 +4,7 @@ import { metrics_ratchet, type Approval } from './metrics-ratchet'
 
 const REASON = 'New guard for #1'
 const DATE = '2026-10-08'
+const LATER = '2026-10-09'
 const COMMIT = 'abc1234'
 const GUARDS = 'guards'
 const RULE_LINES = 'rules.lines'
@@ -163,6 +164,75 @@ describe('metrics_ratchet.accept', () => {
 		const approvals = approval === undefined ? [] : [approval]
 
 		expect(metrics_ratchet.compare(BASE, current, approvals)).toStrictEqual({ kind: 'approved' })
+	})
+})
+
+describe('metrics_ratchet.refresh', () => {
+	it('re-records a named total that grew past the approval at the growth measured now', () => {
+		const current = metrics_with({ guards: 8, rules: { files: 3, lines: 201 } })
+		const approval = approval_of({ [GUARDS]: 1, [RULE_LINES]: 5 })
+
+		expect(metrics_ratchet.refresh(approval, BASE, current, LATER)).toStrictEqual({
+			reason: REASON,
+			date: LATER,
+			growth: { [GUARDS]: 3, [RULE_LINES]: 5 },
+		})
+	})
+
+	it('re-records nothing while the approval still covers every total it names', () => {
+		const current = metrics_with({ guards: 6 })
+
+		expect(
+			metrics_ratchet.refresh(approval_of({ [GUARDS]: 1 }), BASE, current, LATER),
+		).toBeUndefined()
+	})
+
+	it('leaves a total the approval does not name to stop the comparison', () => {
+		const current = metrics_with({ guards: 6, rules: { files: 3, lines: 201 } })
+		const approval = approval_of({ [GUARDS]: 1 })
+		const refreshed = metrics_ratchet.refresh(approval, BASE, current, LATER)
+		const verdict = metrics_ratchet.compare(BASE, current, [refreshed ?? approval])
+
+		expect(refreshed).toBeUndefined()
+		expect(verdict.kind).toBe('regressed')
+	})
+
+	it('writes an approval the comparison then accepts after the growth rose again', () => {
+		const current = metrics_with({ guards: 9 })
+		const refreshed = metrics_ratchet.refresh(approval_of({ [GUARDS]: 1 }), BASE, current, LATER)
+
+		expect(
+			metrics_ratchet.compare(BASE, current, refreshed === undefined ? [] : [refreshed]),
+		).toStrictEqual({
+			kind: 'approved',
+		})
+	})
+})
+
+describe('metrics_ratchet.own_approval', () => {
+	const name = '1.json'
+	const text = metrics_ratchet.approval_text(approval_of({ [GUARDS]: 1 }))
+
+	it("returns the branch's own approval with its reason", () => {
+		const own = metrics_ratchet.own_approval(name, new Map([[name, text]]), new Map())
+
+		expect(own?.reason).toBe(REASON)
+	})
+
+	it('returns nothing for a file absent, held by the merge-base, or not parsed', () => {
+		expect(metrics_ratchet.own_approval(name, new Map(), new Map())).toBeUndefined()
+		expect(
+			metrics_ratchet.own_approval(name, new Map([[name, text]]), new Map([[name, text]])),
+		).toBeUndefined()
+		expect(
+			metrics_ratchet.own_approval(name, new Map([[name, NOT_JSON]]), new Map()),
+		).toBeUndefined()
+	})
+
+	it('returns nothing for an approval that records a blank reason', () => {
+		const blank = metrics_ratchet.approval_text({ ...approval_of({ [GUARDS]: 1 }), reason: ' ' })
+
+		expect(metrics_ratchet.own_approval(name, new Map([[name, blank]]), new Map())).toBeUndefined()
 	})
 })
 

@@ -32,6 +32,7 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'f00dcafe',
 	dirty: {},
+	change: [],
 	directories: [],
 	readers: { [READ_DOCUMENT]: [READER] },
 }

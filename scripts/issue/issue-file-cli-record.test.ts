@@ -31,6 +31,7 @@ function filing_to(target: string): Filing {
 		labels: [],
 		repo: target,
 		distinct: [],
+		found_during: undefined,
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,
@@ -70,6 +71,25 @@ describe('issue_file_cli.record — a split child', () => {
 			found_during: FINDER,
 			child: '#3438',
 		})
+	})
+})
+
+// joshuafolkken/kit#4750: `--found-during` names the finder over the lane child's mark.
+describe('issue_file_cli.record — a named finder', () => {
+	it('names the Issue the filing says it was found during', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		const filing = filing_to(HERE)
+
+		await issue_file_cli.record(
+			URL,
+			{ ...filing, args: { ...filing.args, found_during: '77' } },
+			[],
+		)
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.FILED,
+			`#3438[] ${TITLE} (found during #77)`,
+		)
 	})
 })
 

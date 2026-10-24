@@ -8,16 +8,16 @@ import {
 	FILING_COMMAND,
 	filings_tail,
 } from './delivered-rules-fixture'
-import { filing_cap } from './filing-cap'
 
 // joshuafolkken/kit#2119 / joshuafolkken/kit#2808: the delivery of the filing rules. A hand-built
-// filing is refused by `direct-filing` on every occurrence; the per-run cap triggers on the
-// `josh issue:file` call. The WIP cap and the fold question are the command's own steps
-// (joshuafolkken/kit#3423), so no row delivers them. The payload machinery is shared with
-// `delivered-rules.test.ts` through `delivered-rules-harness.ts`.
+// filing is refused by `direct-filing` on every occurrence. The filing cap, the WIP cap and the fold
+// question are the command's own steps (joshuafolkken/kit#3423, joshuafolkken/kit#4750), so no row
+// delivers them. The payload machinery is shared with `delivered-rules.test.ts` through
+// `delivered-rules-harness.ts`.
 
 const NOW_MS = 1_700_000_000_000
 const A_LATER_MS = NOW_MS + 1
+const ELEVEN_FILINGS = 11
 const harness = delivered_rules_harness.create_harness('rule-guard-filing-')
 const { payload_of } = harness
 
@@ -61,31 +61,14 @@ describe('delivered_rules.delivery — a direct filing is refused and pointed at
 	})
 })
 
-describe('delivered_rules.delivery — the filing cap at the call past the ceiling', () => {
-	it('says nothing while the run is under the cap', () => {
-		const tail = filings_tail(filing_cap.FILING_CAP - 1)
+describe('delivered_rules.delivery — an issue:file call reaches the command', () => {
+	// joshuafolkken/kit#4750: the filing cap counts per originating work item on the event stream, as
+	// `issue:file`'s own step, so no row counts the session transcript's filings against one ceiling.
+	it('lets an eleventh filing on the transcript through to the command', () => {
+		const tail = filings_tail(ELEVEN_FILINGS)
 
 		expect(
-			delivered_rules.delivery(payload_of('cap-under', FILING_COMMAND, 'Bash', tail), NOW_MS),
-		).toBeUndefined()
-	})
-
-	// **It fires on every filing past the cap, not once per run** — a second call is refused too.
-	it('refuses every filing once the cap is reached', () => {
-		const tail = filings_tail(filing_cap.FILING_CAP)
-		const payload = payload_of('cap-over', FILING_COMMAND, 'Bash', tail)
-
-		expect(delivered_rules.delivery(payload, NOW_MS)).toBe(delivered_rules.FILING_CAP_REASON)
-		expect(delivered_rules.delivery(payload, A_LATER_MS)).toBe(delivered_rules.FILING_CAP_REASON)
-	})
-
-	// A failed filing did not create an Issue, so it does not count: ten filings with one failed is
-	// nine, and the tenth is allowed.
-	it('does not count a failed filing toward the cap', () => {
-		const tail = filings_tail(filing_cap.FILING_CAP, 1)
-
-		expect(
-			delivered_rules.delivery(payload_of('cap-refused', FILING_COMMAND, 'Bash', tail), NOW_MS),
+			delivered_rules.delivery(payload_of('past-ten', FILING_COMMAND, 'Bash', tail), NOW_MS),
 		).toBeUndefined()
 	})
 
