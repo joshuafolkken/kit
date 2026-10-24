@@ -15,6 +15,10 @@ const REASON = 'the branch only logs'
 const PINNED_COMMAND = 'test:pinned'
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned_count: 1 }
+const START = 'Sat Oct 24 21:00:00 2026'
+const OTHER_START = 'Sun Oct 25 09:00:00 2026'
+// Taken before any spy, so a test can run the real comparison against a stubbed start.
+const { is_same_process } = process_identity
 // The join's grace after the pair, in milliseconds.
 const GRACE_MS = 120_000
 const CAP_PASSED = GRACE_MS + 1
@@ -47,6 +51,7 @@ function pinned_claim(checkout: string, admitted_at?: number): LiveReservation {
 beforeEach(() => {
 	vi.spyOn(core_budget, 'live_reservations').mockReturnValue([])
 	vi.spyOn(run_review_steps, 'launch_josh').mockReturnValue({ kind: 'launched', pid: PID })
+	vi.spyOn(process_identity, 'read_start').mockReturnValue(START)
 	// A wait that passes the grace signals `PID`'s group; no test may reach a real process.
 	vi.spyOn(process, 'kill').mockReturnValue(true)
 })
@@ -165,6 +170,18 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 		})
 	})
 
+	it('fails open at once on a check whose pid was reissued to a process with another start', async () => {
+		vi.mocked(run_review_steps.launch_josh).mockReturnValue({ kind: 'launched', pid: process.pid })
+		vi.spyOn(process_identity, 'is_same_process').mockImplementation((pid, start) =>
+			is_same_process(pid, start, () => OTHER_START),
+		)
+		run_review_pinned_steps.launch(ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(answer?.text).toContain('its process ended without an answer')
+	})
+
 	it('fails open on a check still running past the grace after the pair', async () => {
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
 		run_review_pinned_steps.launch(ROOT)
@@ -178,7 +195,7 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 
 describe('run_review_pinned_steps.wait_for_answer — stopping a late check', () => {
 	it("stops the check's whole process group once the grace has passed", async () => {
-		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
 		run_review_pinned_steps.launch(ROOT)
 
 		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
@@ -209,11 +226,55 @@ describe('run_review_pinned_steps.wait_for_answer — stopping a late check', ()
 	})
 })
 
+// joshuafolkken/kit#4828: a reopened pair stops the last check rather than leaving it running unowned.
+describe('run_review_pinned_steps.clear — the last check', () => {
+	it("stops the last check's process group while its pid still has the launch's start", () => {
+		const is_same = vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
+
+		run_review_pinned_steps.launch(ROOT)
+		run_review_pinned_steps.clear(ROOT)
+
+		expect(is_same).toHaveBeenCalledWith(PID, START)
+		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+	})
+
+	it('signals nothing once the last pid is reissued to a process with another start', () => {
+		vi.mocked(run_review_steps.launch_josh).mockReturnValue({ kind: 'launched', pid: process.pid })
+		vi.spyOn(process_identity, 'is_same_process').mockImplementation((pid, start) =>
+			is_same_process(pid, start, () => OTHER_START),
+		)
+
+		run_review_pinned_steps.launch(ROOT)
+		run_review_pinned_steps.clear(ROOT)
+
+		// The liveness probe signals `0` to the pid itself; the group is never signalled.
+		expect(process.kill).not.toHaveBeenCalledWith(-process.pid, 'SIGTERM')
+	})
+
+	it.each([
+		['is gone', false],
+		['has a start that could not be read', undefined],
+	])('signals nothing when the last pid %s', (_kind, is_same) => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(is_same)
+		run_review_pinned_steps.launch(ROOT)
+
+		run_review_pinned_steps.clear(ROOT)
+
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+
+	it('signals nothing when no check was launched', () => {
+		run_review_pinned_steps.clear(ROOT)
+
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+})
+
 // joshuafolkken/kit#4808: a check still queued for its cores when the pair ends could not finish
 // within the grace, so the join stops it at once.
 describe('run_review_pinned_steps.wait_for_answer — a check still queued for cores', () => {
 	it('stops it without waiting out the grace and fails open', async () => {
-		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
 		vi.mocked(core_budget.live_reservations).mockReturnValue([pinned_claim(ROOT)])
 		const now = vi.fn(() => 0)
 

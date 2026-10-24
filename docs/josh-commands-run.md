@@ -504,12 +504,11 @@ itself.
 The default waits only for the gate to _start_ and prints the brief;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 "a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
-(a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
+exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
-never drains. Under `--unpinned-ok` the check runs beside the pair too, launched with the reason, and
-`--join` prints the list with the reason and keeps the gate's exit code. The overlap's reader is
-`chain-rule.md`.
+never drains. Under `--unpinned-ok` the check runs too, and `--join` prints the list with the reason
+and keeps the gate's exit code. A scoped refusal launches neither; a reopen stops the last check. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 
