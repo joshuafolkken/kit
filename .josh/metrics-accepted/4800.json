@@ -1,0 +1,8 @@
+{
+	"reason": "poll-loop counts a sleeping counted for loop as a poll (#4800)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 13,
+		"ai_cost.on_demand_bytes": 280
+	}
+}
