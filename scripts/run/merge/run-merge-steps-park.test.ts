@@ -347,7 +347,7 @@ describe('run_merge_steps.do_merged — a child merged while its issue stayed OP
 	})
 
 	it('closes the issue, naming the merged pull request and run:merge', async () => {
-		await run_merge_steps.do_merged({ ...CONTEXT, merged_pr: PR_URL })
+		await run_merge_steps.do_merged({ ...CONTEXT, merged_pr: PR_URL }, vi.fn())
 
 		expect(ensure_closed_mock).toHaveBeenCalledWith(
 			{ issue_number: CHILD, pr_url: PR_URL, closer: 'pnpm josh run:merge' },
@@ -356,13 +356,13 @@ describe('run_merge_steps.do_merged — a child merged while its issue stayed OP
 	})
 
 	it('closes nothing for a child GitHub already closed', async () => {
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(ensure_closed_mock).not.toHaveBeenCalled()
 	})
 
 	it('closes the epics a child closed outside followup completed', async () => {
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(close_epics_mock).toHaveBeenCalledWith({ issue_number: CHILD, is_merged: true })
 	})

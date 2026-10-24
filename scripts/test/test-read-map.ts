@@ -24,6 +24,10 @@ interface ReadMap {
 	// content then (`input_fingerprint.of_files`), so one whose content has not moved since does not count as changed
 	// (joshuafolkken/kit#4425).
 	dirty: Record<string, string>
+	// The recording checkout's change as a test reads it through git — the branch diff from the change
+	// base plus the untracked files (`changed_paths.read_changed_paths`), committed or not
+	// (joshuafolkken/kit#4734).
+	change: Array<string>
 	// The directories `commit` holds, so a directory new since then is told apart from one no test
 	// read — the map's own keys cannot say which, since an unread directory has none.
 	directories: Array<string>
@@ -32,8 +36,9 @@ interface ReadMap {
 
 // Bumped whenever the shape, what a reader means or how `dirty` is digested changes, so a map an older
 // kit wrote reads as no map at all and the next full run writes it afresh. 6: `dirty` is
-// `input-fingerprint.ts`'s digest of every changed file (joshuafolkken/kit#4497).
-const MAP_VERSION = 6
+// `input-fingerprint.ts`'s digest of every changed file (joshuafolkken/kit#4497). 7: `change`
+// (joshuafolkken/kit#4734).
+const MAP_VERSION = 7
 
 const MAP_FILE_STEM = 'test-read-map'
 const RECORD_EXTENSION = '.json'
@@ -83,6 +88,7 @@ const FIELD_CHECKS: ReadonlyArray<[keyof ReadMap, (field: unknown) => boolean]> 
 	['version', (field) => field === MAP_VERSION],
 	['commit', (field) => typeof field === 'string'],
 	['dirty', is_digest_record],
+	['change', is_string_array],
 	['directories', is_string_array],
 	['readers', is_read_records],
 ]
@@ -175,10 +181,16 @@ function readers_of(map: ReadMap, relative: string): Array<string> {
 // leave a key whose directory is this one — a read is recorded before it runs, so a path absent then
 // still leaves its key. **A directory new since the recording counts too** (joshuafolkken/kit#4597):
 // a probe of it or a listing of its parent is one of `readers_of`'s keys, which the caller asks first.
+// **A read of the recording tree's own change does not count** (joshuafolkken/kit#4734): a test that
+// reads this checkout's change through git reads whatever file the recording lane held, so its own
+// `.josh/metrics-accepted/<N>.json` marked that directory read and sent the next lane's to the whole
+// suite. A listing or a walk of the directory, or a read of any other file there, still counts.
 function in_unread_directory(map: ReadMap, relative: string): boolean {
 	const directory = path.dirname(relative)
+	const change = new Set(map.change)
+	const keys = Object.keys(map.readers).filter((key) => !change.has(key))
 
-	return Object.keys(map.readers).every((key) => path.dirname(key) !== directory)
+	return keys.every((key) => path.dirname(key) !== directory)
 }
 
 function map_path(root: string, version: number = MAP_VERSION): string | undefined {

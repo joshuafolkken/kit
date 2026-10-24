@@ -1,0 +1,7 @@
+{
+	"reason": "#4734: run:merge records the merge after main:sync dated to its confirmation (record-once guard, issue close beside the sync), the read map's recording-change field excluded from in_unread_directory, and a shared do_merged test stub",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 43
+	}
+}
