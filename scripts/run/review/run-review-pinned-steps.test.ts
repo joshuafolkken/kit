@@ -11,6 +11,7 @@ import { run_review_steps } from './run-review-steps'
 
 const ROOT = `/nonexistent/run-review-pinned-${randomUUID()}`
 const PID = 4770
+const REASON = 'the branch only logs'
 const PINNED_COMMAND = 'test:pinned'
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned_count: 1 }
@@ -72,6 +73,27 @@ describe('run_review_pinned_steps.launch', () => {
 		run_review_pinned_steps.launch(ROOT)
 
 		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4793: an `--unpinned-ok` open launches in the background too, so its reason rides
+// on the launch record for the join to judge the answer by.
+describe('run_review_pinned_steps.launched_reason', () => {
+	it('reads back the reason the check was launched with', () => {
+		run_review_pinned_steps.launch(ROOT, REASON)
+
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+	})
+
+	it('answers none for a launch without a reason, and none once the next start clears it', () => {
+		run_review_pinned_steps.launch(ROOT, REASON)
+		run_review_pinned_steps.clear(ROOT)
+
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBeUndefined()
+
+		run_review_pinned_steps.launch(ROOT)
+
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBeUndefined()
 	})
 })
 

@@ -69,7 +69,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '--unpinned-ok "only logs"',
-					note: 'check in place first, carry on past unpinned places; the list and the reason follow the brief',
+					note: 'check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places',
 				},
 				{
 					arguments: '--join',

@@ -4,9 +4,10 @@ import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
 
 // joshuafolkken/kit#4647: `josh run:review` runs `josh test:pinned` for round 1, and
-// `--unpinned-ok "<reason>"` carries on with the reason printed after the brief for the reviewer.
-// joshuafolkken/kit#4770: without a reason the check runs in the background, so the gate and the brief
-// start without waiting on it; `--join` stops on its answer (`run-review-cli-join.test.ts`).
+// `--unpinned-ok "<reason>"` carries on past an unpinned change.
+// joshuafolkken/kit#4770, joshuafolkken/kit#4793: the check runs in the background with or without a
+// reason, so the gate and the brief start without waiting on it; `--join` judges its answer
+// (`run-review-cli-join.test.ts`).
 
 const { pinned_run, launch_gate, brief_run, launch_pinned, clear_pinned } = vi.hoisted(() => ({
 	pinned_run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>(),
@@ -39,16 +40,6 @@ vi.mock('./run-review-steps', () => ({
 
 const FAILURE_EXIT_CODE = 1
 const REASON = 'the branch only logs'
-const UNPINNED = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
-const PINNED_REPORT: PinnedReport = {
-	unpinned: [],
-	unchecked: [],
-	unparsed: [],
-	max_hunks: 20,
-	has_runner: true,
-}
-const UNPINNED_REPORT: PinnedReport = { ...PINNED_REPORT, unpinned: [UNPINNED] }
-const UNPINNED_LINE = 'unpinned a.ts:4 — reverting it left every related test green'
 
 const output = { stdout: [] as Array<string>, stderr: [] as Array<string> }
 
@@ -107,42 +98,18 @@ describe('run:review before round 1', () => {
 		expect(output.stderr.join('')).toContain('could not run, so nothing was checked: spawn refused')
 	})
 
-	it('carries on under --unpinned-ok and prints the list and the reason after the brief', async () => {
-		pinned_run.mockResolvedValue(UNPINNED_REPORT)
+	it('starts the gate and the brief under --unpinned-ok without waiting on test:pinned', async () => {
+		pinned_run.mockReturnValue(new Promise<PinnedReport>(() => undefined))
 
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(0)
+		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
 		expect(launch_gate).toHaveBeenCalledOnce()
-		expect(launch_pinned).not.toHaveBeenCalled()
-		expect(output.stdout.join('')).toBe(
-			`BRIEF\nunpinned 1 · unchecked 0\n${UNPINNED_LINE}\n` +
-				`Unpinned accepted by the implementer: ${REASON}\n`,
-		)
+		expect(pinned_run).not.toHaveBeenCalled()
+		expect(output.stdout.join('')).toBe('BRIEF\n')
 	})
 })
 
 describe('run:review when no brief follows', () => {
-	it('keeps the accepted list on stderr when the gate fails to start, so no brief follows', async () => {
-		pinned_run.mockResolvedValue(UNPINNED_REPORT)
-		launch_gate.mockReturnValue({ kind: 'failed', note: 'busy' })
-
-		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(
-			FAILURE_EXIT_CODE,
-		)
-		expect(output.stdout.join('')).toBe('')
-		expect(output.stderr.join('')).toContain(`Unpinned accepted by the implementer: ${REASON}\n`)
-	})
-
-	it('carries on under --unpinned-ok when test:pinned itself cannot run', async () => {
-		pinned_run.mockRejectedValue(new Error('worktree add failed'))
-
-		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(0)
-		expect(launch_gate).toHaveBeenCalledOnce()
-		expect(output.stdout.join('')).toBe('BRIEF\n')
-		expect(output.stderr.join('')).toContain(
-			'could not run, so nothing was checked: worktree add failed',
-		)
-	})
-
 	it('names --unpinned-ok in the usage line it refuses --unpinned-ok without a reason with', async () => {
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG])).toBe(FAILURE_EXIT_CODE)
 		expect(pinned_run).not.toHaveBeenCalled()
@@ -159,6 +126,15 @@ describe('run_review_pinned.verdict_of — the answer the join reads', () => {
 		expect(verdict).toStrictEqual({
 			kind: 'stop',
 			text: `LIST\n${run_review_pinned.STOP_NOTE}\n`,
+		})
+	})
+
+	it('accepts an unpinned change with the list and the reason it was launched with', () => {
+		const verdict = run_review_pinned.verdict_of({ text: 'LIST\n', unpinned_count: 1 }, REASON)
+
+		expect(verdict).toStrictEqual({
+			kind: 'accepted',
+			text: `LIST\nUnpinned accepted by the implementer: ${REASON}\n`,
 		})
 	})
 

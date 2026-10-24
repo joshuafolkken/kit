@@ -14,6 +14,7 @@ const GATE_LOG = '✔ verification gate passed (8 checks)'
 
 beforeEach(() => {
 	vi.spyOn(run_review_pinned_steps, 'wait_for_answer').mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(undefined)
 	vi.spyOn(run_review_steps, 'wait_for_gate_finish').mockResolvedValue(GATE_MOVED)
 	vi.spyOn(run_review_steps, 'read_gate_log').mockReturnValue(GATE_LOG)
 	vi.spyOn(run_review_steps, 'complete_timing').mockReturnValue(undefined)
@@ -95,5 +96,32 @@ describe('run --join on the background test:pinned', () => {
 
 		expect(await run_review_cli.run(['--join'])).toBe(0)
 		expect(errored()).toBe(LIST)
+	})
+})
+
+// joshuafolkken/kit#4793: an `--unpinned-ok` open launched the check with its reason, so the join
+// accepts the unpinned change with the words the open used to print, and keeps the gate's code.
+
+const REASON = 'the branch only logs'
+
+describe('run --join on a test:pinned launched under --unpinned-ok', () => {
+	beforeEach(() => {
+		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		vi.mocked(run_review_pinned_steps.launched_reason).mockReturnValue(REASON)
+		vi.mocked(run_review_pinned_steps.wait_for_answer).mockResolvedValue({
+			text: LIST,
+			unpinned_count: 1,
+		})
+	})
+
+	it("prints the list with the implementer's reason and keeps a green gate's exit code", async () => {
+		vi.mocked(run_review_steps.wait_for_gate_finish).mockResolvedValue(GATE_GREEN)
+
+		expect(await run_review_cli.run(['--join'])).toBe(0)
+		expect(errored()).toBe(`${LIST}Unpinned accepted by the implementer: ${REASON}\n`)
+	})
+
+	it("keeps a moved gate's exit code", async () => {
+		expect(await run_review_cli.run(['--join'])).toBe(run_review.MOVED_EXIT_CODE)
 	})
 })
