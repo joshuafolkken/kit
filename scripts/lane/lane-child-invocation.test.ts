@@ -118,6 +118,26 @@ describe('the ship-stop prompt with its stop context', () => {
 	})
 })
 
+// joshuafolkken/kit#4711: the session still waiting on the ship gets the stop without the resume frame.
+describe('the ship-stop note for the waiting session', () => {
+	it('gives the next step and the context without the resume frame', () => {
+		const failure = 'High: run-ship-waiter.ts'
+		const changed = 'scripts/run/ship/run-ship-waiter.ts'
+		const context = { excerpt: [failure], changed: [changed], more_changed: 0 }
+		const note = lane_child_invocation.ship_stop_note(ISSUE, {
+			...STOP,
+			stage: 'review',
+			title: `Other work #${ISSUE}`,
+			context,
+		})
+
+		expect(note).toContain(`\n${failure}\n`)
+		expect(note).toContain(`Changed files on the branch: ${changed}.`)
+		expect(note).not.toContain('Resuming the lane child')
+		expect(note).not.toContain(`fullrun #${ISSUE}`)
+	})
+})
+
 // joshuafolkken/kit#3878: a brokered reviewer outlives a ship that stopped waiting, so the pattern the
 // liveness read and the reaper share finds it by the tail its prompt ends with.
 describe('the review invocation', () => {

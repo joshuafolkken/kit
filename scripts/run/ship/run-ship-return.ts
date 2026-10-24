@@ -19,6 +19,7 @@ import type { ShipArguments } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 import { run_ship_stop_context } from './run-ship-stop-context'
 import { run_ship_stop_text } from './run-ship-stop-text'
+import { run_ship_waiter } from './run-ship-waiter'
 
 // How a detached `josh ship` supervisor hands a stopped stage back. The agent
 // ended when it handed the region over, so a red gate, a High/Medium review, a failed push or red CI has
@@ -32,7 +33,8 @@ import { run_ship_stop_text } from './run-ship-stop-text'
 //    effort because a fix is judgement. It is started before the supervisor exits, so the parent's
 //    liveness poll never sees the lane empty. An OpenAI lane is left to its own supervisor, which starts
 //    no successor without a cut, so its parent books the stop exactly as it books any ended child.
-//    The relaunches are capped: past the cap the issue is parked and a person told instead.
+//    The relaunches are capped: past the cap the issue is parked and a person told instead. A child
+//    still waiting on the ship (`josh ship:wait`) takes the stop itself, and nothing is relaunched.
 //
 // A ship run in an agent's own turn is not supervised and hands nothing back: its report is already in
 // front of the agent that ran it.
@@ -51,7 +53,7 @@ const RELOAD_POLLS =
 const VERSION_MISMATCH_NOTE =
 	'the lane broker runs older code than this ship (a version mismatch), and no broker on the current code read the request within the wait'
 
-type ReturnOutcome = 'relaunched' | 'recorded' | 'parked' | 'redispatch'
+type ReturnOutcome = 'relaunched' | 'returned' | 'recorded' | 'parked' | 'redispatch'
 
 // `unreadable`: the broker's code predates the request's shape, so it refused the request unread and
 // started nothing.
@@ -160,6 +162,28 @@ async function brokered(lane: LaneInfo, stop: ShipStop, server: string): Promise
 	return 'redispatch'
 }
 
+// **The session that launched the ship takes the stop where it still waits on it** (`run-ship-waiter.ts`),
+// so no fresh session re-reads the run; one that ended is relaunched as below (joshuafolkken/kit#4711).
+async function is_returned(issue: string, stop: ShipStop): Promise<boolean> {
+	const repository = await run_ship_probe.repository_directory()
+	if (repository === undefined) return false
+
+	const stop_note = lane_child_invocation.ship_stop_note(issue, stop)
+
+	return await run_ship_waiter.offer(repository, issue, stop_note)
+}
+
+async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
+	// A followup stop waits for a lane place, keeping the ship-stop prompt and the relaunch cap a driver
+	// re-dispatch would lose (`run-ship-place.ts`).
+	await run_ship_place.await_place(lane, stop.stage)
+	// **A broker that stopped serving before the stop is waited for**: one that died during the review left
+	// the lane unserved at the stop, and a child started here cannot sign in on a token (joshuafolkken/kit#4344).
+	const server = await await_server(lane)
+
+	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
+}
+
 // A child that stopped more often than the cap allows is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
 async function parked(issue: string, reason: string): Promise<ReturnOutcome> {
@@ -190,17 +214,11 @@ async function stopped(
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
 
 	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason)
-	// A followup stop waits for a lane place, keeping the ship-stop prompt and the relaunch cap a driver
-	// re-dispatch would lose (`run-ship-place.ts`).
-	await run_ship_place.await_place(lane, stage)
 
 	const context = await run_ship_stop_context.build(issue, output.body)
 	const stop = { stage, ...resume, context }
-	// **A broker that stopped serving before the stop is waited for**: one that died during the review left
-	// the lane unserved at the stop, and a child started here cannot sign in on a token (joshuafolkken/kit#4344).
-	const server = await await_server(lane)
 
-	return server === undefined ? relaunched(lane, stop) : await brokered(lane, stop, server)
+	return (await is_returned(issue, stop)) ? 'returned' : await relaunched_or_brokered(lane, stop)
 }
 
 async function return_control(
