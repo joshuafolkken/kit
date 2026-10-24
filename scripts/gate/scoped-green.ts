@@ -56,11 +56,13 @@ interface ScopedCheck {
 // The record paths, overridable so a test can plant one without overwriting the record a real run in
 // this checkout relies on — the same reason `gate_skip.reusable_green_gate` takes a `source`.
 // `is_unit_skipped` is overridable for the same reason, so a suite running in a checkout with vitest
-// can stand in for a project without one.
+// can stand in for a project without one. `is_lane_child` is the gate's answer for a dispatched lane
+// child, absent for every other caller.
 interface ScopedSources {
 	lint?: string
 	test?: string
 	is_unit_skipped?: boolean
+	is_lane_child?: boolean
 }
 
 // **`test:related` is required only where it can ever answer**. In a project
@@ -156,18 +158,33 @@ const REFUSAL_HEADLINE = '⛔ scoped checks not green on this tree'
 // **The way out travels with the refusal.** A message saying only "not verified" leaves the caller
 // holding the same question and no sanctioned answer, which is how the checks ended up after the
 // review in the first place. So the text names the one command that closes it, what it costs, and
-// that reissuing this call is the expected next move.
-function refusal(missing: ReadonlyArray<string>): string {
+// the expected next move: reissuing this call, or for a lane child's gate, handing over to ship.
+const REISSUE_STEP = 'and reissue this command.'
+
+// joshuafolkken/kit#4776: a lane child that reissued the gate here ran it in the foreground for three
+// minutes before `ship`, which runs its own gate beside the review, so that green was never used.
+const LANE_CHILD_STEP =
+	'then hand over to `pnpm josh ship --detach --review "<title> #<N>"` rather than reissuing the ' +
+	'gate — this is a dispatched lane child, and ship runs the gate beside the review ' +
+	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
+
+function refusal(missing: ReadonlyArray<string>, next_step: string): string {
 	return (
 		`${REFUSAL_HEADLINE}: ${missing.join(' and ')} ` +
 		'have not passed on the files this branch changed. The gate and review round 1 start together, ' +
 		'so a brief composed now describes a tree neither check has read — joshuafolkken/kit#1503 spent ' +
 		'282 seconds, 31% of the run, picking up one lint rule and one failing test at a time after its ' +
 		'review had already started. Run them in one call — ' +
-		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — and reissue this command. ` +
+		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — ${next_step} ` +
 		'The record fixes when the checks run and never whether they run: nothing is skipped or reused ' +
 		'because of it. `prompts/review.md` → "The scoped checks answer on the last edit".'
 	)
+}
+
+// **Only the gate's pre-check sets `is_lane_child`**: a lane child refused at `josh run:review` reissues
+// it as chain-rule step 0 says, so `review:brief`'s callers keep the reissue wording.
+function next_step_of(sources: ScopedSources): string {
+	return sources.is_lane_child === true ? LANE_CHILD_STEP : REISSUE_STEP
 }
 
 function refusal_for(
@@ -177,7 +194,7 @@ function refusal_for(
 ): string | undefined {
 	const missing = missing_checks(tree, base, sources)
 
-	return missing.length === 0 ? undefined : refusal(missing)
+	return missing.length === 0 ? undefined : refusal(missing, next_step_of(sources))
 }
 
 // **A record is written only by a bare invocation, and any argument at all withholds it.** A path

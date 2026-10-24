@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GateTree } from './gate-tree'
@@ -45,6 +46,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 	rmSync(DIRECTORY, { recursive: true, force: true })
 })
 
@@ -65,6 +67,26 @@ describe('scoped_precheck_refusal — what it enforces', () => {
 		})
 
 		expect(refusal).toBeUndefined()
+	})
+})
+
+function refusal_as(is_lane_child: boolean): string | undefined {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(is_lane_child)
+
+	return verification_gate.scoped_precheck_refusal(GATE_TREE, {
+		is_scoped_enforced: true,
+		scoped_sources: sources(),
+	})
+}
+
+// joshuafolkken/kit#4776: a lane child's gate refusal hands over to ship, whose gate runs beside the review.
+describe('scoped_precheck_refusal — the next step it names', () => {
+	it('hands a lane child over to ship', () => {
+		expect(refusal_as(true)).toContain('pnpm josh ship --detach --review')
+	})
+
+	it('tells any other session to reissue the gate', () => {
+		expect(refusal_as(false)).toContain('and reissue this command.')
 	})
 })
 
