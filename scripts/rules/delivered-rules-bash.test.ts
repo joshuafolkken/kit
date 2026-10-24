@@ -217,9 +217,10 @@ describe('repo-admin — the write that moves the server-side boundary', () => {
 
 // First-party owner, so `third-party-write` stays silent and the exactly-one invariant reads this
 // rule alone — the harness resolves the real session owner (`joshuafolkken`), so `repos/o/r` would
-// trip that row first.
+// trip that row first. Another first-party repository, so `direct-issue-comment` (the checkout's own
+// repository) does not claim it either.
 describe('raw-field-body — the literal @path a raw field flag posts as text', () => {
-	const COMMENTS = 'repos/joshuafolkken/kit/issues/5/comments'
+	const COMMENTS = 'repos/joshuafolkken/other/issues/5/comments'
 	const AT_PATH_COMMENT = `gh api ${COMMENTS} -f body=@/tmp/park.md`
 
 	it.each([

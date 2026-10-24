@@ -1,3 +1,5 @@
+import type { RepoIdentity } from '#scripts/discovery/repo-origin'
+import { repo_party } from '#scripts/discovery/repo-party'
 import { bash_triggers } from './bash-triggers'
 import { direct_pr_create } from './direct-pr-create'
 import { gh_api } from './gh-api'
@@ -12,8 +14,11 @@ import { shell_segments } from './shell-segments'
 // `direct-pr-create.ts`'s cut, so a quoted mention is not a call and `bash -c '…'` still is.
 //
 // **Only the checkout's own repository**: `issue:comment` posts there and nowhere else, so the row
-// claims the spellings that target it — the `{owner}` placeholder, and `gh issue comment` with no
-// repository selector. A comment to another repository named outright is left to `third-party-write`.
+// claims the spellings that target it — the `{owner}` placeholder, the checkout's own `owner/repo`
+// spelled out (the one repository the placeholders can expand to, `repo_party.current_repository`, the
+// candidate set `third-party-write` reads; joshuafolkken/kit#4737), and `gh issue comment` with no
+// repository selector. A comment to another repository named outright is left to `third-party-write`,
+// and so is every spelled-out one where the placeholders could expand to more than one repository.
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 
@@ -43,13 +48,24 @@ function is_comment_cli_call(args: ReadonlyArray<string>): boolean {
 	return group === ISSUE_GROUP && action === COMMENT_ACTION
 }
 
-function is_own_comments_endpoint(endpoint: string): boolean {
-	const owner = gh_api.repo_target(endpoint)?.owner ?? ''
+type ResolveOwnRepository = () => RepoIdentity | undefined
 
-	return gh_api.is_owner_placeholder(owner) && COMMENTS_PATH.test(endpoint)
+// The checkout's own repository is read only for an owner spelled out, so a placeholder write and
+// every other command pay nothing for the config read.
+function is_own_comments_endpoint(endpoint: string, resolve_own: ResolveOwnRepository): boolean {
+	const target = gh_api.repo_target(endpoint)
+
+	if (target === undefined || !COMMENTS_PATH.test(endpoint)) return false
+
+	return (
+		gh_api.is_owner_placeholder(target.owner) || repo_party.is_own_repository(target, resolve_own())
+	)
 }
 
-function is_comment_api_call(args: ReadonlyArray<string>): boolean {
+function is_comment_api_call(
+	args: ReadonlyArray<string>,
+	resolve_own: ResolveOwnRepository,
+): boolean {
 	const call = [direct_pr_create.GH_COMMAND, ...args].join(' ')
 
 	if (!gh_api.is_gh_api(call) || !gh_api.is_write(call)) return false
@@ -59,19 +75,25 @@ function is_comment_api_call(args: ReadonlyArray<string>): boolean {
 		direct_pr_create.API_VALUE_TAKING_FLAGS,
 	)
 
-	return subcommand === API_SUBCOMMAND && is_own_comments_endpoint(endpoint)
+	return subcommand === API_SUBCOMMAND && is_own_comments_endpoint(endpoint, resolve_own)
 }
 
-function is_comment_segment(segment: string): boolean {
+function is_comment_segment(segment: string, resolve_own: ResolveOwnRepository): boolean {
 	const args = git_argv.arguments_of(segment, direct_pr_create.GH_COMMAND)
 
 	if (args === undefined || direct_pr_create.is_help_call(args)) return false
 
-	return is_comment_cli_call(args) || is_comment_api_call(args)
+	return is_comment_cli_call(args) || is_comment_api_call(args, resolve_own)
 }
 
-function is_direct_issue_comment(command: string): boolean {
-	return direct_pr_create.has_run_segment(command, is_comment_segment)
+// `resolve_own` is injected so the suite fixes the checkout's repository without reading the real one.
+function is_direct_issue_comment(
+	command: string,
+	resolve_own: ResolveOwnRepository = repo_party.current_repository,
+): boolean {
+	return direct_pr_create.has_run_segment(command, (segment) =>
+		is_comment_segment(segment, resolve_own),
+	)
 }
 
 // `pnpm josh issue:comment` — the act that keeps the rule, segment-wise so a spelling quoted inside
@@ -106,7 +128,7 @@ const ROW = {
 		title: 'Direct issue comment',
 		topic: '`shell-body.md`',
 		fires:
-			"a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/{owner}/<r>/issues/<N>/comments`); it points at `pnpm josh issue:comment`. Every occurrence",
+			"a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. Every occurrence",
 		quiet:
 			'`pnpm josh issue:comment`, or reading the comments — the path that writes the run marker',
 	},

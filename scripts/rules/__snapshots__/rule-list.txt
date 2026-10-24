@@ -13,7 +13,7 @@
   - silent: filing through `pnpm josh issue:file` — the duplicate scan, the body check and `epic:bundle` all run
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Direct issue comment** (`direct-issue-comment`, `shell-body.md`)
-  - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/{owner}/<r>/issues/<N>/comments`); it points at `pnpm josh issue:comment`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/<owner>/<r>/issues/<N>/comments` whose owner is the `{owner}` placeholder or the checkout's own `owner/repo` spelled out); it points at `pnpm josh issue:comment`. Every occurrence
   - silent: `pnpm josh issue:comment`, or reading the comments — the path that writes the run marker
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Direct issue read** (`direct-issue-read`, `issue-comments.md`)

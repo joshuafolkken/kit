@@ -71,3 +71,51 @@ describe('repo_party.current_owner', () => {
 		expect(repo_party.current_owner()).toBe('joshuafolkken')
 	})
 })
+
+const KIT = { owner: 'joshuafolkken', repo: 'kit' }
+
+describe('repo_party.current_repository', () => {
+	// This suite runs in the kit checkout, whose remotes all name joshuafolkken/kit.
+	it('reads the kit checkout as joshuafolkken/kit', () => {
+		expect(repo_party.current_repository(process.cwd(), {})).toStrictEqual(KIT)
+	})
+
+	it('answers the GH_REPO repository, which overrides the remotes', () => {
+		expect(
+			repo_party.current_repository(process.cwd(), { GH_REPO: 'github.com/sveltejs/kit' }),
+		).toStrictEqual({ owner: 'sveltejs', repo: 'kit' })
+	})
+})
+
+describe('repo_party.sole_repository', () => {
+	it('answers the one repository every candidate names, whatever its case', () => {
+		expect(repo_party.sole_repository([KIT, { owner: 'JoshuaFolkken', repo: 'Kit' }])).toBe(KIT)
+	})
+
+	it.each([
+		['a fork checkout with an upstream remote', [KIT, { owner: 'sveltejs', repo: 'kit' }]],
+		['another repository of the same owner', [KIT, { owner: 'joshuafolkken', repo: 'other' }]],
+		['an unreadable candidate beside origin', [KIT, undefined]],
+		['an unreadable first candidate', [undefined, KIT]],
+		['no candidate at all', []],
+	])('answers nothing for %s', (_name, candidates) => {
+		expect(repo_party.sole_repository(candidates)).toBeUndefined()
+	})
+})
+
+describe('repo_party.is_own_repository', () => {
+	const own = { owner: 'joshuafolkken', repo: 'kit' }
+
+	it.each([
+		['the same owner/repo', { owner: 'joshuafolkken', repo: 'kit' }, true],
+		['another case', { owner: 'JoshuaFolkken', repo: 'KIT' }, true],
+		['another repository of the owner', { owner: 'joshuafolkken', repo: 'other' }, false],
+		['another owner', { owner: 'sveltejs', repo: 'kit' }, false],
+	])('answers %s', (_name, target, expected) => {
+		expect(repo_party.is_own_repository(target, own)).toBe(expected)
+	})
+
+	it('answers false when the own repository cannot be read', () => {
+		expect(repo_party.is_own_repository(own, undefined)).toBe(false)
+	})
+})
