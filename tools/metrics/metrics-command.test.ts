@@ -5,6 +5,7 @@ const ACCEPT = '--accept'
 const REASON = '--reason'
 const NO_STARTUP = '--no-startup'
 const TOTALS_ONLY = '--totals-only'
+const RERECORD = '--rerecord'
 const JSON_FORM = '--json'
 
 describe('metrics_command.parse_arguments', () => {
@@ -26,7 +27,7 @@ describe('metrics_command.parse_arguments', () => {
 		expect(metrics_command.parse_arguments([NO_STARTUP, ACCEPT])).toBeUndefined()
 	})
 
-	// joshuafolkken/kit#3568: the pre-detach form of `josh ship`, the totals without the durations.
+	// joshuafolkken/kit#3568: the totals without the durations; ship's pre-detach adds `--rerecord`.
 	it('checks the totals alone in the pre-detach form', () => {
 		expect(metrics_command.parse_arguments([TOTALS_ONLY])).toStrictEqual({
 			reason: undefined,
@@ -67,5 +68,18 @@ describe('metrics_command.parse_arguments — the accept form', () => {
 	it('refuses a misspelled flag and the removed --write-baseline', () => {
 		expect(metrics_command.parse_arguments([ACCEPT, '--why', 'x'])).toBeUndefined()
 		expect(metrics_command.parse_arguments(['--write-baseline'])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4716: only ship's pre-detach form re-records the approval file.
+describe('metrics_command.parse_arguments — the rerecord form', () => {
+	it('re-records the approved growth only after --totals-only', () => {
+		expect(metrics_command.parse_arguments([TOTALS_ONLY, RERECORD])).toStrictEqual({
+			reason: undefined,
+			is_startup_timed: false,
+			form: 'rerecord',
+		})
+		expect(metrics_command.parse_arguments([RERECORD])).toBeUndefined()
+		expect(metrics_command.parse_arguments([RERECORD, TOTALS_ONLY])).toBeUndefined()
 	})
 })

@@ -71,7 +71,7 @@ interface StopContext {
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean
-	// An Issue filing no guard refused is on this run's transcript tail — `filing_cap`'s count.
+	// An Issue filing no guard refused is on this run's transcript tail — `turn_filings`' count.
 	filed: boolean
 	// The owner of the repository the session runs in, or `undefined` when it cannot be read.
 	session_owner: string | undefined

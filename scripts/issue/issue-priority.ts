@@ -5,9 +5,11 @@ import { markdown_section } from './markdown-section'
 // joshuafolkken/kit#4383: the priority `josh issue:file` applies, read from the body's one priority
 // declaration under its background heading (`issue-template.md` holds the criteria). An urgent or high
 // declaration must name its basis, so neither label is applied on a bare word. A run-time-shortening
-// Issue's reduction-per-merge line sets a floor — its share of the median lane time per merge — and
-// a declaration below that floor is refused. A priority label the filer typed (`kickoff new critical`)
-// wins: the body is then not judged at all.
+// Issue's reduction-per-merge line sets a floor — its share of the median lane time per merge — and so
+// does a causing-lane line, the net minutes of the lane the Issue's defect slowed
+// (joshuafolkken/kit#4749): a declaration below the higher floor is refused, and a body that declares
+// none is filed at it. A priority label the filer typed (`kickoff new critical`) wins: the body is then
+// not judged at all.
 
 type PriorityLevel = 'critical' | 'high' | 'normal'
 
@@ -22,8 +24,8 @@ const DECLARATION_PREFIX = '- 優先度:'
 const NORMAL_LINE = '- 優先度: 通常'
 const CRITICAL_PATTERN = /^- 優先度: 緊急（(?<basis>.*)）$/u
 const HIGH_PATTERN = /^- 優先度: 高（(?<basis>.*)）$/u
-// An interrupt-filing condition number (`wip-cap.md`) or a stated reduction.
-const CRITICAL_BASIS = /条件 ?[1-3]|短縮 ?\d/u
+// An interrupt-filing condition number (`wip-cap.md`), a stated reduction or a causing lane's minutes.
+const CRITICAL_BASIS = /条件 ?[1-3]|短縮 ?\d|原因のレーン ?\d/u
 const PLACEHOLDER = /^<.*>$/u
 const REDUCTION_PREFIX = '- 1 マージあたりの短縮:'
 // A number with its percent sign, half- or full-width, glued to the word before it or not, one space
@@ -31,13 +33,20 @@ const REDUCTION_PREFIX = '- 1 マージあたりの短縮:'
 const PERCENT = /(?<![\d.])(?<value>[\d.]+) ?[%％]/gu
 const CRITICAL_PERCENT = 10
 const HIGH_PERCENT = 3
+const LANE_PREFIX = '- 原因のレーン:'
+// The minutes are the lane's net time (`josh lane:net`), the number its Issue.
+const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
+const CRITICAL_LANE_MINUTES = 60
+const HIGH_LANE_MINUTES = 40
 const LEVELS: ReadonlyArray<PriorityLevel> = ['normal', 'high', 'critical']
 const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	critical: PRIORITY_CRITICAL_LABEL,
 	high: PRIORITY_HIGH_LABEL,
 	normal: undefined,
 }
-const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値> / 原因のレーン <分>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
+
+const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
 
 const REDUCTION_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue states \`${REDUCTION_PREFIX} <分>（レーン中央値 <分> の <%>）\` under \`${expected_effect_lint.HEADING}\` with its percentage filled in (\`issue-template.md\`)`
 
@@ -76,11 +85,13 @@ function level_of(line: string): PriorityLevel | undefined {
 	return parser === undefined ? undefined : parsed_level(parser, line)
 }
 
+function background_lines(body: string, prefix: string): ReadonlyArray<string> {
+	return unfenced_lines(body, BACKGROUND_HEADING).filter((line) => line.startsWith(prefix))
+}
+
 // `normal` when the body declares nothing, `undefined` when it declares more than one line or a bad one.
 function declared_level(body: string): PriorityLevel | undefined {
-	const lines = unfenced_lines(body, BACKGROUND_HEADING).filter((line) =>
-		line.startsWith(DECLARATION_PREFIX),
-	)
+	const lines = background_lines(body, DECLARATION_PREFIX)
 
 	if (lines.length === 0) return 'normal'
 
@@ -97,13 +108,43 @@ function reduction_percent(body: string): number | undefined {
 	return values.findLast((value) => Number.isFinite(value))
 }
 
-// The lowest level a run-time-shortening Issue may declare, from its stated reduction.
-function floor_of(body: string): PriorityLevel {
+// The floor a run-time-shortening Issue's stated reduction sets.
+function reduction_floor(body: string): PriorityLevel {
 	const percent = expected_effect_lint.is_target(body) ? reduction_percent(body) : undefined
 
 	if (percent === undefined || percent < HIGH_PERCENT) return 'normal'
 
 	return percent >= CRITICAL_PERCENT ? 'critical' : 'high'
+}
+
+function has_malformed_lane(body: string): boolean {
+	return background_lines(body, LANE_PREFIX).some((line) => !LANE_LINE.test(line))
+}
+
+// The floor the longest causing lane sets — strictly over each threshold.
+function lane_floor(body: string): PriorityLevel {
+	const minutes = background_lines(body, LANE_PREFIX)
+		.map((line) => Number(LANE_LINE.exec(line)?.groups?.['minutes']))
+		.filter((value) => Number.isFinite(value))
+	const longest = Math.max(0, ...minutes)
+
+	if (longest <= HIGH_LANE_MINUTES) return 'normal'
+
+	return longest > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
+}
+
+// The lowest level the Issue may declare: the higher of its reduction's floor and its causing lane's.
+function floor_of(body: string): PriorityLevel {
+	const ranks = [reduction_floor(body), lane_floor(body)].map((level) => LEVELS.indexOf(level))
+
+	return LEVELS[Math.max(...ranks)] ?? 'normal'
+}
+
+// The level the Issue is filed at: its declaration, else its floor.
+function filed_level(body: string): PriorityLevel | undefined {
+	return background_lines(body, DECLARATION_PREFIX).length === 0
+		? floor_of(body)
+		: declared_level(body)
 }
 
 function is_typed(labels: ReadonlyArray<string>): boolean {
@@ -122,30 +163,31 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 
 	if (LEVELS.indexOf(level) >= LEVELS.indexOf(floor)) return undefined
 
-	return `the stated reduction per merge ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${floor === 'critical' ? '緊急' : '高'}（短縮 …）\` (\`issue-template.md\`)`
+	return `the stated reduction per merge or causing lane ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${floor === 'critical' ? '緊急' : '高'}（短縮 … / 原因のレーン …）\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
 }
 
 // Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list.
 function problem(body: string, typed: ReadonlyArray<string>): string | undefined {
 	if (is_typed(typed)) return undefined
-	const level = declared_level(body)
+	const level = filed_level(body)
 
 	if (level === undefined) return DECLARATION_PROBLEM
 	if (has_missing_reduction(body)) return REDUCTION_PROBLEM
+	if (has_malformed_lane(body)) return LANE_PROBLEM
 
 	return floor_problem(body, level)
 }
 
-// The labels a new Issue is filed with — the declared priority's label added unless one was typed.
+// The labels a new Issue is filed with — the filed level's label added unless one was typed.
 function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<string> {
-	const label = LABELS[declared_level(body) ?? 'normal']
+	const label = LABELS[filed_level(body) ?? 'normal']
 
 	if (label === undefined || is_typed(labels)) return labels
 
 	return [...labels, label]
 }
 
-const issue_priority = { declared_level, floor_of, problem, with_label }
+const issue_priority = { HIGH_LANE_MINUTES, declared_level, floor_of, problem, with_label }
 
 export type { PriorityLevel }
 export { issue_priority }

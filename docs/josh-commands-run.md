@@ -449,9 +449,10 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED) closes any epic it completed, then `main:sync`, is counted into the carry record
-(resetting the failure streak),
-`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
+child (CLOSED) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
+logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
+(`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
+event (`lane-overrun.ts`); a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
@@ -535,7 +536,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 
 <!-- /usage -->
 
-It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate never reaches the commit, and the report closes with the name of the stopped step.
+It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate never reaches the push (the sync before it commits locally), and the report closes with the name of the stopped step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run (branch-2 filing runs before `ship`), forwarded to `run:tail` after the closed issue.
 
@@ -916,6 +917,22 @@ pnpm josh lane:value edit --since 2026-10-23T03:29Z   # the median Edit time sin
 <!-- /usage -->
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
+
+#### `josh lane:net`
+
+<!-- usage: lane:net -->
+
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks and outages stood.
+
+```bash
+pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
+```
+
+<!-- /usage -->
+
+The whole minutes are what an Issue's `- 原因のレーン:` line declares; a lane the ledger holds no dispatch and merge of exits non-zero.
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
 
 ## Session and documents
 

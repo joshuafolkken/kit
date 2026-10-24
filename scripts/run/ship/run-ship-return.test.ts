@@ -25,7 +25,12 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
-	lane_session_broker: { serving_session: serving_mock, request: request_mock },
+	lane_session_broker: {
+		serving_session: serving_mock,
+		request: request_mock,
+		is_unreadable: (answer: { reason?: string }): boolean =>
+			answer.reason?.includes('could not read the request') === true,
+	},
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
@@ -266,6 +271,7 @@ describe('run_ship_return.return_control past the ship-stop cap', () => {
 		is_over_mock.mockResolvedValue(true)
 
 		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()
@@ -304,6 +310,18 @@ describe('run_ship_return.return_control on a merge conflict', () => {
 			`#${ISSUE} conflict failed (conflict) — pnpm josh ship --log ${ISSUE}`,
 		)
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(conflicted)
+	})
+
+	// joshuafolkken/kit#4707: a review-stage conflict counts against the mechanical cap.
+	it('asks the cap for the conflict, not the stage', async () => {
+		await run_ship_return.return_control(
+			ISSUE,
+			'review',
+			{ ...RESUME, conflicts: [conflicted] },
+			OUTPUT,
+		)
+
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'conflict')
 	})
 })
 

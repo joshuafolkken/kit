@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { lane_broker_server, type BrokerServer } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_action, type BrokerAction, type BrokerAnswer } from './lane-session-action'
+import { lane_session_reread } from './lane-session-reread'
 
 // The sessions a lane child's detached `josh ship` cannot start itself, started for it by a process
 // that can: the round-1 and round-2 reviewer, and the fresh child a stopped ship hands back to. An
@@ -38,9 +39,7 @@ const REQUEST_LIMIT_MINUTES: Readonly<Record<BrokerAction['kind'], number>> = {
 	review: 30,
 	relaunch: 2,
 }
-const request_schema = z
-	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
-	.strict()
+const { request_schema } = lane_session_action
 // **A request this broker cannot read is still answered**: the supervisor reloads on new code only at
 // its next pass boundary (`run-wake-code.ts`), so until then a lane's ship can run a newer main than
 // the broker's, and a field the ship added made the request unreadable and
@@ -49,6 +48,15 @@ const request_schema = z
 // broker's schema had never learned even on one main (joshuafolkken/kit#4489).
 const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
 const UNREADABLE_REASON = 'the broker could not read the request'
+// **A refused request is read as a version difference, never dropped silently** (joshuafolkken/kit#4714):
+// the refusal marks the supervisor's code as suspect, so its next pass re-hashes the code even where the
+// commit did not move or the hash at its start could not be read, and reloads when it differs. Only the
+// `run:wake` supervisor takes the mark: an OpenAI lane's own supervisor never re-checks its code.
+// **Before it is refused, the code on disk reads it** (`lane-session-reread.ts`), so a schema main widened
+// since the supervisor started is answered now rather than after the reload (joshuafolkken/kit#4732).
+const VERSION_NOTE =
+	"the broker's code differs from the ship's; a run:wake supervisor re-checks its code at its next pass"
+const refusal = { is_pending: false }
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -103,7 +111,7 @@ function refused_field(issue: z.core.$ZodIssue): ReadonlyArray<string> {
 function unreadable(error: z.ZodError): BrokerAnswer {
 	const fields = error.issues.flatMap((issue) => refused_field(issue))
 
-	return failure(`${UNREADABLE_REASON} — ${fields.join('; ')}`)
+	return failure(`${UNREADABLE_REASON} — ${VERSION_NOTE} — ${fields.join('; ')}`)
 }
 
 // The answer of a broker on code older than the request, which the ship can still fall back from.
@@ -113,10 +121,21 @@ function is_unreadable(answer: BrokerAnswer): boolean {
 
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
 	const parsed = request_schema.safeParse(received)
+	if (parsed.success) return await lane_session_action.answer(lane, parsed.data.action)
 
-	return parsed.success
-		? await lane_session_action.answer(lane, parsed.data.action)
-		: unreadable(parsed.error)
+	refusal.is_pending = true
+
+	return (await lane_session_reread.reread(lane.issue, received)) ?? unreadable(parsed.error)
+}
+
+// Whether a request was refused since the supervisor last asked, clearing the mark — the supervisor
+// re-checks its code on it (`run-wake-code.ts`).
+function take_refusal(): boolean {
+	const { is_pending } = refusal
+
+	refusal.is_pending = false
+
+	return is_pending
 }
 
 // The requests this process's servers are answering now — what the supervisor's reload waits out
@@ -385,6 +404,7 @@ const lane_session_broker = {
 	response_path,
 	review_paths: lane_session_action.review_paths,
 	serving_session,
+	take_refusal,
 	with_server,
 }
 

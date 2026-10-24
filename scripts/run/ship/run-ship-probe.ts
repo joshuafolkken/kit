@@ -31,8 +31,8 @@ async function or_false(is_true: () => Promise<boolean>): Promise<boolean> {
 
 // A clean tree whose branch holds commits the default branch does not: the commit stage's output. A
 // dirty tree is uncommitted work, whatever is already committed beneath it.
-async function read_committed(): Promise<boolean> {
-	if (await run_hold.is_tree_dirty()) return false
+async function read_committed(is_dirty: boolean): Promise<boolean> {
+	if (is_dirty) return false
 
 	const base = await git_command.default_branch_reference()
 
@@ -70,14 +70,15 @@ async function read_review_stale(): Promise<boolean> {
 const NOTHING_DONE: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
 
 async function read_branch_state(branch_name: string): Promise<ShipState> {
+	const is_dirty = await run_hold.is_tree_dirty()
 	const [is_committed, is_pushed, is_merged, is_review_stale] = await Promise.all([
-		or_false(read_committed),
+		or_false(async () => await read_committed(is_dirty)),
 		or_false(async () => await read_pushed(branch_name)),
 		or_false(async () => await read_merged(branch_name)),
 		read_review_stale(),
 	])
 
-	return { is_committed, is_pushed, is_merged, is_review_stale }
+	return { is_committed, is_pushed, is_merged, is_review_stale, is_dirty }
 }
 
 // A branch that cannot be named leaves nothing to ask about, so it reads as nothing done.

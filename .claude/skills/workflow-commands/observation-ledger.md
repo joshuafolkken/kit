@@ -88,7 +88,7 @@ blocked depth-0 work is filed as before.
 - **On `observation:record` answering `file`, the observation is filed**, at depth 1 or deeper, with
   no depth-0 citation (only when exactly one earlier sighting exists).
 - **The Issue quotes the ledger's own dates — the first sighting's and this one's.**
-- **Both ceilings still apply** (`observation-filing.md`): the per-run filing cap and the WIP cap.
+- **Both ceilings still apply** (`observation-filing.md`): the per-origin filing cap and the WIP cap.
 
 **A third and later sighting appends a line and files nothing more** — `pnpm josh issue:scout` finds
 the open Issue.

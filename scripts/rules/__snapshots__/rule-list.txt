@@ -16,10 +16,6 @@
   - fires: `pnpm josh pretool:guard` — a comment to the checkout's own repository outside `josh issue:comment` (`gh issue comment` with no `--repo`, or a `gh api` write to `repos/{owner}/<r>/issues/<N>/comments`); it points at `pnpm josh issue:comment`. Every occurrence
   - silent: `pnpm josh issue:comment`, or reading the comments — the path that writes the run marker
   - not automated: the right act is another command, whose arguments the call does not carry
-- **The 10-Issue filing cap per run** (`filing-cap`, `.claude/skills/workflow-commands/prerequisite.md`, `observation-filing.md`)
-  - fires: `pnpm josh pretool:guard` — the 11th `pnpm josh issue:file` in a run that already has 10 filings not refused; failed calls do not count. Every occurrence
-  - silent: fewer than 10 filings not refused
-  - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Direct issue read** (`direct-issue-read`, `issue-comments.md`)
   - fires: `pnpm josh pretool:guard` — a `gh api` GET of the checkout's own `repos/<o>/<r>/issues/<N>`, `…/comments` or `…/timeline` (the `{owner}` placeholder or the origin spelled out), or a `gh issue view <N>` of it, with no projection or one naming the body (or, for the view, the comments); it points at `pnpm josh issue:read`. Every occurrence
   - silent: `pnpm josh issue:read` / `run:prep` / `run:entry`, a `--jq` / `--json` projection without the body or the comments, `gh issue view --web`, or another repository named outright
@@ -76,6 +72,10 @@
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `general-purpose` type with no `model`. Every occurrence
   - silent: a named agent type, or a `model` set
   - not automated: which model fits the unit is the author's call
+- **Investigator dispatched in the foreground** (`investigator-foreground`, `.claude/skills/workflow-commands/delegation.md` → "The pre-implementation reading — what goes to a unit, and from which file")
+  - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
+  - silent: another agent type, or `run_in_background: false` set
+  - not automated: which reads go beside the dispatch is the author’s call
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
   - silent: not a lane child — the parent owns the run budget

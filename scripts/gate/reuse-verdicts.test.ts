@@ -67,6 +67,7 @@ const READ_MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'f00dcafe',
 	dirty: {},
+	change: [],
 	directories: [],
 	readers: Object.fromEntries(documents.map((relative) => [relative, [DOC_READER]])),
 }

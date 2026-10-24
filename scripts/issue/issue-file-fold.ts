@@ -28,6 +28,7 @@ const CLOSED_STATE = 'CLOSED'
 interface FoldArguments {
 	route: string | undefined
 	distinct: ReadonlyArray<number>
+	found_during: string | undefined
 }
 
 function number_of(reference: string): number {
@@ -55,10 +56,12 @@ async function branch_issue(): Promise<number | undefined> {
 	}
 }
 
-// Whose work turned the finding up: the lane child's mark, else the Issue the checkout's branch names,
-// so a person's `fullrun` on `3423-x` is one finder across its filings just as a lane child is. A
-// checkout on no Issue's branch — a `backlogrun` parent on `main` — has none.
-async function finder(): Promise<string | undefined> {
+// Whose work turned the finding up: the `--found-during` the filing named, else the lane child's mark,
+// else the Issue the checkout's branch names, so a person's `fullrun` on `3423-x` is one finder across
+// its filings just as a lane child is. A checkout on no Issue's branch — a `backlogrun` parent on
+// `main` — has none unless the filing names one.
+async function finder(named?: string): Promise<string | undefined> {
+	if (named !== undefined) return named
 	const marked = lane_child_marker.marked_issue()
 
 	if (marked !== undefined) return marked
@@ -76,6 +79,17 @@ async function events_of(found_during: string | undefined): Promise<ReadonlyArra
 	return await run_event_stream_emit.all_events()
 }
 
+// The finder's filings on the events, in every repository.
+function finder_filings(
+	events: ReadonlyArray<RunEvent>,
+	found_during: string | undefined,
+): ReadonlyArray<Filed> {
+	return events
+		.filter((event) => event.kind === run_event_stream.EVENT_KIND.FILED)
+		.flatMap((event) => run_event_filed.parse(event.text) ?? [])
+		.filter((filed) => filed.found_during === found_during)
+}
+
 // This run's earlier filings by the same finder — so a parallel lane's filing is never what this one
 // folds into — in the repository this filing targets. One the caller named in `--distinct` has been
 // declared a separate deliverable and is left out, the same declaration the scout's candidates take.
@@ -85,10 +99,8 @@ function prior_filings(
 	prefix: string,
 	distinct: ReadonlyArray<number>,
 ): ReadonlyArray<Filed> {
-	return events
-		.filter((event) => event.kind === run_event_stream.EVENT_KIND.FILED)
-		.flatMap((event) => run_event_filed.parse(event.text) ?? [])
-		.filter((filed) => filed.found_during === found_during && prefix_of(filed.reference) === prefix)
+	return finder_filings(events, found_during)
+		.filter((filed) => prefix_of(filed.reference) === prefix)
 		.filter((filed) => !distinct.includes(number_of(filed.reference)))
 }
 
@@ -136,7 +148,7 @@ function held_message(priors: ReadonlyArray<Filed>): string {
 // exempt, as it is from the WIP cap: the split assessment already decided it is a separate deliverable.
 async function is_fold_clear(prefix: string, args: FoldArguments): Promise<boolean> {
 	if (args.route === SPLIT_ROUTE_LABEL) return true
-	const found_during = await finder()
+	const found_during = await finder(args.found_during)
 	const filings = prior_filings(await events_of(found_during), found_during, prefix, args.distinct)
 	const priors = await open_filings(filings, prefix)
 
@@ -150,6 +162,13 @@ async function is_fold_clear(prefix: string, args: FoldArguments): Promise<boole
 	return verdict !== issue_fold.FOLD
 }
 
-const issue_file_fold = { finder, is_fold_clear, prior_filings, reference_prefix }
+const issue_file_fold = {
+	events_of,
+	finder,
+	finder_filings,
+	is_fold_clear,
+	prior_filings,
+	reference_prefix,
+}
 
 export { issue_file_fold }

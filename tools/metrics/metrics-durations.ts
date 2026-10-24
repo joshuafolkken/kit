@@ -38,6 +38,7 @@ const SEPARATOR = ' · '
 
 const RECORDED_NAMES = ['gate', 'unit'] as const
 const DURATION_NAMES = [...RECORDED_NAMES, 'josh_startup', 'guard_startup'] as const
+const RECORDED: ReadonlySet<string> = new Set(RECORDED_NAMES)
 
 type DurationName = (typeof DURATION_NAMES)[number]
 // `undefined` is a duration that was not measured — no solo gate yet, a startup that failed.
@@ -70,6 +71,13 @@ interface GateSpan {
 interface GateSample {
 	elapsed_ms: number
 	unit_ms: number
+	start_ms: number
+	end_ms: number
+}
+
+interface MeasuredWindow {
+	start_ms: number
+	end_ms: number
 }
 
 function present(durations: Durations): ReadonlyArray<[DurationName, number]> {
@@ -149,15 +157,38 @@ function sample(span: GateSpan, spans: ReadonlyArray<GateSpan>): ReadonlyArray<G
 
 	if (unit_ms === undefined) return []
 
-	return is_solo(span, spans) ? [{ elapsed_ms, unit_ms }] : []
+	const { start_ms, end_ms } = span
+
+	return is_solo(span, spans) ? [{ elapsed_ms, unit_ms, start_ms, end_ms }] : []
 }
 
-// The median of the last solo gates that ran the unit suite. A `--no-unit` gate is left out: it timed
-// a different set of checks. Fewer than `RECENT_GATES` reads as not measured, so the first baseline is
-// the median of as many gates as every later reading.
-function from_ledger(entries: ReadonlyArray<LedgerEntry>): Durations {
+// The last solo gates that ran the unit suite. A `--no-unit` gate is left out: it timed a different set
+// of checks.
+function recent_samples(entries: ReadonlyArray<LedgerEntry>): ReadonlyArray<GateSample> {
 	const spans = gate_spans(entries)
-	const gates = spans.flatMap((span) => sample(span, spans)).slice(-RECENT_GATES)
+
+	return spans.flatMap((span) => sample(span, spans)).slice(-RECENT_GATES)
+}
+
+// The spans the gate and unit durations were measured over — one per gate the median reads, the idle
+// gaps between them left out — or none while the ledger holds too few gates for a median.
+function windows(entries: ReadonlyArray<LedgerEntry>): ReadonlyArray<MeasuredWindow> {
+	const gates = recent_samples(entries)
+
+	if (gates.length < RECENT_GATES) return []
+
+	return gates.map(({ start_ms, end_ms }) => ({ start_ms, end_ms }))
+}
+
+// Only the gate and unit durations are read off the measured gates; a startup is timed at the check.
+function is_recorded(change: DurationChange): boolean {
+	return RECORDED.has(change.name)
+}
+
+// The median of the last solo gates. Fewer than `RECENT_GATES` reads as not measured, so the first
+// baseline is the median of as many gates as every later reading.
+function from_ledger(entries: ReadonlyArray<LedgerEntry>): Durations {
+	const gates = recent_samples(entries)
 
 	if (gates.length < RECENT_GATES) return { gate: undefined, unit: undefined }
 
@@ -212,8 +243,10 @@ const metrics_durations = {
 	overlay,
 	parse_baseline,
 	render,
+	is_recorded,
 	render_regressions,
+	windows,
 }
 
-export type { DurationName, Durations, DurationVerdict }
+export type { DurationChange, DurationName, Durations, DurationVerdict, MeasuredWindow }
 export { metrics_durations }

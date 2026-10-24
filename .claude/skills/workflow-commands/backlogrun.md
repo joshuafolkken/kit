@@ -70,7 +70,7 @@ reference is read as a section").
 | Guard | Limit | On reaching it |
 | --- | --- | --- |
 | Children per run | 30 | Stop and report; an epic this large should be split. |
-| Issues filed per run | `prerequisite.md`'s cap | Stop and report. |
+| Issues filed per originating work item | `prerequisite.md`'s cap (`issue:file` refuses the 11th) | Stop and report. |
 | Consecutive child failures | 3 | Stop and report; something is wrong with the environment, not the children. |
 
 A failure that is not consecutive parks its child and the run continues.

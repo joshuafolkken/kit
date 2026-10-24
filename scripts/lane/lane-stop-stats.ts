@@ -86,14 +86,18 @@ function ends_of(
 }
 
 // A stage's start counts from the stop's own instant, so a ship relaunched within the same
-// millisecond still ends the wait; the stage that stopped started before it.
-function wait_ms(stop: StopEntry, ends: ReadonlyArray<IssueAt>): number | undefined {
-	const from_ms = Date.parse(stop.at)
+// millisecond still ends the wait; the stage that stopped started before it. `josh lane:net` derives
+// a park's and an outage's wait the same way (`lane-net-time.ts`).
+function wait_ms(stop: IssueAt, ends: ReadonlyArray<IssueAt>): number | undefined {
 	const later = ends
-		.filter((end) => end.issue === stop.issue && end.at_ms >= from_ms)
-		.map((end) => end.at_ms - from_ms)
+		.filter((end) => end.issue === stop.issue && end.at_ms >= stop.at_ms)
+		.map((end) => end.at_ms - stop.at_ms)
 
 	return later.length === 0 ? undefined : Math.min(...later)
+}
+
+function instant_of(stop: StopEntry): IssueAt {
+	return { issue: stop.issue, at_ms: Date.parse(stop.at) }
 }
 
 // A stop recorded before it named its preconditions (joshuafolkken/kit#4166) or its finding kinds
@@ -112,7 +116,7 @@ function waits_of(
 	return entries.filter(is_stop).map((stop) => ({
 		reason: stop.reason,
 		causes: causes_of(stop),
-		wait_ms: wait_ms(stop, ends),
+		wait_ms: wait_ms(instant_of(stop), ends),
 	}))
 }
 
@@ -167,6 +171,6 @@ function table(
 	].join('\n')
 }
 
-const lane_stop_stats = { REASONS, events_of, table }
+const lane_stop_stats = { REASONS, ends_of, events_of, table, wait_ms }
 
 export { lane_stop_stats }

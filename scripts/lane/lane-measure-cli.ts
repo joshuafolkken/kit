@@ -2,6 +2,8 @@
 import { setInterval as every } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -12,6 +14,7 @@ import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_ledger } from './lane-ledger'
+import { lane_net_time } from './lane-net-time'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_round_one_stats } from './lane-round-one-stats'
 import { lane_round_two_stats } from './lane-round-two-stats'
@@ -25,7 +28,8 @@ import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
 
-// `josh lane:sample` / `josh lane:stats` — the lane-limit measurement.
+// `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
+// `josh lane:net` print one measurement each.
 //
 // `lane:sample` appends one machine-load sample to the ledger, or one every `--every <seconds>` until it
 // is stopped; `lane:stats` reduces a period of the ledger to the one table row #3347 records per lane
@@ -40,12 +44,14 @@ const FAILURE_EXIT_CODE = 1
 const SAMPLE_VERB = 'sample'
 const STATS_VERB = 'stats'
 const VALUE_VERB = 'value'
+const NET_VERB = 'net'
 // A value keeps two decimals: seconds, minutes and per-lane counts read at that grain.
 const VALUE_DIGITS = 2
 const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
+	'       josh lane:net <issue>',
 ].join('\n')
 
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
@@ -253,12 +259,36 @@ async function value_command(
 	return print_value(request, lane_value.value(request.metric, records, window))
 }
 
+// The lane's net minutes, whole, alone on the line a causing-lane declaration copies
+// (`lane-net-time.ts`); a lane the ledger holds no dispatch and merge of fails.
+async function net_command(rest: ReadonlyArray<string>, context: MeasureContext): Promise<number> {
+	const [issue = ''] = rest
+
+	if (rest.length !== 1 || !issue_number_shape.is_issue_number(issue)) return refuse()
+
+	const events = await read_events(context)
+	const net = lane_net_time.net_minutes(await read_ledger(context), events, Number(issue))
+
+	if (net === undefined) {
+		console.error(
+			`josh lane:net ${issue}: the ledger holds no dispatch and merge of ${session_cite.issue(issue)}`,
+		)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	console.info(String(net))
+
+	return 0
+}
+
 type VerbCommand = (rest: ReadonlyArray<string>, context: MeasureContext) => Promise<number>
 
 const VERBS: Readonly<Record<string, VerbCommand>> = {
 	[SAMPLE_VERB]: sample_command,
 	[STATS_VERB]: stats_command,
 	[VALUE_VERB]: value_command,
+	[NET_VERB]: net_command,
 }
 
 async function run(argv: ReadonlyArray<string>, context: MeasureContext = {}): Promise<number> {

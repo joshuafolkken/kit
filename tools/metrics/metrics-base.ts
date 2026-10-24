@@ -79,9 +79,14 @@ function approval_texts(root: string): ReadonlyMap<string, string> {
 	)
 }
 
+// The issue's approval file name, the key `approval_texts` reads it under.
+function approval_name(issue: number): string {
+	return `${String(issue)}${APPROVAL_EXTENSION}`
+}
+
 // Returns the repository-relative path written, for the line the command prints.
 function write_approval(root: string, issue: number, approval: Approval): string {
-	const file = path.join(APPROVAL_DIRECTORY, `${String(issue)}${APPROVAL_EXTENSION}`)
+	const file = path.join(APPROVAL_DIRECTORY, approval_name(issue))
 
 	mkdirSync(path.join(root, APPROVAL_DIRECTORY), { recursive: true })
 	writeFileSync(path.join(root, file), metrics_ratchet.approval_text(approval))
@@ -155,6 +160,7 @@ const metrics_base = {
 	APPROVAL_DIRECTORY,
 	BASE_VARIABLE,
 	JSON_FLAG,
+	approval_name,
 	approval_texts,
 	read,
 	resolve_commit,

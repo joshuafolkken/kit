@@ -20,7 +20,6 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
 	'direct-issue-read': [HEREDOC],
-	'filing-cap': [HEREDOC],
 	'issue-comments': [],
 	'shell-body': [],
 	'raw-field-body': [QUOTED, HEREDOC],
@@ -65,6 +64,7 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'lane-park': ['command-substitution', HEREDOC],
 	'lane-interactive-ask': [],
 	'agent-model': [],
+	'investigator-foreground': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
 	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.

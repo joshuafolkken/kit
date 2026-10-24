@@ -78,7 +78,7 @@ Keeps caches of its own, apart from the gate's.
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
-- In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code.
+- In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
 
 ### `josh lines`
@@ -141,11 +141,11 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 
 The totals: code and comment lines and the comment ratio under `scripts/` (non-test), the lines of `CLAUDE.md` and `prompts/**/*.md`, the number of `*:guard` commands, and the AI cost in bytes.
 
-- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`, once — `josh ship` re-records a later growth of a total the approval names. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: a consumer's gate leaves the step out.
 - The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
-- **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
+- **Durations** fail past +10% of this machine's baseline; the gate and unit durations only warn where another lane worked or the load average passed the cores during most of the gates measured; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics` in detail".
 
@@ -176,6 +176,20 @@ pnpm josh cspell:dot   # includes dotfiles
 <!-- /usage -->
 
 - Runs with `--no-progress`: only the unknown-word lines and the summary print.
+
+### `josh check:related`
+
+<!-- usage: check:related -->
+
+Run related lint, unit and dotfile spelling checks in parallel.
+
+```bash
+pnpm josh check:related
+```
+
+<!-- /usage -->
+
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all three and exits non-zero if any fails.
 
 ### `josh behavior`
 
@@ -264,6 +278,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
 - A source file that differs only from the map's tree joins only when its text names a file this change moved; such a test file always joins.
 - A bare run after a green one reads only what moved since, main syncs included, plus the branch's own test files; nothing moved runs no test. The whole change when no record compares (none, or other tools, `NODE_ENV` or `TZ`), a non-code file moved (the map cannot see its read), or a toolchain, TypeScript or test-runner config moved (`scripts/gate/verification-inputs.ts`).
+- In kit, after a green run, the related tests of each changed code file that names the base branch's resolution (`change_base`, `default_branch`, `diff_main`, a quoted `main`) run again in a checkout shaped like CI's — detached, one commit deep, no local `main`, `origin` kept — and a failure there fails the run (`scripts/test/test-no-base.ts`). A change that names none builds no checkout.
 
 ### `josh test:declared`
 

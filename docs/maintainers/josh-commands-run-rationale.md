@@ -179,6 +179,10 @@ Open and close a lane: one linked git work tree with its own branch and its own 
 
 Measure a lane limit: a per-repository ledger holds merges, gates, each lane's dispatch, ship stages and ship stops, and the machine load `backlog:drive` samples while it runs (`lane:sample [--every <seconds>]` takes a reading outside a run); `lane:stats --period <days> [--limit <n>]` prints a period as one table row, under it the median and maximum of each stage of a lane, and under those how long a stopped `josh ship` waited to resume, per stop reason. Procedure and columns: [lane-limit-measurement.md](./lane-limit-measurement.md).
 
+## `josh lane:net` in detail
+
+Each wait runs from the park or outage to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop leaves no record yet, so its wait is not taken out (joshuafolkken/kit#4753).
+
 ## `josh cost` in detail
 
 Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts`; `--over <tokens>` sets an explicit one; any other flag is a usage error (exit 1). `josh time` carries the hand-off aggregates. History: [josh-commands-rationale.md](./josh-commands-rationale.md) — "`josh cost` and `josh time` lost their report scopes" above.

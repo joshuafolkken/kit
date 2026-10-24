@@ -120,10 +120,17 @@ function issue_read_instruction(issue: string): string {
 	].join(' ')
 }
 
+// **The review runs in this session itself** (joshuafolkken/kit#4715): a reviewer that invoked the
+// `/code-review` skill forked a second agent that read the same diff and brief again. The session is
+// launched without the `Skill` and `Agent` tools (`claude-agent-argv.ts`), and the prompt says so.
+const IN_SESSION_CLAUSE =
+	'Review it yourself in this session — you carry no Skill or Agent tool, so never launch a second reviewer.'
+
 function round_one_opening(brief_path: string): string {
 	return [
-		`Run a /code-review of this checkout: read the review brief at ${brief_path} and follow it exactly —`,
+		`Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
+		IN_SESSION_CLAUSE,
 	].join(' ')
 }
 
@@ -167,9 +174,10 @@ function slot_prompt(
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
 function verification_prompt(brief_path: string, findings_path: string, issue: string): string {
 	return [
-		`Run a /code-review of this checkout — the round-2 verification pass over the round-1 fixes: read the`,
+		`Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
 		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
 		'names, the checkout it pins and its review:attest step. Do not edit any file.',
+		IN_SESSION_CLAUSE,
 		issue_read_instruction(issue),
 		findings_instruction(findings_path, ''),
 	].join(' ')

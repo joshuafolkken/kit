@@ -211,6 +211,8 @@ function issue_create_request(input: {
 			body: input.body,
 		}),
 		jq_filter: HTML_URL_FILTER,
+		// A 502 can follow an issue GitHub already opened, and a retry would open a second one.
+		should_retry: false,
 	}
 }
 

@@ -172,6 +172,21 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 	})
 })
 
+// joshuafolkken/kit#4708: the sync commits the probe's dirty tree locally under the ship's title.
+describe('run_ship_steps — the sync stage', () => {
+	it('hands the sync the title and whether the probe read the tree dirty', async () => {
+		sync_spy.mockReset().mockResolvedValue(OK)
+
+		await step_for(STAGE.SYNC).run(ARGS, { ...FRESH, is_dirty: true })
+		await step_for(STAGE.SYNC).run(ARGS, FRESH)
+
+		expect(sync_spy.mock.calls).toStrictEqual([
+			[ISSUE, TITLE, true],
+			[ISSUE, TITLE, false],
+		])
+	})
+})
+
 describe('run_ship_steps — the ship body draft after the merge', () => {
 	// joshuafolkken/kit#4168: a draft left behind would hand a reopened issue's ship the old body.
 	it('removes the ship body draft once the merge succeeded', async () => {
