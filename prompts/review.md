@@ -162,7 +162,8 @@ Branch 2 only:
   1. Before the current Issue closes, file it tagged `route:review-cap`:
      `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap`. It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
-     (`docs/josh-commands-backlog.md` → `josh issue:file`). `epic:bundle` reads open issues only, so
+     (`docs/josh-commands-backlog.md` → `josh issue:file`). A security finding declares its
+     `- セキュリティ:` line (`issue-template.md` → H). `epic:bundle` reads open issues only, so
      after the parent closes it answers `none` permanently.
   2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
      hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing
