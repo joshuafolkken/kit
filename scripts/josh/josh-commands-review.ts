@@ -67,6 +67,25 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'review:submit': {
+		script: 'scripts/review/review-submit-cli.ts',
+		description: "Write a ship reviewer's findings, read from stdin, where the ship reads them",
+		category: 'AI tools',
+		reference: ['[--interaction] < findings | [--interaction] --none', 'automation', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '< findings.txt', note: 'the /code-review slot' },
+				{ arguments: '--interaction < findings.txt', note: 'the interaction review slot' },
+				{ arguments: '--none', note: 'a review with no findings' },
+			],
+			flags: [
+				{
+					names: ['--none'],
+					description: 'a review with no findings; empty stdin without it is refused.',
+				},
+			],
+		},
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',

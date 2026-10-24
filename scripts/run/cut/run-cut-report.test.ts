@@ -185,3 +185,13 @@ describe('run_cut_report.refuse_unready', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#4799: a reviewer on `review:submit` must never be told to write a findings file.
+describe('run_cut_report — a ship reviewer', () => {
+	it('carries the reviewer on and names no findings sink of its own', () => {
+		expect(run_cut_report.report_reviewer()).toBe(SUCCESS_EXIT_CODE)
+		expect_verdict(run_cut_report.NOT_A_LANE_VERDICT)
+		expect(stderr_text()).toContain('the way your review prompt says')
+		expect(stderr_text()).not.toMatch(/findings file/u)
+	})
+})

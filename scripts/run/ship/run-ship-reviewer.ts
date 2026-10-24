@@ -24,7 +24,7 @@ const should_forward_stderr = true
 const ATTEST_CHECK = ['review:attest', '--check']
 const KEPT_REVIEW_NOTE =
 	'the reviewer wrote its findings before it failed — its review is kept; attest and record judge it.'
-const MISSING_FINDINGS_NOTE = 'the reviewer wrote no findings file at the expected path:'
+const MISSING_FINDINGS_NOTE = 'the reviewer submitted no findings; nothing is at the slot path:'
 type Round = '1' | '2'
 
 const ROUND_ONE: Round = '1'
@@ -83,9 +83,9 @@ function current_verdict(slot?: ReviewSlot): ReturnType<typeof run_ship_review.r
 	return run_ship_review.read_verdict(stamp_file.read_stamp_text(paths(slot).findings))
 }
 
-// **A session that ended with no findings file names the path it was told to write**
-// (joshuafolkken/kit#4774): a reviewer that wrote its findings elsewhere otherwise stops the round
-// later, on a join or a record that never says the file is missing.
+// **A session that ended with no findings file names the slot's path** (joshuafolkken/kit#4774) — the
+// one `review:submit` writes, or the one a lane predating it was told to write: a reviewer that never
+// submitted otherwise stops the round later, on a join or a record that never says the file is missing.
 function missing_findings(slots: ReadonlyArray<ReviewSlot>): string | undefined {
 	const missing = slots
 		.map((slot) => paths(slot).findings)
@@ -166,12 +166,7 @@ function session_for(
 	slots: { slot: ReviewSlot; all: ReadonlyArray<ReviewSlot> },
 ): SlotSession {
 	const { slot, all } = slots
-	const target = paths(slot)
-	const prompt = run_ship_review.slot_prompt(prompt_of, slot, all)(
-		target.brief,
-		target.findings,
-		issue,
-	)
+	const prompt = run_ship_review.slot_prompt(prompt_of, slot, all)(paths(slot).brief, slot, issue)
 
 	return { slot, built: agent_argv.review_in(prompt, Number(round), PROJECT_ROOT) }
 }

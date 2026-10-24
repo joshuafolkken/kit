@@ -35,7 +35,14 @@ const DESCRIPTION_BOUNDARY = / [—–-]{1,2} /u
 // sets no space after `。`, so it ends a sentence on its own.
 const SENTENCE_END = /(?<=[.!?])\s|(?<=。)/u
 const SENTENCE_LIMIT = 200
-type PromptOf = (brief_path: string, findings_path: string, issue: string) => string
+// `findings_path` is set only for a lane whose josh predates `review:submit`
+// (`lane-session-action.ts`).
+type PromptOf = (
+	brief_path: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+) => string
 const ELLIPSIS = '…'
 
 const VERDICT = {
@@ -96,17 +103,52 @@ const UNVERIFIED_OUTCOME: RoundOutcome = {
 // reviewer to cite ride on it rather than in its prose report (joshuafolkken/kit#4673).
 const OTHER_SITES_CLAUSE = '"other sites: <file>:<line>, …" for each other site of the same pattern'
 const ROUND_TWO_CLEAN_NOTE = 'round 2 clean or Low-only — recorded; shipping on.'
+const SUBMIT_COMMAND = 'pnpm josh review:submit'
 const ROUND_TWO_BLOCKING_NOTE = `round 2 found High/Medium or edited the tree — recorded; round 2 is final. ${SWEEP_INSTRUCTION} Then push and gate it, and run followup (\`chain-rule.md\` step 4).`
 
-function findings_instruction(findings_path: string, fixed_clause: string): string {
-	const categories = review_finding_ledger.CATEGORIES.join(', ')
+// **The reviewer hands its findings to a command, never to a path it copies** (joshuafolkken/kit#4799):
+// a reviewer that copied the findings path matched the `josh-review-*` files beside it and dropped
+// `ship-`, so the supervisor never read a review it had finished. `review:submit` knows the slot's path.
+function submit_command(slot: ReviewSlot): string {
+	return slot === review_attest.REVIEW_SLOT.CODE
+		? SUBMIT_COMMAND
+		: `${SUBMIT_COMMAND} --interaction`
+}
+
+// **A lane whose josh predates `review:submit` is handed the path**: the supervisor reloads onto main
+// at its pass boundary (`run-wake-code.ts`), so it meets lanes branched before the command existed.
+function sink_clauses(
+	slot: ReviewSlot,
+	findings_path: string | undefined,
+): readonly [string, string] {
+	if (findings_path !== undefined) {
+		return [
+			`Then write every finding to ${findings_path},`,
+			'and an empty file when there is none.',
+		]
+	}
 
 	return [
-		`Then write every finding to ${findings_path}, one per line as`,
+		`Then pipe every finding on stdin to \`${submit_command(slot)}\` — never write a findings file yourself —`,
+		'or run it with `--none` and no stdin when there is none; if it refuses a line, fix that line and run it again.',
+	]
+}
+
+function findings_instruction(
+	slot: ReviewSlot,
+	fixed_clause: string,
+	findings_path: string | undefined,
+): string {
+	const categories = review_finding_ledger.CATEGORIES.join(', ')
+	const [opening, closing] = sink_clauses(slot, findings_path)
+
+	return [
+		opening,
+		'one per line as',
 		`<category>:<severity>:<file>[:<line>]${DESCRIPTION_SEPARATOR}<one sentence: what is wrong and why>`,
 		`(category one of ${categories}; severity high, medium or low)${fixed_clause},`,
 		`a high or medium line ending with ${OTHER_SITES_CLAUSE},`,
-		'and an empty file when there is none.',
+		closing,
 	].join(' ')
 }
 
@@ -136,7 +178,12 @@ function round_one_opening(brief_path: string): string {
 
 // One line, because `detached_launch` refuses an argument carrying a control character: the multi-line
 // brief travels by path, never inline.
-function reviewer_prompt(brief_path: string, findings_path: string, issue: string): string {
+function reviewer_prompt(
+	brief_path: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+): string {
 	return [
 		round_one_opening(brief_path),
 		issue_read_instruction(issue),
@@ -144,18 +191,27 @@ function reviewer_prompt(brief_path: string, findings_path: string, issue: strin
 		'added test, an added guard; never fix a High or a change that reaches beyond one place, and never',
 		'commit, stage or push. After any fix, run `pnpm josh lint:related && pnpm josh test:related` and',
 		'return only once both are green; revert a fix you cannot get green and report that finding unfixed.',
-		findings_instruction(findings_path, `, prefixing a finding you fixed with "${FIXED_PREFIX}"`),
+		findings_instruction(
+			slot,
+			`, prefixing a finding you fixed with "${FIXED_PREFIX}"`,
+			findings_path,
+		),
 	].join(' ')
 }
 
 // The round-1 review run beside the code review: it reads only, so the two sessions never fix, verify
 // and revert in the one shared checkout at once; its findings go to the lane's one fix pass.
-function report_prompt(brief_path: string, findings_path: string, issue: string): string {
+function report_prompt(
+	brief_path: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+): string {
 	return [
 		round_one_opening(brief_path),
 		'Do not edit any file: the code review running beside this one fixes in this checkout.',
 		issue_read_instruction(issue),
-		findings_instruction(findings_path, ''),
+		findings_instruction(slot, '', findings_path),
 	].join(' ')
 }
 
@@ -172,14 +228,19 @@ function slot_prompt(
 }
 
 // The round-2 verification pass: a fresh session over the round-1 fix delta, reading only.
-function verification_prompt(brief_path: string, findings_path: string, issue: string): string {
+function verification_prompt(
+	brief_path: string,
+	slot: ReviewSlot,
+	issue: string,
+	findings_path?: string,
+): string {
 	return [
 		`Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
 		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
 		'names, the checkout it pins and its review:attest step. Do not edit any file.',
 		IN_SESSION_CLAUSE,
 		issue_read_instruction(issue),
-		findings_instruction(findings_path, ''),
+		findings_instruction(slot, '', findings_path),
 	].join(' ')
 }
 
@@ -341,6 +402,7 @@ const run_ship_review = {
 	round_one_outcome,
 	round_two_outcome,
 	slot_prompt,
+	submit_command,
 	verification_prompt,
 }
 

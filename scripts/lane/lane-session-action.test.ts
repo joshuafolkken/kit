@@ -10,9 +10,11 @@ import { lane_session_action, type BrokerAnswer } from './lane-session-action'
 const argv_mock = vi.hoisted(() => vi.fn())
 const launch_mock = vi.hoisted(() => vi.fn())
 const parked_mock = vi.hoisted(() => vi.fn())
+const exists_mock = vi.hoisted(() => vi.fn())
 const ROUND_ONE = { kind: 'review', round: '1' } as const
 const BOTH_SLOTS = ['code', 'interaction'] as const
 const FIX_IN_PLACE = 'Apply a fix'
+const SUBMIT = 'pnpm josh review:submit'
 const AUTH_FAILED_LOG = JSON.stringify({
 	type: 'result',
 	is_error: true,
@@ -39,6 +41,10 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch_attached: launch_mock },
 }))
 vi.mock('./lane-parked', () => ({ lane_parked: { is_parked: parked_mock } }))
+vi.mock(import('node:fs'), async (import_original) => ({
+	...(await import_original()),
+	existsSync: exists_mock,
+}))
 
 beforeEach(() => {
 	argv_mock.mockReset().mockReturnValue({
@@ -48,6 +54,7 @@ beforeEach(() => {
 	})
 	launch_mock.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: 0 })
 	parked_mock.mockReset().mockResolvedValue(false)
+	exists_mock.mockReset().mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -175,6 +182,45 @@ describe('lane_session_action — slot reviewers side by side', () => {
 		expect(code).toContain(FIX_IN_PLACE)
 		expect(interaction).toContain('Do not edit any file')
 		expect(interaction).not.toContain(FIX_IN_PLACE)
+	})
+
+	// joshuafolkken/kit#4799: a reviewer that copied the findings path dropped `ship-` from it.
+	it('hands each slot reviewer its submit command, never its findings path', async () => {
+		await lane_session_action.answer(LANE, { ...ROUND_ONE, slots: BOTH_SLOTS })
+
+		const [code, interaction] = argv_mock.mock.calls.map(([prompt]) => String(prompt))
+
+		expect(code).toContain(`\`${SUBMIT}\``)
+		expect(interaction).toContain(`\`${SUBMIT} --interaction\``)
+
+		for (const slot of BOTH_SLOTS) {
+			const { findings } = lane_session_action.review_paths(LANE.directory, slot)
+
+			expect(`${String(code)}${String(interaction)}`).not.toContain(findings)
+		}
+	})
+})
+
+describe('lane_session_action — a lane on either side of review:submit', () => {
+	// A consumer's josh is the kit package's, so its script is found under `node_modules`.
+	it('finds the submit command in a consumer lane', async () => {
+		exists_mock.mockImplementation((target: string) => target.includes('node_modules'))
+
+		await lane_session_action.answer(LANE, ROUND_ONE)
+
+		expect(String(argv_mock.mock.calls[0]?.[0])).toContain(`\`${SUBMIT}\``)
+	})
+
+	// The supervisor reloads onto main, so it serves lanes branched before `review:submit` existed.
+	it('hands a lane without the submit command its findings path', async () => {
+		exists_mock.mockReturnValue(false)
+
+		await lane_session_action.answer(LANE, ROUND_ONE)
+
+		const prompt = String(argv_mock.mock.calls[0]?.[0])
+
+		expect(prompt).toContain(lane_session_action.review_paths(LANE.directory, 'code').findings)
+		expect(prompt).not.toContain(SUBMIT)
 	})
 })
 
