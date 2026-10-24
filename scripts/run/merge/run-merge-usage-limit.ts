@@ -35,13 +35,19 @@ function resume_ms(events: ReadonlyArray<RunEvent>): number | undefined {
 	return newest === undefined ? undefined : time_of(newest.text)
 }
 
-// Whether a usage limit still holds launches at `now_ms` — the production `usage_limited` port.
-async function is_held(now_ms: number): Promise<boolean> {
-	const reset_ms = resume_ms(await run_event_stream_emit.current_events())
+// The reset a usage limit still holds launches until at `now_ms`, or `undefined` once it has passed —
+// what `run:board` names a waiting row's hold by (joshuafolkken/kit#4796).
+function held_until(events: ReadonlyArray<RunEvent>, now_ms: number): number | undefined {
+	const reset_ms = resume_ms(events)
 
-	return reset_ms !== undefined && reset_ms > now_ms
+	return reset_ms !== undefined && reset_ms > now_ms ? reset_ms : undefined
 }
 
-const run_merge_usage_limit = { is_held, record, resume_ms }
+// Whether a usage limit still holds launches at `now_ms` — the production `usage_limited` port.
+async function is_held(now_ms: number): Promise<boolean> {
+	return held_until(await run_event_stream_emit.current_events(), now_ms) !== undefined
+}
+
+const run_merge_usage_limit = { held_until, is_held, record, resume_ms }
 
 export { run_merge_usage_limit }

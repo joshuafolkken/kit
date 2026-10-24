@@ -20,6 +20,7 @@ const UNTRIAGED = 3727
 const HELD = 3714
 const OPENING = 3720
 const NO_LANE_LEFT = 0
+const HOUR_MS = 3_600_000
 const { CONDITION_WIDTH } = run_board_render_condition
 const OPENED_AT = new Date(START).toISOString()
 const OPENING_EVENT = {
@@ -100,5 +101,16 @@ describe('run_board_tick.tick — why a waiting row waits', () => {
 
 		expect(await row_of(OPENING, opening, plan)).toMatch(/^ {4}🚪 (?:\d+′)?\d+″ +3720$/u)
 		expect(await row_of(OPENING, { ...opening, is_stranded: true }, plan)).not.toMatch(/🚪/u)
+	})
+})
+
+// joshuafolkken/kit#4796: the usage-limit reset the local read carries reaches the waiting row.
+describe('run_board_tick.tick — a usage-limit hold', () => {
+	it('draws the usage-limit reset the local read carries', async () => {
+		const held = { ...LOCAL, usage_reset_ms: START + HOUR_MS }
+		const plan = plan_of([child(HELD)])
+
+		expect(await row_of(HELD, held, plan)).toMatch(/^ {4}🪫 \d{2}-\d{2} \d{2}:\d{2} +3714$/u)
+		expect(await row_of(HELD, LOCAL, plan)).not.toMatch(/🪫/u)
 	})
 })

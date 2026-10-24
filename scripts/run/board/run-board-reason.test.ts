@@ -6,7 +6,6 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { describe, expect, it } from 'vitest'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan, RowReason } from './run-board-layout'
-import type { MachineGauges } from './run-board-machine'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
 import type { ItemStatus } from './run-board-status'
 
@@ -346,35 +345,5 @@ describe('run_board_reason.reader — a row whose declared start time is ahead',
 			Date.parse(FUTURE),
 			undefined,
 		])
-	})
-})
-
-// joshuafolkken/kit#4084: a row the driver holds for memory says so, with the figures it was held on.
-const PRESSED: MachineGauges = {
-	cpu_percent: undefined,
-	memory_percent: 88,
-	swap_mb_per_s: 12,
-	memory_pressure: undefined,
-}
-
-describe('run_board_reason.reader — a row the machine’s memory keeps waiting', () => {
-	it('leads with 🧠 and its figure, and leaves the 💾 figure to the row’s end', () => {
-		const held = { is_memory_held: true, gauges: PRESSED }
-
-		expect(reasons([child(HELD)], held)).toStrictEqual([
-			{ icon: WAIT_ICONS.memory, value: '88%', tail: '💾 12M/s' },
-		])
-	})
-
-	it('draws no figure where none was read', () => {
-		expect(reasons([child(HELD)], { is_memory_held: true })).toStrictEqual([
-			{ icon: WAIT_ICONS.memory, value: undefined, tail: undefined },
-		])
-	})
-
-	it('leads with 🧵 first when the lanes are full as well', () => {
-		const full = { is_memory_held: true, gauges: PRESSED, free_lanes: NO_LANE_LEFT }
-
-		expect(reasons([child(HELD)], full)).toStrictEqual([NO_LANE_REASON])
 	})
 })

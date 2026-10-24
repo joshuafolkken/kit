@@ -10,7 +10,9 @@ import { lane_state } from '#scripts/lane/lane-state'
 import { stamped_memo } from '#scripts/lib/stamped-memo'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
+import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_merge_usage_limit } from '#scripts/run/merge/run-merge-usage-limit'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
 import { run_board_found, type FoundOf } from './run-board-found'
@@ -62,6 +64,9 @@ interface LocalRead {
 	occupied_count?: number | undefined
 	// How long each phase usually takes, from the repository's lane ledger.
 	usual?: UsualTimes | undefined
+	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
+	// `undefined` once it has passed, where none was recorded, or where no run is carried.
+	usage_reset_ms?: number | undefined
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
@@ -219,13 +224,30 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 	}
 }
 
-// The run's own events, and what its done rows say after their time with each open investigation's
-// session asked of `table`.
+// The reset a usage limit holds the running run's launches until, read off the events `backlog:drive`
+// reads it off (`run_event_stream_emit.current_events`): the carried invocation's, so an ended run's
+// stop holds no row the driver would launch.
+function usage_reset_here(
+	events: ReadonlyArray<RunEvent>,
+	carry: RunCarry | undefined,
+): number | undefined {
+	if (carry === undefined) return undefined
+	const scope = run_event_scope.scope_of({ kind: 'carried', carry })
+
+	return run_merge_usage_limit.held_until(
+		run_event_scope.scoped_events(events, scope) ?? [],
+		Date.now(),
+	)
+}
+
+// The run's own events, what its done rows say after their time with each open investigation's
+// session asked of `table`, and the usage limit its record's invocation is held by.
 async function span_events_here(
 	events: ReadonlyArray<RunEvent>,
 	span: BoardSpan,
 	table: TableRead | undefined,
-): Promise<Pick<LocalRead, 'events' | 'found'>> {
+	carry: RunCarry | undefined,
+): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms'>> {
 	const spanned = run_board_span.events_of(events, span)
 	// An overrun session outlives the run that launched it, so its notes and filings are read past the
 	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.
@@ -234,6 +256,7 @@ async function span_events_here(
 	return {
 		events: spanned,
 		found: run_board_found.found_of(since, await run_board_found.live_in(table)),
+		usage_reset_ms: usage_reset_here(events, carry),
 	}
 }
 
@@ -254,7 +277,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		started_ms: span.started_ms,
 		ended_ms: span.ended_ms,
 		scope: run_board_scope.scope_of(span.invocation),
-		...(await span_events_here(events, span, table)),
+		...(await span_events_here(events, span, table, carry)),
 		lanes: lanes.map((lane) => lane.issue),
 		lane_states,
 		resume,

@@ -51,6 +51,8 @@ interface ReasonRead extends Overlay {
 	occupied_count?: number | undefined
 	// The limit those lanes fill; `undefined` where it could not be read.
 	lane_limit?: number | undefined
+	// The reset a Claude usage limit holds launches until (`run-merge-usage-limit.ts`), if one does.
+	usage_reset_ms?: number | undefined
 	// The driver holds its offered issue for memory (`backlog-drive-memory.ts`).
 	is_memory_held?: boolean | undefined
 	// The machine's latest gauges, the figures a memory hold names.
@@ -190,9 +192,16 @@ function no_memory_of(gauges: MachineGauges | undefined): RowReason {
 	}
 }
 
-// The machine's room: no lane left under the limit, else no memory for one more.
+// `🪫 10-25 16:30`: the reset a usage limit holds every launch until, in the board's local time.
+function usage_limit_of(reset_ms: number): RowReason {
+	return { icon: WAIT_ICONS.usage_limit, value: run_board_labels.day_minute_of(reset_ms) }
+}
+
+// The machine's room: no lane left under the limit, else a usage limit not yet reset, else no memory
+// for one more — the order `backlog:drive` asks them in.
 function room_wait(read: ReasonRead): RowReason | undefined {
 	if (read.free_lanes === NO_FREE_LANES) return no_lane_of(read)
+	if (read.usage_reset_ms !== undefined) return usage_limit_of(read.usage_reset_ms)
 
 	return read.is_memory_held === true ? no_memory_of(read.gauges) : undefined
 }
@@ -247,7 +256,7 @@ function solo_wait(child: EpicChild, pool: Pool): RowReason | undefined {
 // A candidate nothing blocks, in the order the driver answers: the declared order, then what
 // `backlog:next` answers — the pool held for a judgment, then a running `run:solo` issue, then a
 // waiting `run:solo` issue's wait, then a path a running issue declares, then a pool with no lane
-// left, then a machine with no memory.
+// left, then a usage limit not yet reset, then a machine with no memory.
 function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason | undefined {
 	return (
 		named_of(child, read, pool) ??
