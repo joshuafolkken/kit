@@ -15,7 +15,9 @@ const { branch, brief_run, interaction_status, launch_pinned } = vi.hoisted(() =
 }))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
-vi.mock('#scripts/review/review-brief-cli', () => ({ review_brief_cli: { run: brief_run } }))
+vi.mock('#scripts/review/review-brief-cli', () => ({
+	review_brief_cli: { run: brief_run, scoped_refusal: async () => undefined },
+}))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 

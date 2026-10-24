@@ -21,7 +21,9 @@ vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned },
 }))
-vi.mock('#scripts/review/review-brief-cli', () => ({ review_brief_cli: { run: brief_run } }))
+vi.mock('#scripts/review/review-brief-cli', () => ({
+	review_brief_cli: { run: brief_run, scoped_refusal: async () => undefined },
+}))
 // Code's brief alone: the interaction brief beside it is `run-review-cli-interaction.test.ts`'s.
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
