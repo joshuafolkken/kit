@@ -4,8 +4,8 @@ import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_round_one_stats } from '#scripts/lane/lane-round-one-stats'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
-import { review_record } from '#scripts/review/review-record'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
+import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { review_round2 } from '#scripts/review/review-round2'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
@@ -243,25 +243,6 @@ async function code_round_one_record(
 	return recorded
 }
 
-// **A recorded round 1 is reused while the tree it was recorded on holds still** — a lane's review
-// before the ship (joshuafolkken/kit#4620) — **or after the ship's own round 1 stopped on a finding**,
-// however the lane's fix moved the tree: that fix delta is round 2's after the commit. Any other tree
-// that moved since is reviewed again, from that record (`review-reviewed-tree.ts`), so the round reads
-// the delta alone. An issue that changed after that round's brief is never reused: the recorded
-// round never read it, and `josh followup` refuses the merge on it (joshuafolkken/kit#4221).
-async function is_reusable(issue: string, is_stale: boolean): Promise<boolean> {
-	if (is_stale) return false
-
-	const recorded = await review_record.check(Number(issue))
-
-	if (recorded.status !== 'ok') return false
-
-	return (
-		review_reviewed_tree.is_stopped_on(Number(issue)) ||
-		(await review_reviewed_tree.is_unmoved_here())
-	)
-}
-
 // `run:review` alone takes the implementer's `--unpinned-ok "<reason>"`; the interaction brief runs no
 // `test:pinned` check for it to carry past.
 function round_one_opens(
@@ -282,7 +263,8 @@ async function round_one_stage(
 	slots: ReadonlyArray<ReviewSlot>,
 	unpinned_ok: ReadonlyArray<string>,
 ): Promise<StepResult> {
-	if (await is_reusable(issue, is_stale)) {
+	// The reuse question `review:record --check` answers too (`review-round-reuse.ts`).
+	if (await review_round_reuse.is_reusable(Number(issue), is_stale)) {
 		await record_outcome(issue, lane_round_one_stats.REUSED)
 
 		return skipped(ROUND_ONE_RECORDED_NOTE)

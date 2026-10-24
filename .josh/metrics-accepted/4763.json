@@ -1,0 +1,7 @@
+{
+	"reason": "review:record --check answers the ship's round-1 reuse from a shared review-round-reuse module, failing closed when git cannot answer (#4763)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 35
+	}
+}
