@@ -15,9 +15,10 @@ import { shell_segments } from './shell-segments'
 //
 // **Only the checkout's own repository**: `issue:comment` posts there and nowhere else, so the row
 // claims the spellings that target it — the `{owner}` placeholder, the checkout's own `owner/repo`
-// spelled out (judged by `repo_party`, the definition `third-party-write` reads; joshuafolkken/kit#4737),
-// and `gh issue comment` with no repository selector. A comment to another repository named outright
-// is left to `third-party-write`.
+// spelled out (the one repository the placeholders can expand to, `repo_party.current_repository`, the
+// candidate set `third-party-write` reads; joshuafolkken/kit#4737), and `gh issue comment` with no
+// repository selector. A comment to another repository named outright is left to `third-party-write`,
+// and so is every spelled-out one where the placeholders could expand to more than one repository.
 //
 // **It fires on every occurrence**, for the reason `git-force.ts` does.
 

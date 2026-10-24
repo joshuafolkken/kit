@@ -82,4 +82,15 @@ describe('direct-issue-comment delivery', () => {
 
 		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)
 	})
+
+	// The real resolver, read from this kit checkout (`origin` is joshuafolkken/kit), so the default
+	// `resolve_own` the guard runs with is pinned and not only an injected one.
+	it("claims a write to the checkout's own repository spelled out", () => {
+		const command = 'gh api repos/joshuafolkken/kit/issues/4709/comments -F body=@/tmp/x.md'
+		const claiming = delivered_rules.DELIVERED_RULES.find((rule) =>
+			rule.is_trigger({ name: 'Bash', input: { command } }),
+		)
+
+		expect(claiming?.id).toBe(direct_issue_comment.ROW.id)
+	})
 })
