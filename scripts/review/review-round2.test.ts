@@ -19,6 +19,7 @@ const NESTED_README = 'scripts/README.md'
 const CLAUDE_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE_MD = 'CLAUDE.md'
 const CONFIG = 'cspell.config.yaml'
+const APPROVAL = '.josh/metrics-accepted/4765.json'
 const BEFORE = 'aaa'
 const AFTER = 'bbb'
 // What `review-tree.ts` records for a path the change lists but the working tree no longer holds.
@@ -205,6 +206,15 @@ describe('review_round2.decide — a fix that leaves what executes unchanged', (
 		expect(decision.reason).toContain(review_round2.INERT_DELTA_REASON_PREFIX)
 	})
 
+	// joshuafolkken/kit#4842: the ship's pre-detach re-record rewrites the approval after round 1.
+	it('skips the round when a fix delta holds only a metrics approval', () => {
+		const decision = decide_fix([APPROVAL])
+
+		expect(decision.verdict).toBe(review_round2.SKIPPED_VERDICT)
+		expect(decision.reason).toContain(review_round2.INERT_DELTA_REASON_PREFIX)
+		expect(decision.delta).toStrictEqual([APPROVAL])
+	})
+
 	it('skips the round when a fix changed only the comments of a source file', () => {
 		const decision = decide_fix([SOURCE, DOCUMENT], [SOURCE])
 
@@ -251,6 +261,17 @@ describe('review_round2.decide — a fix outside that range still gets the round
 		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
 		expect(decision.reason).toContain(SOURCE)
 		expect(decision.delta).toStrictEqual([CHANGELOG, SOURCE])
+	})
+})
+
+// joshuafolkken/kit#4842: the approval is skippable only alone; code beside it still decides.
+describe('review_round2.decide — a metrics approval beside code', () => {
+	it('requires the round when a fix changed code beside a metrics approval', () => {
+		const decision = decide_fix([APPROVAL, SOURCE])
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toContain(SOURCE)
+		expect(decision.reason).not.toContain(APPROVAL)
 	})
 })
 

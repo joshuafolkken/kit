@@ -15,6 +15,7 @@ const { FRESH_STATE, tick } = run_board_tick
 const ISSUE = 4067
 const TITLE = 'Measure the gate unit leg'
 const REPO = 'joshuafolkken/kit'
+// Read against the wall clock (`issue_not_before.waiting_ms`), not the harness clock.
 const FUTURE = '2999-01-01T00:00Z'
 const RELEASED_LABELS = ['auto-ok', 'run:lane']
 

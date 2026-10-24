@@ -115,7 +115,8 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
 
 - **A** — the fix delta is empty.
 - **B** — every path in the fix delta is inert by the review-level classification above:
-  `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file outside
+  `docs/**/*.md`, the root `README.md`, under `prompts/`, a metrics approval under
+  `.josh/metrics-accepted/`, or a `.ts` / `.js` / `.svelte` file outside
   `.claude/` changed only in comments (a lint, type-check, coverage or bundler directive comment counts
   as code).
 
