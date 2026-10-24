@@ -90,6 +90,12 @@ describe('issue_file_cli.run — the filing cap', () => {
 		expect(await issue_file_cli.run(argv_of(FOUND_DURING_FLAG, 'x'))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('[--found-during <N>]')
 	})
+
+	// joshuafolkken/kit#4768: `--blocks-finder` records that origin as blocked by the filed interrupt.
+	it('names --blocks-finder in the usage a malformed call prints', async () => {
+		expect(await issue_file_cli.run(argv_of(FOUND_DURING_FLAG, 'x'))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('[--blocks-finder]')
+	})
 })
 
 describe('issue_file_cli.run — the --found-during origin as a scout candidate', () => {
