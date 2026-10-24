@@ -9,6 +9,7 @@ import { review_finding_ledger, type Finding, type LineKind } from './review-fin
 import { review_finding_text } from './review-finding-text'
 import { review_interaction } from './review-interaction'
 import { review_record, type RecordVerdict } from './review-record'
+import { review_record_interaction } from './review-record-interaction'
 import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_reuse } from './review-round-reuse'
 import { review_stop_log } from './review-stop-log'
@@ -54,8 +55,6 @@ const REVIEW_AGAIN_LINE =
 	'Not reused: josh ship reviews round 1 again — this tree is not the one the round was recorded and attested on (moved since, a `main:merge` that changed a file it covers included), or the issue changed after its brief. Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const INTERACTION_NOT_REQUIRED_LINE =
-	'No interaction review is due: the change touches no run tooling, or this checkout keeps no ledger.'
 const CARRIED_LINE =
 	'review-finding line(s) recorded on closed issues after their pull requests opened into the ledger.'
 const CARRY_FAILED_LINE =
@@ -228,7 +227,7 @@ const CHECK_MODES: Record<LineKind, CheckMode> = {
 		status: review_interaction.status,
 		recorded: interaction_recorded,
 		refusal: review_interaction.refusal_message,
-		not_required: INTERACTION_NOT_REQUIRED_LINE,
+		not_required: review_record_interaction.NOT_REQUIRED_LINE,
 	},
 }
 
@@ -314,7 +313,7 @@ function unsettled_files(findings: ReadonlyArray<Finding>): ReadonlyArray<string
 }
 
 // A code round also records the tree its verdict stands for, which `josh ship` reuses while the tree
-// holds still (`review-reviewed-tree.ts`); the interaction review decides nothing the ship reuses.
+// holds still (`review-reviewed-tree.ts`), and names an interaction review its fixes made due.
 async function append_round({
 	issue,
 	lines,
@@ -327,7 +326,11 @@ async function append_round({
 	await observation_ledger_home.append(ledger_path, lines)
 	console.info(confirmation(lines.length, ledger_path))
 	await carry_comment_rounds(root)
-	if (kind === 'code') await review_reviewed_tree.record(unsettled_files(findings))
+
+	if (kind === 'code') {
+		await review_reviewed_tree.record(unsettled_files(findings))
+		await review_record_interaction.report_due(issue, root)
+	}
 
 	return 0
 }
