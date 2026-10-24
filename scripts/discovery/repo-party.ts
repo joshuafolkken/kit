@@ -1,5 +1,5 @@
 import { repo_discovery } from './repo-discovery'
-import { repo_origin } from './repo-origin'
+import { repo_origin, type RepoIdentity } from './repo-origin'
 import { session_owner_pin } from './session-owner-pin'
 
 // **First-party vs third-party, computed rather than judged**. `CLAUDE.md`
@@ -48,6 +48,29 @@ function current_owner(repository_path: string = process.cwd()): string | undefi
 	)
 }
 
+function origin_repo(repository_path: string): string | undefined {
+	const origin_url = repo_discovery.read_origin_url(repository_path)
+
+	return origin_url === undefined ? undefined : repo_origin.parse_origin_url(origin_url)?.repo
+}
+
+// The checkout's own repository: the session owner `current_owner` answers, and the repository name of
+// its `origin`. Nothing when either cannot be read.
+function current_repository(repository_path: string = process.cwd()): RepoIdentity | undefined {
+	const owner = current_owner(repository_path)
+	const repo = origin_repo(repository_path)
+
+	return owner === undefined || repo === undefined ? undefined : { owner, repo }
+}
+
+// Whether `target` is the checkout's own repository — a first-party owner and the same name, both
+// compared case-insensitively as GitHub resolves them.
+function is_own_repository(target: RepoIdentity, own: RepoIdentity | undefined): boolean {
+	if (own === undefined || classify(own.owner, target.owner) !== FIRST_PARTY) return false
+
+	return own.repo.toLowerCase() === target.repo.toLowerCase()
+}
+
 // The owner a `[HOST/]OWNER/REPO` selector names — `GH_REPO`, or `gh`'s `-R` / `--repo` value — read
 // from its last two segments so an optional host prefix is skipped.
 function selector_owner(selector: string): string | undefined {
@@ -90,6 +113,8 @@ const repo_party = {
 	UNKNOWN,
 	classify,
 	current_owner,
+	current_repository,
+	is_own_repository,
 	placeholder_owners,
 	selector_owner,
 	target_owner,

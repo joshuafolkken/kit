@@ -193,7 +193,8 @@ describe('third-party-write — delivered through the guard', () => {
 	})
 
 	it('is silent on a first-party comment write', () => {
-		const command = `gh api repos/${SESSION}/kit/issues/5/comments -f body=x`
+		// Not the checkout's own repository, which `direct-issue-comment` claims.
+		const command = `gh api repos/${SESSION}/other/issues/5/comments -f body=x`
 
 		expect(delivered_rules.delivery(payload_of('fp-comment', command), NOW_MS)).toBeUndefined()
 	})

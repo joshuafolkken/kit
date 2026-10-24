@@ -71,3 +71,26 @@ describe('repo_party.current_owner', () => {
 		expect(repo_party.current_owner()).toBe('joshuafolkken')
 	})
 })
+
+describe('repo_party.current_repository', () => {
+	it('reads the session owner and the origin repository name', () => {
+		expect(repo_party.current_repository()).toStrictEqual({ owner: 'joshuafolkken', repo: 'kit' })
+	})
+})
+
+describe('repo_party.is_own_repository', () => {
+	const own = { owner: 'joshuafolkken', repo: 'kit' }
+
+	it.each([
+		['the same owner/repo', { owner: 'joshuafolkken', repo: 'kit' }, true],
+		['another case', { owner: 'JoshuaFolkken', repo: 'KIT' }, true],
+		['another repository of the owner', { owner: 'joshuafolkken', repo: 'other' }, false],
+		['another owner', { owner: 'sveltejs', repo: 'kit' }, false],
+	])('answers %s', (_name, target, expected) => {
+		expect(repo_party.is_own_repository(target, own)).toBe(expected)
+	})
+
+	it('answers false when the own repository cannot be read', () => {
+		expect(repo_party.is_own_repository(own, undefined)).toBe(false)
+	})
+})
