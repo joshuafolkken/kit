@@ -27,10 +27,21 @@ function is_issue_number(value: number): boolean {
 }
 
 function finder_of(filing: InterruptFiling): number | undefined {
-	if (filing.route !== INTERRUPT_ROUTE_LABEL || !filing.is_blocking_finder) return undefined
+	if (filing.route !== INTERRUPT_ROUTE_LABEL || !filing.is_here) return undefined
 	const finder = Number(filing.found_during)
 
-	return filing.is_here && is_issue_number(finder) ? finder : undefined
+	return is_issue_number(finder) ? finder : undefined
+}
+
+// An explicit `--blocks-finder` that records nothing is said, so the caller does not read the
+// silence as a recorded relation and leave the finder dispatchable.
+function ignored_line(filing: InterruptFiling): string {
+	const reason =
+		filing.route === INTERRUPT_ROUTE_LABEL
+			? 'no finder and filed Issue pair in this repository was read'
+			: 'it applies to `--route interrupt` only'
+
+	return `⚠ --blocks-finder recorded nothing: ${reason}.`
 }
 
 // The re-run writes the one relation and nothing else — no epic placement and no chain splice, which
@@ -43,11 +54,8 @@ function failure_line(blocked: number, blocker: number): string {
 	return `⚠ ${cited} — run \`gh api ${path} -F issue_id=${id}\`.`
 }
 
-async function block_finder(filing: InterruptFiling): Promise<void> {
-	const blocked = finder_of(filing)
-
-	if (blocked === undefined || !is_issue_number(filing.blocker)) return
-	const links = [{ blocked, blocker: filing.blocker }]
+async function record(blocked: number, blocker: number): Promise<void> {
+	const links = [{ blocked, blocker }]
 	const failures = await epic_relations.apply_relations(links, 'record')
 
 	if (failures === 0) {
@@ -56,7 +64,20 @@ async function block_finder(filing: InterruptFiling): Promise<void> {
 		return
 	}
 
-	console.error(failure_line(blocked, filing.blocker))
+	console.error(failure_line(blocked, blocker))
+}
+
+async function block_finder(filing: InterruptFiling): Promise<void> {
+	if (!filing.is_blocking_finder) return
+	const blocked = finder_of(filing)
+
+	if (blocked === undefined || !is_issue_number(filing.blocker)) {
+		console.warn(ignored_line(filing))
+
+		return
+	}
+
+	await record(blocked, filing.blocker)
 }
 
 const issue_file_interrupt = { block_finder }

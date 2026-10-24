@@ -13,6 +13,7 @@ const BLOCKER = 4738
 const apply_relations = vi.spyOn(epic_relations, 'apply_relations')
 const info = vi.spyOn(console, 'info')
 const error = vi.spyOn(console, 'error')
+const warn = vi.spyOn(console, 'warn')
 
 function interrupt_filing(): Parameters<typeof issue_file_interrupt.block_finder>[0] {
 	return {
@@ -28,6 +29,7 @@ beforeEach(() => {
 	apply_relations.mockResolvedValue(0)
 	info.mockImplementation(() => undefined)
 	error.mockImplementation(() => undefined)
+	warn.mockImplementation(() => undefined)
 })
 
 afterEach(() => {
@@ -61,17 +63,29 @@ describe('issue_file_interrupt.block_finder — a blocking interrupt with a find
 })
 
 describe('issue_file_interrupt.block_finder — nothing to record', () => {
+	it('stays silent when --blocks-finder was not given', async () => {
+		await issue_file_interrupt.block_finder({ ...interrupt_filing(), is_blocking_finder: false })
+
+		expect(apply_relations).not.toHaveBeenCalled()
+		expect(warn).not.toHaveBeenCalled()
+	})
+
+	const finder_reason = 'no finder and filed Issue pair in this repository'
+	const route_reason = '`--route interrupt` only'
+
+	// An explicit `--blocks-finder` that records nothing says so, rather than leaving the caller to
+	// read the silence as a recorded relation.
 	it.each([
-		['an interrupt that does not block its finder', { is_blocking_finder: false }],
-		['no finder', { found_during: undefined }],
-		['a finder that is not a number', { found_during: '#4711' }],
-		['a filed number that is not a number', { blocker: NaN }],
-		['a route other than interrupt', { route: SPLIT_ROUTE_LABEL }],
-		['no route', { route: undefined }],
-		['a filing in another repository', { is_here: false }],
-	])('records no relation for %s', async (_case, change) => {
+		['no finder', { found_during: undefined }, finder_reason],
+		['a finder that is not a number', { found_during: '#4711' }, finder_reason],
+		['a filed number that is not a number', { blocker: NaN }, finder_reason],
+		['a route other than interrupt', { route: SPLIT_ROUTE_LABEL }, route_reason],
+		['no route', { route: undefined }, route_reason],
+		['a filing in another repository', { is_here: false }, finder_reason],
+	])('records no relation and says so for %s', async (_case, change, reason) => {
 		await issue_file_interrupt.block_finder({ ...interrupt_filing(), ...change })
 
 		expect(apply_relations).not.toHaveBeenCalled()
+		expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(reason))
 	})
 })

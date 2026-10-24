@@ -180,7 +180,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--blocks-finder'],
 					description:
-						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9).',
+						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.',
 				},
 			],
 		},
