@@ -1,0 +1,10 @@
+{
+	"reason": "issue:file gains --blocks-finder: block_finder module with its guards, a warning when an explicit --blocks-finder records nothing, the relation-only re-run hint, the flag's usage entry, and wip-cap.md notes (no flag on three-condition interrupts; epic --reconcile after epic --add under an epic)",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 68,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 348,
+		"prose.long_paragraphs": 1
+	}
+}

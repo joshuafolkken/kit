@@ -132,6 +132,7 @@ pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
 - `--over-cap` — the run is blocked by this filing; the WIP cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
+- `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
 
 <!-- /usage -->
 
@@ -149,7 +150,7 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. File nothing until every candidate is named in `--distinct`; a duplicate is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the search and the epic decision run there.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL.
+9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL. A `--route interrupt --blocks-finder` filing in this repository then records its finder (step 5's origin) as blocked by the filed issue; a write that fails prints `⚠` with the `gh api` call to re-run, and the exit code stays 0; one that records nothing prints why.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
 

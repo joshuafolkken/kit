@@ -130,7 +130,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			'File an Issue with every filing step: lint, Origin, filing cap, fold, WIP cap, duplicate scout, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release]',
+			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',
 			'automation',
 			['network'],
 		],
@@ -176,6 +176,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--release'],
 					description:
 						"a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).",
+				},
+				{
+					names: ['--blocks-finder'],
+					description:
+						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.',
 				},
 			],
 		},

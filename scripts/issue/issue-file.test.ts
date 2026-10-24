@@ -34,6 +34,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,
+		is_blocking_finder: false,
 		...overrides,
 	}
 }
@@ -64,6 +65,12 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 
 	it('reads --release', () => {
 		expect(issue_file.parse([...FILED, '--release'])).toStrictEqual(args_of({ is_release: true }))
+	})
+
+	it('reads --blocks-finder', () => {
+		const parsed = issue_file.parse([...FILED, '--blocks-finder'])
+
+		expect(parsed).toStrictEqual(args_of({ is_blocking_finder: true }))
 	})
 
 	it.each([
