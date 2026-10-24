@@ -16,6 +16,8 @@ const ADDED = 'added.ts'
 const DELETED = 'deleted.ts'
 const NESTED = 'nested'
 const EDITED_TEXT = 'export const value = 2\n'
+const ORIGIN_URL = 'https://github.com/example-owner/example-repo.git'
+const ORIGIN_URL_KEY = 'remote.origin.url'
 
 async function git(cwd: string, arguments_: ReadonlyArray<string>): Promise<string> {
 	return await git_fixture_workspace.git(cwd, arguments_)
@@ -83,6 +85,26 @@ describe('no_base_checkout', () => {
 		no_base_checkout.remove(checkout.directory)
 
 		expect(existsSync(checkout.directory)).toBe(false)
+	})
+})
+
+describe('no_base_checkout — the origin remote', () => {
+	beforeEach(open_checkout)
+	afterEach(close_checkout)
+
+	it('declares no origin when the repository it was cut from has none', async () => {
+		await expect(git(checkout.directory, ['config', '--get', ORIGIN_URL_KEY])).rejects.toThrow()
+	})
+
+	it('declares the origin of the repository it was cut from, and fetches no ref from it', async () => {
+		await git(fixture.workspace, ['config', ORIGIN_URL_KEY, ORIGIN_URL])
+		const directory = await no_base_checkout.create(fixture.workspace)
+		const remote_url = git(directory, ['config', '--get', ORIGIN_URL_KEY])
+		const branches = git(directory, ['for-each-ref', 'refs/remotes', 'refs/heads'])
+
+		await expect(remote_url).resolves.toBe(ORIGIN_URL)
+		await expect(branches).resolves.toBe('')
+		no_base_checkout.remove(directory)
 	})
 })
 
