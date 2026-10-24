@@ -32,6 +32,8 @@ describe('test_pinned_record', () => {
 	})
 })
 
+const inserted = { ...HUNK, new_lines: ['console.log(x)'] }
+
 function site(hunk: PinnedReport['unpinned'][number]): string | undefined {
 	return test_pinned_record.summary_of({ ...REPORT, unpinned: [hunk] }).unpinned[0]
 }
@@ -47,11 +49,21 @@ describe('test_pinned_record — the key of an unpinned place', () => {
 	})
 
 	it('keys two insertions of one length apart by the lines they put in', () => {
-		const inserted = { ...HUNK, new_lines: ['console.log(x)'] }
 		const logged = site(inserted)
 
 		expect(site({ ...inserted, new_start: 40 })).toBe(logged)
 		expect(site({ ...HUNK, new_lines: ['if (x === undefined) return'] })).not.toBe(logged)
+	})
+
+	it('keys a second identical insertion in the file apart from the first', () => {
+		const copied = { ...inserted, new_start: 40 }
+		const [first, second] = test_pinned_record.summary_of({
+			...REPORT,
+			unpinned: [inserted, copied],
+		}).unpinned
+
+		expect(first).toBe(site(inserted))
+		expect(second).not.toBe(first)
 	})
 })
 

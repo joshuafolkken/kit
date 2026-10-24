@@ -1,5 +1,6 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { test_pinned_cache_logic } from './test-pinned-cache-logic'
 import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
@@ -18,7 +19,8 @@ const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: 
 
 type UnpinnedHunk = PinnedReport['unpinned'][number]
 
-// `unpinned` holds one key per unpinned place (`site_of`).
+// `unpinned` holds one key per unpinned place (`site_of`); an identical place in the same file takes its
+// occurrence number, so a copy added later is a place no record holds.
 interface PinnedSummary {
 	text: string
 	unpinned: ReadonlyArray<string>
@@ -38,7 +40,7 @@ function site_of(hunk: UnpinnedHunk): string {
 function summary_of(report: PinnedReport): PinnedSummary {
 	return {
 		text: test_pinned_logic.report_text(report),
-		unpinned: report.unpinned.map((hunk) => site_of(hunk)),
+		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
 }
 
