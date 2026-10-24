@@ -947,7 +947,7 @@ The value is the output's last line, two decimals, so a measurement Issue declar
 
 <!-- usage: lane:net -->
 
-Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks and outages stood.
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages and usage-limit stops stood.
 
 ```bash
 pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
