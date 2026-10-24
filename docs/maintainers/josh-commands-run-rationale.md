@@ -120,6 +120,12 @@ A `preflight` stage runs first: it asks every pull-request precondition at once 
 
 `--review` runs review round 1 beside the gate, after any scoped check not yet green. The round-1 reviewer fixes a small, local Medium in place and marks it `fixed `, counted once the scoped pair is green; a High, an unfixed Medium or a refusal stops the ship. After the commit a `round-2` stage asks `review:round2 --round-1-closed` and, on `required`, runs the scoped pair, `review:brief --round 2`, a fresh read-only reviewer, attest and record — anything but a clean or Low-only round 2 stops before `followup`.
 
+## `josh ship:wait` in detail
+
+The lane session that detached a ship waits instead of ending its turn, so a stop in the gate or review round 1 comes back to the session that already holds the run rather than to a fresh one that re-reads it (joshuafolkken/kit#4711).
+
+Each poll refreshes a heartbeat; the stopped supervisor hands its note to a session whose heartbeat is fresh, and relaunches a fresh session where none takes it within two minutes. A chunk ends `pending` after nine minutes, below the Bash tool's ceiling, and the heartbeat outlives it long enough for the next wait.
+
 ## `josh run:event` in detail
 
 `setup` is one stage the run itself works through — `starting session`, `planning`, `handing off`, `waiting on judgment`, `judgment session running`, `no child launched`, `opening lane #<N>`, `installing dependencies #<N>`, `dispatching #<N>` — written by the step that enters it, and its `at` is the moment `run:board` counts the stage's elapsed time from; it is a trace, so it never moves the run's position.
