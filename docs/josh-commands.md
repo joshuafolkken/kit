@@ -141,7 +141,7 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 
 The totals: code and comment lines and the comment ratio under `scripts/` (non-test), the lines of `CLAUDE.md` and `prompts/**/*.md`, the number of `*:guard` commands, and the AI cost in bytes.
 
-- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`, once — `josh ship` re-records a later growth of a total the approval names. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: a consumer's gate leaves the step out.
 - The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
