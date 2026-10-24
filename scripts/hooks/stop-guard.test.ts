@@ -196,14 +196,20 @@ async function decide_in_lane(
 	arrange: () => void = () => undefined,
 ): Promise<string> {
 	quiet_world()
-	arrange()
 	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 	vi.spyOn(lane_background, 'pending_background_ids').mockReturnValue(pending)
+	vi.spyOn(lane_background, 'pending_command_ids').mockReturnValue(pending)
+	arrange()
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 
 	await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
 
 	return write.mock.calls.map((call) => String(call[0])).join('')
+}
+
+// A tail whose only unfinished tasks are subagents.
+function no_command_pending(): void {
+	vi.spyOn(lane_background, 'pending_command_ids').mockReturnValue([])
 }
 
 // A carried run whose strand check prints its skipped-notify line on stdout, as the #4091 one did.
@@ -359,8 +365,18 @@ describe('write_stop_decision — the lane background wait is wired', () => {
 		)
 	})
 
+	// joshuafolkken/kit#4803: with no command left, the refusal names the wait that receives the answer.
+	it('sends a lane child with only a subagent running to the subagent wait', async () => {
+		const written = await decide_in_lane(['ac544c5a36c3f6f13'], no_command_pending)
+
+		expect(written).toContain(lane_background.LANE_AGENT_STOP_REASON)
+	})
+
 	it('lets a lane child with no task running stop', async () => {
-		expect(await decide_in_lane([])).not.toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
+		const written = await decide_in_lane([])
+
+		expect(written).not.toContain(lane_background.LANE_BACKGROUND_STOP_REASON)
+		expect(written).not.toContain(lane_background.LANE_AGENT_STOP_REASON)
 	})
 
 	// joshuafolkken/kit#4101: the strand check's skipped-notify line went out ahead of the #4091 child's

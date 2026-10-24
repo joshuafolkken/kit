@@ -186,6 +186,12 @@ function pending_agent_ids(tail: string): ReadonlyArray<string> {
 	return unfinished_ids(tail, (block) => [block.agent_id])
 }
 
+// The backgrounded commands alone — what tells a stop with only subagents left apart from one a
+// command still holds.
+function pending_command_ids(tail: string): ReadonlyArray<string> {
+	return unfinished_ids(tail, (block) => [block.background_id])
+}
+
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'process whose background tasks die when the turn ends. Hand over to ' +
@@ -197,6 +203,15 @@ const LANE_BACKGROUND_STOP_REASON =
 	'⛔ lane background stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a background task ' +
 	'it launched has not finished, and ending this turn kills it. Wait for it in the foreground, or ' +
 	're-issue the work through `pnpm josh ship --detach` — do not notify, stop or repeat your reply.'
+
+// **Only subagents left: the wait that receives their answer** (joshuafolkken/kit#4803). Their completion
+// notice is delivered only when a tool call ends, so one long hand-written loop holds it back until the
+// loop itself gives up; short foreground calls, one at a time, let it in at the first one to end.
+const LANE_AGENT_STOP_REASON =
+	'⛔ lane agent stop: this is a dispatched lane child (`JOSH_LANE_CHILD`) and a subagent it launched ' +
+	'has not finished; ending this turn kills it. Its completion notice arrives only when a tool call ' +
+	'ends: wait with one short foreground call at a time (`sleep 20`) until it arrives — never a loop ' +
+	'over its `.output`. Do not notify, stop or repeat your reply.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. It fires on every occurrence (`decide`
 // returns true): a child must never background these, so the route is always the detached ship, never
@@ -217,6 +232,7 @@ const ROW = {
 
 const lane_background = {
 	FOREGROUND_NOTE,
+	LANE_AGENT_STOP_REASON,
 	LANE_BACKGROUND_REASON,
 	LANE_BACKGROUND_STOP_REASON,
 	ROW,
@@ -224,6 +240,7 @@ const lane_background = {
 	is_background_long_run,
 	pending_agent_ids,
 	pending_background_ids,
+	pending_command_ids,
 }
 
 export { lane_background }

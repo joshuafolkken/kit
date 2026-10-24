@@ -88,6 +88,9 @@ interface StopContext {
 	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`.
 	// Apart from `background_pending`, since only a subagent is sure to end.
 	agent_pending: boolean
+	// A backgrounded command this run launched has not finished — `lane_background.pending_command_ids`.
+	// Apart from `agent_pending`, since the two are waited on differently.
+	command_pending: boolean
 	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`.
 	// The supervisor notifies on its own outcome, so nobody waits on this stop.
 	handed_off: boolean
@@ -308,11 +311,19 @@ function needs_background_wait(context: StopContext): boolean {
 	return context.lane_child && context.background_pending
 }
 
+// **Only subagents left take their own wait**: their notice comes in when a tool call ends, while a
+// command is waited on through the detached ship.
+function background_wait_reason(context: StopContext): string {
+	if (context.command_pending) return lane_background.LANE_BACKGROUND_STOP_REASON
+
+	return lane_background.LANE_AGENT_STOP_REASON
+}
+
 // The two lane rules that mean the run is not pausing at all — ahead of every action, since the notify
 // would announce a pause the run has no reason to take.
 function lane_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
-	if (needs_background_wait(context)) return lane_background.LANE_BACKGROUND_STOP_REASON
+	if (needs_background_wait(context)) return background_wait_reason(context)
 
 	return undefined
 }

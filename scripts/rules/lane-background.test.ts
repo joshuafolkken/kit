@@ -346,7 +346,8 @@ describe('lane_background.pending_agent_ids', () => {
 
 describe('stop_rules.stop_outcome — lane background wait', () => {
 	it('sends a lane child with a running task back to wait instead of to notify', () => {
-		const held = context({ lane_child: true, background_pending: true, hold_issue: '7' })
+		const running = { background_pending: true, command_pending: true }
+		const held = context({ ...running, lane_child: true, hold_issue: '7' })
 
 		expect(stop_rules.stop_outcome(held)).toEqual({
 			...stop_rules.NO_OUTCOME,

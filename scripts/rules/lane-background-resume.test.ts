@@ -82,3 +82,50 @@ describe('stop_rules.stop_outcome — a held lane waiting on a resumed subagent'
 		expect(actions.map((action) => action.kind)).toContain('release')
 	})
 })
+
+// joshuafolkken/kit#4803: the #4744 child, told only to "wait in the foreground", hand-wrote a loop over
+// the subagent's `.output` that never saw it finish and ran to its 300-second cap.
+const COMMAND_ID = 'bxj18z032'
+
+function command_launch_line(id: string): string {
+	const content = `Command running in background with ID: ${id}`
+
+	return user_line([{ type: 'tool_result', tool_use_id: 'toolu_3', content }])
+}
+
+// A lane child's stop with every pending fact read off `tail`, as `stop-guard.ts` reads them.
+function lane_stop_reason(tail: string): string | undefined {
+	const pending = {
+		background_pending: lane_background.pending_background_ids(tail).length > 0,
+		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
+		command_pending: lane_background.pending_command_ids(tail).length > 0,
+	}
+
+	return stop_rules.stop_outcome(context({ ...pending, lane_child: true })).reason
+}
+
+describe('stop_rules.stop_outcome — the wait a lane child is sent to', () => {
+	it('sends a child waiting only on a resumed subagent to the subagent wait', () => {
+		expect(lane_stop_reason(resume_line(AGENT_ID))).toBe(lane_background.LANE_AGENT_STOP_REASON)
+	})
+
+	it('keeps the command wait while a command is still running beside the subagent', () => {
+		const tail = [command_launch_line(COMMAND_ID), resume_line(AGENT_ID)].join('\n')
+
+		expect(lane_stop_reason(tail)).toBe(lane_background.LANE_BACKGROUND_STOP_REASON)
+	})
+
+	it('keeps the command wait for a command alone', () => {
+		const reason = lane_stop_reason(command_launch_line(COMMAND_ID))
+
+		expect(reason).toBe(lane_background.LANE_BACKGROUND_STOP_REASON)
+	})
+
+	it('reads no subagent as a pending command', () => {
+		expect(lane_background.pending_command_ids(resume_line(AGENT_ID))).toStrictEqual([])
+	})
+
+	it('names a wait the completion notice can reach, not a loop over the output', () => {
+		expect(lane_background.LANE_AGENT_STOP_REASON).toContain('one short foreground call at a time')
+	})
+})

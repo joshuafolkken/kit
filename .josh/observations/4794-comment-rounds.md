@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/git/base-tree.ts:58 | 2026-10-24 | #4794
+- rf:bug-risks | low | scripts/git/base-tree.ts:89 | 2026-10-24 | #4794
