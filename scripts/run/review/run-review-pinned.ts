@@ -1,6 +1,4 @@
-import { test_pinned } from '#scripts/test/test-pinned'
-import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
-import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
+import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 
 // The round-1 check of `josh run:review` (joshuafolkken/kit#4647): `josh test:pinned` over the change,
 // changed hunks and added files' functions alike. A change no test pins is the finding a review used
@@ -8,10 +6,10 @@ import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinne
 // It runs in the background beside the gate and the brief, and `--join` stops on its answer
 // (joshuafolkken/kit#4770), so its time leaves the critical path.
 //
-// **`--unpinned-ok "<reason>"` carries on past it** for a change no test can pin. That run checks in
-// place, before the pair: the list and the reason follow the brief on stdout, so the reviewer reads
-// both and judges them. Unchecked places (over the cap, an added file `typescript` could not read, or
-// no Vitest to run a probe) never stop the run.
+// **`--unpinned-ok "<reason>"` carries on past it** for a change no test can pin. That check runs in
+// the background too (joshuafolkken/kit#4793), so the pair never waits on it: the join prints the list
+// and the reason and carries on. Unchecked places (over the cap, an added file `typescript` could not
+// read, or no Vitest to run a probe) never stop the run.
 
 const UNPINNED_OK_FLAG = '--unpinned-ok'
 const OK_ARGUMENT_COUNT = 2
@@ -33,7 +31,7 @@ function ok_reason_of(argv: ReadonlyArray<string>): string | undefined {
 	return reason.trim() === '' ? undefined : reason
 }
 
-// The same answer for the in-place check and the background one the join reads.
+// The join's answer on the background check, judged by the reason it was launched with.
 function verdict_of(summary: PinnedSummary, reason: string | undefined): PinnedVerdict {
 	const { text } = summary
 
@@ -43,19 +41,7 @@ function verdict_of(summary: PinnedSummary, reason: string | undefined): PinnedV
 	return { kind: 'accepted', text: `${text}Unpinned accepted by the implementer: ${reason}\n` }
 }
 
-// A `test:pinned` that could not run (its worktree or copy-in failed) checked nothing, so it fails open
-// as an unchecked run would: the note goes beside the other run notes and the review carries on.
-async function check(reason: string | undefined): Promise<PinnedVerdict> {
-	try {
-		const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
-
-		return verdict_of(test_pinned_record.summary_of(report), reason)
-	} catch (error: unknown) {
-		return verdict_of(test_pinned_record.not_run_summary(error), reason)
-	}
-}
-
-const run_review_pinned = { STOP_NOTE, UNPINNED_OK_FLAG, check, ok_reason_of, verdict_of }
+const run_review_pinned = { STOP_NOTE, UNPINNED_OK_FLAG, ok_reason_of, verdict_of }
 
 export type { PinnedVerdict }
 export { run_review_pinned }

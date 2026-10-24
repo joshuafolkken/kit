@@ -13,9 +13,10 @@ import { run_review_steps } from './run-review-steps'
 // cores (`DIRECT_UNIT_CLAIM`), so it shares the budget with the gate's units rather than overrunning it.
 //
 // **Two records, both keyed to the checkout.** The check writes its answer under the launch's token
-// (`test-pinned-record.ts`); the start writes the launched pid and that token here. No pid means no check was
-// launched — an `--unpinned-ok` run checked in place — and a pid that is gone without an answer is a
-// check that died, which fails open the way a check that could not run does.
+// (`test-pinned-record.ts`); the start writes the launched pid and that token here, with the
+// `--unpinned-ok` reason the join judges the answer by (joshuafolkken/kit#4793). No pid means no check
+// was launched, and a pid that is gone without an answer is a check that died, which fails open the way
+// a check that could not run does.
 
 const PINNED_COMMAND = 'test:pinned'
 const RECORD_FLAG = '--record'
@@ -38,6 +39,7 @@ type Clock = () => number
 interface Launch {
 	pid: number
 	token: string
+	reason?: string
 }
 
 function launch_path(root: string = PROJECT_ROOT): string {
@@ -49,22 +51,23 @@ function log_path(root: string = PROJECT_ROOT): string {
 }
 
 // The token ties the answer to this launch (`test-pinned-record.ts`).
-function launch(root: string = PROJECT_ROOT): LaunchResult {
+function launch(root: string = PROJECT_ROOT, reason?: string): LaunchResult {
 	const token = randomUUID()
 	const argv = [PINNED_COMMAND, RECORD_FLAG, token]
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
 
 	if (launched.kind === 'launched') {
-		stamp_file.write_stamp(launch_path(root), { pid: launched.pid, token })
+		stamp_file.write_stamp(launch_path(root), { pid: launched.pid, token, reason })
 	}
 
 	return launched
 }
 
 function to_launch(value: unknown): Launch | undefined {
-	const { pid, token } = value as Record<string, unknown>
+	const { pid, token, reason } = value as Record<string, unknown>
+	if (typeof pid !== 'number' || typeof token !== 'string') return undefined
 
-	return typeof pid === 'number' && typeof token === 'string' ? { pid, token } : undefined
+	return typeof reason === 'string' ? { pid, token, reason } : { pid, token }
 }
 
 function read_launch(root: string): Launch | undefined {
@@ -163,6 +166,11 @@ async function poll_answer(root: string, launched: Launch, now: Clock): Promise<
 	return (await poll_within_grace(root, launched, now)) ?? stopped(launched, TIMED_OUT_NOTE)
 }
 
+// The `--unpinned-ok` reason the last check was launched with; `undefined` when it carried none.
+function launched_reason(root: string = PROJECT_ROOT): string | undefined {
+	return read_launch(root)?.reason
+}
+
 // `undefined` when no check was launched.
 async function wait_for_answer(
 	root: string = PROJECT_ROOT,
@@ -175,6 +183,6 @@ async function wait_for_answer(
 	return await poll_answer(root, launched, now)
 }
 
-const run_review_pinned_steps = { clear, launch, log_path, wait_for_answer }
+const run_review_pinned_steps = { clear, launch, launched_reason, log_path, wait_for_answer }
 
 export { run_review_pinned_steps }

@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/rules/poll-loop.ts:63 | 2026-10-24 | #4800
