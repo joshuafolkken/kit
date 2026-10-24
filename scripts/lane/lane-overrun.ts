@@ -6,6 +6,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_priority } from '#scripts/issue/issue-priority'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
+import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_child_marker } from './lane-child-marker'
@@ -24,20 +25,19 @@ import { lane_net_time } from './lane-net-time'
 const { EVENT_KIND } = run_event_stream
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
+const RESULT = '<the issues filed, or why none was filed>'
 
 function is_overrun(minutes: number | undefined): minutes is number {
 	return minutes !== undefined && minutes > issue_priority.HIGH_LANE_MINUTES
-}
-
-function overran_text(issue: number): string {
-	return `${issue_cite.plain(issue)} overran:`
 }
 
 // A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's launch
 // note on the stream and launches no second session to file the same causes.
 function is_launched(events: ReadonlyArray<RunEvent>, issue: number): boolean {
 	return events.some(
-		(event) => event.kind === EVENT_KIND.NOTE && event.text.startsWith(overran_text(issue)),
+		(event) =>
+			event.kind === EVENT_KIND.NOTE &&
+			event.text.startsWith(run_event_overrun.started_prefix(issue)),
 	)
 }
 
@@ -84,8 +84,7 @@ function prompt(issue: number, minutes: number): string {
 		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
 		'and the causing-lane line; one closed before this lane yet recurring here is filed anew as a',
 		'recurrence, its number in `--distinct`. A cap refusal is final: stop filing.',
-		`Then record the result: \`pnpm josh run:event --append note "${cite} overrun: <the issues filed, or`,
-		'why none was filed>"`.',
+		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, RESULT)}"\`.`,
 	].join(' ')
 }
 
@@ -95,10 +94,7 @@ function log_path(issue: number): string {
 
 function note_failure(issue: number): (note: string) => void {
 	return (note) => {
-		void run_event_stream_emit.emit(
-			EVENT_KIND.NOTE,
-			`${issue_cite.plain(issue)} overrun investigation failed: ${note}`,
-		)
+		void run_event_stream_emit.emit(EVENT_KIND.NOTE, run_event_overrun.failed_text(issue, note))
 	}
 }
 
@@ -119,7 +115,7 @@ function launched(issue: number, minutes: number): string {
 	const result = detached_launch.launch(request, note_failure(issue))
 
 	return result.kind === 'launched'
-		? `investigating in pid ${String(result.pid)}`
+		? run_event_overrun.investigating(result.pid)
 		: `not investigated: ${result.note}`
 }
 
@@ -132,7 +128,7 @@ async function investigate_lane(issue: number): Promise<void> {
 
 	await run_event_stream_emit.emit(
 		EVENT_KIND.NOTE,
-		`${overran_text(issue)} ${String(minutes)} min net — ${outcome}`,
+		run_event_overrun.started_text(issue, minutes, outcome),
 	)
 }
 

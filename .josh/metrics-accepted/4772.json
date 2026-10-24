@@ -1,0 +1,7 @@
+{
+	"reason": "#4772 adds the done-row filings/overrun spinner: run-event-overrun.ts, run-board-found.ts, run-board-render-found.ts",
+	"date": "2026-10-24",
+	"growth": {
+		"scripts.code_lines": 134
+	}
+}
