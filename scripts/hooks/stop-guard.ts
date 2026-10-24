@@ -138,6 +138,7 @@ async function build_context(
 		headless_refusals: stop_rules.count_headless_refusals(tail),
 		background_pending: lane_background.pending_background_ids(tail).length > 0,
 		agent_pending: lane_background.pending_agent_ids(tail).length > 0,
+		command_pending: lane_background.pending_command_ids(tail).length > 0,
 		handed_off: lane_handoff.is_handed_off(process.cwd()),
 		session_lang: session_lang(),
 	}
