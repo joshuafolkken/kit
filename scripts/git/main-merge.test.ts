@@ -14,6 +14,7 @@ vi.mock('./git-command', () => ({
 		get_default_branch: vi.fn(),
 		merge_branch: vi.fn(),
 		merge_fast_forward: vi.fn(),
+		repository_root: vi.fn(),
 		status: vi.fn(),
 		untracked_names: vi.fn(),
 	},
@@ -26,12 +27,17 @@ vi.mock('./change-base', () => ({
 // The guard's one git read — the paths the default branch would bring in.
 vi.mock('./git-spawn', () => ({ git_spawn: { read: vi.fn() } }))
 
+vi.mock('#scripts/lane/lane-install', () => ({
+	lane_install: { install_dependencies: vi.fn() },
+}))
+
 const { git_command } = await import('./git-command')
 const { main_merge } = await import('./main-merge')
 const { main_merge_guard } = await import('./main-merge-guard')
 const { main_merge_regenerate } = await import('./main-merge-regenerate')
 const { git_spawn } = await import('./git-spawn')
 const { split_early_notice } = await import('#scripts/split/split-early-notice')
+const { lane_install } = await import('#scripts/lane/lane-install')
 
 // The notice's ledger record; its marker and ledger writes are `split-early-notice.test.ts`'s.
 const record_notice = vi.spyOn(split_early_notice, 'record').mockResolvedValue()
@@ -56,6 +62,12 @@ const MERGE_FAILURE = create_spawn_error('merge', MERGE_EXIT_CODE)
 const fetch_branch = vi.mocked(git_command.fetch_branch)
 const merge_branch = vi.mocked(git_command.merge_branch)
 const merge_fast_forward = vi.mocked(git_command.merge_fast_forward)
+const install_dependencies = vi.mocked(lane_install.install_dependencies)
+
+const REPOSITORY_ROOT = '/repo'
+const LOCKFILE = 'pnpm-lock.yaml'
+const LOCKFILE_INCOMING = `${CHANGED_FILE}\n${LOCKFILE}`
+const INSTALL_OUTPUT = 'ERR_PNPM_OUTDATED_LOCKFILE'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -67,6 +79,12 @@ beforeEach(() => {
 	merge_branch.mockResolvedValue()
 	vi.mocked(git_command.status).mockResolvedValue('')
 	vi.mocked(git_spawn.read).mockResolvedValue('')
+})
+
+// The lockfile install, succeeding by default so no merge below warns about it.
+beforeEach(() => {
+	vi.mocked(git_command.repository_root).mockResolvedValue(REPOSITORY_ROOT)
+	install_dependencies.mockResolvedValue({ is_installed: true, output: '' })
 })
 
 // The split notice's diff read, empty by default so no merge below prints one.
@@ -157,6 +175,50 @@ describe('the outcome of one merge', () => {
 		merge_branch.mockRejectedValue(MERGE_FAILURE)
 
 		await expect(main_merge.merge()).rejects.toThrow(MERGE_FAILURE.message)
+	})
+})
+
+// joshuafolkken/kit#4777: a merge that brings in a lockfile change installs it, so the next check runs
+// on the dependencies the merged tree names.
+describe('installing a lockfile the merge brought in', () => {
+	it('installs from the repository root when the merge brings the lockfile in', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue(LOCKFILE_INCOMING)
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'merged', branch: 'main' })
+		expect(install_dependencies).toHaveBeenCalledWith(REPOSITORY_ROOT)
+	})
+
+	it('does not install when the merge brings no lockfile change', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue(CHANGED_FILE)
+
+		await main_merge.merge()
+
+		expect(install_dependencies).not.toHaveBeenCalled()
+	})
+
+	it('does not install when the merge stops on a conflict', async () => {
+		merge_branch.mockRejectedValue(MERGE_FAILURE)
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValueOnce(CONFLICT_STATUS)
+		vi.mocked(git_spawn.read).mockResolvedValue(LOCKFILE_INCOMING)
+
+		expect(await main_merge.merge()).toMatchObject({ kind: 'conflict' })
+		expect(install_dependencies).not.toHaveBeenCalled()
+	})
+
+	it('keeps the merge and says the install is owed when it fails', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue(LOCKFILE_INCOMING)
+		install_dependencies.mockResolvedValue({ is_installed: false, output: INSTALL_OUTPUT })
+
+		expect(await main_merge.run(NO_ARGUMENTS)).toBe(SUCCESS_EXIT_CODE)
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(INSTALL_OUTPUT))
+	})
+
+	it('keeps the merge when the install throws', async () => {
+		vi.mocked(git_spawn.read).mockResolvedValue(LOCKFILE_INCOMING)
+		vi.mocked(git_command.repository_root).mockRejectedValue(new Error(INSTALL_OUTPUT))
+
+		expect(await main_merge.merge()).toStrictEqual({ kind: 'merged', branch: 'main' })
+		expect(console.warn).toHaveBeenCalledWith(expect.stringContaining(INSTALL_OUTPUT))
 	})
 })
 

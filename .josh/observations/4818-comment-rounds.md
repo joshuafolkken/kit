@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lane/lane-overrun.ts:100 | 2026-10-24 | #4818
