@@ -1,5 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_filed, type FiledKind } from '#scripts/run/event/run-event-filed'
+import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_ending_reason } from './run-board-ending-reason'
@@ -84,11 +85,16 @@ function plain_note(event: RunEvent): BoardNote {
 	return { kind: 'note', at_ms: Date.parse(event.at), issue, text }
 }
 
+// An overrun note is no finding (joshuafolkken/kit#4818): the merged row says it after its time.
+function is_finding(event: RunEvent): boolean {
+	return event.kind === KIND.NOTE && run_event_overrun.parse(event.text) === undefined
+}
+
 function note_of(event: RunEvent, titles: Titles): BoardNote | undefined {
 	if (event.kind === KIND.FILED) return filed_note(event)
 	if (event.kind === KIND.PARK) return park_note(event, titles)
 
-	return event.kind === KIND.NOTE ? plain_note(event) : undefined
+	return is_finding(event) ? plain_note(event) : undefined
 }
 
 // A park is said only of a child the board still holds parked, so one a person released or closed

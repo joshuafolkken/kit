@@ -1,4 +1,5 @@
 import { run_event_filed, type Filed } from '#scripts/run/event/run-event-filed'
+import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import { run_board_notes } from './run-board-notes'
@@ -167,6 +168,22 @@ describe('run_board_notes.notes_of texts', () => {
 		)
 
 		expect(notes.map((note) => note.text)).toStrictEqual([other, 'auto-ok applied'])
+	})
+
+	// joshuafolkken/kit#4818: an overrun note is the done row's, not a finding.
+	it('drops every overrun note and keeps a plain one', () => {
+		const texts = [
+			run_event_overrun.within_text(4711, 18),
+			run_event_overrun.skipped_text(4711, 'no ledger'),
+			run_event_overrun.ended_text(4711, 'filed'),
+			'#4711 saw it twice',
+		]
+		const notes = run_board_notes.notes_of(
+			texts.map((text, index) => event(KIND.NOTE, text, index + 1)),
+			NO_TITLES,
+		)
+
+		expect(notes.map((note) => note.text)).toStrictEqual(['saw it twice'])
 	})
 
 	it('keeps an Issue filed elsewhere qualified', () => {

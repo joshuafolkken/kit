@@ -26,33 +26,46 @@ import { lane_net_time } from './lane-net-time'
 const { EVENT_KIND } = run_event_stream
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
-const RESULT = '<the issues filed, or why none was filed>'
+const NO_LEDGER = 'no ledger'
 
-function is_overrun(minutes: number | undefined): minutes is number {
-	return minutes !== undefined && minutes > issue_priority.HIGH_LANE_MINUTES
+// A lane's net minutes, or why there are none (joshuafolkken/kit#4818).
+type LaneNet = { kind: 'minutes'; minutes: number } | { kind: 'missing'; reason: string }
+
+function is_overrun(minutes: number): boolean {
+	return minutes > issue_priority.HIGH_LANE_MINUTES
 }
 
-// A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's launch
-// note on the stream and launches no second session to file the same causes.
-function is_launched(events: ReadonlyArray<RunEvent>, issue: number): boolean {
-	return events.some(
-		(event) =>
-			event.kind === EVENT_KIND.NOTE &&
-			event.text.startsWith(run_event_overrun.started_prefix(issue)),
+// A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's note on
+// the stream and launches no second session to file the same causes. A pass that threw before it
+// noted anything leaves only its failure, which the retry answers.
+function is_noted(events: ReadonlyArray<RunEvent>, issue: number): boolean {
+	const notes = events.flatMap((event) =>
+		event.kind === EVENT_KIND.NOTE ? (run_event_overrun.parse(event.text) ?? []) : [],
+	)
+
+	return notes.some(
+		(note) => note.issue === issue && !(note.kind === 'failed' && note.minutes === undefined),
 	)
 }
 
-// The minutes of a lane not yet investigated, or `undefined` when there is nothing to ask.
-async function net_minutes_of(issue: number): Promise<number | undefined> {
-	const path = await lane_ledger.target()
+function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
+	const entries = lane_ledger.read_entries(path)
+	const minutes = lane_net_time.net_minutes(entries, events, issue)
 
-	if (path === undefined) return undefined
+	if (minutes !== undefined) return { kind: 'minutes', minutes }
 
+	return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
+}
+
+// The net time of a lane not yet noted, or `undefined` when its note is on the stream already.
+async function net_of(issue: number): Promise<LaneNet | undefined> {
 	const events = await run_event_stream_emit.all_events()
 
-	if (is_launched(events, issue)) return undefined
+	if (is_noted(events, issue)) return undefined
 
-	return lane_net_time.net_minutes(lane_ledger.read_entries(path), events, issue)
+	const path = await lane_ledger.target()
+
+	return path === undefined ? { kind: 'missing', reason: NO_LEDGER } : net_in(path, events, issue)
 }
 
 function transcript_directories(issue: number): ReadonlyArray<string> {
@@ -85,7 +98,9 @@ function prompt(issue: number, minutes: number): string {
 		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
 		'and the causing-lane line; one closed before this lane yet recurring here is filed anew as a',
 		'recurrence, its number in `--distinct`. A cap refusal is final: stop filing.',
-		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, RESULT)}"\`.`,
+		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, '<result>')}"\`,`,
+		`the result being \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,
+		`when you only commented a recurrence on #<N>, else \`${run_event_overrun.none_result('<why, in about 15 characters>')}\`.`,
 	].join(' ')
 }
 
@@ -120,17 +135,21 @@ function launched(issue: number, minutes: number): string {
 		: `not investigated: ${result.note}`
 }
 
+// The note every merged lane leaves: its net minutes at or under the threshold, why it has none, or the
+// launch of its overrun's investigation.
+function note_text(issue: number, net: LaneNet): string {
+	if (net.kind === 'missing') return run_event_overrun.skipped_text(issue, net.reason)
+	if (!is_overrun(net.minutes)) return run_event_overrun.within_text(issue, net.minutes)
+
+	return run_event_overrun.started_text(issue, net.minutes, launched(issue, net.minutes))
+}
+
 async function investigate_lane(issue: number): Promise<void> {
-	const minutes = await net_minutes_of(issue)
+	const net = await net_of(issue)
 
-	if (!is_overrun(minutes)) return
+	if (net === undefined) return
 
-	const outcome = launched(issue, minutes)
-
-	await run_event_stream_emit.emit(
-		EVENT_KIND.NOTE,
-		run_event_overrun.started_text(issue, minutes, outcome),
-	)
+	await run_event_stream_emit.emit(EVENT_KIND.NOTE, note_text(issue, net))
 }
 
 // Never fails the merge it follows: an error is a note on the stream, not a refused merge.

@@ -189,8 +189,9 @@ const NOTES_ICON = '📌'
 // A plan row the run filed leads its title with it, in place of a findings line naming it again
 // (joshuafolkken/kit#4099).
 const FILED_RUN_MARK = '✚'
-// A done row whose overrun investigation is running ends on it where no spinner turns
-// (joshuafolkken/kit#4772): the investigate phase's own icon, for the same work.
+// A merged row whose overrun investigation is running ends on it where no spinner turns
+// (joshuafolkken/kit#4772), and leads its result once it ended (joshuafolkken/kit#4818): the
+// investigate phase's own icon, for the same work.
 const OVERRUN_MARK = PHASE_ICONS.investigate
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',

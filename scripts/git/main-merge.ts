@@ -1,6 +1,7 @@
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { lane_install } from '#scripts/lane/lane-install'
 import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from '#scripts/split/split-assess'
 import { split_early_notice } from '#scripts/split/split-early-notice'
@@ -34,6 +35,9 @@ const FAILURE_EXIT_CODE = 1
 const COMMAND_NAME = 'main:merge'
 const SPLIT_UNMEASURED =
 	'split notice: the diff could not be measured — run `pnpm josh split:assess`'
+const LOCKFILE = 'pnpm-lock.yaml'
+const INSTALL_OWED =
+	'the merge brought in a lockfile change, but installing it failed — run `pnpm install --frozen-lockfile`'
 
 // git's default merge message carries no `#N`, so on an issue branch the `commit-msg` hook refuses
 // it and leaves the index mid-merge. The number is read with the hook's
@@ -90,6 +94,32 @@ async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	return { kind: target.is_current ? 'current' : 'merged', branch: default_branch }
 }
 
+// joshuafolkken/kit#4777: a merge that brings in a lockfile change leaves `node_modules` on the old
+// one, so the next check fails on files this branch never touched. Only a finished merge installs — a
+// conflict or a refusal changed no dependency yet. A failed install does not fail the merge; it says
+// the install is still owed, with pnpm's output. A throw is caught for the same reason: the merge is
+// already committed, so `josh ship` must not read it as refused.
+async function install_failure(): Promise<string | undefined> {
+	try {
+		const result = await lane_install.install_dependencies(await git_command.repository_root())
+
+		return result.is_installed ? undefined : result.output
+	} catch (error) {
+		return error_text.message_of(error)
+	}
+}
+
+async function install_merged_lockfile(
+	outcome: MergeOutcome,
+	incoming: ReadonlyArray<string>,
+): Promise<void> {
+	if (outcome.kind !== 'merged' || !incoming.includes(LOCKFILE)) return
+
+	const failure = await install_failure()
+
+	if (failure !== undefined) console.warn(`${INSTALL_OWED}\n${failure}`)
+}
+
 // The fetch is what makes `origin/<default>` current before the merge reads it. `git pull` did the
 // two together, which is the only thing it was doing here that is worth keeping. The refusal is read
 // after the fetch, so the incoming paths are the ones the merge would bring in.
@@ -105,7 +135,15 @@ async function merge(): Promise<MergeOutcome> {
 
 	if (message !== undefined) return { kind: 'refused', message }
 
-	return await merge_into({ default_branch, current_branch, is_current: incoming.length === 0 })
+	const outcome = await merge_into({
+		default_branch,
+		current_branch,
+		is_current: incoming.length === 0,
+	})
+
+	await install_merged_lockfile(outcome, incoming)
+
+	return outcome
 }
 
 // A merge that stops on a conflict keeps git's report and adds how to finish it, so the next step is
