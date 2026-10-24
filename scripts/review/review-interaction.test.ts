@@ -125,6 +125,20 @@ describe('review_interaction.refusal', () => {
 	})
 })
 
+// joshuafolkken/kit#4802: `josh ship` and `josh run:review` open round 1 from the one answer.
+describe('review_interaction.round_one_slots', () => {
+	it('puts the interaction slot beside code’s when its review is missing', () => {
+		expect(review_interaction.round_one_slots('missing')).toStrictEqual(['code', 'interaction'])
+	})
+
+	it.each<InteractionStatus | undefined>(['ok', NOT_REQUIRED, undefined])(
+		'keeps code’s slot alone when the status is %s',
+		(status) => {
+			expect(review_interaction.round_one_slots(status)).toStrictEqual(['code'])
+		},
+	)
+})
+
 // A consumer's own `scripts/run/` is not kit's run tooling: neither the brief nor the merge gate asks.
 describe('review_interaction in a consumer checkout', () => {
 	afterEach(() => {

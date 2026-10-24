@@ -1190,7 +1190,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:review": [
-      "[--unpinned-ok "<reason>" | --join]",
+      "[--code-only] [--unpinned-ok "<reason>"] | --join",
       "automation",
       [
         "processes",

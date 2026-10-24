@@ -30,7 +30,8 @@ Review results and successful pushes are never turn boundaries.
    `run:review --join`, run the final scoped lint/test pair with `pnpm josh check:related` and
    `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
    and prints the `/code-review` brief in one call, so they overlap (`--unpinned-ok "<reason>"`
-   carries on). Launch the `/code-review` subagent as the `reviewer`
+   carries on); two briefs take two `reviewer`s side by side, the second recorded with
+   `review:record --interaction`. Launch the `/code-review` subagent as the `reviewer`
    agent type (`kit:reviewer` in a consumer) with that brief and its `model` (`delegation.md`) (one
    agent, no `Skill` / `Agent` tool — `.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
@@ -53,7 +54,6 @@ Review results and successful pushes are never turn boundaries.
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
-   A change to the run tooling also takes the interaction review: `prompts/review.md` → "Interaction review".
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>" --body-file <evidence.md>` — the file carries `## 実機証跡` and
    `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →

@@ -52,12 +52,20 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
-		reference: ['[--unpinned-ok "<reason>" | --join]', 'automation', ['processes', 'files']],
+		reference: [
+			'[--code-only] [--unpinned-ok "<reason>"] | --join',
+			'automation',
+			['processes', 'files'],
+		],
 		usage: {
 			examples: [
 				{
 					arguments: '',
-					note: 'detach test:pinned and the gate, print the brief, then launch the /code-review subagent',
+					note: 'detach test:pinned and the gate, print the brief (the interaction brief after it where due), then launch a reviewer per brief',
+				},
+				{
+					arguments: '--code-only',
+					note: "josh ship's own open: code's brief alone, since the ship opens the interaction brief itself",
 				},
 				{
 					arguments: '--unpinned-ok "only logs"',

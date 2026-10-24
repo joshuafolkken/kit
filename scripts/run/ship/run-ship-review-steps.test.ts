@@ -30,9 +30,11 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
 // Never `missing`, so these cases run no interaction review — its own are in
 // `run-ship-review-interaction.test.ts` (joshuafolkken/kit#4276).
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: async () => undefined },
-}))
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: async () => undefined } }
+})
 vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_round_one: vi.fn(), record_round_two: record_round_two_mock },
 }))
@@ -52,7 +54,7 @@ const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '2427'
 const BRIEF = 'medium\nbrief body'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const JOIN = 'run:review --join'
 const ATTEST = 'review:attest --check'
 const RECORD = `review:record --issue ${ISSUE}`

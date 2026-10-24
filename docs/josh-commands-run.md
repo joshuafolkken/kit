@@ -485,7 +485,8 @@ or a child could not authenticate; it keeps `in-progress`, uncounted, for `/logi
 Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change).
 
 ```bash
-pnpm josh run:review                             # detach test:pinned and the gate, print the brief, then launch the /code-review subagent
+pnpm josh run:review                             # detach test:pinned and the gate, print the brief (the interaction brief after it where due), then launch a reviewer per brief
+pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
 pnpm josh run:review --unpinned-ok "only logs"   # check in place first, carry on past unpinned places; the list and the reason follow the brief
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 ```
@@ -493,6 +494,10 @@ pnpm josh run:review --join                      # after the review returns: joi
 <!-- /usage -->
 
 It composes `josh gate` and `josh review:brief` and changes neither, so `review:attest --check`'s nonce/checkout contract is unchanged.
+Where this branch's issue owes an interaction review not yet recorded, the `review:brief --interaction`
+brief follows code's under its own header, so the round-1 reviewers run side by side and `josh ship`
+reuses both records; `--code-only` is the ship's own open, since the ship opens the interaction brief
+itself.
 
 The default waits only for the gate to _start_ and prints the brief;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
