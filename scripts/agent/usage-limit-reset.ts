@@ -115,25 +115,36 @@ function instant_of(fields: ZoneFields, zone: string): number {
 	return guess - offset_ms(guess - offset_ms(guess, zone), zone)
 }
 
-// Whether a wall clock already past `now_ms` names the next occurrence rather than one just gone: an
-// undated hour always rolls to the next day, a named date only when it is over half a year back — the
-// December sentence read in January. A named date just past stays past, for the caller's re-check.
-function rolls_forward(wall: WallClock, at_ms: number, now_ms: number): boolean {
-	return wall.date === undefined || now_ms - at_ms > HALF_YEAR_MS
+// The years to move a named date in this year by so it lies within half a year of `now_ms`: a January
+// date read in December is next year's, a December date read in January last year's.
+function year_shift(at_ms: number, now_ms: number): number {
+	if (now_ms - at_ms > HALF_YEAR_MS) return 1
+
+	return at_ms - now_ms > HALF_YEAR_MS ? -1 : 0
 }
 
-// The instant the wall clock names next after `now_ms`: today's (or the named date's), else the next
-// day's (or, from a date half a year back, the next year's).
+// A named date's nearest occurrence. One just past stays past, for the caller's re-check.
+function dated_instant(fields: ZoneFields, zone: string, now_ms: number): number {
+	const at_ms = instant_of(fields, zone)
+	const shift = year_shift(at_ms, now_ms)
+
+	return shift === 0 ? at_ms : instant_of({ ...fields, year: fields.year + shift }, zone)
+}
+
+// An undated hour's next occurrence: today's, else the next day's.
+function undated_instant(fields: ZoneFields, zone: string, now_ms: number): number {
+	const at_ms = instant_of(fields, zone)
+
+	return at_ms > now_ms ? at_ms : instant_of({ ...fields, day: fields.day + 1 }, zone)
+}
+
 function next_instant(wall: WallClock, now_ms: number): number {
 	const today = zone_fields(now_ms, wall.zone)
 	const fields = { ...today, ...wall.date, hour: wall.hour, minute: wall.minute }
-	const at_ms = instant_of(fields, wall.zone)
 
-	if (at_ms > now_ms || !rolls_forward(wall, at_ms, now_ms)) return at_ms
+	if (wall.date === undefined) return undated_instant(fields, wall.zone, now_ms)
 
-	const later = wall.date === undefined ? { day: fields.day + 1 } : { year: fields.year + 1 }
-
-	return instant_of({ ...fields, ...later }, wall.zone)
+	return dated_instant(fields, wall.zone, now_ms)
 }
 
 function wall_in(text: string): WallClock | undefined {

@@ -1,8 +1,8 @@
 {
-	"reason": "#4745 adds the usage-limit outcome, its reset parser and the backlog:drive hold (+code lines); the run:merge doc bolds the new **usage-limit** child as it bolds outage and failed (+1 bold span)",
+	"reason": "Usage-limit reset parsing, backlog hold and lane net-time accounting; round 2 split a named date's nearest-year choice from an undated hour's next-day roll",
 	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 215,
+		"scripts.code_lines": 223,
 		"prose.excess_bold": 1
 	}
 }

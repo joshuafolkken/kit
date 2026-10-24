@@ -43,10 +43,16 @@ const READABLE = [
 		expected: NEXT_TOKYO_TEN,
 	},
 	{
-		label: 'a December date read in January, in the next year',
+		label: 'a January date read in December, in the next year',
+		text: "You've hit your weekly limit · resets Jan 2, 10am (Asia/Tokyo)",
+		now: '2026-12-30T00:00:00Z',
+		expected: '2027-01-02T01:00:00.000Z',
+	},
+	{
+		label: 'a December date read in January, as last year past',
 		text: "You've hit your weekly limit · resets Dec 31, 10am (Asia/Tokyo)",
 		now: '2027-01-02T00:00:00Z',
-		expected: '2027-12-31T01:00:00.000Z',
+		expected: '2026-12-31T01:00:00.000Z',
 	},
 	{
 		label: 'the older epoch form',
