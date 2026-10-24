@@ -20,6 +20,7 @@ import {
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	parked_label_of,
 	PARKED_LABELS,
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
@@ -317,6 +318,19 @@ describe('has_parked_label', () => {
 
 	it('does not read in-progress or the human-review label as parked', () => {
 		expect(has_parked_label([IN_PROGRESS_SPELLING, NEEDS_HUMAN_REVIEW_SPELLING])).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4746: an `--only` run's stop names the park each unmerged issue sits on.
+describe('parked_label_of', () => {
+	it('names the park label, whatever casing GitHub answers with', () => {
+		expect(parked_label_of([UNRELATED_SPELLING, RUN_STALLED_CREATED_CASING])).toBe(
+			RUN_STALLED_SPELLING,
+		)
+	})
+
+	it('names no label for an issue that is not parked', () => {
+		expect(parked_label_of([IN_PROGRESS_SPELLING])).toBeUndefined()
 	})
 })
 

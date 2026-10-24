@@ -53,6 +53,15 @@ function held_after(
 	return index > declared.indexOf(next) ? declared[index - 1] : undefined
 }
 
+// **An `--only` run ends once nothing it named is left and nothing is in flight**
+// (joshuafolkken/kit#4746): the stop's reason is read when it is offered, so one offered while a lane
+// still ran would name that lane's issue unmerged even after it merged.
+function only_end(state: DriveState): OfferRead {
+	return state.in_flight.length > 0
+		? { verdict: 'wait', issues: [], retries: NO_RETRIES }
+		: { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
+}
+
 function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead | undefined {
 	const next = next_of(carry, state.in_flight)
 
@@ -64,9 +73,7 @@ function offer(carry: RunCarry, state: DriveState, is_only: boolean): OfferRead 
 			: { verdict: 'run', issues: [issue], retries: NO_RETRIES }
 	}
 
-	return is_only
-		? { verdict: 'stop', issues: [], retries: NO_RETRIES, reason: 'only', is_finish: true }
-		: undefined
+	return is_only ? only_end(state) : undefined
 }
 
 function is_done(result: MergeResult): boolean {
@@ -121,13 +128,26 @@ async function should_skip(issue: string, outcome: MergeResult['outcome']): Prom
 	return await lane_parked.is_parked(issue)
 }
 
+async function carry_target(): Promise<string | undefined> {
+	const directory = await run_carry.repository_directory()
+
+	return directory === undefined ? undefined : run_carry.carry_path(directory)
+}
+
 async function mark_done(issue: string, result: MergeResult, owner: string): Promise<void> {
 	if (!is_done(result)) return
-	const directory = await run_carry.repository_directory()
-	if (directory === undefined) return
-	const target = run_carry.carry_path(directory)
-	if (!mark_one(target, issue, owner)) return
+	const target = await carry_target()
+	if (target === undefined || !mark_one(target, issue, owner)) return
 	if (await should_skip(issue, result.outcome)) skip_after_failure(target, issue, owner)
+}
+
+// **A named issue settled before this run dispatched it skips nothing** (joshuafolkken/kit#4746): it
+// did not fail inside the run, so booking the ones declared after it done would end an `--only` run
+// over issues no lane ever started.
+async function mark_settled(issue: string, owner: string): Promise<void> {
+	const target = await carry_target()
+
+	if (target !== undefined) mark_one(target, issue, owner)
 }
 
 async function reconcile(
@@ -173,6 +193,7 @@ export const backlog_drive_named = {
 	offer,
 	held_after,
 	mark_done,
+	mark_settled,
 	named_issues,
 	own_carried,
 	reconcile,
