@@ -47,8 +47,8 @@ interface LegendDrawn {
 	held: ReadonlyArray<string>
 	// A lane row leads with 🧍, its `run:solo` mark (joshuafolkken/kit#4625).
 	solo: boolean
-	// A done row ends on 🔍, its overrun investigation running where no spinner turns
-	// (joshuafolkken/kit#4772).
+	// A merged row ends on 🔍, its overrun investigation running where no spinner turns
+	// (joshuafolkken/kit#4772) or its result once it ended (joshuafolkken/kit#4818).
 	overrun?: boolean | undefined
 }
 

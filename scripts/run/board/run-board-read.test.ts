@@ -99,6 +99,25 @@ describe('run_board_read.read_local — whether the run is stranded', () => {
 	})
 })
 
+// joshuafolkken/kit#4818: an overrun session outlives the run that launched it.
+describe('run_board_read.read_local — an overrun note after the run ended', () => {
+	it('reads it into the done rows, but not into the events', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const result = { ...AFTER, kind: 'note', text: '#3432 overrun: none: CI wait' }
+
+		vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, result])
+
+		const read = await run_board_read.read_local()
+
+		expect(read?.events).toStrictEqual([INSIDE])
+		expect(read?.found?.get(3432)?.overrun).toStrictEqual({
+			kind: 'ended',
+			issue: 3432,
+			result: 'none: CI wait',
+		})
+	})
+})
+
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
