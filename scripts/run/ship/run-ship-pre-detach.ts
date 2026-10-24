@@ -37,7 +37,8 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
 // the session that grew the total writes the reason itself rather than a relaunched one —
 // `josh lint:related` has already reported the growth in the loop (`metrics-totals.ts`), so this is
-// the stop for a growth that notice did not settle. The
+// the stop for a growth that notice did not settle. A total the branch's approval already names is
+// re-recorded at its growth here rather than stopped (`--rerecord`, joshuafolkken/kit#4716). The
 // durations are left out: they read the gate ledger, stale before the detach, so they stay with the
 // supervised gate.
 
@@ -57,7 +58,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const SECTION_SEPARATOR = '\n\n'
 const PASSED = 'pre-detach checks passed'
-const { METRICS_TOTALS_COMMAND } = metrics_totals
+const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
 	{ list: ['josh', 'exports:unused'], label: gate_plan.EXPORTS_LABEL },
 	{ list: ['josh', 'cspell:dot'] },
@@ -84,7 +85,7 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 
 // The same kit-only rule as the gate's `is_kit_only` step: a consumer's kit has no `josh metrics`.
 function kit_only(directory: string): Array<PreDetachCheck> {
-	return project_checks.is_kit_repository(directory) ? [{ list: METRICS_TOTALS_COMMAND }] : []
+	return project_checks.is_kit_repository(directory) ? [{ list: METRICS_RERECORD_COMMAND }] : []
 }
 
 async function command_lists(directory: string): Promise<Array<PreDetachCheck>> {
@@ -94,7 +95,6 @@ async function command_lists(directory: string): Promise<Array<PreDetachCheck>> 
 		{ list: type_check, label: gate_plan.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
 		...guard_tests(directory),
-		...kit_only(directory),
 	]
 }
 
@@ -135,22 +135,28 @@ function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
 }
 
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
-// The tree is read before they start, so a record is written only for the tree they read.
+// The tree is read before they start, so a record is written only for the tree they read. **The
+// metrics totals run first, alone**: they may re-record the branch's approval file
+// (`metrics-command.ts`), and a file written under the others would move the tree and leave the gate
+// nothing to reuse (joshuafolkken/kit#4716).
 async function checks(
 	directory: string = process.cwd(),
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
 ): Promise<JoshResult> {
+	const metrics = await Promise.all(
+		kit_only(directory).map(async (check) => await run_in(directory, check)),
+	)
 	const [lists, tree] = await Promise.all([command_lists(directory), gate_tree.read_gate_tree()])
 	const runs = await Promise.all(lists.map(async (check) => await run_in(directory, check)))
 
 	await check_reuse.record_green_checks(gate_results(runs), tree, records)
 
-	return verdict(runs)
+	return verdict([...runs, ...metrics])
 }
 
 const run_ship_pre_detach = {
 	GUARD_TEST_TARGETS,
-	METRICS_TOTALS_COMMAND,
+	METRICS_RERECORD_COMMAND,
 	PASSED,
 	STATIC_CHECKS,
 	checks,

@@ -21,7 +21,7 @@ const LINT_CORE_WAIT = 'lint-core-wait'
 const UNMOVED =
 	'lint:related: nothing moved since its last green run on this checkout — linting nothing.'
 const SHIP = 'pnpm josh ship --detach --review "Title #1"'
-const METRICS_STOP = '✗ josh metrics --totals-only — exit code 1\nmetrics grew'
+const METRICS_STOP = '✗ josh metrics --totals-only --rerecord — exit code 1\nmetrics grew'
 
 function call(overrides: Partial<ToolCall>): ToolCall {
 	return {
@@ -88,11 +88,12 @@ describe('lane_value.value — per lane, not per session', () => {
 		const calls = [
 			...sessions,
 			call({ command: SHIP, output: `=== pre-detach checks ===\n${METRICS_STOP}` }),
+			call({ command: SHIP, output: '✗ josh metrics --totals-only — exit code 1' }),
 			call({ command: SHIP, output: '✗ josh cspell:dot — exit code 1' }),
 			call({ command: 'cat log', output: METRICS_STOP }),
 		]
 
-		expect(value(METRICS_STOPS, { calls })).toBe(0.5)
+		expect(value(METRICS_STOPS, { calls })).toBe(1)
 	})
 
 	it('lint-core-wait: the minutes a lane lint:related waited in the period, per lane', () => {
