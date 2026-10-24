@@ -1,7 +1,7 @@
 {
-	"reason": "run:review refuses a tree the scoped pair has not been green on before launching test:pinned and the gate, and stops the last check on reopen only when its pid keeps the launch's start time (#4828)",
+	"reason": "split the group signal into a start-time-verified stop for a stale stamp and a not-proven-gone stop for the join's own check, so a sandbox without /proc or ps still stops a late check (#4828)",
 	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 20
+		"scripts.code_lines": 25
 	}
 }

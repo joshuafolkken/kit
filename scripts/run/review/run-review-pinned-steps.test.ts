@@ -203,6 +203,15 @@ describe('run_review_pinned_steps.wait_for_answer — stopping a late check', ()
 		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
 	})
 
+	it('stops the late check even where its start time could not be read', async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
+		run_review_pinned_steps.launch(ROOT)
+
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+	})
+
 	it('stops nothing when the check answered within the grace', async () => {
 		run_review_pinned_steps.launch(ROOT)
 		test_pinned_record.write(launched_token(), ANSWER, ROOT)

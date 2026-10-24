@@ -111,17 +111,26 @@ function read_answer(root: string, { pid, token, start }: Launch): PinnedSummary
 }
 
 // The launch is detached, so its pid leads a process group holding the `josh` process and its Vitest
-// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held. Only a
-// pid whose start time matches the launch's is signalled: a stale stamp can outlive its check by days,
-// and a reissued pid, or one whose start could not be read, may lead another lane's group.
-function stop({ pid, start }: Launch): void {
-	if (process_identity.is_same_process(pid, start) !== true) return
-
+// workers; signalling the group stops them all, and `base-tree.ts` removes the trees they held.
+function signal_group(pid: number): void {
 	try {
 		process.kill(-pid, STOP_SIGNAL)
 	} catch {
 		// It ended between the check and the signal; there is nothing left to stop.
 	}
+}
+
+// A stale stamp can outlive its check by days, so the start signals only a pid whose start time
+// matches the launch's: a reissued pid, or one whose start could not be read, may lead another
+// lane's group.
+function stop_last({ pid, start }: Launch): void {
+	if (process_identity.is_same_process(pid, start) === true) signal_group(pid)
+}
+
+// The join's stamp is this pair's, minutes old, so the join signals any pid not proven gone: one whose
+// start could not be read (no `/proc`, no `ps`) is the check it has just been waiting on.
+function stop_current({ pid, start }: Launch): void {
+	if (process_identity.is_same_process(pid, start) !== false) signal_group(pid)
 }
 
 // Every start stops the last pair's check and clears its records first, so a join never reads an
@@ -130,7 +139,7 @@ function clear(root: string = PROJECT_ROOT): void {
 	const last = read_launch(root)
 
 	if (last !== undefined) {
-		stop(last)
+		stop_last(last)
 		test_pinned_record.clear(last.token, root)
 	}
 
@@ -153,7 +162,7 @@ function is_queued(root: string): boolean {
 
 // A check given up on fails open and is stopped rather than left burning the cores.
 function stopped(launched: Launch, note: string): PinnedSummary {
-	stop(launched)
+	stop_current(launched)
 
 	return test_pinned_record.not_run_summary(new Error(note))
 }
