@@ -30,6 +30,7 @@ const EDITED_DIGEST = 'digest-after'
 const FAILED_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const NO_ARGUMENTS: ReadonlyArray<string> = []
+const SHIP_HANDOVER = 'pnpm josh ship --detach --review'
 
 function tree_of(digest: string = DIGEST): Record<string, string> {
 	return { [CHANGED_FILE]: digest }
@@ -208,6 +209,25 @@ describe('refusal_for', () => {
 
 		expect(refusal).toContain(scoped_green.REFUSAL_HEADLINE)
 		expect(refusal).toContain(`${scoped_green.LINT_COMMAND} && ${scoped_green.TEST_COMMAND}`)
+	})
+
+	// The review:brief callers pass no `is_lane_child`, so a lane child refused there reissues it too.
+	it('tells a caller that names no lane child to reissue the command', () => {
+		const refusal = scoped_green.refusal_for(tree_of(), BASE, sources())
+
+		expect(refusal).toContain('and reissue this command.')
+		expect(refusal).not.toContain(SHIP_HANDOVER)
+	})
+
+	// joshuafolkken/kit#4776: a lane child that reissued the gate ran it in the foreground before ship.
+	it('hands a lane child over to ship rather than to the gate again', () => {
+		const refusal = scoped_green.refusal_for(tree_of(), BASE, {
+			...sources(),
+			is_lane_child: true,
+		})
+
+		expect(refusal).toContain(SHIP_HANDOVER)
+		expect(refusal).not.toContain('reissue this command')
 	})
 })
 

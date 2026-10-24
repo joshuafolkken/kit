@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -253,7 +254,10 @@ function scoped_precheck_refusal(tree: GateTree, options: GateOptions): string |
 		return undefined
 	}
 
-	return scoped_green.refusal_for(tree.files, tree.base, options.scoped_sources)
+	return scoped_green.refusal_for(tree.files, tree.base, {
+		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		...options.scoped_sources,
+	})
 }
 
 // **A partial gate records nothing green, and this is the same rule as the skip one layer out**.
