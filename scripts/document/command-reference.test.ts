@@ -4,6 +4,7 @@ import {
 	CATALOG_FILE,
 	format_command_entry,
 	generate_catalog,
+	REGENERATE_COMMAND,
 } from '#tools/document/generate-catalog'
 import { describe, expect, it } from 'vitest'
 import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
@@ -61,13 +62,26 @@ describe('every josh command a document names exists', () => {
 	})
 })
 
+// A stale catalog's failure names the command that regenerates it (#4784).
+function expect_catalog_current(on_disk: string, catalog: string): void {
+	expect(on_disk, `the catalog is stale — run \`${REGENERATE_COMMAND}\``).toBe(catalog)
+}
+
 describe('the command catalog is up to date', () => {
 	const catalog = generate_catalog()
 
 	it('matches the command map', () => {
-		const on_disk = readFileSync(CATALOG_FILE, 'utf8')
+		expect_catalog_current(readFileSync(CATALOG_FILE, 'utf8'), catalog)
+	})
 
-		expect(on_disk).toBe(catalog)
+	it('names the regeneration command when the catalog is stale', () => {
+		expect(() => {
+			expect_catalog_current('stale', catalog)
+		}).toThrow('run `tsx tools/document/generate-catalog.ts`')
+	})
+
+	it('names the same regeneration command in the catalog heading', () => {
+		expect(catalog).toContain(`Run \`${REGENERATE_COMMAND}\` to regenerate.`)
 	})
 
 	it('covers every command in the map', () => {

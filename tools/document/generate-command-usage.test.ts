@@ -37,6 +37,13 @@ function heading_commands(text: string): Array<string> {
 	return headings.flatMap((line) => document_scan.command_references(line))
 }
 
+// A stale page's failure names the command that regenerates it (#4784).
+function expect_page_current(text: string): void {
+	const message = `the usage spans are stale — run \`${generate_command_usage.REGENERATE_COMMAND}\``
+
+	expect(generate_command_usage.fill_usage_blocks(text), message).toBe(text)
+}
+
 describe('generate command usage', () => {
 	it('replaces a usage span with the registered usage and keeps the prose around it', () => {
 		const filled = generate_command_usage.fill_usage_blocks(STALE_PAGE)
@@ -60,14 +67,15 @@ describe('generate command usage', () => {
 		).toThrow('josh not-a-command')
 	})
 
-	it.each(generate_command_usage.USAGE_PAGES)(
-		'%s is up to date — run `tsx tools/document/generate-command-usage.ts`',
-		(page) => {
-			const text = page_text(page)
+	it.each(generate_command_usage.USAGE_PAGES)('%s is up to date', (page) => {
+		expect_page_current(page_text(page))
+	})
 
-			expect(generate_command_usage.fill_usage_blocks(text)).toBe(text)
-		},
-	)
+	it('names the regeneration command when a page is stale', () => {
+		expect(() => {
+			expect_page_current(STALE_PAGE)
+		}).toThrow('run `tsx tools/document/generate-command-usage.ts`')
+	})
 })
 
 // The spans are the reference's sections: every command has one, on exactly one page, and a page

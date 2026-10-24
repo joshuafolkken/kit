@@ -417,9 +417,10 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	const signals = await run_merge_signals.read_signals(ctx, read)
 	const outcome = run_merge_signals.outcome_of(read, signals)
 
-	const { merged_pr, is_streak_exempt } = signals
+	const { merged_pr, is_streak_exempt, capped_note } = signals
+	const handled = { ...ctx, merged_pr, is_streak_exempt, capped_note }
 
-	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr, is_streak_exempt })) }
+	return { outcome, ...(await HANDLERS[outcome](handled)) }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

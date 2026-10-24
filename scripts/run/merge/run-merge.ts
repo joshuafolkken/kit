@@ -71,6 +71,9 @@ interface EndingSignals {
 	is_streak_exempt?: boolean | undefined
 	// The exit record shows the session could not authenticate (`api-auth.ts`).
 	is_auth_failure?: boolean | undefined
+	// A re-dispatchable ending the per-child cap turned into `failed`: the line its park leads with
+	// (`run-merge-cap.ts`).
+	capped_note?: string | undefined
 }
 
 const NO_SIGNALS: EndingSignals = { is_outage: false, is_cut: false }

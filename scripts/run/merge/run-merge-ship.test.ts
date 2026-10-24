@@ -120,6 +120,29 @@ describe('run_merge_ship.interrupted_of', () => {
 	})
 })
 
+// joshuafolkken/kit#4765: the dispatch log's header is written before a spawn that may fail, so its mtime
+// read a relaunch the broker refused as answered.
+describe('run_merge_ship.interrupted_of — a relaunch that started nothing', () => {
+	const STOPPED_AT = Date.parse(STOP.at)
+	const FAILED_RELAUNCH = event(
+		3,
+		run_event_stream.EVENT_KIND.RELAUNCH_FAILED,
+		'#12 could not be relaunched: the driver re-dispatches the issue — refused',
+	)
+
+	it('reads a stop whose relaunch failed as unanswered though the log was written after it', () => {
+		const events = [LAUNCH, STOP, FAILED_RELAUNCH]
+
+		expect(run_merge_ship.interrupted_of(ending(FAILED), events, CHILD, STOPPED_AT + 1)).toBe(true)
+	})
+
+	it('leaves a failed relaunch of an earlier stop to the mtime', () => {
+		const events = [LAUNCH, FAILED_RELAUNCH, STOP]
+
+		expect(run_merge_ship.interrupted_of(ending(FAILED), events, CHILD, STOPPED_AT + 1)).toBe(false)
+	})
+})
+
 describe('run_merge_ship.cause', () => {
 	it('reads the record and the stream of the repository the directory belongs to', () => {
 		const repository = vi.spyOn(git_common_directory, 'repository').mockReturnValue(REPOSITORY)

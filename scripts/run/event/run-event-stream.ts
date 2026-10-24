@@ -116,6 +116,11 @@ const EVENT_KIND = {
 	// The position that hands control back: `run:step` prints the command that
 	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
 	SHIP_STOP: 'ship-stop',
+	// The relaunch meant to answer a `SHIP_STOP` started nothing — the broker refused it, or the direct
+	// spawn failed (joshuafolkken/kit#4765). `run:merge` reads it, not the transcript's mtime, to tell the
+	// stop went unanswered, and a re-dispatch cap's park names its reason. A trace: the stop stays the
+	// position `run:step` answers.
+	RELAUNCH_FAILED: 'relaunch-failed',
 	// An Issue the run filed on its way, written by `issue:file`, so a run started from the command line
 	// still surfaces what it found — `run:board`'s findings section reads it.
 	FILED: 'filed',
@@ -184,6 +189,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
+	EVENT_KIND.RELAUNCH_FAILED,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
