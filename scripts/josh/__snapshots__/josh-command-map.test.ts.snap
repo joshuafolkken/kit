@@ -26,6 +26,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lc": "latest:corepack",
     "lli": "lane:limit",
     "ln": "lines",
+    "lnt": "lane:net",
     "lps": "lane:pause",
     "lr": "lint:related",
     "lrs": "lane:restart",
@@ -573,6 +574,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lane:list": [
       "",
       "automation",
+      [
+        "none",
+      ],
+    ],
+    "lane:net": [
+      "<issue>",
+      "maintainer",
       [
         "none",
       ],

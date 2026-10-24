@@ -916,6 +916,22 @@ pnpm josh lane:value edit --since 2026-10-23T03:29Z   # the median Edit time sin
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
+#### `josh lane:net`
+
+<!-- usage: lane:net -->
+
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks and outages stood.
+
+```bash
+pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
+```
+
+<!-- /usage -->
+
+The whole minutes are what an Issue's `- 原因のレーン:` line declares; a lane the ledger holds no dispatch and merge of exits non-zero.
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
+
 ## Session and documents
 
 ### `josh cost`

@@ -88,6 +88,7 @@ const ALIASES: Record<string, string> = {
 	lsm: 'lane:sample',
 	lst: 'lane:stats',
 	lva: 'lane:value',
+	lnt: 'lane:net',
 	lli: 'lane:limit',
 	lrs: 'lane:restart',
 	lwd: 'lane:withdraw',

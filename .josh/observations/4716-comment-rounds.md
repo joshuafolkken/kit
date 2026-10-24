@@ -1,0 +1,2 @@
+- rf:performance | low | scripts/run/ship/run-ship-pre-detach.ts:146 | 2026-10-24 | #4716
+- rf:project-conventions | low | .josh/observations/4732-comment-rounds.md | 2026-10-24 | #4716

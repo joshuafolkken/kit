@@ -163,6 +163,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lane:launch` | `<issue> [--stash <message>]` | automation | files, git, processes | Collapse a backlogrun lane-start event into one call: open the lane, pop and re-install on the first, dispatch the child |
 | `josh lane:limit` · `josh lli` | `[<limit>] [--reset]` | developer | files | Change a live backlogrun’s lane limit without stopping it, or print the limit, lanes in use and free lanes |
 | `josh lane:list` | — | automation | none | List the open lanes: which issue, which ports, and where each one is |
+| `josh lane:net` · `josh lnt` | `<issue>` | maintainer | none | Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks and outages stood |
 | `josh lane:open` | `<issue> [options]` | automation | files, git | Open a lane: a linked work tree with its own branch and its own port seed |
 | `josh lane:output` | `<issue> [path]` | automation | files | Record, or read back, where the unit running a lane’s child writes |
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |

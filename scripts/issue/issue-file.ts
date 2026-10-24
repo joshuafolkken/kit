@@ -143,7 +143,7 @@ function is_undeclared_classification(label: string, body: string): boolean {
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
 // extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
 // already named it, `not-before` while the body's start time is ahead (`issue-not-before-label.ts`), and
-// the declared priority's label unless a `--label` typed one (`issue-priority.ts`).
+// the filed priority's label (the declaration, else its floor) unless a `--label` typed one (`issue-priority.ts`).
 // One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
