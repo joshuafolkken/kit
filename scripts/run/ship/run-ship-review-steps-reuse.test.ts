@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
@@ -9,6 +9,7 @@ const discard_mock = vi.hoisted(() => vi.fn())
 const unmoved_mock = vi.hoisted(() => vi.fn())
 const stopped_on_mock = vi.hoisted(() => vi.fn())
 const mark_stopped_mock = vi.hoisted(() => vi.fn())
+const interaction_status_mock = vi.hoisted(() => vi.fn(async (): Promise<unknown> => undefined))
 const stamps = vi.hoisted(() => ({
 	read_stamp_text: vi.fn(),
 	remove_stamp: vi.fn(),
@@ -31,7 +32,7 @@ vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
-	return { review_interaction: { ...review_interaction, status: async () => undefined } }
+	return { review_interaction: { ...review_interaction, status: interaction_status_mock } }
 })
 vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_round_one: record_round_one_mock, record_round_two: vi.fn() },
@@ -138,6 +139,22 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
 		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+// joshuafolkken/kit#4781: a lane child that ran both reviewers in-session and recorded both leaves
+// the ship nothing to run (round 1 alone recorded: `run-ship-review-interaction.test.ts`).
+describe('run_ship_review_steps.review_stage — a recorded interaction review', () => {
+	afterEach(() => {
+		interaction_status_mock.mockResolvedValue(undefined)
+	})
+
+	it('reuses both records on an unmoved tree, running no review', async () => {
+		interaction_status_mock.mockResolvedValue('ok')
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
+		expect(commands()).toStrictEqual([])
+		expect(launch).not.toHaveBeenCalled()
 	})
 })
 
