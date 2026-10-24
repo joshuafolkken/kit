@@ -15,6 +15,7 @@ const DUPLICATE_B = 2795
 const BODY_FLAG = '--body-file'
 const ROUTE_FLAG = '--route'
 const DISTINCT_FLAG = '--distinct'
+const FOUND_DURING_FLAG = '--found-during'
 const EPIC = 'epic'
 const TIER_A = 'route:tier-a'
 const FILED = [TITLE, BODY_FLAG, BODY_FILE]
@@ -28,6 +29,7 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		labels: [],
 		repo: undefined,
 		distinct: [],
+		found_during: undefined,
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,
@@ -69,6 +71,22 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		['an unknown route', [...FILED, ROUTE_FLAG, 'x']],
 		['a malformed distinct', [...FILED, DISTINCT_FLAG, 'x']],
 		['an unknown flag', [...FILED, '--nope']],
+	])(REFUSES, (_label, argv) => {
+		expect(issue_file.parse(argv)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4750: the origin the filing cap counts against.
+describe('issue_file.parse — the originating work item', () => {
+	it.each(['3423', '#3423'])('reads --found-during %s as the issue number', (value) => {
+		const parsed = issue_file.parse([...FILED, FOUND_DURING_FLAG, value])
+
+		expect(parsed).toStrictEqual(args_of({ found_during: '3423' }))
+	})
+
+	it.each([
+		['a malformed found-during', [...FILED, FOUND_DURING_FLAG, 'x']],
+		['a found-during naming two issues', [...FILED, FOUND_DURING_FLAG, '1,2']],
 	])(REFUSES, (_label, argv) => {
 		expect(issue_file.parse(argv)).toBeUndefined()
 	})

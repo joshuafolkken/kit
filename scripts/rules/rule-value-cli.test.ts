@@ -9,12 +9,12 @@ import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
 
 // A body read reaches the issue-comments trigger; the comments read in front of it is what keeping
-// the rule looks like, so this run reaches and keeps it. The filing reaches the filing cap, which
+// the rule looks like, so this run reaches and keeps it. The force push reaches `git-force`, which
 // declares no `keeps`, so it reads unmeasured.
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 const BODY_READ = 'gh api repos/o/r/issues/12'
-const FILING = 'pnpm josh issue:file "x" --body-file b.md'
-const FILING_CAP = 'filing-cap'
+const FORCE_PUSH = 'git push --force origin main'
+const GIT_FORCE = 'git-force'
 const ISSUE_COMMENTS = 'issue-comments'
 const TEMPORARY_PREFIX = 'rule-value-cli-'
 
@@ -34,7 +34,7 @@ describe('rule_value_cli.render — one row per rule, or the no-targets answer',
 
 	it('prints exactly one line per measured rule', () => {
 		const lines = rule_value_cli
-			.render([[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]])
+			.render([[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FORCE_PUSH)]])
 			.split('\n')
 
 		expect(lines).toHaveLength(delivered_rules.MEASURED_RULES.length)
@@ -42,7 +42,7 @@ describe('rule_value_cli.render — one row per rule, or the no-targets answer',
 })
 
 describe('rule_value_cli.row — the three readings a row can carry', () => {
-	const kept = [[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]]
+	const kept = [[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FORCE_PUSH)]]
 
 	it('renders a reached, measurable rule as a percentage kept unaided', () => {
 		const reading = rule_value_fixture.reading_for(ISSUE_COMMENTS, kept)
@@ -51,7 +51,7 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 	})
 
 	it('renders a rule with no keeps predicate as unmeasured, never as 0%', () => {
-		const reading = rule_value_fixture.reading_for(FILING_CAP, kept)
+		const reading = rule_value_fixture.reading_for(GIT_FORCE, kept)
 
 		expect(rule_value_cli.row(reading)).toContain(rule_value_cli.UNMEASURED)
 		expect(rule_value_cli.row(reading)).not.toContain('%')
@@ -149,11 +149,14 @@ describe('rule_value_cli.render — a lazy source reads as the materialized one'
 	it('renders the same table as the materialized runs it replaces', () => {
 		spy_readers()
 		const comments = fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1')
-		const body = fake_file(rule_value_fixture.session(BODY_READ, FILING), 'run1')
-		const lone = fake_file(rule_value_fixture.session(FILING), 'run2')
+		const body = fake_file(rule_value_fixture.session(BODY_READ, FORCE_PUSH), 'run1')
+		const lone = fake_file(rule_value_fixture.session(FORCE_PUSH), 'run2')
 		const materialized = [
-			[rule_value_fixture.session(COMMENTS_READ), rule_value_fixture.session(BODY_READ, FILING)],
-			[rule_value_fixture.session(FILING)],
+			[
+				rule_value_fixture.session(COMMENTS_READ),
+				rule_value_fixture.session(BODY_READ, FORCE_PUSH),
+			],
+			[rule_value_fixture.session(FORCE_PUSH)],
 		]
 
 		try {

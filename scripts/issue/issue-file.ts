@@ -36,6 +36,10 @@ interface FileArguments {
 	labels: ReadonlyArray<string>
 	repo: string | undefined
 	distinct: ReadonlyArray<number>
+	// `--found-during <N>`: the work item the filing came from when it is not the checkout's own — a
+	// long lane the parent investigated, the Issue a prerequisite or an observation came out of. The
+	// filing cap counts per origin (`issue-file-cap.ts`); absent, the finder is read (`issue-file-fold.ts`).
+	found_during: string | undefined
 	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
 	is_over_cap: boolean
 	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
@@ -51,6 +55,7 @@ const OPTIONS = {
 	label: { type: 'string', multiple: true },
 	repo: { type: 'string' },
 	distinct: { type: 'string', multiple: true },
+	'found-during': { type: 'string' },
 	'over-cap': { type: 'boolean' },
 	'no-auto-ok': { type: 'boolean' },
 	release: { type: 'boolean' },
@@ -95,15 +100,27 @@ function has_text(value: string | undefined): value is string {
 	return value !== undefined && value.trim() !== ''
 }
 
-// The labelled half of the arguments, or `undefined` when a route or `--distinct` entry is not one the
-// command knows.
-function labelled_of(values: ParsedValues): Pick<FileArguments, 'route' | 'distinct'> | undefined {
+// `--found-during 3423` or `#3423` → `'3423'`; `undefined` when absent, `false` when it names no single
+// issue number, so a typo is refused rather than counted against no origin.
+function found_during_of(value: string | undefined): string | undefined | false {
+	if (value === undefined) return undefined
+	const numbers = distinct_numbers([value])
+
+	return numbers?.length === 1 ? String(numbers[0]) : false
+}
+
+type Labelled = Pick<FileArguments, 'route' | 'distinct' | 'found_during'>
+
+// The labelled half of the arguments, or `undefined` when a route, `--distinct` or `--found-during`
+// entry is not one the command knows.
+function labelled_of(values: ParsedValues): Labelled | undefined {
 	const route = route_of(values)
 	const distinct = distinct_numbers(values.distinct ?? [])
+	const found_during = found_during_of(values['found-during'])
 
-	if (route === false || distinct === undefined) return undefined
+	if (route === false || distinct === undefined || found_during === false) return undefined
 
-	return { route, distinct }
+	return { route, distinct, found_during }
 }
 
 function arguments_of(values: ParsedValues, title: string | undefined): FileArguments | undefined {

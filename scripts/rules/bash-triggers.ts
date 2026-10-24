@@ -6,8 +6,8 @@ import { shell_segments } from './shell-segments'
 
 // The trigger helpers the enumeration in `delivered-rules.ts` is built from, held here so a rule
 // that lives in its own module can build its own row without importing the enumeration back.
-// `is_issue_filing` is the one three rows share — the WIP cap, the per-run
-// filing cap and the fold — so it could not stay a private function of the file that spreads their rows.
+// `is_issue_filing` is shared by the readers of a run's filings off the transcript (`turn-filings.ts`,
+// `stop-guard.ts`), so it could not stay a private function of one of them.
 
 // **Only `Bash`, and the omission is deliberate**: Claude Code denies one
 // call of a turn and runs the rest, so a refused `Edit` would leave its siblings applied and itself
@@ -85,7 +85,7 @@ function is_direct_filing(command: string): boolean {
 }
 
 // `pnpm josh issue:file`, in either spelling — **the** filing act once a direct one is refused, so the
-// run-level filing rows (the WIP cap, the per-run cap, the fold) trigger on it. Segment-wise, so a
+// turn's filing count reads it. Segment-wise, so a
 // spelling quoted inside another command's body is not read as a filing.
 const FILING_NAMES: ReadonlySet<string> = new Set(['issue:file'])
 

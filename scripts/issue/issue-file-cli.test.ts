@@ -9,6 +9,7 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_release_cli } from './issue-release-cli'
@@ -73,6 +74,8 @@ const link_release = vi.spyOn(issue_release_cli, 'link')
 // the real stream. The fold question's answers are `issue-file-fold.test.ts`'s; here it only clears.
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
+
+vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {

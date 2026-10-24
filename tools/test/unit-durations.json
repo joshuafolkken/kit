@@ -1098,8 +1098,6 @@
 	"scripts/rules/entry-fetch-document-rule.test.ts": 179,
 	"scripts/rules/entry-read-set-document-rule.test.ts": 24,
 	"scripts/rules/file-body.test.ts": 128,
-	"scripts/rules/filing-cap-document.test.ts": 105,
-	"scripts/rules/filing-cap.test.ts": 29,
 	"scripts/rules/filing-offer.test.ts": 15,
 	"scripts/rules/filing-route-label.test.ts": 30,
 	"scripts/rules/firing-point.test.ts": 13,

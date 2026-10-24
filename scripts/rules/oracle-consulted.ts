@@ -80,7 +80,7 @@ function row_for(oracle: Oracle, firing_point: FiringPoint): DeliveredRule {
 
 // One row per oracle that declared a firing point, in registry order. Spread into `DELIVERED_RULES`
 // after the filing rows, so a firing point that overlaps a filing (`issue:lint`) delivers on the
-// reissue rather than ahead of `filing-cap`.
+// reissue rather than ahead of the filing rows.
 const ROWS: ReadonlyArray<DeliveredRule> = oracle_firing
 	.firing_oracles()
 	.map(({ oracle, firing_point }) => row_for(oracle, firing_point))
