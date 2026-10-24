@@ -2,12 +2,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { document_byte_budget } from '#scripts/document/document-byte-budget'
+import { entry_read_budget } from '#scripts/document/entry-read-budget'
 import { resident_budget } from '#scripts/document/resident-budget'
 import { describe, expect, it } from 'vitest'
 import { bytes_command } from './bytes-command'
 
 const { argument_row, entry_row, entry_rows, near_ceiling_statuses } = bytes_command
 const { scan_lines, status_row, NOT_A_FILE, NOT_BUDGETED } = bytes_command
+const { ENTRY_READ_BUDGET, entry_total_bytes, over_budget_message, recorded_bytes_for } =
+	entry_read_budget
+const NOTHING = 0
 
 const JOSH_COMMANDS = 'docs/josh-commands.md'
 const CLAUDE_MD = 'CLAUDE.md'
@@ -133,6 +137,20 @@ describe('entry_row — the primary per-entry budget', () => {
 		const row = entry_row({ entry: 'kickoff', current: 1200, recorded: 1000, remaining: -200 })
 
 		expect(row).toContain('over by 200')
+	})
+
+	it('reports each entry with the same totals the over-budget message names', () => {
+		for (const [index, { entry, bytes }] of ENTRY_READ_BUDGET.entries()) {
+			const current = entry_total_bytes(process.cwd(), entry)
+			const message = over_budget_message(entry, current, recorded_bytes_for(entry) ?? NOTHING)
+
+			expect(entry_rows()[index]).toContain(
+				`entry ${entry}  ${current.toString()}/${bytes.toString()} bytes`,
+			)
+			expect(message).toContain(
+				`reads ${current.toString()} bytes, over its ${bytes.toString()}-byte`,
+			)
+		}
 	})
 })
 

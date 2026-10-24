@@ -7,8 +7,13 @@ import { entry_read_budget } from './entry-read-budget'
 import { entry_read_set } from './entry-read-set'
 import { read_set_cli } from './read-set-cli'
 
-const { ENTRY_READ_BUDGET, entry_total_bytes, over_budget_message, stale_budget_message } =
-	entry_read_budget
+const {
+	ENTRY_READ_BUDGET,
+	RECHECK_COMMAND,
+	entry_total_bytes,
+	over_budget_message,
+	stale_budget_message,
+} = entry_read_budget
 const { BLOCK_BYTES, block_ceiling } = document_byte_budget
 
 const ROOT = process.cwd()
@@ -132,6 +137,14 @@ describe('the raise/lower messages name the concrete block value to record', () 
 		const message = over_budget_message('fullrun', current, recorded)
 
 		expect(message).toContain(`raise its recorded size to ${block_ceiling(current).toString()}`)
+	})
+
+	it('over-budget names `pnpm josh bytes` as the command that rechecks the budget alone', () => {
+		const recorded = block_ceiling(1000)
+		const message = over_budget_message('fullrun', recorded + 1, recorded)
+
+		expect(RECHECK_COMMAND).toBe('pnpm josh bytes')
+		expect(message).toMatch(/Recheck with `pnpm josh bytes`\.$/u)
 	})
 
 	it('stale names the block multiple to lower to', () => {
