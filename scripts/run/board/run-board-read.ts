@@ -13,6 +13,7 @@ import { run_carry_ended } from '#scripts/run/carry/run-carry-ended'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stranded_detect } from '#scripts/run/run-stranded-detect'
 import { run_wake } from '#scripts/run/wake/run-wake'
+import { run_board_found, type FoundOf } from './run-board-found'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import {
 	run_board_operation_read,
@@ -72,6 +73,9 @@ interface LocalRead {
 	closing?: ReadonlySet<string> | undefined
 	// The run's record, whose declared order holds a queued row (`backlog-drive-named.ts`).
 	carry?: RunCarry | undefined
+	// What each done row says after its time, its sessions probed once a read against `table`
+	// (`run-board-found.ts`), never per redraw.
+	found?: FoundOf | undefined
 }
 
 const NO_SPAN: SpanHere = {
@@ -215,6 +219,21 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 	}
 }
 
+// The run's own events, and what its done rows say after their time with each open investigation's
+// session asked of `table`.
+async function span_events_here(
+	events: ReadonlyArray<RunEvent>,
+	span: BoardSpan,
+	table: TableRead | undefined,
+): Promise<Pick<LocalRead, 'events' | 'found'>> {
+	const spanned = run_board_span.events_of(events, span)
+
+	return {
+		events: spanned,
+		found: run_board_found.found_of(spanned, await run_board_found.live_in(table)),
+	}
+}
+
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
@@ -232,7 +251,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		started_ms: span.started_ms,
 		ended_ms: span.ended_ms,
 		scope: run_board_scope.scope_of(span.invocation),
-		events: run_board_span.events_of(events, span),
+		...(await span_events_here(events, span, table)),
 		lanes: lanes.map((lane) => lane.issue),
 		lane_states,
 		resume,

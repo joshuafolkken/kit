@@ -1,7 +1,6 @@
 import type { ClosedIssue } from './run-board-closed'
 import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
-import { run_board_found } from './run-board-found'
 import type { GatherRead } from './run-board-gather'
 import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -183,7 +182,7 @@ function local_header(local: LocalRead): LocalHeader {
 		operations: local.operations,
 		usual: local.usual,
 		lane_limit: local.lane_limit,
-		found: run_board_found.found_of(local.events, run_board_found.is_session_live),
+		found: local.found,
 	}
 }
 

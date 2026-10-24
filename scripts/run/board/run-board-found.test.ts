@@ -1,4 +1,5 @@
 import { process_identity } from '#scripts/josh/process-identity'
+import type { TableRead } from '#scripts/lane/lane-process-table'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -110,18 +111,46 @@ describe('run_board_found.found_of — the investigation', () => {
 	})
 })
 
-describe('run_board_found.is_session_live — the board’s probe', () => {
-	it('reads the session it names as live', () => {
+// This process's own row, as the read's `ps` snapshot carries it.
+function own_table(): TableRead {
+	const row = { pid: process.pid, parent: 1, time: '0:01', rss_kb: 1, stat: 'S', command: 'node' }
+	const start = process_identity.own_start() ?? ''
+
+	return vi.fn<TableRead>(async () => [{ ...row, start }])
+}
+
+describe('run_board_found.live_in — the board’s probe', () => {
+	it('reads the session it names as live', async () => {
 		const start = process_identity.own_start()
+		const is_live = await run_board_found.live_in(own_table())
 
-		expect(run_board_found.is_session_live(process.pid, start)).toBe(start !== undefined)
+		expect(is_live(process.pid, start)).toBe(start !== undefined)
 	})
 
-	it('reads a later process given the session’s pid as not the session', () => {
-		expect(run_board_found.is_session_live(process.pid, 'proc:0')).toBe(false)
+	it('reads a later process given the session’s pid as not the session', async () => {
+		const is_live = await run_board_found.live_in(own_table())
+
+		expect(is_live(process.pid, 'proc:0')).toBe(false)
 	})
 
-	it('reads a note with no start time as no session, since its pid alone names no process', () => {
-		expect(run_board_found.is_session_live(process.pid, undefined)).toBe(false)
+	it('reads a note with no start time as no session, since its pid alone names no process', async () => {
+		const is_live = await run_board_found.live_in(own_table())
+
+		expect(is_live(process.pid, undefined)).toBe(false)
+	})
+
+	it('asks the snapshot once however many notes it probes', async () => {
+		const table = own_table()
+		const is_live = await run_board_found.live_in(table)
+
+		run_board_found.found_of([started(), started(CHILD + 1)], is_live)
+
+		expect(table).toHaveBeenCalledOnce()
+	})
+
+	it('reads no session live where the snapshot could not be taken', async () => {
+		const is_live = await run_board_found.live_in(undefined)
+
+		expect(is_live(PID, START)).toBe(false)
 	})
 })

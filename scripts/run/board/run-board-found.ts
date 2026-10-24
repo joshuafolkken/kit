@@ -1,4 +1,5 @@
 import { process_identity } from '#scripts/josh/process-identity'
+import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -85,13 +86,18 @@ function found_of(events: ReadonlyArray<RunEvent>, is_live: IsLive): FoundOf {
 	return found
 }
 
-// The board's own probe. The pid alone reads a later process given that pid as the session, so the
-// start token decides; a note without one — a platform that could not read it — turns no spinner.
-function is_session_live(pid: number, start: string | undefined): boolean {
-	return process_identity.is_present_process(pid, start) === true
+// The board's own probe, each start time answered from the read's own `ps` snapshot, so neither the
+// read nor a redraw runs a `ps` of its own per note (joshuafolkken/kit#4263). The pid alone reads a
+// later process given that pid as the session, so the start token decides; a note without one — a
+// platform that could not read it — turns no spinner.
+async function live_in(table: TableRead | undefined): Promise<IsLive> {
+	const rows = table === undefined ? undefined : await table()
+	const read = lane_process_table.start_reader(rows ?? [])
+
+	return (pid, start) => process_identity.is_present_process(pid, start, read) === true
 }
 
-const run_board_found = { found_of, is_session_live }
+const run_board_found = { found_of, live_in }
 
 export { run_board_found }
 export type { Found, FoundOf, IsLive }
