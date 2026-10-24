@@ -8,6 +8,8 @@ import { issue_priority } from './issue-priority'
 const BASE = ['bug']
 const SHORTENING_LINE = '- 目的: 時間短縮\n'
 const HIGH_WITH_DEADLINE = '- 優先度: 高（期限）'
+const URGENT_CONDITION_2 = '- 優先度: 緊急（条件 2）'
+const PARK_PREFIX = '- 原因の park:'
 
 function body(declaration: string, extra = ''): string {
 	return `## 背景\n\n- 種別: 非不具合\n${extra}${declaration}\n\n## 期待効果\n\n`
@@ -108,7 +110,7 @@ describe('issue_priority.problem', () => {
 		expect(
 			issue_priority.problem(shortening('- 優先度: 緊急（短縮 10%）', '10%'), []),
 		).toBeUndefined()
-		expect(issue_priority.problem(shortening('- 優先度: 緊急（条件 2）', '3%'), [])).toBeUndefined()
+		expect(issue_priority.problem(shortening(URGENT_CONDITION_2, '3%'), [])).toBeUndefined()
 	})
 
 	it('refuses a run-time-shortening Issue whose reduction line is missing or left as the placeholder', () => {
@@ -174,6 +176,65 @@ describe('issue_priority.floor_of with a causing lane', () => {
 			expect(issue_priority.floor_of(filed)).toBe(level)
 		},
 	)
+})
+
+const SECURITY_LINE = '- セキュリティ: Issue 本文がガードを通らずに読める\n'
+const PARK_LINE = '- 原因の park: #4703\n'
+
+describe.each([
+	['security finding (H)', SECURITY_LINE, '- セキュリティ:'],
+	['caused park (I)', PARK_LINE, PARK_PREFIX],
+])('issue_priority %s (joshuafolkken/kit#4767)', (_name, line, prefix) => {
+	it('files a body that declares no priority at high', () => {
+		expect(issue_priority.problem(body('', line), [])).toBeUndefined()
+		expect(issue_priority.with_label(BASE, body('', line))).toStrictEqual([
+			...BASE,
+			PRIORITY_HIGH_LABEL,
+		])
+	})
+
+	it('refuses a normal declaration, naming the high floor and the line', () => {
+		const filed = issue_priority.problem(body('- 優先度: 通常', line), [])
+
+		expect(filed).toContain('`high`')
+		expect(filed).toContain(prefix.slice('- '.length, -':'.length))
+	})
+
+	it('accepts a declaration at or above the floor', () => {
+		expect(issue_priority.problem(body(HIGH_WITH_DEADLINE, line), [])).toBeUndefined()
+		expect(issue_priority.problem(body(URGENT_CONDITION_2, line), [])).toBeUndefined()
+	})
+
+	it('does not judge the line when a priority label was typed', () => {
+		const filed = body('- 優先度: 通常', line)
+
+		expect(issue_priority.problem(filed, [PRIORITY_CRITICAL_LABEL])).toBeUndefined()
+		expect(issue_priority.with_label([PRIORITY_CRITICAL_LABEL], filed)).toStrictEqual([
+			PRIORITY_CRITICAL_LABEL,
+		])
+	})
+})
+
+describe('issue_priority malformed H / I lines (joshuafolkken/kit#4767)', () => {
+	it.each([['- セキュリティ:'], ['- セキュリティ: <迂回される gate・ガード・権限>']])(
+		'refuses the security line %j',
+		(line) => {
+			expect(issue_priority.problem(body('', `${line}\n`), [])).toContain('security finding')
+		},
+	)
+
+	it.each([['- 原因の park: 4703'], ['- 原因の park: #<N>'], [PARK_PREFIX]])(
+		'refuses the park line %j',
+		(line) => {
+			expect(issue_priority.problem(body('', `${line}\n`), [])).toContain('caused park')
+		},
+	)
+
+	it('refuses the #4765-shaped body: a caused park declared normal', () => {
+		const filed = `## 背景\n\n- 種別: 不具合\n- 原因の park: #4703\n- 優先度: 通常\n`
+
+		expect(issue_priority.problem(filed, [])).toContain('`high`')
+	})
 })
 
 describe('issue_priority.with_label', () => {

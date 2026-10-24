@@ -7,7 +7,8 @@ import { markdown_section } from './markdown-section'
 // declaration must name its basis, so neither label is applied on a bare word. A run-time-shortening
 // Issue's reduction-per-merge line sets a floor — its share of the median lane time per merge — and so
 // does a causing-lane line, the net minutes of the lane the Issue's defect slowed
-// (joshuafolkken/kit#4749): a declaration below the higher floor is refused, and a body that declares
+// (joshuafolkken/kit#4749), and a security-finding or caused-park line sets a high one
+// (joshuafolkken/kit#4767): a declaration below the highest floor is refused, and a body that declares
 // none is filed at it. A priority label the filer typed (`kickoff new critical`) wins: the body is then
 // not judged at all.
 
@@ -17,6 +18,13 @@ interface LevelParser {
 	pattern: RegExp
 	level: PriorityLevel
 	accepts: (basis: string) => boolean
+}
+
+// A background line that sets a floor, its well-formed shape, and the refusal for a malformed one.
+interface FloorLine {
+	prefix: string
+	accepts: (line: string) => boolean
+	problem: string
 }
 
 const BACKGROUND_HEADING = '## 背景'
@@ -38,6 +46,9 @@ const LANE_PREFIX = '- 原因のレーン:'
 const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
 const CRITICAL_LANE_MINUTES = 60
 const HIGH_LANE_MINUTES = 40
+const SECURITY_PREFIX = '- セキュリティ:'
+const PARK_PREFIX = '- 原因の park:'
+const PARK_LINE = /^- 原因の park: #[1-9]\d*$/u
 const LEVELS: ReadonlyArray<PriorityLevel> = ['normal', 'high', 'critical']
 const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	critical: PRIORITY_CRITICAL_LABEL,
@@ -47,6 +58,16 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値> / 原因のレーン <分>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
 
 const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
+
+const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}\` as \`${SECURITY_PREFIX} <迂回される gate・ガード・権限>\` (\`issue-template.md\`)`
+
+const PARK_PROBLEM = `state a caused park under \`${BACKGROUND_HEADING}\` as \`${PARK_PREFIX} #<N>\` — the Issue the defect parked or whose run it stopped (\`issue-template.md\`)`
+
+const FLOOR_DECLARATIONS: Readonly<Record<PriorityLevel, string>> = {
+	critical: '緊急（短縮 … / 原因のレーン …）',
+	high: '高（短縮 … / 原因のレーン … / セキュリティ … / 原因の park …）',
+	normal: '通常',
+}
 
 const REDUCTION_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue states \`${REDUCTION_PREFIX} <分>（レーン中央値 <分> の <%>）\` under \`${expected_effect_lint.HEADING}\` with its percentage filled in (\`issue-template.md\`)`
 
@@ -117,8 +138,42 @@ function reduction_floor(body: string): PriorityLevel {
 	return percent >= CRITICAL_PERCENT ? 'critical' : 'high'
 }
 
-function has_malformed_lane(body: string): boolean {
-	return background_lines(body, LANE_PREFIX).some((line) => !LANE_LINE.test(line))
+function is_lane_line(line: string): boolean {
+	return LANE_LINE.test(line)
+}
+
+function is_security_line(line: string): boolean {
+	return has_basis(line.slice(SECURITY_PREFIX.length))
+}
+
+function is_park_line(line: string): boolean {
+	return PARK_LINE.test(line)
+}
+
+const LANE_FLOOR_LINE: FloorLine = {
+	prefix: LANE_PREFIX,
+	accepts: is_lane_line,
+	problem: LANE_PROBLEM,
+}
+// H and I of `issue-template.md`'s criteria: either line ranks the Issue high.
+const HIGH_FLOOR_LINES: ReadonlyArray<FloorLine> = [
+	{ prefix: SECURITY_PREFIX, accepts: is_security_line, problem: SECURITY_PROBLEM },
+	{ prefix: PARK_PREFIX, accepts: is_park_line, problem: PARK_PROBLEM },
+]
+
+// The refusal for the first floor line written in the wrong shape, or `undefined`.
+function malformed_problem(body: string): string | undefined {
+	return [LANE_FLOOR_LINE, ...HIGH_FLOOR_LINES].find((entry) =>
+		background_lines(body, entry.prefix).some((line) => !entry.accepts(line)),
+	)?.problem
+}
+
+function marker_floor(body: string): PriorityLevel {
+	const is_marked = HIGH_FLOOR_LINES.some(
+		(entry) => background_lines(body, entry.prefix).length > 0,
+	)
+
+	return is_marked ? 'high' : 'normal'
 }
 
 // The floor the longest causing lane sets — strictly over each threshold.
@@ -133,9 +188,10 @@ function lane_floor(body: string): PriorityLevel {
 	return longest > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
 }
 
-// The lowest level the Issue may declare: the higher of its reduction's floor and its causing lane's.
+// The lowest level the Issue may declare: the highest of its reduction's, causing lane's and markers' floors.
 function floor_of(body: string): PriorityLevel {
-	const ranks = [reduction_floor(body), lane_floor(body)].map((level) => LEVELS.indexOf(level))
+	const floors = [reduction_floor(body), lane_floor(body), marker_floor(body)]
+	const ranks = floors.map((level) => LEVELS.indexOf(level))
 
 	return LEVELS[Math.max(...ranks)] ?? 'normal'
 }
@@ -163,7 +219,7 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 
 	if (LEVELS.indexOf(level) >= LEVELS.indexOf(floor)) return undefined
 
-	return `the stated reduction per merge or causing lane ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${floor === 'critical' ? '緊急' : '高'}（短縮 … / 原因のレーン …）\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
+	return `the stated reduction per merge, causing lane, security finding or caused park ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${FLOOR_DECLARATIONS[floor]}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
 }
 
 // Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list.
@@ -173,9 +229,8 @@ function problem(body: string, typed: ReadonlyArray<string>): string | undefined
 
 	if (level === undefined) return DECLARATION_PROBLEM
 	if (has_missing_reduction(body)) return REDUCTION_PROBLEM
-	if (has_malformed_lane(body)) return LANE_PROBLEM
 
-	return floor_problem(body, level)
+	return malformed_problem(body) ?? floor_problem(body, level)
 }
 
 // The labels a new Issue is filed with — the filed level's label added unless one was typed.
