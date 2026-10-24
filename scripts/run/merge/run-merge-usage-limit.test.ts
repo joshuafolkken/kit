@@ -121,6 +121,20 @@ describe('run_merge_usage_limit.resume_ms', () => {
 	})
 })
 
+// joshuafolkken/kit#4796: the reset `run:board` names a waiting row's hold by.
+describe('run_merge_usage_limit.held_until', () => {
+	const events = [event(1, `#1 usage limit — resumes at ${RESET_ISO}`)]
+
+	it('names the reset while it is still ahead', () => {
+		expect(run_merge_usage_limit.held_until(events as never, RESET_MS - 1)).toBe(RESET_MS)
+	})
+
+	it('names nothing once the reset has passed, or where no stop was recorded', () => {
+		expect(run_merge_usage_limit.held_until(events as never, RESET_MS)).toBeUndefined()
+		expect(run_merge_usage_limit.held_until([], RESET_MS)).toBeUndefined()
+	})
+})
+
 describe('run_merge_usage_limit.is_held', () => {
 	beforeEach(() => {
 		events_mock.mockResolvedValue([event(1, `#1 usage limit — resumes at ${RESET_ISO}`)])
