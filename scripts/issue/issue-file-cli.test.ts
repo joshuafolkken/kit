@@ -12,6 +12,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
+import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
@@ -76,6 +77,8 @@ vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 
 vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
+// The interrupt's blocked-by record is `issue-file-interrupt.test.ts`'s; here it writes nothing.
+vi.spyOn(issue_file_interrupt, 'block_finder').mockResolvedValue()
 
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {
@@ -92,9 +95,7 @@ function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<stri
 }
 
 function create_body(): unknown {
-	const [request] = exec_gh_api.mock.calls[0] ?? []
-
-	return JSON.parse(request?.body ?? '{}')
+	return JSON.parse(exec_gh_api.mock.calls[0]?.[0].body ?? '{}')
 }
 
 beforeEach(() => {
