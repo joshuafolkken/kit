@@ -70,7 +70,7 @@ describe('run_merge_cli.merge_child — putting a merged child on record', () =>
 
 		await run_merge_cli.merge_child(context())
 
-		expect(emit_mock).not.toHaveBeenCalledWith('merge', expect.anything())
+		expect(emit_mock).not.toHaveBeenCalledWith('merge', expect.anything(), expect.anything())
 		expect(record_merge_mock).not.toHaveBeenCalled()
 	})
 
