@@ -1,9 +1,13 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { EPIC_LABEL, has_label_name, has_parked_label } from '#scripts/issue/issue-labels'
+import {
+	EPIC_LABEL,
+	has_label_name,
+	has_parked_label,
+	parked_label_of,
+} from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
-import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
@@ -49,13 +53,11 @@ function budget_offer(
 	}
 }
 
-// The outcome a named issue has already reached without this run dispatching it: closed is merged, and
-// a park (`PARKED_LABELS`) waits on a person, so re-dispatching it only repeats the stop it parked on.
-// Either is booked done rather than offered — the same reading `run:merge` gives a parked child.
-function settled_outcome(state: IssueState): MergeResult['outcome'] | undefined {
-	if (state.state.toUpperCase() === 'CLOSED') return 'merged'
-
-	return has_parked_label(state.labels) ? 'parked' : undefined
+// Whether a named issue has already settled without this run dispatching it: closed is merged, and a
+// park (`PARKED_LABELS`) waits on a person, so re-dispatching it only repeats the stop it parked on.
+// Either is booked done rather than offered.
+function is_settled(state: IssueState): boolean {
+	return state.state.toUpperCase() === 'CLOSED' || has_parked_label(state.labels)
 }
 
 async function classify(
@@ -68,14 +70,8 @@ async function classify(
 
 	if (result.kind !== 'state') return backlog_drive_unread.offer(issue, result, state.retries)
 
-	const outcome = settled_outcome(result.state)
-
-	if (outcome !== undefined) {
-		await backlog_drive_named.mark_done(
-			issue,
-			{ outcome, code: 0, token: 'none', is_offer: true },
-			owner,
-		)
+	if (is_settled(result.state)) {
+		await backlog_drive_named.mark_settled(issue, owner)
 
 		return { verdict: 'wait', issues: [], retries: NO_RETRIES }
 	}
@@ -88,23 +84,37 @@ async function classify(
 // **A named issue booked done is not thereby merged**: a park and a failure are
 // booked done too, so the run moves past them. One the run's own merges did not record and GitHub does
 // not read as closed ended without a merge — and an unreadable state counts as that, because a false
-// stop reaches a person while a false finish ends the run where nobody sees it.
-async function is_unmerged(issue: number, merged: ReadonlyArray<number>): Promise<boolean> {
-	if (merged.includes(issue)) return false
+// stop reaches a person while a false finish ends the run where nobody sees it. The answer is why it
+// did not merge (joshuafolkken/kit#4746): the park it sits on, or that it is open without one.
+async function unmerged_reason(
+	issue: number,
+	merged: ReadonlyArray<number>,
+): Promise<string | undefined> {
+	if (merged.includes(issue)) return undefined
 
 	const result = await issue_state_cli.read_issue(String(issue))
 
-	return result.kind !== 'state' || result.state.state.toUpperCase() !== 'CLOSED'
+	if (result.kind !== 'state') return 'state unreadable'
+	if (result.state.state.toUpperCase() === 'CLOSED') return undefined
+
+	return parked_label_of(result.state.labels) ?? 'open'
 }
 
-// The issues `run:add` put in count too: one that parked is no more a merge
-// than a declared one.
-async function unmerged_of(carry: RunCarry): Promise<Array<number>> {
+function cite(issue: number, reason: string | undefined): string | undefined {
+	return reason === undefined ? undefined : `${issue_cite.plain(issue)} (${reason})`
+}
+
+// Each named issue that did not merge, with its reason. The issues `run:add` put in count too: one that
+// parked is no more a merge than a declared one.
+async function unmerged_of(carry: RunCarry): Promise<Array<string>> {
 	const declared = backlog_drive_named.named_issues(carry)
 	const merged = carry.merged_issues ?? []
-	const flags = await Promise.all(declared.map(async (issue) => await is_unmerged(issue, merged)))
+	const reasons = await Promise.all(
+		declared.map(async (issue) => await unmerged_reason(issue, merged)),
+	)
+	const cited = declared.map((issue, index) => cite(issue, reasons[index]))
 
-	return declared.filter((_, index) => flags[index] === true)
+	return cited.filter((line) => line !== undefined)
 }
 
 // The `--only` run's end: a finish when every named issue merged, otherwise a stop naming the ones that
@@ -114,9 +124,11 @@ async function only_end(carry: RunCarry, named: OfferRead): Promise<OfferRead> {
 
 	if (unmerged.length === 0) return named
 
-	const listed = unmerged.map((issue) => issue_cite.plain(issue)).join(', ')
-
-	return { ...named, reason: `only: ${listed} ended without a merge`, is_finish: false }
+	return {
+		...named,
+		reason: `only: ${unmerged.join(', ')} ended without a merge`,
+		is_finish: false,
+	}
 }
 
 async function not_run(

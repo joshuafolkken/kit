@@ -32,6 +32,21 @@ test('dispatches named issues in order and waits for the first one in flight', (
 	expect(backlog_drive_named.offer(CARRY, running, true)?.verdict).toBe('wait')
 })
 
+// joshuafolkken/kit#4746: the stop's reason is read when it is offered, so one offered while a lane ran
+// named that lane's issue unmerged even after it merged.
+test('ends an --only run with every named issue done only once nothing is in flight', () => {
+	const carry = { ...CARRY, done: [1, 2] }
+	const running = backlog_drive.initial_state(['2'], ACTIVE)
+	const settled = backlog_drive.initial_state([], ACTIVE)
+
+	expect(backlog_drive_named.offer(carry, running, true)?.verdict).toBe('wait')
+	expect(backlog_drive_named.offer(carry, settled, true)).toMatchObject({
+		verdict: 'stop',
+		reason: 'only',
+		is_finish: true,
+	})
+})
+
 // joshuafolkken/kit#3558: a `run:add`ed issue in flight at the head held the named epic behind it, so
 // a child filed into the epic waited for a parent session.
 test('offers the declared item past an added issue already in flight', () => {
