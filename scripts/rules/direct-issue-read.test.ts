@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import {
+	BODY_JQ_COMMAND,
+	BODY_READ_API_COMMAND,
+	BODY_READ_COMMAND,
+	COMMENTED_READ_COMMAND,
+	STATE_CHECK_COMMAND,
+} from './delivered-rules-fixture'
 import { direct_issue_read } from './direct-issue-read'
 
 vi.mock('#scripts/issue/session-cite', () => ({
@@ -70,6 +77,19 @@ describe('direct_issue_read.is_direct_issue_read — is silent on', () => {
 		'gh api --help repos/{owner}/{repo}/issues/5',
 		'echo "gh api repos/{owner}/{repo}/issues/4663"',
 	])('is silent on %j', (command) => {
+		expect(direct_issue_read.is_direct_issue_read(command)).toBe(false)
+	})
+})
+
+// The `issue-comments` fixtures name another repository, so they reach that row and not this one.
+describe('direct_issue_read.is_direct_issue_read — the issue-comments fixtures', () => {
+	it.each([
+		BODY_JQ_COMMAND,
+		BODY_READ_API_COMMAND,
+		BODY_READ_COMMAND,
+		COMMENTED_READ_COMMAND,
+		STATE_CHECK_COMMAND,
+	])('leaves %j to the issue-comments row', (command) => {
 		expect(direct_issue_read.is_direct_issue_read(command)).toBe(false)
 	})
 })
