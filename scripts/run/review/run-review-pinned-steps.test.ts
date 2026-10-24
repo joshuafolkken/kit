@@ -14,7 +14,7 @@ const PID = 4770
 const REASON = 'the branch only logs'
 const PINNED_COMMAND = 'test:pinned'
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
-const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned_count: 1 }
+const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned: ['a.ts 0123456789abcdef'] }
 const START = 'Sat Oct 24 21:00:00 2026'
 const OTHER_START = 'Sun Oct 25 09:00:00 2026'
 // Taken before any spy, so a test can run the real comparison against a stubbed start.
@@ -123,7 +123,7 @@ describe('run_review_pinned_steps.wait_for_answer', () => {
 
 		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
 
-		expect(answer?.unpinned_count).toBe(0)
+		expect(answer?.unpinned).toStrictEqual([])
 	})
 
 	it('reads nothing of the last pair once a new start clears it', async () => {
@@ -166,7 +166,7 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 
 		expect(await run_review_pinned_steps.wait_for_answer(ROOT)).toStrictEqual({
 			text: '`josh test:pinned` could not run, so nothing was checked: its process ended without an answer\n',
-			unpinned_count: 0,
+			unpinned: [],
 		})
 	})
 
@@ -188,7 +188,7 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 
 		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
 
-		expect(answer?.unpinned_count).toBe(0)
+		expect(answer?.unpinned).toStrictEqual([])
 		expect(answer?.text).toContain(TIMED_OUT_NOTE)
 	})
 })
@@ -295,7 +295,7 @@ describe('run_review_pinned_steps.wait_for_answer — a check still queued for c
 		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
 		expect(answer).toStrictEqual({
 			text: '`josh test:pinned` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended\n',
-			unpinned_count: 0,
+			unpinned: [],
 		})
 	})
 

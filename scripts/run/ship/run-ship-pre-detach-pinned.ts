@@ -5,6 +5,7 @@ import { buffered_process } from '#scripts/lib/buffered-process'
 import { error_text } from '#scripts/lib/error-message'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
+import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
 import type { ShipArguments } from './run-ship-steps'
@@ -66,7 +67,7 @@ async function pinned_check(options: CheckOptions): Promise<JoshResult> {
 		return { code: SUCCESS_EXIT_CODE, out: `${SKIPPED_NOTE}${reason}\n` }
 	}
 
-	const verdict = run_review_pinned.verdict_of(await summary(), reason)
+	const verdict = await run_review_pinned_accepted.judge(await summary(), reason)
 
 	return {
 		code: verdict.kind === 'stop' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE,
