@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 	emit: vi.fn<(kind: string, text: string) => Promise<void>>(),
 	launch: vi.fn<(request: { env: Readonly<Record<string, string>> }) => unknown>(),
 	read_entries: vi.fn(),
+	read_start: vi.fn<(pid: number) => string | undefined>(),
 	resolve_in: vi.fn<(invocation: string) => unknown>(),
 	target: vi.fn(),
 	transcripts: vi.fn(),
@@ -28,6 +29,9 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch: mocks.launch, note_of: (error: Error) => error.message },
 }))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: mocks.resolve_in } }))
+vi.mock('#scripts/josh/process-identity', () => ({
+	process_identity: { read_start: mocks.read_start },
+}))
 vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 	cost_transcript: {
 		home_directory: () => '/home',
@@ -189,6 +193,17 @@ describe('lane_overrun.investigate — the record of an overrun', () => {
 			`#${String(ISSUE)} overran: 41 min net — investigating in pid 321`,
 		])
 		expect(launched_prompt()).toContain('pnpm josh run:event --append note')
+	})
+
+	it('records the session’s start time, so a later process given its pid is not read as it', async () => {
+		mocks.read_start.mockReturnValue('proc:9876')
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(mocks.read_start).toHaveBeenCalledWith(PID)
+		expect(notes()).toStrictEqual([
+			`#${String(ISSUE)} overran: 41 min net — investigating in pid 321 started proc:9876`,
+		])
 	})
 
 	it('records a launch that failed', async () => {

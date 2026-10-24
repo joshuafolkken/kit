@@ -20,6 +20,7 @@ const {
 	FILED_KIND_ICONS,
 	FILED_RUN_MARK,
 	KIND_WORDS,
+	OVERRUN_MARK,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	STATE_ICONS,
@@ -46,6 +47,9 @@ interface LegendDrawn {
 	held: ReadonlyArray<string>
 	// A lane row leads with 🧍, its `run:solo` mark (joshuafolkken/kit#4625).
 	solo: boolean
+	// A done row ends on 🔍, its overrun investigation running where no spinner turns
+	// (joshuafolkken/kit#4772).
+	overrun?: boolean | undefined
 }
 
 type LeadWords = ReadonlyArray<readonly [string, keyof Words]>
@@ -150,6 +154,7 @@ function others_line(
 		...waits_legend(rows),
 		...solo_legend(rows, drawn),
 		...filed_legend(rows, notes),
+		...(drawn.overrun === true ? [`${OVERRUN_MARK} ${WORDS.overrun}`] : []),
 		...drawn.held,
 		...drawn.checks,
 		...run_board_render_notes.notes_legend(notes, named, rows),

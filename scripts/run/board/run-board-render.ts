@@ -14,6 +14,7 @@ import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
+import { run_board_render_found } from './run-board-render-found'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -160,13 +161,15 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 }
 
 // Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
-// (`run-board-render-tail.ts`), and a row with nothing after its padded columns ends where its text does.
+// (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
+// and a row with nothing after its padded columns ends where its text does.
 function row_text(row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
 	const tail = run_board_render_tail.tail_of(row, header)
+	const found = run_board_render_found.found_text(row, header)
 	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
 
-	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
+	return joined([head_text(row, frame), ...tail, found, ...notes]).trimEnd()
 }
 
 // A row drawn whole or cut, after its indent.
@@ -176,16 +179,18 @@ function row_draw(indent: string, row: BoardRow, frame: RowFrame): (cut: RowCut)
 
 // A row drawn with lane cells keeps its head on one line, its title giving up their columns where the
 // pane is narrow. A row that draws a tail keeps its whole line, giving up the columns its section's
-// rows give up together (joshuafolkken/kit#4226).
+// rows give up together (joshuafolkken/kit#4226). A done row that ends on what was filed during it keeps
+// its line too, its title giving up the columns alone.
 function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
-	const is_line_kept = run_board_render_tail.tail_of(row, frame.header).length > 0
+	const is_tailed = run_board_render_tail.tail_of(row, frame.header).length > 0
+	const is_found = run_board_render_found.found_text(row, frame.header) !== ''
 
 	return {
-		is_line_kept,
+		is_line_kept: is_tailed || is_found,
 		lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
 		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
 		is_head_kept: frame.cells !== undefined,
-		shared: is_line_kept ? frame.shared : undefined,
+		shared: is_tailed ? frame.shared : undefined,
 	}
 }
 

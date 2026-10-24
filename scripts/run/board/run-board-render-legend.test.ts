@@ -207,3 +207,14 @@ describe('run_board_render_legend.legend_of run:solo icons', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#4772: 🔍 at a done row's end, where no spinner turns for its overrun investigation.
+describe('run_board_render_legend.legend_of overrun investigation', () => {
+	it('names 🔍 while a done row draws it', () => {
+		expect(legend_of([row(1)], { overrun: true })).toStrictEqual(['🔍 overrun investigation'])
+	})
+
+	it('names nothing where no row draws it', () => {
+		expect(legend_of([row(1)])).toStrictEqual([])
+	})
+})

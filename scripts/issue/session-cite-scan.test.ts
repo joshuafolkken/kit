@@ -62,7 +62,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-drive-named-offer.ts', 1],
 	['backlog/backlog-measure-close.ts', 1],
 	['backlog/backlog-wait-cause.ts', 1],
-	['lane/lane-overrun.ts', 3],
+	['lane/lane-overrun.ts', 1],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
 	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
@@ -89,6 +89,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/entry/run-entry-stop.ts', 4],
 	['run/event/run-event-checks.ts', 1],
 	['run/event/run-event-filed.ts', 1],
+	['run/event/run-event-overrun.ts', 3],
 	['run/event/run-event-plan.ts', 1],
 	['run/event/run-event-scope.ts', 1],
 	['run/event/run-event-setup.ts', 3],
