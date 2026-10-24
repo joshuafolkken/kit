@@ -102,7 +102,7 @@ function next_action(issue: string): Record<Verdict, string> {
 		[VERDICT.RETURNED]: 'the ship stopped: fix what the note below says, then ship again',
 		[VERDICT.PASSED]: 'the supervisor ships the rest: end the turn',
 		[VERDICT.ENDED]: 'nothing is left to wait for: end the turn',
-		[VERDICT.PENDING]: `still before the commit: run \`pnpm josh ship:wait ${issue}\` again`,
+		[VERDICT.PENDING]: `still before the commit: on \`pnpm josh cost --cut\` \`under\`, run \`pnpm josh ship:wait ${issue}\` again; else end the turn`,
 	}
 }
 

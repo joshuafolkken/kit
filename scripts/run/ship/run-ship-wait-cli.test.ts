@@ -105,6 +105,18 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 	})
 })
 
+describe('run_ship_wait_cli.wait_for — a commit in progress', () => {
+	it('keeps waiting while the attempt has started its commit but not finished it', async () => {
+		done_mock.mockReturnValue(new Set(['review', 'gate']))
+		started_mock.mockReturnValue(['review', 'gate', 'commit'])
+
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, SHORT_CHUNK_MS)).resolves.toStrictEqual({
+			verdict: VERDICT.PENDING,
+		})
+		expect(done_mock).toHaveBeenCalled()
+	})
+})
+
 describe('run_ship_wait_cli.run', () => {
 	it('prints the verdict line, then the note', async () => {
 		take_mock.mockReturnValue(NOTE)
@@ -115,6 +127,16 @@ describe('run_ship_wait_cli.run', () => {
 			[`${VERDICT.RETURNED} — the ship stopped: fix what the note below says, then ship again`],
 			[NOTE],
 		])
+	})
+
+	it('asks the session boundary again before a pending wait is re-issued', async () => {
+		vi.spyOn(Date, 'now').mockReturnValueOnce(0).mockReturnValue(Number.MAX_SAFE_INTEGER)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await expect(run_ship_wait_cli.run([ISSUE])).resolves.toBe(0)
+		expect(String(info.mock.calls[0]?.[0])).toMatch(
+			/^pending — .*`pnpm josh cost --cut` `under`.*; else end the turn$/u,
+		)
 	})
 
 	it('refuses anything but one issue number', async () => {

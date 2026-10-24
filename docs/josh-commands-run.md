@@ -553,7 +553,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending).
 
 ```bash
-pnpm josh ship:wait <N>   # re-issue it on `pending`; `returned` prints the stop to fix
+pnpm josh ship:wait <N>   # re-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix
 ```
 
 <!-- /usage -->

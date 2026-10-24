@@ -15,6 +15,7 @@ const ROW_ID = 'lane-background'
 const SHIP = 'pnpm josh ship "Title #1" --body-file evidence.md'
 const DETACHED_SHIP = 'pnpm josh ship --detach --review "Title #1"'
 const GATE_AND_SHIP = `${GATE} && ${DETACHED_SHIP}`
+const SHIP_WAIT = 'pnpm josh ship:wait 1'
 const FOREGROUND_TIMEOUT_MS = 600_000
 const BACKGROUND_TIMEOUT_MS = 1_800_000
 
@@ -213,6 +214,25 @@ describe('lane_background.foreground_input — a foreground ship', () => {
 		expect(
 			lane_background.foreground_input({ name: BASH, input: { command: GATE } }, never),
 		).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4711: a `ship:wait` at the two-minute default is moved aside mid-chunk and dies with the
+// headless turn, its verdict unread.
+describe('lane_background.foreground_input — ship:wait', () => {
+	it.each([
+		['in the foreground', { command: SHIP_WAIT }],
+		['in the background', { command: SHIP_WAIT, run_in_background: true }],
+	])('gives a ship:wait %s the foreground cap in a lane child', (_case, input) => {
+		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
+			command: SHIP_WAIT,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('does not refuse a backgrounded ship:wait, since it is rewritten instead', () => {
+		expect(lane_background.is_background_long_run(background_call(SHIP_WAIT), in_lane)).toBe(false)
 	})
 })
 

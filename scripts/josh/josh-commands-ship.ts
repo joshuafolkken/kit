@@ -139,7 +139,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<N>', 'automation', ['files', 'processes']],
 		usage: {
 			examples: [
-				{ arguments: '<N>', note: 're-issue it on `pending`; `returned` prints the stop to fix' },
+				{
+					arguments: '<N>',
+					note: 're-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix',
+				},
 			],
 		},
 	},
