@@ -1,0 +1,5 @@
+- rf:project-conventions | low | scripts/review/review-stop-log.ts:13 | 2026-10-24 | #4817
+- rf:bug-risks | low | scripts/review/review-record-cli.ts:362 | 2026-10-24 | #4817
+- rf:comments | low | docs/josh-commands-automation.md:567 | 2026-10-24 | #4817
+- rf:project-conventions | low | prompts/review.md:84 | 2026-10-24 | #4817
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:53 | 2026-10-24 | #4817
