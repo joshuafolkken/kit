@@ -10,10 +10,13 @@ import {
 
 const CATALOG_FILE = fileURLToPath(new URL('../../docs/josh-command-catalog.md', import.meta.url))
 
+// The heading and a stale-catalog test failure both name it, so the failure says how to fix it (#4784).
+const REGENERATE_COMMAND = 'tsx tools/document/generate-catalog.ts'
+
 const PREAMBLE = `# josh CLI — Command Catalog
 
 Auto-generated — do not edit.
-Run \`tsx tools/document/generate-catalog.ts\` to regenerate.
+Run \`${REGENERATE_COMMAND}\` to regenerate.
 
 `
 
@@ -77,4 +80,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	writeFileSync(CATALOG_FILE, generate_catalog())
 }
 
-export { CATALOG_FILE, format_command_entry, generate_catalog }
+export { CATALOG_FILE, format_command_entry, generate_catalog, REGENERATE_COMMAND }

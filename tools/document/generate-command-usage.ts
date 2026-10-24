@@ -6,8 +6,9 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 // A reference page keeps its headings and its hand-written behavior prose; only the span between
 // `<!-- usage: <command> -->` and `<!-- /usage -->` is generated, from the same description and usage
 // `josh help <command>` prints. The headings stay put because other documents point at them (#3932).
-// Run `tsx tools/document/generate-command-usage.ts` to regenerate.
+// A stale-page test failure names REGENERATE_COMMAND, so the failure says how to fix it (#4784).
 
+const REGENERATE_COMMAND = 'tsx tools/document/generate-command-usage.ts'
 const { USAGE_PAGES } = command_usage
 const USAGE_BLOCK = /<!-- usage: (?<name>\S+) -->\n[\s\S]*?<!-- \/usage -->/gu
 
@@ -56,6 +57,7 @@ const generate_command_usage = {
 	as_sentence,
 	fill_usage_blocks,
 	page_path,
+	REGENERATE_COMMAND,
 	usage_spans,
 }
 
