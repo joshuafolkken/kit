@@ -8,13 +8,10 @@ import { review_record_cli } from './review-record-cli'
 // joshuafolkken/kit#4763: a lane resuming on an old record read `Recorded` as "round 1 is done" and
 // skipped its own review, so `--check` now answers with the ship's own reuse predicate.
 
-const { reusable_mock, stale_mock } = vi.hoisted(() => ({
-	reusable_mock: vi.fn(),
-	stale_mock: vi.fn(),
-}))
+const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 
 vi.mock('./review-round-reuse', () => ({
-	review_round_reuse: { is_reusable: reusable_mock, is_stale_here: stale_mock },
+	review_round_reuse: { is_reusable_here: reusable_mock },
 }))
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reuse-'))
@@ -52,7 +49,6 @@ async function check_output(): Promise<{ code: number; out: string }> {
 describe('review_record_cli.run --check — whether josh ship reuses the round', () => {
 	beforeEach(() => {
 		reusable_mock.mockReset()
-		stale_mock.mockReset().mockResolvedValue(false)
 	})
 
 	it('tells the lane to run run:review when the tree moved since the record', async () => {
@@ -74,12 +70,11 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 		expect(out).not.toContain('run:review')
 	})
 
-	it('asks the shared predicate with the issue and its staleness', async () => {
-		stale_mock.mockResolvedValue(true)
+	it('asks the shared predicate with the issue', async () => {
 		reusable_mock.mockResolvedValue(false)
 		await check_output()
 
-		expect(reusable_mock).toHaveBeenCalledWith(ISSUE, true)
+		expect(reusable_mock).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('answers not reused, exiting 0, when git could not answer the reuse question', async () => {

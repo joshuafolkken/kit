@@ -188,7 +188,7 @@ interface CheckMode {
 // The stale read inside it fails open in `review_round_reuse.is_stale_here`, as the ship's probe reads it.
 async function is_reused_here(issue: number): Promise<boolean> {
 	try {
-		return await review_round_reuse.is_reusable(issue, await review_round_reuse.is_stale_here())
+		return await review_round_reuse.is_reusable_here(issue)
 	} catch (error) {
 		error_text.trace_swallowed('review_record_cli.is_reused_here', error)
 

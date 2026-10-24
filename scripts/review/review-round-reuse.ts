@@ -36,6 +36,11 @@ async function is_reusable(issue: number, is_stale: boolean): Promise<boolean> {
 	return review_reviewed_tree.is_stopped_on(issue) || (await review_reviewed_tree.is_unmoved_here())
 }
 
-const review_round_reuse = { is_reusable, is_stale_here }
+// The ship's own answer for this checkout, asked before the ship runs; a git failure throws.
+async function is_reusable_here(issue: number): Promise<boolean> {
+	return await is_reusable(issue, await is_stale_here())
+}
+
+const review_round_reuse = { is_reusable, is_reusable_here, is_stale_here }
 
 export { review_round_reuse }
