@@ -19,6 +19,34 @@ const { DRIVER_FILE, CHANGED_DRIVER, build_change_branch, git, write } = test_pi
 const EXTRA_TEST = 'extra.test.ts'
 // A source file no hunk sits in and no test reaches, standing in for a fixture or a fix elsewhere.
 const OUTSIDE_FILE = 'outside.ts'
+// joshuafolkken/kit#4723: the module the test reaches the driver through, and the same module once it
+// stops importing the driver — a copy of its functions — so no test reaches the driver's hunks.
+const APP_FILE = 'app.js'
+const APP_THROUGH_DRIVER = `export { label, token_of } from './${DRIVER_FILE}'\n`
+const APP_WITHOUT_DRIVER = `export function label(code) {
+	return code === 0 ? 'merged' : 'busy'
+}
+
+export function token_of(result) {
+	return result.token
+}
+`
+const PINNED_HUNK = `${DRIVER_FILE}:3`
+const UNPINNED_HUNK = `${DRIVER_FILE}:6`
+
+// The change branch with its test reaching the driver only through `app.js`.
+async function build_through_app(): Promise<void> {
+	await build_change_branch()
+	await write(APP_FILE, APP_THROUGH_DRIVER)
+	await write(
+		test_pinned_fixture.TEST_FILE,
+		test_pinned_fixture.DEFAULT_PATH_TEST.replace(`./${DRIVER_FILE}`, './app.js'),
+	)
+}
+
+function locations(report: Awaited<ReturnType<typeof test_pinned.run>>): Array<string> {
+	return report.unpinned.map((hunk) => test_pinned_logic.location(hunk))
+}
 
 // A test file that reaches none of the fixture's code.
 function extra_test(title: string): string {
@@ -96,6 +124,29 @@ describe('test_pinned.run after a hunk changed', () => {
 			expect(report.unpinned.map((hunk) => test_pinned_logic.location(hunk))).toEqual([
 				`${DRIVER_FILE}:6`,
 			])
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+describe('test_pinned.run after a source between the test and the hunk changed', () => {
+	it(
+		'reuses the pinned verdict while nothing changed, then reports the hunk unpinned once no test reaches it',
+		async () => {
+			await build_through_app()
+			const first = await run_report()
+
+			expect(locations(first)).toEqual([UNPINNED_HUNK])
+
+			const runs = vi.spyOn(test_red, 'verdict_in')
+
+			expect(await run_report()).toEqual(first)
+			expect(runs).not.toHaveBeenCalled()
+
+			await write(APP_FILE, APP_WITHOUT_DRIVER)
+			const report = await run_report()
+
+			expect(locations(report)).toEqual(expect.arrayContaining([PINNED_HUNK, UNPINNED_HUNK]))
 		},
 		RUN_TIMEOUT,
 	)
