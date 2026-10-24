@@ -36,9 +36,11 @@ vi.mock('#scripts/run/run-prrun-resume', () => ({
 }))
 
 const { run_entry_cli } = await import('./run-entry-cli')
+const { run_entry_trust } = await import('./run-entry-trust')
 
 const OK = 0
 const ISSUE = '4663'
+const RELEASE = ['run:release', ISSUE]
 const PLANNED = 'run:planned'
 
 const STOP_CASES: ReadonlyArray<[string, boolean, Array<string>]> = [
@@ -52,8 +54,8 @@ function state_read(labels: ReadonlyArray<string>): unknown {
 }
 
 function gathered(
-	is_body_trusted: boolean,
-	has_trusted_comment: boolean,
+	is_body_trusted: boolean | undefined,
+	has_trusted_comment: boolean | undefined,
 	labels: Array<string>,
 ): unknown {
 	const content = { kind: 'ok', block: '', trust: { is_body_trusted, has_trusted_comment } }
@@ -80,7 +82,7 @@ describe('run_entry_cli.run — an untrusted author stops the run until a truste
 			gather_mock.mockResolvedValue(gathered(false, has_comment, labels))
 
 			expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
-			expect(josh_run_mock).toHaveBeenLastCalledWith(['run:release', ISSUE], true)
+			expect(josh_run_mock).toHaveBeenLastCalledWith(RELEASE, true)
 			expect(record_baseline_mock).not.toHaveBeenCalled()
 
 			const [input] = confirm_mock.mock.calls[0] as [ConfirmInput]
@@ -99,4 +101,27 @@ describe('run_entry_cli.run — an untrusted author stops the run until a truste
 		expect(record_baseline_mock).toHaveBeenCalledExactlyOnceWith(ISSUE)
 		expect(confirm_mock).not.toHaveBeenCalled()
 	})
+})
+
+// joshuafolkken/kit#4703: a lookup or a listing that failed is named as the failed read, not as an
+// untrusted author whom a `kickoff` would clear.
+describe('run_entry_cli.run — a trust read that failed stops as the failed read', () => {
+	it.each([
+		['the body author lookup', undefined, false, []],
+		['the comment listing of a planned issue', false, undefined, [PLANNED]],
+	])(
+		'stops when %s failed, naming the failed read',
+		async (_label, is_trusted, has_comment, labels) => {
+			gather_mock.mockResolvedValue(gathered(is_trusted, has_comment, labels))
+
+			expect(await run_entry_cli.run([ISSUE])).not.toBe(OK)
+			expect(josh_run_mock).toHaveBeenLastCalledWith(RELEASE, true)
+
+			const [input] = confirm_mock.mock.calls[0] as [ConfirmInput]
+
+			expect(input.body).toContain(run_entry_trust.UNREAD_REASON)
+			expect(input.body).not.toContain(run_entry_trust.STOP_REASON)
+			expect(input.recommended).not.toContain('kickoff')
+		},
+	)
 })

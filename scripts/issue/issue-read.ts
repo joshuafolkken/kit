@@ -59,15 +59,17 @@ interface IssueFields {
 	title: string
 	state: string
 	body: string
-	// Whether the issue's author has write access — `false` when the lookup failed.
-	is_body_trusted: boolean
+	// Whether the issue's author has write access — `undefined` when the lookup failed, which every
+	// printing site reads as untrusted and `run:entry` reports as the failed read it is (#4703).
+	is_body_trusted: boolean | undefined
 }
 
 interface IssueComment {
 	author: string
 	created_at: string
 	body: string
-	is_trusted: boolean
+	// As `IssueFields.is_body_trusted`: `undefined` when the lookup failed.
+	is_trusted: boolean | undefined
 }
 
 const UNKNOWN_AUTHOR = '(unknown)'
@@ -94,9 +96,7 @@ async function parse_issue_fields(json: string): Promise<IssueFields | undefined
 		title: parsed.title,
 		state: parsed.state,
 		body: parsed.body ?? '',
-		is_body_trusted: await gh_author_association.is_trusted(
-			gh_author_association.author_of(parsed),
-		),
+		is_body_trusted: await gh_author_association.trust_of(gh_author_association.author_of(parsed)),
 	}
 }
 
@@ -107,7 +107,7 @@ async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueCom
 		author: login ?? UNKNOWN_AUTHOR,
 		created_at: raw.created_at ?? UNKNOWN_TIME,
 		body: raw.body ?? '',
-		is_trusted: await gh_author_association.is_trusted({
+		is_trusted: await gh_author_association.trust_of({
 			login,
 			association: raw.author_association,
 		}),
@@ -137,13 +137,13 @@ async function parse_comments(
 
 // The bodies a caller may act on — the comments of authors with write access, in order.
 function trusted_bodies(comments: ReadonlyArray<IssueComment>): ReadonlyArray<string> {
-	return comments.filter((comment) => comment.is_trusted).map((comment) => comment.body)
+	return comments.filter((comment) => comment.is_trusted === true).map((comment) => comment.body)
 }
 
 function format_comment(comment: IssueComment): string {
 	const heading = `${COMMENT_HEADING}${comment.author}${AT}${comment.created_at}`
 
-	return `${heading}\n${comment.is_trusted ? comment.body : UNTRUSTED_COMMENT}`
+	return `${heading}\n${comment.is_trusted === true ? comment.body : UNTRUSTED_COMMENT}`
 }
 
 function format_comments(comments: ReadonlyArray<IssueComment> | undefined): string {
@@ -156,7 +156,7 @@ function format_comments(comments: ReadonlyArray<IssueComment> | undefined): str
 function format_body(fields: IssueFields): string {
 	const body = fields.body === '' ? NO_BODY : fields.body
 
-	return fields.is_body_trusted ? body : `${UNTRUSTED_BODY_HEADING}\n${body}`
+	return fields.is_body_trusted === true ? body : `${UNTRUSTED_BODY_HEADING}\n${body}`
 }
 
 // The number, the title, the state, the body and every comment, in one block. **The number is on the

@@ -25,7 +25,7 @@ import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_stop } from './run-entry-stop'
-import { run_entry_trust } from './run-entry-trust'
+import { run_entry_trust, type TrustStop } from './run-entry-trust'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
 // trip each on `run:hold`, `cost --cut`, `run:prep` and `run:step`, re-billing a lane's full context
@@ -126,7 +126,7 @@ async function check_cost(): Promise<string> {
 interface Reads {
 	report: string
 	verdict: string
-	is_untrusted: boolean
+	trust_stop: TrustStop | undefined
 }
 
 // The issue reads and the pre-implementation verdict, from the one gather `run:prep` and `run:next`
@@ -136,9 +136,9 @@ async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
 	const parts = run_prep_cli.to_parts(issue_number, reads)
 	const verdict = run_step.pre_verdict(run_next.to_input(parts))
-	const is_untrusted = run_entry_trust.needs_trusted_plan(reads.content, reads.state)
+	const trust_stop = run_entry_trust.stop_of(reads.content, reads.state, issue_number)
 
-	return { report: run_prep.format_report(parts), verdict, is_untrusted }
+	return { report: run_prep.format_report(parts), verdict, trust_stop }
 }
 
 function emit(parts: EntryParts): number {
@@ -174,18 +174,19 @@ async function stop_run({ parts, command, ...notice }: StopCall): Promise<number
 
 // **An untrusted author's issue stops after the reads, not before the claim** — the trust is decided
 // by the read `run:prep` already makes, so the gate adds no call; the hold this call claimed is
-// released. It exits non-zero though the hold and the budget both allowed the run.
+// released. It exits non-zero though the hold and the budget both allowed the run. A trust read that
+// failed stops here too, under its own reason (`run-entry-trust.ts`).
 async function stop_untrusted(
 	{ issue_number, command }: EntryRequest,
-	hold: string,
-	cost: string,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+	{ reason, report, recommended }: TrustStop,
 ): Promise<number> {
 	await stop_run({
-		parts: { issue_number, hold, cost, report: run_entry_trust.stop_note(issue_number) },
+		parts: { issue_number, hold, cost, report },
 		command,
-		reason: run_entry_trust.STOP_REASON,
+		reason,
 		should_release: true,
-		recommended: run_entry_trust.recommended(issue_number),
+		recommended,
 	})
 
 	return FAILURE_EXIT_CODE
@@ -287,7 +288,7 @@ async function proceed(
 	await run_label.mark(issue_number)
 	const reads = await gather_reads(issue_number)
 
-	if (reads.is_untrusted) return await stop_untrusted(request, hold, cost)
+	if (reads.trust_stop) return await stop_untrusted(request, { hold, cost }, reads.trust_stop)
 
 	await mark_planned(issue_number, state)
 

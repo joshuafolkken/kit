@@ -28,7 +28,7 @@ const ISSUE_BODY_PATH = /repos\/[^\s'"]*\/issues\/\d+(?=$|["'\s])/u
 // comments endpoint. The short `-c` is deliberately absent — it belongs to `wc`, `grep` and `sort`
 // far more often than to `gh`, and reading it as "comments included" silenced the rule on any line
 // that ended in a pipe. A run that types it pays one round trip instead.
-const FETCHES_COMMENTS = /--comments\b|--json\s[\w,]*\bcomments\b|\/comments\b/u
+const FETCHES_COMMENTS = /--comments\b|--json[=\s]['"]?[\w,]*\bcomments\b|\/comments\b/u
 const ISSUES_PATH = /repos\/[^\s'"]*\/issues\//u
 
 // A field projection — `--jq` for `gh api`, `--json` for `gh issue view` — whose value never names the
@@ -182,6 +182,7 @@ const issue_comments = {
 	ISSUE_COMMENTS_REASON,
 	ROW,
 	comments_input,
+	fetches_issue_comments,
 	is_body_only_issue_read,
 	projects_away_body,
 }
