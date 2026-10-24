@@ -1,3 +1,4 @@
+import { shell_quote } from '#scripts/lib/shell-quote'
 import type { Scenario } from './fresh-machine-spec'
 
 // The script one container runs. Every command is printed before it runs and its exit status after,
@@ -8,28 +9,23 @@ const SEED_MOUNT = '/seed'
 const PACK_MOUNT = '/pack'
 const COPY_SEED = `cp -R ${SEED_MOUNT}/. .`
 const PROBES_HEADING = '# probes — recorded, never failing the run'
-const ESCAPED_QUOTE = String.raw`'\''`
 const PREAMBLE = [
 	String.raw`step() { printf '\n$ %s\n' "$1"; eval "$1"; local code=$?; printf '[exit %s]\n' "$code"; return "$code"; }`,
 	'mkdir -p "$HOME/$RUN_NAME" && cd "$HOME/$RUN_NAME" || exit 1',
 ]
 
-function quote(command: string): string {
-	const escaped = command.split("'").join(ESCAPED_QUOTE)
-
-	return `'${escaped}'`
-}
+const { single_quoted } = shell_quote
 
 function required(command: string): string {
-	return `step ${quote(command)} || exit $?`
+	return `step ${single_quoted(command)} || exit $?`
 }
 
 function probe_lines(probes: ReadonlyArray<string>): Array<string> {
 	if (probes.length === 0) return []
 
 	return [
-		String.raw`printf '\n%s\n' ${quote(PROBES_HEADING)}`,
-		...probes.map((probe) => `step ${quote(probe)}`),
+		String.raw`printf '\n%s\n' ${single_quoted(PROBES_HEADING)}`,
+		...probes.map((probe) => `step ${single_quoted(probe)}`),
 	]
 }
 
