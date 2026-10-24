@@ -384,6 +384,7 @@ const run_ship_detach = {
 	last_launch,
 	log_path,
 	read_log,
+	result_path,
 	running_since,
 	supervisor_argv,
 }

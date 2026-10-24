@@ -52,9 +52,6 @@ measures. Test suites never write to it.
 runs and stops with it, so a period holds the load of the runs themselves. `pnpm josh lane:sample` is
 still there for a reading outside a run.
 
-**Close the period before a reboot.** The ledger lives in the temp root, which a reboot clears; a
-period that has to span one is closed before it and continued as a second row.
-
 ## The columns
 
 | Column                          | Source                                                           |

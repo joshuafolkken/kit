@@ -249,6 +249,8 @@ const backlogrun_launch = {
 	argv_of,
 	chosen_environment,
 	is_running,
+	launch_path,
+	log_path,
 	pending_launch,
 	running_parent,
 	start,

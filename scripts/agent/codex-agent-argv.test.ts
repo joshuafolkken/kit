@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { durable_state } from '#scripts/josh/durable-state'
 import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
@@ -27,9 +28,11 @@ const OTHER_WORKTREE = path.join('worktrees', 'other-lane')
 type Grant = [string, string]
 
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
+const repository_directory = vi.spyOn(git_common_directory, 'repository')
 
 beforeEach(() => {
 	resolve_common_directory.mockReturnValue(undefined)
+	repository_directory.mockReturnValue(undefined)
 })
 
 afterEach(() => {
@@ -230,5 +233,21 @@ describe('Codex lane ledger scope', () => {
 
 		expect(existsSync(path.join(PRIMARY, LEDGER_PARENT))).toBe(false)
 		expect(Object.values(table).filter((access) => access === 'write')).toHaveLength(4)
+	})
+})
+
+// joshuafolkken/kit#4743: the parent's records join its lanes' in the common git directory.
+describe('Codex backlogrun parent run-state scope', () => {
+	it('grants a parent in the primary checkout its run-state directory, not the git directory', () => {
+		const git_directory = path.join(PRIMARY, '.git')
+
+		mkdirSync(git_directory, { recursive: true })
+		repository_directory.mockReturnValue(git_directory)
+		const table = lane_grants(openai_scheduler())
+		const state = realpathSync(durable_state.root_for(git_directory))
+
+		expect(table[state]).toBe('write')
+		expect(table).not.toHaveProperty(realpathSync(git_directory))
+		expect(repository_directory).toHaveBeenCalledWith(LANE)
 	})
 })

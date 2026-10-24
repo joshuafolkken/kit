@@ -32,9 +32,8 @@ import {
 // never lose each other's lines to a read-modify-write race.
 //
 // **Keyed on the common git directory, the event stream's key**, so a lane child's gate, the parent's
-// merge and the sampler all land in one ledger per repository. It sits in the temp root beside every
-// other josh record; a reboot clears it, which is why `docs/maintainers/lane-limit-measurement.md`
-// closes a period with `josh lane:stats` before one.
+// merge and the sampler all land in one ledger per repository. It is a durable record
+// (`durable-state.ts`), so a period runs across a reboot.
 
 const LEDGER_PREFIX = durable_state.PREFIX.LANE_LEDGER
 const LEDGER_SUFFIX = '.jsonl'

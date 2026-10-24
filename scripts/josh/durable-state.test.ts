@@ -1,5 +1,6 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_state } from '#scripts/lane/lane-state'
@@ -149,6 +150,9 @@ describe('the run records kept across a reboot', () => {
 		['the lane ledger', (): string => lane_ledger.target_of(repository)],
 		['the supervisor log', (): string => run_wake.wake_log_path(repository)],
 		['the detached ship log', (): string => run_ship_detach.log_path(repository, ISSUE)],
+		['the detached ship result', (): string => run_ship_detach.result_path(repository, ISSUE)],
+		['the backlogrun launch record', (): string => backlogrun_launch.launch_path(repository)],
+		['the backlogrun log', (): string => backlogrun_launch.log_path(repository)],
 		['the lane dispatch log', (): string => dispatch_log_path(repository)],
 	])('keeps %s in the durable root', (_name, resolve) => {
 		const target = tracked(resolve())

@@ -40,8 +40,13 @@ function state_root(override: string | undefined, common: string | undefined): s
 // Read once at import, as `PLATFORM_TEMP_ROOT` is, so both roots answer for the same override.
 const STATE_ROOT_OVERRIDE = process.env[platform_temporary.TEMP_ROOT_KEY]
 
+// The root for a named common git directory — what a launcher grants a sandboxed child before it runs.
+function root_for(common: string | undefined): string {
+	return state_root(STATE_ROOT_OVERRIDE, common)
+}
+
 function root(): string {
-	return state_root(STATE_ROOT_OVERRIDE, git_common_directory.repository())
+	return root_for(git_common_directory.repository())
 }
 
 // Every record kept here, by the prefix of its file name — the list the one-time copy from `/tmp`
@@ -93,6 +98,14 @@ function durable_path(prefix: string, key_root: string, suffix?: string): string
 	return path.join(ensure(root()), stamp_file.stamp_name(prefix, key_root, suffix))
 }
 
-const durable_state = { PREFIX, ensure, path: durable_path, root, state_root }
+const durable_state = {
+	PREFIX,
+	STATE_DIRECTORY_MODE,
+	ensure,
+	path: durable_path,
+	root,
+	root_for,
+	state_root,
+}
 
 export { durable_state }
