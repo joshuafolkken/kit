@@ -10,15 +10,18 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { execa } from 'execa'
 import { changed_paths } from './changed-paths'
 import { git_command } from './git-command'
 import { git_location_environment } from './git-location-environment'
 
 // **A checkout of this tree as CI's `actions/checkout` hands it over** — a detached, depth-one `HEAD`
-// with no local default branch, no `origin` and so no remote-tracking ref (joshuafolkken/kit#4710).
-// Code that passes `main` to git reads the local branch every lane has and passes here, then fails
-// in CI with `bad revision 'main'`; run inside this checkout, it fails here too.
+// with no local default branch and no remote-tracking ref (joshuafolkken/kit#4710). Code that passes
+// `main` to git reads the local branch every lane has and passes here, then fails in CI with
+// `bad revision 'main'`; run inside this checkout, it fails here too. **The `origin` remote is kept**,
+// as CI keeps it: code that reads the repository's owner from it reads it here too
+// (joshuafolkken/kit#4738).
 //
 // **No object is copied**: the objects are borrowed through `objects/info/alternates`, and only the
 // tree is checked out. The work in progress is copied over it, and `node_modules` is linked, so the
@@ -26,6 +29,7 @@ import { git_location_environment } from './git-location-environment'
 
 const CHECKOUT_PREFIX = 'josh-no-base-'
 const NODE_MODULES = 'node_modules'
+const ORIGIN_URL_KEY = 'remote.origin.url'
 
 // Cleared rather than inherited: under a git hook `GIT_DIR` beats `cwd`, and every command here must
 // act on the new checkout.
@@ -64,6 +68,15 @@ async function borrow_objects(root: string, directory: string): Promise<void> {
 	writeFileSync(alternates, `${path.join(common, 'objects')}\n`)
 }
 
+// The remote is declared and never fetched, so it names the repository without bringing a
+// remote-tracking ref along. A repository with no `origin` hands none over. Written with `git config`
+// rather than `git remote add`, which the unit suite's network guard refuses whole.
+async function add_origin(root: string, directory: string): Promise<void> {
+	const origin_url = repo_discovery.read_origin_url(root)
+
+	if (origin_url !== undefined) await git(directory, ['config', ORIGIN_URL_KEY, origin_url])
+}
+
 function link_dependencies(root: string, directory: string): void {
 	const source = path.join(root, NODE_MODULES)
 
@@ -74,6 +87,7 @@ function link_dependencies(root: string, directory: string): void {
 // own repository, which is the same one wherever `josh test:related` calls this.
 async function check_out(root: string, directory: string, head: string): Promise<void> {
 	await git(directory, ['init', '--quiet'])
+	await add_origin(root, directory)
 	await borrow_objects(root, directory)
 	await git(directory, ['checkout', '--quiet', '--detach', head])
 	writeFileSync(path.join(directory, '.git', 'shallow'), `${head}\n`)
