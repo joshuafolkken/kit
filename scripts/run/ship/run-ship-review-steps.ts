@@ -7,10 +7,12 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { review_round2 } from '#scripts/review/review-round2'
+import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
 import { run_ship_scoped } from './run-ship-scoped'
+import { run_ship_stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
@@ -141,6 +143,13 @@ async function record_and_route(
 	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
 
 	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
+
+	review_stop_log.record({
+		issue: Number(issue),
+		stage: run_ship_stage.STAGE.REVIEW,
+		findings: run_ship_review.passing_fixes(verdict, outcome),
+		is_fixed: true,
+	})
 
 	const out = [...verdict.report, outcome.note].join('\n')
 
