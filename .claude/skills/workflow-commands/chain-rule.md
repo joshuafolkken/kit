@@ -80,6 +80,8 @@ These are the gate → review → PR → merge facts other documents cite; this 
   unresolved or staged paths — commit first with `pnpm josh git -y`, rerun, and **never stash around the
   merge**. A merge stopped on a conflict: remove the markers, then `pnpm josh git -y` stages the
   resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
+  A lane child's resolution: markers removed → `pnpm josh check:related` → `pnpm josh ship --detach
+  --review` (step 0), which records the merge commit and runs the gate.
 - **One related-check command answers once per tree** — run `pnpm josh check:related` after every
   edit; it runs `lint:related`, `test:related`, `check` and `cspell:dot` together, never twice over an untouched
   tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
