@@ -27,6 +27,7 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['stop: notify', stop_rules.STOP_NOTIFY_REASON],
 	['stop: session language', stop_rules.build_language_reason('ja')],
 	['stop: lane background', lane_background.LANE_BACKGROUND_STOP_REASON],
+	['stop: lane agent', lane_background.LANE_AGENT_STOP_REASON],
 	['notice: lane background foreground', lane_background.FOREGROUND_NOTE],
 	['notice: pipefail rewrite', piped_verification.PIPEFAIL_NOTE],
 	['notice: issue-comments rewrite', issue_comments.COMMENTS_NOTE],
