@@ -480,12 +480,12 @@ or a child could not authenticate; it keeps `in-progress`, uncounted, for `/logi
 
 <!-- usage: run:review -->
 
-Run test:pinned, then start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict).
+Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change).
 
 ```bash
-pnpm josh run:review                             # stop on an unpinned change; else detach the gate, print the brief, then launch the /code-review subagent
-pnpm josh run:review --unpinned-ok "only logs"   # carry on past unpinned places; the list and the reason follow the brief
-pnpm josh run:review --join                      # after the review returns: join the gate, check its verdict
+pnpm josh run:review                             # detach test:pinned and the gate, print the brief, then launch the /code-review subagent
+pnpm josh run:review --unpinned-ok "only logs"   # check in place first, carry on past unpinned places; the list and the reason follow the brief
+pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 ```
 
 <!-- /usage -->
@@ -496,7 +496,10 @@ The default waits only for the gate to _start_ and prints the brief;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 "a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
-and its gate stage re-runs on the moved tree. The overlap's reader is `chain-rule.md`.
+and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
+the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
+never drains. `--unpinned-ok` keeps the check in place before the pair, so the accepted list follows
+the brief. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 
