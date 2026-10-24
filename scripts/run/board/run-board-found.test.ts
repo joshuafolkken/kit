@@ -1,8 +1,9 @@
+import { process_identity } from '#scripts/josh/process-identity'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { describe, expect, it } from 'vitest'
-import { run_board_found } from './run-board-found'
+import { describe, expect, it, vi } from 'vitest'
+import { run_board_found, type IsLive } from './run-board-found'
 
 // joshuafolkken/kit#4772: a done row's end is read off the stream — the filings found during its child,
 // and an overrun investigation whose end note is not on the stream yet and whose session is alive.
@@ -11,6 +12,7 @@ const KIND = run_event_stream.EVENT_KIND
 const AT = '2026-10-24T09:00:00.000Z'
 const CHILD = 4711
 const PID = 3616
+const START = 'proc:9876'
 const MINUTES = 55
 const ELSEWHERE = 'joshuafolkken/app-kit#12'
 
@@ -35,7 +37,7 @@ function filed(reference: string): RunEvent {
 }
 
 function started(issue = CHILD): RunEvent {
-	const outcome = run_event_overrun.investigating(PID)
+	const outcome = run_event_overrun.investigating(PID, START)
 
 	return event(KIND.NOTE, run_event_overrun.started_text(issue, MINUTES, outcome))
 }
@@ -92,10 +94,34 @@ describe('run_board_found.found_of — the investigation', () => {
 		expect(run_board_found.found_of([started()], dead).get(CHILD)).toBeUndefined()
 	})
 
+	it('hands the probe the start note’s pid and start time', () => {
+		const probe = vi.fn<IsLive>(alive)
+
+		run_board_found.found_of([started()], probe)
+
+		expect(probe).toHaveBeenCalledWith(PID, START)
+	})
+
 	it('ends only the investigation its end note names', () => {
 		const other = event(KIND.NOTE, run_event_overrun.ended_text(CHILD + 1, 'none filed'))
 		const found = run_board_found.found_of([started(), other], alive)
 
 		expect(found.get(CHILD)?.is_investigating).toBe(true)
+	})
+})
+
+describe('run_board_found.is_session_live — the board’s probe', () => {
+	it('reads the session it names as live', () => {
+		const start = process_identity.own_start()
+
+		expect(run_board_found.is_session_live(process.pid, start)).toBe(start !== undefined)
+	})
+
+	it('reads a later process given the session’s pid as not the session', () => {
+		expect(run_board_found.is_session_live(process.pid, 'proc:0')).toBe(false)
+	})
+
+	it('reads a note with no start time as no session, since its pid alone names no process', () => {
+		expect(run_board_found.is_session_live(process.pid, undefined)).toBe(false)
 	})
 })

@@ -4,6 +4,7 @@ import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_priority } from '#scripts/issue/issue-priority'
+import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
@@ -115,7 +116,7 @@ function launched(issue: number, minutes: number): string {
 	const result = detached_launch.launch(request, note_failure(issue))
 
 	return result.kind === 'launched'
-		? run_event_overrun.investigating(result.pid)
+		? run_event_overrun.investigating(result.pid, process_identity.read_start(result.pid))
 		: `not investigated: ${result.note}`
 }
 

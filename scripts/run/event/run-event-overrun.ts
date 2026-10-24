@@ -1,15 +1,19 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 
 // The notes an overrun investigation leaves on the run's event stream (joshuafolkken/kit#4751): its
-// start, naming the session's pid, and its end — the session's result or the launch's failure.
+// start, naming the session's pid and start time, and its end — the session's result or the launch's failure.
 // `lane-overrun.ts` writes them and `run:board` reads them back, both through this module, so the two
 // never spell them differently.
 
 // What a note says of the investigation of `issue`. A start note that launched no session is neither.
+// `start` is the session's `process_identity` start token, which tells the session from a later process
+// holding its pid; a launcher that could not read it leaves it off.
 type OverrunNote =
-	{ kind: 'started'; issue: number; pid: number } | { kind: 'ended'; issue: number }
+	| { kind: 'started'; issue: number; pid: number; start: string | undefined }
+	| { kind: 'ended'; issue: number }
 
-const STARTED_PATTERN = /^#(?<issue>\d+) overran: .* — investigating in pid (?<pid>\d+)$/u
+const STARTED_PATTERN =
+	/^#(?<issue>\d+) overran: .* — investigating in pid (?<pid>\d+)(?: started (?<start>.+))?$/u
 const ENDED_PATTERN = /^#(?<issue>\d+) overrun(?: investigation failed)?: /u
 
 // The start note's opening, which a merge collected again reads to launch no second session.
@@ -22,8 +26,10 @@ function started_text(issue: number, minutes: number, outcome: string): string {
 }
 
 // The start note's outcome for a launched session.
-function investigating(pid: number): string {
-	return `investigating in pid ${String(pid)}`
+function investigating(pid: number, start: string | undefined): string {
+	const outcome = `investigating in pid ${String(pid)}`
+
+	return start === undefined ? outcome : `${outcome} started ${start}`
 }
 
 function ended_text(issue: number, result: string): string {
@@ -38,7 +44,9 @@ function parse(text: string): OverrunNote | undefined {
 	const started = STARTED_PATTERN.exec(text)?.groups
 
 	if (started !== undefined) {
-		return { kind: 'started', issue: Number(started['issue']), pid: Number(started['pid']) }
+		const { issue, pid, start } = started
+
+		return { kind: 'started', issue: Number(issue), pid: Number(pid), start }
 	}
 
 	const ended = ENDED_PATTERN.exec(text)?.groups

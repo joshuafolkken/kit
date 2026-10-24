@@ -1,7 +1,7 @@
 {
-	"reason": "#4772 adds the done-row filings/overrun spinner: run-event-overrun.ts, run-board-found.ts, run-board-render-found.ts",
+	"reason": "The overrun start note records the session's start time and the board's probe compares it, so a later process given the investigation's pid turns no spinner (review finding on #4772)",
 	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 134
+		"scripts.code_lines": 144
 	}
 }

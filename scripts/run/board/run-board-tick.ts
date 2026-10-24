@@ -1,4 +1,3 @@
-import { process_identity } from '#scripts/josh/process-identity'
 import type { ClosedIssue } from './run-board-closed'
 import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
@@ -184,7 +183,7 @@ function local_header(local: LocalRead): LocalHeader {
 		operations: local.operations,
 		usual: local.usual,
 		lane_limit: local.lane_limit,
-		found: run_board_found.found_of(local.events, process_identity.is_present_pid),
+		found: run_board_found.found_of(local.events, run_board_found.is_session_live),
 	}
 }
 

@@ -1,3 +1,4 @@
+import { process_identity } from '#scripts/josh/process-identity'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -16,9 +17,9 @@ interface Found {
 // By the child's number.
 type FoundOf = ReadonlyMap<number, Found>
 
-// Whether a pid names a process still there, one this reader may not signal included; injected, so a
-// test never probes one.
-type IsLive = (pid: number) => boolean
+// Whether the process a start note names — its pid and start token — is still there, one this reader
+// may not signal included; injected, so a test never probes one.
+type IsLive = (pid: number, start: string | undefined) => boolean
 
 const KIND = run_event_stream.EVENT_KIND
 const NONE: Found = { filed: [], is_investigating: false }
@@ -35,14 +36,16 @@ function overrun_note(event: RunEvent): OverrunNote | undefined {
 	return event.kind === KIND.NOTE ? run_event_overrun.parse(event.text) : undefined
 }
 
-function tracked(pids: Map<number, number>, note: OverrunNote): void {
-	if (note.kind === 'started') pids.set(note.issue, note.pid)
+type Started = Extract<OverrunNote, { kind: 'started' }>
+
+function tracked(pids: Map<number, Started>, note: OverrunNote): void {
+	if (note.kind === 'started') pids.set(note.issue, note)
 	else pids.delete(note.issue)
 }
 
-// The pid of each investigation whose end is not on the stream yet.
-function open_pids(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, number> {
-	const pids = new Map<number, number>()
+// The start note of each investigation whose end is not on the stream yet.
+function open_pids(events: ReadonlyArray<RunEvent>): ReadonlyMap<number, Started> {
+	const pids = new Map<number, Started>()
 	const notes = events.flatMap((event) => overrun_note(event) ?? [])
 
 	for (const note of notes) tracked(pids, note)
@@ -60,14 +63,16 @@ function add_filed(found: Map<number, Found>, events: ReadonlyArray<RunEvent>): 
 	}
 }
 
-// A session that died before its end note turns no spinner.
+// A session that died before its end note turns no spinner, nor does a later process given its pid.
 function add_investigating(
 	found: Map<number, Found>,
 	events: ReadonlyArray<RunEvent>,
 	is_live: IsLive,
 ): void {
-	for (const [issue, pid] of open_pids(events)) {
-		if (is_live(pid)) found.set(issue, { ...(found.get(issue) ?? NONE), is_investigating: true })
+	const live = [...open_pids(events)].filter(([, note]) => is_live(note.pid, note.start))
+
+	for (const [issue] of live) {
+		found.set(issue, { ...(found.get(issue) ?? NONE), is_investigating: true })
 	}
 }
 
@@ -80,7 +85,13 @@ function found_of(events: ReadonlyArray<RunEvent>, is_live: IsLive): FoundOf {
 	return found
 }
 
-const run_board_found = { found_of }
+// The board's own probe. The pid alone reads a later process given that pid as the session, so the
+// start token decides; a note without one — a platform that could not read it — turns no spinner.
+function is_session_live(pid: number, start: string | undefined): boolean {
+	return process_identity.is_present_process(pid, start) === true
+}
+
+const run_board_found = { found_of, is_session_live }
 
 export { run_board_found }
 export type { Found, FoundOf, IsLive }
