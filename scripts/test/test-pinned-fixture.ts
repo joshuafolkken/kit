@@ -88,7 +88,9 @@ async function snapshot(): Promise<string> {
 
 const test_pinned_fixture = {
 	CHANGED_DRIVER,
+	DEFAULT_PATH_TEST,
 	DRIVER_FILE,
+	TEST_FILE,
 	build_base,
 	build_change_branch,
 	git,
