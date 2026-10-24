@@ -7,7 +7,7 @@ import { issue_file_cap } from './issue-file-cap'
 // a count nothing enforces.
 
 const STEPS_DOC = '.claude/skills/workflow-commands/backlogrun-steps.md'
-const PER_RUN_PATTERN = /ten[- ](?:filings[- ])?per[- ](?:run|invocation)/iu
+const PER_RUN_PATTERN = /(?:ten|10)[- ](?:filings[- ])?per[- ](?:run|invocation)|filed per run/iu
 
 const PER_ORIGIN_DOCS = [
 	'.claude/skills/workflow-commands/retrospective.md',
@@ -19,6 +19,9 @@ const CEILING_DOCS = [
 	STEPS_DOC,
 	'.claude/skills/workflow-commands/prerequisite.md',
 	'.claude/skills/workflow-commands/observation-filing.md',
+	'.claude/skills/workflow-commands/backlogrun.md',
+	'docs/maintainers/backlogrun-driver.md',
+	'docs/maintainers/observation-filing-rationale.md',
 ]
 
 describe('issue_file_cap counts per originating work item', () => {

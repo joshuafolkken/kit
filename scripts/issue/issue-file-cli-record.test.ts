@@ -74,6 +74,25 @@ describe('issue_file_cli.record — a split child', () => {
 	})
 })
 
+// joshuafolkken/kit#4750: `--found-during` names the finder over the lane child's mark.
+describe('issue_file_cli.record — a named finder', () => {
+	it('names the Issue the filing says it was found during', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		const filing = filing_to(HERE)
+
+		await issue_file_cli.record(
+			URL,
+			{ ...filing, args: { ...filing.args, found_during: '77' } },
+			[],
+		)
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.FILED,
+			`#3438[] ${TITLE} (found during #77)`,
+		)
+	})
+})
+
 describe('issue_file_cli.record', () => {
 	it('names this repository’s Issue by number and the lane child that found it', async () => {
 		vi.stubEnv(lane_child_marker.KEY, FINDER)

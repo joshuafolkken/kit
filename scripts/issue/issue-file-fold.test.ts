@@ -158,6 +158,13 @@ describe('issue_file_fold.is_fold_clear — the verdict at the call that files',
 	})
 })
 
+// joshuafolkken/kit#4750: `--found-during` names the finder, so the lane's own filings are not its.
+describe('issue_file_fold.is_fold_clear — a finder the filing names', () => {
+	it('reads the filings of the finder the filing names', async () => {
+		expect(await issue_file_fold.is_fold_clear(HERE, { ...PLAIN, found_during: '77' })).toBe(true)
+	})
+})
+
 describe('issue_file_fold.is_fold_clear — which earlier filings it reads', () => {
 	it('reads a finder’s filings off the whole stream, so a run with no carry record still folds', async () => {
 		expect(await issue_file_fold.is_fold_clear(HERE, PLAIN)).toBe(false)

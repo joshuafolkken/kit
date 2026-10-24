@@ -21,7 +21,8 @@ running. A `--merged` or `--filed` issued after the `--cut` is refused.
 
 **`backlog:budget` is fed from the record, never from a count kept in the conversation:** `--started`
 takes the record's `started_at` and `--merged` its `merged`, so `--max` counts across cuts, as one
-invocation's worth. The 10-filings-per-run ceiling is counted the same way, from `filed`. **`--idle`
+invocation's worth. The ten-per-origin filing ceiling outlives a cut too: `issue:file` counts it
+from the event stream's `filed` events. **`--idle`
 is the one budget that is not carried**: a resumed session states its resume moment as `--active` and
 the watch begins again at its full budget.
 
