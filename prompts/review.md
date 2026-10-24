@@ -161,7 +161,8 @@ Branch 2 only:
   a `fold`; the first filing asks nothing.
 
   1. Before the current Issue closes, file it tagged `route:review-cap`:
-     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap`. It lints
+     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap --found-during <N>`
+     (`--found-during` leaves the deferral note on the current Issue the ship reviewer reads). It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). A security finding declares its
      `- セキュリティ:` line (`issue-template.md` → H). `epic:bundle` reads open issues only, so

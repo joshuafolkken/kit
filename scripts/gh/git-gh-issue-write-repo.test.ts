@@ -48,6 +48,14 @@ describe('issue writes — naming another repository', () => {
 		expect(first_request().path).toBe(`${OTHER_ISSUE_PATH}/comments`)
 	})
 
+	// joshuafolkken/kit#4821: the deferral note `issue:file` posts names the finder's repository, so it
+	// lands there even while `GH_REPO` points the filing's listings at another target.
+	it('posts the counted comment to that repository issue', async () => {
+		await git_gh_issue_write.issue_try_comment(ISSUE_NUMBER, BODY, OTHER_REPO)
+
+		expect(first_request().path).toBe(`${OTHER_ISSUE_PATH}/comments`)
+	})
+
 	// joshuafolkken/kit#4717: a 502 can follow an issue GitHub already opened, so a retried creation
 	// could open a second one.
 	it('creates that repository issue without the transient-error retry', () => {

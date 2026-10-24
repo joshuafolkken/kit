@@ -20,6 +20,7 @@ import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
 import { issue_file_cap } from './issue-file-cap'
+import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_lint_cli } from './issue-lint-cli'
@@ -246,6 +247,20 @@ async function place(url: string, target: string): Promise<void> {
 // one append here reaches `run:board` from every route. A filing outside a run lands too, unmarked as
 // the run's (`run_hold_member`), and the board counts only the marked ones; the append is best-effort,
 // as every emit is.
+async function emit_filed(
+	reference: string,
+	filing: Filing,
+	labels: ReadonlyArray<string>,
+	found_during: string | undefined,
+): Promise<void> {
+	const kind = run_event_filed.kind_of(labels)
+	const is_run = await run_hold_member.is_run_member()
+	const { title } = filing.args
+	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
@@ -253,12 +268,14 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 		issue_file_fold.reference_prefix(filing.target, filing.current),
 	)
 	const found_during = await issue_file_fold.finder(filing.args.found_during)
-	const kind = run_event_filed.kind_of(labels)
-	const is_run = await run_hold_member.is_run_member()
-	const { title } = filing.args
-	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+	await emit_filed(reference, filing, labels, found_during)
+	await issue_file_deferral.note_finder({
+		found_during: filing.args.found_during,
+		reference,
+		title: filing.args.title,
+		current: filing.current,
+	})
 	await split_resolution.record_child({ route: filing.args.route, found_during, child: reference })
 	await issue_file_interrupt.block_finder({
 		route: filing.args.route,

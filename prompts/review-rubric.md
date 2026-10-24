@@ -206,6 +206,9 @@ concerns"; if nothing is uncertain, trace the logic path that gives that confide
   not describe.
 - High findings → must fix before committing
 - Medium findings → must fix before opening the PR
+- A finding wholly covered by an open follow-up this Issue filed (a `先送り: #M <title>` comment on
+  it, which `issue:file --found-during <N>` posts) → record it as `low` citing `#M`, never `medium`
+  or `high`, so it does not stop the ship
 - Low findings → document in the PR body if skipped
 
 If the diff is empty or trivial (e.g. whitespace only), state that and skip the review.
