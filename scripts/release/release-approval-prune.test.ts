@@ -6,6 +6,16 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+describe('release_approval_prune.is_approval', () => {
+	it.each([
+		['.josh/metrics-accepted/4788.json', true],
+		['.josh/metrics-accepted-notes.md', false],
+		['scripts/a.ts', false],
+	])('answers %s → %s', (file, expected) => {
+		expect(release_approval_prune.is_approval(file)).toBe(expected)
+	})
+})
+
 describe('release_approval_prune.prune', () => {
 	it('removes the approval directory from the index, tolerating its absence', async () => {
 		const read = vi.spyOn(git_spawn, 'read').mockResolvedValue('')
