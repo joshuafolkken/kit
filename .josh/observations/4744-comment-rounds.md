@@ -1,0 +1,1 @@
+- rf:tests | low | scripts/lane/lane-adopt.ts:90 | 2026-10-24 | #4744
