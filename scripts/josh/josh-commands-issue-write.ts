@@ -162,7 +162,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--found-during <N>'],
 					description:
-						'the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 5); step 7 never holds it as a candidate here.',
+						'the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 5); step 7 never holds it as a candidate here. #N gets a deferral comment.',
 				},
 				{
 					names: ['--over-cap'],

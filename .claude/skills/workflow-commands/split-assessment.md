@@ -46,7 +46,7 @@ test:related` past the guide prints it earlier, once per Issue. Take one action 
 
 - Keep it one Issue — it must land together: one Issue comment with the line
   `- 分割しない理由: <理由>`, citing the counts.
-- Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file --route split`
+- Carve the rest out — the unimplemented part merges separately: `pnpm josh issue:file --route split --found-during <N>`
   it, narrow this Issue's acceptance criteria to this branch, then gate.
 
 Neither on record: the pre-gate `run:cut` answers `split-unresolved`. The notice never creates an epic.
