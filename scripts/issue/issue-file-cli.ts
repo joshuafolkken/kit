@@ -155,7 +155,8 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 
 	if (outcome === undefined) return false
 	console.info(outcome.report)
-	const open = issue_file.unacknowledged(outcome.candidates, filing.args.distinct)
+	const answered = issue_file.acknowledged(filing.args, filing.target, filing.current)
+	const open = issue_file.unacknowledged(outcome.candidates, answered)
 
 	if (open.length > 0) console.error(unacknowledged_message(open))
 

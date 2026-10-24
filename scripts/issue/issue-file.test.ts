@@ -12,6 +12,7 @@ const THERE = 'joshuafolkken/app-kit'
 const ENHANCEMENT_BODY = '## 背景\n\n- 種別: 非不具合\n- 目的: 機能追加\n'
 const DUPLICATE_A = 2801
 const DUPLICATE_B = 2795
+const WITH_ORIGIN = { distinct: [DUPLICATE_A], found_during: String(DUPLICATE_B) }
 const BODY_FLAG = '--body-file'
 const ROUTE_FLAG = '--route'
 const DISTINCT_FLAG = '--distinct'
@@ -217,5 +218,24 @@ describe('issue_file.unacknowledged — the candidates still holding the filing'
 
 	it('holds nothing once every candidate is declared separate', () => {
 		expect(issue_file.unacknowledged([DUPLICATE_A], [DUPLICATE_A])).toStrictEqual([])
+	})
+})
+
+describe('issue_file.acknowledged — the candidates a filing has answered', () => {
+	it('answers only the --distinct numbers when no origin is named', () => {
+		expect(
+			issue_file.acknowledged({ distinct: [DUPLICATE_A], found_during: undefined }, HERE, HERE),
+		).toStrictEqual([DUPLICATE_A])
+	})
+
+	it('answers the --found-during origin too, which is never its own duplicate', () => {
+		expect(issue_file.acknowledged(WITH_ORIGIN, HERE, HERE)).toStrictEqual([
+			DUPLICATE_A,
+			DUPLICATE_B,
+		])
+	})
+
+	it('leaves the same number in another repository to the scout, an unrelated Issue there', () => {
+		expect(issue_file.acknowledged(WITH_ORIGIN, THERE, HERE)).toStrictEqual([DUPLICATE_A])
 	})
 })

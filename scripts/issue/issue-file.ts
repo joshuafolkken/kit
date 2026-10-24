@@ -238,12 +238,27 @@ function unacknowledged(
 	return candidates.filter((candidate) => !distinct.includes(candidate))
 }
 
+// The candidates the filing has already answered: its `--distinct` numbers and, filing into this
+// repository, its `--found-during` origin. The work the finding turned up during is never its duplicate,
+// though a body citing it makes the scout name it (joshuafolkken/kit#4762). The origin is an Issue here,
+// so in another repository the same number is an unrelated Issue the scout may rightly hold.
+function acknowledged(
+	args: Pick<FileArguments, 'distinct' | 'found_during'>,
+	target: string,
+	current: string,
+): ReadonlyArray<number> {
+	if (args.found_during === undefined || !is_same_repository(target, current)) return args.distinct
+
+	return [...args.distinct, Number(args.found_during)]
+}
+
 const issue_file = {
 	parse,
 	labels_of,
 	origin_problem,
 	triage_problem,
 	unacknowledged,
+	acknowledged,
 	is_same_repository,
 }
 

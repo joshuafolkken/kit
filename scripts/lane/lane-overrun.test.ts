@@ -133,6 +133,50 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 	})
 })
 
+// joshuafolkken/kit#4762: the first overrun found two causes and filed neither, told a duplicate refusal
+// was final, and stopped tracing a cause at what took the time.
+describe('lane_overrun.investigate — what the session does with a cause', () => {
+	beforeEach(async () => {
+		mocks.read_entries.mockReturnValue(lane(41))
+		await lane_overrun.investigate(ISSUE)
+	})
+
+	it('reads each duplicate candidate and reissues a distinct one rather than stopping', () => {
+		expect(launched_prompt()).not.toContain('duplicate or cap refusal from issue:file is final')
+		expect(launched_prompt()).toContain('pnpm josh issue:read <N>')
+		expect(launched_prompt()).toContain('--distinct <N,…>')
+	})
+
+	it('records a recurrence on an open candidate fixing the same mechanism, filing nothing new', () => {
+		expect(launched_prompt()).toContain(
+			'is not filed again but gets a comment recording the recurrence with those four',
+		)
+	})
+
+	it('files a recurrence of a candidate closed before the lane, declared distinct', () => {
+		expect(launched_prompt()).toContain(
+			'closed before this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`',
+		)
+	})
+
+	it('keeps a cap refusal final', () => {
+		expect(launched_prompt()).toContain('A cap refusal is final: stop filing.')
+	})
+
+	it('traces each cause to its signal, its deciding file:line and its fix, into the body', () => {
+		for (const part of [
+			'the span it spent',
+			'which command printed what',
+			'`file:line`',
+			'where to fix it',
+		]) {
+			expect(launched_prompt()).toContain(part)
+		}
+
+		expect(launched_prompt()).toContain('its body carrying those four')
+	})
+})
+
 describe('lane_overrun.investigate — the record of an overrun', () => {
 	beforeEach(() => {
 		mocks.read_entries.mockReturnValue(lane(41))
