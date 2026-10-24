@@ -1,3 +1,4 @@
+import { vitest_cache_directory } from '#scripts/test/vitest-cache-directory'
 import { duration_sequencer } from '#tools/test/duration-sequencer'
 import { unit_duration_record } from '#tools/test/unit-duration-record'
 import { vitest_config_workers } from '#tools/test/vitest-config-workers'
@@ -9,6 +10,8 @@ import { unit_projects } from './tools/test/unit-projects.ts'
 // `coverage` stay at the root because Vitest reads them once for the whole run rather than per
 // project; `include`, `exclude`, `isolate` and `env` are each project's own.
 export default defineConfig({
+	// A throwaway tree's run keeps its dependency optimizer off the gate's cache (joshuafolkken/kit#4770).
+	cacheDir: vitest_cache_directory.config_cache_directory(),
 	test: {
 		// A unit test that reaches GitHub fails on someone else's latency rather than on the code under
 		// test. The network guard puts a recording `gh` in front of the real one and fails the run if

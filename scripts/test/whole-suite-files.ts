@@ -42,6 +42,7 @@ const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
 	'scripts/lib/timeouts.ts',
 	'scripts/test/unit-run-marker.ts',
 	'scripts/test/unit-setup-files.ts',
+	'scripts/test/vitest-cache-directory.ts',
 	'tools/test/duration-sequencer.ts',
 	'tools/test/duration-shard.ts',
 	'tools/test/pure-files.ts',

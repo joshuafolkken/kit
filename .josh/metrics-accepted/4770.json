@@ -1,8 +1,8 @@
 {
-	"reason": "Review fix: the test:pinned answer is filed per launch token so a superseded check cannot overwrite it, with tests for the late write and the re-read; the self-check and chain-rule prose say question 1 is answered at --join",
+	"reason": "Isolate the throwaway tree's vitest dependency cache from the gate's (vitest-cache-directory), which the background test:pinned beside the round-1 gate raced on",
 	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 204,
+		"scripts.code_lines": 217,
 		"rules.lines": 1,
 		"ai_cost.on_demand_bytes": 75,
 		"prose.long_paragraphs": 1,

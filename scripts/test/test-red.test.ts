@@ -40,6 +40,16 @@ const SHALLOW_TEST = `${TEST_IMPORTS}it('exports report', () => {
 })
 `
 
+// joshuafolkken/kit#4770: the tree's run names a Vite cache of its own, outside the borrowed
+// `node_modules`, so it never re-bundles the dependencies a gate beside it is importing.
+const OWN_CACHE_TEST = `import { expect, it } from 'vitest'
+it('runs on a cache of its own', () => {
+	const directory = process.env.JOSH_VITEST_CACHE_DIR ?? ''
+	expect(directory).not.toBe('')
+	expect(directory).not.toContain('node_modules')
+})
+`
+
 const fixture: { current?: FixtureWorkspace } = {}
 
 async function git(arguments_: ReadonlyArray<string>): Promise<string> {
@@ -143,6 +153,18 @@ describe('test_red.run', () => {
 
 			expect(verdict).toBe('green')
 			expect(await snapshot()).toBe(before)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+describe('test_red.run beside a gate', () => {
+	it(
+		'runs the tree on a Vite cache outside the borrowed node_modules',
+		async () => {
+			await build_fix_branch(OWN_CACHE_TEST)
+
+			expect(await test_red.run()).toEqual({ verdict: 'green', files: [TEST_FILE] })
 		},
 		RUN_TIMEOUT,
 	)
