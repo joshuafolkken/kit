@@ -135,6 +135,20 @@ function fresh_record(
 	return { issue, ...baseline, acknowledged_at, checked_at, etag: fetched.etag }
 }
 
+// The previous `acknowledged_at` when a re-read of the same issue takes nothing in, so a `josh
+// run:entry` re-run keeps a review briefed before it valid; `undefined` (now) otherwise.
+function kept_acknowledgement(
+	previous: WatchRecord | undefined,
+	issue: string,
+	fetched: Extract<Fetched, { kind: 'read' }>,
+): string | undefined {
+	if (previous?.issue !== issue) return undefined
+
+	const diff = issue_watch_diff.unread_diff(previous, fetched.snapshot)
+
+	return diff === undefined ? previous.acknowledged_at : undefined
+}
+
 // Called by `josh run:entry` once it has printed the issue. `false` when the issue could not be read,
 // which leaves no record — a watch with no baseline would call the whole issue unread.
 async function record_baseline(
@@ -146,7 +160,9 @@ async function record_baseline(
 
 	if (fetched.kind !== 'read') return false
 
-	write_record(fresh_record(issue, fetched, now), root)
+	const acknowledged_at = kept_acknowledgement(read_record(root), issue, fetched)
+
+	write_record(fresh_record(issue, fetched, now, acknowledged_at), root)
 
 	return true
 }
