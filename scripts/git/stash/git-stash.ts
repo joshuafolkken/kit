@@ -88,12 +88,20 @@ async function pop(selector: string, directory?: string): Promise<void> {
 // — the resume path documented in `backlogrun-park.md` ("expect to resolve conflicts"). The non-zero
 // exit is indistinguishable from a real failure by its code alone, so a conflicted pop is told apart
 // by the unmerged paths it leaves: `--diff-filter=U` lists exactly those, empty on any other failure.
-async function has_conflict(directory?: string): Promise<boolean> {
+// Read from git rather than parsed from a status string (`main_merge_guard.unmerged_paths`), since a
+// stash caller holds a directory, not a status.
+async function unmerged_paths(directory?: string): Promise<Array<string>> {
 	const unmerged = await git_spawn.read(
 		git_args(directory, ['diff', NAME_ONLY_FLAG, '--diff-filter=U']),
 	)
 
-	return unmerged !== ''
+	return unmerged.split('\n').filter((line) => line !== '')
+}
+
+async function has_conflict(directory?: string): Promise<boolean> {
+	const unmerged = await unmerged_paths(directory)
+
+	return unmerged.length > 0
 }
 
 // Uncommitted work is anything `git status --porcelain` lists — untracked files included, which is what
@@ -211,6 +219,7 @@ const git_stash = {
 	push,
 	select,
 	STASHABLE_PATHSPEC,
+	unmerged_paths,
 	work_message,
 }
 
