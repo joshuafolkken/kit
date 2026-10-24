@@ -9,9 +9,11 @@ import { project_checks } from './project-checks'
 // pre-detach check stays the stop. A consumer's kit has no `josh metrics`, so it runs in kit alone.
 
 const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
+// The pre-detach form: it also re-records a growth the branch's approval names (joshuafolkken/kit#4716).
+const METRICS_RERECORD_COMMAND: ReadonlyArray<string> = [...METRICS_TOTALS_COMMAND, '--rerecord']
 // Neutral on the cause: a growth and a run that never finished both stop the pre-detach check.
 const NOTICE_HEADING =
-	'⚠ josh metrics --totals-only did not pass — settle it before `josh ship`, or the pre-detach check stops the ship:'
+	'⚠ josh metrics --totals-only did not pass — settle it before `josh ship`, or the pre-detach check stops the ship (a total the branch approval names is re-recorded there):'
 
 async function growth_notice(directory: string): Promise<string | undefined> {
 	if (!project_checks.is_kit_repository(directory)) return undefined
@@ -25,6 +27,11 @@ async function growth_notice(directory: string): Promise<string | undefined> {
 	return `${NOTICE_HEADING}\n${result.output.trim()}`
 }
 
-const metrics_totals = { METRICS_TOTALS_COMMAND, NOTICE_HEADING, growth_notice }
+const metrics_totals = {
+	METRICS_RERECORD_COMMAND,
+	METRICS_TOTALS_COMMAND,
+	NOTICE_HEADING,
+	growth_notice,
+}
 
 export { metrics_totals }

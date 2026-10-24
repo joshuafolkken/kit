@@ -80,7 +80,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline',
 		category: 'Development',
 		reference: [
-			'[--no-startup | --totals-only | --accept --reason "<why>"]',
+			'[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]',
 			'developer',
 			['files'],
 		],

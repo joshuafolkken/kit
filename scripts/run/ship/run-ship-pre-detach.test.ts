@@ -224,7 +224,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 
 // joshuafolkken/kit#3568: the metrics totals, in kit only, so a grown total stops the session that grew it.
 describe('run_ship_pre_detach.checks — the metrics totals', () => {
-	const metrics = run_ship_pre_detach.METRICS_TOTALS_COMMAND.join(' ')
+	const metrics = run_ship_pre_detach.METRICS_RERECORD_COMMAND.join(' ')
 	const grown = `josh metrics: 1 total(s) grew past the baseline\n${ACCEPT_HINT}`
 
 	it('runs no metrics outside kit', async () => {

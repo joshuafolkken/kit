@@ -1,8 +1,8 @@
 {
 	"reason": "Re-record the accepted growth at ship time once a reason is recorded (#4716)",
-	"date": "2026-10-23",
+	"date": "2026-10-24",
 	"growth": {
-		"scripts.code_lines": 52,
+		"scripts.code_lines": 67,
 		"prose.excess_bold": 1
 	}
 }

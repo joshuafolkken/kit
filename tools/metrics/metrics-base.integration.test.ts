@@ -36,6 +36,7 @@ const NOT_GROWN = 'no total grew past the merge-base'
 const NO_ISSUE = 'this branch names no issue to record under'
 const APPROVAL_FILE = '7.json'
 const PARENT = 'HEAD^1'
+const RERECORDED = 'the growth re-recorded in'
 
 const opened: { kit?: JoshEnvironment } = {}
 
@@ -55,6 +56,14 @@ function grow_rules(): void {
 
 async function check(): Promise<HarnessResult> {
 	return await josh_harness.run(kit(), TOTALS_ONLY)
+}
+
+async function rerecord(): Promise<HarnessResult> {
+	return await josh_harness.run(kit(), [...TOTALS_ONLY, '--rerecord'])
+}
+
+function approval_texts(): ReadonlyMap<string, string> {
+	return metrics_base.approval_texts(kit().root)
 }
 
 async function accept(): Promise<HarnessResult> {
@@ -189,7 +198,7 @@ describe('josh metrics --accept', () => {
 })
 
 // An edit after the accept grew a total again, and a reason is already recorded (joshuafolkken/kit#4716).
-describe('josh metrics --totals-only after the growth rose past the accept', () => {
+describe('josh metrics --totals-only --rerecord after the growth rose past the accept', () => {
 	it(
 		're-records the growth the approval names at what it measures now, and passes',
 		async () => {
@@ -198,10 +207,10 @@ describe('josh metrics --totals-only after the growth rose past the accept', () 
 			await accept()
 			grow_rules()
 
-			const result = await check()
+			const result = await rerecord()
 			const [text = ''] = metrics_base.approval_texts(kit().root).values()
 
-			expect(result.stdout).toContain('the growth re-recorded in')
+			expect(result.stdout).toContain(RERECORDED)
 			expect(result.exit_code).toBe(0)
 			expect(metrics_ratchet.parse_approval(text)?.reason).toBe(REASON)
 			expect(await check()).toMatchObject({ exit_code: 0 })
@@ -209,8 +218,29 @@ describe('josh metrics --totals-only after the growth rose past the accept', () 
 		SCENARIO_TIMEOUT_MS,
 	)
 
+	// `josh lint:related` runs the bare form between its two tree reads, so it must not write.
 	it(
-		'still fails a total the recorded approval does not name',
+		'leaves the approval as recorded and fails in the --totals-only form',
+		async () => {
+			await git(['switch', '-c', ISSUE_BRANCH])
+			grow_rules()
+			await accept()
+			grow_rules()
+
+			const before = approval_texts()
+			const result = await check()
+
+			expect(result.stdout).not.toContain(RERECORDED)
+			expect(result.exit_code).toBe(1)
+			expect(approval_texts()).toStrictEqual(before)
+		},
+		SCENARIO_TIMEOUT_MS,
+	)
+})
+
+describe('josh metrics --totals-only --rerecord with a total the approval does not name', () => {
+	it(
+		'still fails it',
 		async () => {
 			await git(['switch', '-c', ISSUE_BRANCH])
 			grow_rules()
@@ -221,7 +251,7 @@ describe('josh metrics --totals-only after the growth rose past the accept', () 
 			mkdirSync(path.dirname(file), { recursive: true })
 			writeFileSync(file, LONG_PARAGRAPH)
 
-			const result = await check()
+			const result = await rerecord()
 
 			expect(result.stderr).toContain(LONG_PARAGRAPHS)
 			expect(result.exit_code).toBe(1)
