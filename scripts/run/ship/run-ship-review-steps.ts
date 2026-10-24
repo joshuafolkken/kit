@@ -7,6 +7,7 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_record } from '#scripts/review/review-record'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
 import { review_round2 } from '#scripts/review/review-round2'
+import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -96,10 +97,17 @@ function has_fixes(slots: ReadonlyArray<ReviewSlot>): boolean {
 	)
 }
 
+// **The tree is asked first, the findings file second** (joshuafolkken/kit#4774): a gate that passed on
+// a tree that has since moved exits the join with its own code, which drains it whatever the reviewer
+// wrote, or failed to write, at its findings path.
+function is_drained(code: number, slots: ReadonlyArray<ReviewSlot>): boolean {
+	return code === run_review.MOVED_EXIT_CODE || has_fixes(slots)
+}
+
 async function join_gate(slots: ReadonlyArray<ReviewSlot>): Promise<JoshResult> {
 	const joined = await josh([RUN_REVIEW, '--join'])
 
-	if (joined.code === SUCCESS_EXIT_CODE || !has_fixes(slots)) return joined
+	if (joined.code === SUCCESS_EXIT_CODE || !is_drained(joined.code, slots)) return joined
 
 	note(FIXED_JOIN_NOTE)
 

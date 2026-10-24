@@ -46,6 +46,7 @@ const { review_round2 } = await import('#scripts/review/review-round2')
 
 const OK = 0
 const FAILED = 1
+const MOVED = 2
 // A round with nothing to review passes, and says it ran no review so the ship does not time it.
 const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '2427'
@@ -66,16 +67,17 @@ const BRIEF_TWO = 'review:brief --round 2'
 const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
+const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
 }
 
-function answer_with(failing: string | undefined): void {
+function answer_with(failing: string | undefined, failed_code = FAILED): void {
 	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
 		const command = argv.join(' ')
 
-		return { code: command === failing ? FAILED : OK, out: command === OPEN ? BRIEF : '' }
+		return { code: command === failing ? failed_code : OK, out: command === OPEN ? BRIEF : '' }
 	})
 }
 
@@ -136,7 +138,7 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 
 		expect(round).toBe(1)
 		expect(prompt).toContain('josh-ship-review-brief-')
-		expect(prompt).toContain('josh-ship-review-findings-')
+		expect(prompt).toContain(FINDINGS_PREFIX)
 	})
 })
 
@@ -170,11 +172,15 @@ describe('run_ship_review_steps.review_stage — a finding or a refusal stops it
 		expect(launch).not.toHaveBeenCalled()
 	})
 
-	it('stops on an unfinished review (no findings file) without recording', async () => {
+	// joshuafolkken/kit#4774: the stop names the path, ahead of a join that would read `Gate RED`.
+	it('stops on an unfinished review (no findings file) at the reviewer, naming its path', async () => {
 		stamps.read_stamp_text.mockReturnValue(undefined)
 
-		expect(await stage()).toHaveProperty('cause', 'infra')
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST])
+		const stopped = await stage()
+
+		expect(stopped).toHaveProperty('cause', 'infra')
+		expect(stopped).toHaveProperty('out', expect.stringContaining(FINDINGS_PREFIX))
+		expect(commands()).toStrictEqual([OPEN])
 	})
 })
 
@@ -204,6 +210,14 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 
 		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
+	})
+
+	// joshuafolkken/kit#4774: the join's own code says the tree moved after a green gate.
+	it('ships on past a join whose gate passed before the tree moved, whatever the findings say', async () => {
+		answer_with(JOIN, MOVED)
+
+		expect(await stage()).toHaveProperty('code', OK)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
 	})
 
 	it('still stops at a red join when nothing was fixed', async () => {

@@ -32,8 +32,12 @@ function now_iso(): string {
 }
 
 // The join exits 0 only on a green gate. `--join` is run before the review verdict is acted on, so a
-// non-zero exit here is what stops a run adopting a review over a red gate.
+// non-zero exit here is what stops a run adopting a review over a red gate. A gate that passed on a tree
+// that has since moved exits with its own code, so `josh ship` tells it from a red gate by the code
+// rather than by a findings file the reviewer may have misnamed (joshuafolkken/kit#4774).
 function join_exit_code(state: GateState): number {
+	if (state === run_review.GATE_MOVED) return run_review.MOVED_EXIT_CODE
+
 	return run_review.adopt_verdict(state === run_review.GATE_GREEN) === run_review.ADOPT
 		? SUCCESS_EXIT_CODE
 		: FAILURE_EXIT_CODE
@@ -96,10 +100,22 @@ function gate_ended_at(is_green: boolean): string {
 const GREEN_NOTE = 'Gate green — the review verdict may be adopted.'
 const RED_NOTE =
 	'Gate RED — the review verdict is blocked; fix the gate and re-run it before committing.'
+const MOVED_NOTE =
+	'Gate passed on an earlier tree — the tree moved after it (a review fix in place); re-run the gate on this tree before committing.'
+
+// A moved tree's gate passed, so its log is no failure to show.
+function settled_note(state: GateState): string | undefined {
+	if (state === run_review.GATE_GREEN) return GREEN_NOTE
+	if (state === run_review.GATE_MOVED) return MOVED_NOTE
+
+	return undefined
+}
 
 function report_gate(state: GateState): void {
-	if (state === run_review.GATE_GREEN) {
-		process.stdout.write(`${GREEN_NOTE}\n`)
+	const settled = settled_note(state)
+
+	if (settled !== undefined) {
+		process.stdout.write(`${settled}\n`)
 
 		return
 	}
@@ -119,7 +135,7 @@ function report_timing(timing: ReviewTiming | undefined): void {
 async function run_join(): Promise<number> {
 	const state = await run_review_steps.wait_for_gate_finish()
 	const timing = run_review_steps.complete_timing({
-		gate_ended_at: gate_ended_at(state === run_review.GATE_GREEN),
+		gate_ended_at: gate_ended_at(settled_note(state) !== undefined),
 		review_ended_at: now_iso(),
 	})
 
