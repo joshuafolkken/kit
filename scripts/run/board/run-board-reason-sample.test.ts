@@ -12,6 +12,7 @@ import { run_board_reason } from './run-board-reason'
 const REPO = 'joshuafolkken/kit'
 const ROW = 4330
 const PR = 4313
+const NOW_MS = Date.parse('2026-10-20T00:00:00.000Z')
 const { WAIT_ICONS } = run_board_labels
 const BODY = `## 背景\n\n- 実施可能条件: #${String(PR)} のマージ後 10 マージ\n`
 
@@ -43,6 +44,7 @@ function reason(): RowReason | undefined {
 		events: [],
 		free_lanes: 1,
 		is_stopped: false,
+		now_ms: NOW_MS,
 	}
 
 	return run_board_reason.reader(read)(row(), [])

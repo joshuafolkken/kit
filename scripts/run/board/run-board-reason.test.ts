@@ -91,6 +91,7 @@ function read_of(plan: BoardPlan, extra: Partial<ReasonRead> = {}): ReasonRead {
 		events: [],
 		free_lanes: ONE_LANE_LEFT,
 		is_stopped: false,
+		now_ms: AT_MS,
 		...extra,
 	}
 }
