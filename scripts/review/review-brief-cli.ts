@@ -299,6 +299,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		readers: await read_readers(contract.checkout.root, base, paths),
 		removed_tests: await read_removed_tests(),
 		interaction,
+		high_cited: review_reviewed_tree.high_cited(),
 	})
 }
 

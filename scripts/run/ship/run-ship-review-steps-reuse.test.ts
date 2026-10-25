@@ -43,7 +43,7 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 		MOVEMENT: { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' },
 		is_stopped_on: stopped_on_mock,
 		mark_stopped: mark_stopped_mock,
-		movement_here: movement_mock,
+		standing_here: movement_mock,
 	},
 }))
 
@@ -92,7 +92,7 @@ beforeEach(() => {
 	record_check_mock.mockReset().mockResolvedValue({ status: 'ok' })
 	record_round_one_mock.mockClear()
 	discard_mock.mockClear()
-	movement_mock.mockReset().mockResolvedValue('held')
+	movement_mock.mockReset().mockResolvedValue({ movement: 'held' })
 	stopped_on_mock.mockReset().mockReturnValue(false)
 	mark_stopped_mock.mockClear()
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
@@ -107,8 +107,8 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('reused'))
 	})
 
-	it('reviews again once a file a recorded High cites moved, recording the clean verdict', async () => {
-		movement_mock.mockResolvedValue(UNSETTLED)
+	it('reviews again once a file moved where round 2 does not read, recording the clean verdict', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
 
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual(REVIEWED)
@@ -135,7 +135,7 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 	})
 
 	it('records a blocking verdict and stops on it', async () => {
-		movement_mock.mockResolvedValue(UNSETTLED)
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
 		stamps.read_stamp_text.mockReturnValue(`${HIGH}\n`)
 
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
@@ -146,8 +146,8 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 
 // joshuafolkken/kit#4878: round 2 reads what moved from the round-1 brief's stamp after the commit.
 describe('run_ship_review_steps.review_stage — a tree moved since the record', () => {
-	it('reuses a recorded round once files no High cites moved, running no scoped pair or reviewer', async () => {
-		movement_mock.mockResolvedValue('delta')
+	it('reuses a recorded round once only files round 2 reads moved, running no scoped pair or reviewer', async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
 
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
 		expect(commands()).toStrictEqual([])
@@ -156,7 +156,7 @@ describe('run_ship_review_steps.review_stage — a tree moved since the record',
 	})
 
 	it('reviews round 1 again on a stale issue even when only settled files moved', async () => {
-		movement_mock.mockResolvedValue('delta')
+		movement_mock.mockResolvedValue({ movement: 'delta' })
 
 		await run_ship_review_steps.review_stage(ISSUE, true)
 
@@ -183,7 +183,7 @@ describe('run_ship_review_steps.review_stage — a recorded interaction review',
 describe('run_ship_review_steps.review_stage — a round whose record failed', () => {
 	// The relaunch re-runs it, so counting this one would count the round twice.
 	it('counts no verdict when review:record itself failed', async () => {
-		movement_mock.mockResolvedValue(UNSETTLED)
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
 		josh_run_mock.mockImplementation(josh_exits(RECORD))
 
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
@@ -193,7 +193,7 @@ describe('run_ship_review_steps.review_stage — a round whose record failed', (
 
 describe('run_ship_review_steps.review_stage — after the ship stopped on a finding', () => {
 	it('clears the stop marker when round 1 passes', async () => {
-		movement_mock.mockResolvedValue(UNSETTLED)
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
 
 		await run_ship_review_steps.review_stage(ISSUE, false)
 
@@ -202,7 +202,7 @@ describe('run_ship_review_steps.review_stage — after the ship stopped on a fin
 
 	// joshuafolkken/kit#2964: the lane's fix moved the tree, and that fix delta is round 2's alone.
 	it('reuses a round the ship stopped on, on a tree the fix moved', async () => {
-		movement_mock.mockResolvedValue(UNSETTLED)
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
 		stopped_on_mock.mockReturnValue(true)
 
 		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)

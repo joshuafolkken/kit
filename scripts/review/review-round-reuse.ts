@@ -28,30 +28,49 @@ type Reuse = (typeof REUSE)[keyof typeof REUSE]
 
 const { MOVEMENT } = review_reviewed_tree
 
-async function recorded_reuse(issue: number): Promise<Reuse> {
-	const movement = await review_reviewed_tree.movement_here()
+// The reuse, and on `again` why (joshuafolkken/kit#4941): `review:record --check` prints it, so a lane
+// reads which condition re-runs round 1 rather than a list of every condition that could.
+interface ReuseAnswer {
+	reuse: Reuse
+	cause?: string | undefined
+}
 
-	if (movement === MOVEMENT.HELD) return REUSE.HELD
+const STALE_CAUSE = "the issue changed after the recorded round's brief"
+const UNRECORDED_CAUSE = 'no review round is recorded for this issue'
+
+async function recorded_answer(issue: number): Promise<ReuseAnswer> {
+	const { movement, cause } = await review_reviewed_tree.standing_here()
+
+	if (movement === MOVEMENT.HELD) return { reuse: REUSE.HELD }
 
 	const is_delta = movement === MOVEMENT.DELTA || review_reviewed_tree.is_stopped_on(issue)
 
-	return is_delta ? REUSE.DELTA : REUSE.AGAIN
+	return is_delta ? { reuse: REUSE.DELTA } : { reuse: REUSE.AGAIN, cause }
 }
 
 // **A recorded round 1 is reused while the tree it was recorded on holds still** — a lane's review
 // before the ship (joshuafolkken/kit#4620) — **or once it moved only where round 2 reads**
 // (joshuafolkken/kit#4878): round 2 reads that delta from the round-1 brief's stamp after the commit, so
 // round 1 run again would read it twice. **The ship's own round 1 that stopped on a finding** is reused
-// however the lane's fix moved the tree, for the same reason. Any other move — a High-cited file, a doc, a revert — is
-// reviewed again, from that record (`review-reviewed-tree.ts`). An issue that changed after that round's brief is never
-// reused: the recorded round never read it, and `josh followup` refuses the merge on it
+// however the lane's fix moved the tree, for the same reason. A High-cited file's fix is such a move
+// where round 2's delta holds it (joshuafolkken/kit#4941). Any other move — a doc, a revert — is
+// reviewed again, from that record (`review-reviewed-tree.ts`). An issue that changed after that
+// round's brief is never reused: the recorded round never read it, and `josh followup` refuses the merge on it
 // (joshuafolkken/kit#4221).
-async function reuse(issue: number, is_stale: boolean): Promise<Reuse> {
-	if (is_stale) return REUSE.AGAIN
+async function answer(issue: number, is_stale: boolean): Promise<ReuseAnswer> {
+	if (is_stale) return { reuse: REUSE.AGAIN, cause: STALE_CAUSE }
 
 	const recorded = await review_record.check(issue)
 
-	return recorded.status === 'ok' ? await recorded_reuse(issue) : REUSE.AGAIN
+	if (recorded.status !== 'ok') return { reuse: REUSE.AGAIN, cause: UNRECORDED_CAUSE }
+
+	return await recorded_answer(issue)
+}
+
+async function reuse(issue: number, is_stale: boolean): Promise<Reuse> {
+	const reused = await answer(issue, is_stale)
+
+	return reused.reuse
 }
 
 async function is_reusable(issue: number, is_stale: boolean): Promise<boolean> {
@@ -59,15 +78,28 @@ async function is_reusable(issue: number, is_stale: boolean): Promise<boolean> {
 }
 
 // The ship's own answer for this checkout, asked before the ship runs; a git failure throws.
+async function answer_here(issue: number): Promise<ReuseAnswer> {
+	return await answer(issue, await is_stale_here())
+}
+
 async function reuse_here(issue: number): Promise<Reuse> {
-	return await reuse(issue, await is_stale_here())
+	const reused = await answer_here(issue)
+
+	return reused.reuse
 }
 
 async function is_reusable_here(issue: number): Promise<boolean> {
 	return (await reuse_here(issue)) !== REUSE.AGAIN
 }
 
-const review_round_reuse = { REUSE, is_reusable, is_reusable_here, is_stale_here, reuse_here }
+const review_round_reuse = {
+	REUSE,
+	answer_here,
+	is_reusable,
+	is_reusable_here,
+	is_stale_here,
+	reuse_here,
+}
 
-export type { Reuse }
+export type { Reuse, ReuseAnswer }
 export { review_round_reuse }

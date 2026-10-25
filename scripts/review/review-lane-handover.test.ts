@@ -12,7 +12,7 @@ const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 vi.mock('./review-round-reuse', () => ({
 	review_round_reuse: {
 		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
-		reuse_here: reusable_mock,
+		answer_here: reusable_mock,
 	},
 }))
 
@@ -28,7 +28,7 @@ function mark(issue: string | undefined, is_child: boolean): void {
 }
 
 beforeEach(() => {
-	reusable_mock.mockResolvedValue('held')
+	reusable_mock.mockResolvedValue({ reuse: 'held' })
 })
 
 afterEach(() => {
@@ -46,7 +46,7 @@ describe('review_lane_handover.is_handed_over — the recorded round', () => {
 
 	it('keeps run:review open when no round is recorded, or the ship would review it again', async () => {
 		mark(String(ISSUE), true)
-		reusable_mock.mockResolvedValue('again')
+		reusable_mock.mockResolvedValue({ reuse: 'again' })
 
 		expect(await review_lane_handover.is_handed_over(ISSUE)).toBe(false)
 	})
@@ -54,7 +54,7 @@ describe('review_lane_handover.is_handed_over — the recorded round', () => {
 	// joshuafolkken/kit#4878: the moved files are round 2's, so the lane hands over all the same.
 	it('hands over a lane child whose recorded round the ship reuses with a delta', async () => {
 		mark(String(ISSUE), true)
-		reusable_mock.mockResolvedValue(DELTA)
+		reusable_mock.mockResolvedValue({ reuse: DELTA })
 
 		expect(await review_lane_handover.is_handed_over(ISSUE)).toBe(true)
 	})
@@ -67,11 +67,11 @@ describe('review_lane_handover.is_handed_over — the recorded round', () => {
 	})
 })
 
-describe('review_lane_handover.reuse_here — the reuse answer', () => {
+describe('review_lane_handover.answer_here — the reuse answer', () => {
 	it("passes the ship's three-way answer through", async () => {
-		reusable_mock.mockResolvedValue(DELTA)
+		reusable_mock.mockResolvedValue({ reuse: DELTA })
 
-		expect(await review_lane_handover.reuse_here(ISSUE)).toBe(DELTA)
+		expect(await review_lane_handover.answer_here(ISSUE)).toStrictEqual({ reuse: DELTA })
 	})
 
 	it('answers again and traces the failure when git cannot answer', async () => {
@@ -80,8 +80,11 @@ describe('review_lane_handover.reuse_here — the reuse answer', () => {
 
 		reusable_mock.mockRejectedValue(error)
 
-		expect(await review_lane_handover.reuse_here(ISSUE)).toBe('again')
-		expect(trace).toHaveBeenCalledWith('review_lane_handover.reuse_here', error)
+		expect(await review_lane_handover.answer_here(ISSUE)).toStrictEqual({
+			reuse: 'again',
+			cause: 'git could not answer the reuse question',
+		})
+		expect(trace).toHaveBeenCalledWith('review_lane_handover.answer_here', error)
 	})
 })
 

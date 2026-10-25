@@ -11,7 +11,7 @@ import { review_record, type RecordVerdict } from './review-record'
 import { review_record_code_round } from './review-record-code-round'
 import { review_record_comment } from './review-record-comment'
 import { review_record_interaction } from './review-record-interaction'
-import type { Reuse } from './review-round-reuse'
+import type { ReuseAnswer } from './review-round-reuse'
 import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
@@ -53,13 +53,19 @@ const REUSED_LINE =
 	'Reused: josh ship takes this round as its round 1 — the files this round covers hold still since the record. A default branch the ship’s sync merges in moves them only where it changed a file this round covers: run `pnpm josh main:merge` before this check for the answer the ship reaches.'
 const DELTA_LINE =
 	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every file moved since the record is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
-const REVIEW_AGAIN_LINE =
-	'Not reused: josh ship reviews round 1 again — a move since the record round 2 would not read (a file a recorded High cites, documentation or a prompt, a revert to the briefed bytes, a default-branch change to a covered file), the round was not attested on this branch, or the issue changed after its brief. Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
-const REUSE_LINES: Readonly<Record<Reuse, string>> = {
-	again: REVIEW_AGAIN_LINE,
-	delta: DELTA_LINE,
-	held: REUSED_LINE,
+
+// The condition that re-runs round 1, and the path that met it, named rather than listed among every
+// condition that could (joshuafolkken/kit#4941).
+function review_again_line(cause = 'the reuse question gave no reason'): string {
+	return `Not reused: josh ship reviews round 1 again — ${cause}. Run \`pnpm josh run:review\` and the round-1 \`/code-review\` here (chain-rule.md step 0).`
 }
+
+function reuse_line(answer: ReuseAnswer): string {
+	if (answer.reuse === 'again') return review_again_line(answer.cause)
+
+	return answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+}
+
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
 const CARRIED_LINE =
@@ -194,9 +200,9 @@ interface CheckMode {
 // reused with the moved files left to round 2, or reviewed again — so the lane runs it itself rather
 // than reading "recorded" as "done".
 async function code_recorded(issue: number): Promise<string> {
-	const reuse = await review_lane_handover.reuse_here(issue)
+	const answer = await review_lane_handover.answer_here(issue)
 
-	return [RECORDED_LINE, REUSE_LINES[reuse]].join('\n')
+	return [RECORDED_LINE, reuse_line(answer)].join('\n')
 }
 
 async function interaction_recorded(): Promise<string> {

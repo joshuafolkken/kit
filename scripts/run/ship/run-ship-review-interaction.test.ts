@@ -54,7 +54,7 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 		MOVEMENT: { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' },
 		is_stopped_on: () => false,
 		mark_stopped,
-		movement_here: async () => 'held',
+		standing_here: async () => ({ movement: 'held' }),
 	},
 }))
 vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one } }))

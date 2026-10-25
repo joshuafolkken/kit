@@ -13,7 +13,7 @@ const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 vi.mock('./review-round-reuse', () => ({
 	review_round_reuse: {
 		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
-		reuse_here: reusable_mock,
+		answer_here: reusable_mock,
 	},
 }))
 
@@ -61,7 +61,7 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 	})
 
 	it('tells the lane to run run:review when the ship reviews round 1 again', async () => {
-		reusable_mock.mockResolvedValue('again')
+		reusable_mock.mockResolvedValue({ reuse: 'again' })
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)
@@ -71,7 +71,7 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 	})
 
 	it('answers reused when the ship takes the recorded round as its round 1', async () => {
-		reusable_mock.mockResolvedValue('held')
+		reusable_mock.mockResolvedValue({ reuse: 'held' })
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)
@@ -80,7 +80,7 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 	})
 
 	it('asks the shared predicate with the issue', async () => {
-		reusable_mock.mockResolvedValue('again')
+		reusable_mock.mockResolvedValue({ reuse: 'again' })
 		await check_output()
 
 		expect(reusable_mock).toHaveBeenCalledWith(ISSUE)
@@ -95,10 +95,23 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 	})
 })
 
+// joshuafolkken/kit#4941: the line names the condition that hit and its path, not every condition.
+describe('review_record_cli.run --check — why the ship reviews round 1 again', () => {
+	it('names the condition and the path that met it', async () => {
+		const cause = 'a move round 2 would not read: docs/guide.md'
+
+		reusable_mock.mockReset().mockResolvedValue({ reuse: 'again', cause })
+		const { out } = await check_output()
+
+		expect(out).toContain(`${NOT_REUSED}: josh ship reviews round 1 again — ${cause}.`)
+		expect(out).not.toContain('a file a recorded High cites')
+	})
+})
+
 // joshuafolkken/kit#4878: the ship reuses round 1 and round 2 reads what moved.
 describe('review_record_cli.run --check — a round whose delta is left to round 2', () => {
 	it('answers reused with the delta left to round 2 when settled files moved', async () => {
-		reusable_mock.mockReset().mockResolvedValue('delta')
+		reusable_mock.mockReset().mockResolvedValue({ reuse: 'delta' })
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)

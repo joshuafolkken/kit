@@ -4,6 +4,7 @@ import { change_base } from '#scripts/git/change-base'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { review_code_tree } from './review-code-tree'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round2, type RoundTwoAnswer } from './review-round2'
 import { review_stamps } from './review-stamps'
@@ -46,14 +47,20 @@ function parse_options(argv: ReadonlyArray<string>): Options | undefined {
 	}
 }
 
-// Only the paths the code record covers are re-read, so a run without one parses nothing.
+// Only the paths the code record covers are re-read, so a run without one parses nothing. **A file a
+// recorded High cites is never comment-only** (joshuafolkken/kit#4941): `josh ship` reuses round 1 once
+// that file's fix moved (`review-reviewed-tree.ts`), so a fix written in comments alone is still this
+// round's to verify.
 async function read_comment_only(base: string | undefined): Promise<ReadonlyArray<string>> {
 	const snapshot = review_stamps.round_one_code_stamp.read()
 	const paths = Object.keys(snapshot?.files ?? {})
 	const tree = await review_code_tree.read(paths)
 	const unmoved = review_round_one_blobs.unmoved({ from: snapshot?.base, to: base, paths })
+	const cited = new Set(review_reviewed_tree.high_cited())
 
-	return review_code_tree.comment_only(snapshot, tree, base, unmoved)
+	return review_code_tree
+		.comment_only(snapshot, tree, base, unmoved)
+		.filter((path) => !cited.has(path))
 }
 
 // The carry over every path changed now, not only round 1's: a file the fix added after the merge is

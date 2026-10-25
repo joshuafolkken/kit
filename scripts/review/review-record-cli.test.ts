@@ -51,7 +51,7 @@ vi.mock('./review-reviewed-tree', () => ({
 vi.mock('./review-round-reuse', () => ({
 	review_round_reuse: {
 		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
-		reuse_here: vi.fn().mockResolvedValue('again'),
+		answer_here: vi.fn().mockResolvedValue({ reuse: 'again' }),
 	},
 }))
 
