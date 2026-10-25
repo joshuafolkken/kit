@@ -53,7 +53,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
-			'[--code-only] [--unpinned-ok "<reason>"] | --join',
+			'[--code-only] [--unpinned-ok "<reason>"] | --join | --pinned',
 			'automation',
 			['processes', 'files'],
 		],
@@ -74,6 +74,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--join',
 					note: 'after the review returns: join the gate and test:pinned; exit 3 on an unpinned change',
+				},
+				{
+					arguments: '--pinned',
+					note: 'read test:pinned alone once review:record restarted it',
 				},
 			],
 		},

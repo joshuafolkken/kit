@@ -60,6 +60,13 @@ vi.mock('./review-record-interaction', async (original) => {
 	}
 })
 
+const restart_mock = vi.hoisted(() => vi.fn())
+
+// The restart reads this checkout's launch; `review-record-pinned.test.ts` owns it.
+vi.mock('./review-record-pinned', () => ({
+	review_record_pinned: { restart_if_moved: restart_mock },
+}))
+
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
 const COMMENT_URL = 'https://example.test/comment\n'
@@ -368,11 +375,12 @@ describe('review_record_cli.run — the reviewed tree', () => {
 })
 
 // joshuafolkken/kit#4835: a round-1 fix can make the interaction review due after its brief opened.
-describe('review_record_cli.run — an interaction review the round made due', () => {
+describe('review_record_cli.run — what the round made due', () => {
 	it('asks after a recorded code round, and not after an interaction or comment round', async () => {
 		const root = root_of('interaction-due')
 
 		report_due_mock.mockClear()
+		restart_mock.mockClear()
 		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
 		await quietly(async () => await review_record_cli.run(['--issue', '4835'], NOW, root))
 		await quietly(
@@ -383,5 +391,7 @@ describe('review_record_cli.run — an interaction review the round made due', (
 		)
 
 		expect(report_due_mock).toHaveBeenCalledExactlyOnceWith(4835, root)
+		// joshuafolkken/kit#4834: so is a tree the fix moved under the background test:pinned.
+		expect(restart_mock).toHaveBeenCalledExactlyOnceWith(root)
 	})
 })

@@ -9,8 +9,8 @@ Review results and successful pushes are never turn boundaries.
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then steps 2–3, the
-   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1), `pnpm josh ship --detach --review "<title> #<N>"`
-   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
+   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, read `pnpm josh run:review --pinned` and pin each unpinned place or take `--unpinned-ok` before the ship), `pnpm josh ship --detach --review "<title> #<N>"`
+   (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` or `--pinned` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
    `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base

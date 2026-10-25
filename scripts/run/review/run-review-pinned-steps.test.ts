@@ -102,6 +102,22 @@ describe('run_review_pinned_steps.launched_reason', () => {
 	})
 })
 
+// joshuafolkken/kit#4834: the launch records the tree it checks, so `review:record` tells a fix that
+// moved it.
+describe('run_review_pinned_steps.launched_tree', () => {
+	it('reads back the tree the check was launched on, and none once the next start clears it', () => {
+		const tree = 'tree-digest'
+
+		run_review_pinned_steps.launch(ROOT, undefined, tree)
+
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(tree)
+
+		run_review_pinned_steps.clear(ROOT)
+
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBeUndefined()
+	})
+})
+
 describe('run_review_pinned_steps.wait_for_answer', () => {
 	it('answers nothing when no check was launched', async () => {
 		test_pinned_record.write('no-launch', ANSWER, ROOT)

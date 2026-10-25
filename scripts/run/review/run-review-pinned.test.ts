@@ -105,7 +105,7 @@ describe('run:review before round 1', () => {
 		pinned_run.mockReturnValue(new Promise<PinnedReport>(() => undefined))
 
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG, REASON])).toBe(0)
-		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
+		expect(launch_pinned.mock.lastCall?.slice(0, 2)).toStrictEqual([expect.any(String), REASON])
 		expect(launch_gate).toHaveBeenCalledOnce()
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stdout.join('')).toBe('BRIEF\n')
@@ -117,7 +117,7 @@ describe('run:review when no brief follows', () => {
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG])).toBe(FAILURE_EXIT_CODE)
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stderr.join('')).toBe(
-			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join\n',
+			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join | --pinned\n',
 		)
 	})
 })

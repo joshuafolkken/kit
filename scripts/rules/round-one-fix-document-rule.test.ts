@@ -38,6 +38,13 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		)
 	})
 
+	// joshuafolkken/kit#4834: a round-1 fix that moves the tree restarts test:pinned at the record.
+	it('step 0 reads the restarted test:pinned before the ship', () => {
+		expect(lane_step()).toContain(
+			'on `test:pinned restarted`, read `pnpm josh run:review --pinned` and pin each unpinned place or take `--unpinned-ok` before the ship',
+		)
+	})
+
 	// Step 0 alone is exempt: a lane child whose ship failed falls to step 1 and may reach `git -y`.
 	it('scopes the round-1 fix gate before git -y to runs outside step 0', () => {
 		const content = read_unwrapped(CHAIN_RULE)
