@@ -28,10 +28,10 @@ Review results and successful pushes are never turn boundaries.
    (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
    `run:review --join`, run the final scoped lint/test pair with `pnpm josh check:related` and
    `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
-   and prints the `/code-review` brief in one call, so they overlap (`--unpinned-ok "<reason>"`
+   and writes the `/code-review` brief to a file, printing its path and prompt, in one call, so they overlap (`--unpinned-ok "<reason>"`
    carries on); two briefs take two `reviewer`s side by side, the second recorded with
    `review:record --interaction`. Launch the `/code-review` subagent as the `reviewer`
-   agent type (`kit:reviewer` in a consumer) with that brief and its `model` (`delegation.md`) (one
+   agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` (`delegation.md`) (one
    agent, no `Skill` / `Agent` tool — `.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
 2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before

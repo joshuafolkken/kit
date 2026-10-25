@@ -3,11 +3,14 @@ import { fileURLToPath } from 'node:url'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_pinned } from './run-review-pinned'
@@ -16,8 +19,9 @@ import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
-// `josh run:review` — one call that leaves `josh gate` running in the background and prints the whole
-// `/code-review` brief, so a lane child launches the two together and they overlap.
+// `josh run:review` — one call that leaves `josh gate` running in the background and writes the
+// `/code-review` brief to a file, printing its path, so a lane child launches the two together and they
+// overlap.
 // It composes `josh gate` and `josh review:brief` and changes neither: the gate is the same command
 // spawned detached, and the brief is `review:brief` run unchanged, so the nonce/checkout contract
 // `review:attest --check` enforces is minted exactly as a standalone brief mints it.
@@ -26,7 +30,7 @@ import { run_review_steps } from './run-review-steps'
 // under `--unpinned-ok "<reason>"` it runs there too and the join carries on (`run-review-pinned.ts`).
 //
 // **The default mode opens the pair; `--join` closes it.** The child runs the default, reads the brief
-// off stdout, launches the review subagent, and — once it returns — runs `--join`, which waits for the
+// path off stdout, launches the review subagent, and — once it returns — runs `--join`, which waits for the
 // gate and the check to finish, records the overlap, and exits non-zero if the gate came back red or
 // the check found an unpinned change. That exit code is
 // what makes "a red gate is not adopted over" a mechanical guarantee rather than an ordering
@@ -67,12 +71,22 @@ function join_exit_code(state: GateState): number {
 }
 
 const JOIN_HINT =
-	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer) with the brief above; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
+	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
-const INTERACTION_HEADER =
-	'=== Interaction review brief — a second `reviewer`, launched beside the first with the brief below ==='
 const INTERACTION_HINT =
-	'Two briefs above: launch one `reviewer` per brief side by side, and once both are attested record the interaction pass with `pnpm josh review:record --interaction --issue <N> [<finding> ...]` beside round 1.'
+	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass with `pnpm josh review:record --interaction --issue <N> [<finding> ...]` beside round 1.'
+
+// The briefs an open writes: the slots this branch's issue owes round 1, and whether this is the ship's
+// own `--code-only` open, which prints code's brief instead.
+interface BriefPlan {
+	is_code_only: boolean
+	slots: ReadonlyArray<ReviewSlot>
+}
+
+const SLOT_ARGV: Readonly<Record<ReviewSlot, ReadonlyArray<string>>> = {
+	code: [],
+	interaction: [INTERACTION_FLAG],
+}
 
 // The slots this branch's issue owes round 1. A branch that names no issue, or the ship's own open,
 // briefs code alone.
@@ -96,23 +110,47 @@ async function handover_refusal(is_code_only: boolean): Promise<string | undefin
 		: undefined
 }
 
-// Code's brief, then the interaction brief under its header — never after a code brief that refused.
-async function print_briefs(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
-	const code = await review_brief_cli.run([])
+// One slot's brief, written to the file `josh ship` hands that slot's reviewer, with only its path on
+// stdout: the two briefs together exceed the Bash output cap, and a truncated brief sent the lane back
+// to `review:brief`, whose new code nonce dropped the interaction slot (joshuafolkken/kit#4863). Its
+// launch prompt follows, the one `josh ship` opens a reviewer with: the brief no longer travels in the
+// prompt, and `/code-review` beside `review:attest` is how the time and cost readers tell a review.
+function save_brief(slot: ReviewSlot, text: string): void {
+	const { brief } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
 
-	if (code !== SUCCESS_EXIT_CODE) return code
-	if (!slots.includes(INTERACTION)) return code
+	stamp_file.write_text_stamp(brief, `${text}\n`)
+	process.stdout.write(
+		`${slot} brief: ${brief}\n${slot} prompt: ${run_ship_review.round_one_opening(brief)}\n`,
+	)
+}
 
-	process.stdout.write(`${INTERACTION_HEADER}\n`)
+async function write_brief(slot: ReviewSlot): Promise<number> {
+	const texts: Array<string> = []
+	const code = await review_brief_cli.run_to(SLOT_ARGV[slot], (text) => {
+		texts.push(text)
+	})
 
-	return await review_brief_cli.run([INTERACTION_FLAG])
+	if (code === SUCCESS_EXIT_CODE) save_brief(slot, texts.join('\n'))
+
+	return code
+}
+
+// Code's brief, then the interaction brief — never after a code brief that refused. `--code-only`, the
+// ship's own open, prints code's brief: the ship reads it off stdout and writes that file itself.
+async function open_briefs(plan: BriefPlan): Promise<number> {
+	if (plan.is_code_only) return await review_brief_cli.run([])
+	const code = await write_brief(CODE)
+
+	if (code !== SUCCESS_EXIT_CODE || !plan.slots.includes(INTERACTION)) return code
+
+	return await write_brief(INTERACTION)
 }
 
 function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
 	return slots.includes(INTERACTION) ? `${JOIN_HINT}\n${INTERACTION_HINT}` : JOIN_HINT
 }
 
-async function start_pair(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
+async function start_pair(plan: BriefPlan): Promise<number> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
@@ -124,12 +162,12 @@ async function start_pair(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
 
 	await run_review_steps.mark_gate_starting()
 	run_review_steps.write_timing_start({ gate_started_at, review_started_at: now_iso() })
-	const code = await print_briefs(slots)
+	const code = await open_briefs(plan)
 
-	// The hint follows a printed brief and nothing else: a brief that refused (a tree the scoped pair
+	// The hint follows a written brief and nothing else: a brief that refused (a tree the scoped pair
 	// has not been green on) exits non-zero, and a "gate running, launch the review" line under that
 	// refusal would send the child to review a tree there is no brief for.
-	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${join_hint(slots)}\n`)
+	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${join_hint(plan.slots)}\n`)
 
 	return code
 }
@@ -139,7 +177,7 @@ async function start_pair(slots: ReadonlyArray<ReviewSlot>): Promise<number> {
 // A check that could not be launched fails open, as one that could not run does. A tree the scoped
 // pair has not been green on is refused before either is launched, so a refused start leaves nothing
 // running (joshuafolkken/kit#4828).
-async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Promise<number> {
+async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 	const refusal = await review_brief_cli.scoped_refusal()
 
 	if (refusal !== undefined) return review_brief_cli.report_error(refusal)
@@ -152,7 +190,7 @@ async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Pro
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
 
-	return await start_pair(slots)
+	return await start_pair(plan)
 }
 
 type PinnedWait = () => Promise<PinnedSummary | undefined>
@@ -251,7 +289,7 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 		return FAILURE_EXIT_CODE
 	}
 
-	return await run_start(await brief_slots(is_code_only), reason)
+	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
 }
 
 async function run_pinned(): Promise<number> {
@@ -280,7 +318,6 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 }
 
 const run_review_cli = {
-	INTERACTION_HEADER,
 	INTERACTION_HINT,
 	JOIN_HINT,
 	join_exit_code,

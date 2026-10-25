@@ -32,8 +32,8 @@ import { json_value } from '#scripts/lib/json-value'
 // which the main line loaded the skill itself.
 //
 // **The launch is recognized by its prompt carrying both `/code-review` and `review:attest`.** The
-// first is the instruction to invoke the review skill; the second is the attestation line
-// `pnpm josh review:brief` emits into the brief the launch passes verbatim.
+// first is the instruction to invoke the review skill; the second is the attestation step the launch
+// prompt `pnpm josh run:review` prints beside each brief file names (joshuafolkken/kit#4863).
 // Neither alone is enough: an investigation subagent about the review tooling quotes `/code-review`
 // in prose and is handed no brief, so `review:attest` is what tells a genuine review launch from a
 // discussion of one — measured against five real launches, it admits the review and rejects every

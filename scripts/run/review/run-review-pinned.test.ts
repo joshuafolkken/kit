@@ -1,3 +1,5 @@
+import type { Emit } from '#scripts/review/review-brief-cli'
+import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import type { PinnedReport } from '#scripts/test/test-pinned-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_cli } from './run-review-cli'
@@ -9,20 +11,27 @@ import { run_review_pinned } from './run-review-pinned'
 // reason, so the gate and the brief start without waiting on it; `--join` judges its answer
 // (`run-review-cli-join.test.ts`).
 
-const { pinned_run, launch_gate, brief_run, launch_pinned, clear_pinned } = vi.hoisted(() => ({
-	pinned_run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>(),
-	launch_gate: vi.fn<() => { kind: string; note?: string }>(),
-	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
-	launch_pinned: vi.fn<() => { kind: string; note?: string }>(),
-	clear_pinned: vi.fn(),
-}))
+const { BRIEF_PATH, pinned_run, launch_gate, brief_run, launch_pinned, clear_pinned } = vi.hoisted(
+	() => ({
+		BRIEF_PATH: '/briefs/brief.md',
+		pinned_run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>(),
+		launch_gate: vi.fn<() => { kind: string; note?: string }>(),
+		brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
+		launch_pinned: vi.fn<() => { kind: string; note?: string }>(),
+		clear_pinned: vi.fn(),
+	}),
+)
 
 vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { run: pinned_run } }))
+vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { write_text_stamp: vi.fn() } }))
+vi.mock('#scripts/lane/lane-session-broker', () => ({
+	lane_session_broker: { review_paths: () => ({ brief: BRIEF_PATH }) },
+}))
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned },
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({
-	review_brief_cli: { run: brief_run, scoped_refusal: async () => undefined },
+	review_brief_cli: { run: brief_run, run_to: brief_run, scoped_refusal: async () => undefined },
 }))
 // Code's brief alone: the interaction brief beside it is `run-review-cli-interaction.test.ts`'s.
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
@@ -40,6 +49,7 @@ vi.mock('./run-review-steps', () => ({
 	},
 }))
 
+const BRIEF_LINE = `code brief: ${BRIEF_PATH}\ncode prompt: ${run_ship_review.round_one_opening(BRIEF_PATH)}\n`
 const FAILURE_EXIT_CODE = 1
 const REASON = 'the branch only logs'
 const SITE = 'scripts/a.ts 0123456789abcdef'
@@ -61,8 +71,8 @@ beforeEach(() => {
 	launch_pinned.mockReset().mockReturnValue({ kind: 'launched' })
 	clear_pinned.mockReset()
 	pinned_run.mockReset()
-	brief_run.mockImplementation(async () => {
-		process.stdout.write('BRIEF\n')
+	brief_run.mockImplementation(async (_argv, emit) => {
+		emit?.('BRIEF')
 
 		return 0
 	})
@@ -81,7 +91,7 @@ describe('run:review before round 1', () => {
 		expect(launch_pinned).toHaveBeenCalledOnce()
 		expect(launch_gate).toHaveBeenCalledOnce()
 		expect(pinned_run).not.toHaveBeenCalled()
-		expect(output.stdout.join('')).toBe('BRIEF\n')
+		expect(output.stdout.join('')).toBe(BRIEF_LINE)
 	})
 
 	it('starts the gate and the brief before an in-place check would have resolved', async () => {
@@ -97,7 +107,7 @@ describe('run:review before round 1', () => {
 
 		expect(await run_review_cli.run([])).toBe(0)
 		expect(launch_gate).toHaveBeenCalledOnce()
-		expect(output.stdout.join('')).toBe('BRIEF\n')
+		expect(output.stdout.join('')).toBe(BRIEF_LINE)
 		expect(output.stderr.join('')).toContain('could not run, so nothing was checked: spawn refused')
 	})
 
@@ -108,7 +118,7 @@ describe('run:review before round 1', () => {
 		expect(launch_pinned.mock.lastCall?.slice(0, 2)).toStrictEqual([expect.any(String), REASON])
 		expect(launch_gate).toHaveBeenCalledOnce()
 		expect(pinned_run).not.toHaveBeenCalled()
-		expect(output.stdout.join('')).toBe('BRIEF\n')
+		expect(output.stdout.join('')).toBe(BRIEF_LINE)
 	})
 })
 
