@@ -38,10 +38,11 @@ interface Script {
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked, withdrawn or failed rather than merged; every other reads as
-	// merged.
+	// Children `run:merge` handled as parked, withdrawn, yielded or failed rather than merged; every other
+	// reads as merged.
 	parked?: ReadonlyArray<string>
 	withdrawn?: ReadonlyArray<string>
+	yielded?: ReadonlyArray<string>
 	unmerged?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
@@ -81,6 +82,7 @@ function merge_outcome(script: Script, issue: string): MergeOutcome {
 	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
 		[script.parked, 'parked'],
 		[script.withdrawn, 'withdrawn'],
+		[script.yielded, 'yielded'],
 		[script.unmerged, 'failed'],
 	]
 

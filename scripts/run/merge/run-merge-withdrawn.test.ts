@@ -54,19 +54,26 @@ describe('run_merge_withdrawn.collect', () => {
 		expect(withdraw_lane_mock).not.toHaveBeenCalled()
 	})
 
-	it('closes the still-open lane of a child that yielded, named as the yield', async () => {
-		events_mock.mockResolvedValue([
-			{ ...WITHDRAW_EVENT, text: `#${CHILD} withdrawn by ${lane_yield.YIELD_TEXT.name}: x` },
-		])
-
-		expect(await run_merge_withdrawn.collect(CHILD)).toStrictEqual(COLLECTED)
-		expect(withdraw_lane_mock).toHaveBeenCalledWith(LANE, lane_yield.YIELD_REASON, 'yield')
-	})
-
 	it('has nothing to withdraw where no lane is open', async () => {
 		find_lane_mock.mockResolvedValue(undefined)
 
 		expect(await run_merge_withdrawn.collect(CHILD)).toStrictEqual(NOTHING)
+		expect(withdraw_lane_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4926: a child that gave its lane back noted it from inside the lane, which
+// `run:merge` closes, named as the yield.
+describe('run_merge_withdrawn.collect_yield', () => {
+	it('closes the still-open lane of a child that yielded, named as the yield', async () => {
+		expect(await run_merge_withdrawn.collect_yield(CHILD)).toStrictEqual(COLLECTED)
+		expect(withdraw_lane_mock).toHaveBeenCalledWith(LANE, lane_yield.YIELD_REASON, 'yield')
+	})
+
+	it('has nothing to close where the lane is already closed', async () => {
+		find_lane_mock.mockResolvedValue(undefined)
+
+		expect(await run_merge_withdrawn.collect_yield(CHILD)).toStrictEqual(NOTHING)
 		expect(withdraw_lane_mock).not.toHaveBeenCalled()
 	})
 })

@@ -1039,13 +1039,13 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 
 A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
-Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 
 On a clash the child gives its lane back instead of polling with its seat taken:
 
-- It writes a `withdraw` event naming `its own lane:plan`, and the session ends with no edit.
-- `run:merge` books it `withdrawn` — not a failure or an outage — and closes the lane.
-- Its plan stays recorded, uncleared: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
+- It notes its yield on the event stream, releases its `run:hold`, and the session ends with no edit.
+- `run:merge` books it `yielded` — not a merge, a failure or an outage — and closes the lane with a withdrawal naming `its own lane:plan`.
+- Its plan stays recorded, uncleared and marked yielded: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
 
 A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares paths as its body does, so a candidate whose plan names a running lane's file is held back before dispatch.
 

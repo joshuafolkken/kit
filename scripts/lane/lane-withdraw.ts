@@ -49,6 +49,8 @@ type Withdrawer = 'person' | 'supervisor' | 'merge' | 'yield'
 
 const OPEN_TAIL =
 	'Its lane child was stopped and the lane closed. The Issue stays open: this run does not resume it, and the next run offers it again.'
+// What `describe` says of an open issue's place in the run once its lane is withdrawn.
+const STAYS_OPEN = 'The Issue stays open: this run does not offer it again, the next run does.'
 
 // How each withdrawer is named on the event stream, in the stash note and on the issue.
 const WITHDRAWER_TEXT = {
@@ -59,6 +61,7 @@ const WITHDRAWER_TEXT = {
 			'Its lane was withdrawn with `pnpm josh lane:withdraw` after the Issue was closed.',
 		open_head: 'Withdrawn from the current run by a person with `pnpm josh lane:withdraw`.',
 		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
 	},
 	supervisor: {
 		name: 'the run:wake supervisor',
@@ -66,6 +69,7 @@ const WITHDRAWER_TEXT = {
 		closed_head: 'Its lane was withdrawn by the `run:wake` supervisor after the Issue was closed.',
 		open_head: 'Withdrawn from the current run by the `run:wake` supervisor.',
 		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
 	},
 	merge: {
 		name: 'the run:merge driver',
@@ -74,6 +78,7 @@ const WITHDRAWER_TEXT = {
 			'Its lane was withdrawn by `pnpm josh run:merge` after the Issue was closed without a merge.',
 		open_head: 'Withdrawn from the current run by `pnpm josh run:merge`.',
 		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
 	},
 	yield: lane_yield.YIELD_TEXT,
 } as const satisfies Record<Withdrawer, Record<string, string>>
@@ -86,6 +91,7 @@ interface Withdrawal {
 
 interface Withdrawn {
 	kind: 'withdrawn'
+	by: Withdrawer
 	// How many of the child's processes the withdrawal stopped — 0 for a child that had already ended.
 	reaped: number
 	stash: string | undefined
@@ -160,6 +166,7 @@ async function stop_and_close(lane: LaneInfo, withdrawal: Withdrawal): Promise<W
 
 	return {
 		kind: 'withdrawn',
+		by: withdrawal.by,
 		reaped,
 		stash: saved.stash,
 		is_noted,
@@ -211,7 +218,7 @@ function withdrawn_text(outcome: Withdrawn, issue: string): string {
 	const noted = outcome.is_noted ? '' : ' The comment saying so could not be posted.'
 	const issue_sentence = outcome.is_closed
 		? 'The Issue was already closed, so its lane no longer holds a place.'
-		: 'The Issue stays open: this run does not offer it again, the next run does.'
+		: WITHDRAWER_TEXT[outcome.by].stays
 
 	return `${head} ${issue_sentence}${noted}${lane}`
 }

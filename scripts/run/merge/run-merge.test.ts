@@ -220,6 +220,20 @@ describe('classify_child — withdrawn by a person', () => {
 	})
 })
 
+// joshuafolkken/kit#4926: a child that gave its lane back on its `lane:plan` is neither a merge, a
+// failure nor an outage, and its OPEN issue stays in the run.
+describe('classify_child — a child that yielded its lane', () => {
+	const open = issue_state_of({ labels: [IN_PROGRESS] })
+
+	it('reads an OPEN child that yielded as yielded, ahead of the outage', () => {
+		expect(run_merge.classify_child(open, { ...OUTAGE, is_yielded: true })).toBe('yielded')
+	})
+
+	it('counts neither a merge nor a failure for it', () => {
+		expect(run_merge.change_of('yielded')).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#4076: a release to wait names what the child waits on, a start date included.
 describe('waiting_comment', () => {
 	it('names every wait and says the child is neither parked nor counted', () => {

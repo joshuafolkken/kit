@@ -1,7 +1,7 @@
 {
-	"reason": "lane:plan yield (#4926): new lane-yield module and its test, the yield path in lane:plan, run:merge and the restore",
+	"reason": "A yield is booked its own run:merge outcome (yielded) and closed by run:merge, with the hold released and the plan kept as yielded — new code paths in lane-yield, run-merge, run-merge-cli and lane-plan-cli",
 	"date": "2026-10-25",
 	"growth": {
-		"scripts.code_lines": 60
+		"scripts.code_lines": 107
 	}
 }

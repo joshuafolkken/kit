@@ -60,6 +60,14 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.earlier_holders(EARLIER_PLAN, holders, DIRECTORY)).toEqual([])
 	})
 
+	// joshuafolkken/kit#4926: a yielded lane keeps its earlier place in line, which must not take a file
+	// from a lane that cleared after it and may be editing it.
+	it('names a cleared holder even when it planned after this one', () => {
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.earlier_holders(EARLIER_PLAN, [LATER], DIRECTORY)).toEqual([LATER])
+	})
+
 	it('reads an issue as uncleared until its plan is recorded cleared', () => {
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 
@@ -72,28 +80,39 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
 	})
 
+	it('reads back the plan it recorded', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+	})
+
 	it('forgets a plan once it is removed', () => {
 		lane_plan.record(LATER_PLAN, DIRECTORY)
 		lane_plan.remove(LATER, DIRECTORY)
 
 		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
 	})
+})
 
-	// joshuafolkken/kit#4926: a lane that yielded closes on an uncleared plan, which keeps the issue held
-	// back and its place in line; a lane that cleared its plan leaves nothing behind.
+describe('lane_plan.release', () => {
+	// joshuafolkken/kit#4926: a lane that yielded closes on a plan marked yielded, which keeps the issue
+	// held back and its place in line; any other plan — cleared or never answered — leaves nothing.
 	it('releases a cleared plan with its lane and keeps one the lane yielded on', () => {
+		const yielded = { ...LATER_PLAN, yielded: true }
+
 		lane_plan.record({ ...EARLIER_PLAN, cleared: true }, DIRECTORY)
-		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.record(yielded, DIRECTORY)
 		lane_plan.release(EARLIER, DIRECTORY)
 		lane_plan.release(LATER, DIRECTORY)
 
 		expect(lane_plan.read(EARLIER, DIRECTORY)).toBeUndefined()
-		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(yielded)
 	})
 
-	it('reads back the plan it recorded', () => {
+	it('releases an uncleared plan its lane did not yield on', () => {
 		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.release(LATER, DIRECTORY)
 
-		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
 	})
 })

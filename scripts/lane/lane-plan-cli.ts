@@ -6,6 +6,7 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_yield } from './lane-yield'
 
@@ -15,14 +16,16 @@ import { lane_yield } from './lane-yield'
 // **The check happens before the first edit**, so a conflict the bodies did not show is met while the
 // later lane has nothing to throw away, not at its ship. **A lane that finds a holder gives its lane
 // back** rather than waiting for the holder to end (joshuafolkken/kit#4926): polling kept the seat taken
-// while nothing moved, which made two lanes one. It writes its yield (`lane-yield.ts`), keeps its plan,
-// prints `yield` and the child ends; the issue is offered again once the holder's lane ends. A document
-// under `docs/` is never a clash (`backlog-overlap.ts` → `is_shared_document`).
+// while nothing moved, which made two lanes one. It notes its yield (`lane-yield.ts`), keeps its plan as
+// yielded, releases its hold, prints `yield` and the child ends; the issue is offered again once the
+// holder's lane ends. A document under `docs/` is never a clash (`backlog-overlap.ts` →
+// `is_shared_document`).
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const YIELD_EXIT_CODE = 2
+const RELEASE_FLAG = '--release'
 const USAGE = 'Usage: josh lane:plan <issue-number> <path> [<path> ...]'
 const RUNNING = new Set([IN_PROGRESS_LABEL])
 
@@ -63,11 +66,15 @@ function overlap_text(issue: number, clash: Clash): string {
 	return `${session_cite.issue(issue)}'s planned \`${clash.path}\` overlaps \`${clash.claimed}\`, which ${holder} declares or plans`
 }
 
-// The yield goes on the stream before the child is told to end, so `run:merge` books it `withdrawn`.
-async function give_back(plan: LanePlan, clash: Clash): Promise<number> {
+// The yield goes on the stream before the child is told to end, so `run:merge` books it `yielded`. The
+// plan is kept as yielded (`lane_plan.release`) and the child's hold released, so it can end with no
+// edit; `yield` is printed last, after the release's own verdict.
+async function give_back(plan: LanePlan, clash: Clash, directory: string): Promise<number> {
 	const overlap = overlap_text(plan.issue, clash)
 
+	lane_plan.record({ ...plan, yielded: true }, directory)
 	await lane_yield.record_yield(plan.issue, overlap)
+	await run_hold_cli.run([RELEASE_FLAG, String(plan.issue)])
 	console.error(
 		`${overlap}, so it gives its lane back: end the session now, with no edit — \`run:merge\` closes the lane, and the issue is offered again once that lane ends.`,
 	)
@@ -98,7 +105,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	if (issues === undefined) return unread()
 	const clash = clash_among(plan, issues, directory)
 
-	return clash === undefined ? clear(plan, directory) : await give_back(plan, clash)
+	return clash === undefined ? clear(plan, directory) : await give_back(plan, clash, directory)
 }
 
 // A lane that plans again — after a yield, or to add a file — keeps the place in line its first plan

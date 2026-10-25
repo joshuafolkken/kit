@@ -5,6 +5,7 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
@@ -31,6 +32,7 @@ const LISTING_LIMIT = 100
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
 const record_yield = vi.spyOn(lane_yield, 'record_yield')
+const release = vi.spyOn(run_hold_cli, 'run')
 const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
 
@@ -63,6 +65,7 @@ beforeEach(() => {
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)
+	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		mkdtempSync(path.join(ROOT, 'repository-')),
 	)
@@ -88,15 +91,16 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 		expect(String(error.mock.calls[0]?.[0])).toMatch(
 			new RegExp(`planned \`${OVERRUN}\`.*#${String(HOLDER)}.*gives its lane back`, 'u'),
 		)
+		expect(String(error.mock.calls[0]?.[0])).not.toContain('waits')
 	})
 
-	it('puts the yield on the stream and keeps its plan uncleared', async () => {
+	it('puts the yield on the stream and keeps its plan uncleared, marked yielded', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)
 
 		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
 
 		expect(record_yield).toHaveBeenCalledWith(LATER, expect.stringContaining(OVERRUN))
-		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([OVERRUN])
+		expect(lane_plan.read(LATER, DIRECTORY)).toMatchObject({ paths: [OVERRUN], yielded: true })
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 	})
 
@@ -107,6 +111,22 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
 		expect(record_yield).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane:plan — the hold of a lane it gives back', () => {
+	it('releases its hold before printing `yield` as its last answer', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		release.mockImplementation(async (): Promise<number> => {
+			console.info('released')
+
+			return SUCCESS
+		})
+
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(release).toHaveBeenCalledWith(['--release', String(LATER)])
+		expect(info.mock.calls.at(-1)).toEqual(['yield'])
 	})
 })
 

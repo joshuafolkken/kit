@@ -141,7 +141,7 @@ interface Holding {
 	repo: string
 }
 
-// The path of `paths` that one of `holders` already declares — what `lane:plan` waits on.
+// The path of `paths` that one of `holders` already declares — what `lane:plan` yields on.
 function path_clash(
 	paths: ReadonlySet<string>,
 	declared: Declared,

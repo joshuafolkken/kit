@@ -72,6 +72,8 @@ interface EndingSignals {
 	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`), or its
 	// issue was closed without a merge (`run-merge-signals.ts` → `read_is_withdrawn`).
 	is_withdrawn?: boolean | undefined
+	// The newest launch of the child gave its lane back on its `lane:plan` (`lane-yield.ts`).
+	is_yielded?: boolean | undefined
 	// The outage is not an API the child could not reach — a ship stop no relaunch answered, or a host
 	// restart that killed it — so it is left out of the run-wide streak.
 	is_streak_exempt?: boolean | undefined
@@ -134,26 +136,29 @@ function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 	return unfinished_outcome(signals)
 }
 
+function state_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
+	return is_closed(state) ? 'merged' : open_outcome(state, signals)
+}
+
 // The signals are read by the CLI and, but for a withdrawal, matter only for an OPEN child — a CLOSED
 // child arrives already filtered by `is_withdrawn` (its timeline), so one that reaches here is merged
-// regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
+// regardless of how the process exited. **A yield, then a withdrawal, is read first**: a yield leaves
+// its issue OPEN and its lane open for `run:merge` to close (`lane-yield.ts`), and `lane:withdraw`
 // records it before stopping the child and leaves the issue OPEN, which would otherwise read as a child
 // to resume or park.
 function classify_child(
 	state: IssueState | undefined,
 	signals: EndingSignals = NO_SIGNALS,
 ): ChildOutcome {
+	if (signals.is_yielded === true) return 'yielded'
+
 	if (signals.is_withdrawn === true) return 'withdrawn'
 
-	if (state === undefined) return 'unresolved'
-
-	if (is_closed(state)) return 'merged'
-
-	return open_outcome(state, signals)
+	return state === undefined ? 'unresolved' : state_outcome(state, signals)
 }
 
 // The counter change a child's outcome implies. A merge counts a merge (which resets the failure
-// streak); a failure counts a failure; a split, parked, withdrawn or human-review child counts nothing —
+// streak); a failure counts a failure; a split, parked, withdrawn, yielded or human-review child counts nothing —
 // a decision a person made or still owes is not the environment failing — and `undefined` says the
 // carry record is left untouched.
 function change_of(outcome: ChildOutcome): CarryChange | undefined {

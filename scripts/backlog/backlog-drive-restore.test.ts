@@ -101,20 +101,27 @@ it('offers again a withdrawn child launched afresh after its withdrawal once tha
 })
 
 // joshuafolkken/kit#4926: a lane that yielded to an earlier lane stays in the run — its retained plan,
-// not the exclusion, holds it back until the holder ends — and is not settled.
-const YIELDED = [
+// not the exclusion, holds it back until the holder ends — and is not settled. The child only notes its
+// yield; `run:merge` closes the lane with a withdrawal named as the yield.
+const YIELD_NOTED = [
 	event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
-	event(2, 'withdraw', '#2508 withdrawn by its own lane:plan: overlaps #2509'),
+	event(2, 'note', '#2508 yielded its lane: overlaps #2509'),
+]
+const YIELDED = [
+	...YIELD_NOTED,
+	event(3, 'withdraw', '#2508 withdrawn by its own lane:plan: overlaps #2509'),
 ]
 
-it('neither excludes from the offer nor settles a child that yielded its lane', () => {
+it('neither excludes from the offer nor settles a child whose yielded lane was closed', () => {
 	expect(backlog_drive_restore.offer_exclude(YIELDED)).toStrictEqual([])
 	expect(backlog_drive_restore.withdrawn_issues(YIELDED)).toStrictEqual([])
 	expect(backlog_drive_restore.settled_issues(YIELDED)).toStrictEqual(new Set())
 })
 
-it('does not restore a child that yielded its lane', () => {
-	expect(backlog_drive_restore.restore([CHILD], YIELDED, [])).toStrictEqual([])
+// A restart between the yield and `run:merge` finds the lane still open, so it is handed back to
+// `run:merge` to close.
+it('restores a child that noted its yield before run:merge closed its lane', () => {
+	expect(backlog_drive_restore.restore([CHILD], YIELD_NOTED, [])).toStrictEqual([CHILD])
 })
 
 it('excludes a child a person withdrew after a yield of an earlier launch', () => {

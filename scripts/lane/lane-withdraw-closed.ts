@@ -50,8 +50,10 @@ async function has_unpushed(branch: string): Promise<boolean> {
 	}
 }
 
-function kept_note(issue: string): string {
-	return `${session_cite.issue(issue)} is closed without a merge, but its branch has commits on no remote, so its lane is kept — run \`pnpm josh lane:withdraw ${issue}\` by hand.`
+function kept_note(issue: string, by: Withdrawer): string {
+	const settled = by === 'yield' ? 'gave its lane back' : 'is closed without a merge'
+
+	return `${session_cite.issue(issue)} ${settled}, but its branch has commits on no remote, so its lane is kept — run \`pnpm josh lane:withdraw ${issue}\` by hand.`
 }
 
 interface UnattendedWithdrawal {
@@ -66,7 +68,7 @@ async function withdraw_lane(
 	reason: string,
 	by: Withdrawer,
 ): Promise<UnattendedWithdrawal> {
-	if (await has_unpushed(lane.branch)) return { note: kept_note(lane.issue), is_retry: false }
+	if (await has_unpushed(lane.branch)) return { note: kept_note(lane.issue, by), is_retry: false }
 	const outcome = await lane_withdraw.withdraw(lane.issue, reason, by)
 
 	return {
