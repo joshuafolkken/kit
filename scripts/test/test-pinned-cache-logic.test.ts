@@ -180,9 +180,20 @@ describe('test_pinned_cache_logic.stored', () => {
 			{ verdict: 'green' as const, failed: [] },
 		]
 
-		expect(test_pinned_cache_logic.stored(['a', 'b'], probes, TEST_DIGESTS, ['s'])).toEqual({
+		expect(
+			test_pinned_cache_logic.stored(['a', 'b'], probes, TEST_DIGESTS, [{ digest: 's' }]),
+		).toEqual({
 			a: { ...RED, basis: 's' },
 			b: { verdict: 'green', tests: {} },
+		})
+	})
+
+	it('records a green basis with the tests it rests on, so a later run can tell which changed', () => {
+		const probes = [{ verdict: 'green' as const, failed: [] }]
+		const bases = [{ digest: 'g', related: { [FAILED_TEST]: FAILED_DIGEST } }]
+
+		expect(test_pinned_cache_logic.stored(['a'], probes, TEST_DIGESTS, bases)).toEqual({
+			a: { verdict: 'green', tests: {}, basis: 'g', related: { [FAILED_TEST]: FAILED_DIGEST } },
 		})
 	})
 })
@@ -225,8 +236,17 @@ describe('test_pinned_cache_logic bases', () => {
 		const digests = new Map([...TEST_DIGESTS, ['b.test.ts', 'digest-b']])
 		const basis = test_pinned_cache_logic.related_basis([FAILED_TEST, 'b.test.ts'], digests)
 
-		expect(test_pinned_cache_logic.related_basis(['b.test.ts', FAILED_TEST], digests)).toBe(basis)
-		expect(test_pinned_cache_logic.related_basis([FAILED_TEST], digests)).not.toBe(basis)
+		expect(test_pinned_cache_logic.related_basis(['b.test.ts', FAILED_TEST], digests)).toEqual(
+			basis,
+		)
+		expect(test_pinned_cache_logic.related_basis([FAILED_TEST], digests).digest).not.toBe(
+			basis.digest,
+		)
+		expect(basis.related).toEqual(Object.fromEntries(digests))
+		expect(
+			test_pinned_cache_logic.related_basis([FAILED_TEST], new Map([[FAILED_TEST, 'digest-x']]))
+				.digest,
+		).not.toBe(test_pinned_cache_logic.related_basis([FAILED_TEST], TEST_DIGESTS).digest)
 	})
 
 	it('reads a red basis whatever order the closures are in, and moves with the assets', () => {

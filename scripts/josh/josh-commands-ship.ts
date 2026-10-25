@@ -77,7 +77,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '--join --fixing',
-					note: 'the join when round 1 has fixes to make: no grace on test:pinned, left running',
+					note: 'the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds',
 				},
 				{
 					arguments: '--pinned',
