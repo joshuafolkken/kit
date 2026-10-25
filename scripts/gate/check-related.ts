@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { status_icons } from '#scripts/lib/status-icons'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { gate_plan } from './gate-plan'
@@ -93,10 +94,22 @@ function report_result(result: CheckResult): void {
 	if (!result.output.endsWith('\n')) process.stdout.write('\n')
 }
 
+// The verdict is the last line, as every josh check prints it, so a reader of the tail sees every
+// check that failed rather than only the section that finished last (joshuafolkken/kit#4940).
+function verdict_line(results: ReadonlyArray<CheckResult>): string {
+	const failed = results.filter((result) => result.exit_code !== 0).map((result) => result.command)
+
+	if (failed.length === 0) return `${status_icons.PASS_ICON} check:related passed`
+
+	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
+}
+
 function report_results(results: ReadonlyArray<CheckResult>): void {
 	for (const result of results) {
 		report_result(result)
 	}
+
+	process.stdout.write(`\n${verdict_line(results)}\n`)
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {

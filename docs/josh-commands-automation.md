@@ -161,7 +161,7 @@ Delivers a trigger-delivered rule at the call that binds it, in place of a rule 
 
 - **Direct filing** — trigger is a hand-built filing (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`); refused on every occurrence, pointed at [`josh issue:file`](josh-commands-backlog.md#josh-issuefile).
 - **Issue comments** — trigger reads an Issue body without them (`gh issue view <N>`, or a `GET` ending `…/issues/<N>`); hands over `gh issue view <N> --comments`.
-- **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
+- **Piped verification** — trigger is a check (`gate`, `check*`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row** — trigger is a `Bash` call running `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**; hands over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step, carried as prose, fired **0 times in 6 lane children**. `--resume`, `--end` and `--json` do not count as taking the cut. Procedure: `.claude/skills/workflow-commands/pre-gate-cut.md`.
 - **The implementation-phase cut row** — an `Edit` / `Write` from a lane that has not taken its cut, once `pnpm josh cost --cut` is over the shared threshold; hands over `pnpm josh run:cut --impl <N> --handoff <path>` on every threshold crossing.

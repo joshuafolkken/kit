@@ -1,3 +1,4 @@
+import { status_icons } from '#scripts/lib/status-icons'
 import { execa } from 'execa'
 import { describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
@@ -145,5 +146,37 @@ describe('check_related.report_results', () => {
 			expect(report).toContain(`=== ${command}: passed ===`)
 			expect(report).toContain(`${command} output`)
 		}
+	})
+})
+
+// joshuafolkken/kit#4940: the verdict is the last line, so a reader of the tail sees every failure.
+describe('check_related.report_results verdict line', () => {
+	it('ends with one passing verdict line when every check is green', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		check_related.report_results(await check_related.run_checks(passing_check))
+
+		const report = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(report.trimEnd().split('\n').at(-1)).toBe(
+			`${status_icons.PASS_ICON} check:related passed`,
+		)
+	})
+
+	it('ends with a verdict line naming every failed check', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const results = CHECK_COMMANDS.map((command): CheckResult => ({
+			command,
+			exit_code: command === LINT_COMMAND || command === TEST_COMMAND ? 1 : 0,
+			output: `${command} output`,
+		}))
+
+		check_related.report_results(results)
+
+		const report = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(report.trimEnd().split('\n').at(-1)).toBe(
+			`${status_icons.FAIL_ICON} check:related failed: ${LINT_COMMAND}, ${TEST_COMMAND}`,
+		)
 	})
 })

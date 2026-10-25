@@ -189,7 +189,7 @@ pnpm josh check:related
 
 <!-- /usage -->
 
-Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all three and exits non-zero if any fails.
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all four, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
 
 ### `josh behavior`
 
