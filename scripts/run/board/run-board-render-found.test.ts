@@ -22,7 +22,8 @@ const FILED = ['4768', '4769', '4770']
 const MINUTES = 52
 const RECURRED = 'recurred #4790'
 const CI_WAIT = 'none: CI wait'
-const NARROW = 87
+const NARROW = 100
+const SQUEEZED = 87
 const PANE_ROWS = 60
 const WITHIN: OverrunNote = { kind: 'within', issue: DONE, minutes: 18 }
 const STARTED_NOTE: OverrunNote = {
@@ -75,6 +76,12 @@ function row_line(board_header: BoardHeader): string {
 
 function done_line(found: Found | undefined, extra: Partial<BoardHeader> = {}): string {
 	return row_line(board(found, extra))
+}
+
+function keyed_line(causes: Parameters<typeof run_event_overrun.small_causes_text>[0]): string {
+	const text = run_event_overrun.small_causes_text(causes)
+
+	return done_line(ended(`${run_event_overrun.none_result('all under 3%')}${text}`))
 }
 
 describe('run_board_render — a merged row’s net minutes', () => {
@@ -160,17 +167,30 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 describe('run_board_render — a merged row’s keyed small causes', () => {
 	const PINNED = 'test:pinned'
 
-	it('says `∅` and each mechanism’s summed minutes, largest first, instead of the reason', () => {
-		const causes = run_event_overrun.small_causes_text([
+	// joshuafolkken/kit#4922: the largest alone, then how many others, so the end stays short.
+	it('says `∅`, the largest mechanism’s summed minutes and how many others, not the reason', () => {
+		const line = keyed_line([
 			{ key: 'check:related', minutes: 1.2, cause: 'lint rerun' },
 			{ key: PINNED, minutes: 7.2, cause: 'restarted' },
 			{ key: 'lane:plan', minutes: 0.4, cause: 'waited' },
 			{ key: PINNED, minutes: 1.5, cause: 'rerun' },
 		])
-		const line = done_line(ended(`${run_event_overrun.none_result('all under 3%')}${causes}`))
 
-		expect(line).toMatch(/52′ {2}🔍 ∅ test:pinned 9′ check:related 1′ lane:plan <1′$/u)
+		expect(line).toMatch(/52′ {2}🔍 ∅ test:pinned 9′ \+2$/u)
 		expect(line).not.toContain('all under')
+	})
+
+	it('counts every other mechanism', () => {
+		const keys = ['run-ship-place', 'a', 'b', 'c', 'd', 'e']
+		const line = keyed_line(keys.map((key, index) => ({ key, minutes: 13 - index, cause: 'x' })))
+
+		expect(line).toMatch(/52′ {2}🔍 ∅ run-ship-place 13′ \+5$/u)
+	})
+
+	it('adds no count for a single mechanism', () => {
+		expect(keyed_line([{ key: PINNED, minutes: 7.2, cause: 'restarted' }])).toMatch(
+			/52′ {2}🔍 ∅ test:pinned 7′$/u,
+		)
 	})
 })
 
@@ -191,9 +211,10 @@ describe('run_board_render — a merged row’s spinner', () => {
 	})
 })
 
-// joshuafolkken/kit#4818: the outcome takes its columns from the title, so the row stays one line.
+// joshuafolkken/kit#4818, joshuafolkken/kit#4922: the row stays one line, its end cut rather than its
+// title, so its time stays in the time column.
 describe('run_board_render — a merged row’s width', () => {
-	it('cuts the title so the row fits a narrow pane', () => {
+	it('cuts the end so the row fits a narrow pane', () => {
 		const found = { ...ended(CI_WAIT), filed: FILED }
 		const size = { rows: PANE_ROWS, columns: NARROW }
 		const line = run_board_render
@@ -202,6 +223,18 @@ describe('run_board_render — a merged row’s width', () => {
 			.find((drawn) => drawn.includes(String(DONE)))
 
 		expect(run_board_fit.width_of(line ?? '')).toBeLessThanOrEqual(NARROW)
+		expect(line).toMatch(/Issue 4711\s+\S+\s+52′ {2}4\d*…$/u)
+	})
+
+	it('cuts the title instead where the pane leaves the end no room', () => {
+		const found = { ...ended(CI_WAIT), filed: FILED }
+		const size = { rows: PANE_ROWS, columns: SQUEEZED }
+		const line = run_board_render
+			.render({ header: board(found), notes: [], size })
+			.map((drawn) => stripVTControlCharacters(drawn))
+			.find((drawn) => drawn.includes(String(DONE)))
+
+		expect(run_board_fit.width_of(line ?? '')).toBeLessThanOrEqual(SQUEEZED)
 		expect(line).toMatch(/…\s.*52′ {2}4768, 4769, 4770 {2}🔍 ∅ CI wait$/u)
 	})
 })
