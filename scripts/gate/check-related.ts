@@ -5,9 +5,11 @@ import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { gate_plan } from './gate-plan'
+import { metrics_totals } from './metrics-totals'
 
+const LINT_RELATED = 'lint:related'
 const CHECKS: ReadonlyArray<string> = [
-	'lint:related',
+	LINT_RELATED,
 	'test:related',
 	gate_plan.TYPE_CHECK_TARGET,
 	'cspell:dot',
@@ -105,11 +107,26 @@ function verdict_line(results: ReadonlyArray<CheckResult>): string {
 	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
 }
 
+// `josh lint:related` ends its section with the metrics growth notice, which the sections after it
+// bury; it is repeated above the verdict so the tail still carries what stops `josh ship`
+// (joshuafolkken/kit#4939).
+function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined {
+	const output = results.find((result) => result.command === LINT_RELATED)?.output ?? ''
+	const start = output.indexOf(metrics_totals.NOTICE_HEADING)
+
+	if (start === -1) return undefined
+
+	return output.slice(start).trimEnd()
+}
+
 function report_results(results: ReadonlyArray<CheckResult>): void {
 	for (const result of results) {
 		report_result(result)
 	}
 
+	const notice = metrics_notice(results)
+
+	if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 	process.stdout.write(`\n${verdict_line(results)}\n`)
 }
 
