@@ -1,3 +1,4 @@
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { defect_origin_line } from './defect-origin-line'
 
 // Defects grouped by the pull request each one's origin line names: how many per pull request, per
@@ -14,9 +15,6 @@ const SCRIPT_AREA_DEPTH = 2
 const ROOT_AREA = '(root)'
 const UNREAD_AREA = '(pull request not read)'
 const TEST_FILE = /\.(?:test|e2e)\.ts$|\.snap$/u
-// The run's own records — observations, accepted metrics — which nearly every merge adds, so they
-// say nothing about what the pull request changed.
-const RUN_RECORD_ROOT = '.josh/'
 
 type ChangeKind = 'add' | 'fix' | 'remove'
 
@@ -54,8 +52,10 @@ interface DefectReport {
 	added_within_week: ReadonlyMap<number, number>
 }
 
+// The run's own records, which nearly every merge adds, say nothing about what the pull request
+// changed.
 function changed(files: ReadonlyArray<PrFile>): ReadonlyArray<PrFile> {
-	return files.filter((file) => !file.filename.startsWith(RUN_RECORD_ROOT))
+	return files.filter((file) => !run_record_path.is_run_record(file.filename))
 }
 
 // A pull request that brought in a new non-test file added a mechanism; one that took out more than it

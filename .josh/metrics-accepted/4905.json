@@ -1,0 +1,7 @@
+{
+	"reason": "#4905: scoped_green keeps a green record across josh's own .josh/ record writes (is_run_record)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}
