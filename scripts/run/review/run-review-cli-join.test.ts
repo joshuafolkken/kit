@@ -91,6 +91,18 @@ describe('run --join on a tree a round-1 fix moved', () => {
 	})
 })
 
+// joshuafolkken/kit#4895: round 1 with fixes to make waits no grace on test:pinned.
+describe('run --join --fixing', () => {
+	it('reads the check as it stands rather than waiting on it', async () => {
+		const answer_now = vi.spyOn(run_review_pinned_steps, 'answer_now').mockReturnValue(undefined)
+
+		await run_review_cli.run(['--join', '--fixing'])
+
+		expect(answer_now).toHaveBeenCalledOnce()
+		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
+	})
+})
+
 describe('run --join on the background test:pinned', () => {
 	beforeEach(() => {
 		vi.spyOn(process.stderr, 'write').mockReturnValue(true)

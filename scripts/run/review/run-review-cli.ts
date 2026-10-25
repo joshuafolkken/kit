@@ -43,16 +43,20 @@ import { run_review_steps } from './run-review-steps'
 // interaction brief itself.
 //
 // **`--pinned` reads the check alone** (joshuafolkken/kit#4834): `josh review:record` starts it again
-// on a tree a round-1 fix moved, after the join has closed the pair, so the lane reads the fixed tree's
-// unpinned places before `josh ship` without joining a gate that already settled.
+// on a tree a round-1 fix moved, after the join has closed the pair, and reads its answer without
+// joining a gate that already settled. The ship's pre-detach reads that answer anyway, so a lane need not
+// (joshuafolkken/kit#4895). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
+// its tree.
 
 const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
+const FIXING_FLAG = '--fixing'
 const PINNED_FLAG = '--pinned'
 const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join | --pinned'
+const USAGE =
+	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned'
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
@@ -256,7 +260,7 @@ function report_timing(timing: ReviewTiming | undefined): void {
 	process.stdout.write(`${run_review.format_timing(timing)}\n`)
 }
 
-async function run_join(): Promise<number> {
+async function run_join(is_fixing = false): Promise<number> {
 	const state = await run_review_steps.wait_for_gate_finish()
 	const timing = run_review_steps.complete_timing({
 		gate_ended_at: gate_ended_at(settled_note(state) !== undefined),
@@ -267,9 +271,17 @@ async function run_join(): Promise<number> {
 	report_timing(timing)
 
 	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
-	const is_unpinned = await join_pinned(async () => await run_review_pinned_join.wait_for_join())
+	const is_unpinned = await join_pinned(
+		async () => await run_review_pinned_join.wait_for_join(undefined, undefined, is_fixing),
+	)
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
+}
+
+// `--join --fixing`: round 1 has fixes to make, so the join waits no grace on test:pinned
+// (joshuafolkken/kit#4895).
+async function run_join_fixing(): Promise<number> {
+	return await run_join(true)
 }
 
 // The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`.
@@ -299,14 +311,15 @@ async function run_pinned(): Promise<number> {
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
-// The modes a lone flag selects; a `Map`, so no prototype key reads as a mode.
+// The modes a whole argv selects; a `Map`, so no prototype key reads as a mode.
 const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
 	[JOIN_FLAG, run_join],
+	[`${JOIN_FLAG} ${FIXING_FLAG}`, run_join_fixing],
 	[PINNED_FLAG, run_pinned],
 ])
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const lone = argv.length === 1 ? LONE_MODES.get(argv[0] ?? '') : undefined
+	const lone = LONE_MODES.get(argv.join(' '))
 
 	if (lone !== undefined) return await lone()
 	const is_code_only = argv[0] === run_review.CODE_ONLY_FLAG

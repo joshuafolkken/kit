@@ -58,16 +58,22 @@ async function is_restarted(root: string): Promise<boolean> {
 // `--join`'s read: the current tree's answer, never a pre-fix tree's. `undefined` when no check was
 // launched. **A ship's own round restarts nothing and leaves nothing running**: under its supervisor
 // no `--pinned` read follows, and the check would hold cores the ship's gate waits on
-// (`review-record-code-round.ts`).
+// (`review-record-code-round.ts`). **A round 1 with fixes to make waits no grace**
+// (joshuafolkken/kit#4895): the fix moves the tree, so this tree's late answer would go unused.
 async function wait_for_join(
 	root: string = PROJECT_ROOT,
 	now?: Clock,
+	is_fixing = false,
 ): Promise<PinnedSummary | undefined> {
-	const is_read_later = !run_ship_detach.is_supervised()
+	if (run_ship_detach.is_supervised()) {
+		return await run_review_pinned_steps.wait_for_answer(root, now, false)
+	}
 
-	if (is_read_later) await is_restarted(root)
+	await is_restarted(root)
 
-	return await run_review_pinned_steps.wait_for_answer(root, now, is_read_later)
+	return is_fixing
+		? run_review_pinned_steps.answer_now(root)
+		: await run_review_pinned_steps.wait_for_answer(root, now)
 }
 
 // A tree git could not read is not the launch's, so the caller runs its own check.
@@ -90,12 +96,20 @@ async function waited_answer(root: string): Promise<PinnedSummary | undefined> {
 	return run_review_pinned_steps.is_answered(root) ? summary : undefined
 }
 
+// A check on another tree is waited out, not stopped (joshuafolkken/kit#4895): it saves its verdicts
+// to the shared cache only once it ends, so the caller's own check, run after it rather than beside it,
+// probes only the hunks that moved since. A lone read's bound still stops one that hung. Only a check
+// proven live is waited on: a stale stamp goes straight to `clear`, which signals no unproven pid.
+async function settle_elsewhere(root: string): Promise<void> {
+	if (run_review_pinned_steps.is_live(root)) await run_review_pinned_steps.wait_alone(root)
+	run_review_pinned_steps.clear(root)
+}
+
 // The answer of the check launched on this very tree, waited for; `undefined` when none was, or it left
-// none, so the caller runs its own. A check on another tree is stopped first, so it does not run beside
-// the caller's own.
+// none, so the caller runs its own.
 async function answer_on_tree(root: string = PROJECT_ROOT): Promise<PinnedSummary | undefined> {
 	if (await is_launched_on_current_tree(root)) return await waited_answer(root)
-	run_review_pinned_steps.clear(root)
+	await settle_elsewhere(root)
 
 	return undefined
 }
