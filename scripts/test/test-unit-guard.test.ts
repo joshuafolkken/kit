@@ -17,6 +17,8 @@ vi.mock('#scripts/git/changed-file-scope', () => ({
 // **Mocked because the real one writes this checkout's test-read map** on a green whole-suite run.
 // What it records and when is `test-read-recording.test.ts`; here it hands the run its variables.
 vi.mock('./test-read-recording', () => ({ test_read_recording: { with_read_recording: vi.fn() } }))
+// Mocked for the reason `test-unit-guard.directory.test.ts` gives: the real one writes the unit log.
+vi.mock('./vitest-failure-summary', () => ({ vitest_failure_summary: { report: vi.fn() } }))
 
 const mocked_execa = vi.mocked(execa)
 const mocked_recording = vi.mocked(test_read_recording.with_read_recording)

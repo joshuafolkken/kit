@@ -1,0 +1,63 @@
+import { stripVTControlCharacters } from 'node:util'
+import { gate_log } from '#scripts/gate/gate-log'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { stamp_file } from '#scripts/josh/stamp-file'
+
+// A failed vitest run's answer, put where a `tail` reaches it (joshuafolkken/kit#4869).
+//
+// **The console's end is the last failure's stack, not the list of what failed.** vitest prints its
+// failures in order and then a summary of counts, so `josh test:related 2>&1 | tail -40` kept one stack
+// and no names, and the only way to learn the rest was to run the suite again. So every run's output
+// goes to a file, and a failed one ends with the failed tests' names and that file's path — the same
+// log and notice `josh gate` uses, imported rather than re-derived.
+
+const UNIT_LOG_PREFIX = 'josh-unit-log-'
+const UNIT_LOG_HEADER = 'vitest'
+const FAILED_LINE = /^FAIL\s+(?<name>\S.*)$/u
+const FAILED_HEADING = 'failed tests:'
+const NONE_NAMED = '  (none named in the output — read the full output)'
+
+// One path per checkout and vitest mode, overwritten by each run, beside the gate's own log. **The
+// mode is in the name** because the gate's whole-suite `run` and a `related` run started beside it
+// overlap, and one shared file would hand the failed run's reader the other run's output.
+function unit_log_path(vitest_arguments: ReadonlyArray<string>): string {
+	const prefix = `${UNIT_LOG_PREFIX}${vitest_arguments[0] ?? UNIT_LOG_HEADER}-`
+
+	return stamp_file.stamp_path(prefix, PROJECT_ROOT, gate_log.GATE_LOG_SUFFIX)
+}
+
+function failed_name(line: string): string | undefined {
+	return FAILED_LINE.exec(stripVTControlCharacters(line).trim())?.groups?.['name']
+}
+
+// vitest names each failed test on a ` FAIL  <file> > <suite> > <test>` line, and a file that could
+// not load on ` FAIL  <file> [ <file> ]`. A name printed twice is listed once.
+function failed_tests(output: string): ReadonlyArray<string> {
+	const names = output.split('\n').map((line) => failed_name(line))
+
+	return [...new Set(names.filter((name) => name !== undefined))]
+}
+
+function format_failure_summary(output: string, log_path: string | undefined): string {
+	const names = failed_tests(output)
+	const lines = names.length === 0 ? [NONE_NAMED] : names.map((name) => `  ${name}`)
+
+	return `${[FAILED_HEADING, ...lines].join('\n')}\n${gate_log.format_log_notice(log_path)}`
+}
+
+// Written on every run, as the gate's is, headed by the run's own invocation; printed only when the
+// run failed, since a green run's answer is already its last line.
+function report(
+	vitest_arguments: ReadonlyArray<string>,
+	output: string,
+	exit_code: number,
+	target: string = unit_log_path(vitest_arguments),
+): void {
+	const header = [UNIT_LOG_HEADER, ...vitest_arguments].join(' ')
+	const log_path = gate_log.write_gate_log([{ header, output }], target)
+	if (exit_code !== 0) process.stdout.write(format_failure_summary(output, log_path))
+}
+
+const vitest_failure_summary = { failed_tests, format_failure_summary, report, unit_log_path }
+
+export { vitest_failure_summary }
