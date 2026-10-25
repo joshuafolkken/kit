@@ -1,0 +1,8 @@
+{
+	"reason": "#4870 adds the under-3% refusal for causing-lane Issues and its overrun-prompt handling; the removed lane floor does not offset it",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 15,
+		"ai_cost.on_demand_bytes": 164
+	}
+}

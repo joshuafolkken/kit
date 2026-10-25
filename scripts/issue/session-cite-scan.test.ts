@@ -63,6 +63,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-measure-close.ts', 1],
 	['backlog/backlog-wait-cause.ts', 1],
 	['lane/lane-overrun.ts', 1],
+	['lane/lane-overrun-prompt.ts', 1],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
 	['run/merge/run-merge-usage-limit.ts', 1],

@@ -3,7 +3,6 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { issue_priority } from '#scripts/issue/issue-priority'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
@@ -13,8 +12,9 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_overrun_prompt } from './lane-overrun-prompt'
 
-// A merged lane over the high-priority threshold of net time is investigated for its causes
+// A merged lane over the overrun threshold of net time is investigated for its causes
 // (joshuafolkken/kit#4751). `run:merge` asks at each merge: a lane at or under the threshold — its long
 // total spent waiting on a person or an outage included — stops here, before any record of it is read.
 // An overrun launches a detached worker session that reads the lane's records and files each unfiled
@@ -28,12 +28,15 @@ const { EVENT_KIND } = run_event_stream
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
 const NO_LEDGER = 'no ledger'
+// The net minutes a lane may take before its causes are investigated. They set no priority: each filing
+// is ranked by the reduction it states (joshuafolkken/kit#4870).
+const OVERRUN_LANE_MINUTES = 40
 
 // A lane's net minutes, or why there are none (joshuafolkken/kit#4818).
 type LaneNet = { kind: 'minutes'; minutes: number } | { kind: 'missing'; reason: string }
 
 function is_overrun(minutes: number): boolean {
-	return minutes > issue_priority.HIGH_LANE_MINUTES
+	return minutes > OVERRUN_LANE_MINUTES
 }
 
 // A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's note on
@@ -79,20 +82,6 @@ function transcript_directories(issue: number): ReadonlyArray<string> {
 		.filter((directory) => directory.endsWith(suffix))
 }
 
-// What a duplicate refusal leads to. A recurrence puts the ranked lines in the open issue's body
-// too, because the backlog ranking reads them only there (joshuafolkken/kit#4859).
-function duplicate_lines(loss_lines: string): ReadonlyArray<string> {
-	return [
-		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
-		'another mechanism, or is only cited, is distinct — reissue with `--distinct <N,…>`; an open one that',
-		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
-		`and ${loss_lines}, and gets those lines added under its background heading too (ranking reads only`,
-		'the body: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one closed before',
-		'this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
-		'A cap refusal is final: stop filing.',
-	]
-}
-
 // What the session reads, and the four facts it traces each cause to.
 function reading(issue: number, cite: string, minutes: number): string {
 	const directories = transcript_directories(issue).join(', ') || 'none found'
@@ -109,43 +98,11 @@ function reading(issue: number, cite: string, minutes: number): string {
 	].join(' ')
 }
 
-// Each lane pays a fixed review-to-merge cost, so causes one fix place shares are one issue. A fold
-// skips `issue:file`, so it carries the ranked lines and the priority floor `issue:file` would set.
-function grouping(issue: number, loss_lines: string, minutes: number): string {
-	const label = issue_priority.lane_label(minutes)
-	const labeling =
-		label === undefined ? '' : `, and give it the \`${label}\` label unless it carries a higher one`
-
-	return [
-		'Causes whose fixes touch the same file or mechanism are one issue, an acceptance criterion per',
-		'cause; causes fixed in different places are separate issues. Before filing one, look for an open',
-		'issue that touches the same files (`pnpm josh issue:scout "<title>" --body-file <draft.md>`, each',
-		'candidate read with `pnpm josh issue:read <N>`): when one does, fold its causes into it by',
-		'`.claude/skills/workflow-commands/issue-fold-existing.md` instead of filing, the appended part',
-		`carrying ${loss_lines}${labeling}; on a verdict other than \`fold\`, file as below.`,
-		'File each other issue with',
-		`\`pnpm josh issue:file --found-during ${String(issue)}\`, its body carrying those four per cause, and`,
-		`${loss_lines} under its background heading, the cause-loss minutes being what that issue's own`,
-		"causes spent — backlog ranking orders one priority by them, else by the lane's minutes, which every",
-		'cause of the lane shares, so a filing without either falls behind every declared one.',
-	].join(' ')
-}
-
 // One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
 function prompt(issue: number, minutes: number): string {
-	const cite = issue_cite.plain(issue)
-	// The lines backlog ranking reads (joshuafolkken/kit#4861): the cause's own minutes, else the lane's.
-	const loss_lines = `\`- 原因のレーン: ${String(minutes)} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
+	const reads = reading(issue, issue_cite.plain(issue), minutes)
 
-	return [
-		reading(issue, cite, minutes),
-		grouping(issue, loss_lines, minutes),
-		...duplicate_lines(loss_lines),
-		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, '<result>')}"\`,`,
-		`the result being \`${run_event_overrun.folded_result(['<A>', '<B>'])}\` naming every issue you folded into`,
-		`when you folded any, else \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,
-		`when you only commented a recurrence on #<N>, else \`${run_event_overrun.none_result('<why, in about 15 characters>')}\`.`,
-	].join(' ')
+	return `${reads} ${lane_overrun_prompt.handling(issue, minutes)}`
 }
 
 function log_path(issue: number): string {
