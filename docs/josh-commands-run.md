@@ -510,7 +510,9 @@ the gate; `--join` prints its lines and **exits `3` on an unpinned change**, whi
 never drains (`--unpinned-ok`: above). The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
 while every place, keyed by file, function and the lines replaced and put in, is recorded. A scoped refusal launches
-neither; a reopen stops the last check. The overlap's reader is `chain-rule.md`.
+neither; a reopen stops the last check. A dispatched lane child whose round 1 is recorded on a tree
+`josh ship` reuses is refused before either launches, pointed at `josh ship --detach --review`, and
+`josh review:record` names the same next step after a code round the ship reuses. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 

@@ -1,0 +1,8 @@
+{
+	"reason": "Refuse a lane child's run:review reopen after a reused round 1 and name the ship from review:record (#4850): a new handover module, its CLI wiring, and one doc sentence",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 47,
+		"ai_cost.on_demand_bytes": 18
+	}
+}
