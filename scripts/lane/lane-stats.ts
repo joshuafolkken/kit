@@ -236,17 +236,23 @@ function lane_minutes(
 
 // One merge's lane time runs from the latest dispatch of its issue — looked up in the whole ledger,
 // since a lane may start before the window — to the merge. A merge no dispatch preceded is skipped.
+function merge_minutes(
+	entries: ReadonlyArray<LedgerEntry>,
+	period: ReadonlyArray<LedgerEntry>,
+): Array<number> {
+	const dispatches = entries.filter(is_dispatch)
+
+	return period
+		.filter((entry) => is_merge(entry))
+		.map((merge) => lane_minutes(dispatches, merge))
+		.filter(is_number)
+}
+
 function lane_cell(
 	entries: ReadonlyArray<LedgerEntry>,
 	period: ReadonlyArray<LedgerEntry>,
 ): string {
-	const dispatches = entries.filter(is_dispatch)
-	const minutes = period
-		.filter((entry) => is_merge(entry))
-		.map((merge) => lane_minutes(dispatches, merge))
-		.filter(is_number)
-
-	return cell(median(minutes))
+	return cell(median(merge_minutes(entries, period)))
 }
 
 // A reused gate ran no check, so its few milliseconds would pull the median toward a gate that never ran.
@@ -314,6 +320,7 @@ const lane_stats = {
 	in_window,
 	mean,
 	median,
+	merge_minutes,
 	peak,
 	row,
 	to_row,

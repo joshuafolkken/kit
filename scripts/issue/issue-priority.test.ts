@@ -93,6 +93,18 @@ describe('issue_priority.floor_of', () => {
 	})
 })
 
+// joshuafolkken/kit#4886: a mechanism's summed share is judged by the same floor.
+describe('issue_priority.percent_floor', () => {
+	it.each([
+		[10, 'critical'],
+		[3, 'high'],
+		[2.9, 'normal'],
+		[undefined, 'normal'],
+	])('ranks a %s%% share as %s', (percent, level) => {
+		expect(issue_priority.percent_floor(percent)).toBe(level)
+	})
+})
+
 describe('issue_priority.problem', () => {
 	it('refuses a declaration below the stated reduction', () => {
 		expect(issue_priority.problem(shortening(HIGH_AT_TEN, '10%'), [])).toContain(CRITICAL_FLOOR)

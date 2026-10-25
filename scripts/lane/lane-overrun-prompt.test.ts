@@ -12,19 +12,29 @@ function handling(): string {
 }
 
 describe('lane_overrun_prompt.handling — a cause under the high reduction', () => {
-	it('folds it or leaves it in the result, never filing it', () => {
+	it('folds it or leaves it keyed in the result, never filing it on its own', () => {
 		for (const part of [
 			'A cause whose fix saves under 3% of the median lane time per merge',
-			'is not filed — `issue:file` refuses it under `- 目的: 時間短縮`: fold it into an open issue',
-			'else end the result below with ` — under 3%: <cause, in a few words>`',
+			'is not filed on its own — `issue:file` refuses it under `- 目的: 時間短縮`.',
+			'Under 3%, fold it into an open issue as above, else end the result below',
+			'with ` — under 3%: <key> <minutes> min: <cause, in a few words>`',
 		]) {
 			expect(handling()).toContain(part)
 		}
 	})
 
-	it('counts the recurrence earlier overrun notes record into the effect rate', () => {
-		expect(handling()).toContain('earlier `overrun:` notes on the run events naming the same cause')
-		expect(handling()).toContain('recurrence into its `効く率`')
+	// joshuafolkken/kit#4886: one mechanism's losses are summed across lanes before a cause is dropped.
+	it("reads its mechanism's summed loss before dropping it, and files the mechanism at 3%", () => {
+		for (const part of [
+			'Key it by its mechanism (a josh command or step, e.g. `test:pinned`)',
+			'Before dropping it, run that command:',
+			'`pnpm josh overrun:mechanisms`',
+			'When a closed issue already fixed the mechanism, re-run it with `--since <that close time>`',
+			'At 3% or over, the mechanism is one root-cause issue — fold into an open issue that fixes it',
+			"The key's cause count is the recurrence to put into its `効く率`.",
+		]) {
+			expect(handling()).toContain(part)
+		}
 	})
 })
 

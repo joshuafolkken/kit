@@ -281,6 +281,18 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The under-share overrun causes summed per mechanism across lanes (joshuafolkken/kit#4886).
+	'overrun:mechanisms': {
+		script: 'scripts/lane/lane-overrun-mechanisms-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Sum the overrun causes left unfiled as under the high share per mechanism key over a period, and print each key’s minutes per merge, its share of the median lane time and whether it is to be filed',
+		category: 'AI tools',
+		reference: ['[--period <days>] [--since <instant>]', 'maintainer', ['none']],
+		usage: {
+			examples: [{ arguments: '--period 3', note: "the last 3 days' mechanisms" }],
+		},
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

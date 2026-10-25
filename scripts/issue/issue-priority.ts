@@ -140,13 +140,17 @@ function reduction_percent(body: string): number | undefined {
 	return values.findLast((value) => Number.isFinite(value))
 }
 
-// The floor a run-time-shortening Issue's stated reduction sets.
-function reduction_floor(body: string): PriorityLevel {
-	const percent = expected_effect_lint.is_target(body) ? reduction_percent(body) : undefined
-
+// The floor a share of the median lane time per merge sets; `josh overrun:mechanisms` judges a
+// mechanism's summed share by it too (joshuafolkken/kit#4886).
+function percent_floor(percent: number | undefined): PriorityLevel {
 	if (percent === undefined || percent < HIGH_PERCENT) return 'normal'
 
 	return percent >= CRITICAL_PERCENT ? 'critical' : 'high'
+}
+
+// The floor a run-time-shortening Issue's stated reduction sets.
+function reduction_floor(body: string): PriorityLevel {
+	return percent_floor(expected_effect_lint.is_target(body) ? reduction_percent(body) : undefined)
 }
 
 function is_lane_line(line: string): boolean {
@@ -288,6 +292,7 @@ const issue_priority = {
 	HIGH_PERCENT,
 	lane_minutes,
 	lost_minutes,
+	percent_floor,
 	problem,
 	with_label,
 }
