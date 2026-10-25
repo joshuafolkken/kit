@@ -1,0 +1,7 @@
+{
+	"reason": "Lane yield on a planned-file clash, plus the named run reading the holder's body so its hold matches lane:plan's yield (round-2 fix)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 150
+	}
+}

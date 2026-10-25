@@ -39,11 +39,12 @@ describe('lane_plan_guard.reason', () => {
 		expect(reason).toContain(`pnpm josh lane:plan ${ISSUE}`)
 	})
 
-	// The review of #4864: the plan is recorded before `lane:plan` waits, so a `wait` lifted the hold.
-	it('keeps refusing while the recorded plan still waits', () => {
+	// The review of #4864: the plan is recorded before `lane:plan` checks, so a `wait` lifted the hold;
+	// joshuafolkken/kit#4926: a `yield` ends the session instead of polling.
+	it('keeps refusing while the recorded plan is uncleared, naming the yield', () => {
 		lane_plan.record(PLAN, LANE)
 
-		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toContain('clear')
+		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toContain('on `yield` end')
 	})
 
 	it('lets the edit through once the plan is cleared', () => {

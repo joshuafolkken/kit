@@ -4,6 +4,7 @@ import { api_usage_limit } from '#scripts/agent/api-usage-limit'
 import { issue_closing_pr } from '#scripts/issue/issue-closing-pr'
 import { issue_merged } from '#scripts/issue/issue-merged'
 import type { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ending } from '#scripts/run/run-ending'
@@ -97,6 +98,11 @@ async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolea
 	return is_merged === undefined ? undefined : !is_merged
 }
 
+// The child's own yield is on the stream, read locally, as a person's withdrawal is.
+async function read_is_yielded(child: string): Promise<boolean> {
+	return lane_yield.is_yielded(await run_event_stream_emit.current_events(), child)
+}
+
 // When a usage limit that stopped the child resets — off without `--output`, as the outage read is. The
 // reset is read from the transcript's last write, not from this late collection of it.
 function read_resume_ms(output: string | undefined): number | undefined {
@@ -107,17 +113,18 @@ function read_resume_ms(output: string | undefined): number | undefined {
 }
 
 async function read_signals(ctx: MergeContext, read: IssueRead): Promise<EndingSignals> {
-	const [is_cut, merged_pr, retryable, is_withdrawn] = await Promise.all([
+	const [is_cut, merged_pr, retryable, is_withdrawn, is_yielded] = await Promise.all([
 		run_merge_steps.has_resumable_cut(ctx.child),
 		read_merged_pr(ctx.child, read),
 		read_retryable(ctx.child, ctx.output),
 		read_is_withdrawn(ctx.child, read),
+		read_is_yielded(ctx.child),
 	])
 
 	const is_auth_failure = read_is_auth_failure(ctx.output)
 	const resume_ms = read_resume_ms(ctx.output)
 
-	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_auth_failure, resume_ms }
+	return { ...retryable, is_cut, merged_pr, is_withdrawn, is_yielded, is_auth_failure, resume_ms }
 }
 
 // An unread state is `unresolved` unless a withdrawal already settled the child, which is read locally;

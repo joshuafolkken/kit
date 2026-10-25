@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import type { Declared } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan, type LanePlan } from './lane-plan'
@@ -60,6 +61,14 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.earlier_holders(EARLIER_PLAN, holders, DIRECTORY)).toEqual([])
 	})
 
+	// joshuafolkken/kit#4926: a yielded lane keeps its earlier place in line, which must not take a file
+	// from a lane that cleared after it and may be editing it.
+	it('names a cleared holder even when it planned after this one', () => {
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.earlier_holders(EARLIER_PLAN, [LATER], DIRECTORY)).toEqual([LATER])
+	})
+
 	it('reads an issue as uncleared until its plan is recorded cleared', () => {
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 
@@ -72,16 +81,78 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
 	})
 
+	it('reads back the plan it recorded', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+	})
+
 	it('forgets a plan once it is removed', () => {
 		lane_plan.record(LATER_PLAN, DIRECTORY)
 		lane_plan.remove(LATER, DIRECTORY)
 
 		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
 	})
+})
 
-	it('reads back the plan it recorded', () => {
+describe('lane_plan.release', () => {
+	// joshuafolkken/kit#4926: a lane that yielded closes on a plan marked yielded, which keeps the issue
+	// held back and its place in line; any other plan — cleared or never answered — leaves nothing.
+	it('releases a cleared plan with its lane and keeps one the lane yielded on', () => {
+		const yielded = { ...LATER_PLAN, yielded: true }
+
+		lane_plan.record({ ...EARLIER_PLAN, cleared: true }, DIRECTORY)
+		lane_plan.record(yielded, DIRECTORY)
+		lane_plan.release(EARLIER, DIRECTORY)
+		lane_plan.release(LATER, DIRECTORY)
+
+		expect(lane_plan.read(EARLIER, DIRECTORY)).toBeUndefined()
+		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(yielded)
+	})
+
+	it('releases an uncleared plan its lane did not yield on', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.release(LATER, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
+	})
+})
+
+// The earlier lane in flight, its body declaring `body` and its recorded plan joined.
+function in_flight(...body: ReadonlyArray<string>): Declared {
+	return lane_plan.with_plans(new Map([[EARLIER, new Set(body)]]), DIRECTORY)
+}
+
+describe('lane_plan.is_yield_held', () => {
+	// joshuafolkken/kit#4926: a named run holds a yielded issue back on its kept plan while an earlier
+	// lane in flight still plans one of its files.
+	it('holds a yielded plan while an earlier lane in flight plans one of its files', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY)).toBe(true)
+		expect(lane_plan.is_yield_held(LATER, new Map(), DIRECTORY)).toBe(false)
+	})
+
+	// The same scope `lane:plan` yielded on: a file the holder's body declares holds as one it planned.
+	it('holds a yielded plan on a file an earlier lane in flight declares in its body', () => {
+		lane_plan.record({ ...EARLIER_PLAN, paths: [RANK] }, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, in_flight(OVERRUN), DIRECTORY)).toBe(true)
+	})
+
+	it('holds no plan its lane did not yield on', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
 		lane_plan.record(LATER_PLAN, DIRECTORY)
 
-		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY)).toBe(false)
+	})
+
+	it('holds no yielded plan that no lane in flight overlaps', () => {
+		lane_plan.record({ ...EARLIER_PLAN, paths: [RANK] }, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, in_flight(), DIRECTORY)).toBe(false)
 	})
 })

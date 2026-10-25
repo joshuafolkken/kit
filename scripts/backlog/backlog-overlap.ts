@@ -22,6 +22,8 @@ const GLOB = '*'
 const ISSUE_MARK = '#'
 const SEPARATOR = '/'
 const MIN_DIRECTORY_DEPTH = 2
+const DOCS_DIRECTORY = 'docs/'
+const MARKDOWN = '.md'
 
 // The paths each issue declares, by issue number. A directory ends in `/`; anything else is a file.
 type Declared = ReadonlyMap<number, ReadonlySet<string>>
@@ -74,7 +76,17 @@ function contains(outer: string, inner: string): boolean {
 	return outer.endsWith(SEPARATOR) ? inner.startsWith(outer) : outer === inner
 }
 
+// A document under `docs/` — a Markdown file or a directory of them. Nearly every issue edits one
+// (`docs/josh-commands-run.md`), and the lane's sync with main resolves the overlap, so holding a lane
+// back for it cost a whole lane each (joshuafolkken/kit#4926). `prompts/` and `.claude/` are the rules
+// themselves and still count.
+function is_shared_document(path: string): boolean {
+	return path.startsWith(DOCS_DIRECTORY) && (path.endsWith(SEPARATOR) || path.endsWith(MARKDOWN))
+}
+
 function overlaps(left: string, right: string): boolean {
+	if (is_shared_document(left) || is_shared_document(right)) return false
+
 	return contains(left, right) || contains(right, left)
 }
 
@@ -129,7 +141,7 @@ interface Holding {
 	repo: string
 }
 
-// The path of `paths` that one of `holders` already declares — what `lane:plan` waits on.
+// The path of `paths` that one of `holders` already declares — what `lane:plan` yields on.
 function path_clash(
 	paths: ReadonlySet<string>,
 	declared: Declared,

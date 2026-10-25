@@ -111,6 +111,7 @@ describe('lane_withdraw.withdraw — the order of the steps', () => {
 		expect(order).toStrictEqual(order.toSorted((left, right) => left - right))
 		expect(outcome).toStrictEqual({
 			kind: 'withdrawn',
+			by: 'person',
 			reaped: 1,
 			stash: undefined,
 			is_noted: true,
@@ -270,6 +271,18 @@ describe('lane_withdraw.withdraw — by run:merge', () => {
 			expect.stringContaining('withdrawn by `pnpm josh run:merge` after the Issue was closed'),
 		)
 		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.not.stringContaining(WITHDRAW_COMMAND))
+	})
+})
+
+// joshuafolkken/kit#4926: a lane given back stays in the run, so its report does not say this run
+// drops it.
+describe('lane_withdraw.withdraw — a yielded lane', () => {
+	it('says the issue is offered again in this run once the holding lane ends', async () => {
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON, 'yield')
+		const text = lane_withdraw.describe(outcome, ISSUE)
+
+		expect(text).toContain('offered again once the holding lane ends')
+		expect(text).not.toContain('this run does not offer it again')
 	})
 })
 

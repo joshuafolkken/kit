@@ -5,13 +5,18 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
+import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
 import { lane_plan_cli } from './lane-plan-cli'
+import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#4864: joshuafolkken/kit#4858 and joshuafolkken/kit#4859 declared disjoint paths
-// and both edited `scripts/lane/lane-overrun.ts`. The later plan now waits before implementing and
+// and both edited `scripts/lane/lane-overrun.ts`. The later plan is held back before implementing and
 // names the file and the holder; a plan that overlaps nothing runs on at once.
+//
+// joshuafolkken/kit#4926: the held-back lane polled up to nine minutes a call, two to four calls, with its
+// seat taken. It now gives its lane back on the first answer, and a docs-only overlap holds nothing.
 
 const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-cli-'))
 const DIRECTORY = path.join(ROOT, 'lane')
@@ -19,13 +24,15 @@ const HOLDER = 4858
 const LATER = 4859
 const OVERRUN = 'scripts/lane/lane-overrun.ts'
 const PRIORITY = 'scripts/issue/issue-priority.ts'
+const RUN_DOC = 'docs/josh-commands-run.md'
+const FREE_FILE = 'scripts/lane/lane-plan.ts'
 const SUCCESS = 0
 const FAILURE = 1
 const LISTING_LIMIT = 100
-const ONCE = { attempts: 1, interval_ms: 0 }
-const TWICE = { attempts: 2, interval_ms: 0, sleeper: vi.fn().mockResolvedValue(undefined) }
 
 const fetch_opted_in = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
+const record_yield = vi.spyOn(lane_yield, 'record_yield')
+const release = vi.spyOn(run_hold_cli, 'run')
 const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
 
@@ -57,11 +64,13 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
+	record_yield.mockResolvedValue(undefined)
+	release.mockResolvedValue(SUCCESS)
 	vi.spyOn(git_common_directory, 'repository').mockReturnValue(
 		mkdtempSync(path.join(ROOT, 'repository-')),
 	)
 	lane_plan.record(
-		{ issue: HOLDER, paths: [OVERRUN, PRIORITY], planned_at: '2000-01-01T00:00:00.000Z' },
+		{ issue: HOLDER, paths: [OVERRUN, PRIORITY, RUN_DOC], planned_at: '2000-01-01T00:00:00.000Z' },
 		DIRECTORY,
 	)
 })
@@ -71,30 +80,81 @@ afterAll(() => {
 })
 
 describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
-	it('waits before implementing and names the file and the holder', async () => {
+	it('gives its lane back on the first answer, naming the file and the holder', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)
 
-		expect(await lane_plan_cli.run([String(LATER), OVERRUN], ONCE, DIRECTORY)).toBe(FAILURE)
-		expect(info).toHaveBeenCalledWith('wait')
-		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
+		const code = await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(code).toBe(lane_plan_cli.YIELD_EXIT_CODE)
+		expect(fetch_opted_in).toHaveBeenCalledOnce()
+		expect(info).toHaveBeenCalledWith('yield')
 		expect(String(error.mock.calls[0]?.[0])).toMatch(
-			new RegExp(`waits before implementing: its planned \`${OVERRUN}\`.*#${String(HOLDER)}`, 'u'),
+			new RegExp(`planned \`${OVERRUN}\`.*#${String(HOLDER)}.*gives its lane back`, 'u'),
 		)
+		expect(String(error.mock.calls[0]?.[0])).not.toContain('waits')
 	})
 
-	it('runs on once the holder’s lane ends, saying why it waited only once', async () => {
-		fetch_opted_in.mockResolvedValueOnce(HOLDING).mockResolvedValueOnce(HOLDER_LEFT)
+	it('puts the yield on the stream and keeps its plan uncleared, marked yielded', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
 
-		expect(await lane_plan_cli.run([String(LATER), OVERRUN], TWICE, DIRECTORY)).toBe(SUCCESS)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(record_yield).toHaveBeenCalledWith(LATER, expect.stringContaining(OVERRUN))
+		expect(lane_plan.read(LATER, DIRECTORY)).toMatchObject({ paths: [OVERRUN], yielded: true })
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
+	})
+
+	it('runs on once the holder’s lane has ended', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		expect(await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
-		expect(error).toHaveBeenCalledOnce()
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
+		expect(record_yield).not.toHaveBeenCalled()
+	})
+})
+
+describe('lane:plan — the yield mark of a plan recorded again', () => {
+	it('drops the yield mark once a later plan clears', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.yielded).toBeUndefined()
 	})
 
+	it('keeps the yield mark when a later plan meets a listing it could not read', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.yielded).toBe(true)
+	})
+})
+
+describe('lane:plan — the hold of a lane it gives back', () => {
+	it('releases its hold before printing `yield` as its last answer', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		release.mockImplementation(async (): Promise<number> => {
+			console.info('released')
+
+			return SUCCESS
+		})
+
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(release).toHaveBeenCalledWith(['--release', String(LATER)])
+		expect(info.mock.calls.at(-1)).toEqual(['yield'])
+	})
+})
+
+describe('lane:plan — the plan it records', () => {
 	it('records its own plan, so a later candidate is weighed against it', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
 
-		await lane_plan_cli.run([String(LATER), `${PRIORITY}:203`], ONCE, DIRECTORY)
+		await lane_plan_cli.run([String(LATER), `${PRIORITY}:203`], DIRECTORY)
 
 		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([PRIORITY])
 	})
@@ -105,7 +165,7 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 		lane_plan.record({ issue: LATER, paths: [PRIORITY], planned_at: first }, DIRECTORY)
 		fetch_opted_in.mockResolvedValue(HOLDING)
 
-		expect(await lane_plan_cli.run([String(LATER), OVERRUN], ONCE, DIRECTORY)).toBe(SUCCESS)
+		expect(await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)).toBe(SUCCESS)
 		expect(lane_plan.read(LATER, DIRECTORY)).toMatchObject({ paths: [OVERRUN], planned_at: first })
 	})
 })
@@ -114,15 +174,22 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 	it('runs on at once, side by side with the holder', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)
 
-		const code = await lane_plan_cli.run(
-			[String(LATER), 'scripts/lane/lane-plan.ts'],
-			TWICE,
-			DIRECTORY,
-		)
+		const code = await lane_plan_cli.run([String(LATER), FREE_FILE], DIRECTORY)
 
 		expect(code).toBe(SUCCESS)
-		expect(fetch_opted_in).toHaveBeenCalledOnce()
 		expect(error).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4926: joshuafolkken/kit#4916 waited 27 minutes on joshuafolkken/kit#4910 for
+	// this file alone.
+	it('runs on at once when only a document under docs/ overlaps the holder’s plan', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+
+		const code = await lane_plan_cli.run([String(LATER), RUN_DOC, FREE_FILE], DIRECTORY)
+
+		expect(code).toBe(SUCCESS)
+		expect(info).toHaveBeenCalledWith('clear')
+		expect(record_yield).not.toHaveBeenCalled()
 	})
 })
 
@@ -131,14 +198,16 @@ describe('lane:plan — what it refuses', () => {
 		['no path', []],
 		['no path it can hold', ['joshuafolkken/kit#4858']],
 	])('prints the usage for a call with %s', async (_case, paths) => {
-		expect(await lane_plan_cli.run([String(LATER), ...paths], ONCE, DIRECTORY)).toBe(FAILURE)
+		expect(await lane_plan_cli.run([String(LATER), ...paths], DIRECTORY)).toBe(FAILURE)
 		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
 	})
 
 	it('waits rather than starting on a listing it could not read', async () => {
 		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
 
-		expect(await lane_plan_cli.run([String(LATER), OVERRUN], ONCE, DIRECTORY)).toBe(FAILURE)
+		expect(await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)).toBe(FAILURE)
+		expect(info).toHaveBeenCalledWith('wait')
 		expect(error).toHaveBeenCalledWith(auto_ok_cli.UNREADABLE_MESSAGE)
+		expect(record_yield).not.toHaveBeenCalled()
 	})
 })

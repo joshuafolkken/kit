@@ -19,7 +19,7 @@ import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
 import { run_merge_usage_limit } from './run-merge-usage-limit'
-import { run_merge_withdrawn } from './run-merge-withdrawn'
+import { run_merge_withdrawn, type Collected } from './run-merge-withdrawn'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event. The parent's context is
 // the largest and its per-turn cost the highest, so it calls this once at a child's return and reads
@@ -381,17 +381,27 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child a person withdrew with `lane:withdraw`, or whose issue closed without a merge: nothing is
-// counted and no merge is put on record, its lane is withdrawn unless a person already did
-// (`run-merge-withdrawn.ts`), and its seat goes to the next child — or a retry, where the withdrawal
-// could not read the child.
-async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
-	const { note, is_retry } = await run_merge_withdrawn.collect(ctx.child)
-
-	if (note !== undefined) console.error(note)
-	if (is_retry) return emit(MERGE_TOKEN.RETRY, FAILURE_EXIT_CODE)
+// The seat of a child whose lane was collected goes to the next child — or a retry, where the
+// withdrawal could not read the child.
+async function on_collected(ctx: MergeContext, collected: Collected): Promise<MergeVerdict> {
+	if (collected.note !== undefined) console.error(collected.note)
+	if (collected.is_retry) return emit(MERGE_TOKEN.RETRY, FAILURE_EXIT_CODE)
 
 	return await offered(ctx)
+}
+
+// A child a person withdrew with `lane:withdraw`, or whose issue closed without a merge: nothing is
+// counted and no merge is put on record, and its lane is withdrawn unless a person already did
+// (`run-merge-withdrawn.ts`).
+async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
+	return await on_collected(ctx, await run_merge_withdrawn.collect(ctx.child))
+}
+
+// A child that gave its lane back on its `lane:plan` (`lane-yield.ts`): its lane is closed the same way,
+// but the issue stays in the run — `backlog:drive` does not exclude a `yielded` child, and its kept
+// plan holds it back until the holder ends.
+async function on_yielded(ctx: MergeContext): Promise<MergeVerdict> {
+	return await on_collected(ctx, await run_merge_withdrawn.collect_yield(ctx.child))
 }
 
 // The child's own ending: it stopped before its commit for a person to look at, so nothing is counted
@@ -422,6 +432,7 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	unresolved: on_unresolved,
 	shipping: on_shipping,
 	withdrawn: on_withdrawn,
+	yielded: on_yielded,
 }
 
 // The whole merge event for one returned child: read its state, classify it, and run the handler.

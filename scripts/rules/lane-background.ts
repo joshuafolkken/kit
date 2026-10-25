@@ -37,7 +37,7 @@ import { run_tail_rule } from './run-tail-rule'
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
 // `ship`, `ship:wait` and `lane:plan` are run in the foreground at the cap rather than refused: a
 // `ship:wait` left at the two-minute default is moved aside mid-chunk and dies with the turn, its verdict
-// unread, and a cut `lane:plan` leaves its plan recorded with the wait it gates unfinished.
+// unread, and a cut `lane:plan` leaves its plan recorded with the check it gates unanswered.
 const FOREGROUND_COMMANDS: ReadonlySet<string> = new Set(
 	['ship', 'ship:wait', 'lane:plan'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
 )

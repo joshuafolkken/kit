@@ -4,6 +4,7 @@
 const CHILD_OUTCOMES = [
 	'merged',
 	'withdrawn',
+	'yielded',
 	'human-review',
 	'parked',
 	'split',

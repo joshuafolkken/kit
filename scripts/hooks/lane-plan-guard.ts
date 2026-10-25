@@ -11,12 +11,13 @@ import { step_zero_notice } from './step-zero-notice'
 // one carrying a mark leaked from a parent, runs no lanes beside it to wait on.
 
 const COMMAND_DOC = '`docs/josh-commands-run.md` → "`josh lane:plan`"'
-const WHY = 'it waits while a running lane that planned one of them first holds it'
+const OUTCOMES =
+	'on `yield` end the session with no edit (its lane is given back); on `wait` run it again'
 
 function reason_text(issue: string): string {
 	const command = `\`pnpm josh lane:plan ${issue} <path>...\``
 
-	return `⛔ lane plan: run ${command} naming every file the work summary changes, again until it prints \`clear\`, before the first implementation edit — ${WHY} (${COMMAND_DOC}).`
+	return `⛔ lane plan: run ${command} naming every file the work summary changes before the first implementation edit — ${OUTCOMES} (${COMMAND_DOC}).`
 }
 
 // The issue of the dispatched lane child making this runtime edit, or `undefined` for any other call.

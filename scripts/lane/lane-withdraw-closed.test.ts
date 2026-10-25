@@ -19,6 +19,7 @@ const SECOND = '4916'
 
 const WITHDRAWN_OUTCOME: WithdrawOutcome = {
 	kind: 'withdrawn',
+	by: 'supervisor',
 	reaped: 1,
 	stash: undefined,
 	is_noted: true,
@@ -179,6 +180,15 @@ describe('lane_withdraw_closed.withdraw_lane — as run:merge', () => {
 		expect(withdraw).not.toHaveBeenCalled()
 		expect(result.is_retry).toBe(false)
 		expect(result.note).toContain(`pnpm josh lane:withdraw ${WITHDRAWN}`)
+	})
+
+	// joshuafolkken/kit#4926: a yielded lane's issue is open, so the note does not call it closed.
+	it('says a kept yielded lane gave its lane back', async () => {
+		unpushed.mockResolvedValue(2)
+		const result = await lane_withdraw_closed.withdraw_lane(lane(WITHDRAWN), REASON, 'yield')
+
+		expect(result.note).toContain('gave its lane back')
+		expect(result.note).not.toContain(REASON)
 	})
 
 	it('asks for a retry when the withdrawal could not read the issue', async () => {

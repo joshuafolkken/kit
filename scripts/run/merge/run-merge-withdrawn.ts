@@ -1,5 +1,6 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
+import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 
@@ -21,18 +22,32 @@ interface Collected {
 
 const NOTHING_LEFT: Collected = { note: undefined, is_retry: false }
 
-/** Withdraw `#<child>`'s open lane unless a withdrawal is already on the stream. */
+/** Withdraw `#<child>`'s open lane unless a withdrawal that closed it is already on the stream. */
 async function collect(child: string): Promise<Collected> {
 	const events = await run_event_stream_emit.current_events()
 
 	if (run_event_scope.is_withdrawn(events, child)) return NOTHING_LEFT
 	const lane = await lane_registry.find_open_lane(child)
 
-	if (lane === undefined) return NOTHING_LEFT
-
-	return await lane_withdraw_closed.withdraw_lane(lane, UNMERGED_REASON, 'merge')
+	return lane === undefined
+		? NOTHING_LEFT
+		: await lane_withdraw_closed.withdraw_lane(lane, UNMERGED_REASON, 'merge')
 }
 
-const run_merge_withdrawn = { UNMERGED_REASON, collect }
+/**
+ * Close the open lane of `#<child>`, which gave it back (`lane-yield.ts`): the child noted its yield
+ * from inside the lane, which it could not close, so the lane is closed here, named as the yield. A
+ * lane already closed — a second `run:merge` — leaves nothing to do.
+ */
+async function collect_yield(child: string): Promise<Collected> {
+	const lane = await lane_registry.find_open_lane(child)
 
+	return lane === undefined
+		? NOTHING_LEFT
+		: await lane_withdraw_closed.withdraw_lane(lane, lane_yield.YIELD_REASON, 'yield')
+}
+
+const run_merge_withdrawn = { UNMERGED_REASON, collect, collect_yield }
+
+export type { Collected }
 export { run_merge_withdrawn }

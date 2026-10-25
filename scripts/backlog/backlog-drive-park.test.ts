@@ -48,3 +48,15 @@ describe('backlog_drive — a withdrawn child is excluded', () => {
 		expect(result.state.exclude).toStrictEqual([FIRST_CHILD])
 	})
 })
+
+// joshuafolkken/kit#4926: a child that gave its lane back stays in the run — its retained plan, not the
+// exclusion, holds it back until the holder ends.
+describe('backlog_drive — a yielded child is not excluded', () => {
+	it('leaves a child run:merge booked yielded out of the exclude list', async () => {
+		const { ports, offers } = harness({ finished: [FIRST_CHILD], yielded: [FIRST_CHILD] })
+		const result = await backlog_drive.run_pass(state([FIRST_CHILD]), false, ports)
+
+		expect(offers[0]?.exclude).toStrictEqual([])
+		expect(result.state.exclude).toStrictEqual([])
+	})
+})

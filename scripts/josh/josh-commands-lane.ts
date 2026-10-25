@@ -169,10 +169,12 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	// `.env` is read for the Telegram settings the yield's hold release reaches (`run-hold-cli.ts`).
 	'lane:plan': {
 		script: 'scripts/lane/lane-plan-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Record the files a lane child plans to edit, and wait before implementing while a running lane that planned earlier declares or plans one of them — naming the file and that issue',
+			'Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue',
 		category: 'AI tools',
 		reference: ['<issue> <path>...', 'automation', ['files', 'network']],
 		usage: {
