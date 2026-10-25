@@ -1,8 +1,10 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
+import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
 // joshuafolkken/kit#4647: `--unpinned-ok "<reason>"` is a start, not a usage error.
@@ -19,9 +21,11 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 const FAILURE_EXIT_CODE = 1
 const REASON = 'only logs'
 const REFUSAL = 'scoped checks not green on this tree'
+const TREE = 'briefed-tree'
 
 beforeEach(() => {
 	vi.spyOn(review_brief_cli, 'scoped_refusal').mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(TREE)
 })
 
 afterEach(() => {
@@ -47,8 +51,47 @@ describe('run with --unpinned-ok', () => {
 		})
 
 		expect(await run_review_cli.run(['--unpinned-ok', REASON])).toBe(FAILURE_EXIT_CODE)
-		expect(launch).toHaveBeenCalledWith(PROJECT_ROOT, REASON)
+		expect(launch).toHaveBeenCalledWith(PROJECT_ROOT, REASON, TREE)
 		expect(order).toStrictEqual(['pinned', 'gate'])
+	})
+})
+
+// joshuafolkken/kit#4834: `review:record` starts the check again on a tree a round-1 fix moved, and
+// `--pinned` reads its answer alone, after the pair's join has already closed.
+describe('run --pinned', () => {
+	const LINE = 'unpinned a.ts:1'
+	const UNPINNED = { text: `${LINE}\n`, unpinned: ['a.ts 0123456789abcdef'] }
+	const PINNED = ['--pinned']
+
+	beforeEach(() => {
+		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(undefined)
+		vi.spyOn(run_review_steps, 'wait_for_gate_finish')
+	})
+
+	it('exits 3 on an unpinned answer without joining the gate', async () => {
+		vi.spyOn(run_review_pinned_steps, 'wait_for_answer')
+		vi.spyOn(run_review_pinned_steps, 'wait_alone').mockResolvedValue(UNPINNED)
+
+		expect(await run_review_cli.run(PINNED)).toBe(run_review.UNPINNED_EXIT_CODE)
+		expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining(LINE))
+		expect(run_review_steps.wait_for_gate_finish).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
+	})
+
+	it('exits 0 on a clear answer, and when no check was launched', async () => {
+		const wait = vi.spyOn(run_review_pinned_steps, 'wait_alone')
+
+		wait.mockResolvedValueOnce({ text: 'unpinned 0\n', unpinned: [] })
+		wait.mockResolvedValueOnce(undefined)
+
+		expect(await run_review_cli.run(PINNED)).toBe(0)
+		expect(await run_review_cli.run(PINNED)).toBe(0)
+	})
+
+	it('refuses a prototype key with the usage line rather than reading it as a mode', async () => {
+		expect(await run_review_cli.run(['toString'])).toBe(1)
+		expect(process.stderr.write).toHaveBeenCalledWith(expect.stringContaining('--pinned'))
 	})
 })
 

@@ -1197,7 +1197,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:review": [
-      "[--code-only] [--unpinned-ok "<reason>"] | --join",
+      "[--code-only] [--unpinned-ok "<reason>"] | --join | --pinned",
       "automation",
       [
         "processes",

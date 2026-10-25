@@ -9,8 +9,8 @@ import { review_finding_text } from './review-finding-text'
 import { review_interaction } from './review-interaction'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
+import { review_record_code_round } from './review-record-code-round'
 import { review_record_interaction } from './review-record-interaction'
-import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
@@ -289,25 +289,7 @@ interface AppendedRound {
 	findings: ReadonlyArray<Finding>
 }
 
-const HIGH_SEVERITY = 'high'
-
-// The files whose finding the round could not have fixed in place — a High never is.
-function unsettled_files(findings: ReadonlyArray<Finding>): ReadonlyArray<string> {
-	return findings
-		.filter((finding) => finding.severity === HIGH_SEVERITY)
-		.map((finding) => finding.file)
-}
-
-// A lane child's round the ship reuses names the ship next (joshuafolkken/kit#4850), read after the
-// tree is stamped; an interaction pass now due follows it, since it is recorded before the ship.
-async function report_handover(issue: number): Promise<void> {
-	if (await review_lane_handover.is_handed_over(issue)) {
-		console.info(review_lane_handover.NEXT_STEP_LINE)
-	}
-}
-
-// A code round also records the tree its verdict stands for, which `josh ship` reuses while the tree
-// holds still (`review-reviewed-tree.ts`), and names an interaction review its fixes made due.
+// A code round goes on to what its tree means for the ship (`review-record-code-round.ts`).
 async function append_round({
 	issue,
 	lines,
@@ -321,11 +303,7 @@ async function append_round({
 	console.info(confirmation(lines.length, ledger_path))
 	await carry_comment_rounds(root)
 
-	if (kind === 'code') {
-		await review_reviewed_tree.record(unsettled_files(findings))
-		await report_handover(issue)
-		await review_record_interaction.report_due(issue, root)
-	}
+	if (kind === 'code') await review_record_code_round.follow(issue, root, findings)
 
 	return 0
 }

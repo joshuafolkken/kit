@@ -8,11 +8,12 @@ import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
-import { test_pinned_record } from '#scripts/test/test-pinned-record'
+import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
+import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
 // `josh run:review` — one call that leaves `josh gate` running in the background and prints the whole
@@ -35,13 +36,18 @@ import { run_review_steps } from './run-review-steps'
 // (joshuafolkken/kit#4802), so the child's round 1 reviews both and `josh ship` reuses both rather than
 // running the interaction pass alone after it. `--code-only` is the ship's own open, which mints the
 // interaction brief itself.
+//
+// **`--pinned` reads the check alone** (joshuafolkken/kit#4834): `josh review:record` starts it again
+// on a tree a round-1 fix moved, after the join has closed the pair, so the lane reads the fixed tree's
+// unpinned places before `josh ship` without joining a gate that already settled.
 
 const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
+const PINNED_FLAG = '--pinned'
 const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join'
+const USAGE = 'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join | --pinned'
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
@@ -137,8 +143,10 @@ async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Pro
 	const refusal = await review_brief_cli.scoped_refusal()
 
 	if (refusal !== undefined) return review_brief_cli.report_error(refusal)
+	const tree = await run_review_pinned_tree.key()
+
 	run_review_pinned_steps.clear()
-	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason)
+	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason, tree)
 
 	if (launched.kind === 'failed') {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
@@ -147,9 +155,12 @@ async function run_start(slots: ReadonlyArray<ReviewSlot>, reason?: string): Pro
 	return await start_pair(slots)
 }
 
-// The background check's answer, on stderr beside the other run notes.
-async function join_pinned(): Promise<boolean> {
-	const summary = await run_review_pinned_steps.wait_for_answer()
+type PinnedWait = () => Promise<PinnedSummary | undefined>
+
+// The background check's answer, on stderr beside the other run notes. The join waits as the end of
+// the pair; `--pinned` waits for a check started moments before (`run_review_pinned_steps.wait_alone`).
+async function join_pinned(wait: PinnedWait): Promise<boolean> {
+	const summary = await wait()
 
 	if (summary === undefined) return false
 
@@ -217,7 +228,7 @@ async function run_join(): Promise<number> {
 	report_timing(timing)
 
 	// An unpinned change stops the round whatever the gate answered.
-	const is_unpinned = await join_pinned()
+	const is_unpinned = await join_pinned(run_review_pinned_steps.wait_for_answer)
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
@@ -243,8 +254,22 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 	return await run_start(await brief_slots(is_code_only), reason)
 }
 
+async function run_pinned(): Promise<number> {
+	const is_unpinned = await join_pinned(run_review_pinned_steps.wait_alone)
+
+	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : SUCCESS_EXIT_CODE
+}
+
+// The modes a lone flag selects; a `Map`, so no prototype key reads as a mode.
+const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
+	[JOIN_FLAG, run_join],
+	[PINNED_FLAG, run_pinned],
+])
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv.length === 1 && argv[0] === JOIN_FLAG) return await run_join()
+	const lone = argv.length === 1 ? LONE_MODES.get(argv[0] ?? '') : undefined
+
+	if (lone !== undefined) return await lone()
 	const is_code_only = argv[0] === run_review.CODE_ONLY_FLAG
 
 	return await run_open(is_code_only, argv.slice(is_code_only ? 1 : 0))

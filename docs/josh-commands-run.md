@@ -491,6 +491,7 @@ pnpm josh run:review                             # detach test:pinned and the ga
 pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
+pnpm josh run:review --pinned                    # read test:pinned alone once review:record restarted it
 ```
 
 <!-- /usage -->

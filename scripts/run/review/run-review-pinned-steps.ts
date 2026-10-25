@@ -33,16 +33,23 @@ const STOP_SIGNAL = 'SIGTERM'
 const GRACE_MS = 120_000
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
+// `josh run:review --pinned` reads a check `josh review:record` started seconds before
+// (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the bound only
+// stops a check that hung.
+const ALONE_GRACE_MS = 900_000
+const ALONE_TIMED_OUT_NOTE = `no answer within ${String(ALONE_GRACE_MS / MS_PER_SECOND)}s of the read`
 
 type Clock = () => number
 
 // `start` is the launched pid's start time, so a pid the OS has since reissued is told apart from the
-// check (joshuafolkken/kit#4828).
+// check (joshuafolkken/kit#4828). `tree` is the digest of the tree it checks (`run-review-pinned-tree.ts`),
+// so `josh review:record` tells a round-1 fix that moved the tree (joshuafolkken/kit#4834).
 interface Launch {
 	pid: number
 	token: string
 	reason?: string | undefined
 	start?: string | undefined
+	tree?: string | undefined
 }
 
 function launch_path(root: string = PROJECT_ROOT): string {
@@ -54,7 +61,7 @@ function log_path(root: string = PROJECT_ROOT): string {
 }
 
 // The token ties the answer to this launch (`test-pinned-record.ts`).
-function launch(root: string = PROJECT_ROOT, reason?: string): LaunchResult {
+function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): LaunchResult {
 	const token = randomUUID()
 	const argv = [PINNED_COMMAND, RECORD_FLAG, token]
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
@@ -67,6 +74,7 @@ function launch(root: string = PROJECT_ROOT, reason?: string): LaunchResult {
 			token,
 			reason,
 			start: process_identity.read_start(pid),
+			tree,
 		})
 	}
 
@@ -78,10 +86,16 @@ function optional_text(value: unknown): string | undefined {
 }
 
 function to_launch(value: unknown): Launch | undefined {
-	const { pid, token, reason, start } = value as Record<string, unknown>
+	const { pid, token, reason, start, tree } = value as Record<string, unknown>
 	if (typeof pid !== 'number' || typeof token !== 'string') return undefined
 
-	return { pid, token, reason: optional_text(reason), start: optional_text(start) }
+	return {
+		pid,
+		token,
+		reason: optional_text(reason),
+		start: optional_text(start),
+		tree: optional_text(tree),
+	}
 }
 
 function read_launch(root: string): Launch | undefined {
@@ -171,11 +185,12 @@ async function poll_within_grace(
 	root: string,
 	launched: Launch,
 	now: Clock,
+	grace_ms: number = GRACE_MS,
 ): Promise<PinnedSummary | undefined> {
 	const started = now()
 	let summary = read_answer(root, launched)
 
-	while (summary === undefined && now() - started < GRACE_MS) {
+	while (summary === undefined && now() - started < grace_ms) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(run_review_steps.POLL_INTERVAL_MS)
 		summary = read_answer(root, launched)
@@ -200,6 +215,11 @@ function launched_reason(root: string = PROJECT_ROOT): string | undefined {
 	return read_launch(root)?.reason
 }
 
+// The tree the last check was launched on; `undefined` when none was, or its tree could not be read.
+function launched_tree(root: string = PROJECT_ROOT): string | undefined {
+	return read_launch(root)?.tree
+}
+
 // `undefined` when no check was launched.
 async function wait_for_answer(
 	root: string = PROJECT_ROOT,
@@ -212,6 +232,27 @@ async function wait_for_answer(
 	return await poll_answer(root, launched, now)
 }
 
-const run_review_pinned_steps = { clear, launch, launched_reason, log_path, wait_for_answer }
+// The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
+async function wait_alone(
+	root: string = PROJECT_ROOT,
+	now: Clock = () => Date.now(),
+): Promise<PinnedSummary | undefined> {
+	const launched = read_launch(root)
+
+	if (launched === undefined) return undefined
+	const summary = await poll_within_grace(root, launched, now, ALONE_GRACE_MS)
+
+	return summary ?? stopped(launched, ALONE_TIMED_OUT_NOTE)
+}
+
+const run_review_pinned_steps = {
+	clear,
+	launch,
+	launched_reason,
+	launched_tree,
+	log_path,
+	wait_alone,
+	wait_for_answer,
+}
 
 export { run_review_pinned_steps }

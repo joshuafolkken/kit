@@ -106,7 +106,7 @@ describe('run:review where the interaction review is due', () => {
 
 	it('prints both briefs unchanged under --unpinned-ok, its reason riding on the launch', async () => {
 		expect(await run_review_cli.run([UNPINNED_OK, REASON])).toBe(0)
-		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
+		expect(launch_pinned.mock.lastCall?.slice(0, 2)).toStrictEqual([expect.any(String), REASON])
 		expect(output.stdout.join('')).toBe(
 			`${CODE_BRIEF}${run_review_cli.INTERACTION_HEADER}\n${INTERACTION_BRIEF}`,
 		)
@@ -143,7 +143,7 @@ describe('run:review that briefs code alone', () => {
 	it('accepts --unpinned-ok after --code-only, with code’s brief and the reason on the launch', async () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG, UNPINNED_OK, REASON])).toBe(0)
 		expect(brief_run.mock.calls).toStrictEqual([[[]]])
-		expect(launch_pinned).toHaveBeenCalledWith(expect.any(String), REASON)
+		expect(launch_pinned.mock.lastCall?.slice(0, 2)).toStrictEqual([expect.any(String), REASON])
 		expect(output.stdout.join('')).toBe(CODE_BRIEF)
 	})
 
