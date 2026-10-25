@@ -40,16 +40,27 @@ function grouping(issue: number, loss_lines: string): string {
 
 // A filing's priority is the reduction it states, and `issue:file` refuses one under the high share,
 // which would not pay back the lane its fix takes (joshuafolkken/kit#4870). Such a cause is still
-// recorded, so a later investigation finding it again can count the recurrence.
+// recorded under its mechanism's key, and the key's sum across lanes is judged before the cause is
+// dropped, since one mechanism losing a little in every lane is not small (joshuafolkken/kit#4886).
 function small_cause_lines(): ReadonlyArray<string> {
 	const percent = `${String(issue_priority.HIGH_PERCENT)}%`
+	const suffix = run_event_overrun.small_causes_text([
+		{ key: '<key>', minutes: '<minutes>', cause: '<cause, in a few words>' },
+	])
 
 	return [
 		`A cause whose fix saves under ${percent} of the median lane time per merge`,
-		'(`- 1 マージあたりの短縮:`) is not filed — `issue:file` refuses it under `- 目的: 時間短縮`: fold it into an open issue as',
-		`above, else end the result below with \` — under ${percent}: <cause, in a few words>\`. Before judging`,
-		'a cause, count the earlier `overrun:` notes on the run events naming the same cause, and put that',
-		'recurrence into its `効く率`.',
+		'(`- 1 マージあたりの短縮:`) is not filed on its own — `issue:file` refuses it under `- 目的: 時間短縮`.',
+		'Key it by its mechanism (a josh command or step, e.g. `test:pinned`), reusing the key',
+		'`pnpm josh overrun:mechanisms` lists for the same mechanism. Before dropping it, run that command:',
+		"add the cause's minutes to its key's sum and divide by the merges and the median lane it prints.",
+		'When a closed issue already fixed the mechanism, re-run it with `--since <that close time>` and',
+		'judge only that sum — the losses before the fix are gone.',
+		`At ${percent} or over, the mechanism is one root-cause issue — fold into an open issue that fixes it`,
+		"as above, else file it with the key's summed minutes as its cause-loss line and the summed share as",
+		`its reduction. Under ${percent}, fold it into an open issue as above, else end the result below`,
+		`with \`${suffix}\`, the segments of several causes joined by \`; \`. The key's cause count is the`,
+		'recurrence to put into its `効く率`.',
 	]
 }
 

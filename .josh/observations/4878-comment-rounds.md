@@ -1,0 +1,3 @@
+- rf:comments | low | scripts/run/ship/run-ship-next.ts:18-20 | 2026-10-25 | #4878
+- rf:comments | low | scripts/run/ship/run-ship-pre-detach-pinned.ts:49-50 | 2026-10-25 | #4878
+- rf:comments | low | scripts/review/review-round-reuse.ts:44-47 | 2026-10-25 | #4878

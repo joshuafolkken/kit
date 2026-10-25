@@ -40,6 +40,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "mm": "main:merge",
     "ms": "main:sync",
     "mt": "metrics",
+    "omc": "overrun:mechanisms",
     "ov": "overrides",
     "pf": "profile",
     "pg": "propagate",
@@ -824,6 +825,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "files",
+      ],
+    ],
+    "overrun:mechanisms": [
+      "[--period <days>] [--since <instant>]",
+      "maintainer",
+      [
+        "none",
       ],
     ],
     "pkg:scout": [

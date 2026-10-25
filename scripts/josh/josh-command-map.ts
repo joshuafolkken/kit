@@ -89,6 +89,7 @@ const ALIASES: Record<string, string> = {
 	lst: 'lane:stats',
 	lva: 'lane:value',
 	lnt: 'lane:net',
+	omc: 'overrun:mechanisms',
 	lli: 'lane:limit',
 	lrs: 'lane:restart',
 	lwd: 'lane:withdraw',

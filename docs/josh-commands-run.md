@@ -995,6 +995,22 @@ The whole minutes are what an Issue's `- 原因のレーン:` line declares; a l
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
 
+#### `josh overrun:mechanisms`
+
+<!-- usage: overrun:mechanisms -->
+
+Sum the overrun causes left unfiled as under the high share per mechanism key over a period, and print each key’s minutes per merge, its share of the median lane time and whether it is to be filed.
+
+```bash
+pnpm josh overrun:mechanisms --period 3   # the last 3 days' mechanisms
+```
+
+<!-- /usage -->
+
+It reads the keyed ` — under 3%: <key> <minutes> min: <cause>` segments of the overrun result notes on the run's event stream (`run-event-overrun.ts`), 7 days by default; a key at 3% or over is filed as one root-cause issue, at 10% or over as urgent. An overrun investigation runs it before dropping a cause (`lane-overrun-prompt.ts`).
+
+`--since <instant>` starts the period later — at the close of the issue that fixed a mechanism, so the sum leaves out the losses that fix removed.
+
 ### `josh lane:plan`
 
 <!-- usage: lane:plan -->

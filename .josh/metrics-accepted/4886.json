@@ -1,0 +1,8 @@
+{
+	"reason": "new josh overrun:mechanisms command (#4886): its CLI, --since window and its reference paragraph",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 188,
+		"prose.long_paragraphs": 1
+	}
+}
