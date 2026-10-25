@@ -11,9 +11,8 @@ import type { ItemState } from './run-board-status'
 // its lane's net minutes — `?′` where there are none — the numbers of the Issues its child filed, then
 // what its overrun investigation came to and the numbers it filed (joshuafolkken/kit#4880), each group
 // two spaces apart: `⏭` and why it was skipped, or 🔍 and the numbers it filed, `↪N` for each open
-// Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not (the largest keyed
-// cause's mechanism and minutes, then `+N` others, joshuafolkken/kit#4911), `∅ ↻#N` for a recurrence commented
-// on, or 💥 for an investigation that failed. While the investigation runs, the spinner stands for 🔍.
+// Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻#N` for a
+// recurrence commented on, or 💥 for an investigation that failed. While the investigation runs, the spinner stands for 🔍.
 // A row its merge left no note on was never asked. A done row that did not merge says only what was
 // filed during it.
 
@@ -28,7 +27,6 @@ const SKIP_MARK = '⏭'
 const NONE_MARK = '∅'
 const RECURRED_MARK = '↻'
 const FOLDED_MARK = '↪'
-const OTHERS_MARK = '+'
 const FAILED_TEXT = `${OVERRUN_MARK} 💥`
 const NO_RECORD = 'no record'
 // The investigator writes its reason in about 15 characters; the row keeps no more.
@@ -56,36 +54,15 @@ function minutes_text(found: Found | undefined): string {
 	return `${minutes.padStart(MINUTES_WIDTH)}${MINUTE_MARK}`
 }
 
-// Whole minutes, `<1′` for a loss that rounds to none.
-function loss_minutes(minutes: number): string {
-	const rounded = Math.round(minutes)
-
-	return rounded === 0 ? `<1${MINUTE_MARK}` : `${String(rounded)}${MINUTE_MARK}`
-}
-
-// The largest mechanism and its summed minutes, then how many others there are (joshuafolkken/kit#4911,
-// joshuafolkken/kit#4922), else the reason when no cause is keyed — `∅` already says nothing was filed.
-function why_text(result: string): string {
-	const [largest, ...others] = run_event_overrun.sum_by_key(
-		run_event_overrun.small_causes_of(result),
-	)
-
-	if (largest === undefined) {
-		return run_board_render_title.title_of(run_event_overrun.reason_of(result), REASON_LIMIT)
-	}
-
-	const text = `${largest.key} ${loss_minutes(largest.minutes)}`
-
-	return others.length === 0 ? text : `${text} ${OTHERS_MARK}${String(others.length)}`
-}
-
 // An investigation that filed nothing: the recurrence it commented on, else why it did not.
 function none_text(result: string): string {
 	const recurred = run_event_overrun.recurred_of(result)
 
 	if (recurred !== undefined) return `${NONE_MARK} ${RECURRED_MARK}${issue_cite.plain(recurred)}`
 
-	return `${NONE_MARK} ${why_text(result)}`
+	const why = run_board_render_title.title_of(run_event_overrun.reason_of(result), REASON_LIMIT)
+
+	return `${NONE_MARK} ${why}`
 }
 
 // The open Issues the investigation appended its causes to, each a link with no `#`.

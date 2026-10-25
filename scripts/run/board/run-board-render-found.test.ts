@@ -78,12 +78,6 @@ function done_line(found: Found | undefined, extra: Partial<BoardHeader> = {}): 
 	return row_line(board(found, extra))
 }
 
-function keyed_line(causes: Parameters<typeof run_event_overrun.small_causes_text>[0]): string {
-	const text = run_event_overrun.small_causes_text(causes)
-
-	return done_line(ended(`${run_event_overrun.none_result('all under 3%')}${text}`))
-}
-
 describe('run_board_render — a merged row’s net minutes', () => {
 	it('ends on the minutes alone at or under the threshold', () => {
 		expect(done_line(found_of(WITHIN))).toMatch(/\S \s*18′$/u)
@@ -163,34 +157,14 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 	})
 })
 
-// joshuafolkken/kit#4911: the keyed causes say where the minutes went; `∅` already says none was filed.
-describe('run_board_render — a merged row’s keyed small causes', () => {
-	const PINNED = 'test:pinned'
+// joshuafolkken/kit#4929: a result written while causes were keyed by mechanism shows its reason, not
+// a mechanism's minutes.
+describe('run_board_render — a merged row’s keyed result from before #4929', () => {
+	it('says `∅` and the reason, not the largest mechanism', () => {
+		const line = done_line(ended('none: all small — under 2%: test:pinned 7.2 min: restarted'))
 
-	// joshuafolkken/kit#4922: the largest alone, then how many others, so the end stays short.
-	it('says `∅`, the largest mechanism’s summed minutes and how many others, not the reason', () => {
-		const line = keyed_line([
-			{ key: 'check:related', minutes: 1.2, cause: 'lint rerun' },
-			{ key: PINNED, minutes: 7.2, cause: 'restarted' },
-			{ key: 'lane:plan', minutes: 0.4, cause: 'waited' },
-			{ key: PINNED, minutes: 1.5, cause: 'rerun' },
-		])
-
-		expect(line).toMatch(/52′ {2}🔍 ∅ test:pinned 9′ \+2$/u)
-		expect(line).not.toContain('all under')
-	})
-
-	it('counts every other mechanism', () => {
-		const keys = ['run-ship-place', 'a', 'b', 'c', 'd', 'e']
-		const line = keyed_line(keys.map((key, index) => ({ key, minutes: 13 - index, cause: 'x' })))
-
-		expect(line).toMatch(/52′ {2}🔍 ∅ run-ship-place 13′ \+5$/u)
-	})
-
-	it('adds no count for a single mechanism', () => {
-		expect(keyed_line([{ key: PINNED, minutes: 7.2, cause: 'restarted' }])).toMatch(
-			/52′ {2}🔍 ∅ test:pinned 7′$/u,
-		)
+		expect(line).toMatch(/52′ {2}🔍 ∅ all small — und…$/u)
+		expect(line).not.toContain('7′')
 	})
 })
 

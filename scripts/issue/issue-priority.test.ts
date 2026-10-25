@@ -96,18 +96,6 @@ describe('issue_priority.problem — a run-time-shortening Issue (joshuafolkken/
 	})
 })
 
-// joshuafolkken/kit#4886: `overrun:mechanisms` judges a mechanism's summed share by these bands.
-describe('issue_priority.percent_floor', () => {
-	it.each([
-		[10, 'critical'],
-		[3, 'high'],
-		[2.9, 'normal'],
-		[undefined, 'normal'],
-	])('ranks a %s%% share as %s', (percent, level) => {
-		expect(issue_priority.percent_floor(percent)).toBe(level)
-	})
-})
-
 describe('issue_priority.problem', () => {
 	it('accepts an urgent declaration naming a condition, and refuses one naming a reduction', () => {
 		expect(issue_priority.problem(shortening(URGENT_CONDITION_2, '3%'), [])).toBeUndefined()

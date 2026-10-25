@@ -33,11 +33,6 @@ const HIGH_PATTERN = /^- 優先度: 高（(?<basis>.*)）$/u
 // An interrupt-filing condition number (`wip-cap.md`); a reduction is no basis (joshuafolkken/kit#4928).
 const CRITICAL_BASIS = /条件 ?[1-3]/u
 const PLACEHOLDER = /^<.*>$/u
-// The bands and the floor `josh overrun:mechanisms` judges a mechanism's summed share of the median lane
-// by (joshuafolkken/kit#4886); an Issue's filing reads no share (joshuafolkken/kit#4928).
-const CRITICAL_PERCENT = 10
-const HIGH_PERCENT = 3
-const FILING_FLOOR_PERCENT = 2
 const LANE_PREFIX = '- 原因のレーン:'
 // The minutes are the lane's net time (`josh lane:net`), the number its Issue.
 const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
@@ -112,13 +107,6 @@ function declared_level(body: string): PriorityLevel | undefined {
 	if (lines.length === 0) return 'normal'
 
 	return lines.length === 1 ? level_of(lines[0] ?? '') : undefined
-}
-
-// The band a mechanism's summed share of the median lane time per merge falls in.
-function percent_floor(percent: number | undefined): PriorityLevel {
-	if (percent === undefined || percent < HIGH_PERCENT) return 'normal'
-
-	return percent >= CRITICAL_PERCENT ? 'critical' : 'high'
 }
 
 function is_lane_line(line: string): boolean {
@@ -237,12 +225,9 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 const issue_priority = {
 	CAUSE_PREFIX,
 	declared_level,
-	FILING_FLOOR_PERCENT,
 	floor_of,
-	HIGH_PERCENT,
 	lane_minutes,
 	lost_minutes,
-	percent_floor,
 	problem,
 	with_label,
 }
