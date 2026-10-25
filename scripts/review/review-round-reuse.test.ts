@@ -14,7 +14,7 @@ vi.mock('./review-reviewed-tree', () => ({
 	review_reviewed_tree: {
 		MOVEMENT: { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' },
 		is_stopped_on: stopped_on_mock,
-		movement_here: movement_mock,
+		standing_here: movement_mock,
 	},
 }))
 
@@ -30,7 +30,7 @@ describe('review_round_reuse.is_reusable', () => {
 	beforeEach(() => {
 		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
 		stopped_on_mock.mockReset().mockReturnValue(false)
-		movement_mock.mockReset().mockResolvedValue('held')
+		movement_mock.mockReset().mockResolvedValue({ movement: 'held' })
 	})
 
 	it('reuses a recorded round while the tree holds still', async () => {
@@ -38,27 +38,27 @@ describe('review_round_reuse.is_reusable', () => {
 	})
 
 	// joshuafolkken/kit#4878: round 2 reads the moved files; round 1 is not run twice.
-	it('reuses a recorded round once files no recorded High cites moved', async () => {
-		movement_mock.mockResolvedValue('delta')
+	it('reuses a recorded round once only files round 2 reads moved', async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(true)
 	})
 
-	it('does not reuse a recorded round once a file a recorded High cites moved', async () => {
-		movement_mock.mockResolvedValue('unsettled')
+	it('does not reuse a recorded round once a move round 2 would not read', async () => {
+		movement_mock.mockResolvedValue({ movement: 'unsettled' })
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(false)
 	})
 
 	it("reuses the ship's own stopped round 1 however the tree moved", async () => {
-		movement_mock.mockResolvedValue('unsettled')
+		movement_mock.mockResolvedValue({ movement: 'unsettled' })
 		stopped_on_mock.mockReturnValue(true)
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(true)
 	})
 
 	it('never reuses a round the issue changed after', async () => {
-		movement_mock.mockResolvedValue('delta')
+		movement_mock.mockResolvedValue({ movement: 'delta' })
 
 		expect(await review_round_reuse.is_reusable(ISSUE, true)).toBe(false)
 		expect(check_mock).not.toHaveBeenCalled()
@@ -86,7 +86,7 @@ describe('review_round_reuse.reuse_here', () => {
 	])(
 		'answers the ship outcome on a %s tree (stopped: %s)',
 		async (movement, is_stopped, expected) => {
-			movement_mock.mockResolvedValue(movement)
+			movement_mock.mockResolvedValue({ movement })
 			stopped_on_mock.mockReturnValue(is_stopped)
 
 			expect(await review_round_reuse.reuse_here(ISSUE)).toBe(expected)
@@ -94,10 +94,53 @@ describe('review_round_reuse.reuse_here', () => {
 	)
 
 	it('answers again on a stale issue whatever moved', async () => {
-		movement_mock.mockResolvedValue('delta')
+		movement_mock.mockResolvedValue({ movement: 'delta' })
 		refusal_mock.mockResolvedValue(REFUSAL)
 
 		expect(await review_round_reuse.reuse_here(ISSUE)).toBe(REUSE.AGAIN)
+	})
+})
+
+// joshuafolkken/kit#4941: `review:record --check` prints the cause of `again`, not every condition.
+describe('review_round_reuse.answer_here — the cause', () => {
+	const MOVE_CAUSE = 'docs/a.md moved where round 2 does not read'
+
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(false)
+		refusal_mock.mockReset().mockResolvedValue(undefined)
+		movement_mock.mockReset().mockResolvedValue({ movement: 'held' })
+	})
+
+	it('names the stale issue', async () => {
+		refusal_mock.mockResolvedValue(REFUSAL)
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({
+			reuse: REUSE.AGAIN,
+			cause: "the issue changed after the recorded round's brief",
+		})
+	})
+
+	it('names a round that is not recorded', async () => {
+		check_mock.mockResolvedValue({ status: 'missing' })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({
+			reuse: REUSE.AGAIN,
+			cause: 'no review round is recorded for this issue',
+		})
+	})
+
+	it('passes the cause of an unsettled tree through', async () => {
+		movement_mock.mockResolvedValue({ movement: 'unsettled', cause: MOVE_CAUSE })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({
+			reuse: REUSE.AGAIN,
+			cause: MOVE_CAUSE,
+		})
+	})
+
+	it('carries no cause on a reused round', async () => {
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({ reuse: REUSE.HELD })
 	})
 })
 
@@ -125,7 +168,7 @@ describe('review_round_reuse.is_reusable_here', () => {
 	beforeEach(() => {
 		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
 		stopped_on_mock.mockReset().mockReturnValue(true)
-		movement_mock.mockReset().mockResolvedValue('held')
+		movement_mock.mockReset().mockResolvedValue({ movement: 'held' })
 	})
 
 	it('reuses a recorded round on a fresh issue', async () => {

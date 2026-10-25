@@ -1,0 +1,8 @@
+{
+	"reason": "#4941 adds the Not-reused cause plumbing (Standing/ReuseAnswer), the round-2 High-fix brief line and its tests; the rationale doc bullets name the new conditions",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 80,
+		"prose.long_paragraphs": 2
+	}
+}

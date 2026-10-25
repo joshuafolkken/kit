@@ -26,9 +26,10 @@ const UNSETTLED_DIGEST = 'unsettled'
 
 // **A file a recorded High cites is recorded as unsettled**: a High is never fixed in place, so the
 // round's verdict does not stand for that file. Its digest matches no tree, so it always reads as moved
-// — the tree is never reused, and a narrowed round reads it again rather than passing over the finding
-// it still holds. A file outside the change (a reader the change broke) is recorded too: left out, it
-// would be absent on both sides and read as unmoved.
+// — the tree is never held, and round 2 reads its fix where its delta holds it (joshuafolkken/kit#4941);
+// anywhere else round 1 reads it again rather than passing over the finding it still holds. A file
+// outside the change (a reader the change broke) is recorded too: left out, it would be absent on both
+// sides and read as unmoved.
 function settled_files(
 	files: Record<string, string>,
 	unsettled: ReadonlyArray<string>,
@@ -86,29 +87,84 @@ const MOVEMENT = { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' } as con
 
 type Movement = (typeof MOVEMENT)[keyof typeof MOVEMENT]
 
-function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
-	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
+// The movement, and on `unsettled` the condition that decided it, with the path that met it where one
+// did — printed by `review:record --check` so a lane reads why the ship reviews round 1 again
+// (joshuafolkken/kit#4941).
+interface Standing {
+	movement: Movement
+	cause?: string
 }
 
-function is_synced_into(stamp: FileMapStamp, parts: MovedParts): boolean {
-	return parts.synced.some((path) => Object.hasOwn(stamp.files, path))
+const CAUSE = {
+	NO_RECORD: 'no reviewed tree was recorded',
+	SKIPPED:
+		'a move round 2 would not read — documentation, a prompt, an inert path, a revert to the briefed bytes, or a file outside the change',
+	SYNCED: 'the default branch changed a file the round covers',
+	UNFIXED:
+		"a file a recorded High cites still holds its round-1 brief bytes, so no fix is in round 2's delta",
+	UNATTESTED: 'the round was not attested on this branch',
+	UNREAD: 'git did not answer',
+} as const
+
+function unsettled_by(cause: string, path?: string): Standing {
+	return { movement: MOVEMENT.UNSETTLED, cause: path === undefined ? cause : `${cause}: ${path}` }
+}
+
+function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
+	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
 }
 
 // **Round 2 reads a move only where its own delta holds it**: it diffs from the round-1 brief's stamp
 // (`briefed`) and passes over documentation, prompts and inert paths (`review-round2.ts`), so a file
 // reverted to the briefed bytes, or one round 2 skips, would ship unread. A path a recorded High cites
-// never matches, and a default-branch change to a covered file is outside round 2's carried delta.
+// is read there too — its fix is the delta round 2 verifies, and its brief names the file as a High's
+// fix (`review-brief.ts`). A default-branch change to a covered file is outside round 2's carried delta.
 function is_read_by_round_two(
 	path: string,
 	tree: GateTree,
-	recorded: FileMapStamp,
 	briefed: FileMapStamp | undefined,
 ): boolean {
-	const is_settled = recorded.files[path] !== UNSETTLED_DIGEST
-
-	if (!is_settled || review_round2.is_unexecuted(path, [])) return false
+	if (review_round2.is_unexecuted(path, [])) return false
 
 	return briefed?.files[path] !== tree.files[path]
+}
+
+// An unread High-cited file round 2 would execute is one whose fix has not landed, not a revert.
+function unread_cause(stamp: FileMapStamp, path: string): string {
+	const is_cited = stamp.files[path] === UNSETTLED_DIGEST
+
+	return is_cited && !review_round2.is_unexecuted(path, []) ? CAUSE.UNFIXED : CAUSE.SKIPPED
+}
+
+function moved_standing(
+	stamp: FileMapStamp,
+	moved: ReadonlyArray<string>,
+	tree: GateTree,
+	briefed: FileMapStamp | undefined,
+): Standing {
+	if (moved.length === 0) return { movement: MOVEMENT.HELD }
+
+	const unread = moved.find((path) => !is_read_by_round_two(path, tree, briefed))
+
+	if (unread === undefined) return { movement: MOVEMENT.DELTA }
+
+	return unsettled_by(unread_cause(stamp, unread), unread)
+}
+
+async function standing(
+	stamp: FileMapStamp,
+	tree: GateTree,
+	briefed?: FileMapStamp,
+): Promise<Standing> {
+	const parts = await moved_paths.moved_parts(stamp, tree)
+
+	if (parts === undefined) return unsettled_by(CAUSE.UNREAD)
+
+	const synced = parts.synced.find((path) => Object.hasOwn(stamp.files, path))
+
+	if (synced !== undefined) return unsettled_by(CAUSE.SYNCED, synced)
+
+	return moved_standing(stamp, moved_files(stamp, tree, parts), tree, briefed)
 }
 
 async function movement(
@@ -116,17 +172,9 @@ async function movement(
 	tree: GateTree,
 	briefed?: FileMapStamp,
 ): Promise<Movement> {
-	const parts = await moved_paths.moved_parts(stamp, tree)
+	const answer = await standing(stamp, tree, briefed)
 
-	if (parts === undefined || is_synced_into(stamp, parts)) return MOVEMENT.UNSETTLED
-
-	const moved = moved_files(stamp, tree, parts)
-
-	if (moved.length === 0) return MOVEMENT.HELD
-
-	const is_delta = moved.every((path) => is_read_by_round_two(path, tree, stamp, briefed))
-
-	return is_delta ? MOVEMENT.DELTA : MOVEMENT.UNSETTLED
+	return answer.movement
 }
 
 async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
@@ -136,18 +184,25 @@ async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean>
 // **Only a review attested on this branch is reused**, as `resume_point` narrows from no other: the
 // reuse skips the ship's own `review:attest --check`, so a round recorded over a review that read
 // another checkout, or never finished, would otherwise ship unreviewed.
-async function movement_here(): Promise<Movement> {
+async function standing_here(): Promise<Standing> {
 	const stamp = review_stamps.reviewed_stamp.read()
 
-	if (stamp === undefined) return MOVEMENT.UNSETTLED
+	if (stamp === undefined) return unsettled_by(CAUSE.NO_RECORD)
 
 	const checkout = await review_checkout.read_checkout()
 
-	if (!review_attest.is_attested_on(checkout, checkout.root)) return MOVEMENT.UNSETTLED
+	if (!review_attest.is_attested_on(checkout, checkout.root)) return unsettled_by(CAUSE.UNATTESTED)
 
 	const tree = await gate_tree.read_gate_tree()
 
-	return await movement(stamp, tree, review_stamps.round_one_stamp.read())
+	return await standing(stamp, tree, review_stamps.round_one_stamp.read())
+}
+
+// The files a recorded High cites — the ones the round-2 brief names as a High's fix to read whole.
+function high_cited(): ReadonlyArray<string> {
+	const files = review_stamps.reviewed_stamp.read()?.files ?? {}
+
+	return Object.keys(files).filter((path) => files[path] === UNSETTLED_DIGEST)
 }
 
 // The record a resumed brief narrows from: written after the brief the pointer names, whose review was
@@ -207,14 +262,15 @@ function discard(): void {
 const review_reviewed_tree = {
 	MOVEMENT,
 	discard,
+	high_cited,
 	is_stopped_on,
 	is_unmoved,
 	mark_stopped,
 	movement,
-	movement_here,
 	record,
 	resume_point,
+	standing_here,
 }
 
-export type { Movement }
+export type { Movement, Standing }
 export { review_reviewed_tree }

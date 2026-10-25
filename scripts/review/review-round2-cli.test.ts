@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round2_cli } from './review-round2-cli'
 import { review_stamps } from './review-stamps'
 
@@ -54,6 +55,13 @@ function plant_record(digest: string): void {
 	})
 }
 
+async function plant_unmoved_record(cited: ReadonlyArray<string>): Promise<void> {
+	const current = await review_code_tree.read([SOURCE])
+
+	plant_record(current[SOURCE] ?? '')
+	vi.spyOn(review_reviewed_tree, 'high_cited').mockReturnValue(cited)
+}
+
 // joshuafolkken/kit#3826: the code record is re-read against this checkout's own files, so a file
 // whose comment-free digest still matches is named comment-only and one whose digest moved is not.
 describe('review_round2_cli.read_comment_only', () => {
@@ -62,11 +70,16 @@ describe('review_round2_cli.read_comment_only', () => {
 	})
 
 	it('names a file whose code is as the record took it', async () => {
-		const current = await review_code_tree.read([SOURCE])
-
-		plant_record(current[SOURCE] ?? '')
+		await plant_unmoved_record([])
 
 		expect(await review_round2_cli.read_comment_only(BASE)).toStrictEqual([SOURCE])
+	})
+
+	// joshuafolkken/kit#4941: the ship reuses round 1 on the High's fix, so round 2 must read it.
+	it('never names a file a recorded High cites, whose fix may be comments alone', async () => {
+		await plant_unmoved_record([SOURCE])
+
+		expect(await review_round2_cli.read_comment_only(BASE)).toStrictEqual([])
 	})
 
 	it('names nothing when the code moved since the record', async () => {

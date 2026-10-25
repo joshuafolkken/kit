@@ -11,10 +11,12 @@ import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
+import { review_brief_paths } from './review-brief-paths'
 import { review_checkout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
 import { review_diff_write } from './review-diff-write'
 import { review_interaction } from './review-interaction'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -147,6 +149,17 @@ describe('review:brief --interaction', () => {
 		stub_change([DUE_FILE])
 
 		await expect(review_brief_cli.run([INTERACTION_FLAG, 'extra'])).resolves.toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4941: the round-2 brief names the files a recorded High cites, from its record.
+describe('review:brief --round 2 — the High-cited files', () => {
+	it('names the files the reviewed-tree record cites', async () => {
+		stub_change([DUE_FILE])
+		vi.spyOn(review_reviewed_tree, 'high_cited').mockReturnValue([DUE_FILE])
+
+		await expect(review_brief_cli.run(['--round', '2'])).resolves.toBe(0)
+		expect(printed()).toContain(`${review_brief_paths.HIGH_FIX_LINE}\n  /lanes/4276/${DUE_FILE}`)
 	})
 })
 

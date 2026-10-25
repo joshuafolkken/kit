@@ -47,6 +47,7 @@ const STAMP: FileMapStamp = {
 	files: { [FILE]: 'x' },
 	base: BASE,
 }
+const PROMPT = 'prompts/new.md'
 const CHECKOUT: ReviewCheckout = { root: '/lanes/4620', branch: '4620-lane', head: 'head' }
 
 describe('review_reviewed_tree.is_unmoved', () => {
@@ -151,21 +152,12 @@ describe('review_reviewed_tree.is_unmoved on a base the sync moved', () => {
 // joshuafolkken/kit#4878: a tree moved only where round 2 reads leaves the delta to round 2.
 describe('review_reviewed_tree.movement', () => {
 	const { DELTA, HELD, UNSETTLED } = review_reviewed_tree.MOVEMENT
-	const CITED = 'b.ts'
 	const ADDED = 'c.ts'
-	const PROMPT = 'prompts/new.md'
-	const cited: FileMapStamp = { ...STAMP, files: { [FILE]: 'x', [CITED]: UNSETTLED } }
 
 	it.each([
 		['the tree held still', STAMP, { [FILE]: 'x' }, HELD],
 		['a runtime file changed', STAMP, { [FILE]: 'y' }, DELTA],
 		['a runtime file was added', STAMP, { [FILE]: 'x', [ADDED]: 'z' }, DELTA],
-		[
-			'a file a recorded High cites is in the change',
-			cited,
-			{ [FILE]: 'x', [CITED]: 'w' },
-			UNSETTLED,
-		],
 		['git answered nothing', STAMP, {}, UNSETTLED],
 		['a prompt round 2 passes over was added', STAMP, { [FILE]: 'x', [PROMPT]: 'p' }, UNSETTLED],
 	])('answers the movement when %s', async (_case, stamp, files, expected) => {
@@ -184,6 +176,24 @@ describe('review_reviewed_tree.movement', () => {
 	})
 })
 
+// joshuafolkken/kit#4941: round 2 reads a High's fix where its delta holds it, so the ship reuses round 1.
+describe('review_reviewed_tree.movement of a file a recorded High cites', () => {
+	const { DELTA, UNSETTLED } = review_reviewed_tree.MOVEMENT
+	const CITED = 'b.ts'
+
+	function cited(path: string): FileMapStamp {
+		return { ...STAMP, files: { [FILE]: 'x', [path]: UNSETTLED } }
+	}
+
+	it.each([
+		['fixed in the change', CITED, { [FILE]: 'x', [CITED]: 'w' }, DELTA],
+		['outside the change', CITED, { [FILE]: 'x' }, UNSETTLED],
+		['a prompt, fixed', PROMPT, { [FILE]: 'x', [PROMPT]: 'p' }, UNSETTLED],
+	])('answers the movement for one %s', async (_case, path, files, expected) => {
+		expect(await review_reviewed_tree.movement(cited(path), { files, base: BASE })).toBe(expected)
+	})
+})
+
 describe('review_reviewed_tree.movement on a base the sync moved', () => {
 	const { UNSETTLED } = review_reviewed_tree.MOVEMENT
 
@@ -197,46 +207,108 @@ describe('review_reviewed_tree.movement on a base the sync moved', () => {
 	})
 })
 
-describe('review_reviewed_tree.movement_here', () => {
-	const { DELTA, HELD, UNSETTLED } = review_reviewed_tree.MOVEMENT
+function arrange_attested_held(): void {
+	read_mock.mockReset().mockReturnValue(STAMP)
+	attested_mock.mockReset().mockReturnValue(true)
+	checkout_mock.mockReset().mockResolvedValue(CHECKOUT)
+	gate_tree_mock.mockReset().mockResolvedValue({ files: { [FILE]: 'x' }, base: BASE })
+	briefed_mock.mockReset().mockReturnValue(undefined)
+	git_read_mock.mockReset()
+}
 
-	beforeEach(() => {
-		read_mock.mockReset().mockReturnValue(STAMP)
-		attested_mock.mockReset().mockReturnValue(true)
-		checkout_mock.mockReset().mockResolvedValue(CHECKOUT)
-		gate_tree_mock.mockReset().mockResolvedValue({ files: { [FILE]: 'x' }, base: BASE })
-		briefed_mock.mockReset().mockReturnValue(undefined)
-	})
+describe('review_reviewed_tree.standing_here', () => {
+	const { DELTA, HELD } = review_reviewed_tree.MOVEMENT
+
+	beforeEach(arrange_attested_held)
 
 	it('answers held for an attested review whose recorded tree held still', async () => {
-		expect(await review_reviewed_tree.movement_here()).toBe(HELD)
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({ movement: HELD })
 		expect(attested_mock).toHaveBeenCalledWith(CHECKOUT, CHECKOUT.root)
 	})
 
 	it('answers delta for an attested review on a tree a settled file moved', async () => {
 		gate_tree_mock.mockResolvedValue({ files: { [FILE]: 'y' }, base: BASE })
 
-		expect(await review_reviewed_tree.movement_here()).toBe(DELTA)
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({ movement: DELTA })
 	})
 
-	it('answers unsettled when the moved file is back at the round-1 brief bytes', async () => {
-		gate_tree_mock.mockResolvedValue({ files: { [FILE]: 'y' }, base: BASE })
-		briefed_mock.mockReturnValue({ ...STAMP, files: { [FILE]: 'y' } })
+	// joshuafolkken/kit#4941: the lane's #4926 record — a High's fix, then a test pinned after it.
+	it('answers delta when only a High-cited fix and a pinning test moved since the record', async () => {
+		const test_file = 'a.test.ts'
 
-		expect(await review_reviewed_tree.movement_here()).toBe(UNSETTLED)
+		read_mock.mockReturnValue({ ...STAMP, files: { [FILE]: 'unsettled', [test_file]: 't' } })
+		briefed_mock.mockReturnValue({ ...STAMP, files: { [FILE]: 'x' } })
+		gate_tree_mock.mockResolvedValue({ files: { [FILE]: 'y', [test_file]: 'u' }, base: BASE })
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({ movement: DELTA })
+	})
+})
+
+// joshuafolkken/kit#4941: `review:record --check` prints the condition that hit and its path.
+describe('review_reviewed_tree.standing_here when unsettled', () => {
+	const { UNSETTLED } = review_reviewed_tree.MOVEMENT
+
+	beforeEach(arrange_attested_held)
+
+	async function expect_unsettled(cause: string | RegExp): Promise<void> {
+		const standing = await review_reviewed_tree.standing_here()
+
+		expect(standing.movement).toBe(UNSETTLED)
+		expect(standing.cause).toMatch(cause)
+	}
+
+	// The tree stands at the round-1 brief bytes in both: a revert, or a High's fix that never landed.
+	it.each([
+		['back at the round-1 brief bytes', 'x', 'y', 'revert to the briefed bytes'],
+		['a recorded High cites, still unfixed', 'unsettled', 'x', 'a recorded High cites still holds'],
+	])('names the condition and path of a file %s', async (_case, recorded, briefed, condition) => {
+		read_mock.mockReturnValue({ ...STAMP, files: { [FILE]: recorded } })
+		briefed_mock.mockReturnValue({ ...STAMP, files: { [FILE]: briefed } })
+		gate_tree_mock.mockResolvedValue({ files: { [FILE]: briefed }, base: BASE })
+
+		await expect_unsettled(new RegExp(`${condition}.*: ${FILE}$`, 'u'))
+	})
+
+	it('names the covered file the default branch changed', async () => {
+		git_read_mock.mockResolvedValue(`${FILE}\0`)
+		gate_tree_mock.mockResolvedValue({ files: { [FILE]: 'x' }, base: 'new' })
+
+		await expect_unsettled(`the default branch changed a file the round covers: ${FILE}`)
 	})
 
 	it('answers unsettled without a record', async () => {
 		read_mock.mockReturnValue(undefined)
 
-		expect(await review_reviewed_tree.movement_here()).toBe(UNSETTLED)
+		await expect_unsettled('no reviewed tree')
 	})
 
 	// The reuse skips the ship's own attest, so an unattested review is never reused.
 	it('answers unsettled on an unmoved tree whose review was not attested on this branch', async () => {
 		attested_mock.mockReturnValue(false)
 
-		expect(await review_reviewed_tree.movement_here()).toBe(UNSETTLED)
+		await expect_unsettled('not attested on this branch')
+	})
+
+	it('answers unsettled when git answered nothing', async () => {
+		gate_tree_mock.mockResolvedValue({ files: {}, base: BASE })
+
+		await expect_unsettled('git did not answer')
+	})
+})
+
+describe('review_reviewed_tree.high_cited', () => {
+	const cited = 'b.ts'
+
+	it('answers the files a recorded High cites', () => {
+		read_mock.mockReturnValue({ ...STAMP, files: { [FILE]: 'x', [cited]: 'unsettled' } })
+
+		expect(review_reviewed_tree.high_cited()).toStrictEqual([cited])
+	})
+
+	it('answers none without a record', () => {
+		read_mock.mockReturnValue(undefined)
+
+		expect(review_reviewed_tree.high_cited()).toStrictEqual([])
 	})
 })
 
