@@ -10,13 +10,16 @@ import { run_board_tick } from './run-board-tick'
 // and counted in the header's `💤 N`. Read open without the label, it is drawn where the plan places
 // it — here waiting on its declared start time.
 
-const { LOCAL, WORDS, harness } = run_board_fixture
+const { LOCAL, START, WORDS, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
 const ISSUE = 4067
 const TITLE = 'Measure the gate unit leg'
 const REPO = 'joshuafolkken/kit'
-// Read against the wall clock (`issue_not_before.waiting_ms`), not the harness clock.
-const FUTURE = '2999-01-01T00:00Z'
+const HOUR_MS = 3_600_000
+// joshuafolkken/kit#4848: ahead of the harness clock and behind the wall clock, so a board that read the
+// wall clock would draw the row due.
+const FUTURE = '2026-10-08T10:00Z'
+const FUTURE_MS = Date.parse(FUTURE)
 const RELEASED_LABELS = ['auto-ok', 'run:lane']
 
 function event_of(pos: number, at: string, kind: string, verb: string): RunEvent {
@@ -53,9 +56,11 @@ function plan_with(labels: ReadonlyArray<string>): BoardPlan {
 async function frame_with(
 	labels: ReadonlyArray<string>,
 	local = LOCAL_PARKED,
+	now_ms = START,
 ): Promise<Array<string>> {
-	const { ports, frames } = harness(local, [plan_with(labels)])
+	const { ports, frames, clock } = harness(local, [plan_with(labels)])
 
+	clock.now_ms = now_ms
 	await tick(FRESH_STATE, ports)
 
 	return (frames.at(-1) ?? '').split('\n')
@@ -68,7 +73,7 @@ function row_of(lines: ReadonlyArray<string>): string | undefined {
 describe('run_board_tick.tick — a parked child a person released', () => {
 	it('draws it waiting on its start time and leaves it out of the parked count', async () => {
 		const lines = await frame_with(RELEASED_LABELS)
-		const not_before = `📅 ${run_board_labels.day_minute_of(Date.parse(FUTURE))}`
+		const not_before = `📅 ${run_board_labels.day_minute_of(FUTURE_MS)}`
 		const row = row_of(lines)
 
 		expect(row).not.toContain('💤')
@@ -77,6 +82,13 @@ describe('run_board_tick.tick — a parked child a person released', () => {
 			lines.findIndex((line) => line.includes(`🔗 ${WORDS.waiting}`)),
 		)
 		expect(lines[0]).toContain('💤 0')
+	})
+
+	// joshuafolkken/kit#4848: the start time is weighed against the board's clock, not the wall clock.
+	it('stops drawing the start time once the board’s clock passes it', async () => {
+		const row = row_of(await frame_with(RELEASED_LABELS, LOCAL_PARKED, FUTURE_MS + HOUR_MS))
+
+		expect(row).not.toContain('📅')
 	})
 
 	// joshuafolkken/kit#4099: drawn 🙋 and counted as remaining, as it still waits on a decision.

@@ -13,6 +13,7 @@ const REPO = 'joshuafolkken/kit'
 const HELD = 3714
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
+const NOW_MS = Date.parse('2026-10-25T16:00:00.000Z')
 const { WAIT_ICONS } = run_board_labels
 const NO_LANE_REASON: RowReason = { icon: WAIT_ICONS.lane }
 
@@ -36,6 +37,7 @@ function reason(extra: Partial<ReasonRead>): RowReason | undefined {
 		events: [],
 		free_lanes: ONE_LANE_LEFT,
 		is_stopped: false,
+		now_ms: NOW_MS,
 		...extra,
 	}
 

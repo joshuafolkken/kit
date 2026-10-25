@@ -133,7 +133,12 @@ function earlier_here(local: LocalRead): EarlierLanes {
 }
 
 // The plan laid under its statuses, each waiting row saying why it waits.
-function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
+function planned_layout(
+	state: BoardState,
+	plan: BoardPlan,
+	local: LocalRead,
+	now_ms: number,
+): BoardLayout {
 	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
@@ -142,6 +147,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		...room_of(state, local),
 		carry: local.carry,
 		is_stopped: activity_here(local).is_stopped,
+		now_ms,
 	})
 
 	return run_board_layout.layout_of(
@@ -154,8 +160,8 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.
 // Before the plan is read, the run's own children alone, named and settled as the snapshot left them.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout {
-	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
+function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardLayout {
+	if (state.plan !== undefined) return planned_layout(state, state.plan, local, now_ms)
 
 	const read = open_read_of(state, undefined)
 	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
@@ -255,7 +261,7 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 // The first total the plan gives is the baseline every later arrival is counted against; the run's own
 // children before it are no total.
 function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
-	const layout = layout_for(state, local)
+	const layout = layout_for(state, local, redraw.now_ms)
 	const first_total =
 		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }
