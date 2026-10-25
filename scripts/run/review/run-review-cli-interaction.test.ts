@@ -54,7 +54,7 @@ vi.mock('./run-review-early-push', () => ({
 	},
 }))
 vi.mock('./run-review-pinned-steps', () => ({
-	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn() },
+	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn(), is_answered: () => false },
 }))
 vi.mock('./run-review-steps', () => ({
 	run_review_steps: {
