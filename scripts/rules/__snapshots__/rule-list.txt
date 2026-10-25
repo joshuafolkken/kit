@@ -33,7 +33,7 @@
   - silent: `-F` / `--field body=@`, a body without `@`, or `pnpm josh issue:comment`
   - not automated: the body moves to a file the call does not name
 - **Piped verification** (`piped-verification`, `output-bounds.md`)
-  - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise
+  - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise
   - silent: the exit code reaches the caller — a failure reads as a failure
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")
