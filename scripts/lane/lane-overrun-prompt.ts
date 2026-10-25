@@ -3,19 +3,26 @@ import { issue_priority } from '#scripts/issue/issue-priority'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 
 // What an overrun investigation's session does with the causes it found (joshuafolkken/kit#4751) —
-// group, fold or file each, and record the result — the part of its prompt that reads no record.
+// pick, group, fold or file each, and record the result — the part of its prompt that reads no record.
 // `lane-overrun.ts` puts what the session reads ahead of it.
 
-// What a duplicate refusal leads to. A recurrence puts the ranked lines in the open issue's body
-// too, because the backlog ranking reads them only there (joshuafolkken/kit#4859).
+// The most causes one investigation files, and the fewest minutes one must cut to be filed
+// (joshuafolkken/kit#4928).
+const MAX_FILINGS = 5
+const MIN_MINUTES = 1
+
+// What a duplicate refusal leads to. A recurrence appends its own cause-loss line to the open issue's
+// body, because the backlog ranking reads them only there and sums them (joshuafolkken/kit#4859,
+// joshuafolkken/kit#4928).
 function duplicate_lines(loss_lines: string): ReadonlyArray<string> {
 	return [
 		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
 		'another mechanism, or is only cited, is distinct — reissue with `--distinct <N,…>`; an open one that',
 		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
-		`and ${loss_lines}, and gets those lines added under its background heading too (ranking reads only`,
-		'the body: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one closed before',
-		'this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
+		`and ${loss_lines}, and gets those lines added under its background heading too, the cause-loss line`,
+		`appended beside the ones already there, since ranking sums every \`${issue_priority.CAUSE_PREFIX}\` line`,
+		'and reads only the body (`gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one',
+		'closed before this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
 		'A cap refusal is final: stop filing.',
 	]
 }
@@ -40,48 +47,25 @@ function grouping(origin: number | undefined, loss_lines: string): string {
 		'File each other issue with',
 		`\`${file_command(origin)}\`, its body carrying those four per cause, and`,
 		`${loss_lines} under its background heading, the cause-loss minutes being what that issue's own`,
-		"causes spent — backlog ranking orders one priority by them, else by the lane's minutes, which every",
+		"causes would cut — backlog ranking orders one priority by them, else by the lane's minutes, which every",
 		'cause of the lane shares, so a filing without either falls behind every declared one.',
 	].join(' ')
 }
 
-// A defect is filed at any share, and so is a mechanism whose loss grew: an average share misses a
-// defect split into small causes and a hole that widens as `main` grows (joshuafolkken/kit#4910). Both
-// are filed with no time-shortening line, since `issue:file` refuses one under the floor beside a
-// causing lane. Only the time the work inherently takes is judged by the filing floor below.
-function class_lines(): ReadonlyArray<string> {
-	return [
-		'Sort each cause first: a defect — a tool did something unneeded or wrong (a rerun on an unchanged',
-		'tree, a lost scope) — or time the work inherently takes (CI wait, review). File a defect at any share',
-		'as `- 種別: 不具合`, with no `- 目的: 時間短縮` line and so no reduction percentage. A key',
-		`\`pnpm josh overrun:mechanisms\` marks \`${run_event_overrun.GROWN_MARK}\` lost more per merge than over the period`,
-		'of the same length before it: file its mechanism as one root-cause issue at any share the same way,',
-		'as `- 種別: 不具合` with no `- 目的: 時間短縮` line. The share rules below judge only the inherent time.',
-	]
-}
-
-// A filing's priority is the reduction it states, and `issue:file` refuses one under the filing floor,
-// which would not pay back the lane its fix takes (joshuafolkken/kit#4870). Such a cause is still
-// recorded under its mechanism's key, and the key's sum across lanes is judged before the cause is
-// dropped, since one mechanism losing a little in every lane is not small (joshuafolkken/kit#4886).
-// `sum_lines` say how the key's sum is reached: one lane's cause adds to it, a baseline's is it already.
-function small_cause_lines(sum_lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	const percent = `${String(issue_priority.FILING_FLOOR_PERCENT)}%`
-	const suffix = run_event_overrun.small_causes_text([
-		{ key: '<key>', minutes: '<minutes>', cause: '<cause, in a few words>' },
-	])
+// A share over every merge thins a new mechanism's cost below any line (joshuafolkken/kit#4928), so the
+// causes are picked by the minutes a fix would cut from what was read, largest first. `scope` names
+// that span: one lane, or the baseline's merge.
+function selection_lines(scope: string): ReadonlyArray<string> {
+	const limit = `${String(MAX_FILINGS)} causes`
 
 	return [
-		`A cause whose fix saves under ${percent} of the median lane time per merge`,
-		'(`- 1 マージあたりの短縮:`) is not filed on its own — `issue:file` refuses it under `- 目的: 時間短縮`.',
-		'Key it by its mechanism (a josh command or step, e.g. `test:pinned`), reusing the key',
-		'`pnpm josh overrun:mechanisms` lists for the same mechanism.',
-		...sum_lines,
-		`At ${percent} or over, the mechanism is one root-cause issue — fold into an open issue that fixes it`,
-		"as above, else file it with the key's summed minutes as its cause-loss line and the summed share as",
-		`its reduction. Under ${percent}, fold it into an open issue as above, else end the result below`,
-		`with \`${suffix}\`, the segments of several causes joined by \`; \`. The key's cause count is the`,
-		'recurrence to put into its `効く率`.',
+		`Estimate each cause's reducible minutes: what its fix would cut from ${scope}. Time the work`,
+		'inherently takes (a CI wait the pipeline requires, a review) counts only for the part a fix removes,',
+		'and not at all when no fix removes any.',
+		`Take at most the ${limit} with the most reducible minutes, largest first, each cutting`,
+		`${String(MIN_MINUTES)} minute or more, and drop the rest: file or fold only those.`,
+		'File a defect — a tool did something unneeded or wrong (a rerun on an unchanged tree, a lost scope)',
+		'— as `- 種別: 不具合`, any other cause as `- 目的: 時間短縮`.',
 	]
 }
 
@@ -96,33 +80,25 @@ function result_lines(template: string): ReadonlyArray<string> {
 }
 
 // How an investigation's causes are handled: the lane its filings were found during, if any, the ranked
-// lines each filing carries, the note its result is recorded as, and how a small cause's key sum is
-// reached.
+// lines each filing carries, the note its result is recorded as, and the span a cause's reducible
+// minutes are cut from.
 interface CauseHandling {
 	origin: number | undefined
 	loss_lines: string
 	template: string
-	sum_lines: ReadonlyArray<string>
+	scope: string
 }
 
 // The filing rules an investigation's causes follow, shared by the overrun and the baseline
 // investigation (joshuafolkken/kit#4887).
 function cause_handling(rules: CauseHandling): string {
 	return [
+		...selection_lines(rules.scope),
 		grouping(rules.origin, rules.loss_lines),
-		...class_lines(),
-		...small_cause_lines(rules.sum_lines),
 		...duplicate_lines(rules.loss_lines),
 		...result_lines(rules.template),
 	].join(' ')
 }
-
-// One lane's small cause is a share of its mechanism's loss, so it is judged by the sum over the lanes.
-const LANE_SUM_LINES = [
-	"Before dropping it, run that command: add the cause's minutes to its key's sum and divide by the",
-	'merges and the median lane it prints. When a closed issue already fixed the mechanism, re-run it with',
-	'`--since <that close time>` and judge only that sum — the losses before the fix are gone.',
-]
 
 // The lines backlog ranking reads (joshuafolkken/kit#4861): the cause's own minutes, else the lane's
 // `minutes`, cited to lane `issue`.
@@ -138,7 +114,7 @@ function handling(issue: number, minutes: number): string {
 		origin: issue,
 		loss_lines: loss_lines_of(issue, String(minutes)),
 		template: run_event_overrun.ended_text(issue, '<result>'),
-		sum_lines: LANE_SUM_LINES,
+		scope: 'this lane alone, judged from its own record',
 	})
 }
 

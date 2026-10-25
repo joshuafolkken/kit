@@ -141,8 +141,8 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 **Steps (run in this order):**
 
 1. Refuse unless the target is first-party: a third-party target (Tier C), and one whose owner cannot be read (`unknown`). The `third-party-write` guard stays silent on `unknown`; this command files only to a tracker known to be ours.
-2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below the floor its required `- 1 マージあたりの短縮:` percentage sets (`issue-template.md`); a typed `--label priority:*` skips this judgement.
-   A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets a floor too; `- 原因のレーン:` only ranks, refusing a time-shortening body under 2%. A malformed one is refused; a body with no declaration is filed at the floor.
+2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below its floor (`issue-template.md`); a typed `--label priority:*` skips this judgement.
+   A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor; `- 原因のレーン:` and `- 原因の損失:` only rank, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
    A `- 規模見積もり:` over the split guide on both axes ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`.
 3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件:` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
 4. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
@@ -708,7 +708,7 @@ Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
-**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:`, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
+**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 

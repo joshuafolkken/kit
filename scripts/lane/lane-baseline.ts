@@ -1,4 +1,3 @@
-import { issue_priority } from '#scripts/issue/issue-priority'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_baseline } from '#scripts/run/event/run-event-baseline'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -12,25 +11,18 @@ import { lane_stage_stats } from './lane-stage-stats'
 // The overrun investigation (`lane-overrun.ts`) reads only a lane slower than the threshold, so the time
 // every lane spends is never a candidate for a cut. `run:merge` asks at each merge: the last multiple the
 // ledger's merge count reached, when no note has it yet, launches a detached worker session that reads
-// `lane:stats`, takes every stage and sub-stage at or over the filing floor's share of the median lane
-// (joshuafolkken/kit#4910), and files their causes by the overrun investigation's filing rules — the
-// same prompt part, so its floor holds here too, a cause's minutes being its mechanism's sum over the
-// period already. Its filings name no lane they were found
-// during. The launch and the session's result go on the run's event stream as notes, which `run:board`
-// shows.
+// `lane:stats`, takes the stages and sub-stages that spend the most per merge, and files their causes
+// by the overrun investigation's filing rules — the same prompt part, a cause's reducible minutes cut
+// from one median merge rather than one lane (joshuafolkken/kit#4928). Its filings name no lane they
+// were found during. The launch and the session's result go on the run's event stream as notes, which
+// `run:board` shows.
 
 const { EVENT_KIND } = run_event_stream
 const BASELINE_MERGES = 30
 const LOG_PREFIX = 'josh-lane-baseline-'
 const STATS_PERIOD_DAYS = 3
 const MEDIAN_PLACEHOLDER = '<median lane minutes>'
-const FLOOR = `${String(issue_priority.FILING_FLOOR_PERCENT)}%`
-// The baseline reads every period lane, so a cause's per-merge minutes are its mechanism's sum already;
-// `overrun:mechanisms` sums only overrun notes, so adding to its key would count the lanes twice.
-const SUM_LINES = [
-	"Its per-merge minutes are already the mechanism's sum over the period's merges: judge their share",
-	"of the median lane as the key's summed share, without adding them to a sum `overrun:mechanisms` prints.",
-]
+const SCOPE = 'the median merge, judged from the per-merge minutes `lane:stats` prints'
 
 // The last multiple of `BASELINE_MERGES` the count reached: two merges recorded between two asks, or an
 // ask that failed, still leave the bucket due at the next merge.
@@ -66,8 +58,8 @@ function reading(merges: number): string {
 		'spends. Leave this checkout as it is: write any file, an issue body included, under the system temp',
 		'directory, and never stage, commit or push.',
 		`Read \`pnpm josh lane:stats --period ${String(STATS_PERIOD_DAYS)}\` — its stage table and its`,
-		`implement sub-stage table — and take every stage and sub-stage at or over ${FLOOR} of the median`,
-		"lane, not only the largest. Read the period lanes' transcripts (the lane directories `lane:stats`",
+		'implement sub-stage table — and take the stages and sub-stages that spend the most per merge, not',
+		"only the largest. Read the period lanes' transcripts (the lane directories `lane:stats`",
 		"reads) and the run events (`pnpm josh run:event --from 0`) for where each one's time goes, and find",
 		'the causes a fix could cut.',
 		'Trace each cause to what can fix it: the minutes it spends per merge, the signal that led to the',
@@ -82,7 +74,7 @@ function prompt(issue: number, merges: number): string {
 		origin: undefined,
 		loss_lines: lane_overrun_prompt.loss_lines_of(issue, MEDIAN_PLACEHOLDER),
 		template: run_event_baseline.ended_text(merges, '<result>'),
-		sum_lines: SUM_LINES,
+		scope: SCOPE,
 	})
 
 	return `${reading(merges)} ${handling}`
