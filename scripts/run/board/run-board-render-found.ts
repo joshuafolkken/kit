@@ -8,16 +8,18 @@ import { run_board_render_title } from './run-board-render-title'
 import type { ItemState } from './run-board-status'
 
 // A done row's end after its time (joshuafolkken/kit#4772, joshuafolkken/kit#4818). A merged row says
-// its lane's net minutes — `?′` where there are none — what its overrun investigation came to, then the
-// numbers of the Issues filed during its child's work: `⏭` and why it was skipped, or 🔍 alone where it
-// filed, `↪N` for each open Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did
-// not, `∅ ↻#N` for a recurrence commented on, or 💥 for an investigation that failed. While the
+// its lane's net minutes — `?′` where there are none — the numbers of the Issues its child filed, then
+// what its overrun investigation came to and the numbers it filed (joshuafolkken/kit#4880), each group
+// two spaces apart: `⏭` and why it was skipped, or 🔍 and the numbers it filed, `↪N` for each open
+// Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻#N` for a
+// recurrence commented on, or 💥 for an investigation that failed. While the
 // investigation runs, the spinner stands for 🔍. A row its merge left no note on was never asked. A done
 // row that did not merge says only what was filed during it.
 
 const { OVERRUN_MARK } = run_board_labels
 const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done'])
 const SEPARATOR = ', '
+const GROUP_SEPARATOR = '  '
 const MINUTES_WIDTH = 3
 const MINUTE_MARK = '′'
 const UNKNOWN_MINUTES = '?'
@@ -36,8 +38,14 @@ function found_of(row: BoardRow, header: BoardHeader): Found | undefined {
 	return header.found?.get(row.number)
 }
 
+function links_of(references: ReadonlyArray<string>, header: BoardHeader): string {
+	return references.map((reference) => header.link(reference)).join(SEPARATOR)
+}
+
+// Every filing, the child's and the investigation's alike: a row that did not merge has no outcome
+// to tell them apart by.
 function numbers_of(found: Found | undefined, header: BoardHeader): string {
-	return (found?.filed ?? []).map((reference) => header.link(reference)).join(SEPARATOR)
+	return links_of([...(found?.filed ?? []), ...(found?.overrun_filed ?? [])], header)
 }
 
 function minutes_text(found: Found | undefined): string {
@@ -62,7 +70,8 @@ function folded_text(issues: ReadonlyArray<number>, header: BoardHeader): string
 	return `${OVERRUN_MARK} ${links.join(SEPARATOR)}`
 }
 
-// The result decides, not whether anything was filed: the numbers also hold the child's own filings.
+// The result decides, not whether anything was filed: an event written before the overrun mark reads
+// as the child's.
 function ended_text(result: string, header: BoardHeader): string {
 	const folded = run_event_overrun.folded_of(result)
 
@@ -90,16 +99,26 @@ function outcome_text(found: Found, note: OverrunNote, header: BoardHeader): str
 	return note.kind === 'started' ? started_text(found, header) : FAILED_TEXT
 }
 
-function merged_text(row: BoardRow, header: BoardHeader): string {
-	const found = found_of(row, header)
+function joined(parts: ReadonlyArray<string>, separator: string): string {
+	return parts.filter((part) => part !== '').join(separator)
+}
+
+// What the investigation came to, then the Issues it filed.
+function investigation_text(found: Found | undefined, header: BoardHeader): string {
 	const outcome =
 		found?.overrun === undefined
 			? `${SKIP_MARK} ${NO_RECORD}`
 			: outcome_text(found, found.overrun, header)
 
-	return [minutes_text(found), outcome, numbers_of(found, header)]
-		.filter((part) => part !== '')
-		.join(' ')
+	return joined([outcome, links_of(found?.overrun_filed ?? [], header)], ' ')
+}
+
+// The minutes, the child's own filings, then the investigation, each group apart by two spaces.
+function merged_text(row: BoardRow, header: BoardHeader): string {
+	const found = found_of(row, header)
+	const own = links_of(found?.filed ?? [], header)
+
+	return joined([minutes_text(found), own, investigation_text(found, header)], GROUP_SEPARATOR)
 }
 
 // Empty for an unmerged done row with nothing filed, for every row not done, and on a board that read

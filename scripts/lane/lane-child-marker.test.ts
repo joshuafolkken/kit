@@ -28,6 +28,29 @@ describe('env_for', () => {
 	})
 })
 
+// joshuafolkken/kit#4880: an overrun investigation runs as the lane's child and carries a mark of its
+// own, which `issue:file` records on its filings.
+describe('overrun_env_for and is_overrun', () => {
+	it('carries the child’s environment and the overrun mark', () => {
+		expect(lane_child_marker.overrun_env_for(ISSUE)).toStrictEqual({
+			...lane_child_marker.env_for(ISSUE),
+			[lane_child_marker.OVERRUN_KEY]: '1',
+		})
+	})
+
+	it('reads the environment it composes as an overrun investigation', () => {
+		expect(lane_child_marker.is_overrun(lane_child_marker.overrun_env_for(ISSUE))).toBe(true)
+	})
+
+	it('reads a child’s own environment as no overrun investigation', () => {
+		expect(lane_child_marker.is_overrun(lane_child_marker.env_for(ISSUE))).toBe(false)
+	})
+
+	it('reads an overrun mark with no child mark beside it as absent', () => {
+		expect(lane_child_marker.is_overrun({ [lane_child_marker.OVERRUN_KEY]: '1' })).toBe(false)
+	})
+})
+
 describe('marked_issue', () => {
 	it('reads back a valid issue number', () => {
 		expect(lane_child_marker.marked_issue({ [lane_child_marker.KEY]: ISSUE })).toBe(ISSUE)

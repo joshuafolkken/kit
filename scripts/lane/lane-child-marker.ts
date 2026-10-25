@@ -28,6 +28,12 @@ const KEY = 'JOSH_LANE_CHILD'
 const CACHE_TTL_KEY = 'CLAUDE_CODE_PROMPT_CACHE_TTL'
 const CACHE_TTL = '5m'
 
+// **An overrun investigation also carries its own mark** (joshuafolkken/kit#4880): it runs as the
+// lane's child, so `issue:file` reads this one to record its filings as the investigation's rather than
+// the child's. The launcher sets it, so the record never rests on the model passing an argument.
+const OVERRUN_KEY = 'JOSH_LANE_OVERRUN'
+const OVERRUN_VALUE = '1'
+
 type MarkerSource = Readonly<Record<string, string | undefined>>
 
 // The environment fragment that marks a child dispatched for `#<issue>`. Composed from a digits-only
@@ -50,6 +56,16 @@ function marked_issue(source: MarkerSource = process.env): string | undefined {
 	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(value) ? value : undefined
 }
 
+// The environment of the overrun investigation of `#<issue>`'s lane: the child's, plus its own mark.
+function overrun_environment_for(issue: string): Record<string, string> {
+	return { ...environment_for(issue), [OVERRUN_KEY]: OVERRUN_VALUE }
+}
+
+// Read only beside a valid child mark, so a mark leaked without one is read as absent.
+function is_overrun(source: MarkerSource = process.env): boolean {
+	return source[OVERRUN_KEY] === OVERRUN_VALUE && marked_issue(source) !== undefined
+}
+
 // True when this session is a dispatched lane child for the checkout it is running in: the mark is
 // present and names this lane's own issue, read from the checkout path. A numeric mark naming a
 // *different* issue leaked in from a parent session into a checkout it does not belong to, so it is
@@ -63,8 +79,11 @@ function is_child_of(directory: string, source: MarkerSource = process.env): boo
 
 const lane_child_marker = {
 	KEY,
+	OVERRUN_KEY,
 	env_for: environment_for,
+	overrun_env_for: overrun_environment_for,
 	is_child_of,
+	is_overrun,
 	marked_issue,
 }
 

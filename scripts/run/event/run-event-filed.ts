@@ -29,14 +29,18 @@ interface Filed {
 	// outside the run sharing the repository's stream (joshuafolkken/kit#4099). An event written before
 	// the mark was recorded reads as filed outside.
 	is_run?: boolean | undefined
+	// A lane's overrun investigation filed it, not the child (joshuafolkken/kit#4880). An event written
+	// before the mark was recorded reads as the child's.
+	is_overrun?: boolean | undefined
 }
 
 // The kind slot is always written, `[<label>]` or `[]`, against the reference with no space: an event
 // written before the kind always has the space there, so no title, whatever it opens with, reads as a
-// kind. The run's mark follows the kind slot, again with no space.
+// kind. The run's mark follows the kind slot, then the overrun's, again with no space.
 const RUN_MARK = '[run]'
+const OVERRUN_MARK = '[overrun]'
 const TEXT_PATTERN = new RegExp(
-	String.raw`^(?<reference>\S*#\d+)(?:\[(?<kind>${KINDS.join('|')}|)\](?<run>\[run\])?)? (?<title>.*?)(?: \(found during #(?<during>\d+)\))?$`,
+	String.raw`^(?<reference>\S*#\d+)(?:\[(?<kind>${KINDS.join('|')}|)\](?<run>\[run\])?(?<overrun>\[overrun\])?)? (?<title>.*?)(?: \(found during #(?<during>\d+)\))?$`,
 	'u',
 )
 
@@ -46,7 +50,8 @@ function kind_of(labels: ReadonlyArray<string>): FiledKind | undefined {
 }
 
 function text_of(filed: Filed): string {
-	const kind = `[${filed.kind ?? ''}]${filed.is_run === true ? RUN_MARK : ''}`
+	const marks = `${filed.is_run === true ? RUN_MARK : ''}${filed.is_overrun === true ? OVERRUN_MARK : ''}`
+	const kind = `[${filed.kind ?? ''}]${marks}`
 	const suffix =
 		filed.found_during === undefined
 			? ''
@@ -66,6 +71,7 @@ function parse(text: string): Filed | undefined {
 		title: String(groups['title']),
 		found_during: groups['during'],
 		is_run: groups['run'] !== undefined,
+		is_overrun: groups['overrun'] !== undefined,
 	}
 }
 

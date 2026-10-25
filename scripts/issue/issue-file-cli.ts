@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
@@ -245,8 +246,8 @@ async function place(url: string, target: string): Promise<void> {
 
 // Every filing lands on the run's event stream: this is the one filing path, so
 // one append here reaches `run:board` from every route. A filing outside a run lands too, unmarked as
-// the run's (`run_hold_member`), and the board counts only the marked ones; the append is best-effort,
-// as every emit is.
+// the run's (`run_hold_member`), and the board counts only the marked ones; a lane's overrun
+// investigation marks its own, which the board draws after 🔍; the append is best-effort, as every emit is.
 async function emit_filed(
 	reference: string,
 	filing: Filing,
@@ -255,8 +256,9 @@ async function emit_filed(
 ): Promise<void> {
 	const kind = run_event_filed.kind_of(labels)
 	const is_run = await run_hold_member.is_run_member()
+	const is_overrun = lane_child_marker.is_overrun()
 	const { title } = filing.args
-	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
+	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run, is_overrun })
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
 }

@@ -6,11 +6,15 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 
 // What a done row says after its time (joshuafolkken/kit#4772, joshuafolkken/kit#4818): the Issues
 // filed during its child's work, its lane's net minutes and what its overrun investigation came to —
-// read off the stream's `filed` events and the overrun notes (`run-event-overrun.ts`).
+// read off the stream's `filed` events and the overrun notes (`run-event-overrun.ts`). The child's own
+// filings and the investigation's are kept apart by the event's recorded mark (joshuafolkken/kit#4880).
 
 interface Found {
-	// Each filing as `header.link` takes it: `4768`, or `owner/repo#12` for one filed elsewhere.
+	// Each filing of the child's own session as `header.link` takes it: `4768`, or `owner/repo#12` for
+	// one filed elsewhere. An event with no overrun mark is the child's.
 	filed: ReadonlyArray<string>
+	// Each filing of the lane's overrun investigation, read off its mark (joshuafolkken/kit#4880).
+	overrun_filed: ReadonlyArray<string>
 	// The lane's net minutes, from the notes; `undefined` where none said them.
 	minutes: number | undefined
 	// The child's latest overrun note.
@@ -29,14 +33,31 @@ type FoundOf = ReadonlyMap<number, Found>
 type IsLive = (pid: number, start: string | undefined) => boolean | undefined
 
 const KIND = run_event_stream.EVENT_KIND
-const NONE: Found = { filed: [], minutes: undefined, overrun: undefined, is_investigating: false }
+const NONE: Found = {
+	filed: [],
+	overrun_filed: [],
+	minutes: undefined,
+	overrun: undefined,
+	is_investigating: false,
+}
 
-function filed_pair(event: RunEvent): ReadonlyArray<readonly [number, string]> {
+// The child a filing was found during, the reference the board draws, and whether the overrun filed it.
+type FiledEntry = readonly [number, string, boolean]
+
+function filed_entry(event: RunEvent): ReadonlyArray<FiledEntry> {
 	const filed = event.kind === KIND.FILED ? run_event_filed.parse(event.text) : undefined
 
 	if (filed?.found_during === undefined) return []
 
-	return [[Number(filed.found_during), filed.reference.replace(/^#/u, '')]]
+	return [
+		[Number(filed.found_during), filed.reference.replace(/^#/u, ''), filed.is_overrun === true],
+	]
+}
+
+function with_filed(known: Found, reference: string, is_overrun: boolean): Found {
+	if (is_overrun) return { ...known, overrun_filed: [...known.overrun_filed, reference] }
+
+	return { ...known, filed: [...known.filed, reference] }
 }
 
 function overrun_note(event: RunEvent): OverrunNote | undefined {
@@ -59,12 +80,10 @@ function noted(found: Found, note: OverrunNote, is_live: IsLive): Found {
 }
 
 function add_filed(found: Map<number, Found>, events: ReadonlyArray<RunEvent>): void {
-	const pairs = events.flatMap((event) => filed_pair(event))
+	const entries = events.flatMap((event) => filed_entry(event))
 
-	for (const [issue, reference] of pairs) {
-		const known = found.get(issue) ?? NONE
-
-		found.set(issue, { ...known, filed: [...known.filed, reference] })
+	for (const [issue, reference, is_overrun] of entries) {
+		found.set(issue, with_filed(found.get(issue) ?? NONE, reference, is_overrun))
 	}
 }
 
