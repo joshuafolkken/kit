@@ -33,8 +33,11 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_merge: record_merge_mock } }))
 vi.mock('#scripts/lane/lane-overrun', () => ({ lane_overrun: { investigate: investigate_mock } }))
 vi.mock('#scripts/lane/lane-baseline', () => ({ lane_baseline: { investigate: baseline_mock } }))
-vi.mock('#scripts/lane/lane-withdraw', () => ({
-	lane_withdraw: { withdraw: withdraw_mock, describe: vi.fn().mockReturnValue('withdrawn') },
+vi.mock('#scripts/lane/lane-withdraw-closed', () => ({
+	lane_withdraw_closed: { withdraw_lane: withdraw_mock },
+}))
+vi.mock('#scripts/lane/lane-registry', () => ({
+	lane_registry: { find_open_lane: vi.fn().mockResolvedValue({ issue: '4906' }) },
 }))
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
@@ -66,7 +69,7 @@ beforeEach(() => {
 	baseline_mock.mockReset().mockResolvedValue(undefined)
 	do_merged_mock.mockReset().mockResolvedValue(undefined)
 	merge_state_mock.mockReset().mockResolvedValue(false)
-	withdraw_mock.mockReset().mockResolvedValue({ kind: 'closed' })
+	withdraw_mock.mockReset().mockResolvedValue({ note: 'withdrawn', is_retry: false })
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
 
@@ -90,11 +93,11 @@ describe('run_merge_cli.merge_child — a child whose issue closed without a mer
 	it('withdraws its lane through lane:withdraw', async () => {
 		await run_merge_cli.merge_child(context())
 
-		expect(withdraw_mock).toHaveBeenCalledWith(CHILD, expect.any(String), 'merge')
+		expect(withdraw_mock).toHaveBeenCalledWith({ issue: CHILD }, expect.any(String), 'merge')
 	})
 
 	it('asks to retry, offering no child, when the withdrawal could not read it', async () => {
-		withdraw_mock.mockResolvedValue({ kind: 'unreadable' })
+		withdraw_mock.mockResolvedValue({ note: 'unreadable', is_retry: true })
 
 		const result = await run_merge_cli.merge_child(context())
 
