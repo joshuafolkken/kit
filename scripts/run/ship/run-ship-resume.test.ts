@@ -239,12 +239,17 @@ describe('josh ship — a restart with no record', () => {
 		expect(commands().slice(0, 2)).toStrictEqual(['gate', `git -y --skip-commit ${TITLE}`])
 	})
 
-	it('never pushes twice: a pushed tree resumes with the commit and push skipped', async () => {
+	// joshuafolkken/kit#4907: a lane child's `run:review` pushes before the ship, so a pushed tree with
+	// no record is gated again too.
+	it('never pushes twice: a pushed tree is gated again, then resumes with the commit and push skipped', async () => {
 		probe.read_state.mockResolvedValue(SHIPPED)
 
 		await run_ship_cli.run([TITLE])
 
-		expect(commands()[0]).toBe(`git -y --skip-commit --skip-push ${TITLE}`)
+		expect(commands().slice(0, 2)).toStrictEqual([
+			'gate',
+			`git -y --skip-commit --skip-push ${TITLE}`,
+		])
 	})
 
 	it('never merges twice: a merged pull request resumes at the report', async () => {
@@ -331,6 +336,12 @@ describe('josh ship — the attempt each stage line carries', () => {
 	const resumed_only = 'ship-stage #2426 report done commit,followup,report'
 
 	it('lists only the stages a resumed ship started', async () => {
+		const { STAGE } = run_ship_stage
+
+		for (const stage of [STAGE.PREFLIGHT, STAGE.SYNC, STAGE.GATE]) {
+			run_ship_stage.mark_done(current.target, stage)
+		}
+
 		probe.read_state.mockResolvedValue(SHIPPED)
 
 		await run_ship_cli.run([TITLE])

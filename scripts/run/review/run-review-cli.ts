@@ -13,6 +13,7 @@ import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
+import { run_review_early_push } from './run-review-early-push'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
@@ -46,7 +47,8 @@ import { run_review_steps } from './run-review-steps'
 // on a tree a round-1 fix moved, after the join has closed the pair, and reads its answer without
 // joining a gate that already settled. The ship's pre-detach reads that answer anyway, so a lane need not
 // (joshuafolkken/kit#4895). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
-// its tree.
+// its tree. **A lane child's open commits first and `--push` pushes at the green gate**
+// (`run-review-early-push.ts`).
 
 const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
@@ -56,7 +58,7 @@ const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned'
+	'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push'
 const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
 
 function now_iso(): string {
@@ -155,7 +157,13 @@ function join_hint(slots: ReadonlyArray<ReviewSlot>): string {
 	return slots.includes(INTERACTION) ? `${JOIN_HINT}\n${INTERACTION_HINT}` : JOIN_HINT
 }
 
-async function start_pair(plan: BriefPlan): Promise<number> {
+// The early push waits on the gate this pair launched, so it follows a written brief alone.
+function follow_brief(slots: ReadonlyArray<ReviewSlot>, is_early_push: boolean): void {
+	process.stderr.write(`${join_hint(slots)}\n`)
+	if (is_early_push) run_review_early_push.launch()
+}
+
+async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<number> {
 	const gate_started_at = now_iso()
 	const launch = run_review_steps.launch_gate()
 
@@ -172,7 +180,7 @@ async function start_pair(plan: BriefPlan): Promise<number> {
 	// The hint follows a written brief and nothing else: a brief that refused (a tree the scoped pair
 	// has not been green on) exits non-zero, and a "gate running, launch the review" line under that
 	// refusal would send the child to review a tree there is no brief for.
-	if (code === SUCCESS_EXIT_CODE) process.stderr.write(`${join_hint(plan.slots)}\n`)
+	if (code === SUCCESS_EXIT_CODE) follow_brief(plan.slots, is_early_push)
 
 	return code
 }
@@ -186,6 +194,7 @@ async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 	const refusal = await review_brief_cli.scoped_refusal()
 
 	if (refusal !== undefined) return review_brief_cli.report_error(refusal)
+	const is_early_push = await run_review_early_push.prepare(plan)
 	const tree = await run_review_pinned_tree.key()
 
 	run_review_pinned_steps.clear()
@@ -195,7 +204,7 @@ async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
 	}
 
-	return await start_pair(plan)
+	return await start_pair(plan, is_early_push)
 }
 
 type PinnedWait = () => Promise<PinnedSummary | undefined>
@@ -316,6 +325,7 @@ const LONE_MODES: ReadonlyMap<string, () => Promise<number>> = new Map([
 	[JOIN_FLAG, run_join],
 	[`${JOIN_FLAG} ${FIXING_FLAG}`, run_join_fixing],
 	[PINNED_FLAG, run_pinned],
+	[run_review_early_push.PUSH_FLAG, run_review_early_push.push],
 ])
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

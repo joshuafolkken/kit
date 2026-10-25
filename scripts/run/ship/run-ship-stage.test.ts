@@ -33,7 +33,14 @@ describe('run_ship_stage.is_done — the gate', () => {
 	})
 
 	it('is passed over once its output, a pushed commit, exists', () => {
-		expect(run_ship_stage.is_done(STAGE.GATE, NONE, SHIPPED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.GATE, ALL, SHIPPED)).toBe(true)
+	})
+
+	// joshuafolkken/kit#4907: a lane child's `run:review` pushed before the ship ran any stage.
+	it('runs over a commit the lane pushed, with no record of its own', () => {
+		for (const stage of [STAGE.PREFLIGHT, STAGE.SYNC, STAGE.REVIEW, STAGE.GATE]) {
+			expect(run_ship_stage.is_done(stage, NONE, SHIPPED)).toBe(false)
+		}
 	})
 
 	// joshuafolkken/kit#4708: the sync stage's local commit precedes the gate, so it is not its output.
@@ -54,7 +61,7 @@ describe('run_ship_stage.is_done — the preflight', () => {
 	})
 
 	it('is passed over once a commit exists', () => {
-		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, NONE, COMMITTED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, ALL, COMMITTED)).toBe(true)
 	})
 })
 
@@ -311,7 +318,7 @@ describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)
 	})
 
 	it('is passed over once a pushed commit or a merge exists, never on a commit alone', () => {
-		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, SHIPPED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.REVIEW, ALL, SHIPPED)).toBe(true)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, MERGED)).toBe(true)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, ALL, COMMITTED)).toBe(false)
 	})

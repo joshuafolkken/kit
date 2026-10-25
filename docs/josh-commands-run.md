@@ -498,6 +498,7 @@ pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running
 pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway)
+pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
 ```
 
 <!-- /usage -->

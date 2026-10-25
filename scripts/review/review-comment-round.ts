@@ -104,14 +104,20 @@ function carried_path(issue: number, root: string): string {
 	return observation_ledger_home.file_path(`${String(issue)}${CARRIED_SUFFIX}`, root)
 }
 
-// An issue whose comments could not be read writes no file, so the next run reads it again, and
-// throws so this one says so.
-async function carry_issue(issue: number, root: string): Promise<number> {
+// One issue's comment-round lines. Comments that could not be read throw, so no caller reads an
+// unread issue as one without a round.
+async function issue_lines(issue: number): Promise<Array<string>> {
 	const raw = await git_gh_issue_read.issue_list_comments(String(issue))
 
 	if (raw === undefined) throw new Error(`${UNREAD_COMMENTS} ${session_cite.issue(issue)}`)
 
-	const lines = await lines_of(parse_json_array_safe(raw, comment_schema))
+	return await lines_of(parse_json_array_safe(raw, comment_schema))
+}
+
+// An issue whose comments could not be read writes no file, so the next run reads it again, and
+// throws so this one says so.
+async function carry_issue(issue: number, root: string): Promise<number> {
+	const lines = await issue_lines(issue)
 
 	await observation_ledger_home.append(carried_path(issue, root), lines)
 
@@ -127,6 +133,6 @@ async function carry(root: string): Promise<number> {
 	return counts.reduce((total, count) => total + count, 0)
 }
 
-const review_comment_round = { body_of, carried_path, carry, lines_of }
+const review_comment_round = { body_of, carried_path, carry, issue_lines, lines_of }
 
 export { review_comment_round }

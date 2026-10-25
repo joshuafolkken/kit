@@ -122,7 +122,7 @@ async function join_gate(slots: ReadonlyArray<ReviewSlot>): Promise<JoshResult> 
 // **A passing round 2 is recorded on the issue, not in the tree**: it ran after the commit and reads
 // only, so no commit of the run's follows it, and a line appended now would be pushed onto the open
 // pull request by `pnpm josh followup` — restarting the CI the round ran beside. A blocking round 2
-// keeps the tree: the fix it stops for is pushed anyway, and carries the lines.
+// on a pushed, clean tree goes to the issue as well (`review-record-comment.ts`).
 function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string> {
 	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
 }

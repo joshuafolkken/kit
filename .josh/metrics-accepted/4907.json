@@ -1,0 +1,8 @@
+{
+	"reason": "run:review pushes at the first green gate in a lane and review:record keeps a pushed round on the issue (#4907)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 150,
+		"ai_cost.on_demand_bytes": 56
+	}
+}
