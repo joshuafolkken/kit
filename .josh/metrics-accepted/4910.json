@@ -1,0 +1,9 @@
+{
+	"reason": "#4910 adds the lane-tail stats module, the per-merge growth mark in overrun:mechanisms and the defect/inherent-time split in the overrun prompt, and documents the 2% filing floor and growth mark in josh-commands-run.md",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 70,
+		"ai_cost.on_demand_bytes": 88,
+		"prose.long_paragraphs": 1
+	}
+}

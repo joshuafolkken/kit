@@ -13,6 +13,7 @@ import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
+import { lane_tail_stats } from './lane-tail-stats'
 
 // A merged lane over the overrun threshold of net time is investigated for its causes
 // (joshuafolkken/kit#4751). `run:merge` asks at each merge: a lane at or under the threshold — its long
@@ -29,16 +30,9 @@ const { EVENT_KIND } = run_event_stream
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
 const NO_LEDGER = 'no ledger'
-// The net minutes a lane may take before its causes are investigated. They set no priority: each filing
-// is ranked by the reduction it states (joshuafolkken/kit#4870).
-const OVERRUN_LANE_MINUTES = 40
 
 // A lane's net minutes, or why there are none (joshuafolkken/kit#4818).
 type LaneNet = { kind: 'minutes'; minutes: number } | { kind: 'missing'; reason: string }
-
-function is_overrun(minutes: number): boolean {
-	return minutes > OVERRUN_LANE_MINUTES
-}
 
 // A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's note on
 // the stream and launches no second session to file the same causes. A pass that threw before it
@@ -157,7 +151,12 @@ function launched(issue: number, minutes: number): string {
 // launch of its overrun's investigation.
 function note_text(issue: number, net: LaneNet): string {
 	if (net.kind === 'missing') return run_event_overrun.skipped_text(issue, net.reason)
-	if (!is_overrun(net.minutes)) return run_event_overrun.within_text(issue, net.minutes)
+	// The threshold sets no priority: each filing is ranked by the reduction it states
+	// (joshuafolkken/kit#4870). `lane:stats` counts the lanes over it on dispatch-to-merge time, not
+	// on this net time.
+	const is_over = lane_tail_stats.is_overrun(net.minutes)
+
+	if (!is_over) return run_event_overrun.within_text(issue, net.minutes)
 
 	return run_event_overrun.started_text(issue, net.minutes, launched(issue, net.minutes))
 }

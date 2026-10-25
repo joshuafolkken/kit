@@ -286,7 +286,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/lane/lane-overrun-mechanisms-cli.ts',
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description:
-			'Sum the overrun causes left unfiled as under the high share per mechanism key over a period, and print each key’s minutes per merge, its share of the median lane time and whether it is to be filed',
+			'Sum the unfiled overrun causes per mechanism key over a period, and print each key’s minutes per merge, its share of the median lane time and whether it is to be filed',
 		category: 'AI tools',
 		reference: ['[--period <days>] [--since <instant>]', 'maintainer', ['none']],
 		usage: {

@@ -62,6 +62,8 @@ still there for a reading outside a run.
 | `merges / hour`                 | merges per active hour — time `load` samples saw a lane working  |
 | `effective lanes`               | mean of the working `load` samples' `lanes` (child running)      |
 | `lane median (min)`             | median per merge of the time since its issue's latest `dispatch` |
+| `lanes over 40 min`             | merges whose lane time is over the overrun threshold             |
+| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times              |
 | `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                     |
 | `load peak` / `mean`            | `load` samples' one-minute load average                          |
 | `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples   |
