@@ -39,7 +39,7 @@ afterAll(() => {
 })
 
 describe('backlog_next.gate_scope', () => {
-	it("joins a running lane's recorded plan to the paths its body declares", async () => {
+	it("reads a running lane's recorded plan in place of the paths its body declares", async () => {
 		vi.spyOn(git_common_directory, 'repository').mockReturnValue(ROOT)
 		vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
 		lane_plan.record(
@@ -49,6 +49,6 @@ describe('backlog_next.gate_scope', () => {
 
 		const scope = await backlog_next.gate_scope(CONTEXT)
 
-		expect([...(scope.declared.get(RUNNING) ?? [])]).toEqual([BODY_FILE, PLANNED_FILE])
+		expect([...(scope.declared.get(RUNNING) ?? [])]).toEqual([PLANNED_FILE])
 	})
 })

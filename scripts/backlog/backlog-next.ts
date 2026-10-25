@@ -357,9 +357,8 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 // which is what lets a candidate be held back from a path a running lane already declares.
 // `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
 // records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
-// A lane's recorded plan joins its body, so a candidate waits on the files a running lane plans to
-// edit as well as the ones its body names (joshuafolkken/kit#4864), and a candidate's plan comment
-// joins its own (joshuafolkken/kit#4923).
+// A lane's recorded plan (joshuafolkken/kit#4864), else a plan comment (joshuafolkken/kit#4923), is
+// read in place of the body (joshuafolkken/kit#4937).
 async function gate_scope(context: PoolContext): Promise<GateScope> {
 	const { issues } = context.opted_in
 

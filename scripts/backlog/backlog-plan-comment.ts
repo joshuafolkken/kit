@@ -7,8 +7,11 @@ import { lane_plan } from '#scripts/lane/lane-plan'
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { backlog_overlap, type Declared } from './backlog-overlap'
 
-// The paths a pool issue declares — its body, the plan `issue:plan` posted as a comment, and the plan a
-// running lane recorded with `lane:plan`.
+// The paths a pool issue declares — the plan a running lane recorded with `lane:plan`, else the plan
+// `issue:plan` posted as a comment, else its body.
+//
+// **A plan replaces the body**: a body cites paths as evidence (joshuafolkken/kit#4937). A plan naming
+// no path leaves the body.
 //
 // **A plan posted as a comment declares paths too.** joshuafolkken/kit#4910's body named none of the
 // files its plan comment did, so dispatch saw no overlap with joshuafolkken/kit#4911 and
@@ -61,7 +64,9 @@ async function with_plan(issue: PoolIssue): Promise<PoolIssue> {
 
 	const plan = await read_plan(issue.number)
 
-	return plan === undefined ? issue : { ...issue, body: `${issue.body ?? ''}\n${plan}` }
+	if (plan === undefined || backlog_overlap.declared_paths(plan).size === 0) return issue
+
+	return { ...issue, body: plan }
 }
 
 // What each of `issues` declares, read from `directory`'s lane plans — the scope dispatch gates on.
