@@ -93,6 +93,16 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 
 		expect(git_next_issues.order(issues)).toHaveLength(OVER_LIMIT_COUNT)
 	})
+
+	// joshuafolkken/kit#4859: the body's causing-lane minutes rank an older issue ahead.
+	it('puts the issue whose body declares a causing lane ahead of a newer one', () => {
+		const declared = {
+			...issue(1, CREATED_EARLIER),
+			body: '## 背景\n\n- 原因のレーン: 16 分（#4794）\n',
+		}
+
+		expect(prioritized_numbers([declared, issue(2, CREATED_LATER)])).toEqual([1, 2])
+	})
 })
 
 describe('git_next_issues.prioritize - exclusions', () => {

@@ -1,0 +1,8 @@
+{
+	"reason": "Same-priority backlog ranking gains a causing-lane minutes key (#4859)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 24,
+		"prose.excess_bold": 1
+	}
+}

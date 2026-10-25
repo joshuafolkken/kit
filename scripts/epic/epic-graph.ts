@@ -33,7 +33,8 @@ interface EpicChild extends AuthorFields {
 	state: 'OPEN' | 'CLOSED'
 	labels: ReadonlyArray<string>
 	blocked_by: ReadonlyArray<IssueReference>
-	// Read only to hold a child until its declared start time; absent on rows built without a read.
+	// Read to hold a child until its declared start time and to rank it by its causing-lane minutes;
+	// absent on rows built without a read.
 	body?: string | undefined
 }
 
