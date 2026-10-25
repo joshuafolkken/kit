@@ -94,6 +94,7 @@ const review_prior_findings = {
 	ENTRY_LENGTH_LIMIT,
 	PRIOR_LIMIT,
 	fix_lines,
+	latest,
 	on_files,
 	prompt_clauses,
 }

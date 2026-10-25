@@ -178,7 +178,7 @@ const THRESHOLD_TEXT = `${figure_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-to
 // the cut" is not left to look it up.
 const IMPLEMENTATION_CUT_REASON =
 	`⛔ implementation-phase cut: refused on every edit past the ${THRESHOLD_TEXT} line. ` +
-	`Write \`${run_cut_handoff.HANDOFF_PATH}\` as ${run_cut_handoff.HANDOFF_FORMAT}, run ` +
+	`Write \`${run_cut_handoff.HANDOFF_PATH}\`: ${run_cut_handoff.HANDOFF_FORMAT}, run ` +
 	'`pnpm josh run:cut --impl <N> --handoff <path>`; `cut`: end the turn immediately, no Telegram ' +
 	'is owed; else reissue the edit (`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 

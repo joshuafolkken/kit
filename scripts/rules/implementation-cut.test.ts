@@ -113,6 +113,12 @@ describe('the handoff format the refusal asks for', () => {
 	it.each(run_cut_handoff.handoff_schema.keyof().options)('names the schema key %j', (key) => {
 		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain(`"${key}"`)
 	})
+
+	// joshuafolkken/kit#4868: a cut before an attested round's record dropped its findings, and the
+	// resumed lane reran round 1.
+	it('asks for an unrecorded review round to be carried in the handoff', () => {
+		expect(implementation_cut.IMPLEMENTATION_CUT_REASON).toContain('"findings":["unrecorded"]')
+	})
 })
 
 describe('takes_the_impl_cut', () => {

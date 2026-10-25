@@ -6,6 +6,7 @@ import { run_cut_cli } from './run-cut-cli'
 import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 import { run_cut_decline } from './run-cut-decline'
 import { run_cut_report } from './run-cut-report'
+import { run_cut_review } from './run-cut-review'
 
 const {
 	BRANCH,
@@ -13,13 +14,16 @@ const {
 	DEFAULT_BRANCH,
 	REPOSITORY,
 	ISSUE,
+	WITH_FINDINGS_HANDOFF,
 	WITH_HANDOFF,
 	emit,
 	existing_cut,
 	find_open_lane,
+	is_attested_on,
 	is_reviewer,
 	launch,
 	printed_errors,
+	record_check,
 	session_verdict,
 	state,
 	target,
@@ -44,6 +48,44 @@ describe('the implementation cut needs its handoff', () => {
 		expect([code, verdict()]).toStrictEqual([FAILURE_EXIT_CODE, run_cut_cli.BAD_HANDOFF_VERDICT])
 		expect(run_cut.read_cut(target()).kind).toBe('none')
 		expect(launch).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4868: a cut after an attested round 1 but before its `review:record` dropped the
+// findings with the conversation, and the resumed lane reran round 1.
+describe('the implementation cut over an attested, unrecorded round', () => {
+	beforeEach(() => {
+		is_attested_on.mockReturnValue(true)
+		record_check.mockResolvedValue({ status: 'missing', issue: Number(ISSUE) })
+	})
+
+	it('refuses a handoff without the findings and relaunches nothing', async () => {
+		const code = await run_cut_cli.run(['--impl', ISSUE, ...WITH_HANDOFF])
+
+		expect([code, verdict()]).toStrictEqual([FAILURE_EXIT_CODE, run_cut_cli.BAD_HANDOFF_VERDICT])
+		expect(printed_errors()).toContain(`review:record --issue ${ISSUE}`)
+		expect(run_cut.read_cut(target()).kind).toBe('none')
+		expect(launch).not.toHaveBeenCalled()
+	})
+
+	it('cuts when the handoff carries the findings', async () => {
+		const code = await run_cut_cli.run(['--impl', ISSUE, ...WITH_FINDINGS_HANDOFF])
+
+		expect([code, verdict()]).toStrictEqual([0, run_cut_cli.CUT_VERDICT])
+		expect(launch).toHaveBeenCalledOnce()
+	})
+})
+
+describe('the implementation resume after a recorded round', () => {
+	it('prints that round 1 is recorded and is not to be rerun', async () => {
+		existing_cut(run_cut.IMPLEMENTATION_PHASE)
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+		record_check.mockResolvedValue({ status: 'ok', issue: Number(ISSUE) })
+
+		await run_cut_cli.run(['--resume', ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.RESUME_IMPL_VERDICT)
+		expect(printed_errors()).toContain(run_cut_review.RECORDED_ROUND_HEADING)
 	})
 })
 

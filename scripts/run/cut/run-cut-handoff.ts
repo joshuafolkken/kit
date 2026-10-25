@@ -25,6 +25,9 @@ interface Handoff {
 	completed: ReadonlyArray<string>
 	remaining: ReadonlyArray<string>
 	untouched: ReadonlyArray<string>
+	// An attested review round's findings not yet `review:record`ed — the conversation that held them is
+	// what the cut drops, so without this the resumed run reruns round 1 (joshuafolkken/kit#4868).
+	findings?: ReadonlyArray<string> | undefined
 }
 
 const handoff_schema = z.object({
@@ -32,6 +35,7 @@ const handoff_schema = z.object({
 	completed: z.array(z.string()),
 	remaining: z.array(z.string()),
 	untouched: z.array(z.string()),
+	findings: z.array(z.string()).optional(),
 })
 
 // The label each list is printed under when the handoff is shown to the resumed session, kept beside
@@ -40,23 +44,34 @@ const COMPLETED_LABEL = 'Completed'
 const REMAINING_LABEL = 'Remaining'
 const UNTOUCHED_LABEL = 'Deliberately untouched'
 const INSTRUCTION_LABEL = 'Instruction (verbatim)'
+const FINDINGS_LABEL =
+	'Round-1 findings, attested but not recorded — do not rerun round 1: fix them, then record them with `pnpm josh review:record --issue <N>`'
 const EMPTY_LIST_NOTE = '(none)'
 
 type HandoffKey = keyof Handoff
 
-function describe_key(key: HandoffKey): string {
-	const value = handoff_schema.shape[key] instanceof z.ZodArray ? '["…"]' : '"…"'
+// The placeholders each example value is drawn with; `findings`' says which round it carries. They
+// parse, so a copied example is read as entries — `carried_findings` drops them, or a copied
+// `findings` would pass the unrecorded-round refusal.
+const PLACEHOLDER = '…'
+const FINDINGS_PLACEHOLDER = 'unrecorded'
+const EXAMPLE_LIST = `["${PLACEHOLDER}"]`
 
-	return `"${key}": ${value}`
+const EXAMPLE_VALUES: Readonly<Record<HandoffKey, string>> = {
+	instruction: `"${PLACEHOLDER}"`,
+	completed: EXAMPLE_LIST,
+	remaining: EXAMPLE_LIST,
+	untouched: EXAMPLE_LIST,
+	findings: `["${FINDINGS_PLACEHOLDER}"]`,
 }
 
-// The shape a handoff file must have, derived from `handoff_schema` so the refusal that asks for the file
+// The shape a handoff file must have, keyed from `handoff_schema` so the refusal that asks for the file
 // and the error that rejects it can never name a key the parser does not read — a refusal listing the
 // items in prose invites Markdown, which `parse_handoff` rejects.
-const HANDOFF_FORMAT = `a JSON object {${handoff_schema
+const HANDOFF_FORMAT = `{${handoff_schema
 	.keyof()
-	.options.map((key) => describe_key(key))
-	.join(', ')}}`
+	.options.map((key) => `"${key}":${EXAMPLE_VALUES[key]}`)
+	.join(',')}}`
 
 function parse_handoff(raw: string): Handoff | undefined {
 	return json_value.parse_with(raw, handoff_schema)
@@ -115,6 +130,25 @@ function describe_list(label: string, items: ReadonlyArray<string>): string {
 	return `${label}:\n${bullets}`
 }
 
+// The findings a handoff really carries: a blank entry or an example placeholder is no finding.
+function carried_findings(handoff: Handoff | undefined): ReadonlyArray<string> {
+	const findings = handoff?.findings ?? []
+
+	return findings.filter(
+		(finding) => ![PLACEHOLDER, FINDINGS_PLACEHOLDER, ''].includes(finding.trim()),
+	)
+}
+
+// Carried findings are printed only when there are some — a handoff cut before any review says nothing
+// about one.
+function describe_findings(handoff: Handoff): ReadonlyArray<string> {
+	const findings = carried_findings(handoff)
+
+	if (findings.length === 0) return []
+
+	return [describe_list(FINDINGS_LABEL, findings)]
+}
+
 // The block the resume prints to standard error so the fresh process continues on the original
 // instruction rather than the tree alone.
 function describe_handoff(handoff: Handoff): string {
@@ -123,6 +157,7 @@ function describe_handoff(handoff: Handoff): string {
 		describe_list(COMPLETED_LABEL, handoff.completed),
 		describe_list(REMAINING_LABEL, handoff.remaining),
 		describe_list(UNTOUCHED_LABEL, handoff.untouched),
+		...describe_findings(handoff),
 	].join('\n\n')
 }
 
@@ -134,6 +169,7 @@ const HANDOFF_PATH = '.josh/tmp/handoff-<N>.json'
 const run_cut_handoff = {
 	HANDOFF_FORMAT,
 	HANDOFF_PATH,
+	carried_findings,
 	describe_handoff,
 	handoff_schema,
 	is_complete_handoff,

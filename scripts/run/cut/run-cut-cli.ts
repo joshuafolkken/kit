@@ -17,6 +17,7 @@ import { run_cut_decline } from './run-cut-decline'
 import { run_cut_handoff } from './run-cut-handoff'
 import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
+import { run_cut_review } from './run-cut-review'
 
 // `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
 // resume from it. `run:cut <N>` writes the record and relaunches a fresh
@@ -188,7 +189,8 @@ async function write_cut(target: string, request: CutRequest): Promise<number | 
 		handoff: loaded.handoff,
 	}
 
-	const spec_note = spec_refusal(spec)
+	const spec_note =
+		spec_refusal(spec) ?? (await run_cut_review.unrecorded_refusal(request, loaded.handoff))
 
 	if (spec_note !== undefined) return report_bad_handoff(spec_note)
 	if (run_cut.begin_cut(target, spec) === undefined) return report_cut_exists(target)
@@ -287,15 +289,6 @@ function take_over(target: string, cut_record: RunCut): RunCut | undefined {
 	return cut_record
 }
 
-// The carried instruction and work state, printed to standard error so the resumed session continues
-// on what the run was told to do rather than on the tree alone. The record is cleared
-// on adoption, so this is where it reaches the fresh process.
-function announce_handoff(cut_record: RunCut): void {
-	if (cut_record.handoff !== undefined) {
-		console.error(run_cut_handoff.describe_handoff(cut_record.handoff))
-	}
-}
-
 // **An implementation resume appends a `resume` event**. It clears the record
 // the `cut` event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate
 // resume keeps its record and appends nothing. Best-effort, as the cut's own append is.
@@ -313,10 +306,9 @@ async function adopt(target: string, cut_record: RunCut): Promise<number> {
 
 	if (taken === undefined) return report_busy(cut_record)
 
-	announce_handoff(cut_record)
-
 	const verdict = resume_verdict_for(cut_record)
 
+	await run_cut_review.announce_resume(cut_record, verdict === RESUME_IMPL_VERDICT)
 	await emit_resume_event(cut_record.issue, verdict)
 
 	return report(verdict, SUCCESS_EXIT_CODE)

@@ -64,7 +64,8 @@ pnpm josh run:cut --resume <N>
   implementation**; re-read the issue body and comments, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — the cut was taken **during** implementation. Skip the title, the plan, the
   fresh hold claim and the split assessment, re-read the plan, then **continue implementation** — do
-  **not** go straight to the gate.
+  **not** go straight to the gate. A round 1 the resume prints is continued, not rerun
+  (`scripts/run/cut/run-cut-review.ts`).
 - `handed-off` (0) — a successor already adopted this cut. **End the turn quietly and do nothing**;
   no Telegram owed.
 - `stale` (1) — the record does not match the tree (branch, clean tree, expired, or unknown hand-off).
