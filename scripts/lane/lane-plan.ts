@@ -11,8 +11,7 @@ import { z } from 'zod'
 // joshuafolkken/kit#4858 and joshuafolkken/kit#4859 declared disjoint paths, ran side by side, and both
 // edited `scripts/lane/lane-overrun.ts`; the second ship stopped on the conflict (joshuafolkken/kit#4864).
 // The plan is the first moment the touched files are known, so it is recorded here and read as the
-// declaration in place of the body — by `lane:plan` to hold the later lane back, and by `backlog:next` so a
-// candidate waits on a running lane's plan as it waits on its body.
+// declaration in place of the body — by `lane:plan` to hold the later lane back, and by `backlog:next`.
 //
 // **Keyed to the repository and the issue, not the work tree**, and kept in the common git directory
 // (`durable-state.ts`): the lane records it from its own work tree and the parent reads it from the main
@@ -77,9 +76,7 @@ function release(issue: number, directory: string): void {
 	if (read(issue, directory)?.yielded !== true) remove(issue, directory)
 }
 
-// `declared` with each issue's recorded plan in place of the paths its body or plan comment declares —
-// the record is the declaration nearest the edit, so a path only cited there holds nothing
-// (joshuafolkken/kit#4937). An issue with no record keeps what it declares.
+// `declared` with each issue's recorded plan, if any, in place of what it declares (joshuafolkken/kit#4937).
 function with_plans(declared: Declared, directory: string): Declared {
 	const replaced = [...declared].map(([issue, paths]): [number, ReadonlySet<string>] => [
 		issue,

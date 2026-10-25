@@ -6,7 +6,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan, type LanePlan } from './lane-plan'
 
-// joshuafolkken/kit#4864: a lane's recorded plan is read as a declaration beside its body, and a lane
+// joshuafolkken/kit#4864: a lane's recorded plan is read as its declaration in place of its body, and a lane
 // waits only on a holder that planned before it.
 
 const ROOT = mkdtempSync(path.join(tmpdir(), 'lane-plan-'))

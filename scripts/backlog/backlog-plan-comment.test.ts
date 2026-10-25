@@ -100,8 +100,7 @@ describe('backlog_plan_comment.declared_of', () => {
 		expect(list_comments_mock).toHaveBeenCalledExactlyOnceWith(String(CANDIDATE))
 	})
 
-	// joshuafolkken/kit#4937: joshuafolkken/kit#4926's body cited a file its plan never touched, and
-	// joshuafolkken/kit#4929 waited on it.
+	// joshuafolkken/kit#4937: joshuafolkken/kit#4929 waited on a path joshuafolkken/kit#4926's body only cited.
 	it('declares only the plan of an issue whose body cites another path', async () => {
 		parse_comments_mock.mockResolvedValue([comment(plan(OLD_FILE))])
 		const issue = { ...PLANNED_CANDIDATE, body: RUNNING_BODY }
@@ -110,6 +109,16 @@ describe('backlog_plan_comment.declared_of', () => {
 		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([OLD_FILE]))
 	})
 
+	it('keeps the body when the plan comment names no path', async () => {
+		parse_comments_mock.mockResolvedValue([comment(`## 計画\n\n散文だけ\n\n${CONSUMERS}\n`)])
+		const issue = { ...PLANNED_CANDIDATE, body: RUNNING_BODY }
+		const declared = await backlog_plan_comment.declared_of([issue], NO_DIRECTORY)
+
+		expect(declared.get(CANDIDATE)).toStrictEqual(new Set([SHARED]))
+	})
+})
+
+describe('backlog_plan_comment.declared_of without a plan', () => {
 	it('reads no comments for an issue without run:planned', async () => {
 		const declared = await backlog_plan_comment.declared_of(
 			[{ number: CANDIDATE, body: RUNNING_BODY, labels: [] }],

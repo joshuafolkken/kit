@@ -39,7 +39,6 @@ afterAll(() => {
 })
 
 describe('backlog_next.gate_scope', () => {
-	// joshuafolkken/kit#4937: the recorded plan replaces the body, so a path the body only cites holds nothing.
 	it("reads a running lane's recorded plan in place of the paths its body declares", async () => {
 		vi.spyOn(git_common_directory, 'repository').mockReturnValue(ROOT)
 		vi.spyOn(lane_state, 'read_states').mockResolvedValue(new Map())
