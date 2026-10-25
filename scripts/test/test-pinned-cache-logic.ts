@@ -31,11 +31,30 @@ const LINE_BREAK = '\n'
 const VERDICTS = ['red', 'green', 'no-test', 'test-only'] as const
 
 // A hunk's verdict, with the content digest of each test file that failed on it and what it rests on.
+// `related` is a `green` or `no-test` basis's own tests with their digests, so a later run can tell
+// which of them were added or edited (joshuafolkken/kit#4936).
 interface StoredVerdict {
 	verdict: RedVerdict
 	tests: Record<string, string>
 	basis?: string | undefined
+	related?: Record<string, string> | undefined
 }
+
+// What a verdict rests on now: its `basis` digest, and for a `green` or `no-test` one its tests.
+interface Basis {
+	digest: string
+	related?: Record<string, string> | undefined
+}
+
+// A `green` or `no-test` verdict that holds once `recheck` — the tests added or edited since, among
+// those reaching its hunk — stays green with the hunk reverted (joshuafolkken/kit#4936).
+interface Recheck {
+	verdict: RedVerdict
+	recheck: ReadonlyArray<string>
+}
+
+// What the cache knows of a hunk: a verdict, one to recheck against a few tests, or nothing.
+type Known = RedProbe | Recheck | undefined
 
 interface VerdictCache {
 	test_contents: string
@@ -53,6 +72,7 @@ const STORED_SCHEMA = z.object({
 	verdict: z.enum(VERDICTS),
 	tests: z.record(z.string(), z.string()),
 	basis: z.string().optional(),
+	related: z.record(z.string(), z.string()).optional(),
 })
 const CACHE_SCHEMA = z.object({
 	test_contents: z.string(),
@@ -161,8 +181,50 @@ function fresh_verdict(
 }
 
 // A `green` or `no-test` verdict's basis: each test whose imports reach the hunk's file, with its content.
-function related_basis(tests: ReadonlyArray<string>, digests: ReadonlyMap<string, string>): string {
-	return digest_of(JSON.stringify(sorted(tests).map((file) => [file, digests.get(file)])))
+function related_basis(tests: ReadonlyArray<string>, digests: ReadonlyMap<string, string>): Basis {
+	const pairs = sorted(tests).map((file) => [file, digests.get(file) ?? ''] as const)
+
+	return { digest: digest_of(JSON.stringify(pairs)), related: Object.fromEntries(pairs) }
+}
+
+// The tests added or edited since `before` was read; `undefined` once one of its tests is gone or no
+// longer reaches the hunk, which only a run over every reaching test can answer.
+function changed_tests(
+	before: Record<string, string>,
+	now: Record<string, string>,
+): Array<string> | undefined {
+	if (Object.keys(before).some((file) => now[file] === undefined)) return undefined
+
+	return Object.keys(now).filter((file) => before[file] !== now[file])
+}
+
+function recheck_tests(entry: StoredVerdict, basis: Basis | undefined): Array<string> | undefined {
+	if (entry.related === undefined || basis?.related === undefined) return undefined
+
+	return changed_tests(entry.related, basis.related)
+}
+
+// A `green` or `no-test` verdict whose code change is the same, rechecked against only the tests added
+// or edited since; a source change, a removed test or no recorded tests reruns every reaching test.
+function recheck_of(
+	entry: StoredVerdict,
+	freshness: Freshness,
+	basis: Basis | undefined,
+): Recheck | undefined {
+	if (entry.verdict === 'red' || !freshness.is_same_change) return undefined
+	const recheck = recheck_tests(entry, basis) ?? []
+
+	return recheck.length === 0 ? undefined : { verdict: entry.verdict, recheck }
+}
+
+// The verdict a recheck answers: a red test pins the hunk; otherwise the stored verdict stands, raised
+// to `green` when a stored `no-test` now has a test that ran.
+function rechecked(known: Recheck, probe: RedProbe): RedProbe {
+	return probe.verdict === 'no-test' ? { verdict: known.verdict, failed: [] } : probe
+}
+
+function is_recheck(known: Known): known is Recheck {
+	return known !== undefined && 'recheck' in known
 }
 
 // A `red` verdict's basis: the base commit with the changed files no import graph follows (`assets`,
@@ -191,11 +253,14 @@ function tests_of(
 function stored_of(
 	probe: RedProbe,
 	digests: ReadonlyMap<string, string>,
-	basis: string | undefined,
+	basis: Basis | undefined,
 ): StoredVerdict {
 	const entry = { verdict: probe.verdict, tests: tests_of(probe.failed, digests) }
+	if (basis === undefined) return entry
 
-	return basis === undefined ? entry : { ...entry, basis }
+	return basis.related === undefined
+		? { ...entry, basis: basis.digest }
+		: { ...entry, basis: basis.digest, related: basis.related }
 }
 
 // The verdicts to write back, keyed, each with its basis where one was read; a key with no verdict is
@@ -204,7 +269,7 @@ function stored(
 	keys: ReadonlyArray<string>,
 	probes: ReadonlyArray<RedProbe | undefined>,
 	digests: ReadonlyMap<string, string>,
-	bases: ReadonlyArray<string | undefined> = [],
+	bases: ReadonlyArray<Basis | undefined> = [],
 ): Record<string, StoredVerdict> {
 	const pairs = keys.flatMap((key, index) => {
 		const probe = probes[index]
@@ -224,6 +289,9 @@ const test_pinned_cache_logic = {
 	fresh_verdict,
 	freshness_of,
 	hunk_key,
+	is_recheck,
+	recheck_of,
+	rechecked,
 	red_basis,
 	related_basis,
 	stored,
@@ -231,5 +299,5 @@ const test_pinned_cache_logic = {
 	test_set_of,
 }
 
-export type { Freshness, StoredVerdict, VerdictCache }
+export type { Basis, Freshness, Known, Recheck, StoredVerdict, VerdictCache }
 export { test_pinned_cache_logic }

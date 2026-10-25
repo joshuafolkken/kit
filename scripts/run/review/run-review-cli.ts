@@ -209,12 +209,21 @@ async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 
 type PinnedWait = () => Promise<PinnedSummary | undefined>
 
+// A partial answer (joshuafolkken/kit#4936) is printed, but neither stops the round nor replaces the
+// accepted `--unpinned-ok` record (`run_review_pinned_accepted.remember`).
+function show_partial(summary: PinnedSummary): boolean {
+	process.stderr.write(summary.text)
+
+	return false
+}
+
 // The background check's answer, on stderr beside the other run notes. The join waits as the end of
 // the pair; `--pinned` waits for a check started moments before (`run_review_pinned_steps.wait_alone`).
 async function join_pinned(wait: PinnedWait): Promise<boolean> {
 	const summary = await wait()
 
 	if (summary === undefined) return false
+	if (summary.is_partial === true) return show_partial(summary)
 
 	const verdict = await run_review_pinned_accepted.judge(
 		summary,

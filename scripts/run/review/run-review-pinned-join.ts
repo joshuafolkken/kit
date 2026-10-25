@@ -1,7 +1,9 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
-import type { PinnedSummary } from '#scripts/test/test-pinned-record'
+import { test_pinned } from '#scripts/test/test-pinned'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
+import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 
@@ -18,6 +20,9 @@ import { run_review_pinned_tree } from './run-review-pinned-tree'
 // no launch.
 
 type Clock = () => number
+
+const PENDING_NOTE =
+	'`josh test:pinned` is still running; the hunks below are unpinned by the verdicts it already reached; the round is not stopped on them:'
 
 // The current tree's digest when it differs from the launch's; `undefined` when nothing is to start.
 async function moved_tree(root: string): Promise<string | undefined> {
@@ -55,6 +60,30 @@ async function is_restarted(root: string): Promise<boolean> {
 	}
 }
 
+// The cached verdicts' unpinned hunks, read without a probe; `undefined` when none is unpinned or the
+// tree could not be read, so the caller says the check is still running.
+async function cached_summary(): Promise<PinnedSummary | undefined> {
+	try {
+		const report = await test_pinned.cached(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+		return report.unpinned.length === 0
+			? undefined
+			: test_pinned_record.partial_summary(report, PENDING_NOTE)
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_join.cached_summary', error)
+
+		return undefined
+	}
+}
+
+// A check still running answers with what the shared cache already holds for the hunks that did not
+// move (joshuafolkken/kit#4936), so round 1 can pin them in its own fixes.
+async function fixing_answer(root: string): Promise<PinnedSummary | undefined> {
+	const cached = run_review_pinned_steps.is_pending(root) ? await cached_summary() : undefined
+
+	return cached ?? run_review_pinned_steps.answer_now(root)
+}
+
 // `--join`'s read: the current tree's answer, never a pre-fix tree's. `undefined` when no check was
 // launched. **A ship's own round restarts nothing and leaves nothing running**: under its supervisor
 // no `--pinned` read follows, and the check would hold cores the ship's gate waits on
@@ -72,7 +101,7 @@ async function wait_for_join(
 	await is_restarted(root)
 
 	return is_fixing
-		? run_review_pinned_steps.answer_now(root)
+		? await fixing_answer(root)
 		: await run_review_pinned_steps.wait_for_answer(root, now)
 }
 
@@ -96,8 +125,8 @@ async function waited_answer(root: string): Promise<PinnedSummary | undefined> {
 	return run_review_pinned_steps.is_answered(root) ? summary : undefined
 }
 
-// A check on another tree is waited out, not stopped (joshuafolkken/kit#4895): it saves its verdicts
-// to the shared cache only once it ends, so the caller's own check, run after it rather than beside it,
+// A check on another tree is waited out, not stopped (joshuafolkken/kit#4895): the caller's own check,
+// run after it rather than beside it, then reads every verdict it reached from the shared cache and
 // probes only the hunks that moved since. A lone read's bound still stops one that hung. Only a check
 // proven live is waited on: a stale stamp goes straight to `clear`, which signals no unproven pid.
 async function settle_elsewhere(root: string): Promise<void> {

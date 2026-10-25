@@ -5,6 +5,7 @@ import { GATE_GREEN, GATE_MOVED, run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
+import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
@@ -100,6 +101,19 @@ describe('run --join --fixing', () => {
 
 		expect(answer_now).toHaveBeenCalledOnce()
 		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4936: what a running check reached is printed, never judged as its answer.
+	it("prints a partial answer and keeps the gate's exit code without judging it", async () => {
+		const partial = { text: LIST, unpinned: [SITE], is_partial: true }
+
+		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		vi.spyOn(run_review_pinned_join, 'wait_for_join').mockResolvedValue(partial)
+		const judge = vi.spyOn(run_review_pinned_accepted, 'judge')
+
+		expect(await run_review_cli.run(['--join', '--fixing'])).toBe(run_review.MOVED_EXIT_CODE)
+		expect(errored()).toBe(LIST)
+		expect(judge).not.toHaveBeenCalled()
 	})
 })
 

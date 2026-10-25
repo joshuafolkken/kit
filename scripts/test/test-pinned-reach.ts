@@ -18,8 +18,9 @@ import { whole_suite_files } from './whole-suite-files'
 const NUL = '\0'
 const FIXTURE_MARK = '-fixture'
 
+// `related` names the tests reaching a file, which `test-pinned-cache-logic.ts` turns into a basis.
 interface Reach {
-	related: (file: string) => Promise<string | undefined>
+	related: (file: string) => Promise<Array<string> | undefined>
 	failed: (tests: ReadonlyArray<string>) => Promise<string | undefined>
 }
 
@@ -100,13 +101,13 @@ async function probed_files(files: ReadonlyArray<string>): Promise<Array<string>
 	return files.filter((file) => !is_fixture(file) || is_asset(view, file))
 }
 
-function related_of(view: GraphView, file: string, inputs: ReachInputs): string {
+// The test files whose imports reach `file`.
+function related_of(view: GraphView, file: string): Array<string> {
 	const reached = view.graph.importers([path.resolve(file)], view.universe)
-	const tests = [...reached]
+
+	return [...reached]
 		.map((reader) => path.relative(process.cwd(), reader))
 		.filter((reader) => test_declared_logic.is_test_file(reader))
-
-	return test_pinned_cache_logic.related_basis(tests, inputs.test_digests)
 }
 
 // None where no failed test is named or one is gone: what such a red rests on, no graph names.
@@ -126,11 +127,11 @@ function failed_of(
 function create(inputs: ReachInputs): Reach {
 	const held: { view?: Promise<GraphView | undefined> } = {}
 
-	async function related(file: string): Promise<string | undefined> {
+	async function related(file: string): Promise<Array<string> | undefined> {
 		held.view ??= view_of()
 		const read = await held.view
 
-		return read === undefined ? undefined : related_of(read, file, inputs)
+		return read === undefined ? undefined : related_of(read, file)
 	}
 
 	async function failed(tests: ReadonlyArray<string>): Promise<string | undefined> {
