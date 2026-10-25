@@ -31,9 +31,6 @@ const COMMAND = {
 	DETACH_REVIEW: 'pnpm josh ship --detach --review',
 } as const
 
-// A token of only these characters means the same to the shell quoted or not, so it is left bare.
-const BARE_WORD = /^[\w%+,./:=@-]+$/u
-
 // What a stopped ship is re-run with: its title, every option it was started with, and whether it
 // carried `--review` — the one option a route decides rather than repeats.
 interface ShipResume {
@@ -51,13 +48,8 @@ interface ShipResume {
 	is_review_stale?: boolean
 }
 
-// Single quotes, so a `$` or a backtick in a title is never expanded by the shell that runs it.
-function shell_word(token: string): string {
-	return BARE_WORD.test(token) ? token : shell_quote.single_quoted(token)
-}
-
 // A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
-// or an issue number and fits the prompt; `shell_word` quotes the `--unpinned-ok` reason.
+// or an issue number and fits the prompt; `shell_quote.word` quotes the `--unpinned-ok` reason.
 function resume_of(args: ShipArguments): ShipResume {
 	const cites = args.cites.flatMap((cite) => ['--cite', cite])
 
@@ -75,7 +67,9 @@ function ship_command(
 	resume: ShipResume,
 	review_flags: ReadonlyArray<string> = [],
 ): string {
-	const words = [...review_flags, ...resume.flags, resume.title].map((token) => shell_word(token))
+	const words = [...review_flags, ...resume.flags, resume.title].map((token) =>
+		shell_quote.word(token),
+	)
 
 	return [command, ...words].join(' ')
 }

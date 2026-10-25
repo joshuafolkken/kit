@@ -94,6 +94,7 @@ const markdown_section = {
 	section_lines,
 	section_lines_matching,
 	fence_free_lines,
+	lines_of,
 	unfenced_lines,
 	has_line,
 	has_unfenced_line,
