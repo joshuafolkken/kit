@@ -1,13 +1,11 @@
 import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
-import path from 'node:path'
-import { base_tree, type BaseTree } from '#scripts/git/base-tree'
+import { readFile } from 'node:fs/promises'
 import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { review_code_tree } from '#scripts/review/review-code-tree'
-import { test_pinned_cache } from './test-pinned-cache'
-import { test_pinned_cache_logic } from './test-pinned-cache-logic'
+import { test_pinned_cache, type CacheWriter, type Reached } from './test-pinned-cache'
+import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
 import {
@@ -16,12 +14,10 @@ import {
 	type PinnedReport,
 	type UnpinnedHunk,
 } from './test-pinned-logic'
-import { test_pinned_pool } from './test-pinned-pool'
+import { test_pinned_probe, type Probe } from './test-pinned-probe'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
-import { test_unit_guard } from './test-unit-guard'
-import { unit_worker_share } from './unit-worker-share'
 
 // `josh test:pinned` (joshuafolkken/kit#4516) — put each changed hunk of a non-test code file back to
 // the merge-base's lines, one at a time, run that file's related tests, and list the hunks no test went
@@ -31,12 +27,16 @@ import { unit_worker_share } from './unit-worker-share'
 // The changed files are copied in from the working tree first, so what is reverted is the change as it
 // stands, committed or not, and each hunk's file is restored before the next one runs.
 
-const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
 
 interface StubRead {
 	hunks: ReadonlyArray<Hunk>
 	unparsed: ReadonlyArray<string>
+}
+
+interface RunOptions {
+	max_hunks: number
+	is_cached_only: boolean
 }
 
 const NO_REPORT = { unpinned: [], unchecked: [], unparsed: [] } as const
@@ -55,63 +55,6 @@ async function read_hunks(base: string, files: ReadonlyArray<string>): Promise<A
 	)
 }
 
-// The verdict with this one hunk reverted. The file is put back before the next hunk runs, or that
-// hunk's tests would also see this revert.
-async function verdict_of(tree: BaseTree, hunk: Hunk, workers: number): Promise<RedProbe> {
-	const target = path.join(tree.tree, hunk.file)
-	const content = await readFile(target, 'utf8')
-	const selection = [
-		'related',
-		hunk.file,
-		'--run',
-		...unit_worker_share.worker_arguments([], workers),
-	]
-
-	await writeFile(target, test_pinned_logic.revert(content, hunk))
-
-	try {
-		return await test_red.probe_in(tree, selection)
-	} finally {
-		await writeFile(target, content)
-	}
-}
-
-// One hunk at a time within a lane: its hunks share the lane's tree (`test-pinned-pool.ts`).
-async function verdicts_in(
-	tree: BaseTree,
-	hunks: ReadonlyArray<Hunk>,
-	workers: number,
-): Promise<Array<RedProbe>> {
-	const verdicts: Array<RedProbe> = []
-
-	for (const hunk of hunks) {
-		// eslint-disable-next-line no-await-in-loop -- the hunks share one tree, so each revert waits for the last restore
-		verdicts.push(await verdict_of(tree, hunk, workers))
-	}
-
-	return verdicts
-}
-
-// The hunks no fresh cached verdict covers, checked over as many trees as the worker budget allows.
-async function checked_on(
-	paths: ReadonlyArray<string>,
-	hunks: ReadonlyArray<Hunk>,
-): Promise<Array<RedProbe>> {
-	if (hunks.length === 0) return []
-	const plan = test_pinned_pool.lane_plan(hunks.length, await test_unit_guard.vitest_share([]))
-
-	return await test_pinned_pool.run_pool(
-		hunks,
-		plan.lanes,
-		async (group) =>
-			await base_tree.with_tree(TREE_PREFIX, HEAD, async (tree) => {
-				await base_tree.copy_in(tree.tree, paths)
-
-				return await verdicts_in(tree, group, plan.workers)
-			}),
-	)
-}
-
 // The key of each hunk, read off the working file its lines sit in now.
 async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
 	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
@@ -121,18 +64,43 @@ async function keys_of(hunks: ReadonlyArray<Hunk>): Promise<Array<string>> {
 	)
 }
 
+// The verdict the cache already holds; one left to recheck holds none yet.
+function held_of(known: Known): RedProbe | undefined {
+	return test_pinned_cache_logic.is_recheck(known) ? undefined : known
+}
+
+function recheck_of(known: Known): Recheck | undefined {
+	return test_pinned_cache_logic.is_recheck(known) ? known : undefined
+}
+
+// The hunks no held verdict covers, each with its recheck where the cache named one.
+function probes_of(hunks: ReadonlyArray<Hunk>, known: ReadonlyArray<Known>): Array<Probe> {
+	return hunks
+		.map((hunk, index) => ({ hunk, index, recheck: recheck_of(known[index]) }))
+		.filter((probe) => held_of(known[probe.index]) === undefined)
+}
+
+function reached_of(verdicts: ReadonlyArray<RedProbe | undefined>): Array<Reached> {
+	return verdicts.flatMap((verdict, index) => (verdict === undefined ? [] : [[index, verdict]]))
+}
+
 // Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
+// The held ones are written first and each fresh one as it is reached (`test_pinned_cache.writer`).
 async function verdicts_on(
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
-	known: ReadonlyArray<RedProbe | undefined>,
+	known: ReadonlyArray<Known>,
+	writer: CacheWriter,
 ): Promise<Array<RedProbe | undefined>> {
-	const fresh = await checked_on(
-		paths,
-		hunks.filter((_hunk, index) => known[index] === undefined),
-	)
+	const verdicts = known.map((entry) => held_of(entry))
 
-	return known.map((verdict) => verdict ?? fresh.shift())
+	await writer.record(reached_of(verdicts))
+	await test_pinned_probe.checked_on(paths, probes_of(hunks, known), async (index, verdict) => {
+		verdicts[index] = verdict
+		await writer.record([[index, verdict]])
+	})
+
+	return verdicts
 }
 
 // Green and no-test both leave a hunk unpinned: either way nothing went red when it was reverted.
@@ -143,23 +111,22 @@ function unpinned_of(hunk: Hunk, probe: RedProbe | undefined): Array<UnpinnedHun
 }
 
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
-// stored again, so a rerun on the same tree starts no vitest.
+// stored again, so a rerun on the same tree starts no vitest. `is_cached_only` runs no probe: only the
+// verdicts the cache holds are read, and nothing is written.
 async function unpinned_on(
 	base: string,
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
+	is_cached_only: boolean,
 ): Promise<Array<UnpinnedHunk>> {
 	if (hunks.length === 0) return []
 	const cache = await test_pinned_cache.load(base)
 	const keys = await keys_of(hunks)
 	const files = hunks.map((hunk) => hunk.file)
-	const verdicts = await verdicts_on(
-		paths,
-		hunks,
-		await test_pinned_cache.known(cache, keys, files),
-	)
-
-	await test_pinned_cache.save(cache, keys, verdicts, files)
+	const known = await test_pinned_cache.known(cache, keys, files)
+	const verdicts = is_cached_only
+		? known.map((entry) => held_of(entry))
+		: await verdicts_on(paths, hunks, known, test_pinned_cache.writer(cache, keys, files))
 
 	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
 }
@@ -214,33 +181,43 @@ async function existing_since(commit: string): Promise<Array<string>> {
 
 async function report_on(
 	base: string,
-	max_hunks: number,
+	options: RunOptions,
 	has_runner: boolean,
 ): Promise<PinnedReport> {
+	const { max_hunks, is_cached_only } = options
 	const paths = await existing_since(HEAD)
 	const changed = await existing_since(base)
 	const targets = await test_pinned_reach.probed_files(
 		changed.filter((file) => test_pinned_logic.is_target(file)),
 	)
 	const probes = await read_probes(base, targets)
-	const cap = has_runner ? max_hunks : 0
-	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, cap)
-	const unpinned = await unpinned_on(base, paths, checked)
+	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, has_runner ? max_hunks : 0)
+	const unpinned = await unpinned_on(base, paths, checked, is_cached_only)
 
 	return { unpinned, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
+}
+
+async function report(options: RunOptions): Promise<PinnedReport> {
+	const base = await change_base.resolved_through_merge()
+	const has_runner = test_red.has_runner()
+	if (base === undefined) return { ...NO_REPORT, max_hunks: options.max_hunks, has_runner }
+
+	return await report_on(base, options, has_runner)
 }
 
 // No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
 // is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
 // none) no probe runs, so every one is unchecked rather than unpinned.
 async function run(max_hunks: number): Promise<PinnedReport> {
-	const base = await change_base.resolved_through_merge()
-	const has_runner = test_red.has_runner()
-	if (base === undefined) return { ...NO_REPORT, max_hunks, has_runner }
-
-	return await report_on(base, max_hunks, has_runner)
+	return await report({ max_hunks, is_cached_only: false })
 }
 
-const test_pinned = { run }
+// The unpinned hunks the cache already answers for this tree, probing nothing (joshuafolkken/kit#4936):
+// what a check still running — or one stopped mid-way — has reached for the hunks that did not move.
+async function cached(max_hunks: number): Promise<PinnedReport> {
+	return await report({ max_hunks, is_cached_only: true })
+}
+
+const test_pinned = { cached, run }
 
 export { test_pinned }

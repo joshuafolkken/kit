@@ -278,6 +278,13 @@ function is_answered(root: string = PROJECT_ROOT): boolean {
 	return launched !== undefined && test_pinned_record.read(launched.token, root) !== undefined
 }
 
+// Whether a check was launched and has no answer yet: still running, rather than done or lost.
+function is_pending(root: string = PROJECT_ROOT): boolean {
+	const launched = read_launch(root)
+
+	return launched !== undefined && read_answer(root, launched) === undefined
+}
+
 // Whether the last check's process is proven to be the one launched, as `stop_last` asks before it
 // signals: a stale stamp's reissued or unreadable pid is not waited on.
 function is_live(root: string = PROJECT_ROOT): boolean {
@@ -308,6 +315,7 @@ const run_review_pinned_steps = {
 	clear,
 	is_answered,
 	is_live,
+	is_pending,
 	launch,
 	launched_reason,
 	launched_tree,

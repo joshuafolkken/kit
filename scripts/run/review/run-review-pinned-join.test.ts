@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { core_budget } from '#scripts/gate/core-budget'
 import { process_identity } from '#scripts/josh/process-identity'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { test_pinned } from '#scripts/test/test-pinned'
+import { test_pinned_logic, type PinnedReport } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review_pinned_join } from './run-review-pinned-join'
@@ -19,6 +21,21 @@ const FIXED_TREE = 'fixed-tree'
 const REASON = 'only logs'
 const ANSWER = { text: 'unpinned 0 · unchecked 0\n', unpinned: [] }
 const GIT_FAILED = new Error('git failed')
+const FIXING_TEXT = 'round 1 has fixes to make'
+const EMPTY_REPORT: PinnedReport = {
+	unpinned: [],
+	unchecked: [],
+	unparsed: [],
+	max_hunks: test_pinned_logic.DEFAULT_MAX_HUNKS,
+	has_runner: true,
+}
+const UNPINNED = {
+	file: 'driver.js',
+	new_start: 6,
+	new_count: 1,
+	old_lines: ['old'],
+	is_green: true,
+}
 
 function launched_token(): string {
 	const [argv] = vi.mocked(run_review_steps.launch_josh).mock.lastCall ?? [[]]
@@ -35,6 +52,7 @@ beforeEach(() => {
 	vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
 	vi.spyOn(process, 'kill').mockReturnValue(true)
 	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(FIXED_TREE)
+	vi.spyOn(test_pinned, 'cached').mockResolvedValue(EMPTY_REPORT)
 })
 
 afterEach(() => {
@@ -92,7 +110,7 @@ describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () =
 		expect(now).not.toHaveBeenCalled()
 		expect(process.kill).not.toHaveBeenCalled()
 		expect(answer?.unpinned).toStrictEqual([])
-		expect(answer?.text).toContain('round 1 has fixes to make')
+		expect(answer?.text).toContain(FIXING_TEXT)
 	})
 
 	it('reads the answer the check already left', async () => {
@@ -100,10 +118,40 @@ describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () =
 		test_pinned_record.write(launched_token(), ANSWER, ROOT)
 
 		expect(await run_review_pinned_join.wait_for_join(ROOT, undefined, true)).toStrictEqual(ANSWER)
+		expect(test_pinned.cached).not.toHaveBeenCalled()
 	})
 
 	it('answers none when no check was launched', async () => {
 		expect(await run_review_pinned_join.wait_for_join(ROOT, undefined, true)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4936: the verdicts a running check already reached answer for the unmoved hunks.
+describe('run_review_pinned_join.wait_for_join with round-1 fixes to make and a check still running', () => {
+	it('shows the unpinned hunks the cache already holds while the check still runs', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		vi.mocked(test_pinned.cached).mockResolvedValue({ ...EMPTY_REPORT, unpinned: [UNPINNED] })
+
+		const answer = await run_review_pinned_join.wait_for_join(ROOT, undefined, true)
+
+		expect(answer?.unpinned).toStrictEqual(
+			test_pinned_record.summary_of({ ...EMPTY_REPORT, unpinned: [UNPINNED] }).unpinned,
+		)
+		expect(answer?.unpinned).toHaveLength(1)
+		expect(answer).toMatchObject({ is_partial: true })
+		expect(answer?.text).toContain('still running')
+		expect(answer?.text).toContain(UNPINNED.file)
+		expect(process.kill).not.toHaveBeenCalled()
+	})
+
+	it('says the check still runs when reading the cache failed', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		vi.mocked(test_pinned.cached).mockRejectedValue(GIT_FAILED)
+
+		const answer = await run_review_pinned_join.wait_for_join(ROOT, undefined, true)
+
+		expect(answer?.unpinned).toStrictEqual([])
+		expect(answer?.text).toContain(FIXING_TEXT)
 	})
 })
 

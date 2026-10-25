@@ -256,17 +256,16 @@ describe('test_pinned_reach.create', () => {
 		expect(await reach.failed([TEST_FILE])).toBeUndefined()
 	})
 
-	it('reads a related basis that moves with the reaching test only', async () => {
+	it('reads the reaching tests only as the related basis', async () => {
 		await build_with_graph()
-		const related = await related_with([[TEST_FILE, 'a']])
 
+		expect(await related_with([[TEST_FILE, 'a']])).toEqual([TEST_FILE])
 		expect(
 			await related_with([
 				[TEST_FILE, 'a'],
 				[EXTRA_TEST, 'b'],
 			]),
-		).toBe(related)
-		expect(await related_with([[TEST_FILE, 'c']])).not.toBe(related)
+		).toEqual([TEST_FILE])
 	})
 
 	it('reads no red basis for a failed test the tree no longer digests, or none named', async () => {

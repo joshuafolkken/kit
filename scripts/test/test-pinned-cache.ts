@@ -1,14 +1,18 @@
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { atomic_write } from '#scripts/lib/atomic-write'
 import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from './test-declared-logic'
 import {
 	test_pinned_cache_logic,
+	type Basis,
 	type Freshness,
+	type Known,
+	type StoredVerdict,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
 import { test_pinned_reach, type Reach, type ReachInputs } from './test-pinned-reach'
@@ -41,6 +45,22 @@ interface LoadedCache extends VerdictCache {
 	freshness: Freshness
 	test_digests: ReadonlyMap<string, string>
 	reach: Reach
+}
+
+// A verdict reached by a run, with the index of the key it answers.
+type Reached = readonly [number, RedProbe]
+
+interface CacheWriter {
+	record: (reached: ReadonlyArray<Reached>) => Promise<void>
+}
+
+// The verdicts a run reached so far, each with the basis read when it was reached.
+interface WriterState {
+	cache: LoadedCache
+	keys: ReadonlyArray<string>
+	files: ReadonlyArray<string>
+	probes: Array<RedProbe | undefined>
+	bases: Array<Basis | undefined>
 }
 
 async function read_text(file: string): Promise<string> {
@@ -122,35 +142,49 @@ async function basis_of(
 	cache: LoadedCache,
 	probe: RedProbe,
 	file: string,
-): Promise<string | undefined> {
-	if (probe.verdict !== 'red') return await cache.reach.related(file)
+): Promise<Basis | undefined> {
+	if (probe.verdict !== 'red') {
+		const tests = await cache.reach.related(file)
 
-	return await cache.reach.failed(probe.failed)
+		return tests && test_pinned_cache_logic.related_basis(tests, cache.test_digests)
+	}
+
+	const digest = await cache.reach.failed(probe.failed)
+
+	return digest === undefined ? undefined : { digest }
 }
 
 // The tree-wide digests first; only an entry they drop has its basis read, so an unchanged tree builds
-// no import graph.
-async function known_one(
+// no import graph. Past the basis, a `green` or `no-test` one may still be rechecked against the tests
+// added or edited since (`recheck_of`).
+async function known_by_basis(
 	cache: LoadedCache,
-	key: string,
+	entry: StoredVerdict,
 	file: string,
-): Promise<RedProbe | undefined> {
+): Promise<Known> {
+	const { freshness, test_digests } = cache
+	const stored = { verdict: entry.verdict, failed: Object.keys(entry.tests) }
+	const basis = await basis_of(cache, stored, file)
+	const held = test_pinned_cache_logic.fresh_verdict(entry, freshness, test_digests, basis?.digest)
+
+	return held ?? test_pinned_cache_logic.recheck_of(entry, freshness, basis)
+}
+
+async function known_one(cache: LoadedCache, key: string, file: string): Promise<Known> {
 	const entry = cache.entries[key]
 	const kept = test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests)
 	if (kept !== undefined || entry?.basis === undefined) return kept
-	const stored = { verdict: entry.verdict, failed: Object.keys(entry.tests) }
-	const basis = await basis_of(cache, stored, file)
 
-	return test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests, basis)
+	return await known_by_basis(cache, entry, file)
 }
 
-// The verdict stored under each key, or `undefined` where none is stored or what it rests on changed;
-// `files` names each key's hunk file.
+// What the cache knows of each key: its stored verdict, one to recheck, or `undefined` where none is
+// stored or what it rests on changed; `files` names each key's hunk file.
 async function known(
 	cache: LoadedCache,
 	keys: ReadonlyArray<string>,
 	files: ReadonlyArray<string>,
-): Promise<Array<RedProbe | undefined>> {
+): Promise<Array<Known>> {
 	return await Promise.all(
 		keys.map(async (key, index) => await known_one(cache, key, files[index] ?? '')),
 	)
@@ -162,66 +196,87 @@ async function stored_basis(
 	key: string,
 	probe: RedProbe,
 	file: string,
-): Promise<string | undefined> {
+): Promise<Basis | undefined> {
 	const entry = cache.entries[key]
 	const kept = test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests)
-	if (kept?.verdict === probe.verdict) return entry?.basis
+
+	if (kept?.verdict === probe.verdict && entry?.basis !== undefined) {
+		return { digest: entry.basis, related: entry.related }
+	}
+
 	const failed = Object.keys(test_pinned_cache_logic.tests_of(probe.failed, cache.test_digests))
 
 	return await basis_of(cache, { ...probe, failed }, file)
 }
 
-async function read_bases(
-	cache: LoadedCache,
-	keys: ReadonlyArray<string>,
-	probes: ReadonlyArray<RedProbe | undefined>,
-	files: ReadonlyArray<string>,
-): Promise<Array<string | undefined>> {
-	return await Promise.all(
-		keys.map(async (key, index) => {
-			const probe = probes[index]
-
-			return probe === undefined
-				? undefined
-				: await stored_basis(cache, key, probe, files[index] ?? '')
-		}),
-	)
-}
-
-// **A basis is read after the probes, so it is kept only while the tree still reads as it did at
-// `load`**: one read off an edit made mid-run would hold a verdict the probes never saw.
-async function bases_of(
-	cache: LoadedCache,
-	keys: ReadonlyArray<string>,
-	probes: ReadonlyArray<RedProbe | undefined>,
-	files: ReadonlyArray<string>,
-): Promise<Array<string | undefined>> {
-	const bases = await read_bases(cache, keys, probes, files)
+// Whether the tree still reads as it did at `load`.
+async function is_steady(cache: LoadedCache): Promise<boolean> {
 	const now = await read_tree(cache.base)
-	const is_steady = now.change === cache.change && now.test_contents === cache.test_contents
 
-	return is_steady ? bases : []
+	return now.change === cache.change && now.test_contents === cache.test_contents
 }
 
-// Only the verdicts this run used are written, so the file never holds a hunk the branch has left behind.
-async function save(
-	cache: LoadedCache,
-	keys: ReadonlyArray<string>,
-	probes: ReadonlyArray<RedProbe | undefined>,
-	files: ReadonlyArray<string>,
-): Promise<void> {
-	const bases = await bases_of(cache, keys, probes, files)
+function write(cache: LoadedCache, entries: Record<string, StoredVerdict>): void {
 	const content: VerdictCache = {
 		test_contents: cache.test_contents,
 		change: cache.change,
-		entries: test_pinned_cache_logic.stored(keys, probes, cache.test_digests, bases),
+		entries,
 	}
 
-	await mkdir(path.dirname(cache.file), { recursive: true })
-	await writeFile(cache.file, `${JSON.stringify(content)}${LINE_BREAK}`)
+	atomic_write.replace_file(cache.file, `${JSON.stringify(content)}${LINE_BREAK}`)
 }
 
-const test_pinned_cache = { known, load, save }
+// **Each verdict is written as soon as it is reached** (joshuafolkken/kit#4936), so a run stopped
+// mid-way — `josh run:review` stops one a round-1 fix moved the tree under — leaves the verdicts it
+// already had for the next run to reuse. The writes are queued one after another, and each replaces the
+// file whole, so a stopped run leaves either write, never half of one.
+//
+// **A basis is read once its verdict is reached, and kept only while the tree still reads as it did at
+// `load`**: one read off an edit made mid-run would hold a verdict the probes never saw. A verdict
+// reached before the edit keeps the basis it was written with.
+//
+// Only the verdicts this run used are written, so the file never holds a hunk the branch has left behind.
+async function settle(state: WriterState, reached: ReadonlyArray<Reached>): Promise<void> {
+	const { cache, keys, files, probes, bases } = state
+	const read = await Promise.all(
+		reached.map(
+			async ([index, probe]) =>
+				await stored_basis(cache, keys[index] ?? '', probe, files[index] ?? ''),
+		),
+	)
+	const is_kept = await is_steady(cache)
 
-export type { LoadedCache }
+	for (const [position, [index, probe]] of reached.entries()) {
+		probes[index] = probe
+		bases[index] = is_kept ? read[position] : undefined
+	}
+
+	write(cache, test_pinned_cache_logic.stored(keys, probes, cache.test_digests, bases))
+}
+
+function writer(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	files: ReadonlyArray<string>,
+): CacheWriter {
+	const state: WriterState = { cache, keys, files, probes: [], bases: [] }
+	const queue = { last: Promise.resolve() }
+
+	async function record(reached: ReadonlyArray<Reached>): Promise<void> {
+		const previous = queue.last
+		const current = (async (): Promise<void> => {
+			await previous
+			await settle(state, reached)
+		})()
+
+		queue.last = current
+		await current
+	}
+
+	return { record }
+}
+
+const test_pinned_cache = { known, load, writer }
+
+export type { CacheWriter, LoadedCache, Reached }
 export { test_pinned_cache }
