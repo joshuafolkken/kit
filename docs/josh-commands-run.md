@@ -416,7 +416,9 @@ the supervisor's driver runs the idle watch — `pnpm josh retrospective` at a d
 at the cut cap, `stop` once the session has handed the record off, and `unknown` (exit 1, with the usage
 on stderr) in a lane child or when no record is this session's.
 
-When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the one action line.
+When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
+
+A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
@@ -753,7 +755,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and waits …" from.
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
-- `📂 <N>` — a path its body declares overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `📂 <N>` — a path its body or plan comment declares overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves the column blank.
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
@@ -1038,6 +1040,8 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes, and again until it prints `clear`; until then `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
 Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body.
+
+A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares paths as its body does, so a candidate whose plan names a running lane's file is held back before dispatch.
 
 **Output / exit codes:** the reason on stderr when it changes — the waiting issue, its planned file, the path it overlaps and the holder. `clear` on stdout, exit 0, once nothing holds the planned files; `wait`, exit 1, after 18 polls 30 s apart or on an unreadable listing — run it again. No path: the usage, exit 1.
 

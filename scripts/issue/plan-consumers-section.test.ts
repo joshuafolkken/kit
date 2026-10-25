@@ -71,3 +71,24 @@ describe('plan_consumers_section.refusal_of — refuses a missing or unanswered 
 		expect(refusal_of(plan_with(section))).toContain('without a reason')
 	})
 })
+
+// joshuafolkken/kit#4923: the section's entries are readers, so dispatch reads a plan without it.
+describe('plan_consumers_section.without', () => {
+	it('drops the section up to the next heading, keeping the rest', () => {
+		expect(plan_consumers_section.without(plan_with('- `a.ts` reads it'))).toBe(
+			['## 計画', '', '### 方針', '', '- step', '', '### テスト', '', '- t'].join('\n'),
+		)
+	})
+
+	it('keeps a fenced heading inside the section from ending it', () => {
+		const plan = ['## 計画', HEADING, '```', '# c', '```', '- `a.ts`', '### テスト'].join('\n')
+
+		expect(plan_consumers_section.without(plan)).toBe(['## 計画', '### テスト'].join('\n'))
+	})
+
+	it('returns a plan without the section unchanged', () => {
+		const plan = '## 計画\n- `a.ts`'
+
+		expect(plan_consumers_section.without(plan)).toBe(plan)
+	})
+})

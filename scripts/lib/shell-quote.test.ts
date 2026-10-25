@@ -26,3 +26,20 @@ describe('shell_quote.single_quoted', () => {
 		},
 	)
 })
+
+// joshuafolkken/kit#4923: a printed path is quoted only when the shell would read it otherwise.
+describe('shell_quote.word', () => {
+	it.each(['scripts/lib/shell-quote.ts', '4923', '--review', 'a@b:c=d,e+f%g'])(
+		'leaves a token the shell reads as is bare: %s',
+		(token) => {
+			expect(shell_quote.word(token)).toBe(token)
+		},
+	)
+
+	it.each(['src/routes/(app)/+layout.svelte', 'src/routes/[slug]/+page.ts', 'a b', ''])(
+		'quotes a token the shell would split or expand: %s',
+		(token) => {
+			expect(shell_quote.word(token)).toBe(shell_quote.single_quoted(token))
+		},
+	)
+})

@@ -50,6 +50,27 @@ function refusal_of(plan: string): string | undefined {
 	return is_bare_none(entries) ? BARE_NONE : undefined
 }
 
-const plan_consumers_section = { HEADING, refusal_of }
+// The lines `[start, end)` the section spans in `visible`, or `undefined` when the plan has none.
+function section_range(visible: ReadonlyArray<string>): [number, number] | undefined {
+	const start = visible.findIndex((line) => line.trim() === HEADING)
+
+	if (start === -1) return undefined
+	const end = visible.slice(start + 1).findIndex((line) => ANY_HEADING.test(line.trim()))
+
+	return [start, end === -1 ? visible.length : start + 1 + end]
+}
+
+// `plan` with the section, heading included, removed — its entries name the files that read what the
+// plan changes, not the files it edits (joshuafolkken/kit#4923).
+function without(plan: string): string {
+	const range = section_range(markdown_section.unfenced_lines(plan))
+
+	if (range === undefined) return plan
+	const lines = markdown_section.lines_of(plan)
+
+	return [...lines.slice(0, range[0]), ...lines.slice(range[1])].join('\n')
+}
+
+const plan_consumers_section = { HEADING, refusal_of, without }
 
 export { plan_consumers_section }
