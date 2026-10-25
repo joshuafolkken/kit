@@ -61,6 +61,8 @@ interface ReasonRead extends Overlay {
 	carry?: RunCarry | undefined
 	// A stopped run opens no lane, so a stage its stream ends on is not one any lane is at.
 	is_stopped: boolean
+	// The board's clock, which a declared start time is weighed against.
+	now_ms: number
 }
 
 // What every row of one layout is weighed against, read once.
@@ -111,7 +113,7 @@ function running_of(read: ReasonRead): Array<number> {
 function is_candidate(child: EpicChild, read: ReasonRead): boolean {
 	return (
 		epic_triage.is_triaged(child) &&
-		issue_not_before.is_due(child.body) &&
+		issue_not_before.is_due(child.body, read.now_ms) &&
 		!run_board_layout.is_blocked(child, read)
 	)
 }
@@ -280,8 +282,8 @@ function sample_wait_of(child: EpicChild): RowReason | undefined {
 
 // `📅 10-20 16:30`: the start time the body declares and the clock has not reached, in the board's
 // local time.
-function not_before_of(child: EpicChild): RowReason | undefined {
-	const ms = issue_not_before.waiting_ms(child.body)
+function not_before_of(child: EpicChild, now_ms: number): RowReason | undefined {
+	const ms = issue_not_before.waiting_ms(child.body, now_ms)
 
 	if (ms === undefined) return sample_wait_of(child)
 
@@ -312,7 +314,7 @@ function wait_of(
 	if (!epic_triage.is_triaged(child)) return untriaged_of(waits)
 	if (waits.length > 0) return { icon: blocker_icon(child, pool), issues: waits }
 
-	return not_before_of(child) ?? offer_wait(child, read, pool)
+	return not_before_of(child, read.now_ms) ?? offer_wait(child, read, pool)
 }
 
 // What each waiting row of one layout says, the pool-wide facts read once for all of them.
