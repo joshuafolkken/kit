@@ -13,6 +13,7 @@ import { lane_check_stats } from './lane-check-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
+import { lane_implement_stats } from './lane-implement-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_process_stats } from './lane-process-stats'
@@ -152,6 +153,7 @@ interface PeriodRecords {
 function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
 	return [
 		lane_stage_stats.table(entries, window),
+		lane_implement_stats.table(calls, window),
 		lane_stop_stats.table(entries, window, events),
 		lane_gap_stats.table(entries, window, events),
 		lane_round_one_stats.table(entries, window),

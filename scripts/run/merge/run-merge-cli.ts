@@ -3,6 +3,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_baseline } from '#scripts/lane/lane-baseline'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { lane_overrun } from '#scripts/lane/lane-overrun'
@@ -243,6 +244,7 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	if (refused !== undefined) return report_count_refused(refused)
 
 	await lane_overrun.investigate(Number(ctx.child))
+	await lane_baseline.investigate(Number(ctx.child))
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) {
 		return emit(MERGE_TOKEN.OVER, SUCCESS_EXIT_CODE)
