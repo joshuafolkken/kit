@@ -254,10 +254,12 @@ describe('lane_overrun.investigate — how the session groups its causes', () =>
 		expect(launched_prompt()).toContain('on a verdict other than `fold`, file as below.')
 	})
 
-	it('carries the causing-lane line and the priority floor into the folded issue', () => {
+	// joshuafolkken/kit#4870: the lane's minutes set no priority, so a fold carries no label from them.
+	it('carries the causing-lane line into the folded issue, and no label from its minutes', () => {
 		expect(launched_prompt()).toContain(
-			`the appended part carrying ${LOSS_LINES}, and give it the \`priority:high\` label unless it carries a higher one;`,
+			`the appended part carrying ${LOSS_LINES}; on a verdict other than \`fold\``,
 		)
+		expect(launched_prompt()).not.toContain('priority:')
 	})
 })
 
