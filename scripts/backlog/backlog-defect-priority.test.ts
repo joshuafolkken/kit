@@ -140,6 +140,17 @@ describe('backlog:next while the defect rate is above its baseline', () => {
 	})
 })
 
+// joshuafolkken/kit#4859: the causing-lane key ranks above this order, so the note says it orders ties.
+describe('backlog:next defect-priority note', () => {
+	it('says the order applies among ranking ties', async () => {
+		stub({ defect_rate: ABOVE_BASELINE })
+
+		await backlog_next.run([])
+
+		expect(stderr()).toContain('among issues the ranking keys tie')
+	})
+})
+
 // The plan renders the same answer, so it cannot promise an order the run does not take.
 describe('backlog:plan while the defect rate is above its baseline', () => {
 	it('lists the ready children in the order backlog:next offers them', async () => {

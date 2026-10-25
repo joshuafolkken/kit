@@ -79,6 +79,20 @@ function transcript_directories(issue: number): ReadonlyArray<string> {
 		.filter((directory) => directory.endsWith(suffix))
 }
 
+// What a duplicate refusal leads to. A recurrence puts the causing-lane line in the open issue's body
+// too, because the backlog ranking reads it only there (joshuafolkken/kit#4859).
+function duplicate_lines(lane_line: string): ReadonlyArray<string> {
+	return [
+		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
+		'another mechanism, or is only cited, is distinct — reissue with `--distinct <N,…>`; an open one that',
+		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
+		`and \`${lane_line}\`, and gets that line added under its background heading too (ranking reads only`,
+		'the body: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one closed before',
+		'this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
+		'A cap refusal is final: stop filing.',
+	]
+}
+
 // What the session reads, and the four facts it traces each cause to.
 function reading(issue: number, cite: string, minutes: number): string {
 	const directories = transcript_directories(issue).join(', ') || 'none found'
@@ -111,7 +125,8 @@ function grouping(issue: number, lane_line: string, minutes: number): string {
 		`carrying \`${lane_line}\`${labeling}; on a verdict other than \`fold\`, file as below.`,
 		'File each other issue with',
 		`\`pnpm josh issue:file --found-during ${String(issue)}\`, its body carrying those four per cause, and`,
-		`\`${lane_line}\` under its background heading.`,
+		`\`${lane_line}\` under its background heading — backlog ranking orders one priority by those minutes,`,
+		'so a filing without it falls behind every declared one.',
 	].join(' ')
 }
 
@@ -123,11 +138,7 @@ function prompt(issue: number, minutes: number): string {
 	return [
 		reading(issue, cite, minutes),
 		grouping(issue, lane_line, minutes),
-		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
-		'another mechanism, or is only cited, is distinct — reissue with `--distinct <N,…>`; an open one that',
-		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
-		'and the causing-lane line; one closed before this lane yet recurring here is filed anew as a',
-		'recurrence, its number in `--distinct`. A cap refusal is final: stop filing.',
+		...duplicate_lines(lane_line),
 		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, '<result>')}"\`,`,
 		`the result being \`${run_event_overrun.folded_result(['<A>', '<B>'])}\` naming every issue you folded into`,
 		`when you folded any, else \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,

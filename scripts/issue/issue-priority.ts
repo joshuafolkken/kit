@@ -176,6 +176,15 @@ function marker_floor(body: string): PriorityLevel {
 	return is_marked ? 'high' : 'normal'
 }
 
+// The longest causing lane the body declares, in minutes; `0` when it declares none.
+function lane_minutes(body = ''): number {
+	const minutes = background_lines(body, LANE_PREFIX)
+		.map((line) => Number(LANE_LINE.exec(line)?.groups?.['minutes']))
+		.filter((value) => Number.isFinite(value))
+
+	return Math.max(0, ...minutes)
+}
+
 // The floor a causing lane of `minutes` net time sets — strictly over each threshold.
 function minutes_floor(minutes: number): PriorityLevel {
 	if (minutes <= HIGH_LANE_MINUTES) return 'normal'
@@ -191,11 +200,7 @@ function lane_label(minutes: number): string | undefined {
 
 // The floor the longest causing lane sets.
 function lane_floor(body: string): PriorityLevel {
-	const minutes = background_lines(body, LANE_PREFIX)
-		.map((line) => Number(LANE_LINE.exec(line)?.groups?.['minutes']))
-		.filter((value) => Number.isFinite(value))
-
-	return minutes_floor(Math.max(0, ...minutes))
+	return minutes_floor(lane_minutes(body))
 }
 
 // The lowest level the Issue may declare: the highest of its reduction's, causing lane's and markers' floors.
@@ -257,6 +262,7 @@ const issue_priority = {
 	declared_level,
 	floor_of,
 	lane_label,
+	lane_minutes,
 	problem,
 	with_label,
 }

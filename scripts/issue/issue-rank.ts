@@ -11,8 +11,11 @@ import {
 // every ranking that asks: the `🗒 Next issues` display, the `auto-ok` pickup and `backlog:next`.
 //
 // In order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
-// `route:interrupt`), then how many other open issues wait on it. Below those, the caller's own order
-// stands — the sort is stable, so recency and the defect-rate adjustment survive as the last key.
+// `route:interrupt`), then the lane minutes its cause lost (the body's causing-lane line,
+// `issue_priority.lane_minutes`; `0` when undeclared, so an
+// undeclared issue follows every declared one of its priority), then how many other open issues wait on
+// it. Below those, the caller's own order stands — the sort is stable, so recency and the defect-rate
+// adjustment survive as the last key.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.
@@ -20,6 +23,7 @@ import {
 
 interface RankRow {
 	labels: ReadonlyArray<string>
+	lane_minutes: number
 	dependents: number
 }
 
@@ -56,6 +60,7 @@ function keys_of(row: RankRow): ReadonlyArray<number> {
 		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
 		-flag(is_verification_defect(row.labels)),
+		-row.lane_minutes,
 		-row.dependents,
 	]
 }

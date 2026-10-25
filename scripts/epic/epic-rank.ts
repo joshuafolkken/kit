@@ -1,3 +1,4 @@
+import { issue_priority } from '#scripts/issue/issue-priority'
 import { issue_rank } from '#scripts/issue/issue-rank'
 import { epic_graph, type EpicChild } from './epic-graph'
 
@@ -28,6 +29,7 @@ function rank(
 
 	return issue_rank.rank(children, (child) => ({
 		labels: child.labels,
+		lane_minutes: issue_priority.lane_minutes(child.body),
 		dependents: dependents.get(epic_graph.key_of(child)) ?? 0,
 	}))
 }

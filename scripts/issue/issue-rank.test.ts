@@ -16,7 +16,11 @@ interface Row extends RankRow {
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, labels, dependents }
+	return { name, labels, lane_minutes: 0, dependents }
+}
+
+function lost(name: string, lane_minutes: number, labels: ReadonlyArray<string> = []): Row {
+	return { ...row(name, labels), lane_minutes }
 }
 
 function names_of(rows: ReadonlyArray<Row>): Array<string> {
@@ -77,6 +81,45 @@ describe('issue_rank.rank priority:critical', () => {
 		]
 
 		expect(names_of(rows)).toStrictEqual([CRITICAL, URGENT, DEFECT])
+	})
+})
+
+// joshuafolkken/kit#4859: within one priority, the larger declared causing lane goes first.
+describe('issue_rank.rank lane minutes', () => {
+	const LONG = 'long'
+	const SHORT = 'short'
+	const LONG_MINUTES = 16
+	const SHORT_MINUTES = 4
+
+	it('puts the larger causing lane ahead within one priority', () => {
+		const rows = [
+			lost(SHORT, SHORT_MINUTES, [PRIORITY_HIGH_LABEL]),
+			lost(LONG, LONG_MINUTES, [PRIORITY_HIGH_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([LONG, SHORT])
+	})
+
+	it('puts an undeclared issue after every declared one of its priority, in the given order', () => {
+		const rows = [row(PLAIN, [], MANY), lost(SHORT, SHORT_MINUTES), row(PLAIN_SECOND)]
+
+		expect(names_of(rows)).toStrictEqual([SHORT, PLAIN, PLAIN_SECOND])
+	})
+
+	it('keeps a verification-path defect ahead of a larger causing lane', () => {
+		const rows = [lost(LONG, LONG_MINUTES), row(DEFECT, [BUG_LABEL, RUN_SOLO_LABEL])]
+
+		expect(names_of(rows)).toStrictEqual([DEFECT, LONG])
+	})
+
+	it('never lets the minutes reorder issues of different priorities', () => {
+		const rows = [
+			lost(LONG, LONG_MINUTES),
+			lost(SHORT, SHORT_MINUTES, [PRIORITY_HIGH_LABEL]),
+			row(CRITICAL, [PRIORITY_CRITICAL_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([CRITICAL, SHORT, LONG])
 	})
 })
 

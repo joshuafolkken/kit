@@ -10,6 +10,7 @@ const SHORTENING_LINE = '- 目的: 時間短縮\n'
 const HIGH_WITH_DEADLINE = '- 優先度: 高（期限）'
 const URGENT_CONDITION_2 = '- 優先度: 緊急（条件 2）'
 const PARK_PREFIX = '- 原因の park:'
+const MALFORMED_LANE = '- 原因のレーン: 64 分（4695）'
 
 function body(declaration: string, extra = ''): string {
 	return `## 背景\n\n- 種別: 非不具合\n${extra}${declaration}\n\n## 期待効果\n\n`
@@ -154,13 +155,12 @@ describe('issue_priority causing lane (joshuafolkken/kit#4749)', () => {
 		).toBeUndefined()
 	})
 
-	it.each([
-		['- 原因のレーン: 長い 分（#4695）'],
-		['- 原因のレーン: 64 分'],
-		['- 原因のレーン: 64 分（4695）'],
-	])('refuses the malformed line %j', (line) => {
-		expect(issue_priority.problem(body('', `${line}\n`), [])).toContain('lane:net')
-	})
+	it.each([['- 原因のレーン: 長い 分（#4695）'], ['- 原因のレーン: 64 分'], [MALFORMED_LANE]])(
+		'refuses the malformed line %j',
+		(line) => {
+			expect(issue_priority.problem(body('', `${line}\n`), [])).toContain('lane:net')
+		},
+	)
 })
 
 describe('issue_priority.floor_of with a causing lane', () => {
@@ -176,6 +176,23 @@ describe('issue_priority.floor_of with a causing lane', () => {
 			expect(issue_priority.floor_of(filed)).toBe(level)
 		},
 	)
+})
+
+// joshuafolkken/kit#4859: the minutes backlog ranking orders one priority by.
+describe('issue_priority.lane_minutes', () => {
+	it('reads the longest causing lane under the background heading', () => {
+		const filed = body('', `${lane_line('4')}${lane_line('16.5')}`)
+
+		expect(issue_priority.lane_minutes(filed)).toBe(16.5)
+	})
+
+	it.each([
+		['no body', undefined],
+		['no causing lane', body('')],
+		['a malformed line', body('', `${MALFORMED_LANE}\n`)],
+	])('answers 0 for %s', (_case, text) => {
+		expect(issue_priority.lane_minutes(text)).toBe(0)
+	})
 })
 
 const SECURITY_LINE = '- セキュリティ: Issue 本文がガードを通らずに読める\n'

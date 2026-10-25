@@ -27,7 +27,8 @@ const BACKLOG_SCAN_FIELDS = `number,title,body,labels,${BLOCKED_BY_COUNT_FIELD}`
 // gets that from the epic listing, which by construction holds no closed epic.
 const NUMBER_TITLE_AND_LABELS_FIELDS = 'number,title,labels'
 // The fields every listing that is *ranked* asks for: `createdAt` to order by and `labels` to
-// exclude by. Shared by the next-issues display and the `auto-ok` pickup, which rank identically.
+// exclude by. Shared by the next-issues display and the `auto-ok` pickup, which rank identically —
+// each adds `body` for the causing-lane key.
 const SUMMARY_FIELDS = 'number,title,labels,createdAt'
 // The pickup's list, which is the display's plus the native blocker relation. Kept apart from
 // `SUMMARY_FIELDS` on purpose: a listing carries no `blockedBy`, so the field is answered from each
@@ -64,9 +65,13 @@ const PICKUP_FIELDS = `${SUMMARY_FIELDS},blockedBy,body,${gh_author_association.
 const { issue_list } = git_gh_issue_list
 
 // The newest open issues, for the next-issues display at workflow completion. `createdAt`
-// rides along because the caller re-sorts explicitly rather than inheriting the listing's order.
+// rides along because the caller re-sorts explicitly rather than inheriting the listing's order, and
+// `body` because the ranking reads its causing-lane minutes — without it the display would order a
+// priority differently from the pickup (joshuafolkken/kit#4859). It adds no listing request, as
+// above; `backlog:plan`'s read now also hands the bodies to `issue_sample_gate.prime`, which reads
+// the pull requests they cite.
 async function issue_list_recent(limit: number): Promise<IssueListOutcome> {
-	return await issue_list({ json_fields: SUMMARY_FIELDS, limit })
+	return await issue_list({ json_fields: `${SUMMARY_FIELDS},body`, limit })
 }
 
 // Every open issue with its title and body. Used by `epic:bundle` to scan the backlog and by

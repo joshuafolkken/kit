@@ -149,6 +149,23 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 		expect(launched_prompt()).toContain(`- 原因のレーン: 41 分（#${String(ISSUE)}）`)
 	})
 
+	// joshuafolkken/kit#4859: the session is told why the line matters, so it does not drop it.
+	it('says an undeclared filing falls behind in backlog ranking', async () => {
+		await lane_overrun.investigate(ISSUE)
+
+		expect(launched_prompt()).toContain('a filing without it falls behind every declared one')
+	})
+
+	// joshuafolkken/kit#4859: ranking reads only the body, so a recurrence adds the causing-lane line
+	// to the open issue's body as well as recording it in the comment.
+	it('asks a recurrence for the same causing-lane line in the comment and the body', async () => {
+		await lane_overrun.investigate(ISSUE)
+
+		expect(launched_prompt()).toContain(
+			`those four and \`- 原因のレーン: 41 分（#${String(ISSUE)}）\`, and gets that line added under its background heading too`,
+		)
+	})
+
 	it("names only the lane's own transcripts", async () => {
 		await lane_overrun.investigate(ISSUE)
 

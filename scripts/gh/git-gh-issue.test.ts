@@ -54,6 +54,19 @@ describe('issue_list_by_label', () => {
 	})
 })
 
+// joshuafolkken/kit#4859: the display ranks by the body's causing-lane minutes, as the pickup does.
+describe('issue_list_recent', () => {
+	it('asks for the body the ranking reads', async () => {
+		mocked_open.mockResolvedValue(CAPPED)
+
+		await git_gh_issue.issue_list_recent(LIMIT)
+
+		expect(mocked_open).toHaveBeenCalledWith(
+			expect.objectContaining({ json_fields: expect.stringContaining('body') as string }),
+		)
+	})
+})
+
 // joshuafolkken/kit#1679: the one wrapper that does not list open issues. It is asserted here rather
 // than in `issue:scout`'s own suite because what it gets wrong fails silently — a listing asked for
 // with the default state answers open issues, which is precisely the scan that already existed.
