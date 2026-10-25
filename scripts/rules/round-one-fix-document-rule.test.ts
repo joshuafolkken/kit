@@ -52,8 +52,19 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		const content = read_unwrapped(CHAIN_RULE)
 
 		expect(content).toContain(
-			'Outside step 0, a round-1 fix runs its scoped check and the gate before `git -y`.',
+			'Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.',
 		)
 		expect(content).not.toContain('Any round-1 fix runs its affected scoped check and the gate')
+	})
+})
+
+describe('chain-rule — a review round’s fixes are checked once', () => {
+	// joshuafolkken/kit#4949: a lane child ran check:related after each round-1 finding it fixed,
+	// and the earlier run added nothing the later one did not answer.
+	it('checks a round’s fixes with one check:related after the last, not one per finding', () => {
+		expect(lane_step()).toContain("round's fixes, all made before one `pnpm josh check:related`")
+		expect(read_unwrapped(CHAIN_RULE)).toContain(
+			"after every edit, a review round's fixes once after the last",
+		)
 	})
 })
