@@ -1,3 +1,4 @@
+import { run_event_baseline } from '#scripts/run/event/run-event-baseline'
 import { run_event_filed, type Filed } from '#scripts/run/event/run-event-filed'
 import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -190,5 +191,21 @@ describe('run_board_notes.notes_of texts', () => {
 		const [note] = run_board_notes.notes_of([filed_event({ reference: ELSEWHERE })], NO_TITLES)
 
 		expect(note?.issue).toBe(ELSEWHERE)
+	})
+})
+
+describe('run_board_notes.notes_of — the baseline investigation', () => {
+	// joshuafolkken/kit#4887: its launch and result are findings on the board.
+	it('keeps its launch and result notes, newest first', () => {
+		const texts = [
+			run_event_baseline.started_text(30, 'investigating in pid 42'),
+			run_event_baseline.ended_text(30, 'filed'),
+		]
+		const notes = run_board_notes.notes_of(
+			texts.map((text, index) => event(KIND.NOTE, text, index + 1)),
+			NO_TITLES,
+		)
+
+		expect(notes.map((note) => note.text)).toStrictEqual(texts.toReversed())
 	})
 })
