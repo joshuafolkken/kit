@@ -6,6 +6,7 @@ import {
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
+import { issue_priority } from './issue-priority'
 import { issue_rank, type RankRow } from './issue-rank'
 
 // joshuafolkken/kit#2928: priority:high, then a verification-path defect, then dependents, then the
@@ -120,6 +121,29 @@ describe('issue_rank.rank lane minutes', () => {
 		]
 
 		expect(names_of(rows)).toStrictEqual([CRITICAL, SHORT, LONG])
+	})
+})
+
+// joshuafolkken/kit#4928: a recurrence appends a cause-loss line, so a cause that recurs ranks by its
+// accumulated minutes, ahead of one larger in a single lane.
+function cause_body(lines: ReadonlyArray<number>): string {
+	const losses = lines.map((minutes) => `- 原因の損失: ${String(minutes)} 分\n`).join('')
+
+	return `## 背景\n\n- 原因のレーン: 77 分（#4887）\n${losses}`
+}
+
+function from_body(name: string, lines: ReadonlyArray<number>): Row {
+	return lost(name, issue_priority.lost_minutes(cause_body(lines)))
+}
+
+describe('issue_rank.rank accumulated cause loss', () => {
+	const RECURRING = 'recurring'
+	const SINGLE = 'single'
+
+	it('orders by the sum of every recurrence, not by the largest single loss', () => {
+		const rows = [from_body(SINGLE, [20]), from_body(RECURRING, [8, 7, 6])]
+
+		expect(names_of(rows)).toStrictEqual([RECURRING, SINGLE])
 	})
 })
 

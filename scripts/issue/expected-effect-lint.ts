@@ -53,7 +53,6 @@ const expected_effect_lint = {
 	DECLARATION_LINE,
 	HEADING,
 	ITEM_LABELS,
-	is_target,
 	problems,
 }
 
