@@ -41,6 +41,8 @@ vi.mock('#scripts/cost-runtime/cost-transcript', () => ({
 }))
 
 const ISSUE = 4695
+// joshuafolkken/kit#4861: every path that writes the causing-lane line writes the cause-loss line too.
+const LOSS_LINES = `\`- 原因のレーン: 41 分（#${String(ISSUE)}）\` and \`- 原因の損失: <分> 分\``
 const MINUTE_MS = 60_000
 const PID = 321
 const START = Date.parse('2026-10-24T03:00:00.000Z')
@@ -153,7 +155,16 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 	it('says an undeclared filing falls behind in backlog ranking', async () => {
 		await lane_overrun.investigate(ISSUE)
 
-		expect(launched_prompt()).toContain('a filing without it falls behind every declared one')
+		expect(launched_prompt()).toContain('a filing without either falls behind every declared one')
+	})
+
+	// joshuafolkken/kit#4861: causes of one lane share its minutes, so each filing states its own.
+	it("asks each filing for its own causes' lost minutes", async () => {
+		await lane_overrun.investigate(ISSUE)
+
+		expect(launched_prompt()).toContain(
+			`${LOSS_LINES} under its background heading, the cause-loss minutes being what that issue's own causes spent`,
+		)
 	})
 
 	// joshuafolkken/kit#4859: ranking reads only the body, so a recurrence adds the causing-lane line
@@ -162,7 +173,7 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 		await lane_overrun.investigate(ISSUE)
 
 		expect(launched_prompt()).toContain(
-			`those four and \`- 原因のレーン: 41 分（#${String(ISSUE)}）\`, and gets that line added under its background heading too`,
+			`those four and ${LOSS_LINES}, and gets those lines added under its background heading too`,
 		)
 	})
 
@@ -245,7 +256,7 @@ describe('lane_overrun.investigate — how the session groups its causes', () =>
 
 	it('carries the causing-lane line and the priority floor into the folded issue', () => {
 		expect(launched_prompt()).toContain(
-			`the appended part carrying \`- 原因のレーン: 41 分（#${String(ISSUE)}）\`, and give it the \`priority:high\` label unless it carries a higher one;`,
+			`the appended part carrying ${LOSS_LINES}, and give it the \`priority:high\` label unless it carries a higher one;`,
 		)
 	})
 })

@@ -79,14 +79,14 @@ function transcript_directories(issue: number): ReadonlyArray<string> {
 		.filter((directory) => directory.endsWith(suffix))
 }
 
-// What a duplicate refusal leads to. A recurrence puts the causing-lane line in the open issue's body
-// too, because the backlog ranking reads it only there (joshuafolkken/kit#4859).
-function duplicate_lines(lane_line: string): ReadonlyArray<string> {
+// What a duplicate refusal leads to. A recurrence puts the ranked lines in the open issue's body
+// too, because the backlog ranking reads them only there (joshuafolkken/kit#4859).
+function duplicate_lines(loss_lines: string): ReadonlyArray<string> {
 	return [
 		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
 		'another mechanism, or is only cited, is distinct — reissue with `--distinct <N,…>`; an open one that',
 		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
-		`and \`${lane_line}\`, and gets that line added under its background heading too (ranking reads only`,
+		`and ${loss_lines}, and gets those lines added under its background heading too (ranking reads only`,
 		'the body: `gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one closed before',
 		'this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
 		'A cap refusal is final: stop filing.',
@@ -110,8 +110,8 @@ function reading(issue: number, cite: string, minutes: number): string {
 }
 
 // Each lane pays a fixed review-to-merge cost, so causes one fix place shares are one issue. A fold
-// skips `issue:file`, so it carries the causing-lane line and the priority floor `issue:file` would set.
-function grouping(issue: number, lane_line: string, minutes: number): string {
+// skips `issue:file`, so it carries the ranked lines and the priority floor `issue:file` would set.
+function grouping(issue: number, loss_lines: string, minutes: number): string {
 	const label = issue_priority.lane_label(minutes)
 	const labeling =
 		label === undefined ? '' : `, and give it the \`${label}\` label unless it carries a higher one`
@@ -122,23 +122,25 @@ function grouping(issue: number, lane_line: string, minutes: number): string {
 		'issue that touches the same files (`pnpm josh issue:scout "<title>" --body-file <draft.md>`, each',
 		'candidate read with `pnpm josh issue:read <N>`): when one does, fold its causes into it by',
 		'`.claude/skills/workflow-commands/issue-fold-existing.md` instead of filing, the appended part',
-		`carrying \`${lane_line}\`${labeling}; on a verdict other than \`fold\`, file as below.`,
+		`carrying ${loss_lines}${labeling}; on a verdict other than \`fold\`, file as below.`,
 		'File each other issue with',
 		`\`pnpm josh issue:file --found-during ${String(issue)}\`, its body carrying those four per cause, and`,
-		`\`${lane_line}\` under its background heading — backlog ranking orders one priority by those minutes,`,
-		'so a filing without it falls behind every declared one.',
+		`${loss_lines} under its background heading, the cause-loss minutes being what that issue's own`,
+		"causes spent — backlog ranking orders one priority by them, else by the lane's minutes, which every",
+		'cause of the lane shares, so a filing without either falls behind every declared one.',
 	].join(' ')
 }
 
 // One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
 function prompt(issue: number, minutes: number): string {
 	const cite = issue_cite.plain(issue)
-	const lane_line = `- 原因のレーン: ${String(minutes)} 分（${cite}）`
+	// The lines backlog ranking reads (joshuafolkken/kit#4861): the cause's own minutes, else the lane's.
+	const loss_lines = `\`- 原因のレーン: ${String(minutes)} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
 
 	return [
 		reading(issue, cite, minutes),
-		grouping(issue, lane_line, minutes),
-		...duplicate_lines(lane_line),
+		grouping(issue, loss_lines, minutes),
+		...duplicate_lines(loss_lines),
 		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, '<result>')}"\`,`,
 		`the result being \`${run_event_overrun.folded_result(['<A>', '<B>'])}\` naming every issue you folded into`,
 		`when you folded any, else \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,

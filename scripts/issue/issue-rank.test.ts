@@ -16,11 +16,11 @@ interface Row extends RankRow {
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, labels, lane_minutes: 0, dependents }
+	return { name, labels, lost_minutes: 0, dependents }
 }
 
-function lost(name: string, lane_minutes: number, labels: ReadonlyArray<string> = []): Row {
-	return { ...row(name, labels), lane_minutes }
+function lost(name: string, lost_minutes: number, labels: ReadonlyArray<string> = []): Row {
+	return { ...row(name, labels), lost_minutes }
 }
 
 function names_of(rows: ReadonlyArray<Row>): Array<string> {

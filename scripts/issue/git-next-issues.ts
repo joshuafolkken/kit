@@ -65,7 +65,7 @@ function order(
 
 	return issue_rank.rank(candidates, (issue) => ({
 		labels: (issue.labels ?? []).map((label) => label.name),
-		lane_minutes: issue_priority.lane_minutes(issue.body),
+		lost_minutes: issue_priority.lost_minutes(issue.body),
 		dependents: dependents.get(String(issue.number)) ?? 0,
 	}))
 }

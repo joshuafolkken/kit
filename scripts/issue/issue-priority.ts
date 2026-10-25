@@ -44,6 +44,10 @@ const HIGH_PERCENT = 3
 const LANE_PREFIX = '- 原因のレーン:'
 // The minutes are the lane's net time (`josh lane:net`), the number its Issue.
 const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
+// The minutes one cause of an overrun lost, ranked ahead of its causing lane's (joshuafolkken/kit#4861).
+// They set no floor: the causing-lane line alone does.
+const CAUSE_PREFIX = '- 原因の損失:'
+const CAUSE_LINE = /^- 原因の損失: (?<minutes>\d+(?:\.\d+)?) 分$/u
 const CRITICAL_LANE_MINUTES = 60
 const HIGH_LANE_MINUTES = 40
 const SECURITY_PREFIX = '- セキュリティ:'
@@ -58,6 +62,8 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値> / 原因のレーン <分>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
 
 const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
+
+const CAUSE_PROBLEM = `state a cause's lost minutes under \`${BACKGROUND_HEADING}\` as \`${CAUSE_PREFIX} <分> 分\` (\`issue-template.md\`)`
 
 const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}\` as \`${SECURITY_PREFIX} <迂回される gate・ガード・権限>\` (\`issue-template.md\`)`
 
@@ -142,6 +148,10 @@ function is_lane_line(line: string): boolean {
 	return LANE_LINE.test(line)
 }
 
+function is_cause_line(line: string): boolean {
+	return CAUSE_LINE.test(line)
+}
+
 function is_security_line(line: string): boolean {
 	return has_basis(line.slice(SECURITY_PREFIX.length))
 }
@@ -161,9 +171,16 @@ const HIGH_FLOOR_LINES: ReadonlyArray<FloorLine> = [
 	{ prefix: PARK_PREFIX, accepts: is_park_line, problem: PARK_PROBLEM },
 ]
 
-// The refusal for the first floor line written in the wrong shape, or `undefined`.
+// Read for ranking, not a floor, yet a malformed one would rank as undeclared without a word.
+const CAUSE_RANK_LINE: FloorLine = {
+	prefix: CAUSE_PREFIX,
+	accepts: is_cause_line,
+	problem: CAUSE_PROBLEM,
+}
+
+// The refusal for the first floor or cause-loss line written in the wrong shape, or `undefined`.
 function malformed_problem(body: string): string | undefined {
-	return [LANE_FLOOR_LINE, ...HIGH_FLOOR_LINES].find((entry) =>
+	return [LANE_FLOOR_LINE, CAUSE_RANK_LINE, ...HIGH_FLOOR_LINES].find((entry) =>
 		background_lines(body, entry.prefix).some((line) => !entry.accepts(line)),
 	)?.problem
 }
@@ -176,13 +193,26 @@ function marker_floor(body: string): PriorityLevel {
 	return is_marked ? 'high' : 'normal'
 }
 
-// The longest causing lane the body declares, in minutes; `0` when it declares none.
-function lane_minutes(body = ''): number {
-	const minutes = background_lines(body, LANE_PREFIX)
-		.map((line) => Number(LANE_LINE.exec(line)?.groups?.['minutes']))
+// The largest minutes the background lines of `prefix` declare in `pattern`'s shape; `0` when none do.
+function declared_minutes(body: string, prefix: string, pattern: RegExp): number {
+	const minutes = background_lines(body, prefix)
+		.map((line) => Number(pattern.exec(line)?.groups?.['minutes']))
 		.filter((value) => Number.isFinite(value))
 
 	return Math.max(0, ...minutes)
+}
+
+// The longest causing lane the body declares, in minutes; `0` when it declares none.
+function lane_minutes(body = ''): number {
+	return declared_minutes(body, LANE_PREFIX, LANE_LINE)
+}
+
+// The minutes the body's cause lost, the rank backlog ordering reads: its cause-loss line, else its
+// causing lane, whose net time bounds the loss from above; `0` when it declares neither.
+function lost_minutes(body = ''): number {
+	const cause = declared_minutes(body, CAUSE_PREFIX, CAUSE_LINE)
+
+	return cause > 0 ? cause : lane_minutes(body)
 }
 
 // The floor a causing lane of `minutes` net time sets — strictly over each threshold.
@@ -258,11 +288,13 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 }
 
 const issue_priority = {
+	CAUSE_PREFIX,
 	HIGH_LANE_MINUTES,
 	declared_level,
 	floor_of,
 	lane_label,
 	lane_minutes,
+	lost_minutes,
 	problem,
 	with_label,
 }

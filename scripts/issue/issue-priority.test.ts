@@ -195,6 +195,47 @@ describe('issue_priority.lane_minutes', () => {
 	})
 })
 
+// joshuafolkken/kit#4861: the minutes one cause lost rank it within its lane, and set no floor.
+describe('issue_priority.lost_minutes', () => {
+	const CAUSE_LINE = '- 原因の損失: 16 分\n'
+
+	it('reads the largest cause-loss line ahead of the causing lane', () => {
+		const filed = body('', `${lane_line('98')}- 原因の損失: 4 分\n${CAUSE_LINE}`)
+
+		expect(issue_priority.lost_minutes(filed)).toBe(16)
+	})
+
+	it('falls back to the causing lane when no cause-loss line is declared', () => {
+		expect(issue_priority.lost_minutes(lane('98'))).toBe(98)
+	})
+
+	it.each([
+		['an absent body', undefined],
+		['a body declaring neither', body('')],
+	])('reads 0 from %s', (_case, text) => {
+		expect(issue_priority.lost_minutes(text)).toBe(0)
+	})
+
+	it.each([['- 原因の損失: 16'], ['- 原因の損失: 16分'], ['- 原因の損失: 約 16 分']])(
+		'refuses the cause-loss line %j',
+		(line) => {
+			expect(issue_priority.problem(body('', `${line}\n`), [])).toContain("cause's lost minutes")
+		},
+	)
+
+	it('accepts a well-formed cause-loss line', () => {
+		expect(issue_priority.problem(body('', CAUSE_LINE), [])).toBeUndefined()
+	})
+
+	it('leaves the floor to the causing lane', () => {
+		const short_lane = body('', `${lane_line('30')}- 原因の損失: 90 分\n`)
+		const long_lane = body('', `${lane_line('98')}- 原因の損失: 2 分\n`)
+
+		expect(issue_priority.floor_of(short_lane)).toBe('normal')
+		expect(issue_priority.floor_of(long_lane)).toBe('critical')
+	})
+})
+
 const SECURITY_LINE = '- セキュリティ: Issue 本文がガードを通らずに読める\n'
 const PARK_LINE = '- 原因の park: #4703\n'
 

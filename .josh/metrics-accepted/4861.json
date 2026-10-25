@@ -1,0 +1,9 @@
+{
+	"reason": "#4861 adds the per-cause lost-minutes rank key, its parser and its malformed-line refusal",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 21,
+		"rules.lines": 2,
+		"ai_cost.on_demand_bytes": 304
+	}
+}
