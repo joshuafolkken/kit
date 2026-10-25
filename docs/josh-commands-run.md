@@ -456,8 +456,8 @@ logged once at confirmation, then `lane:close <N>` and the epic counters; a merg
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
 a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
-lane ledger launches one baseline investigation of the median lane — every stage and sub-stage at 2% or over
-in `lane:stats --period 3`, its causes filed by the overrun's rules — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
+lane ledger launches one baseline investigation of the median lane — the stages and sub-stages that spend the most per merge
+in `lane:stats --period 3`, its causes filed by the overrun's rules (at most five, the largest reducible minutes first, each 1 minute or more) — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
 its wording `run-event-baseline.ts`), a finding on the board. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
@@ -1021,7 +1021,7 @@ pnpm josh overrun:mechanisms --period 3   # the last 3 days' mechanisms
 <!-- /usage -->
 
 It reads the keyed ` — under 2%: <key> <minutes> min: <cause>` segments of overrun result notes (`run-event-overrun.ts`), 7 days by default; a key at 2% or over is filed as one root-cause issue, at 10% as urgent.
-One losing more per merge than the equal period before ends ` · grown from <m> min/merge`, filed at any share. An overrun investigation runs it before dropping a cause (`lane-overrun-prompt.ts`).
+One losing more per merge than the equal period before ends ` · grown from <m> min/merge`, filed at any share. No overrun investigation runs it or writes new segments any more (`lane-overrun-prompt.ts` files a lane's own largest causes); it reads only the notes written before.
 
 `--since <instant>` starts the period later — at the close of the issue that fixed a mechanism, so the sum leaves out the losses that fix removed.
 

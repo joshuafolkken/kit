@@ -167,7 +167,7 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 		await lane_overrun.investigate(ISSUE)
 
 		expect(launched_prompt()).toContain(
-			`${LOSS_LINES} under its background heading, the cause-loss minutes being what that issue's own causes spent`,
+			`${LOSS_LINES} under its background heading, the cause-loss minutes being what that issue's own causes would cut`,
 		)
 	})
 

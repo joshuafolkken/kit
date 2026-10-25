@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
 
-// joshuafolkken/kit#4870: a cause whose fix saves under the filing floor per merge is not worth a lane of
-// its own, so the session folds it or records it, and the lane's minutes set no filing's priority.
+// joshuafolkken/kit#4928: an investigation reads only its lane's record and files its five largest
+// reducible causes of a minute or more — a share over every merge thins a new mechanism's cost below
+// any line, so no share is computed.
 
 const ISSUE = 4695
 const MINUTES = 65
@@ -11,55 +12,54 @@ function handling(): string {
 	return lane_overrun_prompt.handling(ISSUE, MINUTES)
 }
 
-describe('lane_overrun_prompt.handling — a cause under the filing floor', () => {
-	it('folds it or leaves it keyed in the result, never filing it on its own', () => {
+describe('lane_overrun_prompt.handling — which causes are filed', () => {
+	it('files the five largest reducible causes of a minute or more, from this lane alone', () => {
 		for (const part of [
-			'A cause whose fix saves under 2% of the median lane time per merge',
-			'is not filed on its own — `issue:file` refuses it under `- 目的: 時間短縮`.',
-			'Under 2%, fold it into an open issue as above, else end the result below',
-			'with ` — under 2%: <key> <minutes> min: <cause, in a few words>`',
+			"Estimate each cause's reducible minutes: what its fix would cut from this lane alone, judged from its own record.",
+			'Take at most the 5 causes with the most reducible minutes, largest first, each cutting 1 minute or more, and drop the rest',
 		]) {
 			expect(handling()).toContain(part)
 		}
 	})
 
-	// joshuafolkken/kit#4886: one mechanism's losses are summed across lanes before a cause is dropped.
-	it("reads its mechanism's summed loss before dropping it, and files the mechanism at 2%", () => {
+	it('counts the time the work inherently takes only for the part a fix removes', () => {
+		expect(handling()).toContain(
+			'Time the work inherently takes (a CI wait the pipeline requires, a review) counts only for the part a fix removes, and not at all when no fix removes any.',
+		)
+	})
+
+	it('picks the causes before grouping and filing them', () => {
+		const text = handling()
+
+		expect(text.indexOf('Take at most the 5 causes')).toBeLessThan(
+			text.indexOf('Causes whose fixes'),
+		)
+	})
+
+	it('files a defect as a defect and any other cause as time shortening', () => {
+		expect(handling()).toContain('as `- 種別: 不具合`, any other cause as `- 目的: 時間短縮`.')
+	})
+})
+
+describe('lane_overrun_prompt.handling — no share of merges', () => {
+	it('names no share, no 2–3% line, no period average and no cross-lane sum', () => {
 		for (const part of [
-			'Key it by its mechanism (a josh command or step, e.g. `test:pinned`)',
-			'Before dropping it, run that command:',
-			'`pnpm josh overrun:mechanisms`',
-			'When a closed issue already fixed the mechanism, re-run it with `--since <that close time>`',
-			'At 2% or over, the mechanism is one root-cause issue — fold into an open issue that fixes it',
-			"The key's cause count is the recurrence to put into its `効く率`.",
+			'%',
+			'share of',
+			'median lane',
+			'per merge',
+			'7 day',
+			'overrun:mechanisms',
 		]) {
-			expect(handling()).toContain(part)
+			expect(handling()).not.toContain(part)
 		}
 	})
 })
 
-// joshuafolkken/kit#4910: only the time the work inherently takes is judged by the floor.
-describe('lane_overrun_prompt.handling — a defect and a grown mechanism', () => {
-	it('sorts each cause into a defect or inherent time before any share rule', () => {
-		const text = handling()
-		const sort = text.indexOf('Sort each cause first: a defect')
-
-		expect(sort).toBeGreaterThan(-1)
-		expect(sort).toBeLessThan(text.indexOf('A cause whose fix saves under 2%'))
-		expect(text).toContain('time the work inherently takes (CI wait, review)')
-	})
-
-	it('files a defect at any share, as a defect with no time-shortening line', () => {
+describe('lane_overrun_prompt.handling — a recurrence', () => {
+	it('appends its own cause-loss line to the open issue, which ranking sums', () => {
 		expect(handling()).toContain(
-			'File a defect at any share as `- 種別: 不具合`, with no `- 目的: 時間短縮` line and so no reduction percentage.',
-		)
-	})
-
-	// A time-shortening body under the floor beside a causing lane is refused by `issue:file`, so the
-	// grown mechanism takes the defect's form, which `issue-priority-floor.test.ts` files.
-	it('files a mechanism `overrun:mechanisms` marks grown at any share, in the form issue:file accepts', () => {
-		expect(handling()).toContain(
-			'A key `pnpm josh overrun:mechanisms` marks `grown` lost more per merge than over the period of the same length before it: file its mechanism as one root-cause issue at any share the same way, as `- 種別: 不具合` with no `- 目的: 時間短縮` line.',
+			'the cause-loss line appended beside the ones already there, since ranking sums every `- 原因の損失:` line',
 		)
 	})
 })

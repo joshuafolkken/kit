@@ -142,11 +142,9 @@ describe('lane_baseline.investigate — the prompt', () => {
 
 		for (const part of [
 			'pnpm josh lane:stats --period 3',
-			'take every stage and sub-stage at or over 2% of the median lane, not only the largest',
-			'Sort each cause first: a defect',
-			'A cause whose fix saves under 2% of the median lane time per merge',
-			'`pnpm josh overrun:mechanisms`',
-			"already the mechanism's sum over the period's merges",
+			'take the several stages and sub-stages with the largest per-merge time, not just the one largest',
+			"Estimate each cause's reducible minutes: what its fix would cut from the median merge",
+			'Take at most the 5 causes with the most reducible minutes',
 			`- 原因のレーン: <median lane minutes> 分（#${String(ISSUE)}）`,
 			`pnpm josh run:event --append note "${run_event_baseline.ended_text(30, '<result>')}"`,
 		]) {
@@ -154,14 +152,15 @@ describe('lane_baseline.investigate — the prompt', () => {
 		}
 	})
 
-	it('files with no lane it was found during, and adds nothing to the sum `overrun:mechanisms` prints', async () => {
+	it('files with no lane it was found during, and judges no share (joshuafolkken/kit#4928)', async () => {
 		mocks.read_entries.mockReturnValue(merges(30))
 
 		await lane_baseline.investigate(ISSUE)
 
 		expect(launched_prompt()).toContain('`pnpm josh issue:file`')
 		expect(launched_prompt()).not.toContain('--found-during')
-		expect(launched_prompt()).not.toContain("add the cause's minutes to its key's sum")
+		expect(launched_prompt()).not.toContain('%')
+		expect(launched_prompt()).not.toContain('overrun:mechanisms')
 	})
 
 	it('launches the session with no lane marks in its env', async () => {

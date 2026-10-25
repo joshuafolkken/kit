@@ -184,8 +184,8 @@ function launched(issue: number, minutes: number): string {
 // launch of its overrun's investigation.
 function note_text(issue: number, net: LaneNet): string {
 	if (net.kind === 'missing') return run_event_overrun.skipped_text(issue, net.reason)
-	// The threshold sets no priority: each filing is ranked by the reduction it states
-	// (joshuafolkken/kit#4870). `lane:stats` counts the lanes over it on dispatch-to-merge time, not
+	// The threshold sets no priority: each filing is ranked by its causes' reducible minutes
+	// (joshuafolkken/kit#4928). `lane:stats` counts the lanes over it on dispatch-to-merge time, not
 	// on this net time.
 	const is_over = lane_tail_stats.is_overrun(net.minutes)
 
