@@ -1,0 +1,7 @@
+{
+	"reason": "#4879: probed_files skips test-only fixtures in test:pinned probes",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}
