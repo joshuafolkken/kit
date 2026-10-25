@@ -288,7 +288,7 @@ function is_written_since(source: string, taken_at: string): boolean {
 
 // Whether the brief the pointer names was attested, on this branch — the half of a finished review
 // that does not depend on where its verdict was written down.
-function is_attested_on(checkout: ReviewCheckout, root?: string): boolean {
+function is_attested_on(checkout: Pick<ReviewCheckout, 'branch'>, root?: string): boolean {
 	const pointer = read_pointer(root)
 
 	if (pointer === undefined) return false

@@ -146,3 +146,44 @@ describe('the block shown to the resumed session', () => {
 		expect(block).toContain('Remaining: (none)')
 	})
 })
+
+// joshuafolkken/kit#4868: an attested round's findings not yet recorded ride in the handoff, so the
+// resumed run fixes them rather than rerunning round 1.
+describe('the unrecorded findings a handoff carries', () => {
+	const FINDING = 'code:medium:scripts/a.ts — the guard reads the wrong root'
+
+	it('round-trips the findings through JSON', () => {
+		const handoff = { ...HANDOFF, findings: [FINDING] }
+
+		expect(run_cut_handoff.parse_handoff(JSON.stringify(handoff))).toStrictEqual(handoff)
+	})
+
+	it('shows each finding with the instruction not to rerun round 1', () => {
+		const block = run_cut_handoff.describe_handoff({ ...HANDOFF, findings: [FINDING] })
+
+		expect(block).toContain(FINDING)
+		expect(block).toContain('do not rerun round 1')
+	})
+
+	it.each([[undefined], [[]], [['…']], [['unrecorded']], [[' ']]])(
+		'prints no findings block for %j',
+		(findings) => {
+			const block = run_cut_handoff.describe_handoff({ ...HANDOFF, findings })
+
+			expect(block).not.toContain('Round-1 findings')
+		},
+	)
+
+	// The stated format parses, so a copied example must not read as a carried round.
+	it('carries none from the stated format copied as written', () => {
+		const copied = run_cut_handoff.parse_handoff(run_cut_handoff.HANDOFF_FORMAT)
+
+		expect(run_cut_handoff.carried_findings(copied)).toStrictEqual([])
+	})
+
+	it('keeps a real finding beside a placeholder', () => {
+		const handoff = { ...HANDOFF, findings: ['unrecorded', FINDING] }
+
+		expect(run_cut_handoff.carried_findings(handoff)).toStrictEqual([FINDING])
+	})
+})
