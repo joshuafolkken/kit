@@ -161,11 +161,10 @@ async function left_behind_of(issue: string, targets: LaneTargets): Promise<Arra
 	return [...(await residue(targets)), ...survivors]
 }
 
-// An ended lane's plan goes with it, so the issue's next lane plans afresh rather than inheriting the
-// files and the place in line of a run that is over.
+// An ended lane's cleared plan goes with it; a plan its lane yielded on stays (`lane_plan.release`).
 async function record_end(issue: string): Promise<void> {
 	await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
-	lane_plan.remove(Number(issue), process.cwd())
+	lane_plan.release(Number(issue), process.cwd())
 }
 
 async function close_lane(issue: string): Promise<CloseOutcome> {

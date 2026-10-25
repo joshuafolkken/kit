@@ -19,6 +19,7 @@ vi.mock('#scripts/lane/lane-withdraw-closed', () => ({
 }))
 
 const { run_merge_withdrawn } = await import('./run-merge-withdrawn')
+const { lane_yield } = await import('#scripts/lane/lane-yield')
 
 const CHILD = '4906'
 const LANE = { issue: CHILD, branch: `${CHILD}-lane` }
@@ -51,6 +52,15 @@ describe('run_merge_withdrawn.collect', () => {
 
 		expect(await run_merge_withdrawn.collect(CHILD)).toStrictEqual(NOTHING)
 		expect(withdraw_lane_mock).not.toHaveBeenCalled()
+	})
+
+	it('closes the still-open lane of a child that yielded, named as the yield', async () => {
+		events_mock.mockResolvedValue([
+			{ ...WITHDRAW_EVENT, text: `#${CHILD} withdrawn by ${lane_yield.YIELD_TEXT.name}: x` },
+		])
+
+		expect(await run_merge_withdrawn.collect(CHILD)).toStrictEqual(COLLECTED)
+		expect(withdraw_lane_mock).toHaveBeenCalledWith(LANE, lane_yield.YIELD_REASON, 'yield')
 	})
 
 	it('has nothing to withdraw where no lane is open', async () => {

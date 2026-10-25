@@ -79,6 +79,18 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#4926: a lane that yielded closes on an uncleared plan, which keeps the issue held
+	// back and its place in line; a lane that cleared its plan leaves nothing behind.
+	it('releases a cleared plan with its lane and keeps one the lane yielded on', () => {
+		lane_plan.record({ ...EARLIER_PLAN, cleared: true }, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.release(EARLIER, DIRECTORY)
+		lane_plan.release(LATER, DIRECTORY)
+
+		expect(lane_plan.read(EARLIER, DIRECTORY)).toBeUndefined()
+		expect(lane_plan.read(LATER, DIRECTORY)).toEqual(LATER_PLAN)
+	})
+
 	it('reads back the plan it recorded', () => {
 		lane_plan.record(LATER_PLAN, DIRECTORY)
 

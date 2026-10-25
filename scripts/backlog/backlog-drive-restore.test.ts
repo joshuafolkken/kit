@@ -70,9 +70,10 @@ it('does not restore a split child whose lane remains registered', () => {
 
 // joshuafolkken/kit#3908: `lane:withdraw` settles the child itself, so a driver restarted after it
 // neither waits on the lane nor offers the closed issue again in a named run.
+const PERSON_WITHDRAWAL = '#2508 withdrawn by a person: superseded'
 const WITHDRAWN = [
 	event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
-	event(2, 'withdraw', '#2508 withdrawn by a person: superseded'),
+	event(2, 'withdraw', PERSON_WITHDRAWAL),
 ]
 
 it('does not restore a child a person withdrew whose lane remains registered', () => {
@@ -97,6 +98,33 @@ it('offers again a withdrawn child launched afresh after its withdrawal once tha
 	]
 
 	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual([])
+})
+
+// joshuafolkken/kit#4926: a lane that yielded to an earlier lane stays in the run — its retained plan,
+// not the exclusion, holds it back until the holder ends — and is not settled.
+const YIELDED = [
+	event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+	event(2, 'withdraw', '#2508 withdrawn by its own lane:plan: overlaps #2509'),
+]
+
+it('neither excludes from the offer nor settles a child that yielded its lane', () => {
+	expect(backlog_drive_restore.offer_exclude(YIELDED)).toStrictEqual([])
+	expect(backlog_drive_restore.withdrawn_issues(YIELDED)).toStrictEqual([])
+	expect(backlog_drive_restore.settled_issues(YIELDED)).toStrictEqual(new Set())
+})
+
+it('does not restore a child that yielded its lane', () => {
+	expect(backlog_drive_restore.restore([CHILD], YIELDED, [])).toStrictEqual([])
+})
+
+it('excludes a child a person withdrew after a yield of an earlier launch', () => {
+	const events = [
+		...YIELDED,
+		event(3, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(4, 'withdraw', PERSON_WITHDRAWAL),
+	]
+
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual([CHILD])
 })
 
 it('offers a child withdrawn in another run', () => {

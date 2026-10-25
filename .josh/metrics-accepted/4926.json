@@ -1,0 +1,7 @@
+{
+	"reason": "lane:plan yield (#4926): new lane-yield module and its test, the yield path in lane:plan, run:merge and the restore",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}

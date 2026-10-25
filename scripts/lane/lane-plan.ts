@@ -17,7 +17,7 @@ import { z } from 'zod'
 // **Keyed to the repository and the issue, not the work tree**, and kept in the common git directory
 // (`durable-state.ts`): the lane records it from its own work tree and the parent reads it from the main
 // checkout, both resolve the same directory, and a reboot does not drop a running lane's plan.
-// `lane:close` removes it with the lane, so the issue's next lane plans afresh.
+// `lane:close` releases it with the lane (`release`).
 
 const lane_plan_schema = z.object({
 	issue: z.number(),
@@ -66,6 +66,14 @@ function is_uncleared(issue: number, directory: string): boolean {
 	)
 }
 
+// What an ended lane does with its plan. A cleared plan goes, so the issue's next lane plans afresh
+// rather than inheriting the files and the place in line of a run that is over. A plan never cleared —
+// the lane yielded on it (`lane-yield.ts`, joshuafolkken/kit#4926) — stays: `backlog:next` holds the
+// issue back on it while the holder runs, and its next lane keeps the place in line it took.
+function release(issue: number, directory: string): void {
+	if (read(issue, directory)?.cleared === true) remove(issue, directory)
+}
+
 // `declared` with each issue's recorded plan joined to the paths its body declares.
 function with_plans(declared: Declared, directory: string): Declared {
 	const joined = [...declared].map(([issue, paths]): [number, ReadonlySet<string>] => [
@@ -90,7 +98,7 @@ function earlier_holders(
 	})
 }
 
-const lane_plan = { earlier_holders, is_uncleared, read, record, remove, with_plans }
+const lane_plan = { earlier_holders, is_uncleared, read, record, release, remove, with_plans }
 
 export { lane_plan }
 export type { LanePlan }

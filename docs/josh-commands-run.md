@@ -1029,7 +1029,7 @@ One losing more per merge than the equal period before ends ` · grown from <m> 
 
 <!-- usage: lane:plan -->
 
-Record the files a lane child plans to edit, and wait before implementing while a running lane that planned earlier declares or plans one of them — naming the file and that issue.
+Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue.
 
 ```bash
 pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts
@@ -1037,13 +1037,19 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 
 <!-- /usage -->
 
-A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes, and again until it prints `clear`; until then `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
+A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
-Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body.
+Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+
+On a clash the child gives its lane back instead of polling with its seat taken:
+
+- It writes a `withdraw` event naming `its own lane:plan`, and the session ends with no edit.
+- `run:merge` books it `withdrawn` — not a failure or an outage — and closes the lane.
+- Its plan stays recorded, uncleared: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
 
 A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares paths as its body does, so a candidate whose plan names a running lane's file is held back before dispatch.
 
-**Output / exit codes:** the reason on stderr when it changes — the waiting issue, its planned file, the path it overlaps and the holder. `clear` on stdout, exit 0, once nothing holds the planned files; `wait`, exit 1, after 18 polls 30 s apart or on an unreadable listing — run it again. No path: the usage, exit 1.
+**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
 
