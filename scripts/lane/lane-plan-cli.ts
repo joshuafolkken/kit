@@ -54,10 +54,8 @@ function clash_among(
 	directory: string,
 ): Clash | undefined {
 	const declared = lane_plan.with_plans(backlog_overlap.declared_of(issues), directory)
-	const numbers = issues.map((issue) => issue.number)
-	const holders = lane_plan.earlier_holders(plan, numbers, directory)
 
-	return backlog_overlap.path_clash(new Set(plan.paths), declared, holders)
+	return lane_plan.clash_of(plan, declared, directory)
 }
 
 function overlap_text(issue: number, clash: Clash): string {

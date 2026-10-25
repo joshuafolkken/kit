@@ -1,7 +1,7 @@
 {
-	"reason": "Lane give-back on a planned-file clash, docs Markdown never clashing, and a named run holding a yielded issue back on its kept plan while the lane it yielded to runs",
+	"reason": "Lane yield on a planned-file clash, plus the named run reading the holder's body so its hold matches lane:plan's yield (round-2 fix)",
 	"date": "2026-10-25",
 	"growth": {
-		"scripts.code_lines": 137
+		"scripts.code_lines": 150
 	}
 }

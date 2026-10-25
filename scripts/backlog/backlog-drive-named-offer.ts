@@ -1,3 +1,4 @@
+import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import {
 	EPIC_LABEL,
@@ -14,6 +15,8 @@ import type { DriveState, OfferRead } from './backlog-drive'
 import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_unread } from './backlog-drive-unread'
+import type { Declared } from './backlog-overlap'
+import { backlog_plan_comment } from './backlog-plan-comment'
 
 interface NamedContext {
 	is_only: boolean
@@ -139,13 +142,28 @@ async function not_run(
 	return named?.is_finish === true ? await only_end(carry, named) : named
 }
 
+// What the lanes in flight declare — body, plan comment and recorded plan, the scope `lane:plan` and
+// `backlog:next` read. A lane the listing does not carry, or an unread listing, declares its plan alone.
+async function in_flight_declared(in_flight: ReadonlyArray<string>): Promise<Declared> {
+	const listing = await auto_ok_cli.fetch_opted_in()
+	const listed = listing.kind === 'read' ? listing.issues : []
+	const pool = in_flight
+		.map(Number)
+		.map((number) => listed.find((issue) => issue.number === number) ?? { number })
+
+	return await backlog_plan_comment.declared_of(pool, process.cwd())
+}
+
 // The issues in flight, with each named one whose yielded plan a running lane still holds: the offer
 // waits on it as on a lane, so the run does not relaunch it into the same yield (joshuafolkken/kit#4926).
-function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Array<string> {
-	const running = in_flight.map(Number)
-	const held = backlog_drive_named
+// The listing is read only when a named issue yielded and a lane runs.
+async function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Promise<Array<string>> {
+	const yielded = backlog_drive_named
 		.named_issues(carry)
-		.filter((issue) => lane_plan.is_yield_held(issue, running, process.cwd()))
+		.filter((issue) => lane_plan.is_yielded(issue, process.cwd()))
+	if (yielded.length === 0 || in_flight.length === 0) return [...in_flight]
+	const declared = await in_flight_declared(in_flight)
+	const held = yielded.filter((issue) => lane_plan.is_yield_held(issue, declared, process.cwd()))
 
 	return [...new Set([...in_flight, ...held.map(String)])]
 }
@@ -155,7 +173,7 @@ async function read(
 	state: DriveState,
 	context: NamedContext,
 ): Promise<OfferRead | undefined> {
-	const waiting = { ...state, in_flight: holding(carry, state.in_flight) }
+	const waiting = { ...state, in_flight: await holding(carry, state.in_flight) }
 	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
 	if (named?.verdict !== 'run') return await not_run(carry, named)
 	const budget = budget_offer(carry, state, context.forwarded)

@@ -1,6 +1,9 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { cutoff_of } from '#scripts/git/listing-cutoff'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_plan } from '#scripts/lane/lane-plan'
@@ -11,6 +14,7 @@ import { backlog_drive_epic } from './backlog-drive-epic'
 import { backlog_drive_fixture, type Harness } from './backlog-drive-fixture'
 import { backlog_drive_named_offer } from './backlog-drive-named-offer'
 import { backlog_offer } from './backlog-offer'
+import { backlog_plan_comment } from './backlog-plan-comment'
 
 const ACTIVE = new Date().toISOString()
 const CARRY = {
@@ -52,17 +56,56 @@ test('offers a named epic child from the epic instead of launching the root', as
 	epic.mockRestore()
 })
 
+const RUNNING: OpenIssueData = {
+	number: 3,
+	title: 'running',
+	createdAt: '2026-10-25T03:07:44Z',
+	blockedBy: undefined,
+	labels: [{ name: 'in-progress' }],
+	body: '`scripts/lane/lane-overrun.ts`',
+}
+const LISTING_LIMIT = 100
+const DECLARED = new Map([[3, new Set(['scripts/lane/lane-overrun.ts'])]])
+
 // joshuafolkken/kit#4926: a declared issue that gave its lane back waits on its kept plan while the
-// lane it yielded to runs, rather than relaunching into the same yield.
+// lane it yielded to runs, rather than relaunching into the same yield. The running lane's body is read
+// with its plan — the scope `lane:plan` yielded on.
 test('waits on a declared issue whose yielded plan a lane in flight still holds', async () => {
-	const state = backlog_drive.initial_state(['3'], ACTIVE)
+	vi.spyOn(lane_plan, 'is_yielded').mockImplementation((issue) => issue === 1)
+	vi.spyOn(auto_ok_cli, 'fetch_opted_in').mockResolvedValue({
+		kind: 'read',
+		issues: [RUNNING],
+		cutoff: cutoff_of(1, LISTING_LIMIT, false),
+	})
+	const declared = vi.spyOn(backlog_plan_comment, 'declared_of').mockResolvedValue(DECLARED)
 	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
 
-	const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+	const offer = await backlog_drive_named_offer.read(
+		CARRY,
+		backlog_drive.initial_state(['3'], ACTIVE),
+		CONTEXT,
+	)
 
 	expect(offer?.verdict).toBe('wait')
-	expect(held).toHaveBeenCalledWith(1, [3], process.cwd())
-	held.mockRestore()
+	expect(declared).toHaveBeenCalledWith([RUNNING], process.cwd())
+	expect(held).toHaveBeenCalledWith(1, DECLARED, process.cwd())
+	vi.restoreAllMocks()
+})
+
+test('reads no listing while no declared issue yielded', async () => {
+	vi.spyOn(lane_plan, 'is_yielded').mockReturnValue(false)
+	vi.spyOn(issue_state_cli, 'read_issue').mockResolvedValue({
+		kind: 'state',
+		state: { state: 'OPEN', labels: [], is_human_review: false },
+	})
+	const fetch = vi.spyOn(auto_ok_cli, 'fetch_opted_in')
+	const state = backlog_drive.initial_state(['3'], ACTIVE)
+	const context = { ...CONTEXT, forwarded: ['--max', '2'] }
+
+	await backlog_drive_named_offer.read(CARRY, state, context)
+
+	expect(fetch).not.toHaveBeenCalled()
+	vi.restoreAllMocks()
 })
 
 function begin_named(target: string, directory: string): RunCarry | undefined {
