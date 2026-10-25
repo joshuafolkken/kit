@@ -20,4 +20,13 @@ describe('epic_rank.rank', () => {
 
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([3, 2, 1])
 	})
+
+	// joshuafolkken/kit#4861: causes of one lane are ranked by the minutes each lost.
+	it('puts the child whose cause lost more first among causes of one lane', () => {
+		const small = `${lane_body(98)}- 原因の損失: 4 分\n`
+		const large = `${lane_body(98)}- 原因の損失: 16 分\n`
+		const children = [child(1, small), child(2, large)]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 1])
+	})
 })
