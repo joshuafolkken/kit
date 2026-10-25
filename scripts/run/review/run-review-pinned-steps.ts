@@ -27,10 +27,14 @@ const LOST_NOTE = 'its process ended without an answer'
 const STOP_SIGNAL = 'SIGTERM'
 
 // The join waits here only once the gate has settled and the review has returned, so the grace is
-// counted from the end of the pair (joshuafolkken/kit#4794). A check this far behind it is one the
-// CPU starved, and a longer wait would end in the same not-run answer, minutes later. A check still
-// queued for its cores gets no grace at all (joshuafolkken/kit#4808): it could not finish within it.
+// counted from the end of the pair (joshuafolkken/kit#4794). A check still queued for its cores gets no
+// grace at all (joshuafolkken/kit#4808): it could not finish within it. **Where a read follows, neither
+// is stopped** (joshuafolkken/kit#4888): the check keeps running on the tree the join read, and the note
+// names the one command that waits for its answer, so no lane runs `test:pinned` again by hand. Where
+// none follows, the late check is stopped rather than left holding cores.
 const GRACE_MS = 120_000
+const READ_COMMAND = 'pnpm josh run:review --pinned'
+const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\``
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
 // `josh run:review --pinned` reads a check `josh review:record` started seconds before
@@ -141,8 +145,9 @@ function stop_last({ pid, start }: Launch): void {
 	if (process_identity.is_same_process(pid, start) === true) signal_group(pid)
 }
 
-// The join's stamp is this pair's, minutes old, so the join signals any pid not proven gone: one whose
-// start could not be read (no `/proc`, no `ps`) is the check it has just been waiting on.
+// The stamp a waiter just read is this pair's, minutes old, so the lone read and a supervised join
+// signal any pid not proven gone: one whose start could not be read (no `/proc`, no `ps`) is the check
+// they have just been waiting on.
 function stop_current({ pid, start }: Launch): void {
 	if (process_identity.is_same_process(pid, start) !== false) signal_group(pid)
 }
@@ -199,15 +204,27 @@ async function poll_within_grace(
 	return summary
 }
 
-// The check usually settles while the review is still running; the grace only bounds one that fell
-// far behind the pair while running its tests.
-async function poll_answer(root: string, launched: Launch, now: Clock): Promise<PinnedSummary> {
+function given_up(launched: Launch, note: string, is_left_running: boolean): PinnedSummary {
+	if (!is_left_running) return stopped(launched, note)
+
+	return test_pinned_record.not_run_summary(new Error(`${note} — ${STILL_RUNNING_NOTE}`))
+}
+
+// The check usually settles while the review is still running; the grace only bounds the join's wait
+// on one that fell far behind the pair while running its tests.
+async function poll_answer(
+	root: string,
+	launched: Launch,
+	now: Clock,
+	is_left_running: boolean,
+): Promise<PinnedSummary> {
 	const summary = read_answer(root, launched)
 
 	if (summary !== undefined) return summary
-	if (is_queued(root)) return stopped(launched, QUEUED_NOTE)
+	if (is_queued(root)) return given_up(launched, QUEUED_NOTE, is_left_running)
+	const late = await poll_within_grace(root, launched, now)
 
-	return (await poll_within_grace(root, launched, now)) ?? stopped(launched, TIMED_OUT_NOTE)
+	return late ?? given_up(launched, TIMED_OUT_NOTE, is_left_running)
 }
 
 // The `--unpinned-ok` reason the last check was launched with; `undefined` when it carried none.
@@ -220,16 +237,24 @@ function launched_tree(root: string = PROJECT_ROOT): string | undefined {
 	return read_launch(root)?.tree
 }
 
-// `undefined` when no check was launched.
+// `undefined` when no check was launched. `is_left_running` is false where nothing reads a late answer.
 async function wait_for_answer(
 	root: string = PROJECT_ROOT,
 	now: Clock = () => Date.now(),
+	is_left_running = true,
 ): Promise<PinnedSummary | undefined> {
 	const launched = read_launch(root)
 
 	if (launched === undefined) return undefined
 
-	return await poll_answer(root, launched, now)
+	return await poll_answer(root, launched, now, is_left_running)
+}
+
+// Whether the last check left its answer, rather than ending without one or never being launched.
+function is_answered(root: string = PROJECT_ROOT): boolean {
+	const launched = read_launch(root)
+
+	return launched !== undefined && test_pinned_record.read(launched.token, root) !== undefined
 }
 
 // The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
@@ -246,7 +271,9 @@ async function wait_alone(
 }
 
 const run_review_pinned_steps = {
+	READ_COMMAND,
 	clear,
+	is_answered,
 	launch,
 	launched_reason,
 	launched_tree,

@@ -15,6 +15,7 @@ import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinne
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
+import { run_review_pinned_join } from './run-review-pinned-join'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
 import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
@@ -265,8 +266,8 @@ async function run_join(): Promise<number> {
 	report_gate(state)
 	report_timing(timing)
 
-	// An unpinned change stops the round whatever the gate answered.
-	const is_unpinned = await join_pinned(run_review_pinned_steps.wait_for_answer)
+	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
+	const is_unpinned = await join_pinned(async () => await run_review_pinned_join.wait_for_join())
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }

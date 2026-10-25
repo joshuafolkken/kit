@@ -4,19 +4,25 @@ import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinne
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { run_mock, read_mock, clear_mock, pre_detach_checks, reusable_mock } = vi.hoisted(() => ({
-	run_mock: vi.fn<(list: ReadonlyArray<string>) => Promise<Record<string, unknown>>>(),
-	read_mock: vi.fn<(token: string) => PinnedSummary | undefined>(),
-	clear_mock: vi.fn<(token: string) => void>(),
-	pre_detach_checks:
-		vi.fn<
-			(
-				directory?: string,
-				records?: unknown,
-				pinned?: () => Promise<JoshResult>,
-			) => Promise<JoshResult>
-		>(),
-	reusable_mock: vi.fn<(issue: number) => Promise<boolean>>(),
+const { run_mock, read_mock, clear_mock, pre_detach_checks, reusable_mock, on_tree_mock } =
+	vi.hoisted(() => ({
+		run_mock: vi.fn<(list: ReadonlyArray<string>) => Promise<Record<string, unknown>>>(),
+		read_mock: vi.fn<(token: string) => PinnedSummary | undefined>(),
+		clear_mock: vi.fn<(token: string) => void>(),
+		pre_detach_checks:
+			vi.fn<
+				(
+					directory?: string,
+					records?: unknown,
+					pinned?: () => Promise<JoshResult>,
+				) => Promise<JoshResult>
+			>(),
+		reusable_mock: vi.fn<(issue: number) => Promise<boolean>>(),
+		on_tree_mock: vi.fn<() => Promise<PinnedSummary | undefined>>(),
+	}))
+
+vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
+	run_review_pinned_join: { answer_on_tree: on_tree_mock },
 }))
 
 vi.mock('#scripts/lib/buffered-process', () => ({
@@ -78,6 +84,27 @@ beforeEach(() => {
 	clear_mock.mockReset()
 	pre_detach_checks.mockReset().mockResolvedValue(PASSED)
 	reusable_mock.mockReset().mockResolvedValue(false)
+	on_tree_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4888: the tree `run:review` checked is not checked twice.
+describe('run_ship_pre_detach_pinned.pinned_check on the tree run:review checked', () => {
+	it("judges the background check's answer and runs no josh test:pinned of its own", async () => {
+		on_tree_mock.mockResolvedValue(CLEAR)
+
+		expect(await check([])).toStrictEqual({ code: OK, out: CLEAR.text })
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+
+	it('stops on an unpinned place the background check found', async () => {
+		on_tree_mock.mockResolvedValue(UNPINNED)
+		read_mock.mockReturnValue(CLEAR)
+
+		const result = await check([])
+
+		expect(result.code).toBe(FAILED)
+		expect(run_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_ship_pre_detach_pinned.pinned_check', () => {
