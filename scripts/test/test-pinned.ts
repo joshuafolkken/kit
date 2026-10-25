@@ -17,6 +17,7 @@ import {
 	type UnpinnedHunk,
 } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
+import { test_pinned_reach } from './test-pinned-reach'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
 import { test_unit_guard } from './test-unit-guard'
@@ -218,7 +219,9 @@ async function report_on(
 ): Promise<PinnedReport> {
 	const paths = await existing_since(HEAD)
 	const changed = await existing_since(base)
-	const targets = changed.filter((file) => test_pinned_logic.is_target(file))
+	const targets = await test_pinned_reach.probed_files(
+		changed.filter((file) => test_pinned_logic.is_target(file)),
+	)
 	const probes = await read_probes(base, targets)
 	const cap = has_runner ? max_hunks : 0
 	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, cap)

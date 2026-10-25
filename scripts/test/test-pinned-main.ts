@@ -15,7 +15,7 @@ const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
 	'Usage: josh test:pinned [--max <n>] [--record <token>] [--help]',
-	'  revert each changed hunk of a non-test code file and run its related tests;',
+	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
 	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)});`,
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`',

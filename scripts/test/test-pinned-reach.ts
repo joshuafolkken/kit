@@ -9,12 +9,14 @@ import { whole_suite_files } from './whole-suite-files'
 
 // What one `josh test:pinned` verdict rests on, read off the import graph (joshuafolkken/kit#4873): the
 // `basis` `test-pinned-cache-logic.ts` holds a verdict by past the tree-wide digests. The graph is built
-// on the first basis asked for, so a rerun the tree-wide digests already hold builds none.
+// on the first basis asked for, so a rerun the tree-wide digests already hold builds none — unless a
+// changed fixture asks `probed_files` for its reach.
 //
 // **Where no graph can be built (no `typescript`, no `tsconfig.json`) every basis is undefined**, and a
 // verdict holds only by the tree-wide digests, as before.
 
 const NUL = '\0'
+const FIXTURE_MARK = '-fixture'
 
 interface Reach {
 	related: (file: string) => Promise<string | undefined>
@@ -77,6 +79,22 @@ function is_asset(view: GraphView, file: string): boolean {
 	return [...reached].some((reader) => is_root(view, reader))
 }
 
+// The mark of the test-only modules `package.json`'s `files` keeps out of the published package.
+function is_fixture(file: string): boolean {
+	return path.basename(file).includes(FIXTURE_MARK)
+}
+
+// The changed files `josh test:pinned` probes (joshuafolkken/kit#4879): a fixture no root reaches only
+// moves what its tests cover, so its hunks hold no runtime behavior a test could pin. One a root reaches is
+// kept, and so is every fixture where no graph can be built; the graph is built only for a fixture.
+async function probed_files(files: ReadonlyArray<string>): Promise<Array<string>> {
+	if (files.every((file) => !is_fixture(file))) return [...files]
+	const view = await view_of()
+	if (view === undefined) return [...files]
+
+	return files.filter((file) => !is_fixture(file) || is_asset(view, file))
+}
+
 function related_of(view: GraphView, file: string, inputs: ReachInputs): string {
 	const reached = view.graph.importers([path.resolve(file)], view.universe)
 	const tests = [...reached]
@@ -120,7 +138,7 @@ function create(inputs: ReachInputs): Reach {
 	return { related, failed }
 }
 
-const test_pinned_reach = { create, work_tree_files }
+const test_pinned_reach = { create, probed_files, work_tree_files }
 
 export type { Reach, ReachInputs }
 export { test_pinned_reach }
