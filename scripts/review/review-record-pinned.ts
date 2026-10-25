@@ -1,8 +1,10 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { review_finding_ledger } from './review-finding-ledger'
 
 // What `josh review:record` does about the background `josh test:pinned` (joshuafolkken/kit#4834).
 //
@@ -33,12 +35,32 @@ async function restart_if_moved(root: string = PROJECT_ROOT): Promise<void> {
 	}
 }
 
+// Whether the lane's code round is on the ledger: from then on `review:record` owns the restart, behind
+// its own handover guard.
+async function is_round_recorded(root: string): Promise<boolean> {
+	const issue = lane_child_marker.marked_issue()
+	if (issue === undefined) return false
+	const content = await observation_ledger_home.read(root)
+
+	return content !== undefined && review_finding_ledger.has_issue_record(content, Number(issue))
+}
+
 // `josh check:related`'s restart (joshuafolkken/kit#4948) runs only in a lane child outside a ship's
-// supervisor, as `review:record`'s does: a launch record outlives its issue in a reused checkout, and
-// only a lane child's `--review` ship reads the answer.
+// supervisor and before its round 1 is recorded: a launch record outlives its issue in a reused
+// checkout, and a child relaunched after a ship stop may re-detach without `--review`, which reads no
+// answer.
+async function is_restartable_before_record(root: string): Promise<boolean> {
+	if (!lane_child_marker.is_child_of(root) || run_ship_detach.is_supervised()) return false
+
+	return !(await is_round_recorded(root))
+}
+
 async function restart_in_lane(root: string = PROJECT_ROOT): Promise<void> {
-	if (!lane_child_marker.is_child_of(root) || run_ship_detach.is_supervised()) return
-	await restart_if_moved(root)
+	try {
+		if (await is_restartable_before_record(root)) await restart_if_moved(root)
+	} catch (error) {
+		error_text.trace_swallowed('review_record_pinned.restart_in_lane', error)
+	}
 }
 
 const review_record_pinned = { restart_if_moved, restart_in_lane, started_line }
