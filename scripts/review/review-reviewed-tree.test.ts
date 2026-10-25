@@ -91,6 +91,31 @@ describe('review_reviewed_tree.is_unmoved after the approval was re-recorded', (
 	})
 })
 
+// joshuafolkken/kit#4874: `chain-rule.md` step 0 pins each unpinned place after `review:record`.
+describe('review_reviewed_tree.is_unmoved after pinning tests were added', () => {
+	const PINNED = 'a.test.ts'
+	const recorded: FileMapStamp = { ...STAMP, files: { [FILE]: 'x', [PINNED]: 'old' } }
+
+	it.each([
+		['a test was added', STAMP, { [FILE]: 'x', [PINNED]: 'new' }],
+		['a test was edited', recorded, { [FILE]: 'x', [PINNED]: 'new' }],
+	])('answers true when %s', async (_case, stamp, files) => {
+		expect(await review_reviewed_tree.is_unmoved(stamp, { files, base: BASE })).toBe(true)
+	})
+
+	it.each([
+		['a runtime file changed beside the test', recorded, { [FILE]: 'y', [PINNED]: 'new' }],
+		['a test was removed', recorded, { [FILE]: 'x' }],
+		[
+			'the test is one a recorded High cites',
+			{ ...STAMP, files: { [FILE]: 'x', [PINNED]: 'unsettled' } },
+			{ [FILE]: 'x', [PINNED]: 'new' },
+		],
+	])('answers false when %s', async (_case, stamp, files) => {
+		expect(await review_reviewed_tree.is_unmoved(stamp, { files, base: BASE })).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#4829: the ship's sync moves the base under a recorded round.
 describe('review_reviewed_tree.is_unmoved on a base the sync moved', () => {
 	const moved = { files: { [FILE]: 'x' }, base: 'new-base' }

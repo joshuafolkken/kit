@@ -4,6 +4,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
+import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { review_attest } from './review-attest'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_stamps } from './review-stamps'
@@ -63,10 +64,24 @@ function is_rerecorded_approval(stamp: FileMapStamp, path: string): boolean {
 	return release_approval_prune.is_approval(path) && stamp.files[path] !== UNSETTLED_DIGEST
 }
 
+// **A test added or edited since the record is no move** (joshuafolkken/kit#4874): `chain-rule.md`
+// step 0 pins each `test:pinned` unpinned place after `review:record`, and a test changes no runtime
+// the round's verdict covers; round 2 still reads the test delta (`review-round2.ts` keeps tests live).
+// A test removed since, or one a recorded High cites, still reads as moved.
+function is_pinning_test(stamp: FileMapStamp, tree: GateTree, path: string): boolean {
+	const is_settled = Object.hasOwn(tree.files, path) && stamp.files[path] !== UNSETTLED_DIGEST
+
+	return is_settled && test_declared_logic.is_test_file(path)
+}
+
+function is_no_move(stamp: FileMapStamp, tree: GateTree, path: string): boolean {
+	return is_rerecorded_approval(stamp, path) || is_pinning_test(stamp, tree, path)
+}
+
 async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
 	const parts = await moved_paths.moved_parts(stamp, tree)
 
-	if (!parts?.changed.every((path) => is_rerecorded_approval(stamp, path))) return false
+	if (!parts?.changed.every((path) => is_no_move(stamp, tree, path))) return false
 
 	return parts.synced.every((path) => !Object.hasOwn(stamp.files, path))
 }

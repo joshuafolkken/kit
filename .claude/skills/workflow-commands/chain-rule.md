@@ -9,7 +9,7 @@ Review results and successful pushes are never turn boundaries.
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then steps 2–3, the
-   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, read `pnpm josh run:review --pinned` and pin each unpinned place or take `--unpinned-ok` before the ship), `pnpm josh ship --detach --review "<title> #<N>"`
+   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 on it or on one only tests moved since, else reviews the delta — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, read `pnpm josh run:review --pinned` and pin each unpinned place or take `--unpinned-ok` before the ship), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` or `--pinned` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
@@ -19,9 +19,7 @@ Review results and successful pushes are never turn boundaries.
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
    directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
-   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`). Ship
-   reuses the recorded round 1 on a tree unmoved since the record, else reviews only the
-   delta.
+   round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`).
    `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
