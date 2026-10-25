@@ -215,6 +215,7 @@ const review_round2 = {
 	empty_reason,
 	INERT_DELTA_REASON_PREFIX,
 	inert_reason,
+	is_unexecuted,
 	JSON_KEY,
 	live_reason,
 	NO_SNAPSHOT_REASON,

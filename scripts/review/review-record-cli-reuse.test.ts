@@ -11,13 +11,17 @@ import { review_record_cli } from './review-record-cli'
 const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 
 vi.mock('./review-round-reuse', () => ({
-	review_round_reuse: { is_reusable_here: reusable_mock },
+	review_round_reuse: {
+		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
+		reuse_here: reusable_mock,
+	},
 }))
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reuse-'))
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4763
 const NOT_REUSED = 'Not reused'
+const RUN_REVIEW = 'run:review'
 
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
@@ -51,8 +55,8 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 		reusable_mock.mockReset()
 	})
 
-	it('tells the lane to run run:review when the tree moved since the record', async () => {
-		reusable_mock.mockResolvedValue(false)
+	it('tells the lane to run run:review when the ship reviews round 1 again', async () => {
+		reusable_mock.mockResolvedValue('again')
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)
@@ -62,16 +66,16 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 	})
 
 	it('answers reused when the ship takes the recorded round as its round 1', async () => {
-		reusable_mock.mockResolvedValue(true)
+		reusable_mock.mockResolvedValue('held')
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)
 		expect(out).toContain('Reused:')
-		expect(out).not.toContain('run:review')
+		expect(out).not.toContain(RUN_REVIEW)
 	})
 
 	it('asks the shared predicate with the issue', async () => {
-		reusable_mock.mockResolvedValue(false)
+		reusable_mock.mockResolvedValue('again')
 		await check_output()
 
 		expect(reusable_mock).toHaveBeenCalledWith(ISSUE)
@@ -83,5 +87,18 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 
 		expect(code).toBe(0)
 		expect(out).toContain(NOT_REUSED)
+	})
+})
+
+// joshuafolkken/kit#4878: the ship reuses round 1 and round 2 reads what moved.
+describe('review_record_cli.run --check — a round whose delta is left to round 2', () => {
+	it('answers reused with the delta left to round 2 when settled files moved', async () => {
+		reusable_mock.mockReset().mockResolvedValue('delta')
+		const { code, out } = await check_output()
+
+		expect(code).toBe(0)
+		expect(out).toContain('Reused, delta to round 2:')
+		expect(out).not.toContain(NOT_REUSED)
+		expect(out).not.toContain(RUN_REVIEW)
 	})
 })

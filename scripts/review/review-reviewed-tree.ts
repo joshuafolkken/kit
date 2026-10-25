@@ -1,5 +1,5 @@
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
-import { moved_paths } from '#scripts/gate/moved-paths'
+import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -7,12 +7,14 @@ import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { review_attest } from './review-attest'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
+import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 
 // The tree a recorded `/code-review` round stands for: the changed files as they were when
 // `review:record` wrote the round, its fixes included (joshuafolkken/kit#4620). A lane reviews before
 // `josh ship`, so the ship's round 1 asks this record whether the tree moved since: unmoved, the
-// recorded round is the ship's; moved, the round reads the delta from here.
+// recorded round is the ship's; moved only where round 2 reads, it is still the ship's and round 2
+// reads the delta (joshuafolkken/kit#4878); else round 1 reads the delta from here.
 //
 // **Taken at the record, not the brief**. A round that fixed findings approved its own edits, so the
 // briefed tree is not what its verdict covers: a file reverted to the briefed bytes would drop out of a
@@ -78,27 +80,74 @@ function is_no_move(stamp: FileMapStamp, tree: GateTree, path: string): boolean 
 	return is_rerecorded_approval(stamp, path) || is_pinning_test(stamp, tree, path)
 }
 
-async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
+// How the tree stands against the record: `held` — nothing the round read moved; `delta` — every move
+// is one round 2 reads (joshuafolkken/kit#4878); `unsettled` — any other move, or git did not answer.
+const MOVEMENT = { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' } as const
+
+type Movement = (typeof MOVEMENT)[keyof typeof MOVEMENT]
+
+function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
+	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
+}
+
+function is_synced_into(stamp: FileMapStamp, parts: MovedParts): boolean {
+	return parts.synced.some((path) => Object.hasOwn(stamp.files, path))
+}
+
+// **Round 2 reads a move only where its own delta holds it**: it diffs from the round-1 brief's stamp
+// (`briefed`) and passes over documentation, prompts and inert paths (`review-round2.ts`), so a file
+// reverted to the briefed bytes, or one round 2 skips, would ship unread. A path a recorded High cites
+// never matches, and a default-branch change to a covered file is outside round 2's carried delta.
+function is_read_by_round_two(
+	path: string,
+	tree: GateTree,
+	recorded: FileMapStamp,
+	briefed: FileMapStamp | undefined,
+): boolean {
+	const is_settled = recorded.files[path] !== UNSETTLED_DIGEST
+
+	if (!is_settled || review_round2.is_unexecuted(path, [])) return false
+
+	return briefed?.files[path] !== tree.files[path]
+}
+
+async function movement(
+	stamp: FileMapStamp,
+	tree: GateTree,
+	briefed?: FileMapStamp,
+): Promise<Movement> {
 	const parts = await moved_paths.moved_parts(stamp, tree)
 
-	if (!parts?.changed.every((path) => is_no_move(stamp, tree, path))) return false
+	if (parts === undefined || is_synced_into(stamp, parts)) return MOVEMENT.UNSETTLED
 
-	return parts.synced.every((path) => !Object.hasOwn(stamp.files, path))
+	const moved = moved_files(stamp, tree, parts)
+
+	if (moved.length === 0) return MOVEMENT.HELD
+
+	const is_delta = moved.every((path) => is_read_by_round_two(path, tree, stamp, briefed))
+
+	return is_delta ? MOVEMENT.DELTA : MOVEMENT.UNSETTLED
+}
+
+async function is_unmoved(stamp: FileMapStamp, tree: GateTree): Promise<boolean> {
+	return (await movement(stamp, tree)) === MOVEMENT.HELD
 }
 
 // **Only a review attested on this branch is reused**, as `resume_point` narrows from no other: the
 // reuse skips the ship's own `review:attest --check`, so a round recorded over a review that read
 // another checkout, or never finished, would otherwise ship unreviewed.
-async function is_unmoved_here(): Promise<boolean> {
+async function movement_here(): Promise<Movement> {
 	const stamp = review_stamps.reviewed_stamp.read()
 
-	if (stamp === undefined) return false
+	if (stamp === undefined) return MOVEMENT.UNSETTLED
 
 	const checkout = await review_checkout.read_checkout()
 
-	if (!review_attest.is_attested_on(checkout, checkout.root)) return false
+	if (!review_attest.is_attested_on(checkout, checkout.root)) return MOVEMENT.UNSETTLED
 
-	return await is_unmoved(stamp, await gate_tree.read_gate_tree())
+	const tree = await gate_tree.read_gate_tree()
+
+	return await movement(stamp, tree, review_stamps.round_one_stamp.read())
 }
 
 // The record a resumed brief narrows from: written after the brief the pointer names, whose review was
@@ -156,13 +205,16 @@ function discard(): void {
 }
 
 const review_reviewed_tree = {
+	MOVEMENT,
 	discard,
 	is_stopped_on,
 	is_unmoved,
-	is_unmoved_here,
 	mark_stopped,
+	movement,
+	movement_here,
 	record,
 	resume_point,
 }
 
+export type { Movement }
 export { review_reviewed_tree }

@@ -1,17 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_round_reuse } from './review-round-reuse'
 
-const { check_mock, refusal_mock, stopped_on_mock, unmoved_mock } = vi.hoisted(() => ({
+const { check_mock, refusal_mock, stopped_on_mock, movement_mock } = vi.hoisted(() => ({
 	check_mock: vi.fn(),
 	refusal_mock: vi.fn(),
 	stopped_on_mock: vi.fn(),
-	unmoved_mock: vi.fn(),
+	movement_mock: vi.fn(),
 }))
 
 vi.mock('./review-record', () => ({ review_record: { check: check_mock } }))
 
 vi.mock('./review-reviewed-tree', () => ({
-	review_reviewed_tree: { is_stopped_on: stopped_on_mock, is_unmoved_here: unmoved_mock },
+	review_reviewed_tree: {
+		MOVEMENT: { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' },
+		is_stopped_on: stopped_on_mock,
+		movement_here: movement_mock,
+	},
 }))
 
 vi.mock('#scripts/issue/issue-watch-gate', () => ({
@@ -20,32 +24,42 @@ vi.mock('#scripts/issue/issue-watch-gate', () => ({
 
 const ISSUE = 4763
 const REFUSAL = 'the issue changed after the brief'
+const { REUSE } = review_round_reuse
 
 describe('review_round_reuse.is_reusable', () => {
 	beforeEach(() => {
 		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
 		stopped_on_mock.mockReset().mockReturnValue(false)
-		unmoved_mock.mockReset().mockResolvedValue(true)
+		movement_mock.mockReset().mockResolvedValue('held')
 	})
 
 	it('reuses a recorded round while the tree holds still', async () => {
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(true)
 	})
 
-	it('does not reuse a recorded round once the tree moved, as after a main:merge', async () => {
-		unmoved_mock.mockResolvedValue(false)
+	// joshuafolkken/kit#4878: round 2 reads the moved files; round 1 is not run twice.
+	it('reuses a recorded round once files no recorded High cites moved', async () => {
+		movement_mock.mockResolvedValue('delta')
+
+		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(true)
+	})
+
+	it('does not reuse a recorded round once a file a recorded High cites moved', async () => {
+		movement_mock.mockResolvedValue('unsettled')
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(false)
 	})
 
 	it("reuses the ship's own stopped round 1 however the tree moved", async () => {
-		unmoved_mock.mockResolvedValue(false)
+		movement_mock.mockResolvedValue('unsettled')
 		stopped_on_mock.mockReturnValue(true)
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(true)
 	})
 
 	it('never reuses a round the issue changed after', async () => {
+		movement_mock.mockResolvedValue('delta')
+
 		expect(await review_round_reuse.is_reusable(ISSUE, true)).toBe(false)
 		expect(check_mock).not.toHaveBeenCalled()
 	})
@@ -54,6 +68,36 @@ describe('review_round_reuse.is_reusable', () => {
 		check_mock.mockResolvedValue({ status: 'missing' })
 
 		expect(await review_round_reuse.is_reusable(ISSUE, false)).toBe(false)
+	})
+})
+
+describe('review_round_reuse.reuse_here', () => {
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(false)
+		refusal_mock.mockReset().mockResolvedValue(undefined)
+	})
+
+	it.each([
+		['held', false, REUSE.HELD],
+		['delta', false, REUSE.DELTA],
+		['unsettled', true, REUSE.DELTA],
+		['unsettled', false, REUSE.AGAIN],
+	])(
+		'answers the ship outcome on a %s tree (stopped: %s)',
+		async (movement, is_stopped, expected) => {
+			movement_mock.mockResolvedValue(movement)
+			stopped_on_mock.mockReturnValue(is_stopped)
+
+			expect(await review_round_reuse.reuse_here(ISSUE)).toBe(expected)
+		},
+	)
+
+	it('answers again on a stale issue whatever moved', async () => {
+		movement_mock.mockResolvedValue('delta')
+		refusal_mock.mockResolvedValue(REFUSAL)
+
+		expect(await review_round_reuse.reuse_here(ISSUE)).toBe(REUSE.AGAIN)
 	})
 })
 
@@ -81,7 +125,7 @@ describe('review_round_reuse.is_reusable_here', () => {
 	beforeEach(() => {
 		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
 		stopped_on_mock.mockReset().mockReturnValue(true)
-		unmoved_mock.mockReset().mockResolvedValue(true)
+		movement_mock.mockReset().mockResolvedValue('held')
 	})
 
 	it('reuses a recorded round on a fresh issue', async () => {

@@ -2,7 +2,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
-import { review_round_reuse } from './review-round-reuse'
+import { review_round_reuse, type Reuse } from './review-round-reuse'
 
 // joshuafolkken/kit#4850: once a lane child has recorded round 1 on a tree `josh ship` reuses, round 2
 // is the ship's. The rule stood in `chain-rule.md` step 0 as prose alone (joshuafolkken/kit#4830), and
@@ -18,14 +18,18 @@ const NEXT_STEP_LINE = `Next: hand over to \`${SHIP_STEP}\` — round 2 is the s
 // A reuse question git could not answer reads as not reused: the lane then reviews the round itself,
 // which costs one review, rather than leaving it to a ship that may review it again detached.
 // The stale read inside it fails open in `review_round_reuse.is_stale_here`, as the ship's probe reads it.
-async function is_reused_here(issue: number): Promise<boolean> {
+async function reuse_here(issue: number): Promise<Reuse> {
 	try {
-		return await review_round_reuse.is_reusable_here(issue)
+		return await review_round_reuse.reuse_here(issue)
 	} catch (error) {
-		error_text.trace_swallowed('review_lane_handover.is_reused_here', error)
+		error_text.trace_swallowed('review_lane_handover.reuse_here', error)
 
-		return false
+		return review_round_reuse.REUSE.AGAIN
 	}
+}
+
+async function is_reused_here(issue: number): Promise<boolean> {
+	return (await reuse_here(issue)) !== review_round_reuse.REUSE.AGAIN
 }
 
 // The mark must name this issue as well as this checkout, so a person's run — or a branch whose issue
@@ -53,8 +57,8 @@ function refusal(issue: number): string {
 const review_lane_handover = {
 	NEXT_STEP_LINE,
 	is_handed_over,
-	is_reused_here,
 	refusal,
+	reuse_here,
 }
 
 export { review_lane_handover }

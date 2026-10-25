@@ -15,8 +15,8 @@ import type { Cause } from './run-ship-stop-cause'
 //
 // **Every route is a re-detach.** The prompt only ever reaches a lane child, and a lane child's commit
 // and push belong to the detached ship (`scripts/rules/lane-background.ts`), so a `josh git -y` here could never
-// run. The rounds are the supervisor's too: under `--review` it reuses a round 1 recorded on the unmoved
-// tree, reviews only the delta from that record otherwise, and asks `review:round2` itself after the
+// run. The rounds are the supervisor's too: under `--review` it reuses a round 1 recorded on a tree
+// unmoved or moved only where round 2 reads, reviews only the delta from that record otherwise, and asks `review:round2` itself after the
 // commit (`run-ship-review-steps.ts`), so the whole change is never reviewed again as round 1.
 //
 // **The re-run carries the stopped ship's own options.** A preflight that stopped on missing live

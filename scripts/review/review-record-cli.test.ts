@@ -39,8 +39,8 @@ vi.mock('./review-reviewed-tree', () => ({
 // The reuse answer reads this checkout's tree and the issue; `review-record-cli-reuse.test.ts` owns it.
 vi.mock('./review-round-reuse', () => ({
 	review_round_reuse: {
-		is_reusable: vi.fn().mockResolvedValue(false),
-		is_stale_here: vi.fn().mockResolvedValue(false),
+		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
+		reuse_here: vi.fn().mockResolvedValue('again'),
 	},
 }))
 

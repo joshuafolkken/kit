@@ -1,0 +1,8 @@
+{
+	"reason": "review reuse answers three ways (held/delta/again); delta only where round 2 reads every move (not a doc, a revert to briefed bytes, a High-cited or synced file), so round 1 is not run twice; chain-rule step 0 names it",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 60,
+		"ai_cost.on_demand_bytes": 6
+	}
+}

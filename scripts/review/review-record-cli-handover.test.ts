@@ -12,7 +12,10 @@ import { review_record_cli } from './review-record-cli'
 const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 
 vi.mock('./review-round-reuse', () => ({
-	review_round_reuse: { is_reusable_here: reusable_mock },
+	review_round_reuse: {
+		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
+		reuse_here: reusable_mock,
+	},
 }))
 vi.mock('./review-comment-round', () => ({ review_comment_round: { carry: async () => 0 } }))
 vi.mock('./review-reviewed-tree', () => ({ review_reviewed_tree: { record: vi.fn() } }))
@@ -55,7 +58,7 @@ describe('review_record_cli.run — the next step after a lane child records rou
 
 	it('names the ship as the next step for a lane child whose round the ship reuses', async () => {
 		lane_child(true)
-		reusable_mock.mockResolvedValue(true)
+		reusable_mock.mockResolvedValue('held')
 		const { code, out } = await record_output([])
 
 		expect(code).toBe(0)
@@ -66,7 +69,7 @@ describe('review_record_cli.run — the next step after a lane child records rou
 
 	it('prints no ship step for a round the ship would review again', async () => {
 		lane_child(true)
-		reusable_mock.mockResolvedValue(false)
+		reusable_mock.mockResolvedValue('again')
 		const { out } = await record_output([])
 
 		expect(out).not.toContain(SHIP_STEP)
@@ -74,7 +77,7 @@ describe('review_record_cli.run — the next step after a lane child records rou
 
 	it('prints no ship step outside a lane child', async () => {
 		lane_child(false)
-		reusable_mock.mockResolvedValue(true)
+		reusable_mock.mockResolvedValue('held')
 		const { out } = await record_output([])
 
 		expect(out).not.toContain(SHIP_STEP)
@@ -82,7 +85,7 @@ describe('review_record_cli.run — the next step after a lane child records rou
 
 	it('prints no ship step for the interaction pass', async () => {
 		lane_child(true)
-		reusable_mock.mockResolvedValue(true)
+		reusable_mock.mockResolvedValue('held')
 		const { out } = await record_output(['--interaction'])
 
 		expect(out).not.toContain(SHIP_STEP)
