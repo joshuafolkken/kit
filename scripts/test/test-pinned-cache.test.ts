@@ -11,8 +11,9 @@ import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4706: `josh test:pinned` (and `josh run:review`, which calls the same `run`) reuses
 // a hunk's stored verdict — a pinned one while the code change and the test it failed in are the same
-// (joshuafolkken/kit#4790), an unpinned one while no test file changed — and spreads the rest over as
-// many trees as the worker budget allows, with the verdicts a serial run gives.
+// (joshuafolkken/kit#4790), an unpinned one while no test file changed, either also while the edit leaves
+// its import-graph basis alone (joshuafolkken/kit#4873) — and spreads the rest over as many trees as the
+// worker budget allows, with the verdicts a serial run gives.
 
 const RUN_TIMEOUT = 240_000
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'

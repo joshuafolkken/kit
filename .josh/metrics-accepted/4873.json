@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned verdicts keep a per-hunk import-graph basis (#4873)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 185
+	}
+}
