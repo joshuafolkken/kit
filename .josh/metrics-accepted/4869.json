@@ -1,0 +1,9 @@
+{
+	"reason": "test:related/test:unit print failed test names and the full-output log path on failure (#4869)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 43,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 198
+	}
+}

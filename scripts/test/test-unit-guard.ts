@@ -11,6 +11,7 @@ import { project_test_script, type ProjectScriptState } from './project-test-scr
 import { SKIP_MARKER } from './skip-marker'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
 import { unit_worker_share } from './unit-worker-share'
+import { vitest_failure_summary } from './vitest-failure-summary'
 
 const PNPM = 'pnpm'
 const FAIL_EXIT_CODE = 1
@@ -205,15 +206,22 @@ async function execute_vitest(
 	recording: RecordingEnvironment,
 	directory: string,
 ): Promise<number> {
+	// Shown as it runs and kept as well, so a failed run can end with its summary (joshuafolkken/kit#4869).
 	const result = await execa(PNPM, ['exec', 'vitest', ...vitest_arguments], {
 		cwd: directory,
 		env: { ...isolated_unit_environment(), ...recording },
 		extendEnv: false,
-		stdio: 'inherit',
+		stdin: 'inherit',
+		stdout: ['inherit', 'pipe'],
+		stderr: ['inherit', 'pipe'],
+		all: true,
 		reject: false,
 	})
+	const exit_code = result.exitCode ?? FAIL_EXIT_CODE
 
-	return result.exitCode ?? FAIL_EXIT_CODE
+	vitest_failure_summary.report(vitest_arguments, result.all, exit_code)
+
+	return exit_code
 }
 
 // A whole-suite run also records the test-read map `josh test:related` narrows by. `directory` is
