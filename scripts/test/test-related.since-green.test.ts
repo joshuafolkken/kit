@@ -10,6 +10,7 @@ import { test_read_map } from './test-read-map'
 import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
+import { test_related_synced } from './test-related-synced'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
@@ -330,6 +331,51 @@ describe('test_related.run_related_tests — a metrics approval file this branch
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toEqual(['related', absolute(metrics_reader), '--run'])
+	})
+})
+
+// joshuafolkken/kit#4912: a sync brought in ~430 files, and every test importing a synced module ran
+// again, though main's CI had run them against it.
+function split_into(left: Array<string>, shared: Array<string>): void {
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared })
+}
+
+describe('test_related.run_related_tests — a code module a main sync brought in', () => {
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([FIXED_SOURCE, BRANCH_TEST])
+		mocked_moved.mockResolvedValue({ changed: [FIXED_SOURCE], synced: [UNTOUCHED_SOURCE] })
+	})
+
+	it('hands vitest the tests it shares with the branch change in place of the module', async () => {
+		split_into([UNTOUCHED_SOURCE], [SCOPE_TEST])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			absolute(FIXED_SOURCE),
+			absolute(SCOPE_TEST),
+			absolute(BRANCH_TEST),
+			'--run',
+		])
+	})
+
+	it('runs no test rather than the whole suite when only a module it leaves out moved', async () => {
+		mocked_moved.mockResolvedValue({ changed: [], synced: [UNTOUCHED_SOURCE] })
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([])
+		split_into([UNTOUCHED_SOURCE], [])
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+
+	it('still hands vitest the module where the split leaves nothing out', async () => {
+		split_into([], [])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toContain(absolute(UNTOUCHED_SOURCE))
 	})
 })
 
