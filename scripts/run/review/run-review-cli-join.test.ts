@@ -6,6 +6,7 @@ import { run_review_cli } from './run-review-cli'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_steps } from './run-review-pinned-steps'
+import { run_review_pinned_tree } from './run-review-pinned-tree'
 import { run_review_steps } from './run-review-steps'
 
 // joshuafolkken/kit#4774: a gate that passed before a review fix moved the tree is not reported red —
@@ -17,6 +18,8 @@ const GATE_LOG = '✔ verification gate passed (8 checks)'
 beforeEach(() => {
 	vi.spyOn(run_review_pinned_steps, 'wait_for_answer').mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(undefined)
+	// No launch, so the join never reads this checkout's own record nor starts a real check.
+	vi.spyOn(run_review_pinned_steps, 'launched_tree').mockReturnValue(undefined)
 	vi.spyOn(run_review_steps, 'wait_for_gate_finish').mockResolvedValue(GATE_MOVED)
 	vi.spyOn(run_review_steps, 'read_gate_log').mockReturnValue(GATE_LOG)
 	vi.spyOn(run_review_steps, 'complete_timing').mockReturnValue(undefined)
@@ -66,6 +69,27 @@ function errored(): string {
 		.mock.calls.map((call) => String(call[0]))
 		.join('')
 }
+
+// joshuafolkken/kit#4878: the join after a round-1 fix reads the fixed tree's check.
+describe('run --join on a tree a round-1 fix moved', () => {
+	it('starts the check again on the fixed tree before it waits', async () => {
+		const fixed_tree = 'fixed-tree'
+
+		vi.mocked(run_review_pinned_steps.launched_tree).mockReturnValue('briefed-tree')
+		vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(fixed_tree)
+		vi.spyOn(run_review_pinned_steps, 'clear').mockReturnValue(undefined)
+		const launch = vi
+			.spyOn(run_review_pinned_steps, 'launch')
+			.mockReturnValue({ kind: 'launched', pid: 1 })
+
+		await run_review_cli.run(['--join'])
+
+		expect(launch).toHaveBeenCalledWith(expect.any(String), undefined, fixed_tree)
+		expect(launch.mock.invocationCallOrder[0]).toBeLessThan(
+			vi.mocked(run_review_pinned_steps.wait_for_answer).mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+})
 
 describe('run --join on the background test:pinned', () => {
 	beforeEach(() => {

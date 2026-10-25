@@ -6,6 +6,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
+import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
 import type { ShipArguments } from './run-ship-steps'
@@ -16,11 +17,12 @@ import type { ShipArguments } from './run-ship-steps'
 // foreground, with the text and the `--unpinned-ok` judgment `run:review --join` uses
 // (`run-review-pinned.ts`).
 //
-// **It runs as its own `josh` command**, so it reserves its own cores (`DIRECT_UNIT_CLAIM`) beside the
-// other checks rather than probing outside the budget, and it reads the same per-checkout verdict cache
-// (`test-pinned-cache.ts`): on the tree `run:review` checked it starts no probe, and after a fix it
-// probes only the hunks whose stored verdict that cache no longer holds (`test-pinned-cache-logic.ts`).
-// Its answer comes back through the record `--record` leaves (`test-pinned-record.ts`). Under
+// **On the tree `run:review` checked it runs no `test:pinned`**: it reads that background check's
+// answer (`run-review-pinned-join.ts`). On another tree it stops that check and runs its own as a
+// `josh` command, so it reserves its own cores (`DIRECT_UNIT_CLAIM`) beside the other checks, and it
+// probes only the hunks whose stored verdict the per-checkout cache no longer holds
+// (`test-pinned-cache-logic.ts`). Its answer comes back through the record `--record` leaves
+// (`test-pinned-record.ts`). Under
 // `--unpinned-ok "<reason>"` it runs only when the supervisor reuses round 1 (`pinned_check`).
 // Without `--review` nothing after the detach asks `test:pinned`, and `--unpinned-ok` is refused there
 // (`run-ship-args.ts`), so the check is not asked.
@@ -35,7 +37,7 @@ type CheckOptions = Pick<ShipArguments, 'number' | 'unpinned_ok'>
 type PinnedOptions = CheckOptions & Pick<ShipArguments, 'is_review'>
 
 // A check that left no answer could not run, and fails open as the one `run:review` launches does.
-async function summary(): Promise<PinnedSummary> {
+async function own_summary(): Promise<PinnedSummary> {
 	const token = randomUUID()
 	const result = await buffered_process.run_buffered_process([...PINNED_COMMAND, token])
 	const answer = test_pinned_record.read(token)
@@ -43,6 +45,13 @@ async function summary(): Promise<PinnedSummary> {
 	test_pinned_record.clear(token)
 
 	return answer ?? test_pinned_record.not_run_summary(result.output)
+}
+
+// **The tree `run:review` checked is not checked twice** (joshuafolkken/kit#4888): its background
+// check's answer is read, waited for while it still runs; only another tree, or a check that left no
+// answer, runs one here.
+async function summary(): Promise<PinnedSummary> {
+	return (await run_review_pinned_join.answer_on_tree()) ?? (await own_summary())
 }
 
 // Whether the supervisor runs a fresh round 1, whose `run:review --join` lists and records the unpinned

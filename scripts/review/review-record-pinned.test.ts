@@ -31,7 +31,7 @@ describe('review_record_pinned.restart_if_moved on a tree the fix moved', () => 
 		expect(run_review_pinned_steps.clear).toHaveBeenCalledWith(ROOT)
 		expect(run_review_pinned_steps.launch).toHaveBeenCalledWith(ROOT, REASON, FIXED_TREE)
 		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
-		expect(review_record_pinned.started_line()).toContain(review_record_pinned.READ_COMMAND)
+		expect(review_record_pinned.started_line()).toContain('`pnpm josh run:review --pinned`')
 		expect(review_record_pinned.started_line()).toContain('--unpinned-ok')
 	})
 
