@@ -142,7 +142,7 @@ describe('lane_baseline.investigate — the prompt', () => {
 
 		for (const part of [
 			'pnpm josh lane:stats --period 3',
-			'take the stages and sub-stages that spend the most per merge, not only the largest',
+			'take the several stages and sub-stages with the largest per-merge time, not just the one largest',
 			"Estimate each cause's reducible minutes: what its fix would cut from the median merge",
 			'Take at most the 5 causes with the most reducible minutes',
 			`- 原因のレーン: <median lane minutes> 分（#${String(ISSUE)}）`,

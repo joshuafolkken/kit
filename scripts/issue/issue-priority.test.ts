@@ -8,6 +8,7 @@ const BASE = ['bug']
 const SHORTENING_LINE = '- 目的: 時間短縮\n'
 const HIGH_WITH_DEADLINE = '- 優先度: 高（期限）'
 const URGENT_CONDITION_2 = '- 優先度: 緊急（条件 2）'
+const URGENT_REDUCTION = '- 優先度: 緊急（短縮 10%）'
 const PARK_PREFIX = '- 原因の park:'
 const MALFORMED_LANE = '- 原因のレーン: 64 分（4695）'
 const DECLARATION_REFUSAL = 'declare at most one priority'
@@ -35,7 +36,6 @@ function lane(minutes: string, declaration = ''): string {
 describe('issue_priority.declared_level', () => {
 	it.each([
 		['- 優先度: 緊急（条件 1）', 'critical'],
-		['- 優先度: 緊急（短縮 12%）', 'critical'],
 		['- 優先度: 高（持ち主の期限）', 'high'],
 		['- 優先度: 通常', 'normal'],
 		['', 'normal'],
@@ -46,7 +46,8 @@ describe('issue_priority.declared_level', () => {
 	it.each([
 		['- 優先度: 緊急（なし）'],
 		['- 優先度: 緊急（短縮 未計測）'],
-		['- 優先度: 緊急（条件 <1-3> / 短縮 <値>）'],
+		['- 優先度: 緊急（短縮 12%）'],
+		['- 優先度: 緊急（条件 <1-3>）'],
 		['- 優先度: 高（）'],
 		['- 優先度: 高（<根拠>）'],
 		['- 優先度: 高'],
@@ -108,11 +109,18 @@ describe('issue_priority.percent_floor', () => {
 })
 
 describe('issue_priority.problem', () => {
-	it('accepts an urgent declaration naming a condition or a reduction', () => {
-		expect(
-			issue_priority.problem(shortening('- 優先度: 緊急（短縮 10%）', '10%'), []),
-		).toBeUndefined()
+	it('accepts an urgent declaration naming a condition, and refuses one naming a reduction', () => {
 		expect(issue_priority.problem(shortening(URGENT_CONDITION_2, '3%'), [])).toBeUndefined()
+		expect(issue_priority.problem(shortening(URGENT_REDUCTION, '10%'), [])).toContain(
+			DECLARATION_REFUSAL,
+		)
+	})
+
+	it('names only a condition as the urgent basis when refusing a declaration', () => {
+		const refusal = issue_priority.problem(body(URGENT_REDUCTION), [])
+
+		expect(refusal).toContain('`- 優先度: 緊急（条件 <1-3>）`')
+		expect(refusal).not.toContain('短縮 <値>')
 	})
 
 	it('does not judge the body when a priority label was typed', () => {

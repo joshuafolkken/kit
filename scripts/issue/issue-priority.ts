@@ -30,8 +30,8 @@ const DECLARATION_PREFIX = '- 優先度:'
 const NORMAL_LINE = '- 優先度: 通常'
 const CRITICAL_PATTERN = /^- 優先度: 緊急（(?<basis>.*)）$/u
 const HIGH_PATTERN = /^- 優先度: 高（(?<basis>.*)）$/u
-// An interrupt-filing condition number (`wip-cap.md`) or a stated reduction.
-const CRITICAL_BASIS = /条件 ?[1-3]|短縮 ?\d/u
+// An interrupt-filing condition number (`wip-cap.md`); a reduction is no basis (joshuafolkken/kit#4928).
+const CRITICAL_BASIS = /条件 ?[1-3]/u
 const PLACEHOLDER = /^<.*>$/u
 // The bands and the floor `josh overrun:mechanisms` judges a mechanism's summed share of the median lane
 // by (joshuafolkken/kit#4886); an Issue's filing reads no share (joshuafolkken/kit#4928).
@@ -54,7 +54,7 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	high: PRIORITY_HIGH_LABEL,
 	normal: undefined,
 }
-const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent one names its condition, a high one its basis (\`issue-template.md\`)`
 
 const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
 
