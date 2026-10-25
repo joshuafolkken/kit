@@ -9,6 +9,7 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { test_declared_logic } from './test-declared-logic'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_record, type RunInput } from './test-related-record'
@@ -85,8 +86,8 @@ async function change_since(
 
 // **The map's tree is whichever lane last ran the whole suite green**, so the change since it holds that
 // lane's own branch change too (joshuafolkken/kit#4527). What this branch did not change is marked
-// `since_map`: it still reaches its readers — a source file only when it names what moved — but only
-// this branch's change can send the run to the whole suite. A branch change git cannot read marks nothing.
+// `since_map`: it reaches vitest only as a code file naming what moved, and only this branch's change
+// can send the run to the whole suite (joshuafolkken/kit#4896). A branch change git cannot read marks nothing.
 async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 	const changed = await change_since(root, map)
 
@@ -102,8 +103,8 @@ async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 // Explicit file arguments win over the git reading, which is what makes the narrowing testable by
 // hand and usable from a hook that already knows which file it just wrote. **The map still answers
 // only for the change since its tree**, so that change joins the arguments: a test added since the
-// map was recorded is in no entry, and only its own appearance in the change runs it — a source file
-// there only when it names a file the arguments moved (`naming_moved`).
+// map was recorded is in no entry, and only its own appearance in the change runs it — when it names
+// a file the arguments moved (`naming_moved`), as a source file there does.
 async function explicit_change(
 	root: string,
 	explicit: ReadonlyArray<string>,
@@ -120,24 +121,36 @@ async function explicit_change(
 }
 
 // **A non-code file a main sync brought in is not this branch's change** (joshuafolkken/kit#4572), so it
-// joins `since_map`: it still reaches the tests reading it, but never sends the run to the whole suite —
-// main's CI verified it. A synced module stays a moved file, so `vitest related` still walks to the
+// joins `since_map`: it neither adds the tests reading it nor sends the run to the whole suite — main's
+// CI verified it. A synced module stays a moved file, so `vitest related` still walks to the
 // tests importing it, a branch-only one among them. A branch change git cannot read marks nothing.
-async function synced_data(synced: ReadonlyArray<string>): Promise<ReadonlyArray<string>> {
+function synced_data(
+	synced: ReadonlyArray<string>,
+	branch: ReadonlyArray<string> | undefined,
+): ReadonlyArray<string> {
 	const data = synced.filter((file) => !related_scope.is_relatable(file))
 
-	if (data.length === 0) return []
+	return data.filter((file) => !(branch ?? data).includes(file))
+}
 
-	const branch = (await branch_change()) ?? data
-
-	return data.filter((file) => !branch.includes(file))
+// **The branch's own test files stay out of `since_map`** (joshuafolkken/kit#4393), so each runs again
+// on every bare run after a green one — the map holds no entry for a read one started since its tree.
+// Only main's and another lane's test files are left to CI (joshuafolkken/kit#4896). A branch change git
+// cannot read keeps every test file.
+function without_own_tests(
+	since_map: ReadonlyArray<string>,
+	branch: ReadonlyArray<string> | undefined,
+): ReadonlyArray<string> {
+	return since_map.filter(
+		(file) => !test_declared_logic.is_test_file(file) || branch?.includes(file) === false,
+	)
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
 // are. A moved file — code or not — reaches the tests reading it as data through the map, whose
 // entries hold no module that started reading it after the map's tree; the change since that tree
-// joins the list — its test files, and a source file only when it names a moved file
-// (`naming_moved`) — so such a module runs the tests importing it. Nothing moved runs nothing; no map,
+// joins the list — a code file of it only when it names a moved file (`naming_moved`) — so such a
+// module runs the tests importing it. Nothing moved runs nothing; no map,
 // or one git can no longer diff against, answers `undefined`, which reads the whole branch change.
 async function since_green_change(
 	root: string,
@@ -160,7 +173,11 @@ async function since_green_change(
 
 	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
 
-	const since_map = [...(change.since_map ?? []), ...(await synced_data(parts.synced))]
+	const branch = await branch_change()
+	const since_map = [
+		...without_own_tests(change.since_map ?? [], branch),
+		...synced_data(parts.synced, branch),
+	]
 
 	return { ...change, since_map, synced: parts.synced }
 }
@@ -239,7 +256,7 @@ async function scope_of(root: string, change: ChangeReading): Promise<RelatedSco
 // narrows with, so the gate's reuse of a green unit step (`check-inputs.ts`) can never trust a change
 // this command would have run tests for. Unknown reaches: no map, or one recorded on a tree git can
 // no longer diff against. The change since the map joins the paths as it does for explicit
-// arguments, so a test added or edited after the map was recorded still reaches.
+// arguments, so a test added or edited after the map was recorded still reaches when it names a path.
 async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promise<boolean> {
 	if (paths.length === 0) return false
 

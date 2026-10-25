@@ -240,10 +240,21 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 	})
 })
 
-// joshuafolkken/kit#4532: a test the map holds no entry for may reach a moved file through a helper.
+// joshuafolkken/kit#4896: a test changed since the map is main's or another lane's, which CI verified.
 describe('test_related.run_related_tests — a test changed since the map', () => {
-	it('runs it though it names no moved file', async () => {
+	it('leaves it out when it names no moved file', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, SCOPE_TEST])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', absolute(FIXED_SOURCE), '--run'])
+	})
+
+	// joshuafolkken/kit#4393: the branch's own test runs again on every bare run after a green one.
+	it('runs it though it names no moved file when the branch changed it', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([SCOPE_TEST])
+		mocked_changed.mockResolvedValue([FIXED_SOURCE, SCOPE_TEST])
 		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])

@@ -199,7 +199,7 @@ describe('related_scope.resolve_scope — files known to reach no test', () => {
 		const scope = related_scope.resolve_scope(request([UNREAD_FILE], { recorded: HELD_UNREAD }))
 		const description = related_scope.describe_scope(scope, ROOT)
 
-		expect(description).toContain('1 changed file(s) no test reads — running no tests')
+		expect(description).toContain('1 changed file(s) reach no test — running no tests')
 		expect(description).toContain(UNREAD_FILE)
 	})
 })
@@ -221,7 +221,7 @@ describe('related_scope.resolve_scope — files added to a directory no test rea
 		)
 
 		expect(description).toBe(
-			`${related_scope.COMMAND_LABEL}: 1 changed file(s) no test reads — running no tests.\n  - ${NEW_UNREAD_FILE}`,
+			`${related_scope.COMMAND_LABEL}: 1 changed file(s) reach no test — running no tests.\n  - ${NEW_UNREAD_FILE}`,
 		)
 	})
 

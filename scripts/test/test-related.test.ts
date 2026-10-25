@@ -215,7 +215,7 @@ describe('test_related.run_related_tests — explicit arguments against a map', 
 		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
 	})
 
-	it('joins the change since the map to the arguments, so a test added since it runs', async () => {
+	it('joins the change since the map to the arguments, so a test added since it naming one runs', async () => {
 		mocked_since.mockResolvedValue([ADDED_TEST])
 
 		await test_related.run_related_tests([DOCUMENT])
@@ -247,6 +247,7 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 
 	it('reads the change since the map’s commit rather than the branch change', async () => {
 		mocked_since.mockResolvedValue([DOCUMENT])
+		mocked_changed.mockResolvedValue([DOCUMENT])
 
 		await test_related.run_related_tests([])
 
@@ -273,10 +274,18 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 	})
 
 	it('counts what already differed from the map’s tree as changed', async () => {
+		mocked_changed.mockResolvedValue([DIRTY_DOCUMENT])
+
 		await test_related.run_related_tests([])
 
 		expect(announcement()).toContain(CHANGED_SOURCE)
 		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+})
+
+describe('test_related.run_related_tests — a map whose commit cannot be resolved', () => {
+	beforeEach(() => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
 	})
 
 	it('drops the map and reads the branch change when its commit cannot be resolved', async () => {
