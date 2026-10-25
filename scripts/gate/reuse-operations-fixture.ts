@@ -16,6 +16,7 @@ interface Step {
 }
 
 const RECORD = 'record a green run'
+const SHELL_EDIT = 'edit an imported module from the shell'
 const MODULE_DIRECTORY = 'src'
 const TYPES_DIRECTORY = 'types'
 const AMBIENT_KINDS: ReadonlySet<string> = new Set(['declaration', 'globals'])
@@ -89,6 +90,8 @@ const OPERATIONS: ReadonlyArray<Operation> = [
 			world.recorded = reuse_world.snapshot(world)
 		},
 	},
+	// The same content edit as above, by a command no edit hook sees — `sed -i` (joshuafolkken/kit#4867).
+	{ name: SHELL_EDIT, targets: imported, apply: reuse_world.write },
 ]
 
 function pick<T>(items: ReadonlyArray<T>, choice: number): T {
@@ -116,4 +119,4 @@ function step_of(world: World, choice: readonly [number, number]): Step {
 const reuse_operations = { step_of }
 
 export type { Step }
-export { RECORD, reuse_operations }
+export { RECORD, reuse_operations, SHELL_EDIT }
