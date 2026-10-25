@@ -188,6 +188,35 @@ describe('run_merge_signals.read_signals — a closed withdrawn child', () => {
 	})
 })
 
+// joshuafolkken/kit#4916: a CLOSED child no one withdrew is still withdrawn unless a merge closed it —
+// closed as not planned, or with no merged pull request.
+describe('run_merge_signals.read_signals — a closed child no one withdrew', () => {
+	it('reads a child closed without a merge as withdrawn', async () => {
+		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: true })
+		expect(merged_mock).toHaveBeenCalledWith(CHILD)
+	})
+
+	it('reads a child a merge closed as not withdrawn', async () => {
+		merged_mock.mockResolvedValue(true)
+		const signals = await signals_of(CLOSED_READ)
+
+		expect(signals).toMatchObject({ is_withdrawn: false })
+		expect(run_merge_signals.outcome_of(CLOSED_READ, signals as never)).toBe('merged')
+	})
+
+	it('asks again about a closed child whose timeline could not be read', async () => {
+		merged_mock.mockResolvedValue(undefined)
+		const signals = await signals_of(CLOSED_READ)
+
+		expect(run_merge_signals.outcome_of(CLOSED_READ, signals as never)).toBe('unresolved')
+	})
+
+	it('reads no timeline for an OPEN child', async () => {
+		expect(await signals_of(OPEN_READ)).toMatchObject({ is_withdrawn: false })
+		expect(merged_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('run_merge_signals.outcome_of — the outcome the readings decide', () => {
 	it('settles an unread child a person withdrew', () => {
 		const outcome = run_merge_signals.outcome_of(UNREAD, {

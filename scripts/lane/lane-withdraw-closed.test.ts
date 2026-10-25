@@ -157,3 +157,34 @@ describe('lane_withdraw_closed.withdraw_closed — a failure', () => {
 		])
 	})
 })
+
+// joshuafolkken/kit#4916: `run:merge` withdraws a lane closed without a merge through the same guard.
+describe('lane_withdraw_closed.withdraw_lane — as run:merge', () => {
+	const REASON = 'closed without a merge'
+
+	it('withdraws the lane as the named withdrawer', async () => {
+		const result = await lane_withdraw_closed.withdraw_lane(lane(WITHDRAWN), REASON, 'merge')
+
+		expect(withdraw).toHaveBeenCalledExactlyOnceWith(WITHDRAWN, REASON, 'merge')
+		expect(result).toStrictEqual({
+			note: lane_withdraw.describe(WITHDRAWN_OUTCOME, WITHDRAWN),
+			is_retry: false,
+		})
+	})
+
+	it('keeps a branch with commits on no remote', async () => {
+		unpushed.mockResolvedValue(2)
+		const result = await lane_withdraw_closed.withdraw_lane(lane(WITHDRAWN), REASON, 'merge')
+
+		expect(withdraw).not.toHaveBeenCalled()
+		expect(result.is_retry).toBe(false)
+		expect(result.note).toContain(`pnpm josh lane:withdraw ${WITHDRAWN}`)
+	})
+
+	it('asks for a retry when the withdrawal could not read the issue', async () => {
+		withdraw.mockResolvedValue({ kind: 'unreadable' })
+		const result = await lane_withdraw_closed.withdraw_lane(lane(WITHDRAWN), REASON, 'merge')
+
+		expect(result.is_retry).toBe(true)
+	})
+})

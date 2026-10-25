@@ -29,7 +29,9 @@ import { lane_state } from './lane-state'
 // **An issue closed on GitHub while its lane stayed open is withdrawn the same way**
 // (joshuafolkken/kit#4915): its child would otherwise keep working, be resumed by the next cut and
 // hold a lane. `lane-withdraw-closed.ts` sweeps those lanes each supervisor pass, and the event, the
-// stash note and the issue comment name the supervisor rather than a person.
+// stash note and the issue comment name the supervisor rather than a person. `run:merge` withdraws a
+// returned child whose issue closed without a merge the same way, named as itself
+// (`run-merge-withdrawn.ts`, joshuafolkken/kit#4916).
 
 const WITHDRAW_OCCASION = 'lane withdraw'
 const CLOSED_STATE = 'CLOSED'
@@ -39,8 +41,9 @@ const UNREADABLE_KIND = 'unreadable'
 
 type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
-// Who withdrew the lane: a person with `lane:withdraw`, or the supervisor's sweep of closed issues.
-type Withdrawer = 'person' | 'supervisor'
+// Who withdrew the lane: a person with `lane:withdraw`, the supervisor's sweep of closed issues, or
+// `run:merge` collecting a child whose issue closed without a merge (joshuafolkken/kit#4916).
+type Withdrawer = 'person' | 'supervisor' | 'merge'
 
 // How each withdrawer is named on the event stream, in the stash note and on the issue.
 const WITHDRAWER_TEXT = {
@@ -56,6 +59,13 @@ const WITHDRAWER_TEXT = {
 		cause: 'the `run:wake` supervisor withdrew it after its issue was closed',
 		closed_head: 'Its lane was withdrawn by the `run:wake` supervisor after the Issue was closed.',
 		open_head: 'Withdrawn from the current run by the `run:wake` supervisor.',
+	},
+	merge: {
+		name: 'the run:merge driver',
+		cause: '`run:merge` withdrew it after its issue was closed without a merge',
+		closed_head:
+			'Its lane was withdrawn by `pnpm josh run:merge` after the Issue was closed without a merge.',
+		open_head: 'Withdrawn from the current run by `pnpm josh run:merge`.',
 	},
 } as const satisfies Record<Withdrawer, Record<string, string>>
 
@@ -223,7 +233,12 @@ function describe(outcome: WithdrawOutcome, issue: string): string {
 		: refused_text(outcome, issue)
 }
 
-const lane_withdraw = { describe, withdraw }
+// How every withdrawer is named in the `withdraw` event — the board reads the reason after it.
+const WITHDRAWER_NAMES: ReadonlyArray<string> = Object.values(WITHDRAWER_TEXT).map(
+	(text) => text.name,
+)
+
+const lane_withdraw = { WITHDRAWER_NAMES, describe, withdraw }
 
 export type { Withdrawer, WithdrawOutcome }
 export { lane_withdraw }

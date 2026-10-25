@@ -1,0 +1,8 @@
+{
+	"reason": "run:merge doc names the new withdrawn outcome in bold like its merged/parked/failed siblings (#4916)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 52,
+		"prose.excess_bold": 1
+	}
+}

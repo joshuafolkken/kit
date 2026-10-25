@@ -6,7 +6,7 @@ import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_registry, type LaneInfo } from './lane-registry'
-import { lane_withdraw } from './lane-withdraw'
+import { lane_withdraw, type Withdrawer } from './lane-withdraw'
 
 // Every open lane whose issue was closed on GitHub as not planned is withdrawn through `lane:withdraw`'s
 // own path (joshuafolkken/kit#4915): its child is stopped, its work stashed and the lane closed, so the
@@ -15,12 +15,14 @@ import { lane_withdraw } from './lane-withdraw'
 //
 // **Only a not-planned close is swept.** A merged issue's lane is ended by the merge path, where a
 // detached ship may still be running its tail; an issue closed as completed by hand is left to
-// `lane:prune` and `run:merge`, which do not book it withdrawn. An issue that could not be read is
+// `lane:prune` and `run:merge`, which books it withdrawn when no merged pull request closed it
+// (joshuafolkken/kit#4916). An issue that could not be read is
 // asked again on the next pass, and a lane whose withdrawal is already on the event stream is not
 // withdrawn twice.
 //
 // **A branch with commits on no remote is kept**: the close deletes the branch and the stash keeps only
-// uncommitted work, so a person decides with `lane:withdraw` by hand.
+// uncommitted work, so a person decides with `lane:withdraw` by hand. `run:merge` withdraws through the
+// same guard (`withdraw_lane`).
 
 const SWEEP_REASON = 'its issue was closed as not planned while the lane was still open'
 
@@ -49,7 +51,28 @@ async function has_unpushed(branch: string): Promise<boolean> {
 }
 
 function kept_note(issue: string): string {
-	return `${session_cite.issue(issue)} is closed as not planned, but its branch has commits on no remote, so its lane is kept — run \`pnpm josh lane:withdraw ${issue}\` by hand.`
+	return `${session_cite.issue(issue)} is closed without a merge, but its branch has commits on no remote, so its lane is kept — run \`pnpm josh lane:withdraw ${issue}\` by hand.`
+}
+
+interface UnattendedWithdrawal {
+	note: string
+	// The withdrawal could not read the issue, so nothing was stopped or closed.
+	is_retry: boolean
+}
+
+/** Withdraw a closed issue's open lane with no person present, keeping a branch with unpushed commits. */
+async function withdraw_lane(
+	lane: LaneInfo,
+	reason: string,
+	by: Withdrawer,
+): Promise<UnattendedWithdrawal> {
+	if (await has_unpushed(lane.branch)) return { note: kept_note(lane.issue), is_retry: false }
+	const outcome = await lane_withdraw.withdraw(lane.issue, reason, by)
+
+	return {
+		note: lane_withdraw.describe(outcome, lane.issue),
+		is_retry: outcome.kind === 'unreadable',
+	}
 }
 
 async function sweep_lane(
@@ -57,10 +80,9 @@ async function sweep_lane(
 	events: ReadonlyArray<RunEvent>,
 ): Promise<string | undefined> {
 	if (run_event_scope.is_withdrawn(events, lane.issue)) return undefined
-	if (await has_unpushed(lane.branch)) return kept_note(lane.issue)
-	const outcome = await lane_withdraw.withdraw(lane.issue, SWEEP_REASON, 'supervisor')
+	const { note } = await withdraw_lane(lane, SWEEP_REASON, 'supervisor')
 
-	return lane_withdraw.describe(outcome, lane.issue)
+	return note
 }
 
 // One lane's failure does not stop the sweep: the rest are still withdrawn, and this one is asked again.
@@ -95,6 +117,6 @@ async function withdraw_closed(): Promise<Array<string>> {
 	return notes
 }
 
-const lane_withdraw_closed = { SWEEP_REASON, withdraw_closed }
+const lane_withdraw_closed = { SWEEP_REASON, withdraw_closed, withdraw_lane }
 
 export { lane_withdraw_closed }

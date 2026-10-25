@@ -254,6 +254,25 @@ describe('lane_withdraw.withdraw — a closed issue with a lane still open', () 
 	})
 })
 
+// joshuafolkken/kit#4916: `run:merge` withdraws a returned child whose issue closed without a merge.
+describe('lane_withdraw.withdraw — by run:merge', () => {
+	it('names run:merge when it withdraws a lane closed without a merge', async () => {
+		read_issue.mockResolvedValue(state_read('CLOSED'))
+		changes_probe.mockResolvedValue(true)
+		await lane_withdraw.withdraw(ISSUE, REASON, 'merge')
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.WITHDRAW,
+			`#${ISSUE} withdrawn by the run:merge driver: ${REASON}`,
+		)
+		expect(try_comment).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining('withdrawn by `pnpm josh run:merge` after the Issue was closed'),
+		)
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.not.stringContaining(WITHDRAW_COMMAND))
+	})
+})
+
 describe('lane_withdraw.withdraw — refusals write nothing', () => {
 	it('refuses a closed issue with no lane open', async () => {
 		read_issue.mockResolvedValue(state_read('closed'))

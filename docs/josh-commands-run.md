@@ -449,7 +449,7 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
+child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
@@ -467,6 +467,8 @@ against no streak, and a `usage-limit` event names the reset (unreadable or past
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
+A **withdrawn** child (a `lane:withdraw` on the stream, or CLOSED with no merged pull request) counts and logs nothing
+and launches no investigation; its lane is withdrawn through `lane:withdraw`'s path unless already withdrawn — kept, as the `run:wake` sweep keeps one, where its branch has commits on no remote; a retry where the withdrawal cannot read it.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
 newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`. A stop
 followed by `relaunch-failed` (the relaunch started nothing) is unanswered, re-dispatched whatever the
