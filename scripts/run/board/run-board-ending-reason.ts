@@ -10,8 +10,8 @@ const KIND = run_event_stream.EVENT_KIND
 // waiting park does not name its issue twice.
 const PARK_PREFIX = /^#\d+ (?:parked\s*)?/u
 const PARENTHESES = /^\((?<inner>.*)\)$/u
-// `#<N> withdrawn by a person: <reason>` (`lane-withdraw.ts`).
-const WITHDRAW_PREFIX = /^#\d+ withdrawn by a person:\s*/u
+// `#<N> withdrawn by <who>: <reason>` — a person, or the supervisor's sweep (`lane-withdraw.ts`).
+const WITHDRAW_PREFIX = /^#\d+ withdrawn by (?:a person|the run:wake supervisor):\s*/u
 
 // `#<N> parked (needs-decision)` reads as the reason `needs-decision`; a bare park has none.
 function park_reason(event: RunEvent): string {
