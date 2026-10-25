@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { status_icons } from '#scripts/lib/status-icons'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { gate_plan } from './gate-plan'
@@ -98,9 +99,9 @@ function report_result(result: CheckResult): void {
 function verdict_line(results: ReadonlyArray<CheckResult>): string {
 	const failed = results.filter((result) => result.exit_code !== 0).map((result) => result.command)
 
-	if (failed.length === 0) return '✓ check:related passed'
+	if (failed.length === 0) return `${status_icons.PASS_ICON} check:related passed`
 
-	return `✗ check:related failed: ${failed.join(', ')}`
+	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
 }
 
 function report_results(results: ReadonlyArray<CheckResult>): void {
