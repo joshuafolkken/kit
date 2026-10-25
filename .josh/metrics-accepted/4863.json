@@ -1,0 +1,8 @@
+{
+	"reason": "run:review writes each brief to a file and prints its path; the docs say so (#4863)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 30,
+		"ai_cost.on_demand_bytes": 82
+	}
+}

@@ -358,6 +358,8 @@ interface ChangeReading {
 	tree: Record<string, string>
 }
 
+type Emit = (text: string) => void
+
 // One reading, used by every half below. Read twice, the level could describe a different change from
 // the digests printed beside it — and it would cost four git spawns to do so.
 async function read_change(): Promise<ChangeReading> {
@@ -384,6 +386,7 @@ async function record_review(
 async function run_review(
 	round: number,
 	reading: ChangeReading,
+	emit: Emit,
 	interaction?: ReadonlyArray<string>,
 ): Promise<number> {
 	const { base, commit, paths, tree } = reading
@@ -396,7 +399,7 @@ async function run_review(
 	agent_role_profile.warn_of_default()
 	const { profile } = resolved
 
-	console.info(await compose_brief({ round, paths, tree, base, profile, interaction }))
+	emit(await compose_brief({ round, paths, tree, base, profile, interaction }))
 	if (interaction === undefined) await record_review(round, tree, commit)
 
 	return 0
@@ -408,12 +411,12 @@ async function run_review(
 // **An issue update taken in after round 1's brief refuses it**: this brief is minted on its own slot
 // beside round 1's (joshuafolkken/kit#4672), so it is refused here rather than briefed over an earlier
 // specification round 1 read.
-async function run_interaction(): Promise<number> {
+async function run_interaction(emit: Emit): Promise<number> {
 	const reading = await read_change()
 	const targets = review_interaction.due_paths(reading.paths)
 
 	if (targets.length === 0) {
-		console.info(review_interaction.NOT_DUE_LINE)
+		emit(review_interaction.NOT_DUE_LINE)
 
 		return 0
 	}
@@ -422,7 +425,7 @@ async function run_interaction(): Promise<number> {
 
 	if (stale !== undefined) return report_error(stale)
 
-	return await run_review(FIRST_ROUND, reading, targets)
+	return await run_review(FIRST_ROUND, reading, emit, targets)
 }
 
 // The scoped-green refusal a brief on this tree would print, read without composing one — so
@@ -433,15 +436,21 @@ async function scoped_refusal(): Promise<string | undefined> {
 	return scoped_green.refusal_for(tree, commit)
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
+// `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
+// the Bash output cap (joshuafolkken/kit#4863). `run` prints it.
+async function run_to(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
 	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
-	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction()
+	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction(emit)
 
 	const round = parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
 
-	return await run_review(round, await read_change())
+	return await run_review(round, await read_change(), emit)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	return await run_to(argv, console.info)
 }
 
 const review_brief_cli = {
@@ -454,7 +463,9 @@ const review_brief_cli = {
 	record_round_one,
 	report_error,
 	run,
+	run_to,
 	scoped_refusal,
 }
 
+export type { Emit }
 export { review_brief_cli }

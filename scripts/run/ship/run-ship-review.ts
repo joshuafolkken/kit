@@ -390,6 +390,7 @@ const run_ship_review = {
 	read_verdict,
 	report_prompt,
 	reviewer_prompt,
+	round_one_opening,
 	round_one_outcome,
 	round_two_outcome,
 	slot_prompt,
