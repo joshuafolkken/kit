@@ -33,6 +33,11 @@ const STOP_SIGNAL = 'SIGTERM'
 const GRACE_MS = 120_000
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
+// `josh run:review --pinned` reads a check `josh review:record` started seconds before
+// (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the bound only
+// stops a check that hung.
+const ALONE_GRACE_MS = 900_000
+const ALONE_TIMED_OUT_NOTE = `no answer within ${String(ALONE_GRACE_MS / MS_PER_SECOND)}s of the read`
 
 type Clock = () => number
 
@@ -180,11 +185,12 @@ async function poll_within_grace(
 	root: string,
 	launched: Launch,
 	now: Clock,
+	grace_ms: number = GRACE_MS,
 ): Promise<PinnedSummary | undefined> {
 	const started = now()
 	let summary = read_answer(root, launched)
 
-	while (summary === undefined && now() - started < GRACE_MS) {
+	while (summary === undefined && now() - started < grace_ms) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await sleep(run_review_steps.POLL_INTERVAL_MS)
 		summary = read_answer(root, launched)
@@ -226,12 +232,26 @@ async function wait_for_answer(
 	return await poll_answer(root, launched, now)
 }
 
+// The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
+async function wait_alone(
+	root: string = PROJECT_ROOT,
+	now: Clock = () => Date.now(),
+): Promise<PinnedSummary | undefined> {
+	const launched = read_launch(root)
+
+	if (launched === undefined) return undefined
+	const summary = await poll_within_grace(root, launched, now, ALONE_GRACE_MS)
+
+	return summary ?? stopped(launched, ALONE_TIMED_OUT_NOTE)
+}
+
 const run_review_pinned_steps = {
 	clear,
 	launch,
 	launched_reason,
 	launched_tree,
 	log_path,
+	wait_alone,
 	wait_for_answer,
 }
 

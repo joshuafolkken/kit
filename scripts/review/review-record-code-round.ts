@@ -1,3 +1,4 @@
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import type { Finding } from './review-finding-ledger'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record_interaction } from './review-record-interaction'
@@ -5,9 +6,10 @@ import { review_record_pinned } from './review-record-pinned'
 import { review_reviewed_tree } from './review-reviewed-tree'
 
 // What `josh review:record` does once a code round is on the ledger: it records the tree the verdict
-// stands for, which `josh ship` reuses while the tree holds still (`review-reviewed-tree.ts`), names the
-// ship next for a lane child (`review-lane-handover.ts`), names an interaction review its fixes made due (`review-record-interaction.ts`), and starts `josh test:pinned`
-// again on a tree its fixes moved (`review-record-pinned.ts`).
+// stands for, which `josh ship` reuses while the tree holds still (`review-reviewed-tree.ts`), names
+// the ship next for a lane child (`review-lane-handover.ts`), names an interaction review its fixes
+// made due (`review-record-interaction.ts`), and starts `josh test:pinned` again on a tree its fixes
+// moved (`review-record-pinned.ts`).
 
 const HIGH_SEVERITY = 'high'
 
@@ -20,10 +22,18 @@ function unsettled_files(findings: ReadonlyArray<Finding>): ReadonlyArray<string
 
 // A lane child's round the ship reuses names the ship next (joshuafolkken/kit#4850), read after the
 // tree is stamped; the lines that follow name what is done before that ship.
-async function report_handover(issue: number): Promise<void> {
-	if (await review_lane_handover.is_handed_over(issue)) {
-		console.info(review_lane_handover.NEXT_STEP_LINE)
-	}
+async function report_handover(issue: number): Promise<boolean> {
+	const is_handed_over = await review_lane_handover.is_handed_over(issue)
+
+	if (is_handed_over) console.info(review_lane_handover.NEXT_STEP_LINE)
+
+	return is_handed_over
+}
+
+// Only a lane child's round the ship will reuse restarts the check: the ship's own rounds run under its
+// supervisor, where nothing reads the answer and the check would hold cores the ship's gate waits on.
+function is_restarted_here(is_handed_over: boolean): boolean {
+	return is_handed_over && !run_ship_detach.is_supervised()
 }
 
 async function follow(
@@ -32,9 +42,10 @@ async function follow(
 	findings: ReadonlyArray<Finding>,
 ): Promise<void> {
 	await review_reviewed_tree.record(unsettled_files(findings))
-	await report_handover(issue)
+	const is_handed_over = await report_handover(issue)
+
 	await review_record_interaction.report_due(issue, root)
-	await review_record_pinned.restart_if_moved(root)
+	if (is_restarted_here(is_handed_over)) await review_record_pinned.restart_if_moved(root)
 }
 
 const review_record_code_round = { follow }

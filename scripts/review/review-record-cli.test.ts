@@ -391,7 +391,8 @@ describe('review_record_cli.run — what the round made due', () => {
 		)
 
 		expect(report_due_mock).toHaveBeenCalledExactlyOnceWith(4835, root)
-		// joshuafolkken/kit#4834: so is a tree the fix moved under the background test:pinned.
-		expect(restart_mock).toHaveBeenCalledExactlyOnceWith(root)
+		// joshuafolkken/kit#4834: only a lane child's handed-over round restarts test:pinned
+		// (`review-record-code-round.test.ts`); #4835 is no lane child's issue here, so none starts.
+		expect(restart_mock).not.toHaveBeenCalled()
 	})
 })
