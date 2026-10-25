@@ -81,6 +81,32 @@ describe('run_review_pinned_join.wait_for_join on a tree a round-1 fix moved', (
 	})
 })
 
+// joshuafolkken/kit#4895: the join waited out the grace on a tree round 1's fixes were about to move.
+describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () => {
+	it('waits no grace on a running check and leaves it running', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		const now = vi.fn(() => 0)
+
+		const answer = await run_review_pinned_join.wait_for_join(ROOT, now, true)
+
+		expect(now).not.toHaveBeenCalled()
+		expect(process.kill).not.toHaveBeenCalled()
+		expect(answer?.unpinned).toStrictEqual([])
+		expect(answer?.text).toContain('round 1 has fixes to make')
+	})
+
+	it('reads the answer the check already left', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		expect(await run_review_pinned_join.wait_for_join(ROOT, undefined, true)).toStrictEqual(ANSWER)
+	})
+
+	it('answers none when no check was launched', async () => {
+		expect(await run_review_pinned_join.wait_for_join(ROOT, undefined, true)).toBeUndefined()
+	})
+})
+
 describe("run_review_pinned_join.wait_for_join under a ship's supervisor", () => {
 	it('starts nothing again on a moved tree, where no --pinned read follows', async () => {
 		vi.spyOn(run_ship_detach, 'is_supervised').mockReturnValue(true)
@@ -110,15 +136,6 @@ describe('run_review_pinned_join.answer_on_tree', () => {
 		expect(await run_review_pinned_join.answer_on_tree(ROOT)).toBeUndefined()
 	})
 
-	it('stops the check on another tree, so it does not run beside the caller’s own', async () => {
-		run_review_pinned_steps.launch(ROOT, undefined, BRIEFED_TREE)
-
-		await run_review_pinned_join.answer_on_tree(ROOT)
-
-		expect(process.kill).toHaveBeenCalledWith(-BRIEFED_PID, 'SIGTERM')
-		expect(run_review_pinned_steps.launched_tree(ROOT)).toBeUndefined()
-	})
-
 	it('answers none when git could not read the current tree', async () => {
 		run_review_pinned_steps.launch(ROOT, undefined, FIXED_TREE)
 		test_pinned_record.write(launched_token(), ANSWER, ROOT)
@@ -132,5 +149,34 @@ describe('run_review_pinned_join.answer_on_tree', () => {
 		run_review_pinned_steps.launch(ROOT, undefined, FIXED_TREE)
 
 		expect(await run_review_pinned_join.answer_on_tree(ROOT)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4895: stopped mid-run, the check saved no verdicts, and the caller probed every hunk.
+describe('run_review_pinned_join.answer_on_tree on another tree', () => {
+	it('waits the check out before clearing it, so its verdicts reach the cache', async () => {
+		run_review_pinned_steps.launch(ROOT, undefined, BRIEFED_TREE)
+		vi.spyOn(run_review_pinned_steps, 'is_live').mockReturnValue(true)
+		const waited = vi.spyOn(run_review_pinned_steps, 'wait_alone').mockResolvedValue(ANSWER)
+		const cleared = vi.spyOn(run_review_pinned_steps, 'clear')
+
+		await run_review_pinned_join.answer_on_tree(ROOT)
+
+		expect(waited).toHaveBeenCalledWith(ROOT)
+		expect(waited.mock.invocationCallOrder[0]).toBeLessThan(
+			cleared.mock.invocationCallOrder[0] ?? 0,
+		)
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBeUndefined()
+	})
+
+	it('clears a stale stamp at once, waiting on and signalling no unproven pid', async () => {
+		run_review_pinned_steps.launch(ROOT, undefined, BRIEFED_TREE)
+		vi.spyOn(run_review_pinned_steps, 'is_live').mockReturnValue(false)
+		const waited = vi.spyOn(run_review_pinned_steps, 'wait_alone')
+
+		await run_review_pinned_join.answer_on_tree(ROOT)
+
+		expect(waited).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBeUndefined()
 	})
 })

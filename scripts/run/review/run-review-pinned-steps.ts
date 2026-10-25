@@ -37,6 +37,10 @@ const READ_COMMAND = 'pnpm josh run:review --pinned'
 const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\``
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
+// A round 1 with fixes to make moves the tree, and `josh review:record` starts the check again on the
+// fixed one, so the join waits no grace on this tree's (joshuafolkken/kit#4895).
+const FIXING_NOTE =
+	"round 1 has fixes to make — it is left running, and `josh review:record` starts it again on the fixed tree for the ship's pre-detach to read"
 // `josh run:review --pinned` reads a check `josh review:record` started seconds before
 // (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the bound only
 // stops a check that hung.
@@ -250,11 +254,31 @@ async function wait_for_answer(
 	return await poll_answer(root, launched, now, is_left_running)
 }
 
+// The answer as it stands, waiting nothing and stopping nothing; `undefined` when no check was launched.
+function answer_now(root: string = PROJECT_ROOT): PinnedSummary | undefined {
+	const launched = read_launch(root)
+
+	if (launched === undefined) return undefined
+
+	return read_answer(root, launched) ?? test_pinned_record.not_run_summary(new Error(FIXING_NOTE))
+}
+
 // Whether the last check left its answer, rather than ending without one or never being launched.
 function is_answered(root: string = PROJECT_ROOT): boolean {
 	const launched = read_launch(root)
 
 	return launched !== undefined && test_pinned_record.read(launched.token, root) !== undefined
+}
+
+// Whether the last check's process is proven to be the one launched, as `stop_last` asks before it
+// signals: a stale stamp's reissued or unreadable pid is not waited on.
+function is_live(root: string = PROJECT_ROOT): boolean {
+	const launched = read_launch(root)
+
+	return (
+		launched !== undefined &&
+		process_identity.is_same_process(launched.pid, launched.start) === true
+	)
 }
 
 // The lone read's wait: a queued check is waited on, not stopped. `undefined` when no check was launched.
@@ -271,9 +295,10 @@ async function wait_alone(
 }
 
 const run_review_pinned_steps = {
-	READ_COMMAND,
+	answer_now,
 	clear,
 	is_answered,
+	is_live,
 	launch,
 	launched_reason,
 	launched_tree,

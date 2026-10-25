@@ -31,8 +31,13 @@ describe('review_record_pinned.restart_if_moved on a tree the fix moved', () => 
 		expect(run_review_pinned_steps.clear).toHaveBeenCalledWith(ROOT)
 		expect(run_review_pinned_steps.launch).toHaveBeenCalledWith(ROOT, REASON, FIXED_TREE)
 		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
-		expect(review_record_pinned.started_line()).toContain('`pnpm josh run:review --pinned`')
 		expect(review_record_pinned.started_line()).toContain('--unpinned-ok')
+	})
+
+	// joshuafolkken/kit#4895: the named foreground read stalled the lane for minutes before the ship.
+	it("leaves the answer to the ship's pre-detach, asking no foreground read", () => {
+		expect(review_record_pinned.started_line()).not.toContain('run:review --pinned')
+		expect(review_record_pinned.started_line()).toContain('pre-detach')
 	})
 
 	it('names no read when the check could not be started', async () => {

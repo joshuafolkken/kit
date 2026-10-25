@@ -18,11 +18,11 @@ import type { ShipArguments } from './run-ship-steps'
 // (`run-review-pinned.ts`).
 //
 // **On the tree `run:review` checked it runs no `test:pinned`**: it reads that background check's
-// answer (`run-review-pinned-join.ts`). On another tree it stops that check and runs its own as a
-// `josh` command, so it reserves its own cores (`DIRECT_UNIT_CLAIM`) beside the other checks, and it
-// probes only the hunks whose stored verdict the per-checkout cache no longer holds
-// (`test-pinned-cache-logic.ts`). Its answer comes back through the record `--record` leaves
-// (`test-pinned-record.ts`). Under
+// answer (`run-review-pinned-join.ts`). On another tree it waits that check out, so its verdicts
+// reach the cache (joshuafolkken/kit#4895), then runs its own as a `josh` command, so it reserves its
+// own cores (`DIRECT_UNIT_CLAIM`) beside the other checks, and it probes only the hunks whose stored
+// verdict the per-checkout cache no longer holds (`test-pinned-cache-logic.ts`). Its answer comes
+// back through the record `--record` leaves (`test-pinned-record.ts`). Under
 // `--unpinned-ok "<reason>"` it runs only when the supervisor reuses round 1 (`pinned_check`).
 // Without `--review` nothing after the detach asks `test:pinned`, and `--unpinned-ok` is refused there
 // (`run-ship-args.ts`), so the check is not asked.

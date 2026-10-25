@@ -127,7 +127,7 @@ describe('run:review when no brief follows', () => {
 		expect(await run_review_cli.run([run_review_pinned.UNPINNED_OK_FLAG])).toBe(FAILURE_EXIT_CODE)
 		expect(pinned_run).not.toHaveBeenCalled()
 		expect(output.stderr.join('')).toBe(
-			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join | --pinned\n',
+			'Usage: josh run:review [--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned\n',
 		)
 	})
 })
