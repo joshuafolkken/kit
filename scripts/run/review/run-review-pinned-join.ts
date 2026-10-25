@@ -114,6 +114,16 @@ async function answer_on_tree(root: string = PROJECT_ROOT): Promise<PinnedSummar
 	return undefined
 }
 
-const run_review_pinned_join = { answer_on_tree, restart_if_moved, wait_for_join }
+// The answer a check launched on this very tree already left, read without waiting
+// (joshuafolkken/kit#4920); `undefined` when the tree moved, the check is still running or left none.
+async function finished_on_tree(root: string = PROJECT_ROOT): Promise<PinnedSummary | undefined> {
+	if (!run_review_pinned_steps.is_answered(root)) return undefined
+
+	return (await is_launched_on_current_tree(root))
+		? run_review_pinned_steps.answer_now(root)
+		: undefined
+}
+
+const run_review_pinned_join = { answer_on_tree, finished_on_tree, restart_if_moved, wait_for_join }
 
 export { run_review_pinned_join }

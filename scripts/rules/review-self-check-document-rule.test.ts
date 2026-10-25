@@ -129,6 +129,7 @@ describe('the self-check question 1 and josh test:pinned', () => {
 			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
 		)
 		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
-		expect(step).toContain('`--unpinned-ok "<reason>"` carries on')
+		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.
+		expect(step).toContain('`3` on an `unpinned` line (its note names the `--unpinned-ok` call)')
 	})
 })

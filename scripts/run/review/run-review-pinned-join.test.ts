@@ -180,3 +180,30 @@ describe('run_review_pinned_join.answer_on_tree on another tree', () => {
 		expect(run_review_pinned_steps.launched_tree(ROOT)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#4920: a reason given after the join stopped judges the answer the check already left.
+describe('run_review_pinned_join.finished_on_tree', () => {
+	it('reads the answer left on the tree it was launched on, stopping and clearing nothing', async () => {
+		run_review_pinned_steps.launch(ROOT, undefined, FIXED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		expect(await run_review_pinned_join.finished_on_tree(ROOT)).toStrictEqual(ANSWER)
+		expect(process.kill).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(FIXED_TREE)
+	})
+
+	it('answers none on a moved tree, so the open checks it again', async () => {
+		run_review_pinned_steps.launch(ROOT, undefined, BRIEFED_TREE)
+		test_pinned_record.write(launched_token(), ANSWER, ROOT)
+
+		expect(await run_review_pinned_join.finished_on_tree(ROOT)).toBeUndefined()
+	})
+
+	it('answers none for a check still running or never launched', async () => {
+		expect(await run_review_pinned_join.finished_on_tree(ROOT)).toBeUndefined()
+
+		run_review_pinned_steps.launch(ROOT, undefined, FIXED_TREE)
+
+		expect(await run_review_pinned_join.finished_on_tree(ROOT)).toBeUndefined()
+	})
+})

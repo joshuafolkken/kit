@@ -8,13 +8,15 @@ import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 //
 // **`--unpinned-ok "<reason>"` carries on past it** for a change no test can pin. That check runs in
 // the background too (joshuafolkken/kit#4793), so the pair never waits on it: the join prints the list
-// and the reason and carries on. Unchecked places (over the cap, an added file `typescript` could not
+// and the reason and carries on. **Given after the join stopped, on the same tree and a green gate,
+// the reason judges the finished answer** and re-runs neither the check nor the pair
+// (joshuafolkken/kit#4920). Unchecked places (over the cap, an added file `typescript` could not
 // read, or no Vitest to run a probe) never stop the run.
 
 const UNPINNED_OK_FLAG = '--unpinned-ok'
 const OK_ARGUMENT_COUNT = 2
 const STOP_NOTE =
-	'Pin each unpinned place with a test that turns red without it, then re-run `pnpm josh run:review`; for a change no test can pin, re-run it with `--unpinned-ok "<reason>"` (`pnpm josh ship --review` forwards it).'
+	'Pin each unpinned place with a test that turns red without it, then re-run `pnpm josh run:review`; for a change no test can pin, leave the tree as it is and pass the reason with `pnpm josh run:review --unpinned-ok "<reason>"` — on this tree and a green gate it judges this answer and re-runs nothing (`pnpm josh ship --review` forwards it).'
 
 type PinnedKind = 'clear' | 'stop' | 'accepted'
 
