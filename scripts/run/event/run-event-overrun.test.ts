@@ -146,3 +146,24 @@ describe('run_event_overrun — the keyed small causes', () => {
 		expect(run_event_overrun.small_causes_of(run_event_overrun.FILED_RESULT)).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#4911: the board and `josh overrun:mechanisms` sum one mechanism's causes alike.
+describe('run_event_overrun.sum_by_key', () => {
+	it('sums one key’s minutes and causes, the largest loss first', () => {
+		const cut = 'token-cut'
+		const causes = [
+			{ key: cut, minutes: 2, cause: 'a' },
+			{ key: 'run:cut', minutes: 6.5, cause: 'b' },
+			{ key: cut, minutes: 5, cause: 'c' },
+		]
+
+		expect(run_event_overrun.sum_by_key(causes)).toStrictEqual([
+			{ key: cut, minutes: 7, causes: 2 },
+			{ key: 'run:cut', minutes: 6.5, causes: 1 },
+		])
+	})
+
+	it('sums nothing from no cause', () => {
+		expect(run_event_overrun.sum_by_key([])).toStrictEqual([])
+	})
+})
