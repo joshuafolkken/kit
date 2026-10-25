@@ -10,7 +10,8 @@ import type { RedProbe, RedVerdict } from './test-red-logic'
 // **A verdict is keyed by the hunk's own lines, never its position**, so a hunk that only moved — an
 // edit above it in the same file — keeps its verdict.
 // **A `red` verdict holds while the code change and the test files it failed in are the same**
-// (`change`: the base commit and the content of every non-test path changed since it; `tests`: the
+// (`change`: the base commit and the content of every non-test path changed since it, a run's own
+// record under `.josh/` left out since no test reads one, joshuafolkken/kit#4856; `tests`: the
 // content digest of each failed test file, joshuafolkken/kit#4790). A hunk goes red on the tree with
 // only it reverted, so a fixture, a config or another source file can decide it — a test that already
 // failed before the revert reads red too — and a red kept past any of those, or past an edit to the test
