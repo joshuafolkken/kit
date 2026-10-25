@@ -22,8 +22,9 @@ const LABEL = 'the last 1 day(s)'
 const HEAD = `overrun mechanisms in ${LABEL}: 3 merge(s), median lane 51.0 min`
 const PINNED_LINE = 'test:pinned  25.0 min over 4 cause(s) · 8.3 min/merge · 16.3% — file (urgent)'
 const TOKEN_LINE = 'token-cut  2.0 min over 1 cause(s) · 0.7 min/merge · 1.3% — under 2%'
+// Before a --since cut at minute 150, test:pinned lost 16 minutes over two merges: 8 per merge.
 const SINCE_PINNED_LINE =
-	'test:pinned  9.0 min over 1 cause(s) · 9.0 min/merge · 17.6% — file (urgent)'
+	'test:pinned  9.0 min over 1 cause(s) · 9.0 min/merge · 17.6% — file (urgent) · grown from 8.0 min/merge'
 const GATE_CUT = 'cut before the gate'
 
 // The three 2026-10-25 lanes the issue names: their lane minutes and the test:pinned losses their
@@ -82,17 +83,36 @@ function events(): Array<RunEvent> {
 	})
 }
 
-function report(lane_events: ReadonlyArray<RunEvent>): Array<string> {
+function report(
+	lane_events: ReadonlyArray<RunEvent>,
+	earlier: ReadonlyArray<LedgerEntry> = [],
+): Array<string> {
 	const window = lane_stats.window_of(PERIOD_DAYS, NOW_MS)
 
 	return lane_overrun_mechanisms_cli
-		.report({ entries: ledger(), events: lane_events }, window, LABEL)
+		.report({ entries: [...earlier, ...ledger()], events: lane_events }, window, LABEL)
 		.split('\n')
+}
+
+// One overrun result note keying `causes`.
+function noted(causes: ReadonlyArray<SmallCause>, note_at: string): RunEvent {
+	const result = `${NONE_RESULT}${run_event_overrun.small_causes_text(causes)}`
+
+	return note(run_event_overrun.ended_text(4600, result), note_at)
 }
 
 describe('lane_overrun_mechanisms_cli.report — the 2026-10-25 lanes', () => {
 	it('sums test:pinned past the floor of the median lane and sends it to filing', () => {
 		expect(report(events())).toStrictEqual([HEAD, PINNED_LINE, TOKEN_LINE])
+	})
+
+	// joshuafolkken/kit#4910: the filing floor sits under the high band, so 2.5% is filed, not dropped.
+	it('sends a key between the filing floor and the high band to filing', () => {
+		const plan = noted([{ key: 'lane:plan', minutes: 3.8, cause: 'plan reread' }], at(1))
+
+		expect(report([...events(), plan])).toContain(
+			'lane:plan  3.8 min over 1 cause(s) · 1.3 min/merge · 2.5% — file',
+		)
 	})
 
 	it('leaves out a note outside the period and a free-text cause written before the keys', () => {
@@ -109,42 +129,50 @@ describe('lane_overrun_mechanisms_cli.report — the 2026-10-25 lanes', () => {
 	})
 })
 
-// joshuafolkken/kit#4910: a key that lost more than over the period of the same length before it.
-function prior(causes: ReadonlyArray<SmallCause>, note_at: string): RunEvent {
-	const result = `${NONE_RESULT}${run_event_overrun.small_causes_text(causes)}`
-
-	return note(run_event_overrun.ended_text(4600, result), note_at)
-}
-
+// joshuafolkken/kit#4910: a key that lost more per merge than over the period of the same length
+// before it. The period before holds one merged lane, so its minutes are its minutes per merge.
 describe('lane_overrun_mechanisms_cli.report — growth over the period before', () => {
 	const PRIOR_AT = '2026-10-24T00:00:00.000Z'
+	const PRIOR_LANE: ReadonlyArray<LedgerEntry> = [
+		{ kind: 'dispatch', at: '2026-10-23T23:00:00.000Z', issue: 4600 },
+		{ kind: 'merge', at: PRIOR_AT, issue: 4600 },
+	]
 	const RERUN = 'pinned rerun'
 
-	it('marks a key that grew and leaves one that held unmarked', () => {
-		const earlier = prior(
+	it('marks a key that grew per merge and leaves one that shrank per merge unmarked', () => {
+		const earlier = noted(
 			[
-				{ key: PINNED, minutes: 10, cause: RERUN },
+				{ key: PINNED, minutes: 5, cause: RERUN },
 				{ key: 'token-cut', minutes: 2, cause: GATE_CUT },
 			],
 			PRIOR_AT,
 		)
 
-		expect(report([earlier, ...events()])).toStrictEqual([
+		expect(report([earlier, ...events()], PRIOR_LANE)).toStrictEqual([
 			HEAD,
-			`${PINNED_LINE} · grown from 10.0 min`,
+			`${PINNED_LINE} · grown from 5.0 min/merge`,
 			TOKEN_LINE,
 		])
 	})
 
-	it('marks nothing for a key with no earlier loss, nor for one that shrank', () => {
-		const earlier = prior([{ key: PINNED, minutes: 30, cause: RERUN }], PRIOR_AT)
+	it('reads a busier period whose total grew but whose loss per merge fell as no growth', () => {
+		const earlier = noted([{ key: PINNED, minutes: 10, cause: RERUN }], PRIOR_AT)
+
+		expect(report([earlier, ...events()], PRIOR_LANE).join('\n')).not.toContain('grown')
+	})
+
+	it('marks nothing when the period before merged nothing', () => {
+		const earlier = noted([{ key: PINNED, minutes: 1, cause: RERUN }], PRIOR_AT)
 
 		expect(report([earlier, ...events()]).join('\n')).not.toContain('grown')
 	})
+})
 
+// The period before a --since window holds the lanes 4873 and 4880, two merges.
+describe('lane_overrun_mechanisms_cli.report — growth before a --since window', () => {
 	it('compares a --since window with the period of its own width before it', () => {
 		const window = { since_ms: Date.parse(at(150)), until_ms: NOW_MS }
-		const earlier = prior([{ key: 'token-cut', minutes: 1, cause: 'cut early' }], at(120))
+		const earlier = noted([{ key: 'token-cut', minutes: 1, cause: 'cut early' }], at(120))
 		const text = lane_overrun_mechanisms_cli.report(
 			{ entries: ledger(), events: [earlier, ...events()] },
 			window,
@@ -153,7 +181,7 @@ describe('lane_overrun_mechanisms_cli.report — growth over the period before',
 
 		expect(text.split('\n').slice(1)).toStrictEqual([
 			SINCE_PINNED_LINE,
-			'token-cut  2.0 min over 1 cause(s) · 2.0 min/merge · 3.9% — file · grown from 1.0 min',
+			'token-cut  2.0 min over 1 cause(s) · 2.0 min/merge · 3.9% — file · grown from 0.5 min/merge',
 		])
 	})
 })

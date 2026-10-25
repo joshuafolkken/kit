@@ -55,9 +55,11 @@ describe('lane_overrun_prompt.handling — a defect and a grown mechanism', () =
 		)
 	})
 
-	it('files a mechanism `overrun:mechanisms` marks grown at any share', () => {
+	// A time-shortening body under the floor beside a causing lane is refused by `issue:file`, so the
+	// grown mechanism takes the defect's form, which `issue-priority-floor.test.ts` files.
+	it('files a mechanism `overrun:mechanisms` marks grown at any share, in the form issue:file accepts', () => {
 		expect(handling()).toContain(
-			'A key `pnpm josh overrun:mechanisms` marks `grown` lost more than over the period of the same length before it: file its mechanism as one root-cause issue at any share too.',
+			'A key `pnpm josh overrun:mechanisms` marks `grown` lost more per merge than over the period of the same length before it: file its mechanism as one root-cause issue at any share the same way, as `- 種別: 不具合` with no `- 目的: 時間短縮` line.',
 		)
 	})
 })

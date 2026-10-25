@@ -14,12 +14,13 @@ import type { MeasureContext } from './lane-sampler'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // `josh overrun:mechanisms [--period <days>]` — the causes overrun investigations left unfiled as under
-// the high share, summed per mechanism key across the period's lanes (joshuafolkken/kit#4886): one lane's
-// few minutes are under the share, but a mechanism losing them in every lane is not. Each key's sum is
-// divided by the period's merges and their median lane time, and judged by the floor an Issue's stated
-// reduction per merge is (`issue_priority.percent_floor`). A key that lost more than over the period of
-// the same length before it is marked grown, which the investigation files at any share
-// (joshuafolkken/kit#4910); a key with no earlier loss has no growth to measure.
+// the filing floor, summed per mechanism key across the period's lanes (joshuafolkken/kit#4886): one
+// lane's few minutes are under the floor, but a mechanism losing them in every lane is not. Each key's
+// sum is divided by the period's merges and their median lane time, and judged by the filing floor and
+// the floor an Issue's stated reduction per merge is (`issue_priority.percent_floor`). A key that lost
+// more per merge than over the period of the same length before it is marked grown, which the
+// investigation files at any share (joshuafolkken/kit#4910); a key with no earlier loss, or a period
+// before with no merge, has no growth to measure.
 
 const OPTIONS = { period: { type: 'string' }, since: { type: 'string' } } as const
 const DEFAULT_PERIOD_DAYS = 7
@@ -28,8 +29,9 @@ const ARGV_OFFSET = 2
 const PERCENT = 100
 const DECIMALS = 1
 const MISSING = '—'
+const UNDER_FLOOR = `under ${String(issue_priority.FILING_FLOOR_PERCENT)}%`
 const VERDICTS: Record<PriorityLevel, string> = {
-	normal: `under ${String(issue_priority.FILING_FLOOR_PERCENT)}%`,
+	normal: 'file',
 	high: 'file',
 	critical: 'file (urgent)',
 }
@@ -81,42 +83,62 @@ function prior_window(window: StatsWindow): StatsWindow {
 	return { since_ms: window.since_ms - width, until_ms: window.since_ms - 1 }
 }
 
-// Each key's summed minutes over the window before `window`.
-function prior_minutes(events: ReadonlyArray<RunEvent>, window: StatsWindow): Map<string, number> {
-	const losses = losses_of(lane_stats.in_window(events, prior_window(window)))
+// `entries` is the whole ledger, since a lane may start before the window.
+function base_of(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): MergeBase {
+	const merge_minutes = lane_stats.merge_minutes(entries, lane_stats.in_window(entries, window))
 
-	return new Map(losses.map((loss) => [loss.key, loss.minutes]))
+	return { merges: merge_minutes.length, median_minutes: lane_stats.median(merge_minutes) }
 }
 
-function growth_of(loss: KeyedLoss, prior: ReadonlyMap<string, number>): string {
-	const before = prior.get(loss.key)
+function per_merge(minutes: number, base: MergeBase): number | undefined {
+	return base.merges === 0 ? undefined : minutes / base.merges
+}
 
-	if (before === undefined || loss.minutes <= before) return ''
+// Each key's minutes per merge over the window before `window`: per merge, so a busier period is not
+// read as growth. Empty when that window merged nothing.
+function prior_rates(records: PeriodRecords, window: StatsWindow): Map<string, number> {
+	const before = prior_window(window)
+	const base = base_of(records.entries, before)
 
-	return ` · ${run_event_overrun.GROWN_MARK} from ${cell(before, ' min')}`
+	if (base.merges === 0) return new Map()
+	const losses = losses_of(lane_stats.in_window(records.events, before))
+
+	return new Map(losses.map((loss) => [loss.key, loss.minutes / base.merges]))
+}
+
+function growth_of(rate: number | undefined, before: number | undefined): string {
+	if (rate === undefined || before === undefined || rate <= before) return ''
+
+	return ` · ${run_event_overrun.GROWN_MARK} from ${cell(before, ' min/merge')}`
+}
+
+// With no merge to divide by there is no share, so no verdict either.
+function verdict_of(share: number | undefined): string {
+	if (share === undefined) return MISSING
+	if (share < issue_priority.FILING_FLOOR_PERCENT) return UNDER_FLOOR
+
+	return VERDICTS[issue_priority.percent_floor(share)]
 }
 
 function line_of(loss: KeyedLoss, base: MergeBase, prior: ReadonlyMap<string, number>): string {
 	const share = share_of(loss, base)
-	const per_merge = base.merges === 0 ? undefined : loss.minutes / base.merges
+	const rate = per_merge(loss.minutes, base)
 	const total = `${cell(loss.minutes, ' min')} over ${String(loss.causes)} cause(s)`
-	// With no merge to divide by there is no share, so no verdict either.
-	const verdict = share === undefined ? MISSING : VERDICTS[issue_priority.percent_floor(share)]
+	const growth = growth_of(rate, prior.get(loss.key))
 
-	return `${loss.key}  ${total} · ${cell(per_merge, ' min/merge')} · ${cell(share, '%')} — ${verdict}${growth_of(loss, prior)}`
+	return `${loss.key}  ${total} · ${cell(rate, ' min/merge')} · ${cell(share, '%')} — ${verdict_of(share)}${growth}`
 }
 
-// The report over `window`, named by `label`: `entries` is the whole ledger, since a lane may start
-// before the window. The head prints even with no cause, since an investigation divides by it.
-function report({ entries, events }: PeriodRecords, window: StatsWindow, label: string): string {
-	const merge_minutes = lane_stats.merge_minutes(entries, lane_stats.in_window(entries, window))
-	const base = { merges: merge_minutes.length, median_minutes: lane_stats.median(merge_minutes) }
-	const losses = losses_of(lane_stats.in_window(events, window))
+// The report over `window`, named by `label`. The head prints even with no cause, since an
+// investigation divides by it.
+function report(records: PeriodRecords, window: StatsWindow, label: string): string {
+	const base = base_of(records.entries, window)
+	const losses = losses_of(lane_stats.in_window(records.events, window))
 	const median = cell(base.median_minutes, ' min')
 	const head = `overrun mechanisms in ${label}: ${String(base.merges)} merge(s), median lane ${median}`
 
 	if (losses.length === 0) return `${head}\nno keyed small overrun causes recorded`
-	const prior = prior_minutes(events, window)
+	const prior = prior_rates(records, window)
 
 	return [head, ...losses.map((loss) => line_of(loss, base, prior))].join('\n')
 }

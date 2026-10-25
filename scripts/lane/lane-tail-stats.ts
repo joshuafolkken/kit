@@ -1,6 +1,7 @@
 // The tail of the period's lane times beside `lane:stats`'s median (joshuafolkken/kit#4910): a lane's
 // target is a ceiling, so the lanes over the overrun threshold and the 90th percentile say what a median
-// hides. The threshold is the one the overrun investigation launches past (`lane-overrun.ts`).
+// hides. The threshold is the one the overrun investigation launches past (`lane-overrun.ts`), which
+// judges a lane's net time; `lane:stats` counts on its dispatch-to-merge time.
 
 // The net minutes a lane may take before its causes are investigated.
 const OVERRUN_LANE_MINUTES = 40
