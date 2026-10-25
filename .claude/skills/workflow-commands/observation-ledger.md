@@ -66,7 +66,8 @@ blocked depth-0 work is filed as before.
   goes ahead.
 - **A review round that passes after the pull request opened is recorded on the Issue, not in the
   ledger** — `pnpm josh review:record --issue <N> --comment` (`pnpm josh ship --review` does this for a
-  passing round 2), so CI does not restart. **A round 2 that blocks records in the tree as before.**
+  passing round 2), so CI does not restart; so does any code round on a pushed, clean tree, a
+  blocking round 2 included.
   Once the Issue closes, the next ledger round carries the comment's lines into
   `<N>-comment-rounds.md` (`review-comment-round.ts`).
 - **`pnpm josh followup` commits any other line appended after the run's commit onto the pull request,

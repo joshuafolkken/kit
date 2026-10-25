@@ -1213,11 +1213,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:review": [
-      "[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned",
+      "[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push",
       "automation",
       [
         "processes",
         "files",
+        "git",
+        "network",
       ],
     ],
     "run:status": [

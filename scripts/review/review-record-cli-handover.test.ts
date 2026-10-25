@@ -19,6 +19,10 @@ vi.mock('./review-round-reuse', () => ({
 }))
 vi.mock('./review-comment-round', () => ({ review_comment_round: { carry: async () => 0 } }))
 vi.mock('./review-reviewed-tree', () => ({ review_reviewed_tree: { record: vi.fn() } }))
+// The real probe reads this checkout's branch; `review-record-cli-push.test.ts` owns the pushed case.
+vi.mock('#scripts/run/ship/run-ship-probe', () => ({
+	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
+}))
 vi.mock('./review-record-interaction', async (original) => {
 	const { review_record_interaction } =
 		await original<Record<'review_record_interaction', object>>()

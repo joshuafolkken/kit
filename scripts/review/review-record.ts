@@ -1,5 +1,6 @@
 import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 
 // The gate that refuses a merge until the `/code-review` round was recorded.
@@ -33,14 +34,37 @@ interface RecordVerdict {
 // lane. Every file of the directory is read, so the round is found whichever
 // file holds it; a directory that is not there answers `undefined`, a ledger this checkout does not
 // keep, which becomes `not-required`.
+//
+// **A round recorded on the issue counts too** (`josh review:record --comment`): a round that ran after
+// the branch was pushed keeps its lines there so CI does not restart (joshuafolkken/kit#4907). Comments
+// that could not be read are no record — the refusal stands.
+type CommentLines = (issue: number) => Promise<ReadonlyArray<string>>
+
+async function has_comment_record(issue: number, read: CommentLines): Promise<boolean> {
+	try {
+		const lines = await read(issue)
+
+		return review_finding_ledger.has_issue_record(lines.join('\n'), issue)
+	} catch {
+		return false
+	}
+}
+
+async function is_recorded(content: string, issue: number, read: CommentLines): Promise<boolean> {
+	if (review_finding_ledger.has_issue_record(content, issue)) return true
+
+	return await has_comment_record(issue, read)
+}
+
 async function check(
 	issue: number,
 	root: string = observation_ledger_home.ledger_root(),
+	read_comment_lines: CommentLines = review_comment_round.issue_lines,
 ): Promise<RecordVerdict> {
 	const content = await observation_ledger_home.read(root)
 
 	if (content === undefined) return { status: 'not-required' }
-	if (review_finding_ledger.has_issue_record(content, issue)) return { status: 'ok', issue }
+	if (await is_recorded(content, issue, read_comment_lines)) return { status: 'ok', issue }
 
 	return { status: 'missing', issue }
 }

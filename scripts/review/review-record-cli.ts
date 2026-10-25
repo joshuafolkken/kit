@@ -1,4 +1,3 @@
-import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
@@ -10,6 +9,7 @@ import { review_interaction } from './review-interaction'
 import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
 import { review_record_code_round } from './review-record-code-round'
+import { review_record_comment } from './review-record-comment'
 import { review_record_interaction } from './review-record-interaction'
 import type { Reuse } from './review-round-reuse'
 import { review_stop_log } from './review-stop-log'
@@ -255,25 +255,6 @@ async function run_check(parsed: Parsed, root: string): Promise<number> {
 	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
-// **A comment that could not be posted fails the record**: it is the round's only copy, so a
-// swallowed refusal would read as a recorded round that exists nowhere.
-async function post_comment(issue: number, lines: ReadonlyArray<string>): Promise<number> {
-	try {
-		const url = await git_gh_issue_write.issue_comment(
-			String(issue),
-			review_comment_round.body_of(lines),
-		)
-
-		console.info(`Recorded ${String(lines.length)} review-finding line(s) in ${url.trim()}.`)
-
-		return 0
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
-
-		return FAILURE_EXIT_CODE
-	}
-}
-
 // The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`). **A carry
 // that fails never fails the record**: this round is recorded, and the comment rounds wait for the
 // next run's.
@@ -316,6 +297,7 @@ async function append_round({
 	return 0
 }
 
+// A code round recorded after the push goes to the issue unasked (`review-record-comment.ts`).
 async function write_round(
 	parsed: Parsed,
 	request: Request,
@@ -324,8 +306,13 @@ async function write_round(
 ): Promise<number> {
 	const kind = kind_of(parsed)
 	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind)
+	const { issue, findings } = request
 
-	if (parsed.comment) return await post_comment(request.issue, lines)
+	if (parsed.comment) return await review_record_comment.post(issue, lines)
+
+	if (kind === 'code' && (await review_record_comment.is_after_push())) {
+		return await review_record_comment.post_after_push({ issue, lines, root, findings })
+	}
 
 	return await append_round({
 		issue: request.issue,

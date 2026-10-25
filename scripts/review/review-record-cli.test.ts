@@ -21,12 +21,23 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_comment: issue_comment_mock },
 }))
 
+// The real probe reads this checkout's branch; `review-record-cli-push.test.ts` owns the pushed case.
+vi.mock('#scripts/run/ship/run-ship-probe', () => ({
+	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
+}))
+
 const carry_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./review-comment-round', async (original) => {
 	const actual = await original<{ review_comment_round: typeof review_comment_round }>()
 
-	return { review_comment_round: { ...actual.review_comment_round, carry: carry_mock } }
+	return {
+		review_comment_round: {
+			...actual.review_comment_round,
+			carry: carry_mock,
+			issue_lines: vi.fn().mockResolvedValue([]),
+		},
+	}
 })
 
 const reviewed_record_mock = vi.hoisted(() => vi.fn())
@@ -282,14 +293,6 @@ describe('review_record_cli.run --comment', () => {
 
 	it('keeps the ledger grammar readable inside the comment', () => {
 		expect(review_comment_round.body_of([ZERO_LINE]).split('\n')).toContain(ZERO_LINE)
-	})
-
-	it('exits 1 when the comment could not be posted, the round being recorded nowhere', async () => {
-		issue_comment_mock.mockReset().mockRejectedValue(GH_REFUSED)
-		const argv = ['--issue', '3645', '--comment']
-		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root_of('lost')))
-
-		expect(code).toBe(1)
 	})
 })
 

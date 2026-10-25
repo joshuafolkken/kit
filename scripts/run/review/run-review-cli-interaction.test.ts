@@ -13,6 +13,12 @@ import { run_review_cli } from './run-review-cli'
 // joshuafolkken/kit#4863: each brief goes to the file `josh ship` hands that slot's reviewer, and
 // stdout carries only the paths, so the two briefs together never overrun the Bash output cap.
 
+const { early_launch, early_prepare, early_push } = vi.hoisted(() => ({
+	early_launch: vi.fn(),
+	early_prepare: vi.fn<() => Promise<boolean>>(),
+	early_push: vi.fn<() => Promise<number>>(),
+}))
+
 const { branch, brief_run, brief_run_to, interaction_status, launch_pinned, write_text_stamp } =
 	vi.hoisted(() => ({
 		branch: vi.fn<() => Promise<string>>(),
@@ -38,6 +44,15 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 	return { review_interaction: { ...review_interaction, status: interaction_status } }
 })
+// joshuafolkken/kit#4907: `run-review-early-push.test.ts` owns the commit and the push themselves.
+vi.mock('./run-review-early-push', () => ({
+	run_review_early_push: {
+		PUSH_FLAG: '--push',
+		launch: early_launch,
+		prepare: early_prepare,
+		push: early_push,
+	},
+}))
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn() },
 }))
@@ -103,6 +118,11 @@ beforeEach(() => {
 	})
 	vi.spyOn(process.stdout, 'write').mockImplementation(capture(output.stdout))
 	vi.spyOn(process.stderr, 'write').mockImplementation(capture(output.stderr))
+})
+
+beforeEach(() => {
+	early_launch.mockReset()
+	early_prepare.mockReset().mockResolvedValue(false)
 })
 
 afterEach(() => {
@@ -203,5 +223,32 @@ describe('run:review that briefs code alone', () => {
 	it('refuses an argument after --code-only that is not --unpinned-ok', async () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG, '--join'])).toBe(FAILURE_EXIT_CODE)
 		expect(brief_run).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4907: the push waits on the gate this pair launched, so it follows a written brief.
+describe('run:review early push', () => {
+	it('launches the early push after a written brief, when the open prepared one', async () => {
+		interaction_status.mockResolvedValue('ok')
+		early_prepare.mockResolvedValue(true)
+
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(early_launch).toHaveBeenCalledOnce()
+	})
+
+	it('launches no early push after a brief that refused', async () => {
+		early_prepare.mockResolvedValue(true)
+		brief_run_to.mockResolvedValue(FAILURE_EXIT_CODE)
+
+		expect(await run_review_cli.run([])).toBe(FAILURE_EXIT_CODE)
+		expect(early_launch).not.toHaveBeenCalled()
+	})
+
+	it('runs the push alone under --push', async () => {
+		early_push.mockResolvedValue(0)
+
+		expect(await run_review_cli.run(['--push'])).toBe(0)
+		expect(early_push).toHaveBeenCalledOnce()
+		expect(brief_run_to).not.toHaveBeenCalled()
 	})
 })

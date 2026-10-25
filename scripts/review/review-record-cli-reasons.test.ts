@@ -49,6 +49,11 @@ vi.mock('./review-round-reuse', () => ({
 	},
 }))
 
+// The real probe reads this checkout's branch; `review-record-cli-push.test.ts` owns the pushed case.
+vi.mock('#scripts/run/ship/run-ship-probe', () => ({
+	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
+}))
+
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4772
 const EPERM_SPEC = 'bug-risks:medium:tick.ts:187'
