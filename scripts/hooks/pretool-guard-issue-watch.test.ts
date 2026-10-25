@@ -7,6 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // parent hand-off, so a person's issue update reaches the session on its next tool call. A separate
 // suite from `pretool-guard.test.ts`, which is at its length limit.
 
+vi.mock('#scripts/hooks/lane-plan-guard', () => ({
+	lane_plan_guard: { reason: vi.fn().mockReturnValue(undefined) },
+}))
+
 vi.mock('#scripts/run/run-watcher-hook', () => ({
 	run_watcher_hook: { watcher_hook_reason: vi.fn().mockResolvedValue(undefined) },
 }))

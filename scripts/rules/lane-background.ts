@@ -35,10 +35,11 @@ import { run_tail_rule } from './run-tail-rule'
 
 // The josh subcommands that run long enough to be backgrounded, as `time_shell` names them — canonical,
 // so the `ga` / `g` / `fu` aliases are covered by the one spelling.
-// `ship` and `ship:wait` are run in the foreground at the cap rather than refused: a `ship:wait` left at
-// the two-minute default is moved aside mid-chunk and dies with the turn, its verdict unread.
+// `ship`, `ship:wait` and `lane:plan` are run in the foreground at the cap rather than refused: a
+// `ship:wait` left at the two-minute default is moved aside mid-chunk and dies with the turn, its verdict
+// unread, and a cut `lane:plan` leaves its plan recorded with the wait it gates unfinished.
 const FOREGROUND_COMMANDS: ReadonlySet<string> = new Set(
-	['ship', 'ship:wait'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
+	['ship', 'ship:wait', 'lane:plan'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
 )
 const LONG_RUNNING_COMMANDS: ReadonlySet<string> = new Set([
 	...['gate', 'git', 'followup'].map((name) => `${time_shell.JOSH_PREFIX}${name}`),
@@ -139,7 +140,7 @@ function foreground_input(
 }
 
 const FOREGROUND_NOTE =
-	"lane background: a lane child's `josh ship` or `josh ship:wait` backgrounded, by its flag or by " +
+	"lane background: a lane child's `josh ship`, `josh ship:wait` or `josh lane:plan` backgrounded, by its flag or by " +
 	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
 	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
 	'`chain-rule.md` step 0 (`josh ship:wait` on `launched`).'

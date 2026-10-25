@@ -1,0 +1,7 @@
+{
+	"reason": "lane:plan with its guard, the plan store and a cleared mark so a wait keeps the edit hold; tests pin each",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 212
+	}
+}

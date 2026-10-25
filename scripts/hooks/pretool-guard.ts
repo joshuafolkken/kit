@@ -11,6 +11,7 @@ import { run_poll_hook } from '#scripts/run/run-poll-hook'
 import { run_watcher_hook } from '#scripts/run/run-watcher-hook'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { batch_outcome } from './batch-guard'
+import { lane_plan_guard } from './lane-plan-guard'
 import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
 
@@ -72,6 +73,7 @@ function guard_outcome(raw_payload: string): GuardOutcome {
 		batch_outcome(raw_payload),
 		investigation_outcome(raw_payload),
 		duplicate_read_outcome(raw_payload),
+		{ reason: lane_plan_guard.reason(raw_payload), notice: undefined, fault: undefined },
 	]
 
 	return combine_outcomes(outcomes, delivered_rules.delivery(raw_payload))
