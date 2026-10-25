@@ -95,8 +95,8 @@ function outage_resume_invocation(issue: string): string {
 // tail and the changed files (`run-ship-stop-context.ts`), so the session starts at the fix rather than
 // at `josh ship --log` and `git diff` (joshuafolkken/kit#3923).
 //
-// The context gets what the rest of the prompt leaves of the one argv element's cap, so the whole
-// prompt still launches (joshuafolkken/kit#3964).
+// The context gets what the rest of the prompt leaves of `MAX_VALUE_LENGTH`, so the whole prompt
+// stays within it and launches (joshuafolkken/kit#3964).
 function known_stop_lines(
 	issue: string,
 	stop: ShipStop,

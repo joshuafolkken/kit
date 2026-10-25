@@ -1,7 +1,8 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { claude_agent_argv, type ClaudeArgv } from '#scripts/agent/claude-agent-argv'
 import { run_wake_session } from '#scripts/run/wake/run-wake-session'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { detached_launch } from './detached-launch'
 
 const INVOCATION = 'fullrun #2070'
@@ -38,9 +39,18 @@ describe('the argv safety gate', () => {
 		expect(detached_launch.is_safe_argv(argv)).toBe(true)
 		expect(detached_launch.is_safe_argv({ ...argv, args: ['--model\n', ...argv.args] })).toBe(false)
 		expect(detached_launch.is_safe_argv({ command: 'node', args: ['a\nb'] })).toBe(false)
-		const oversized = built(`a\n${'x'.repeat(agent_role_profile.MAX_VALUE_LENGTH)}`)
+		const oversized = built(`a\n${'x'.repeat(agent_safe_text.MAX_PROMPT_LENGTH)}`)
 
 		expect(detached_launch.is_safe_argv(oversized)).toBe(false)
+	})
+
+	// joshuafolkken/kit#4930: a prompt refused for its length was reported as unsafe characters.
+	it('names the length among the reasons a refused launch gives', () => {
+		const oversized = built('x'.repeat(agent_safe_text.MAX_PROMPT_LENGTH + 1))
+		const result = detached_launch.launch({ argv: oversized, cwd: '/' }, vi.fn())
+
+		expect(result).toStrictEqual({ kind: 'failed', note: detached_launch.UNSAFE_NOTE })
+		expect(detached_launch.UNSAFE_NOTE).toContain('over length')
 	})
 
 	it('accepts a vector composed by the Claude adapter', () => {
