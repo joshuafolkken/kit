@@ -1,0 +1,7 @@
+{
+	"reason": "Linked work trees resolve the managed osv-scanner at the primary checkout (#4942)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}

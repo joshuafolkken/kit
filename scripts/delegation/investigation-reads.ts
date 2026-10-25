@@ -2,6 +2,7 @@ import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { capped_print_part } from '#scripts/document/capped-print-part'
+import { changed_paths_sync } from '#scripts/git/changed-paths-sync'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
@@ -11,7 +12,8 @@ import { delegation_policy } from './delegation-policy'
 
 // How many files a run has read and not edited since its last delegated unit, counted off the
 // transcript rather than left to the agent's memory, so the threshold fires again on a second
-// accumulation. A delegation clears the set; a read adds to it; an edit exempts its file.
+// accumulation. A delegation clears the set; a read adds to it; an edit exempts its file, as does
+// the branch's own change since its merge base, which an earlier session of the run wrote.
 
 const READ_TOOLS: ReadonlySet<string> = new Set(['Read'])
 // Both spellings of the subagent tool are in use: `Task` (published) and `Agent` (this harness).
@@ -55,7 +57,8 @@ interface ReadTally {
 	// The search-side `pending` / `pending_since`, reset by a delegation or a successful write.
 	searches: number
 	searches_since: number
-	// Files successfully edited in the window; a read of one stays in the main line, so it never counts.
+	// Files successfully edited in the window or changed on the branch; a read of one stays in the main
+	// line, so it never counts.
 	edited: ReadonlySet<string>
 }
 
@@ -245,9 +248,15 @@ function pending_after(pending: ReadonlyMap<string, number>, since_ms: number): 
 	return [...pending.values()].filter((at_ms) => at_ms > since_ms).length
 }
 
-function tally_of(text: string, since_ms: number = hook_decision.NEVER_MS): ReadTally {
+// `branch_files` (repository-relative) are the branch's own change since its merge base: an earlier
+// session of this run wrote them, and a resumed session's transcript holds none of those writes.
+function tally_of(
+	text: string,
+	since_ms: number = hook_decision.NEVER_MS,
+	branch_files: ReadonlyArray<string> = [],
+): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
-	const edited = edited_files(spans)
+	const edited = new Set([...edited_files(spans), ...subject_targets(branch_files)])
 	const accumulation: Accumulation = { pending: new Map(), searches: new Map() }
 
 	for (const span of spans) apply_span(accumulation, span, edited)
@@ -340,6 +349,20 @@ function is_growing_past_threshold(tally: ReadTally, call: GuardedCall): boolean
 	return projected_count(tally.pending, call, tally.edited) > tally.pending.length
 }
 
+function is_blocking(tally: ReadTally, call: GuardedCall, refused_at_ms: number): boolean {
+	return is_growing_past_threshold(tally, call) && is_rearmed(tally, refused_at_ms)
+}
+
+// The branch diff is a git read, so it is asked only of a call the transcript alone would refuse; more
+// edited files can only lower the counts, so a call that passes without it passes with it.
+function is_blocking_past_branch(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+	if (!is_blocking(tally_of(text, refused_at_ms), call, refused_at_ms)) return false
+
+	const branch_files = changed_paths_sync.read_changed_paths()
+
+	return is_blocking(tally_of(text, refused_at_ms, branch_files), call, refused_at_ms)
+}
+
 function should_block(
 	text: string,
 	call: GuardedCall,
@@ -349,9 +372,7 @@ function should_block(
 	// A delegated unit is never refused: the remedy — send the reading to a unit — does not exist inside one.
 	if (!is_refusable_call(call) || is_unit_run(run)) return false
 
-	const tally = tally_of(text, refused_at_ms)
-
-	return is_growing_past_threshold(tally, call) && is_rearmed(tally, refused_at_ms)
+	return is_blocking_past_branch(text, call, refused_at_ms)
 }
 
 const investigation_reads = {
