@@ -29,7 +29,7 @@ function rank(
 
 	return issue_rank.rank(children, (child) => ({
 		labels: child.labels,
-		lane_minutes: issue_priority.lane_minutes(child.body),
+		lost_minutes: issue_priority.lost_minutes(child.body),
 		dependents: dependents.get(epic_graph.key_of(child)) ?? 0,
 	}))
 }

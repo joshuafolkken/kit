@@ -103,6 +103,15 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 
 		expect(prioritized_numbers([declared, issue(2, CREATED_LATER)])).toEqual([1, 2])
 	})
+
+	// joshuafolkken/kit#4861: causes of one lane are ranked by the minutes each lost.
+	it('puts the cause that lost more ahead among causes of one lane', () => {
+		const lane_body = '## 背景\n\n- 原因のレーン: 98 分（#4794）\n'
+		const small = { ...issue(1, CREATED_LATER), body: `${lane_body}- 原因の損失: 4 分\n` }
+		const large = { ...issue(2, CREATED_EARLIER), body: `${lane_body}- 原因の損失: 16 分\n` }
+
+		expect(prioritized_numbers([small, large])).toEqual([2, 1])
+	})
 })
 
 describe('git_next_issues.prioritize - exclusions', () => {
