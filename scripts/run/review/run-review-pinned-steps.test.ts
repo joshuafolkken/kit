@@ -102,6 +102,19 @@ describe('run_review_pinned_steps.launched_reason', () => {
 
 		expect(run_review_pinned_steps.launched_reason(ROOT)).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4920: a reason given after the check ended rides on its launch record.
+	it('carries a later reason onto the launch, and onto none when nothing was launched', () => {
+		run_review_pinned_steps.carry_reason(REASON, ROOT)
+
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBeUndefined()
+
+		run_review_pinned_steps.launch(ROOT, undefined, 'tree')
+		run_review_pinned_steps.carry_reason(REASON, ROOT)
+
+		expect(run_review_pinned_steps.launched_reason(ROOT)).toBe(REASON)
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe('tree')
+	})
 })
 
 // joshuafolkken/kit#4834: the launch records the tree it checks, so `review:record` tells a fix that

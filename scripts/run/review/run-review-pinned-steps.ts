@@ -236,6 +236,14 @@ function launched_reason(root: string = PROJECT_ROOT): string | undefined {
 	return read_launch(root)?.reason
 }
 
+// A reason given after the check ended (joshuafolkken/kit#4920) goes on its launch record, so a later
+// restart on a moved tree carries it as a launch's own reason does.
+function carry_reason(reason: string, root: string = PROJECT_ROOT): void {
+	const launched = read_launch(root)
+
+	if (launched !== undefined) stamp_file.write_stamp(launch_path(root), { ...launched, reason })
+}
+
 // The tree the last check was launched on; `undefined` when none was, or its tree could not be read.
 function launched_tree(root: string = PROJECT_ROOT): string | undefined {
 	return read_launch(root)?.tree
@@ -296,6 +304,7 @@ async function wait_alone(
 
 const run_review_pinned_steps = {
 	answer_now,
+	carry_reason,
 	clear,
 	is_answered,
 	is_live,

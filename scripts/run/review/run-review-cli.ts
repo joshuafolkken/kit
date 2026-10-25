@@ -293,23 +293,60 @@ async function run_join_fixing(): Promise<number> {
 	return await run_join(true)
 }
 
+const REUSED_NOTE =
+	'Judged the finished test:pinned answer on this tree and its green gate with the reason; nothing ran again — go on as after a join that passed.'
+
+// The answer the join stopped on: unpinned places, judged with no reason. A clear answer, or one
+// launched under a reason, stopped nothing, so a reopen there is a new round that needs its brief.
+function is_stopped_answer(summary: PinnedSummary): boolean {
+	return summary.unpinned.length > 0 && run_review_pinned_steps.launched_reason() === undefined
+}
+
+// The finished check's stopped answer on this tree, when the pair's gate is green on it too.
+async function finished_pair(): Promise<PinnedSummary | undefined> {
+	const summary = await run_review_pinned_join.finished_on_tree()
+	if (summary === undefined || !is_stopped_answer(summary)) return undefined
+
+	return (await run_review_steps.read_gate_state()) === run_review.GATE_GREEN ? summary : undefined
+}
+
+// `--unpinned-ok` given after the join stopped, on the tree it stopped on, judges the finished check
+// with the reason and re-runs neither it nor the pair (joshuafolkken/kit#4920). `undefined` where the
+// tree moved, no answer was left, the answer stopped nothing or the gate is not green: the open runs as
+// before. The ship's own `--code-only` open needs the brief, so it never takes this path.
+async function accept_finished(
+	is_code_only: boolean,
+	reason: string | undefined,
+): Promise<number | undefined> {
+	if (reason === undefined || is_code_only) return undefined
+	const summary = await finished_pair()
+	if (summary === undefined) return undefined
+
+	run_review_pinned_steps.carry_reason(reason)
+	const verdict = await run_review_pinned_accepted.judge(summary, reason)
+
+	process.stderr.write(`${verdict.text}${REUSED_NOTE}\n`)
+
+	return SUCCESS_EXIT_CODE
+}
+
+function refuse(text: string): number {
+	process.stderr.write(`${text}\n`)
+
+	return FAILURE_EXIT_CODE
+}
+
 // The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`.
 async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
 	const reason = run_review_pinned.ok_reason_of(argv)
 
-	if (reason === undefined && argv.length > 0) {
-		process.stderr.write(`${USAGE}\n`)
+	if (reason === undefined && argv.length > 0) return refuse(USAGE)
+	const accepted = await accept_finished(is_code_only, reason)
 
-		return FAILURE_EXIT_CODE
-	}
-
+	if (accepted !== undefined) return accepted
 	const handover = await handover_refusal(is_code_only)
 
-	if (handover !== undefined) {
-		process.stderr.write(`${handover}\n`)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (handover !== undefined) return refuse(handover)
 
 	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
 }

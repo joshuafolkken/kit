@@ -28,7 +28,7 @@ vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: { review_paths: () => ({ brief: BRIEF_PATH }) },
 }))
 vi.mock('./run-review-pinned-steps', () => ({
-	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned },
+	run_review_pinned_steps: { launch: launch_pinned, clear: clear_pinned, is_answered: () => false },
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({
 	review_brief_cli: { run: brief_run, run_to: brief_run, scoped_refusal: async () => undefined },
