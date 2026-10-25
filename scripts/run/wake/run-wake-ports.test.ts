@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { lane_close } from '#scripts/lane/lane-close'
+import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,6 +21,7 @@ const PROFILE = agent_role_profile.DEFAULT_PROFILES.scheduler
 const SID = '11111111-1111-4111-8111-111111111111'
 const MATERIAL = 'judgment: #278 is untriaged'
 const SESSION_PID = 4242
+const SWEPT = 'Withdrew #4906.'
 const scratch = { directory: '' }
 
 function context(): WakeContext {
@@ -93,5 +96,20 @@ describe('run_wake_ports.ports_for — code staleness', () => {
 		const ports = run_wake_ports.ports_for(context(), PROFILE, async () => true)
 
 		expect(await ports.is_code_stale()).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4915: each pass also withdraws the lanes whose issue was closed as not planned.
+describe('run_wake_ports.ports_for — the lanes ended each pass', () => {
+	it('retries the incomplete closes, withdraws the closed lanes and says each on stderr', async () => {
+		const retry = vi.spyOn(lane_close, 'retry_closes').mockResolvedValue({ closed: [], failed: [] })
+		const sweep = vi.spyOn(lane_withdraw_closed, 'withdraw_closed').mockResolvedValue([SWEPT])
+		const stderr = vi.spyOn(console, 'error').mockReturnValue()
+
+		await run_wake_ports.ports_for(context(), PROFILE).retry_closes()
+
+		expect(retry).toHaveBeenCalledOnce()
+		expect(sweep).toHaveBeenCalledOnce()
+		expect(stderr).toHaveBeenCalledExactlyOnceWith(`wake: ${SWEPT}`)
 	})
 })
