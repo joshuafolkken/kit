@@ -142,8 +142,9 @@ describe('lane_baseline.investigate — the prompt', () => {
 
 		for (const part of [
 			'pnpm josh lane:stats --period 3',
-			'the largest share of the median lane',
-			'A cause whose fix saves under 3% of the median lane time per merge',
+			'take every stage and sub-stage at or over 2% of the median lane, not only the largest',
+			'Sort each cause first: a defect',
+			'A cause whose fix saves under 2% of the median lane time per merge',
 			'`pnpm josh overrun:mechanisms`',
 			"already the mechanism's sum over the period's merges",
 			`- 原因のレーン: <median lane minutes> 分（#${String(ISSUE)}）`,

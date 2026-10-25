@@ -13,7 +13,9 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // the high share, summed per mechanism key across the period's lanes (joshuafolkken/kit#4886): one lane's
 // few minutes are under the share, but a mechanism losing them in every lane is not. Each key's sum is
 // divided by the period's merges and their median lane time, and judged by the floor an Issue's stated
-// reduction per merge is (`issue_priority.percent_floor`).
+// reduction per merge is (`issue_priority.percent_floor`). A key that lost more than over the period of
+// the same length before it is marked grown, which the investigation files at any share
+// (joshuafolkken/kit#4910); a key with no earlier loss has no growth to measure.
 
 const OPTIONS = { period: { type: 'string' }, since: { type: 'string' } } as const
 const DEFAULT_PERIOD_DAYS = 7
@@ -23,7 +25,7 @@ const PERCENT = 100
 const DECIMALS = 1
 const MISSING = '—'
 const VERDICTS: Record<PriorityLevel, string> = {
-	normal: `under ${String(issue_priority.HIGH_PERCENT)}%`,
+	normal: `under ${String(issue_priority.FILING_FLOOR_PERCENT)}%`,
 	high: 'file',
 	critical: 'file (urgent)',
 }
@@ -84,14 +86,36 @@ function cell(value: number | undefined, unit: string): string {
 	return value === undefined ? MISSING : `${value.toFixed(DECIMALS)}${unit}`
 }
 
-function line_of(loss: MechanismLoss, base: MergeBase): string {
+// The window of the same length that ends just before `window` starts.
+function prior_window(window: StatsWindow): StatsWindow {
+	const width = window.until_ms - window.since_ms
+
+	return { since_ms: window.since_ms - width, until_ms: window.since_ms - 1 }
+}
+
+// Each key's summed minutes over the window before `window`.
+function prior_minutes(events: ReadonlyArray<RunEvent>, window: StatsWindow): Map<string, number> {
+	const losses = losses_of(lane_stats.in_window(events, prior_window(window)))
+
+	return new Map(losses.map((loss) => [loss.key, loss.minutes]))
+}
+
+function growth_of(loss: MechanismLoss, prior: ReadonlyMap<string, number>): string {
+	const before = prior.get(loss.key)
+
+	if (before === undefined || loss.minutes <= before) return ''
+
+	return ` · ${run_event_overrun.GROWN_MARK} from ${cell(before, ' min')}`
+}
+
+function line_of(loss: MechanismLoss, base: MergeBase, prior: ReadonlyMap<string, number>): string {
 	const share = share_of(loss, base)
 	const per_merge = base.merges === 0 ? undefined : loss.minutes / base.merges
 	const total = `${cell(loss.minutes, ' min')} over ${String(loss.causes)} cause(s)`
 	// With no merge to divide by there is no share, so no verdict either.
 	const verdict = share === undefined ? MISSING : VERDICTS[issue_priority.percent_floor(share)]
 
-	return `${loss.key}  ${total} · ${cell(per_merge, ' min/merge')} · ${cell(share, '%')} — ${verdict}`
+	return `${loss.key}  ${total} · ${cell(per_merge, ' min/merge')} · ${cell(share, '%')} — ${verdict}${growth_of(loss, prior)}`
 }
 
 // The report over `window`, named by `label`: `entries` is the whole ledger, since a lane may start
@@ -104,8 +128,9 @@ function report({ entries, events }: PeriodRecords, window: StatsWindow, label: 
 	const head = `overrun mechanisms in ${label}: ${String(base.merges)} merge(s), median lane ${median}`
 
 	if (losses.length === 0) return `${head}\nno keyed small overrun causes recorded`
+	const prior = prior_minutes(events, window)
 
-	return [head, ...losses.map((loss) => line_of(loss, base))].join('\n')
+	return [head, ...losses.map((loss) => line_of(loss, base, prior))].join('\n')
 }
 
 async function read_records(context: MeasureContext): Promise<PeriodRecords> {

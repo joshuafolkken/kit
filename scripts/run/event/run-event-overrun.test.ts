@@ -126,18 +126,25 @@ describe('run_event_overrun — the result', () => {
 	})
 })
 
-// joshuafolkken/kit#4886: the causes left under 3% carry their mechanism's key and minutes.
+// joshuafolkken/kit#4886: the causes left under the filing floor carry their mechanism's key and minutes.
 describe('run_event_overrun — the keyed small causes', () => {
-	it('writes and reads back the keyed causes a result ends with', () => {
-		const causes = [
-			{ key: 'test:pinned', minutes: 6.4, cause: 'run:review restarted it' },
-			{ key: 'token-cut', minutes: 2, cause: 'cut before the gate' },
-		]
-		const result = `${run_event_overrun.none_result('all causes <3%')}${run_event_overrun.small_causes_text(causes)}`
+	const causes = [
+		{ key: 'test:pinned', minutes: 6.4, cause: 'run:review restarted it' },
+		{ key: 'token-cut', minutes: 2, cause: 'cut before the gate' },
+	]
+	const segments =
+		'test:pinned 6.4 min: run:review restarted it; token-cut 2 min: cut before the gate'
 
-		expect(result).toBe(
-			'none: all causes <3% — under 3%: test:pinned 6.4 min: run:review restarted it; token-cut 2 min: cut before the gate',
-		)
+	it('writes the keyed causes under the filing floor and reads them back', () => {
+		const result = `${run_event_overrun.none_result('all causes <2%')}${run_event_overrun.small_causes_text(causes)}`
+
+		expect(result).toBe(`none: all causes <2% — under 2%: ${segments}`)
+		expect(run_event_overrun.small_causes_of(result)).toStrictEqual(causes)
+	})
+
+	it('still reads a note written under the earlier 3% floor (joshuafolkken/kit#4910)', () => {
+		const result = `none: all causes <3% — under 3%: ${segments}`
+
 		expect(run_event_overrun.small_causes_of(result)).toStrictEqual(causes)
 	})
 

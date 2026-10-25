@@ -8,8 +8,8 @@ import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun_mechanisms_cli } from './lane-overrun-mechanisms-cli'
 import { lane_stats } from './lane-stats'
 
-// joshuafolkken/kit#4886: the causes each lane left under 3% are summed per mechanism across lanes, so a
-// mechanism that loses a few minutes in every lane is filed.
+// joshuafolkken/kit#4886: the causes each lane left under the filing floor are summed per mechanism
+// across lanes, so a mechanism that loses a few minutes in every lane is filed.
 
 const NOW_MS = Date.parse('2026-10-25T12:00:00.000Z')
 const DAY_START = Date.parse('2026-10-25T00:00:00.000Z')
@@ -20,6 +20,11 @@ const NONE_RESULT = run_event_overrun.none_result('all causes <3%')
 const PINNED = 'test:pinned'
 const LABEL = 'the last 1 day(s)'
 const HEAD = `overrun mechanisms in ${LABEL}: 3 merge(s), median lane 51.0 min`
+const PINNED_LINE = 'test:pinned  25.0 min over 4 cause(s) · 8.3 min/merge · 16.3% — file (urgent)'
+const TOKEN_LINE = 'token-cut  2.0 min over 1 cause(s) · 0.7 min/merge · 1.3% — under 2%'
+const SINCE_PINNED_LINE =
+	'test:pinned  9.0 min over 1 cause(s) · 9.0 min/merge · 17.6% — file (urgent)'
+const GATE_CUT = 'cut before the gate'
 
 // The three 2026-10-25 lanes the issue names: their lane minutes and the test:pinned losses their
 // investigations found (6 + 6.4, 3.6 and 9 minutes).
@@ -48,7 +53,7 @@ const LANES: ReadonlyArray<Lane> = [
 		minutes: 51,
 		causes: [
 			{ key: PINNED, minutes: 9, cause: 'round 2 reread the pinned run' },
-			{ key: 'token-cut', minutes: 2, cause: 'cut before the gate' },
+			{ key: 'token-cut', minutes: 2, cause: GATE_CUT },
 		],
 	},
 ]
@@ -86,12 +91,8 @@ function report(lane_events: ReadonlyArray<RunEvent>): Array<string> {
 }
 
 describe('lane_overrun_mechanisms_cli.report — the 2026-10-25 lanes', () => {
-	it('sums test:pinned past 3% of the median lane and sends it to filing', () => {
-		expect(report(events())).toStrictEqual([
-			HEAD,
-			'test:pinned  25.0 min over 4 cause(s) · 8.3 min/merge · 16.3% — file (urgent)',
-			'token-cut  2.0 min over 1 cause(s) · 0.7 min/merge · 1.3% — under 3%',
-		])
+	it('sums test:pinned past the floor of the median lane and sends it to filing', () => {
+		expect(report(events())).toStrictEqual([HEAD, PINNED_LINE, TOKEN_LINE])
 	})
 
 	it('leaves out a note outside the period and a free-text cause written before the keys', () => {
@@ -105,6 +106,55 @@ describe('lane_overrun_mechanisms_cli.report — the 2026-10-25 lanes', () => {
 		)
 
 		expect(report([old, free])).toStrictEqual([HEAD, 'no keyed small overrun causes recorded'])
+	})
+})
+
+// joshuafolkken/kit#4910: a key that lost more than over the period of the same length before it.
+function prior(causes: ReadonlyArray<SmallCause>, note_at: string): RunEvent {
+	const result = `${NONE_RESULT}${run_event_overrun.small_causes_text(causes)}`
+
+	return note(run_event_overrun.ended_text(4600, result), note_at)
+}
+
+describe('lane_overrun_mechanisms_cli.report — growth over the period before', () => {
+	const PRIOR_AT = '2026-10-24T00:00:00.000Z'
+	const RERUN = 'pinned rerun'
+
+	it('marks a key that grew and leaves one that held unmarked', () => {
+		const earlier = prior(
+			[
+				{ key: PINNED, minutes: 10, cause: RERUN },
+				{ key: 'token-cut', minutes: 2, cause: GATE_CUT },
+			],
+			PRIOR_AT,
+		)
+
+		expect(report([earlier, ...events()])).toStrictEqual([
+			HEAD,
+			`${PINNED_LINE} · grown from 10.0 min`,
+			TOKEN_LINE,
+		])
+	})
+
+	it('marks nothing for a key with no earlier loss, nor for one that shrank', () => {
+		const earlier = prior([{ key: PINNED, minutes: 30, cause: RERUN }], PRIOR_AT)
+
+		expect(report([earlier, ...events()]).join('\n')).not.toContain('grown')
+	})
+
+	it('compares a --since window with the period of its own width before it', () => {
+		const window = { since_ms: Date.parse(at(150)), until_ms: NOW_MS }
+		const earlier = prior([{ key: 'token-cut', minutes: 1, cause: 'cut early' }], at(120))
+		const text = lane_overrun_mechanisms_cli.report(
+			{ entries: ledger(), events: [earlier, ...events()] },
+			window,
+			LABEL,
+		)
+
+		expect(text.split('\n').slice(1)).toStrictEqual([
+			SINCE_PINNED_LINE,
+			'token-cut  2.0 min over 1 cause(s) · 2.0 min/merge · 3.9% — file · grown from 1.0 min',
+		])
 	})
 })
 
@@ -185,7 +235,7 @@ describe('lane_overrun_mechanisms_cli.run', () => {
 		expect(code).toBe(0)
 		expect(text.split('\n')).toStrictEqual([
 			`overrun mechanisms in the last 1 day(s) since ${at(150)}: 1 merge(s), median lane 51.0 min`,
-			'test:pinned  9.0 min over 1 cause(s) · 9.0 min/merge · 17.6% — file (urgent)',
+			SINCE_PINNED_LINE,
 			'token-cut  2.0 min over 1 cause(s) · 2.0 min/merge · 3.9% — file',
 		])
 	})

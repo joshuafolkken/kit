@@ -454,7 +454,7 @@ logged once at confirmation, then `lane:close <N>` and the epic counters; a merg
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
 a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; every 30th merge in the
-lane ledger launches one baseline investigation of the median lane — the stage or implement sub-stage with the largest share
+lane ledger launches one baseline investigation of the median lane — each stage and implement sub-stage at a 2% share or over
 in `lane:stats --period 3`, its causes filed by the overrun's rules — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
 its wording `run-event-baseline.ts`), a finding on the board. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
@@ -1015,7 +1015,8 @@ pnpm josh overrun:mechanisms --period 3   # the last 3 days' mechanisms
 
 <!-- /usage -->
 
-It reads the keyed ` — under 3%: <key> <minutes> min: <cause>` segments of the overrun result notes on the run's event stream (`run-event-overrun.ts`), 7 days by default; a key at 3% or over is filed as one root-cause issue, at 10% or over as urgent. An overrun investigation runs it before dropping a cause (`lane-overrun-prompt.ts`).
+It reads the keyed ` — under 2%: <key> <minutes> min: <cause>` segments of the overrun result notes (`run-event-overrun.ts`, any earlier floor too), 7 days by default; a key at 2% or over is filed as one root-cause issue, at 10% or over as urgent.
+A key that lost more than over the same-length period before ends ` · grown from <minutes> min`, filed at any share. An overrun investigation runs it before dropping a cause (`lane-overrun-prompt.ts`).
 
 `--since <instant>` starts the period later — at the close of the issue that fixed a mechanism, so the sum leaves out the losses that fix removed.
 

@@ -2,6 +2,7 @@ import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { DispatchEntry, GateEntry, LedgerEntry, LoadEntry, MergeEntry } from './lane-ledger'
 import { lane_sampler } from './lane-sampler'
+import { lane_tail_stats } from './lane-tail-stats'
 
 // The lane-limit measurement's one table row: the ledger entries of one period
 // reduced to throughput, gate duration and machine load, in the column order
@@ -41,6 +42,8 @@ const COLUMNS = [
 	'merges / hour',
 	'effective lanes',
 	'lane median (min)',
+	`lanes over ${String(lane_tail_stats.OVERRUN_LANE_MINUTES)} min`,
+	'lane p90 (min)',
 	'gate median (min)',
 	'gate max (min)',
 	'load peak',
@@ -248,11 +251,18 @@ function merge_minutes(
 		.filter(is_number)
 }
 
-function lane_cell(
+// The median lane, then its tail (`lane-tail-stats.ts`).
+function lane_cells(
 	entries: ReadonlyArray<LedgerEntry>,
 	period: ReadonlyArray<LedgerEntry>,
-): string {
-	return cell(median(merge_minutes(entries, period)))
+): Array<string> {
+	const minutes = merge_minutes(entries, period)
+
+	return [
+		cell(median(minutes)),
+		String(lane_tail_stats.overrun_count(minutes)),
+		cell(lane_tail_stats.tail_minutes(minutes)),
+	]
 }
 
 // A reused gate ran no check, so its few milliseconds would pull the median toward a gate that never ran.
@@ -307,7 +317,7 @@ function row(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow, label: Ro
 		label.limit,
 		String(label.period_days),
 		...throughput_cells(period),
-		lane_cell(entries, period),
+		...lane_cells(entries, period),
 		...gate_cells(period),
 		...load_cells(period.filter(is_load)),
 	])
