@@ -9,6 +9,7 @@ import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
@@ -62,6 +63,13 @@ interface ShipContext {
 	done: ReadonlySet<string>
 	state: ShipState
 	started: Array<string>
+	// Whether the code this process loaded has changed since it started (`run-ship-handover.ts`).
+	is_stale: CodeCheck
+}
+
+interface ShipOutcome {
+	sections: ReadonlyArray<ShipSection>
+	is_handed_over: boolean
 }
 
 const { PHASE, STAGE } = run_ship_stage
@@ -173,9 +181,10 @@ async function run_stage(
 }
 
 async function open_context(args: ShipArguments): Promise<ShipContext> {
-	const [target, state] = await Promise.all([
+	const [target, state, is_stale] = await Promise.all([
 		run_ship_probe.record_target(args.number),
 		run_ship_probe.read_state(),
+		run_ship_handover.watch(),
 	])
 
 	const done = target === undefined ? new Set<string>() : run_ship_stage.read_done(target)
@@ -186,7 +195,7 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 		run_ship_stage.clear_waits(path)
 	})
 
-	return { target, done, state, started }
+	return { target, done, state, started, is_stale }
 }
 
 // Every stop goes to the lane ledger — supervised, in an agent's own turn, or a lane child's preflight
@@ -220,28 +229,50 @@ async function stopped(
 	return sections
 }
 
+// One stage, and the outcome where the ship ends at it: a failure, or a sync after which a successor on
+// the code it merged took the rest over (`run-ship-handover.ts`).
+async function ship_stage(
+	step: Step,
+	args: ShipArguments,
+	context: ShipContext,
+	sections: Array<ShipSection>,
+): Promise<ShipOutcome | undefined> {
+	const section = await run_stage(step, args, context)
+
+	sections.push(section)
+
+	if (section.code !== SUCCESS_EXIT_CODE) {
+		return { sections: await stopped(sections, args, step, context), is_handed_over: false }
+	}
+
+	if (step.stage !== STAGE.SYNC) return undefined
+	const handover = await run_ship_handover.hand_over(args, context.is_stale)
+
+	return handover === undefined
+		? undefined
+		: { sections: [...sections, handover], is_handed_over: true }
+}
+
 // Run the stages in order, stopping at the first that failed: a red gate never reaches the commit, so
 // the returned sections end at the failure the report names. A ship that reached the end clears its
-// record, so the next ship of the same issue starts from the preflight.
-async function ship(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
+// record, so the next ship of the same issue starts from the preflight; one handed over leaves it to
+// the successor, which passes over what this one finished.
+async function ship(args: ShipArguments): Promise<ShipOutcome> {
 	const context = await open_context(args)
 	const sections: Array<ShipSection> = []
 
 	for (const step of run_ship_steps.steps(args)) {
 		// eslint-disable-next-line no-await-in-loop -- stages run in order and the first failure stops the ship
-		const section = await run_stage(step, args, context)
+		const outcome = await ship_stage(step, args, context, sections)
 
-		sections.push(section)
-
-		// eslint-disable-next-line no-await-in-loop -- stages run in order and the first failure stops the ship
-		if (section.code !== SUCCESS_EXIT_CODE) return await stopped(sections, args, step, context)
+		if (outcome !== undefined) return outcome
 	}
 
 	record(context.target, (path) => {
 		run_ship_stage.clear(path)
 	})
 
-	return sections
+	return { sections, is_handed_over: false }
 }
 
 async function print_log(number: string): Promise<number> {
@@ -358,9 +389,10 @@ async function run_ship_command(args: ShipArguments): Promise<number> {
 	}
 
 	await claim_supervised_identity(args)
-	const sections = await ship(args)
+	const { sections, is_handed_over } = await ship(args)
 
-	await record_supervised_result(args, sections)
+	// The successor carries the same launch record, so its result is the one written there.
+	if (!is_handed_over) await record_supervised_result(args, sections)
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)

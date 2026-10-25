@@ -384,9 +384,11 @@ const run_ship_detach = {
 	last_launch,
 	log_path,
 	read_log,
+	read_record,
 	result_path,
 	running_since,
 	supervisor_argv,
+	supervisor_environment,
 }
 
 export type { DetachRequest, DetachResult }

@@ -564,6 +564,8 @@ A `preflight` stage first asks every pull-request precondition together, so a st
 
 A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
+A supervisor whose `sync` changed its own code hands the stages after it to a successor on that code (the wake supervisor's take-over, same launch record); a successor that does not take over leaves it running on.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
 
 ### `josh review:submit`
