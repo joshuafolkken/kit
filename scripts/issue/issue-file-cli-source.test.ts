@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
 import { issue_file_cli } from './issue-file-cli'
+import { issue_sample_gate } from './issue-sample-gate'
 import { issue_scout_cli } from './issue-scout-cli'
 
 // joshuafolkken/kit#4460: `josh issue:file` refuses a start condition citing an issue rather than a
@@ -24,18 +25,33 @@ const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-source-'))
 const body_path = path.join(work, 'conditioned.md')
 
 const origin_path = path.join(work, 'origin.md')
+const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
 const BODY = [
 	'## 背景',
 	'',
 	'- 種別: 不具合',
 	'- 原因: #4201',
-	'- 人の判断: 不要',
+	JUDGEMENT_NOT_NEEDED,
 	'- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
 	`- 実施可能条件: #${String(CITED)} のマージ後 30 マージ`,
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
 
+// joshuafolkken/kit#4901: a measurement follow-up — no file to change, a criterion reading
+// `lane:stats` about a cited change — with no start condition at all.
+const measurement_path = path.join(work, 'measurement.md')
+const MEASUREMENT_BODY = [
+	'## 背景',
+	'',
+	'- 種別: 非不具合',
+	JUDGEMENT_NOT_NEEDED,
+	'- 規模見積もり: 約 0 ファイル / 0 行（テスト除く）',
+	'',
+	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] #4896 後の `pnpm josh lane:stats` の中央値を記録する\n',
+].join('\n')
+
+writeFileSync(measurement_path, MEASUREMENT_BODY)
 writeFileSync(body_path, BODY)
 writeFileSync(origin_path, `${BODY}\n## Origin\n\n${HERE}#2808\n`)
 
@@ -63,6 +79,15 @@ afterEach(() => {
 afterAll(() => {
 	vi.restoreAllMocks()
 	rmSync(work, { recursive: true, force: true })
+})
+
+describe('issue_file_cli.run — a measurement follow-up with no start condition', () => {
+	it('refuses the filing with the declaration line, before any read or create', async () => {
+		expect(await issue_file_cli.run(argv_of(measurement_path))).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(issue_sample_gate.DECLARATION)
+		expect(exec_gh_api).not.toHaveBeenCalled()
+		expect(scout).not.toHaveBeenCalled()
+	})
 })
 
 describe('issue_file_cli.run — a start condition citing an issue', () => {
