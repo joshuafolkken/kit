@@ -61,10 +61,11 @@ interface ScannerChoice {
 
 // A linked work tree shares the primary checkout's managed scanner, so a lane neither downloads its
 // own copy at every session start nor keeps its own no-retry record (joshuafolkken/kit#4942). Where
-// the primary checkout cannot be named — a bare repository, or no repository — the root is the
-// project's own.
+// the primary checkout cannot be named — a bare repository, a submodule, or no repository — the root
+// is the project's own. The primary checkout reads git's answer too, so it keys the no-retry record
+// on the same real path its lanes do even when it was entered through a symlink.
 function managed_root(project_root: string): string {
-	const common = git_common_directory.resolve(project_root)
+	const common = git_common_directory.repository(project_root)
 	if (common === undefined || path.basename(common) !== GIT_DIRECTORY_NAME) return project_root
 
 	return path.dirname(common)

@@ -110,6 +110,19 @@ describe('security_audit.managed_binary_path', () => {
 		)
 	})
 
+	it('names its own managed path in a work tree of a bare repository', async () => {
+		const { git } = git_fixture_workspace
+		const bare_root = path.join(fixture.workspace, 'bare.git')
+		const bare_lane = path.join(fixture.workspace, 'bare-lane')
+
+		await git(fixture.workspace, ['init', '--bare', bare_root])
+		await git(bare_root, ['worktree', 'add', '--orphan', '-b', 'bare-lane', bare_lane])
+
+		expect(security_audit.managed_binary_path(bare_lane, LINUX_PLATFORM)).toBe(
+			managed_path_in(bare_lane),
+		)
+	})
+
 	it('names its own managed path outside any repository', () => {
 		const outside = path.join(fixture.workspace, 'outside')
 
