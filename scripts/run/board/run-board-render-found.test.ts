@@ -156,6 +156,24 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 	})
 })
 
+// joshuafolkken/kit#4911: the keyed causes say where the minutes went; `∅` already says none was filed.
+describe('run_board_render — a merged row’s keyed small causes', () => {
+	const PINNED = 'test:pinned'
+
+	it('says `∅` and each mechanism’s summed minutes, largest first, instead of the reason', () => {
+		const causes = run_event_overrun.small_causes_text([
+			{ key: 'check:related', minutes: 1.2, cause: 'lint rerun' },
+			{ key: PINNED, minutes: 7.2, cause: 'restarted' },
+			{ key: 'lane:plan', minutes: 0.4, cause: 'waited' },
+			{ key: PINNED, minutes: 1.5, cause: 'rerun' },
+		])
+		const line = done_line(ended(`${run_event_overrun.none_result('all under 3%')}${causes}`))
+
+		expect(line).toMatch(/52′ {2}🔍 ∅ test:pinned 9′ check:related 1′ lane:plan <1′$/u)
+		expect(line).not.toContain('all under')
+	})
+})
+
 describe('run_board_render — a merged row’s spinner', () => {
 	it('stands still on 🔍 for a session whose start token was never read', () => {
 		const unknown = found_of(STARTED_NOTE, { is_investigating: undefined })

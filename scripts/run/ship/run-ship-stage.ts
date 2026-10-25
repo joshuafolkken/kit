@@ -166,19 +166,23 @@ function is_shipped(state: ShipState): boolean {
 	return state.is_committed && state.is_pushed
 }
 
+// A lane child's `run:review` commits and pushes before the ship runs (joshuafolkken/kit#4907), so a
+// commit or a push is a stage's output only beside the ship's own record of that stage.
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
 	// The preflight asks what the commit stage would refuse on, so a commit is
 	// its output; a resumed commit stage still asks `git -y`'s own preflight.
-	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
+	[STAGE.PREFLIGHT]: (done, state) =>
+		state.is_merged || (done.has(STAGE.PREFLIGHT) && state.is_committed),
 	// The sync stage commits locally before the review round and the gate, without pushing
 	// (`run-ship-sync.ts`), so a commit is neither's output: a pushed one on a clean tree is, as only the
 	// commit stage after the gate pushes — unless the issue changed since.
-	[STAGE.REVIEW]: (_done, state) =>
-		state.is_merged || (is_shipped(state) && state.is_review_stale !== true),
-	[STAGE.GATE]: (_done, state) => state.is_merged || is_shipped(state),
+	[STAGE.REVIEW]: (done, state) =>
+		state.is_merged ||
+		(done.has(STAGE.REVIEW) && is_shipped(state) && state.is_review_stale !== true),
+	[STAGE.GATE]: (done, state) => state.is_merged || (done.has(STAGE.GATE) && is_shipped(state)),
 	// The merge of the default branch before the gate: once pushed, a default branch that
 	// moved is the followup's to merge again.
-	[STAGE.SYNC]: (_done, state) => state.is_merged || is_shipped(state),
+	[STAGE.SYNC]: (done, state) => state.is_merged || (done.has(STAGE.SYNC) && is_shipped(state)),
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// The round-2 pass reads the pushed fix delta, so its record is honored only
 	// while that push still stands — new work pushed on top reruns it.

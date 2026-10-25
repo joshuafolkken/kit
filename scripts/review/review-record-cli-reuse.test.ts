@@ -17,6 +17,11 @@ vi.mock('./review-round-reuse', () => ({
 	},
 }))
 
+// The real probe reads this checkout's branch; `review-record-cli-push.test.ts` owns the pushed case.
+vi.mock('#scripts/run/ship/run-ship-probe', () => ({
+	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
+}))
+
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reuse-'))
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4763

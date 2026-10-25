@@ -54,6 +54,13 @@ interface SmallCause {
 	cause: string
 }
 
+// One mechanism's summed minutes, and how many causes they were summed from.
+interface KeyedLoss {
+	key: string
+	minutes: number
+	causes: number
+}
+
 function started_text(issue: number, minutes: number, outcome: string): string {
 	return `${issue_cite.plain(issue)} overran: ${String(minutes)} min net — ${outcome}`
 }
@@ -140,6 +147,19 @@ function small_causes_of(result: string): ReadonlyArray<SmallCause> {
 		.flatMap((segment) => small_cause(segment))
 }
 
+// The causes summed per key, the largest loss first.
+function sum_by_key(causes: ReadonlyArray<SmallCause>): Array<KeyedLoss> {
+	const totals = new Map<string, KeyedLoss>()
+
+	for (const { key, minutes } of causes) {
+		const known = totals.get(key) ?? { key, minutes: 0, causes: 0 }
+
+		totals.set(key, { key, minutes: known.minutes + minutes, causes: known.causes + 1 })
+	}
+
+	return [...totals.values()].toSorted((left, right) => right.minutes - left.minutes)
+}
+
 // The reason a `none: <reason>` result gives, else the result as it is.
 function reason_of(result: string): string {
 	return result.startsWith(NONE_LEAD) ? result.slice(NONE_LEAD.length) : result
@@ -206,8 +226,9 @@ const run_event_overrun = {
 	small_causes_of,
 	small_causes_text,
 	started_text,
+	sum_by_key,
 	within_text,
 }
 
 export { run_event_overrun }
-export type { OverrunNote, SmallCause }
+export type { KeyedLoss, OverrunNote, SmallCause }

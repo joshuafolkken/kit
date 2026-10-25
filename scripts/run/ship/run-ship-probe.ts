@@ -80,6 +80,14 @@ async function read_branch_state(branch_name: string): Promise<ShipState> {
 	return { is_committed, is_pushed, is_merged, is_review_stale, is_dirty }
 }
 
+// Origin holds `HEAD` and nothing is left uncommitted: a line written to the tree now has no commit of
+// the run's own to ride, so pushing it would restart the pull request's CI (joshuafolkken/kit#4907).
+async function is_pushed_clean(): Promise<boolean> {
+	if (await run_hold.is_tree_dirty()) return false
+
+	return await or_false(async () => await read_pushed(await git_command.branch()))
+}
+
 // A branch that cannot be named leaves nothing to ask about, so it reads as nothing done.
 async function read_state(): Promise<ShipState> {
 	try {
@@ -109,6 +117,12 @@ async function record_target(issue: string): Promise<string | undefined> {
 	return repository === undefined ? undefined : run_ship_stage.record_path(repository, issue)
 }
 
-const run_ship_probe = { read_review_stale, read_state, record_target, repository_directory }
+const run_ship_probe = {
+	is_pushed_clean,
+	read_review_stale,
+	read_state,
+	record_target,
+	repository_directory,
+}
 
 export { run_ship_probe }

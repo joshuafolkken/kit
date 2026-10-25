@@ -2,7 +2,11 @@
 import { fileURLToPath } from 'node:url'
 import { issue_priority, type PriorityLevel } from '#scripts/issue/issue-priority'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { run_event_overrun, type SmallCause } from '#scripts/run/event/run-event-overrun'
+import {
+	run_event_overrun,
+	type KeyedLoss,
+	type SmallCause,
+} from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
@@ -30,13 +34,6 @@ const VERDICTS: Record<PriorityLevel, string> = {
 	critical: 'file (urgent)',
 }
 
-// One mechanism's summed loss over the period, and how many causes it was summed from.
-interface MechanismLoss {
-	key: string
-	minutes: number
-	causes: number
-}
-
 // What a per-merge share divides by: the period's merges and their median lane minutes.
 interface MergeBase {
 	merges: number
@@ -62,21 +59,12 @@ function causes_of(event: RunEvent): ReadonlyArray<SmallCause> {
 }
 
 // The period's keyed causes summed per key, the largest loss first.
-function losses_of(events: ReadonlyArray<RunEvent>): Array<MechanismLoss> {
-	const totals = new Map<string, MechanismLoss>()
-	const causes = events.flatMap((event) => causes_of(event))
-
-	for (const { key, minutes } of causes) {
-		const known = totals.get(key) ?? { key, minutes: 0, causes: 0 }
-
-		totals.set(key, { key, minutes: known.minutes + minutes, causes: known.causes + 1 })
-	}
-
-	return [...totals.values()].toSorted((left, right) => right.minutes - left.minutes)
+function losses_of(events: ReadonlyArray<RunEvent>): Array<KeyedLoss> {
+	return run_event_overrun.sum_by_key(events.flatMap((event) => causes_of(event)))
 }
 
 // The loss per merge as a share of the median lane time, else `undefined` with no merge to divide by.
-function share_of(loss: MechanismLoss, base: MergeBase): number | undefined {
+function share_of(loss: KeyedLoss, base: MergeBase): number | undefined {
 	if (base.merges === 0 || base.median_minutes === undefined) return undefined
 
 	return (loss.minutes / base.merges / base.median_minutes) * PERCENT
@@ -100,7 +88,7 @@ function prior_minutes(events: ReadonlyArray<RunEvent>, window: StatsWindow): Ma
 	return new Map(losses.map((loss) => [loss.key, loss.minutes]))
 }
 
-function growth_of(loss: MechanismLoss, prior: ReadonlyMap<string, number>): string {
+function growth_of(loss: KeyedLoss, prior: ReadonlyMap<string, number>): string {
 	const before = prior.get(loss.key)
 
 	if (before === undefined || loss.minutes <= before) return ''
@@ -108,7 +96,7 @@ function growth_of(loss: MechanismLoss, prior: ReadonlyMap<string, number>): str
 	return ` · ${run_event_overrun.GROWN_MARK} from ${cell(before, ' min')}`
 }
 
-function line_of(loss: MechanismLoss, base: MergeBase, prior: ReadonlyMap<string, number>): string {
+function line_of(loss: KeyedLoss, base: MergeBase, prior: ReadonlyMap<string, number>): string {
 	const share = share_of(loss, base)
 	const per_merge = base.merges === 0 ? undefined : loss.minutes / base.merges
 	const total = `${cell(loss.minutes, ' min')} over ${String(loss.causes)} cause(s)`

@@ -28,6 +28,7 @@ const { run_ship_probe } = await import('./run-ship-probe')
 const HEAD = 'abc123'
 const AHEAD = 2
 const NOT_A_REPOSITORY = 'not a repository'
+const BEHIND_TIP = 'def456\trefs/heads/2426-lane'
 
 beforeEach(() => {
 	git.branch.mockResolvedValue('2426-lane')
@@ -80,7 +81,7 @@ describe('run_ship_probe.read_state — pushed and merged', () => {
 	})
 
 	it('reads an origin tip behind HEAD as not pushed', async () => {
-		ls_remote_branch.mockResolvedValue('def456\trefs/heads/2426-lane')
+		ls_remote_branch.mockResolvedValue(BEHIND_TIP)
 
 		expect(await run_ship_probe.read_state()).toMatchObject({ is_pushed: false })
 	})
@@ -103,6 +104,29 @@ describe('run_ship_probe.read_state — pushed and merged', () => {
 
 	it('reads a merged pull request under commits the default branch lacks as not merged', async () => {
 		expect(await run_ship_probe.read_state()).toMatchObject({ is_merged: false })
+	})
+})
+
+// joshuafolkken/kit#4907: whether a ledger line written now would need a push of its own.
+describe('run_ship_probe.is_pushed_clean', () => {
+	it('is true when origin holds HEAD and the tree is clean', async () => {
+		expect(await run_ship_probe.is_pushed_clean()).toBe(true)
+	})
+
+	it('is false on a dirty tree, whatever origin holds', async () => {
+		is_tree_dirty.mockResolvedValue(true)
+
+		expect(await run_ship_probe.is_pushed_clean()).toBe(false)
+	})
+
+	it('is false when origin is behind HEAD or cannot be read', async () => {
+		ls_remote_branch.mockResolvedValue(BEHIND_TIP)
+
+		expect(await run_ship_probe.is_pushed_clean()).toBe(false)
+
+		ls_remote_branch.mockRejectedValue(new Error('offline'))
+
+		expect(await run_ship_probe.is_pushed_clean()).toBe(false)
 	})
 })
 

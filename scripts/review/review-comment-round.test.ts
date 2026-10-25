@@ -181,3 +181,16 @@ describe('review_comment_round.carry — what it throws on', () => {
 		await expect(review_comment_round.carry(root_of('no-search'))).rejects.toThrow('search')
 	})
 })
+
+// joshuafolkken/kit#4907: the merge gate's attest check reads an open issue's rounds the same way.
+describe('review_comment_round.issue_lines', () => {
+	it('reads the comment-round lines of one issue', async () => {
+		expect(await review_comment_round.issue_lines(ISSUE)).toStrictEqual(ROUND)
+	})
+
+	it('throws where the comments could not be read, never reading them as no round', async () => {
+		comments_mock.mockResolvedValue(undefined)
+
+		await expect(review_comment_round.issue_lines(ISSUE)).rejects.toThrow(`#${String(ISSUE)}`)
+	})
+})
