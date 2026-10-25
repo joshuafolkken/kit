@@ -53,9 +53,17 @@ async function view_of(): Promise<GraphView | undefined> {
 	return { graph, universe: code.map((file) => path.resolve(file)) }
 }
 
+// A code file nothing imports that is not a test: a config, a setup file or a CLI a test spawns.
+function is_root(view: GraphView, file: string): boolean {
+	const relative = path.relative(process.cwd(), file)
+	if (test_declared_logic.is_test_file(relative)) return false
+
+	return view.graph.importers([file], view.universe).size <= 1
+}
+
 // A changed path no import names a test's dependency on: a non-code file a test reads, one every test
-// depends on without importing it (the vitest config, the setup files, the lock), or a code file nothing
-// imports — a config, a setup file or a CLI a test spawns, which the graph cannot tie to any test.
+// depends on without importing it (the vitest config, the setup files, the lock), or a code file a root
+// reaches — the root itself or a module it imports, which a test spawning it runs past any closure.
 function is_asset(view: GraphView, file: string): boolean {
 	if (
 		!related_scope.is_relatable(file) ||
@@ -64,7 +72,9 @@ function is_asset(view: GraphView, file: string): boolean {
 		return true
 	}
 
-	return view.graph.importers([path.resolve(file)], view.universe).size <= 1
+	const reached = view.graph.importers([path.resolve(file)], view.universe)
+
+	return [...reached].some((reader) => is_root(view, reader))
 }
 
 function related_of(view: GraphView, file: string, inputs: ReachInputs): string {

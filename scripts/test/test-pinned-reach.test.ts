@@ -17,11 +17,12 @@ const TSCONFIG_CONTENT =
 	'{ "compilerOptions": { "allowJs": true, "moduleResolution": "bundler", "module": "esnext" } }\n'
 const EXTRA_TEST = 'extra.test.ts'
 const OUTSIDE_FILE = 'outside.ts'
-// A module importing `outside.ts`, so the graph ties it to no test rather than to nothing at all.
-const USER_FILE = 'user.ts'
-const USER_CONTENT = "export { outside } from './outside'\n"
+// A test importing `outside.ts` and reaching no hunk, so the graph ties it to a test no hunk rests on.
+const USER_FILE = 'user.test.ts'
+const USER_CONTENT = "import './outside'\nimport { it } from 'vitest'\n\nit('runs', () => {})\n"
 // A code file nothing imports, as a CLI a test spawns: the graph cannot tie it to any test.
 const ROOT_FILE = 'cli.ts'
+const ROOT_IMPORTING_OUTSIDE = "export { outside } from './outside'\n"
 const FIXTURE_FILE = 'fixture.json'
 const UNPINNED_HUNK = `${DRIVER_FILE}:6`
 // The module the test reaches the driver through.
@@ -48,11 +49,15 @@ async function build_with_graph(): Promise<void> {
 	await write(TSCONFIG, TSCONFIG_CONTENT)
 }
 
-// The graph branch with `outside.ts` imported by a module no test imports.
-async function build_with_outside(): Promise<void> {
+async function write_outside(value: number): Promise<void> {
+	await write(OUTSIDE_FILE, `export const outside = ${String(value)}\n`)
+}
+
+// The graph branch with `outside.ts` imported by `importer` alone.
+async function build_with_outside(importer = USER_FILE, content = USER_CONTENT): Promise<void> {
 	await build_with_graph()
-	await write(USER_FILE, USER_CONTENT)
-	await write(OUTSIDE_FILE, 'export const outside = 0\n')
+	await write(importer, content)
+	await write_outside(0)
 }
 
 // The graph branch with the test reaching the driver through `app.js`.
@@ -102,12 +107,12 @@ describe('test_pinned.run over an import graph after an edit no hunk rests on', 
 	)
 
 	it(
-		'keeps the pinned verdict without starting vitest after a source no test imports changed',
+		'keeps the pinned verdict without starting vitest after a source only another test imports changed',
 		async () => {
 			await build_with_outside()
 			const first = await run_report()
 
-			await write(OUTSIDE_FILE, 'export const outside = 1\n')
+			await write_outside(1)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			expect(await run_report()).toEqual(first)
@@ -120,13 +125,13 @@ describe('test_pinned.run over an import graph after an edit no hunk rests on', 
 // The round-1 fix of joshuafolkken/kit#4868: a test and a source edited together.
 describe('test_pinned.run over an import graph after a test and a source both changed', () => {
 	it(
-		'keeps every verdict after an edit to a test reaching no hunk and a source no test imports',
+		'keeps every verdict after an edit to a test reaching no hunk and a source only it imports',
 		async () => {
 			await build_with_outside()
 			await write(EXTRA_TEST, extra_test('runs'))
 			await run_report()
 			await write(EXTRA_TEST, extra_test('runs again'))
-			await write(OUTSIDE_FILE, 'export const outside = 2\n')
+			await write_outside(2)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			expect(locations(await run_report())).toEqual([UNPINNED_HUNK])
@@ -190,6 +195,24 @@ describe('test_pinned.run over an import graph after an edit the failed test res
 			await build_with_graph()
 			await run_report()
 			await write(ROOT_FILE, 'export const cli = 1\n')
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(1)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// The round-2 fix: a module a spawned CLI imports runs past every test's import closure.
+describe('test_pinned.run over an import graph after an edit a spawned CLI rests on', () => {
+	it(
+		'checks the pinned hunk again after a module only a code file nothing imports reaches changed',
+		async () => {
+			await build_with_outside(ROOT_FILE, ROOT_IMPORTING_OUTSIDE)
+			await run_report()
+			await write_outside(1)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()
