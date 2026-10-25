@@ -43,9 +43,10 @@ import { run_review_steps } from './run-review-steps'
 // running the interaction pass alone after it. `--code-only` is the ship's own open, which mints the
 // interaction brief itself.
 //
-// **`--pinned` reads the check alone** (joshuafolkken/kit#4834): `josh review:record` starts it again
-// on a tree a round-1 fix moved, after the join has closed the pair, and reads its answer without
-// joining a gate that already settled. The ship's pre-detach reads that answer anyway, so a lane need not
+// **`--pinned` reads the check alone** (joshuafolkken/kit#4834): the fix's `josh check:related` in a lane
+// child (joshuafolkken/kit#4948), or else `josh review:record`, starts it again on a tree a round-1 fix
+// moved, after the join has closed the pair, and reads its answer without joining a gate that already
+// settled. The ship's pre-detach reads that answer anyway, so a lane need not
 // (joshuafolkken/kit#4895). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
 // its tree. **A lane child's open commits first and `--push` pushes at the green gate**
 // (`run-review-early-push.ts`).

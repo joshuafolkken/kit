@@ -191,6 +191,8 @@ pnpm josh check:related
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all four, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
 
+In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`.
+
 ### `josh behavior`
 
 <!-- usage: behavior -->

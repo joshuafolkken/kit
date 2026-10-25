@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { status_icons } from '#scripts/lib/status-icons'
+import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { gate_plan } from './gate-plan'
@@ -116,13 +117,23 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 	return results.every((result: CheckResult): boolean => result.exit_code === 0) ? 0 : 1
 }
 
-const check_related = { execute_check, exit_code, report_results, run_checks }
+// **The first check of a round-1 fix starts `josh test:pinned` again on the fixed tree**
+// (joshuafolkken/kit#4948): left to `josh review:record`, the restart came minutes before the ship, and
+// its pre-detach waited out a whole run. Started here, the check runs beside these four; a tree that did
+// not move, or a run outside a lane child, starts nothing.
+async function run_all(root?: string, execute: CheckExecutor = execute_check): Promise<number> {
+	await review_record_pinned.restart_in_lane(root)
+	const results = await run_checks(execute)
+
+	report_results(results)
+
+	return exit_code(results)
+}
+
+const check_related = { execute_check, exit_code, report_results, run_all, run_checks }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	const results = await check_related.run_checks()
-
-	check_related.report_results(results)
-	process.exitCode = check_related.exit_code(results)
+	process.exitCode = await check_related.run_all()
 }
 
 export type { CheckExecutor, CheckResult }

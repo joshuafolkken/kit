@@ -40,6 +40,11 @@ describe('review_record_pinned.restart_if_moved on a tree the fix moved', () => 
 		expect(review_record_pinned.started_line()).toContain('pre-detach')
 	})
 
+	// joshuafolkken/kit#4948: `check:related` prints it too, one step before `review:record`.
+	it('names no next step, so it reads right from check:related as well as review:record', () => {
+		expect(review_record_pinned.started_line()).not.toContain('go on to the ship')
+	})
+
 	it('names no read when the check could not be started', async () => {
 		vi.mocked(run_review_pinned_steps.launch).mockReturnValue({ kind: 'failed', note: 'busy' })
 
