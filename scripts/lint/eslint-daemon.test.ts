@@ -209,12 +209,12 @@ describe('eslint_daemon.read_record', () => {
 	})
 })
 
-describe('eslint_daemon.remember_started', () => {
+describe('eslint_daemon.remember_after_edit', () => {
 	it('records a daemon the edit hook started, so the next run keeps it', () => {
 		const before = eslint_daemon.read_record(project_root)
 
 		checkout()
-		eslint_daemon.remember_started(project_root, before)
+		eslint_daemon.remember_after_edit(project_root, before, TARGET)
 
 		const current = eslint_daemon.fingerprint(project_root)
 
@@ -223,7 +223,7 @@ describe('eslint_daemon.remember_started', () => {
 
 	it('leaves a daemon that ran before the edit hook unrecorded', () => {
 		checkout()
-		eslint_daemon.remember_started(project_root, eslint_daemon.read_record(project_root))
+		eslint_daemon.remember_after_edit(project_root, eslint_daemon.read_record(project_root), TARGET)
 
 		expect(eslint_daemon.read_record(project_root).recorded).toBeUndefined()
 	})

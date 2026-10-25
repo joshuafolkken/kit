@@ -360,6 +360,19 @@ async function collect_unfixed(
 	return unfixed
 }
 
+// The edited file as the daemon read it, or nothing when no eslint command linted it — a `.json`
+// module prettier alone formats is still in the type program, and a refreshed record would hide its
+// old copy there (joshuafolkken/kit#4867).
+function linted_path(
+	plan: ReadonlyArray<FormatCommand>,
+	file_path: string,
+	project_root: string,
+): string | undefined {
+	if (plan.every((command) => command.bin !== ESLINT_BIN)) return undefined
+
+	return relative_to_root(project_root, file_path)
+}
+
 async function format_edited_file(
 	raw_payload: string,
 	runner: CommandRunner,
@@ -376,7 +389,11 @@ async function format_edited_file(
 	const daemon_before = eslint_daemon.read_record(project_root)
 	const unfixed = await collect_unfixed(plan, runner, project_root)
 
-	eslint_daemon.remember_started(project_root, daemon_before)
+	eslint_daemon.remember_after_edit(
+		project_root,
+		daemon_before,
+		linted_path(plan, file_path, project_root),
+	)
 
 	return format_diagnostics(unfixed === '' ? undefined : unfixed)
 }

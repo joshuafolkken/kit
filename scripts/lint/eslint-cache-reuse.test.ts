@@ -1,6 +1,11 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { RECORD, reuse_operations } from '#scripts/gate/reuse-operations-fixture'
+import {
+	RECORD,
+	reuse_operations,
+	SHELL_EDIT,
+	type Step,
+} from '#scripts/gate/reuse-operations-fixture'
 import { CONFIG_FILES, reuse_world, TSCONFIG, type World } from '#scripts/gate/reuse-world-fixture'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import fc from 'fast-check'
@@ -8,6 +13,7 @@ import { parse, stringify } from 'flatted'
 import { describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_daemon } from './eslint-daemon'
+import { eslint_daemon_sources } from './eslint-daemon-sources'
 import { reuse_disk, type Disk } from './reuse-disk-fixture'
 
 // joshuafolkken/kit#4494: the ESLint side of reusing a verdict — a cached entry answers for a file
@@ -21,7 +27,8 @@ import { reuse_disk, type Disk } from './reuse-disk-fixture'
 // statement and a module declaring `global` reach every file without being imported. The daemon reads
 // the eslint config, the manifest and the lockfile, and its type program the tsconfig, which it never
 // watches; a source edit reaches it through the edit hook, a merge only through the commit checked
-// out (joshuafolkken/kit#4496).
+// out (joshuafolkken/kit#4496), and a shell edit the hook never saw only through a restart
+// (joshuafolkken/kit#4867).
 
 const MAX_STEPS = 20
 const NUM_RUNS = 25
@@ -36,8 +43,11 @@ interface Walk {
 	disk: Disk
 	// What each cached entry's verdict read, as `closure` renders it.
 	linted: Map<string, string>
-	// What the daemon was current for when the last green record started it.
+	// What the daemon was current for when the last green record started it, each file the edit hook
+	// linted since refreshed in it.
 	daemon_fingerprint: string
+	// The files a shell edit changed since that record that the hook has not linted since.
+	unseen: Set<string>
 }
 
 interface Verdicts {
@@ -51,8 +61,8 @@ interface CacheEntry {
 	value: { data: Record<string, unknown>; content?: string | undefined }
 }
 
-// `git rev-parse HEAD`: the merge base the walk sits on.
-const head = vi.spyOn(git_spawn_sync, 'read')
+// `git rev-parse HEAD` answers the merge base the walk sits on, and `git diff HEAD` the branch's changes.
+const git_read = vi.spyOn(git_spawn_sync, 'read')
 
 function reached(world: World, start: string): ReadonlyArray<string> {
 	const seen = new Set([start])
@@ -159,7 +169,7 @@ function expected_verdicts(walk: Walk): Verdicts {
 
 	return {
 		kept: kept.map(([file]) => file).toSorted(reuse_world.by_name),
-		daemon_restarts: has_daemon_input_moved(walk.world),
+		daemon_restarts: has_daemon_input_moved(walk.world) || walk.unseen.size > 0,
 	}
 }
 
@@ -171,10 +181,68 @@ function remember(walk: Walk, kept: ReadonlyArray<string>): void {
 	walk.linted = new Map([...cached].map((file) => [file, closure(walk.world, file)]))
 }
 
+function branch_changes(world: World): ReadonlyArray<string> {
+	return reuse_world
+		.all_paths(world.contents, world.base_contents)
+		.filter((relative) => reuse_world.is_branch_change(world, relative))
+}
+
+// Every file is tracked, so the untracked list is empty and the full list stays the merge base's name.
+function answer_git(git_arguments: ReadonlyArray<string>, world: World, base: number): string {
+	if (git_arguments[0] === 'diff') return branch_changes(world).join('\0')
+
+	return git_arguments.includes('--cached') || git_arguments[0] !== 'ls-files'
+		? reuse_world.base_name(base)
+		: ''
+}
+
 // Writes the world to disk and checks out the merge base it now sits on.
 function sync(disk: Disk, world: World): void {
 	reuse_disk.sync(disk, world)
-	head.mockReturnValue(reuse_world.base_name(disk.base))
+	git_read.mockImplementation((git_arguments) => answer_git(git_arguments, world, disk.base))
+}
+
+function edited(before: ReadonlyMap<string, string>, world: World): ReadonlyArray<string> {
+	return reuse_world
+		.all_paths(before, world.contents)
+		.filter((relative) => before.get(relative) !== world.contents.get(relative))
+}
+
+// The edit hook lints each file a step edited through the daemon, refreshing its line of the record;
+// a shell edit reaches neither.
+function note_edits(walk: Walk, step: Step, files: ReadonlyArray<string>): void {
+	if (step.name.startsWith(SHELL_EDIT)) {
+		for (const relative of files) walk.unseen.add(relative)
+
+		return
+	}
+
+	const current = eslint_daemon_sources.snapshot(walk.disk.root)
+
+	for (const relative of files) {
+		walk.daemon_fingerprint = eslint_daemon_sources.refresh(
+			walk.daemon_fingerprint,
+			current,
+			relative,
+		)
+		walk.unseen.delete(relative)
+	}
+}
+
+function apply_step(walk: Walk, step: Step): void {
+	const before = new Map(walk.world.contents)
+
+	step.apply()
+	sync(walk.disk, walk.world)
+
+	if (step.name !== RECORD) {
+		note_edits(walk, step, edited(before, walk.world))
+
+		return
+	}
+
+	walk.daemon_fingerprint = eslint_daemon.fingerprint(walk.disk.root)
+	walk.unseen.clear()
 }
 
 async function take(
@@ -185,9 +253,7 @@ async function take(
 	const step = reuse_operations.step_of(walk.world, choice)
 
 	trace.push(step.name)
-	step.apply()
-	sync(walk.disk, walk.world)
-	if (step.name === RECORD) walk.daemon_fingerprint = eslint_daemon.fingerprint(walk.disk.root)
+	apply_step(walk, step)
 	const expected = expected_verdicts(walk)
 	const actual = await actual_verdicts(walk)
 
@@ -205,6 +271,7 @@ async function start_walk(): Promise<Walk> {
 		disk,
 		linted: new Map(),
 		daemon_fingerprint: eslint_daemon.fingerprint(disk.root),
+		unseen: new Set(),
 	}
 	const { kept } = await actual_verdicts(walk)
 
