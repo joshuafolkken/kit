@@ -37,10 +37,11 @@ const READ_COMMAND = 'pnpm josh run:review --pinned'
 const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\``
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
-// A round 1 with fixes to make moves the tree, and `josh review:record` starts the check again on the
-// fixed one, so the join waits no grace on this tree's (joshuafolkken/kit#4895).
+// A round 1 with fixes to make moves the tree, and the fix's `josh check:related` starts the check
+// again on the fixed one (joshuafolkken/kit#4948), so the join waits no grace on this tree's
+// (joshuafolkken/kit#4895).
 const FIXING_NOTE =
-	"round 1 has fixes to make — it is left running, and `josh review:record` starts it again on the fixed tree for the ship's pre-detach to read"
+	"round 1 has fixes to make — it is left running, and the fix's `josh check:related` starts it again on the fixed tree for the ship's pre-detach to read"
 // `josh run:review --pinned` reads a check `josh review:record` started seconds before
 // (joshuafolkken/kit#4834), so it waits through the core queue and the whole run; the bound only
 // stops a check that hung.

@@ -111,6 +111,8 @@ describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () =
 		expect(process.kill).not.toHaveBeenCalled()
 		expect(answer?.unpinned).toStrictEqual([])
 		expect(answer?.text).toContain(FIXING_TEXT)
+		// joshuafolkken/kit#4948: the fix's `check:related` restarts it, not `review:record` alone.
+		expect(answer?.text).toContain('`josh check:related` starts it again')
 	})
 
 	it('reads the answer the check already left', async () => {

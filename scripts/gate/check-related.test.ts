@@ -1,6 +1,13 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { status_icons } from '#scripts/lib/status-icons'
+import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
+import { review_record_pinned } from '#scripts/review/review-record-pinned'
+import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
+import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
+import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { execa } from 'execa'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 
 const execa_mock = vi.hoisted(() => vi.fn())
@@ -146,6 +153,73 @@ describe('check_related.report_results', () => {
 			expect(report).toContain(`=== ${command}: passed ===`)
 			expect(report).toContain(`${command} output`)
 		}
+	})
+})
+
+const ROOT = '/checkout'
+const BRIEFED_TREE = 'briefed-tree'
+const FIXED_TREE = 'fixed-tree'
+const REASON = 'only logs'
+const LANE_ISSUE = '4948'
+
+// A lane child outside a ship's supervisor, its round 1 not yet recorded.
+function in_lane_before_record(): void {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+	vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(LANE_ISSUE)
+	vi.spyOn(run_ship_detach, 'is_supervised').mockReturnValue(false)
+	vi.spyOn(observation_ledger_home, 'read').mockResolvedValue('')
+	vi.spyOn(review_finding_ledger, 'has_issue_record').mockReturnValue(false)
+}
+
+function launch_on(tree: string): void {
+	in_lane_before_record()
+	vi.spyOn(run_review_pinned_steps, 'launched_tree').mockReturnValue(tree)
+	vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(REASON)
+	vi.spyOn(run_review_pinned_steps, 'clear').mockReturnValue(undefined)
+	vi.spyOn(run_review_pinned_steps, 'launch').mockReturnValue({ kind: 'launched', pid: 1 })
+	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(FIXED_TREE)
+	vi.spyOn(console, 'info').mockReturnValue(undefined)
+	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+}
+
+// joshuafolkken/kit#4948: the restart on the fixed tree came only at `review:record`, minutes before
+// the ship, so its pre-detach waited out a whole `test:pinned` run.
+describe('check_related.run_all restarts test:pinned on a tree a fix moved', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('starts the check again on the current tree when the launch is on an older one', async () => {
+		launch_on(BRIEFED_TREE)
+
+		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
+		expect(run_review_pinned_steps.launch).toHaveBeenCalledExactlyOnceWith(ROOT, REASON, FIXED_TREE)
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
+	})
+
+	it('starts nothing when the check already runs on the current tree', async () => {
+		launch_on(FIXED_TREE)
+
+		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
+		expect(run_review_pinned_steps.launch).not.toHaveBeenCalled()
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	// A launch record outlives its issue in a reused checkout, and only a lane child's ship reads it;
+	// once round 1 is recorded, `review:record` owns the restart behind its handover guard.
+	it.each([
+		['outside a lane child', false, false, false],
+		["under a ship's supervisor", true, true, false],
+		['after round 1 is recorded', true, false, true],
+	])('starts nothing on an older tree %s', async (_label, is_child, is_supervised, is_recorded) => {
+		launch_on(BRIEFED_TREE)
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(is_child)
+		vi.mocked(run_ship_detach.is_supervised).mockReturnValue(is_supervised)
+		vi.mocked(review_finding_ledger.has_issue_record).mockReturnValue(is_recorded)
+
+		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
+		expect(run_review_pinned_steps.clear).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.launch).not.toHaveBeenCalled()
 	})
 })
 

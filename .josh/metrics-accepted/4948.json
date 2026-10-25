@@ -1,0 +1,7 @@
+{
+	"reason": "check:related restarts test:pinned on the fixed tree in a lane child (#4948): entry function and its lane guard",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}
