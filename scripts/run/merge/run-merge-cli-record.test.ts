@@ -8,6 +8,7 @@ const emit_mock = vi.hoisted(() => vi.fn())
 const recorded_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const investigate_mock = vi.hoisted(() => vi.fn())
+const baseline_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {
@@ -26,6 +27,7 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 }))
 vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_merge: record_merge_mock } }))
 vi.mock('#scripts/lane/lane-overrun', () => ({ lane_overrun: { investigate: investigate_mock } }))
+vi.mock('#scripts/lane/lane-baseline', () => ({ lane_baseline: { investigate: baseline_mock } }))
 vi.mock('./run-merge-steps', () => ({
 	run_merge_steps: {
 		ask_next: vi.fn().mockResolvedValue('2039'),
@@ -58,6 +60,7 @@ beforeEach(() => {
 	recorded_mock.mockReset().mockResolvedValue([])
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
 	investigate_mock.mockReset().mockResolvedValue(undefined)
+	baseline_mock.mockReset().mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#4751: the merged lane is asked for an overrun once its merge is on record, and
@@ -71,6 +74,13 @@ describe('run_merge_cli.merge_child — asking a merged lane for an overrun', ()
 			investigate_mock.mock.invocationCallOrder[0] ?? 0,
 		)
 		expect(verdict.token).toBe('2039')
+	})
+
+	// joshuafolkken/kit#4887: every merge also asks whether the median lane is due an investigation.
+	it('asks the baseline investigation at the merged lane too', async () => {
+		await run_merge_cli.merge_child(context())
+
+		expect(baseline_mock).toHaveBeenCalledWith(Number(CHILD))
 	})
 })
 

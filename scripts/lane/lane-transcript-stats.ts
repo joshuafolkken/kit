@@ -66,11 +66,16 @@ function segment_command(segment: string): string {
 	return named.slice(time_shell.JOSH_PREFIX.length)
 }
 
-function verification_commands(command = ''): Array<string> {
+// Every josh command a shell `command` runs, in order.
+function josh_commands(command = ''): Array<string> {
 	const spoken = time_shell.unquoted(command)
 	const named = spoken.split(SEPARATOR_PATTERN).map((segment) => segment_command(segment))
 
-	return named.filter((name) => VERIFICATION_COMMANDS.has(name))
+	return named.filter((name) => name !== '')
+}
+
+function verification_commands(command = ''): Array<string> {
+	return josh_commands(command).filter((name) => VERIFICATION_COMMANDS.has(name))
 }
 
 function seconds_cell(ms: number | undefined): string {
@@ -185,6 +190,7 @@ function read_calls(directories: ReadonlyArray<string>, window: StatsWindow): Ar
 const lane_transcript_stats = {
 	durations,
 	in_period,
+	josh_commands,
 	read_calls,
 	solo_calls,
 	table,

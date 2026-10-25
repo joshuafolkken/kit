@@ -106,35 +106,51 @@ function prompt(issue: number, minutes: number): string {
 	return `${reads} ${lane_overrun_prompt.handling(issue, minutes)}`
 }
 
-function log_path(issue: number): string {
-	return stamp_file.stamp_path(`${LOG_PREFIX}${String(issue)}-`, PROJECT_ROOT, LOG_SUFFIX)
-}
-
 function note_failure(issue: number): (note: string) => void {
 	return (note) => {
 		void run_event_stream_emit.emit(EVENT_KIND.NOTE, run_event_overrun.failed_text(issue, note))
 	}
 }
 
-// What became of the launch, in the words the launch note carries.
-function launched(issue: number, minutes: number): string {
+// A detached investigation session: its prompt, its `env` — the lane marks an overrun's filings count
+// against that lane by, none for the baseline's — the prefix of its log's name, and the note a failed
+// launch leaves.
+interface Investigation {
+	env: Readonly<Record<string, string>>
+	prompt: string
+	log_prefix: string
+	on_failure: (note: string) => void
+}
+
+// What became of the launch, in the words the launch note carries — the overrun's and the baseline
+// investigation's (`lane-baseline.ts`) alike.
+function launch(investigation: Investigation): string {
 	const cwd = process.cwd()
-	const built = agent_argv.resolve_in(prompt(issue, minutes), agent_role_profile.WORKER, cwd)
+	const built = agent_argv.resolve_in(investigation.prompt, agent_role_profile.WORKER, cwd)
 
 	if (built.kind === 'rejected') return `not investigated: ${built.note}`
 
 	const request = {
 		argv: built.argv,
 		cwd,
-		env: lane_child_marker.overrun_env_for(String(issue)),
-		log_path: log_path(issue),
+		env: investigation.env,
+		log_path: stamp_file.stamp_path(investigation.log_prefix, PROJECT_ROOT, LOG_SUFFIX),
 		profile: built.profile,
 	}
-	const result = detached_launch.launch(request, note_failure(issue))
+	const result = detached_launch.launch(request, investigation.on_failure)
 
 	return result.kind === 'launched'
 		? run_event_overrun.investigating(result.pid, process_identity.read_start(result.pid))
 		: `not investigated: ${result.note}`
+}
+
+function launched(issue: number, minutes: number): string {
+	return launch({
+		env: lane_child_marker.overrun_env_for(String(issue)),
+		prompt: prompt(issue, minutes),
+		log_prefix: `${LOG_PREFIX}${String(issue)}-`,
+		on_failure: note_failure(issue),
+	})
 }
 
 // The note every merged lane leaves: its net minutes at or under the threshold, why it has none, or the
@@ -163,6 +179,7 @@ async function investigate(issue: number): Promise<void> {
 	}
 }
 
-const lane_overrun = { investigate }
+const lane_overrun = { investigate, launch }
 
+export type { Investigation }
 export { lane_overrun }

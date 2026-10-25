@@ -453,7 +453,10 @@ child (CLOSED) closes epics beside `main:sync`, is counted (resets the failure s
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
-a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`. The board's
+a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; every 30th merge in the
+lane ledger launches one baseline investigation of the median lane — the stage or implement sub-stage with the largest share
+in `lane:stats --period 3`, its causes filed by the overrun's rules — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
+its wording `run-event-baseline.ts`), a finding on the board. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
 (`47′  4847  🔍 4856`); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
@@ -960,6 +963,10 @@ pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
 ```
 
 <!-- /usage -->
+
+Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
+(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
+`review-fix` from `run:review` on, each call's span counted from the previous call's end.
 
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 

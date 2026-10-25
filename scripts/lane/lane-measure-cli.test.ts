@@ -259,6 +259,15 @@ describe('lane_measure_cli.run — stats transcripts', () => {
 		expect(printed).toContain('| transcript metric | value |')
 		expect(printed).toContain('| verification calls, solo | 1 |')
 	})
+
+	// joshuafolkken/kit#4887: the implement stage broken down by sub-stage, off the same transcripts.
+	it('prints the implement sub-stage table', async () => {
+		await lane_measure_cli.run(['stats', '--period', '2'], fresh_context())
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| implement sub-stage | lanes | median (min) | max (min) |')
+	})
 })
 
 // One lane session that made one `Edit` taking 1.5 seconds, at `NOW`.
