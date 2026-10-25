@@ -1,3 +1,4 @@
+import { lane_withdraw } from '#scripts/lane/lane-withdraw'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_stalled } from '#scripts/run/park/run-stalled'
@@ -10,8 +11,11 @@ const KIND = run_event_stream.EVENT_KIND
 // waiting park does not name its issue twice.
 const PARK_PREFIX = /^#\d+ (?:parked\s*)?/u
 const PARENTHESES = /^\((?<inner>.*)\)$/u
-// `#<N> withdrawn by <who>: <reason>` — a person, or the supervisor's sweep (`lane-withdraw.ts`).
-const WITHDRAW_PREFIX = /^#\d+ withdrawn by (?:a person|the run:wake supervisor):\s*/u
+// `#<N> withdrawn by <who>: <reason>` — every withdrawer `lane-withdraw.ts` names.
+const WITHDRAW_PREFIX = new RegExp(
+	String.raw`^#\d+ withdrawn by (?:${lane_withdraw.WITHDRAWER_NAMES.join('|')}):\s*`,
+	'u',
+)
 
 // `#<N> parked (needs-decision)` reads as the reason `needs-decision`; a bare park has none.
 function park_reason(event: RunEvent): string {

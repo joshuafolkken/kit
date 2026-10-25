@@ -35,7 +35,7 @@ const ONE = 1
 
 // What a returned child turned out to be, decided from its GitHub state and — for the failed case
 // alone — the exit record.
-// - `merged`      — CLOSED; the child finished and its pull request merged. Also an OPEN, unparked
+// - `merged`      — CLOSED by a merge; the child finished and its pull request merged. Also an OPEN, unparked
 //                   child a merged pull request's `closes #N` names — GitHub merged it without closing
 //                   the issue.
 // - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
@@ -55,7 +55,9 @@ const ONE = 1
 //                   resets (joshuafolkken/kit#4745).
 // - `failed`      — OPEN and carrying neither, and not an outage; the child did not finish.
 // - `withdrawn`   — a person withdrew it with `lane:withdraw`, read from the event stream before the
-//                   GitHub state: left OPEN for the next run, it is neither merged nor failed.
+//                   GitHub state: left OPEN for the next run, it is neither merged nor failed. Also a
+//                   CLOSED child no merge closed — closed as not planned, or with no merged pull
+//                   request (joshuafolkken/kit#4916).
 // - `unresolved`  — the state could not be read; re-read before deciding.
 // The names themselves are `run-merge-outcome.ts`'s.
 
@@ -67,7 +69,8 @@ interface EndingSignals {
 	// The merged pull request whose `closes #N` names the child, when GitHub left the child OPEN after
 	// merging it.
 	merged_pr?: string | undefined
-	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`).
+	// The newest launch of the child was withdrawn by a person (`run_event_scope.is_withdrawn`), or its
+	// issue was closed without a merge (`run-merge-signals.ts` → `read_is_withdrawn`).
 	is_withdrawn?: boolean | undefined
 	// The outage is not an API the child could not reach — a ship stop no relaunch answered, or a host
 	// restart that killed it — so it is left out of the run-wide streak.
@@ -104,7 +107,8 @@ function environment_outcome(signals: EndingSignals): ChildOutcome {
 	return signals.is_outage ? 'outage' : 'failed'
 }
 
-// **CLOSED means merged, whatever labels it carries** — a child that finished and merged keeps the
+// **CLOSED means merged, whatever labels it carries**, once the withdrawal signal has ruled out a close
+// no merge made (`classify_child`) — a child that finished and merged keeps the
 // `needs-human-review` a person put on it, so that label is read only on an OPEN child
 // (`backlogrun-progress.md` → "Running a named epic's children").
 // An OPEN, unparked child that is not waiting on a person: a declared cut is resumed, and it is read
@@ -131,7 +135,8 @@ function open_outcome(state: IssueState, signals: EndingSignals): ChildOutcome {
 }
 
 // The signals are read by the CLI and, but for a withdrawal, matter only for an OPEN child — a CLOSED
-// child is merged regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
+// child arrives already filtered by `is_withdrawn` (its timeline), so one that reaches here is merged
+// regardless of how the process exited. **A withdrawal is read first**: `lane:withdraw`
 // records it before stopping the child and leaves the issue OPEN, which would otherwise read as a child
 // to resume or park.
 function classify_child(

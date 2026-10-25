@@ -13,6 +13,7 @@ const do_merged_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
 const restart_mock = vi.hoisted(() => vi.fn())
+const merge_state_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-merge-restart', () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
@@ -29,7 +30,7 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 vi.mock('#scripts/issue/issue-merged', () => ({
 	issue_merged: {
 		read_merged: vi.fn().mockResolvedValue(false),
-		read_merge_state: vi.fn().mockResolvedValue(false),
+		read_merge_state: merge_state_mock,
 	},
 }))
 
@@ -91,6 +92,7 @@ beforeEach(() => {
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
 	restart_mock.mockReset().mockResolvedValue(false)
+	merge_state_mock.mockReset().mockResolvedValue(true)
 })
 
 // joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
@@ -109,6 +111,7 @@ describe('run_merge_cli.merge_child — a child a person withdrew', () => {
 	])('offers the next child for a withdrawn %s issue', async (_label, state) => {
 		read_issue_mock.mockResolvedValue(state)
 		events_mock.mockResolvedValue([WITHDRAW_EVENT])
+		merge_state_mock.mockResolvedValue(false)
 
 		const result = await run_merge_cli.merge_child(context())
 
