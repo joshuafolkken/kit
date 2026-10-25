@@ -14,6 +14,10 @@ import { step_zero_notice } from './step-zero-notice'
 // The watcher guard is the one composed rule that reads off disk, so it is mocked here to pin the
 // composition — that a stale-watcher reason fills a clear verdict, and that a synchronous refusal wins
 // over it (joshuafolkken/kit#2353). Its own detection is pinned in `run-watcher-hook.test.ts`.
+vi.mock('#scripts/hooks/lane-plan-guard', () => ({
+	lane_plan_guard: { reason: vi.fn().mockReturnValue(undefined) },
+}))
+
 vi.mock('#scripts/run/run-watcher-hook', () => ({
 	run_watcher_hook: { watcher_hook_reason: vi.fn().mockResolvedValue(undefined) },
 }))
@@ -37,6 +41,8 @@ const { run_watcher_hook } = await import('#scripts/run/run-watcher-hook')
 const watcher_hook_reason = vi.mocked(run_watcher_hook.watcher_hook_reason)
 const { run_parent_cut_hook } = await import('#scripts/run/run-parent-cut-hook')
 const parent_cut_reason = vi.mocked(run_parent_cut_hook.parent_cut_reason)
+const { lane_plan_guard } = await import('#scripts/hooks/lane-plan-guard')
+const lane_plan_reason = vi.mocked(lane_plan_guard.reason)
 
 const { combine_outcomes } = pretool_guard
 
@@ -45,6 +51,7 @@ const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
 const SHELL_BODY_REASON = 'shell-evaluated body'
 const WATCHER_STALE_REASON = 'watcher stale'
 const PARENT_CUT_REASON = 'parent hand-off'
+const LANE_PLAN_REASON = 'lane plan unrecorded'
 
 function outcome(
 	reason: string | undefined,
@@ -133,6 +140,13 @@ describe('pretool_outcome', () => {
 		const refusal = pretool_outcome(payload_with_transcript(SHELL_BODY_COMMAND))
 
 		expect(refusal.reason).toContain(SHELL_BODY_REASON)
+	})
+
+	// joshuafolkken/kit#4864: a lane child's edit before its plan is recorded is refused here.
+	it('surfaces the lane plan refusal on an edit', () => {
+		lane_plan_reason.mockReturnValueOnce(LANE_PLAN_REASON)
+
+		expect(pretool_outcome(edit_payload_with_transcript()).reason).toBe(LANE_PLAN_REASON)
 	})
 })
 

@@ -22,6 +22,7 @@ const SHARED = 'scripts/run/ship/run-ship.ts'
 const IDLE: BusyRead = { kind: 'idle' }
 // The directory the glob `scripts/lines/**` names.
 const LINES_DIRECTORY = 'scripts/lines/'
+const RUN_DIRECTORY = 'scripts/run/'
 
 // The paths joshuafolkken/kit#3582 and joshuafolkken/kit#3586 declared, abridged.
 const LIMITS_BODY = [
@@ -106,6 +107,20 @@ describe('backlog_overlap.declared_paths — tokens with no directory', () => {
 		expect(backlog_overlap.declared_paths(body)).toStrictEqual(
 			new Set(['package.json', 'CLAUDE.md']),
 		)
+	})
+})
+
+describe('backlog_overlap.path_clash', () => {
+	it('names the holder whose declared directory covers a planned file', () => {
+		const planned = backlog_overlap.path_claims([SHARED, `joshuafolkken/kit#${String(FIRST)}`])
+		const declared = new Map([[RUNNING, new Set([RUN_DIRECTORY])]])
+
+		expect(backlog_overlap.path_clash(planned, declared, [RUNNING])).toStrictEqual({
+			path: SHARED,
+			claimed: RUN_DIRECTORY,
+			holder: RUNNING,
+		})
+		expect(backlog_overlap.path_clash(planned, declared, [])).toBeUndefined()
 	})
 })
 

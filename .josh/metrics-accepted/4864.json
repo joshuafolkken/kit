@@ -1,0 +1,7 @@
+{
+	"reason": "joshuafolkken/kit#4864 adds the lane:plan command, its plan record and the lane-plan PreToolUse guard",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 204
+	}
+}

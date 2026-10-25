@@ -16,6 +16,7 @@ const SHIP = 'pnpm josh ship "Title #1" --body-file evidence.md'
 const DETACHED_SHIP = 'pnpm josh ship --detach --review "Title #1"'
 const GATE_AND_SHIP = `${GATE} && ${DETACHED_SHIP}`
 const SHIP_WAIT = 'pnpm josh ship:wait 1'
+const LANE_PLAN = 'pnpm josh lane:plan 1 scripts/lane/lane-plan.ts'
 const FOREGROUND_TIMEOUT_MS = 600_000
 const BACKGROUND_TIMEOUT_MS = 1_800_000
 
@@ -233,6 +234,23 @@ describe('lane_background.foreground_input — ship:wait', () => {
 
 	it('does not refuse a backgrounded ship:wait, since it is rewritten instead', () => {
 		expect(lane_background.is_background_long_run(background_call(SHIP_WAIT), in_lane)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4864: a `lane:plan` cut at the default records its plan with the wait unfinished.
+describe('lane_background.foreground_input — lane:plan', () => {
+	it('gives a lane:plan the foreground cap in a lane child', () => {
+		const input = { command: LANE_PLAN }
+
+		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
+			command: LANE_PLAN,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('names lane:plan in the note on the rewritten call', () => {
+		expect(lane_background.FOREGROUND_NOTE).toContain('josh lane:plan')
 	})
 })
 

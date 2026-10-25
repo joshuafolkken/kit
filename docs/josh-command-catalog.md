@@ -168,6 +168,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh lane:open` | `<issue> [options]` | automation | files, git | Open a lane: a linked work tree with its own branch and its own port seed |
 | `josh lane:output` | `<issue> [path]` | automation | files | Record, or read back, where the unit running a lane’s child writes |
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |
+| `josh lane:plan` | `<issue> <path>...` | automation | files, network | Record the files a lane child plans to edit, and wait before implementing while a running lane that planned earlier declares or plans one of them — naming the file and that issue |
 | `josh lane:prune` | — | automation | files, git | Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root |
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |

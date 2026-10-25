@@ -52,14 +52,18 @@ function claim_of(path: string): string | undefined {
 	return is_file(path) ? path : undefined
 }
 
-// The backticked files and directories `body` declares.
-function declared_paths(body: string): ReadonlySet<string> {
-	const tokens = [...body.matchAll(CODE_SPAN)].map((match) => match[1] ?? '')
+// The files and directories `tokens` claim — a body's code spans, or the paths a lane plans to edit.
+function path_claims(tokens: ReadonlyArray<string>): ReadonlySet<string> {
 	const paths = tokens
 		.filter((token) => !token.includes(ISSUE_MARK))
 		.map((token) => claim_of(without_glob(token.replace(LINE_SUFFIX, ''))))
 
 	return new Set(paths.filter((path) => path !== undefined))
+}
+
+// The backticked files and directories `body` declares.
+function declared_paths(body: string): ReadonlySet<string> {
+	return path_claims([...body.matchAll(CODE_SPAN)].map((match) => match[1] ?? ''))
 }
 
 function declared_of(issues: ReadonlyArray<DeclaringIssue>): Declared {
@@ -125,12 +129,19 @@ interface Holding {
 	repo: string
 }
 
+// The path of `paths` that one of `holders` already declares — what `lane:plan` waits on.
+function path_clash(
+	paths: ReadonlySet<string>,
+	declared: Declared,
+	holders: ReadonlyArray<number>,
+): Clash | undefined {
+	return clash_of(claims_of(declared, holders), paths)
+}
+
 // The path `child` declares that one of the running `holders` already declares — the clash `separate`
 // withholds a candidate on, for a reader that names the running issues itself (`run:board`).
 function running_clash(child: EpicChild, declared: Declared, holding: Holding): Clash | undefined {
-	const claims = claims_of(declared, holding.holders)
-
-	return clash_of(claims, paths_of(child, declared, holding.repo))
+	return path_clash(paths_of(child, declared, holding.repo), declared, holding.holders)
 }
 
 // Whether `waiting` declares a path `holder` declares — the overlap `separate` withholds it on.
@@ -207,7 +218,15 @@ function separate(
 	return { offered: walk.offered, withheld, ...(notice !== undefined && { notice }) }
 }
 
-const backlog_overlap = { declared_of, declared_paths, holds, running_clash, separate }
+const backlog_overlap = {
+	declared_of,
+	declared_paths,
+	holds,
+	path_claims,
+	path_clash,
+	running_clash,
+	separate,
+}
 
 export { backlog_overlap }
 export type { Clash, Declared }

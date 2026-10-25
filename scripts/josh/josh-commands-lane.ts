@@ -169,6 +169,16 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	'lane:plan': {
+		script: 'scripts/lane/lane-plan-cli.ts',
+		description:
+			'Record the files a lane child plans to edit, and wait before implementing while a running lane that planned earlier declares or plans one of them — naming the file and that issue',
+		category: 'AI tools',
+		reference: ['<issue> <path>...', 'automation', ['files', 'network']],
+		usage: {
+			examples: [{ arguments: '4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts' }],
+		},
+	},
 	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
 	'lane:pause': {
 		...PAUSE_ARGUMENTS,

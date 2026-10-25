@@ -1,6 +1,7 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
+import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -90,7 +91,7 @@ function holding(
 	issues: ReadonlyArray<OpenIssueData>,
 	records: ReadonlyArray<LaneStateRecord>,
 ): Array<LaneStateRecord> {
-	const declared = backlog_overlap.declared_of(issues)
+	const declared = lane_plan.with_plans(backlog_overlap.declared_of(issues), process.cwd())
 	const waiting = waiting_of(issues, records)
 
 	return paused.filter((record) =>

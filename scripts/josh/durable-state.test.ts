@@ -139,6 +139,16 @@ describe('durable_state.ensure', () => {
 	})
 })
 
+// joshuafolkken/kit#4864: the lane plan is a run record of its own, so the upkeep knows its files.
+describe('durable_state.PREFIX — the lane plan', () => {
+	it('names the lane plan with a prefix no other record shares', () => {
+		const prefixes = Object.values(durable_state.PREFIX)
+
+		expect(durable_state.PREFIX.LANE_PLAN).toBe('josh-lane-plan-')
+		expect(prefixes.filter((prefix) => prefix === durable_state.PREFIX.LANE_PLAN)).toHaveLength(1)
+	})
+})
+
 describe('the run records kept across a reboot', () => {
 	const repository = key_root('records')
 

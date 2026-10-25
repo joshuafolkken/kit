@@ -58,6 +58,11 @@ function is_candidate(raw_payload: string, root: string): string | undefined {
 	return has_runtime_file ? payload.transcript_path : undefined
 }
 
+// Whether the payload edits a runtime file under `root` — the edit Step 0 and the lane plan precede.
+function is_runtime_edit(raw_payload: string, root: string = process.cwd()): boolean {
+	return is_candidate(raw_payload, root) !== undefined
+}
+
 function notice(raw_payload: string, root: string = process.cwd()): string | undefined {
 	const transcript = is_candidate(raw_payload, root)
 
@@ -72,6 +77,6 @@ function notice(raw_payload: string, root: string = process.cwd()): string | und
 	return NOTICE
 }
 
-const step_zero_notice = { NOTICE, notice, stamp_path: STAMP.path }
+const step_zero_notice = { NOTICE, is_runtime_edit, notice, stamp_path: STAMP.path }
 
 export { step_zero_notice }

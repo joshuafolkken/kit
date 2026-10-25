@@ -993,6 +993,24 @@ The whole minutes are what an Issue's `- 原因のレーン:` line declares; a l
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
 
+### `josh lane:plan`
+
+<!-- usage: lane:plan -->
+
+Record the files a lane child plans to edit, and wait before implementing while a running lane that planned earlier declares or plans one of them — naming the file and that issue.
+
+```bash
+pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts
+```
+
+<!-- /usage -->
+
+A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes; until then `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
+
+Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body.
+
+**Output / exit codes:** the reason on stderr when it changes — the waiting issue, its planned file, the path it overlaps and the holder. `clear` on stdout, exit 0, once nothing holds the planned files; `wait`, exit 1, after 18 polls 30 s apart or on an unreadable listing — run it again. No path: the usage, exit 1.
+
 ## Session and documents
 
 ### `josh cost`
