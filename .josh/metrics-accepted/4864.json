@@ -1,7 +1,7 @@
 {
-	"reason": "joshuafolkken/kit#4864 adds the lane:plan command, its plan record and the lane-plan PreToolUse guard",
+	"reason": "lane:plan with its guard, the plan store and a cleared mark so a wait keeps the edit hold; tests pin each",
 	"date": "2026-10-25",
 	"growth": {
-		"scripts.code_lines": 204
+		"scripts.code_lines": 212
 	}
 }

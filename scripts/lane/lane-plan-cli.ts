@@ -88,10 +88,19 @@ async function is_clear(watch: Watch): Promise<boolean> {
 	return settle(watch, note_of(watch, issues))
 }
 
+// A lane that plans again — after a `wait`, or to add a file — keeps the place in line its first plan
+// took: a fresh time would hand the files it already holds to a lane that planned after it.
+function placed(plan: LanePlan, directory: string): LanePlan {
+	const recorded = lane_plan.read(plan.issue, directory)
+
+	return recorded === undefined ? plan : { ...plan, planned_at: recorded.planned_at }
+}
+
 async function watch_plan(watch: Watch, options: PollOptions): Promise<number> {
 	lane_plan.record(watch.plan, watch.directory)
 	const is_done = await poll.poll_until(async () => await is_clear(watch), options)
 
+	if (is_done) lane_plan.record({ ...watch.plan, cleared: true }, watch.directory)
 	console.info(is_done ? 'clear' : 'wait')
 
 	return is_done ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
@@ -103,8 +112,9 @@ async function run(
 	directory: string = process.cwd(),
 ): Promise<number> {
 	const plan = plan_of(argv, new Date())
+	const watch = plan === undefined ? undefined : { plan: placed(plan, directory), directory }
 
-	if (plan !== undefined) return await watch_plan({ plan, directory }, options)
+	if (watch !== undefined) return await watch_plan(watch, options)
 
 	console.error(USAGE)
 

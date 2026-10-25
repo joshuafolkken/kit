@@ -60,12 +60,16 @@ describe('lane_plan.earlier_holders', () => {
 		expect(lane_plan.earlier_holders(EARLIER_PLAN, holders, DIRECTORY)).toEqual([])
 	})
 
-	it('reads an issue as unrecorded until its plan is recorded', () => {
-		expect(lane_plan.is_unrecorded(LATER, DIRECTORY)).toBe(true)
+	it('reads an issue as uncleared until its plan is recorded cleared', () => {
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 
 		lane_plan.record(LATER_PLAN, DIRECTORY)
 
-		expect(lane_plan.is_unrecorded(LATER, DIRECTORY)).toBe(false)
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
+
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
 	})
 
 	it('forgets a plan once it is removed', () => {

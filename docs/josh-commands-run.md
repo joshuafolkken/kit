@@ -1005,7 +1005,7 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 
 <!-- /usage -->
 
-A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes; until then `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
+A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes, and again until it prints `clear`; until then `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
 Only a lane whose plan was recorded first holds the files, so two lanes never wait on each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan as on its body.
 

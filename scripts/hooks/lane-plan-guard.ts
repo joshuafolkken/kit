@@ -3,7 +3,7 @@ import { lane_plan } from '#scripts/lane/lane-plan'
 import { step_zero_notice } from './step-zero-notice'
 
 // A dispatched lane child's first implementation edit is refused until `josh lane:plan` has recorded
-// the files its work summary changes (joshuafolkken/kit#4864). The record is what holds a later lane
+// the files its work summary changes and cleared them (joshuafolkken/kit#4864). The record is what holds a later lane
 // back from those files, so it has to exist before the code does; a document asking for it would be
 // read after the edit it governs.
 //
@@ -16,7 +16,7 @@ const WHY = 'it waits while a running lane that planned one of them first holds 
 function reason_text(issue: string): string {
 	const command = `\`pnpm josh lane:plan ${issue} <path>...\``
 
-	return `⛔ lane plan: run ${command} naming every file the work summary changes, before the first implementation edit — ${WHY} (${COMMAND_DOC}).`
+	return `⛔ lane plan: run ${command} naming every file the work summary changes, again until it prints \`clear\`, before the first implementation edit — ${WHY} (${COMMAND_DOC}).`
 }
 
 // The issue of the dispatched lane child making this runtime edit, or `undefined` for any other call.
@@ -41,7 +41,7 @@ function reason(
 
 	if (issue === undefined) return undefined
 
-	return lane_plan.is_unrecorded(Number(issue), directory) ? reason_text(issue) : undefined
+	return lane_plan.is_uncleared(Number(issue), directory) ? reason_text(issue) : undefined
 }
 
 const lane_plan_guard = { reason }

@@ -14,6 +14,7 @@ const LANE = path.join(ROOT, '.kit-lanes', ISSUE)
 const CHILD = { JOSH_LANE_CHILD: ISSUE }
 const RUNTIME_FILE = 'scripts/lane/lane-overrun.ts'
 const DOC_FILE = 'docs/why.md'
+const PLAN = { issue: Number(ISSUE), paths: [RUNTIME_FILE], planned_at: '2026-10-25T03:10:00Z' }
 
 function edit_of(file_path: string): string {
 	const transcript_path = path.join(ROOT, 'transcript.jsonl')
@@ -38,10 +39,15 @@ describe('lane_plan_guard.reason', () => {
 		expect(reason).toContain(`pnpm josh lane:plan ${ISSUE}`)
 	})
 
-	it('lets the edit through once the plan is recorded', () => {
-		const plan = { issue: Number(ISSUE), paths: [RUNTIME_FILE], planned_at: '2026-10-25T03:10:00Z' }
+	// The review of #4864: the plan is recorded before `lane:plan` waits, so a `wait` lifted the hold.
+	it('keeps refusing while the recorded plan still waits', () => {
+		lane_plan.record(PLAN, LANE)
 
-		lane_plan.record(plan, LANE)
+		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toContain('clear')
+	})
+
+	it('lets the edit through once the plan is cleared', () => {
+		lane_plan.record({ ...PLAN, cleared: true }, LANE)
 
 		expect(lane_plan_guard.reason(edit_of(RUNTIME_FILE), LANE, CHILD)).toBeUndefined()
 	})

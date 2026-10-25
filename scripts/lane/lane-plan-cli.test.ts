@@ -76,6 +76,7 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 
 		expect(await lane_plan_cli.run([String(LATER), OVERRUN], ONCE, DIRECTORY)).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('wait')
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 		expect(String(error.mock.calls[0]?.[0])).toMatch(
 			new RegExp(`waits before implementing: its planned \`${OVERRUN}\`.*#${String(HOLDER)}`, 'u'),
 		)
@@ -87,6 +88,7 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 		expect(await lane_plan_cli.run([String(LATER), OVERRUN], TWICE, DIRECTORY)).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(error).toHaveBeenCalledOnce()
+		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(false)
 	})
 
 	it('records its own plan, so a later candidate is weighed against it', async () => {
@@ -95,6 +97,16 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 		await lane_plan_cli.run([String(LATER), `${PRIORITY}:203`], ONCE, DIRECTORY)
 
 		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([PRIORITY])
+	})
+
+	it('keeps the place in line of a plan it records again, so it goes on holding its files', async () => {
+		const first = '1999-01-01T00:00:00.000Z'
+
+		lane_plan.record({ issue: LATER, paths: [PRIORITY], planned_at: first }, DIRECTORY)
+		fetch_opted_in.mockResolvedValue(HOLDING)
+
+		expect(await lane_plan_cli.run([String(LATER), OVERRUN], ONCE, DIRECTORY)).toBe(SUCCESS)
+		expect(lane_plan.read(LATER, DIRECTORY)).toMatchObject({ paths: [OVERRUN], planned_at: first })
 	})
 })
 

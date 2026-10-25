@@ -23,6 +23,7 @@ const lane_plan_schema = z.object({
 	issue: z.number(),
 	paths: z.array(z.string()),
 	planned_at: z.string(),
+	cleared: z.boolean().optional(),
 })
 
 type LanePlan = z.infer<typeof lane_plan_schema>
@@ -55,11 +56,13 @@ function read(issue: number, directory: string): LanePlan | undefined {
 	return text === undefined ? undefined : json_value.parse_with(text, lane_plan_schema)
 }
 
-// Whether `issue` has no plan on record in a repository that can hold one — a checkout with no common
-// git directory cannot record a plan, so it is never asked for one.
-function is_unrecorded(issue: number, directory: string): boolean {
+// Whether `issue` has no plan that `lane:plan` cleared, in a repository that can hold one — a checkout
+// with no common git directory cannot record a plan, so it is never asked for one. A plan recorded and
+// still waiting is not cleared: the record is written before the wait, so it alone lifts no hold.
+function is_uncleared(issue: number, directory: string): boolean {
 	return (
-		git_common_directory.repository(directory) !== undefined && read(issue, directory) === undefined
+		git_common_directory.repository(directory) !== undefined &&
+		read(issue, directory)?.cleared !== true
 	)
 }
 
@@ -87,7 +90,7 @@ function earlier_holders(
 	})
 }
 
-const lane_plan = { earlier_holders, is_unrecorded, read, record, remove, with_plans }
+const lane_plan = { earlier_holders, is_uncleared, read, record, remove, with_plans }
 
 export { lane_plan }
 export type { LanePlan }
