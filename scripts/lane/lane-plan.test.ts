@@ -35,12 +35,13 @@ afterAll(() => {
 })
 
 describe('lane_plan.with_plans', () => {
-	it('joins a recorded plan to the paths the body declares', () => {
+	// joshuafolkken/kit#4937: a path the body only cites holds nothing once the lane recorded its plan.
+	it('reads a recorded plan in place of the paths the body declares', () => {
 		lane_plan.record(EARLIER_PLAN, DIRECTORY)
 
-		const joined = lane_plan.with_plans(new Map([[EARLIER, new Set([RANK])]]), DIRECTORY)
+		const replaced = lane_plan.with_plans(new Map([[EARLIER, new Set([RANK])]]), DIRECTORY)
 
-		expect([...(joined.get(EARLIER) ?? [])]).toEqual([RANK, OVERRUN])
+		expect([...(replaced.get(EARLIER) ?? [])]).toEqual([OVERRUN])
 	})
 
 	it('leaves an issue with no recorded plan at its body', () => {
@@ -118,7 +119,7 @@ describe('lane_plan.release', () => {
 	})
 })
 
-// The earlier lane in flight, its body declaring `body` and its recorded plan joined.
+// The earlier lane in flight, its body declaring `body` and its recorded plan read in its place.
 function in_flight(...body: ReadonlyArray<string>): Declared {
 	return lane_plan.with_plans(new Map([[EARLIER, new Set(body)]]), DIRECTORY)
 }
@@ -134,12 +135,13 @@ describe('lane_plan.is_yield_held', () => {
 		expect(lane_plan.is_yield_held(LATER, new Map(), DIRECTORY)).toBe(false)
 	})
 
-	// The same scope `lane:plan` yielded on: a file the holder's body declares holds as one it planned.
-	it('holds a yielded plan on a file an earlier lane in flight declares in its body', () => {
+	// joshuafolkken/kit#4937: the holder's recorded plan is its whole scope, so a file its body only
+	// cites holds nothing.
+	it('holds no yielded plan on a file an earlier lane in flight only cites in its body', () => {
 		lane_plan.record({ ...EARLIER_PLAN, paths: [RANK] }, DIRECTORY)
 		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
 
-		expect(lane_plan.is_yield_held(LATER, in_flight(OVERRUN), DIRECTORY)).toBe(true)
+		expect(lane_plan.is_yield_held(LATER, in_flight(OVERRUN), DIRECTORY)).toBe(false)
 	})
 
 	it('holds no plan its lane did not yield on', () => {

@@ -142,7 +142,7 @@ async function not_run(
 	return named?.is_finish === true ? await only_end(carry, named) : named
 }
 
-// What the lanes in flight declare — body, plan comment and recorded plan, the scope `lane:plan` and
+// What the lanes in flight declare — recorded plan, else plan comment, else body, the scope `lane:plan` and
 // `backlog:next` read. A lane the listing does not carry, or an unread listing, declares its plan alone.
 async function in_flight_declared(in_flight: ReadonlyArray<string>): Promise<Declared> {
 	const listing = await auto_ok_cli.fetch_opted_in()

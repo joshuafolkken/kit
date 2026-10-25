@@ -10,8 +10,8 @@ import { z } from 'zod'
 // **An issue body names the paths its reporter saw, not the ones the change touches.**
 // joshuafolkken/kit#4858 and joshuafolkken/kit#4859 declared disjoint paths, ran side by side, and both
 // edited `scripts/lane/lane-overrun.ts`; the second ship stopped on the conflict (joshuafolkken/kit#4864).
-// The plan is the first moment the touched files are known, so it is recorded here and read as a
-// declaration beside the body — by `lane:plan` to hold the later lane back, and by `backlog:next` so a
+// The plan is the first moment the touched files are known, so it is recorded here and read as the
+// declaration in place of the body — by `lane:plan` to hold the later lane back, and by `backlog:next` so a
 // candidate waits on a running lane's plan as it waits on its body.
 //
 // **Keyed to the repository and the issue, not the work tree**, and kept in the common git directory
@@ -77,14 +77,16 @@ function release(issue: number, directory: string): void {
 	if (read(issue, directory)?.yielded !== true) remove(issue, directory)
 }
 
-// `declared` with each issue's recorded plan joined to the paths its body declares.
+// `declared` with each issue's recorded plan in place of the paths its body or plan comment declares —
+// the record is the declaration nearest the edit, so a path only cited there holds nothing
+// (joshuafolkken/kit#4937). An issue with no record keeps what it declares.
 function with_plans(declared: Declared, directory: string): Declared {
-	const joined = [...declared].map(([issue, paths]): [number, ReadonlySet<string>] => [
+	const replaced = [...declared].map(([issue, paths]): [number, ReadonlySet<string>] => [
 		issue,
-		new Set([...paths, ...(read(issue, directory)?.paths ?? [])]),
+		new Set(read(issue, directory)?.paths ?? paths),
 	])
 
-	return new Map(joined)
+	return new Map(replaced)
 }
 
 // Whether `other` holds its files ahead of `plan`: it was cleared, or it planned first. A cleared lane
@@ -107,7 +109,7 @@ function earlier_holders(
 	})
 }
 
-// The first file of `plan` that a lane in `declared` — body and recorded plan joined — holds ahead of
+// The first file of `plan` that a lane in `declared` — its recorded plan, else its body — holds ahead of
 // it. `lane:plan` yields on it, and a named run holds the yielded issue back on the same answer.
 function clash_of(plan: LanePlan, declared: Declared, directory: string): Clash | undefined {
 	const holders = earlier_holders(plan, [...declared.keys()], directory)
