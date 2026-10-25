@@ -15,7 +15,8 @@ import { lane_withdraw } from './lane-withdraw'
 //
 // **Only a not-planned close is swept.** A merged issue's lane is ended by the merge path, where a
 // detached ship may still be running its tail; an issue closed as completed by hand is left to
-// `lane:prune` and `run:merge`, which do not book it withdrawn. An issue that could not be read is
+// `lane:prune` and `run:merge`, which books it withdrawn when no merged pull request closed it
+// (joshuafolkken/kit#4916). An issue that could not be read is
 // asked again on the next pass, and a lane whose withdrawal is already on the event stream is not
 // withdrawn twice.
 //

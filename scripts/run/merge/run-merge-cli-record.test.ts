@@ -18,6 +18,9 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	},
 }))
 vi.mock('#scripts/issue/issue-closing-pr')
+vi.mock('#scripts/issue/issue-merged', () => ({
+	issue_merged: { read_merge_state: vi.fn().mockResolvedValue(true) },
+}))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: {
 		emit: emit_mock,

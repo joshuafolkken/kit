@@ -26,6 +26,9 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 }))
 
 vi.mock('#scripts/issue/issue-closing-pr')
+vi.mock('#scripts/issue/issue-merged', () => ({
+	issue_merged: { read_merge_state: vi.fn().mockResolvedValue(true) },
+}))
 vi.mock('#scripts/lane/lane-ledger')
 vi.mock('./run-merge-ship')
 

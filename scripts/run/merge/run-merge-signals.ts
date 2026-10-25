@@ -81,14 +81,17 @@ async function read_merged_pr(child: string, read: IssueRead): Promise<string | 
 	return await issue_closing_pr.read_closing_pr(child)
 }
 
-// A child that merged before `lane:withdraw` stopped it is merged, not withdrawn: the withdrawal's
-// event is already written, so only the timeline tells its merged close from the not-planned one. An
-// unread timeline answers `undefined`, and `outcome_of` asks again rather than guessing.
+// **A CLOSED child is withdrawn unless a merge closed it**, whether or not `lane:withdraw` ran: an issue
+// closed as not planned, or closed with no merged pull request, never merged, so it must not be booked
+// as a merge (joshuafolkken/kit#4916). Only the timeline tells a merged close from the rest, so it
+// decides — and a child that merged before `lane:withdraw` stopped it is merged. Any other child is
+// withdrawn only by its event. An unread timeline answers `undefined`, and `outcome_of` asks again
+// rather than guessing.
 async function read_is_withdrawn(child: string, read: IssueRead): Promise<boolean | undefined> {
-	const events = await run_event_stream_emit.current_events()
+	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'merged') {
+		return run_event_scope.is_withdrawn(await run_event_stream_emit.current_events(), child)
+	}
 
-	if (!run_event_scope.is_withdrawn(events, child)) return false
-	if (read.kind !== 'state' || run_merge.classify_child(read.state) !== 'merged') return true
 	const is_merged = await issue_merged.read_merge_state(child)
 
 	return is_merged === undefined ? undefined : !is_merged

@@ -47,3 +47,12 @@ describe('run_board_ending_reason.reason_of', () => {
 		expect(reasons(KIND.MERGE, ['#13 merged'])).toStrictEqual([undefined])
 	})
 })
+
+// joshuafolkken/kit#4916: `run:merge` withdraws a child whose issue closed without a merge.
+describe('run_board_ending_reason.reason_of — a run:merge withdrawal', () => {
+	it('reads the reason after the run:merge driver prefix', () => {
+		expect(
+			reasons(KIND.WITHDRAW, ['#13 withdrawn by the run:merge driver: closed without a merge']),
+		).toStrictEqual(['closed without a merge'])
+	})
+})

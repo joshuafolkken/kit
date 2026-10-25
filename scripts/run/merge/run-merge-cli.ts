@@ -19,6 +19,7 @@ import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
 import { run_merge_usage_limit } from './run-merge-usage-limit'
+import { run_merge_withdrawn } from './run-merge-withdrawn'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event. The parent's context is
 // the largest and its per-turn cost the highest, so it calls this once at a child's return and reads
@@ -380,10 +381,16 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its lane
-// and put itself on the stream, leaving its issue open for the next run, so nothing is counted or
-// written here and its seat goes to the next child.
+// A child a person withdrew with `lane:withdraw`, or whose issue closed without a merge: nothing is
+// counted and no merge is put on record, its lane is withdrawn unless a person already did
+// (`run-merge-withdrawn.ts`), and its seat goes to the next child — or a retry, where the withdrawal
+// could not read the child.
 async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
+	const { note, is_retry } = await run_merge_withdrawn.collect(ctx.child)
+
+	if (note !== undefined) console.error(note)
+	if (is_retry) return emit(MERGE_TOKEN.RETRY, FAILURE_EXIT_CODE)
+
 	return await offered(ctx)
 }
 
