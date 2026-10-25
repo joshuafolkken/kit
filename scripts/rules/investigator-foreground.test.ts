@@ -50,6 +50,45 @@ describe('investigator_foreground.is_background_investigator — the refusal', (
 	})
 })
 
+// joshuafolkken/kit#4889: a build whose subagent tool declares no `run_in_background` drops the field
+// from the parsed input, and the model writes it as a string there. The stand-down reads that string off
+// the call or the tail; a tail of boolean spellings is a build that declares it, so the refusal holds.
+function use_line(input: Record<string, unknown>, name = 'Agent'): string {
+	return JSON.stringify({
+		type: 'assistant',
+		timestamp: '2026-10-25T08:50:55.976Z',
+		message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name, input }] },
+	})
+}
+
+describe('investigator_foreground.lacks_background_field — the build without the field', () => {
+	const bare = agent_call({ subagent_type: INVESTIGATOR })
+
+	it('stands down once a dispatch on the tail wrote the field as a string', () => {
+		const tail = use_line({ subagent_type: INVESTIGATOR, run_in_background: 'false' })
+
+		expect(investigator_foreground.lacks_background_field(tail, bare)).toBe(true)
+		expect(investigator_foreground.ROW.already_satisfied(tail, bare)).toBe(true)
+	})
+
+	it('stands down when the call in hand carries the string', () => {
+		const call = agent_call({ subagent_type: INVESTIGATOR, run_in_background: 'false' })
+
+		expect(investigator_foreground.lacks_background_field('', call)).toBe(true)
+	})
+
+	it.each([
+		['an empty tail', ''],
+		[
+			'a boolean spelling on the tail',
+			use_line({ subagent_type: INVESTIGATOR, run_in_background: false }),
+		],
+		['a string on another tool', use_line({ command: 'ls', run_in_background: 'false' }, 'Bash')],
+	])('keeps refusing on %s, where the build declares the field', (_case, tail) => {
+		expect(investigator_foreground.lacks_background_field(tail, bare)).toBe(false)
+	})
+})
+
 describe('investigator_foreground.ROW — delivered by the rule guard', () => {
 	it('refuses every occurrence', () => {
 		expect(investigator_foreground.ROW.decide()).toBe(true)
