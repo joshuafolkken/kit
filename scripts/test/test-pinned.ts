@@ -151,9 +151,14 @@ async function unpinned_on(
 	if (hunks.length === 0) return []
 	const cache = await test_pinned_cache.load(base)
 	const keys = await keys_of(hunks)
-	const verdicts = await verdicts_on(paths, hunks, test_pinned_cache.known(cache, keys))
+	const files = hunks.map((hunk) => hunk.file)
+	const verdicts = await verdicts_on(
+		paths,
+		hunks,
+		await test_pinned_cache.known(cache, keys, files),
+	)
 
-	await test_pinned_cache.save(cache, keys, verdicts)
+	await test_pinned_cache.save(cache, keys, verdicts, files)
 
 	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
 }

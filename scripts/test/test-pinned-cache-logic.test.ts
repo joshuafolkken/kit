@@ -173,4 +173,79 @@ describe('test_pinned_cache_logic.stored', () => {
 			a: { verdict: 'red', tests: {} },
 		})
 	})
+
+	it('records each verdict with the basis read for it, and none where none was read', () => {
+		const probes = [
+			{ verdict: 'red' as const, failed: [FAILED_TEST] },
+			{ verdict: 'green' as const, failed: [] },
+		]
+
+		expect(test_pinned_cache_logic.stored(['a', 'b'], probes, TEST_DIGESTS, ['s'])).toEqual({
+			a: { ...RED, basis: 's' },
+			b: { verdict: 'green', tests: {} },
+		})
+	})
+})
+
+// joshuafolkken/kit#4873: past the tree-wide digests, a verdict holds while its own basis is the same.
+describe('test_pinned_cache_logic.fresh_verdict with a basis', () => {
+	const none_same: Freshness = { is_same_change: false, is_unchanged: false }
+	const green: StoredVerdict = { verdict: 'green', tests: {}, basis: 'b' }
+	const red: StoredVerdict = { ...RED, basis: 'r' }
+
+	it('keeps a green verdict past an edited test while the tests reaching its hunk are the same', () => {
+		expect(test_pinned_cache_logic.fresh_verdict(green, none_same, TEST_DIGESTS, 'b')).toEqual({
+			verdict: 'green',
+			failed: [],
+		})
+		expect(
+			test_pinned_cache_logic.fresh_verdict(green, none_same, TEST_DIGESTS, 'c'),
+		).toBeUndefined()
+	})
+
+	it('keeps a red verdict past another code change while its basis and failed test are the same', () => {
+		const edited = new Map([[FAILED_TEST, 'digest-u']])
+
+		expect(test_pinned_cache_logic.fresh_verdict(red, none_same, TEST_DIGESTS, 'r')).toEqual(
+			RED_PROBE,
+		)
+		expect(test_pinned_cache_logic.fresh_verdict(red, none_same, edited, 'r')).toBeUndefined()
+		expect(test_pinned_cache_logic.fresh_verdict(red, none_same, TEST_DIGESTS, 's')).toBeUndefined()
+	})
+
+	it('falls back to the tree-wide digests where no basis was stored or none could be read now', () => {
+		expect(test_pinned_cache_logic.fresh_verdict(RED, none_same, TEST_DIGESTS, 'r')).toBeUndefined()
+		expect(test_pinned_cache_logic.fresh_verdict(red, none_same, TEST_DIGESTS)).toBeUndefined()
+		expect(test_pinned_cache_logic.fresh_verdict(green, none_same, TEST_DIGESTS)).toBeUndefined()
+	})
+})
+
+describe('test_pinned_cache_logic bases', () => {
+	it('reads a related basis whatever order the tests are listed in, and moves with their content', () => {
+		const digests = new Map([...TEST_DIGESTS, ['b.test.ts', 'digest-b']])
+		const basis = test_pinned_cache_logic.related_basis([FAILED_TEST, 'b.test.ts'], digests)
+
+		expect(test_pinned_cache_logic.related_basis(['b.test.ts', FAILED_TEST], digests)).toBe(basis)
+		expect(test_pinned_cache_logic.related_basis([FAILED_TEST], digests)).not.toBe(basis)
+	})
+
+	it('reads a red basis whatever order the closures are in, and moves with the assets', () => {
+		const basis = test_pinned_cache_logic.red_basis('x', [
+			['a', '1'],
+			['b', '2'],
+		])
+
+		expect(
+			test_pinned_cache_logic.red_basis('x', [
+				['b', '2'],
+				['a', '1'],
+			]),
+		).toBe(basis)
+		expect(
+			test_pinned_cache_logic.red_basis('y', [
+				['a', '1'],
+				['b', '2'],
+			]),
+		).not.toBe(basis)
+	})
 })

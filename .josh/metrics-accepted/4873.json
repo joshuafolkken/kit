@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned red basis treats a module a spawned CLI reaches as an asset (round-2 fix), with its test",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 191
+	}
+}

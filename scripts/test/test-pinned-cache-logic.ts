@@ -20,15 +20,21 @@ import type { RedProbe, RedVerdict } from './test-red-logic'
 // **A `green` or `no-test` one holds while no test file's path or content changed** (`test_contents`):
 // it is only rechecked when a test could have come to reach it, and a stale one stops a lane rather
 // than passing it.
+// **Past those tree-wide digests, a verdict also holds while its own `basis` is the same**
+// (joshuafolkken/kit#4873): for a `red`, the base commit, the changed non-code and whole-suite files,
+// and each failed test's import closure; for any other, the tests whose imports reach the hunk's file,
+// with their content. An edit outside them keeps the verdict; with no basis — no import graph, no
+// failed file recorded — only the tree-wide digests hold it, as before.
 
 const DIGEST_ALGORITHM = 'sha256'
 const LINE_BREAK = '\n'
 const VERDICTS = ['red', 'green', 'no-test', 'test-only'] as const
 
-// A hunk's verdict, with the content digest of each test file that failed on it.
+// A hunk's verdict, with the content digest of each test file that failed on it and what it rests on.
 interface StoredVerdict {
 	verdict: RedVerdict
 	tests: Record<string, string>
+	basis?: string | undefined
 }
 
 interface VerdictCache {
@@ -46,6 +52,7 @@ interface Freshness {
 const STORED_SCHEMA = z.object({
 	verdict: z.enum(VERDICTS),
 	tests: z.record(z.string(), z.string()),
+	basis: z.string().optional(),
 })
 const CACHE_SCHEMA = z.object({
 	test_contents: z.string(),
@@ -122,26 +129,48 @@ function holds_tests(
 	return files.every(([file, digest]) => digests.get(file) === digest)
 }
 
+// The entry was stored with a basis, and what it rests on reads the same now.
+function is_based(entry: StoredVerdict, basis: string | undefined): boolean {
+	return entry.basis !== undefined && entry.basis === basis
+}
+
 function holds(
 	entry: StoredVerdict,
 	freshness: Freshness,
 	digests: ReadonlyMap<string, string>,
+	basis: string | undefined,
 ): boolean {
-	if (entry.verdict !== 'red') return freshness.is_unchanged
+	if (entry.verdict !== 'red') return freshness.is_unchanged || is_based(entry, basis)
+	const is_same = freshness.is_same_change || is_based(entry, basis)
 
-	return freshness.is_same_change && holds_tests(entry.tests, freshness, digests)
+	return is_same && holds_tests(entry.tests, freshness, digests)
 }
 
 // The stored verdict while what it rests on is unchanged: the code change and the failed test files for
-// `red`, every test file for any other. `digests` holds each test file's content digest now.
+// `red`, every test file for any other — or, past either, its own `basis` read now. `digests` holds each
+// test file's content digest now.
 function fresh_verdict(
 	entry: StoredVerdict | undefined,
 	freshness: Freshness,
 	digests: ReadonlyMap<string, string>,
+	basis?: string,
 ): RedProbe | undefined {
-	if (entry === undefined || !holds(entry, freshness, digests)) return undefined
+	if (entry === undefined || !holds(entry, freshness, digests, basis)) return undefined
 
 	return { verdict: entry.verdict, failed: Object.keys(entry.tests) }
+}
+
+// A `green` or `no-test` verdict's basis: each test whose imports reach the hunk's file, with its content.
+function related_basis(tests: ReadonlyArray<string>, digests: ReadonlyMap<string, string>): string {
+	return digest_of(JSON.stringify(sorted(tests).map((file) => [file, digests.get(file)])))
+}
+
+// A `red` verdict's basis: the base commit with the changed files no import graph follows (`assets`,
+// a `change_of` digest), and each failed test's import closure.
+function red_basis(assets: string, closures: ReadonlyArray<readonly [string, string]>): string {
+	const named = closures.toSorted(([left], [right]) => left.localeCompare(right))
+
+	return digest_of(JSON.stringify([assets, named]))
 }
 
 // Each failed file with its digest now; a failed file with none — not a test file this cache digests —
@@ -159,17 +188,29 @@ function tests_of(
 	return pairs.length === failed.length ? Object.fromEntries(pairs) : {}
 }
 
-// The verdicts to write back, keyed; a key with no verdict is left out.
+function stored_of(
+	probe: RedProbe,
+	digests: ReadonlyMap<string, string>,
+	basis: string | undefined,
+): StoredVerdict {
+	const entry = { verdict: probe.verdict, tests: tests_of(probe.failed, digests) }
+
+	return basis === undefined ? entry : { ...entry, basis }
+}
+
+// The verdicts to write back, keyed, each with its basis where one was read; a key with no verdict is
+// left out.
 function stored(
 	keys: ReadonlyArray<string>,
 	probes: ReadonlyArray<RedProbe | undefined>,
 	digests: ReadonlyMap<string, string>,
+	bases: ReadonlyArray<string | undefined> = [],
 ): Record<string, StoredVerdict> {
 	const pairs = keys.flatMap((key, index) => {
 		const probe = probes[index]
 		if (probe === undefined) return []
 
-		return [[key, { verdict: probe.verdict, tests: tests_of(probe.failed, digests) }] as const]
+		return [[key, stored_of(probe, digests, bases[index])] as const]
 	})
 
 	return Object.fromEntries(pairs)
@@ -183,7 +224,10 @@ const test_pinned_cache_logic = {
 	fresh_verdict,
 	freshness_of,
 	hunk_key,
+	red_basis,
+	related_basis,
 	stored,
+	tests_of,
 	test_set_of,
 }
 
