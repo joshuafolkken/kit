@@ -106,6 +106,17 @@ describe('run_event_overrun — the result', () => {
 		expect(run_event_overrun.recurred_of(run_event_overrun.FILED_RESULT)).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#4858
+	it('reads back every issue a result folded causes into', () => {
+		const result = run_event_overrun.folded_result([4801, 4802])
+
+		expect(result).toBe('folded #4801,#4802')
+		expect(run_event_overrun.folded_of(result)).toStrictEqual([4801, 4802])
+		expect(run_event_overrun.folded_of(run_event_overrun.FILED_RESULT)).toStrictEqual([])
+		expect(run_event_overrun.folded_of(run_event_overrun.recurred_result(4790))).toStrictEqual([])
+		expect(run_event_overrun.folded_of(`${result} (as #4703)`)).toStrictEqual([4801, 4802])
+	})
+
 	it('reads the reason a result gives for filing nothing', () => {
 		const reason = 'CI wait'
 		const bare = 'nothing to fix'

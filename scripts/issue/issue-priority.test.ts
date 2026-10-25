@@ -237,6 +237,20 @@ describe('issue_priority malformed H / I lines (joshuafolkken/kit#4767)', () => 
 	})
 })
 
+// joshuafolkken/kit#4858: a fold into an open Issue skips issue:file, so it sets this floor itself.
+describe('issue_priority.lane_label', () => {
+	it('labels a causing lane by the same thresholds as its line in a body', () => {
+		expect(issue_priority.lane_label(40)).toBeUndefined()
+		expect(issue_priority.lane_label(41)).toBe(PRIORITY_HIGH_LABEL)
+		expect(issue_priority.lane_label(60)).toBe(PRIORITY_HIGH_LABEL)
+		expect(issue_priority.lane_label(61)).toBe(PRIORITY_CRITICAL_LABEL)
+	})
+
+	it('reads no floor from a causing-lane line without minutes', () => {
+		expect(issue_priority.floor_of(body('', '- 原因のレーン: 不明\n'))).toBe('normal')
+	})
+})
+
 describe('issue_priority.with_label', () => {
 	it('adds the declared level label', () => {
 		expect(issue_priority.with_label(BASE, body('- 優先度: 緊急（条件 3）'))).toStrictEqual([
