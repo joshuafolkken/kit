@@ -3,6 +3,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
+import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from './test-declared-logic'
 import {
 	test_pinned_cache_logic,
@@ -23,6 +25,8 @@ const LINE_BREAK = '\n'
 const NUL = '\0'
 // Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
 const AS_COMMIT = '^{commit}'
+// The ledger's own directory only: its legacy paths sit under `docs/`, which a test does read.
+const OBSERVATION_PREFIX = `${OBSERVATION_LEDGER_DIRECTORY}/`
 
 interface LoadedCache extends VerdictCache {
 	file: string
@@ -63,14 +67,23 @@ function contents_digest(digests: ReadonlyMap<string, string>): string {
 	)
 }
 
+// A run's own record — an observation line or a `josh metrics` approval — which no test reads, so one
+// written after a probe keeps its `red` (joshuafolkken/kit#4856).
+function is_run_record(file: string): boolean {
+	return release_approval_prune.is_approval(file) || file.startsWith(OBSERVATION_PREFIX)
+}
+
 // The code change: `base` as a commit, and every non-test path changed since it with its content. A
-// test file is left out — a `red` rests on the test files it failed in, not on every test.
+// test file is left out — a `red` rests on the test files it failed in, not on every test — and so is
+// a run record.
 async function change_digest(base: string): Promise<string> {
 	const [commit, paths] = await Promise.all([
 		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
 	])
-	const code = paths.filter((file) => !test_declared_logic.is_test_file(file))
+	const code = paths.filter(
+		(file) => !test_declared_logic.is_test_file(file) && !is_run_record(file),
+	)
 
 	return test_pinned_cache_logic.change_of(commit.trim(), code, await digests_of(code))
 }

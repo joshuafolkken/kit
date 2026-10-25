@@ -1,4 +1,5 @@
-import { rm } from 'node:fs/promises'
+import { mkdir, rm } from 'node:fs/promises'
+import path from 'node:path'
 import { base_tree } from '#scripts/git/base-tree'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,6 +20,10 @@ const { DRIVER_FILE, CHANGED_DRIVER, build_change_branch, git, write } = test_pi
 const EXTRA_TEST = 'extra.test.ts'
 // A source file no hunk sits in and no test reaches, standing in for a fixture or a fix elsewhere.
 const OUTSIDE_FILE = 'outside.ts'
+const APPROVAL_FILE = path.join('.josh', 'metrics-accepted', '1.json')
+const OBSERVATION_FILE = path.join('.josh', 'observations', '1.md')
+const LEGACY_LEDGER_FILE = path.join('docs', 'maintainers', 'observations', '1.md')
+const OBSERVATION_LINE = '- observed\n'
 // joshuafolkken/kit#4723: the module the test reaches the driver through, and the same module once it
 // stops importing the driver — a copy of its functions — so no test reaches the driver's hunks.
 const APP_FILE = 'app.js'
@@ -104,6 +109,46 @@ describe('test_pinned.run with a stored verdict', () => {
 
 			expect(runs).toHaveBeenCalledTimes(1)
 			expect(report).toEqual(first)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#4856: a run writes its own records after a probe, and no test reads them.
+describe('test_pinned.run after only run records changed', () => {
+	it(
+		'keeps every verdict without starting vitest when an approval and an observation are written',
+		async () => {
+			await build_change_branch()
+			const first = await run_report()
+
+			await mkdir(path.dirname(APPROVAL_FILE), { recursive: true })
+			await mkdir(path.dirname(OBSERVATION_FILE), { recursive: true })
+			await write(APPROVAL_FILE, '{}\n')
+			await write(OBSERVATION_FILE, OBSERVATION_LINE)
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			const report = await run_report()
+
+			expect(runs).not.toHaveBeenCalled()
+			expect(report).toEqual(first)
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'checks the pinned hunk again after a legacy ledger file under docs/ changed, which a test may read',
+		async () => {
+			await build_change_branch()
+			await run_report()
+
+			await mkdir(path.dirname(LEGACY_LEDGER_FILE), { recursive: true })
+			await write(LEGACY_LEDGER_FILE, OBSERVATION_LINE)
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(1)
 		},
 		RUN_TIMEOUT,
 	)

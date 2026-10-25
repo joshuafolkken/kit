@@ -1,0 +1,7 @@
+{
+	"reason": "#4856 adds is_run_record so test:pinned keeps cached red verdicts when only .josh run records change",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
