@@ -148,10 +148,11 @@ Record a `/code-review` round's findings so they survive the run. It appends one
 
 A recorded code round also says whether `josh ship` reuses it as its round 1 (joshuafolkken/kit#4763), from the ship's own predicate (`scripts/review/review-round-reuse.ts`):
 
-- `Reused`: the files this round covers hold still since the record, or the ship's own round 1 stopped on a finding.
-- `Not reused`: the tree moved (a `main:merge` that changed a recorded file included), the round was not attested on this branch, or the issue changed after its brief — run `pnpm josh run:review` and the round-1 `/code-review` in the session.
+- `Reused`: the files this round covers hold still since the record.
+- `Reused, delta to round 2`: every file moved since the record is one round 2 reads from the round-1 brief's stamp after the commit (joshuafolkken/kit#4878), or the ship's own round 1 stopped on a finding. The ship does not run round 1 again.
+- `Not reused`: a move round 2 would not read — a file a recorded High cites, documentation or a prompt, a file back at its briefed bytes, a default-branch change to a covered file — the round was not attested on this branch, or the issue changed after its brief — run `pnpm josh run:review` and the round-1 `/code-review` in the session.
 
-The answer is for this tree: run `pnpm josh main:merge` before the check for the answer the ship's sync reaches. A merge that moves only the base keeps the round (joshuafolkken/kit#4829) — every recorded digest matches and no path the default branch changed is a recorded file; a recorded base git can no longer resolve reads as moved.
+The answer is for this tree: run `pnpm josh main:merge` before the check for the answer the ship's sync reaches. A merge that moves only the base keeps the round as it stands (joshuafolkken/kit#4829) — every recorded digest matches and no path the default branch changed is a recorded file; a recorded base git can no longer resolve reads as `Not reused`.
 
 A reuse question git cannot answer reads as `Not reused`; an issue that cannot be read reads as fresh, as in the ship, and `josh followup` still refuses a stale review. The exit code does not change.
 

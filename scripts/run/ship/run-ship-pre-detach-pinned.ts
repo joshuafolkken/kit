@@ -46,8 +46,8 @@ async function summary(): Promise<PinnedSummary> {
 }
 
 // Whether the supervisor runs a fresh round 1, whose `run:review --join` lists and records the unpinned
-// places under the reason. A reused round 1 — after the ship's own round 1 stopped, the lane's fix
-// included — runs no `test:pinned` (`review-round-reuse.ts`). A question git could not answer probes.
+// places under the reason. A reused round 1 — its delta left to round 2, or after the ship's own
+// round 1 stopped, the lane's fix included — runs no `test:pinned` (`review-round-reuse.ts`). A question git could not answer probes.
 async function is_listed_after_detach(number: string): Promise<boolean> {
 	try {
 		return !(await review_round_reuse.is_reusable_here(Number(number)))

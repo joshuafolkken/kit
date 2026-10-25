@@ -26,7 +26,10 @@ vi.mock('#scripts/lane/lane-ledger', () => ({
 	lane_ledger: { record_round_one: record_round_one_mock, record_round_two: vi.fn() },
 }))
 vi.mock('#scripts/review/review-stamps', () => ({
-	review_stamps: { reviewed_stamp: { read: stamp_read_mock, remove: vi.fn(), write: vi.fn() } },
+	review_stamps: {
+		reviewed_stamp: { read: stamp_read_mock, remove: vi.fn(), write: vi.fn() },
+		round_one_stamp: { read: () => undefined },
+	},
 }))
 vi.mock('#scripts/review/review-attest', async (import_original) => {
 	const { review_attest } = await import_original<Record<'review_attest', object>>()

@@ -1,4 +1,5 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { error_text } from '#scripts/lib/error-message'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_lane_handover } from './review-lane-handover'
 
@@ -9,12 +10,17 @@ import { review_lane_handover } from './review-lane-handover'
 const { reusable_mock } = vi.hoisted(() => ({ reusable_mock: vi.fn() }))
 
 vi.mock('./review-round-reuse', () => ({
-	review_round_reuse: { is_reusable_here: reusable_mock },
+	review_round_reuse: {
+		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
+		reuse_here: reusable_mock,
+	},
 }))
 
 const ISSUE = 4850
 const OTHER_ISSUE = 4775
 const SHIP_STEP = 'pnpm josh ship --detach --review'
+const DELTA = 'delta'
+const GIT_FAILURE = 'git unavailable'
 
 function mark(issue: string | undefined, is_child: boolean): void {
 	vi.spyOn(lane_child_marker, 'marked_issue').mockReturnValue(issue)
@@ -22,7 +28,7 @@ function mark(issue: string | undefined, is_child: boolean): void {
 }
 
 beforeEach(() => {
-	reusable_mock.mockResolvedValue(true)
+	reusable_mock.mockResolvedValue('held')
 })
 
 afterEach(() => {
@@ -40,16 +46,42 @@ describe('review_lane_handover.is_handed_over — the recorded round', () => {
 
 	it('keeps run:review open when no round is recorded, or the ship would review it again', async () => {
 		mark(String(ISSUE), true)
-		reusable_mock.mockResolvedValue(false)
+		reusable_mock.mockResolvedValue('again')
 
 		expect(await review_lane_handover.is_handed_over(ISSUE)).toBe(false)
 	})
 
+	// joshuafolkken/kit#4878: the moved files are round 2's, so the lane hands over all the same.
+	it('hands over a lane child whose recorded round the ship reuses with a delta', async () => {
+		mark(String(ISSUE), true)
+		reusable_mock.mockResolvedValue(DELTA)
+
+		expect(await review_lane_handover.is_handed_over(ISSUE)).toBe(true)
+	})
+
 	it('keeps run:review open when git cannot answer the reuse question', async () => {
 		mark(String(ISSUE), true)
-		reusable_mock.mockRejectedValue(new Error('git unavailable'))
+		reusable_mock.mockRejectedValue(new Error(GIT_FAILURE))
 
 		expect(await review_lane_handover.is_handed_over(ISSUE)).toBe(false)
+	})
+})
+
+describe('review_lane_handover.reuse_here — the reuse answer', () => {
+	it("passes the ship's three-way answer through", async () => {
+		reusable_mock.mockResolvedValue(DELTA)
+
+		expect(await review_lane_handover.reuse_here(ISSUE)).toBe(DELTA)
+	})
+
+	it('answers again and traces the failure when git cannot answer', async () => {
+		const trace = vi.spyOn(error_text, 'trace_swallowed').mockReturnValue(undefined)
+		const error = new Error(GIT_FAILURE)
+
+		reusable_mock.mockRejectedValue(error)
+
+		expect(await review_lane_handover.reuse_here(ISSUE)).toBe('again')
+		expect(trace).toHaveBeenCalledWith('review_lane_handover.reuse_here', error)
 	})
 })
 
