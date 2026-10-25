@@ -1,0 +1,7 @@
+{
+	"reason": "chain-rule.md step 0 names the second reviewer and its review:record --interaction, which #4781's acceptance criterion requires (+119 on-demand bytes)",
+	"date": "2026-10-24",
+	"growth": {
+		"ai_cost.on_demand_bytes": 119
+	}
+}

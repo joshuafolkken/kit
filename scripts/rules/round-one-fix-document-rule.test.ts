@@ -30,6 +30,14 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 		)
 	})
 
+	// joshuafolkken/kit#4781: a lane child that ran round 1 with one reviewer left the interaction
+	// review to run alone in ship, so step 0 names the second reviewer and its record.
+	it('step 0 runs two reviewers on two briefs and records the second as the interaction pass', () => {
+		expect(lane_step()).toContain(
+			'on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>`',
+		)
+	})
+
 	// Step 0 alone is exempt: a lane child whose ship failed falls to step 1 and may reach `git -y`.
 	it('scopes the round-1 fix gate before git -y to runs outside step 0', () => {
 		const content = read_unwrapped(CHAIN_RULE)
