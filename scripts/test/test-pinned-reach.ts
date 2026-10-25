@@ -45,14 +45,19 @@ async function work_tree_files(): Promise<Array<string>> {
 	return listed.split(NUL).filter((file) => file !== '')
 }
 
-// The graph with every code file the work tree holds, as absolute paths the graph resolves to.
-async function view_of(): Promise<GraphView | undefined> {
-	const graph = await import_graph.create(process.cwd())
-	if (graph === undefined) return undefined
+// Every code file the work tree holds, as absolute paths the graph resolves to.
+async function code_universe(): Promise<Array<string>> {
 	const files = await work_tree_files()
 	const code = files.filter((file) => related_scope.is_relatable(file) && existsSync(file))
 
-	return { graph, universe: code.map((file) => path.resolve(file)) }
+	return code.map((file) => path.resolve(file))
+}
+
+async function view_of(): Promise<GraphView | undefined> {
+	const graph = await import_graph.create(process.cwd())
+	if (graph === undefined) return undefined
+
+	return { graph, universe: await code_universe() }
 }
 
 // A code file nothing imports that is not a test: a config, a setup file or a CLI a test spawns.
@@ -138,7 +143,7 @@ function create(inputs: ReachInputs): Reach {
 	return { related, failed }
 }
 
-const test_pinned_reach = { create, probed_files, work_tree_files }
+const test_pinned_reach = { code_universe, create, probed_files, work_tree_files }
 
 export type { Reach, ReachInputs }
 export { test_pinned_reach }

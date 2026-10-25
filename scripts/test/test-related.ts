@@ -3,7 +3,7 @@ import path from 'node:path'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
-import { moved_paths } from '#scripts/gate/moved-paths'
+import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
@@ -14,6 +14,7 @@ import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope, type ScopeRequest } from './test-related-scope'
+import { test_related_synced, type SyncedSplit } from './test-related-synced'
 import { test_unit_guard } from './test-unit-guard'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -122,8 +123,8 @@ async function explicit_change(
 
 // **A non-code file a main sync brought in is not this branch's change** (joshuafolkken/kit#4572), so it
 // joins `since_map`: it neither adds the tests reading it nor sends the run to the whole suite — main's
-// CI verified it. A synced module stays a moved file, so `vitest related` still walks to the
-// tests importing it, a branch-only one among them. A branch change git cannot read marks nothing.
+// CI verified it. A synced module is `test-related-synced.ts`'s: only the tests it shares with this
+// branch's change run for it. A branch change git cannot read marks nothing.
 function synced_data(
 	synced: ReadonlyArray<string>,
 	branch: ReadonlyArray<string> | undefined,
@@ -144,6 +145,31 @@ function without_own_tests(
 	return since_map.filter(
 		(file) => !test_declared_logic.is_test_file(file) || branch?.includes(file) === false,
 	)
+}
+
+// The moved files handed on as explicit arguments: a synced module only this branch's change shares a
+// test with is replaced by that test (`test-related-synced.ts`).
+function narrowed_moved(moved: ReadonlyArray<string>, split: SyncedSplit): ReadonlyArray<string> {
+	return [...new Set([...moved.filter((file) => !split.left.includes(file)), ...split.shared])]
+}
+
+// The reading's `since_map`: what this branch did not change. The synced modules left out join it and
+// the change, so they settle as reaching no test rather than leaving an empty selection that runs the
+// whole suite.
+function moved_reading(
+	change: ChangeReading,
+	parts: MovedParts,
+	branch: ReadonlyArray<string> | undefined,
+	split: SyncedSplit,
+): ChangeReading {
+	const since_map = [
+		...without_own_tests(change.since_map ?? [], branch),
+		...synced_data(parts.synced, branch),
+		...split.left,
+	]
+	const changed = [...new Set([...(change.changed ?? []), ...split.left])]
+
+	return { ...change, changed, since_map: [...new Set(since_map)], synced: parts.synced }
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
@@ -167,19 +193,15 @@ async function since_green_change(
 
 	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
 
-	const change = await explicit_change(root, moved, map)
+	const branch = await branch_change()
+	const split = await test_related_synced.split(root, parts.synced, branch, map)
+	const change = await explicit_change(root, narrowed_moved(moved, split), map)
 
 	if (change.map === undefined) return undefined
 
 	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
 
-	const branch = await branch_change()
-	const since_map = [
-		...without_own_tests(change.since_map ?? [], branch),
-		...synced_data(parts.synced, branch),
-	]
-
-	return { ...change, since_map, synced: parts.synced }
+	return moved_reading(change, parts, branch, split)
 }
 
 async function whole_change(root: string, map: ReadMap | undefined): Promise<ChangeReading> {
