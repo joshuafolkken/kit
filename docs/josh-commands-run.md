@@ -455,7 +455,7 @@ child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
-a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; every 30th merge in the
+a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
 lane ledger launches one baseline investigation of the median lane — every stage and sub-stage at 2% or over
 in `lane:stats --period 3`, its causes filed by the overrun's rules — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
 its wording `run-event-baseline.ts`), a finding on the board. The board's

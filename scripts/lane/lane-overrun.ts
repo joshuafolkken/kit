@@ -6,7 +6,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { detached_launch } from '#scripts/run/detached-launch'
-import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
+import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_child_marker } from './lane-child-marker'
@@ -34,17 +34,50 @@ const NO_LEDGER = 'no ledger'
 // A lane's net minutes, or why there are none (joshuafolkken/kit#4818).
 type LaneNet = { kind: 'minutes'; minutes: number } | { kind: 'missing'; reason: string }
 
-// A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's note on
-// the stream and launches no second session to file the same causes. A pass that threw before it
-// noted anything leaves only its failure, which the retry answers.
-function is_noted(events: ReadonlyArray<RunEvent>, issue: number): boolean {
-	const notes = events.flatMap((event) =>
+// A launch that failed is retried once, at the next `run:merge` (joshuafolkken/kit#4930).
+const MAX_LAUNCH_FAILURES = 2
+
+function overrun_notes(events: ReadonlyArray<RunEvent>): ReadonlyArray<OverrunNote> {
+	return events.flatMap((event) =>
 		event.kind === EVENT_KIND.NOTE ? (run_event_overrun.parse(event.text) ?? []) : [],
 	)
+}
 
-	return notes.some(
-		(note) => note.issue === issue && !(note.kind === 'failed' && note.minutes === undefined),
-	)
+// A pass that threw before it noted anything leaves a failure with no minutes.
+function is_thrown(note: OverrunNote): boolean {
+	return note.kind === 'failed' && note.minutes === undefined
+}
+
+// A start note that launched no session.
+function is_launch_failure(note: OverrunNote): boolean {
+	return note.kind === 'failed' && note.minutes !== undefined
+}
+
+function is_final(note: OverrunNote): boolean {
+	return !is_thrown(note) && !is_launch_failure(note)
+}
+
+// A merge `run:merge` collects again — a driver retry, a parent's hand run — finds its lane's note on
+// the stream and launches no second session to file the same causes. A pass that threw before it
+// noted anything leaves only its failure, which the retry answers; a launch that failed is answered
+// once more.
+function is_noted(events: ReadonlyArray<RunEvent>, issue: number): boolean {
+	const notes = overrun_notes(events).filter((note) => note.issue === issue)
+	const failures = notes.filter((note) => is_launch_failure(note)).length
+
+	return failures >= MAX_LAUNCH_FAILURES || notes.some((note) => is_final(note))
+}
+
+// The earlier lanes whose latest note is a launch failure not yet retried; a retry that threw leaves
+// its own note last, so it is not swept up again at every merge after.
+function retried_lanes(events: ReadonlyArray<RunEvent>, issue: number): ReadonlyArray<number> {
+	const latest = new Map(overrun_notes(events).map((note) => [note.issue, note]))
+
+	latest.delete(issue)
+
+	return [...latest.values()]
+		.filter((note) => is_launch_failure(note) && !is_noted(events, note.issue))
+		.map((note) => note.issue)
 }
 
 function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
@@ -170,12 +203,27 @@ async function investigate_lane(issue: number): Promise<void> {
 }
 
 // Never fails the merge it follows: an error is a note on the stream, not a refused merge.
-async function investigate(issue: number): Promise<void> {
+async function guarded(issue: number, pass: (issue: number) => Promise<void>): Promise<void> {
 	try {
-		await investigate_lane(issue)
+		await pass(issue)
 	} catch (error) {
 		note_failure(issue)(detached_launch.note_of(error))
 	}
+}
+
+// The merged lane, then each earlier lane whose launch failed once.
+async function investigate_with_retries(issue: number): Promise<void> {
+	await investigate_lane(issue)
+	const retried = retried_lanes(await run_event_stream_emit.all_events(), issue)
+
+	for (const lane of retried) {
+		// eslint-disable-next-line no-await-in-loop -- one pass at a time appends to the stream, as the merged lane's did
+		await guarded(lane, investigate_lane)
+	}
+}
+
+async function investigate(issue: number): Promise<void> {
+	await guarded(issue, investigate_with_retries)
 }
 
 const lane_overrun = { investigate, launch }
