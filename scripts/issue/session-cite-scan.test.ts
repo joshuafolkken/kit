@@ -104,6 +104,8 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
 	['run/pause/run-pause.ts', 5],
 	['run/ship/run-ship-detach.ts', 1],
+	// The handover note on the run event stream, which `run:board` attributes by its `#<N>`.
+	['run/ship/run-ship-handover.ts', 1],
 	// The ship-stop cap's Telegram warning.
 	['run/ship/run-ship-relaunch-cap.ts', 1],
 	// The `relaunch-failed` event `run:merge` reads.
