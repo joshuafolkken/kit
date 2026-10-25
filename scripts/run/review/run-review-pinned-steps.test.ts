@@ -14,6 +14,8 @@ const PID = 4770
 const REASON = 'the branch only logs'
 const PINNED_COMMAND = 'test:pinned'
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
+const STILL_RUNNING_NOTE =
+	'it is still running on this tree; wait for its answer with `pnpm josh run:review --pinned`'
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned: ['a.ts 0123456789abcdef'] }
 const START = 'Sat Oct 24 21:00:00 2026'
 const OTHER_START = 'Sun Oct 25 09:00:00 2026'
@@ -209,12 +211,38 @@ describe('run_review_pinned_steps.wait_for_answer — failing open', () => {
 	})
 })
 
-describe('run_review_pinned_steps.wait_for_answer — stopping a late check', () => {
+// joshuafolkken/kit#4888: a late check is left running on its tree, and the note names the one command
+// that waits for its answer rather than asking for a run by hand.
+describe('run_review_pinned_steps.wait_for_answer — a late check', () => {
+	it.each([
+		['is running', true],
+		['has an unreadable start', undefined],
+	])('leaves a check past the grace that %s running', async (_kind, is_same) => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(is_same)
+		run_review_pinned_steps.launch(ROOT)
+
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(process.kill).not.toHaveBeenCalledWith(-PID, 'SIGTERM')
+	})
+
+	it('names `run:review --pinned` as the one command to wait on', async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
+		run_review_pinned_steps.launch(ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+
+		expect(answer?.text).toContain(STILL_RUNNING_NOTE)
+	})
+})
+
+// Where no read follows (a ship's supervised join), a late check is stopped as before joshuafolkken/kit#4888.
+describe('run_review_pinned_steps.wait_for_answer — stopping a late check nothing reads', () => {
 	it("stops the check's whole process group once the grace has passed", async () => {
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
 		run_review_pinned_steps.launch(ROOT)
 
-		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock(), false)
 
 		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
 	})
@@ -223,9 +251,29 @@ describe('run_review_pinned_steps.wait_for_answer — stopping a late check', ()
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(undefined)
 		run_review_pinned_steps.launch(ROOT)
 
-		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock())
+		await run_review_pinned_steps.wait_for_answer(ROOT, capped_clock(), false)
 
 		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+	})
+})
+
+describe('run_review_pinned_steps.wait_for_answer — stopping a queued check nothing reads', () => {
+	it('stops it without waiting out the grace and fails open', async () => {
+		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
+		vi.mocked(core_budget.live_reservations).mockReturnValue([pinned_claim(ROOT)])
+		run_review_pinned_steps.launch(ROOT)
+
+		const answer = await run_review_pinned_steps.wait_for_answer(
+			ROOT,
+			vi.fn(() => 0),
+			false,
+		)
+
+		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+		expect(answer).toStrictEqual({
+			text: '`josh test:pinned` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended\n',
+			unpinned: [],
+		})
 	})
 
 	it('stops nothing when the check answered within the grace', async () => {
@@ -296,9 +344,10 @@ describe('run_review_pinned_steps.clear — the last check', () => {
 })
 
 // joshuafolkken/kit#4808: a check still queued for its cores when the pair ends could not finish
-// within the grace, so the join stops it at once.
+// within the grace, so the join answers at once; it is left queued for `run:review --pinned`
+// (joshuafolkken/kit#4888).
 describe('run_review_pinned_steps.wait_for_answer — a check still queued for cores', () => {
-	it('stops it without waiting out the grace and fails open', async () => {
+	it('answers without waiting out the grace, leaving the check queued', async () => {
 		vi.spyOn(process_identity, 'is_same_process').mockReturnValue(true)
 		vi.mocked(core_budget.live_reservations).mockReturnValue([pinned_claim(ROOT)])
 		const now = vi.fn(() => 0)
@@ -308,9 +357,9 @@ describe('run_review_pinned_steps.wait_for_answer — a check still queued for c
 		const answer = await run_review_pinned_steps.wait_for_answer(ROOT, now)
 
 		expect(now).not.toHaveBeenCalled()
-		expect(process.kill).toHaveBeenCalledWith(-PID, 'SIGTERM')
+		expect(process.kill).not.toHaveBeenCalledWith(-PID, 'SIGTERM')
 		expect(answer).toStrictEqual({
-			text: '`josh test:pinned` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended\n',
+			text: `\`josh test:pinned\` could not run, so nothing was checked: it was still waiting for cores when the gate and the review ended — ${STILL_RUNNING_NOTE}\n`,
 			unpinned: [],
 		})
 	})
