@@ -11,6 +11,7 @@ import {
 	type Freshness,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
+import { test_pinned_reach, type Reach, type ReachInputs } from './test-pinned-reach'
 import type { RedProbe } from './test-red-logic'
 
 // The reads and writes of `josh test:pinned`'s verdict cache (joshuafolkken/kit#4706); what a key is and
@@ -22,28 +23,35 @@ import type { RedProbe } from './test-red-logic'
 
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'
 const LINE_BREAK = '\n'
-const NUL = '\0'
 // Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
 const AS_COMMIT = '^{commit}'
 // The ledger's own directory only: its legacy paths sit under `docs/`, which a test does read.
 const OBSERVATION_PREFIX = `${OBSERVATION_LEDGER_DIRECTORY}/`
 
+interface TreeRead {
+	test_digests: ReadonlyMap<string, string>
+	code: Omit<ReachInputs, 'test_digests'>
+	test_contents: string
+	change: string
+}
+
 interface LoadedCache extends VerdictCache {
 	file: string
+	base: string
 	freshness: Freshness
 	test_digests: ReadonlyMap<string, string>
+	reach: Reach
 }
 
 async function read_text(file: string): Promise<string> {
 	return existsSync(file) ? await readFile(file, 'utf8') : ''
 }
 
-// Every test file in the work tree, tracked or untracked but not ignored. `-z` lists a path as it is,
-// where `core.quotePath` would quote a non-ASCII one.
+// Every test file in the work tree, tracked or untracked but not ignored.
 async function test_files(): Promise<Array<string>> {
-	const listed = await git_spawn.read(['ls-files', '-coz', '--exclude-standard'])
+	const listed = await test_pinned_reach.work_tree_files()
 
-	return listed.split(NUL).filter((file) => test_declared_logic.is_test_file(file))
+	return listed.filter((file) => test_declared_logic.is_test_file(file))
 }
 
 // The digest of each named file the work tree still holds.
@@ -76,7 +84,7 @@ function is_run_record(file: string): boolean {
 // The code change: `base` as a commit, and every non-test path changed since it with its content. A
 // test file is left out — a `red` rests on the test files it failed in, not on every test — and so is
 // a run record.
-async function change_digest(base: string): Promise<string> {
+async function code_change(base: string): Promise<Omit<ReachInputs, 'test_digests'>> {
 	const [commit, paths] = await Promise.all([
 		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
@@ -85,28 +93,114 @@ async function change_digest(base: string): Promise<string> {
 		(file) => !test_declared_logic.is_test_file(file) && !is_run_record(file),
 	)
 
-	return test_pinned_cache_logic.change_of(commit.trim(), code, await digests_of(code))
+	return { commit: commit.trim(), code, digests: await digests_of(code) }
+}
+
+// The work tree's tree-wide digests, with what they were read off.
+async function read_tree(base: string): Promise<TreeRead> {
+	const [test_digests, code] = await Promise.all([test_digests_of(), code_change(base)])
+	const test_contents = contents_digest(test_digests)
+	const change = test_pinned_cache_logic.change_of(code.commit, code.code, code.digests)
+
+	return { test_digests, code, test_contents, change }
 }
 
 async function load(base: string): Promise<LoadedCache> {
 	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
-	const [text, test_digests, change] = await Promise.all([
-		read_text(file),
-		test_digests_of(),
-		change_digest(base),
-	])
-	const test_contents = contents_digest(test_digests)
+	const [text, tree] = await Promise.all([read_text(file), read_tree(base)])
+	const { test_digests, code, test_contents, change } = tree
 	const entries = test_pinned_cache_logic.entries_of(text)
 	const freshness = test_pinned_cache_logic.freshness_of(text, { change, test_contents })
+	const reach = test_pinned_reach.create({ ...code, test_digests })
 
-	return { file, test_contents, change, entries, freshness, test_digests }
+	return { file, base, test_contents, change, entries, freshness, test_digests, reach }
 }
 
-// The verdict stored under each key, or `undefined` where none is stored or what it rests on changed.
-function known(cache: LoadedCache, keys: ReadonlyArray<string>): Array<RedProbe | undefined> {
-	return keys.map((key) =>
-		test_pinned_cache_logic.fresh_verdict(cache.entries[key], cache.freshness, cache.test_digests),
+// What a verdict on a hunk of `file` rests on now: the failed tests' closures for a `red`, the tests
+// reaching `file` for any other.
+async function basis_of(
+	cache: LoadedCache,
+	probe: RedProbe,
+	file: string,
+): Promise<string | undefined> {
+	if (probe.verdict !== 'red') return await cache.reach.related(file)
+
+	return await cache.reach.failed(probe.failed)
+}
+
+// The tree-wide digests first; only an entry they drop has its basis read, so an unchanged tree builds
+// no import graph.
+async function known_one(
+	cache: LoadedCache,
+	key: string,
+	file: string,
+): Promise<RedProbe | undefined> {
+	const entry = cache.entries[key]
+	const kept = test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests)
+	if (kept !== undefined || entry?.basis === undefined) return kept
+	const stored = { verdict: entry.verdict, failed: Object.keys(entry.tests) }
+	const basis = await basis_of(cache, stored, file)
+
+	return test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests, basis)
+}
+
+// The verdict stored under each key, or `undefined` where none is stored or what it rests on changed;
+// `files` names each key's hunk file.
+async function known(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	files: ReadonlyArray<string>,
+): Promise<Array<RedProbe | undefined>> {
+	return await Promise.all(
+		keys.map(async (key, index) => await known_one(cache, key, files[index] ?? '')),
 	)
+}
+
+// A verdict the tree-wide digests still hold keeps its stored basis; any other has its own read now.
+async function stored_basis(
+	cache: LoadedCache,
+	key: string,
+	probe: RedProbe,
+	file: string,
+): Promise<string | undefined> {
+	const entry = cache.entries[key]
+	const kept = test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests)
+	if (kept?.verdict === probe.verdict) return entry?.basis
+	const failed = Object.keys(test_pinned_cache_logic.tests_of(probe.failed, cache.test_digests))
+
+	return await basis_of(cache, { ...probe, failed }, file)
+}
+
+async function read_bases(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	probes: ReadonlyArray<RedProbe | undefined>,
+	files: ReadonlyArray<string>,
+): Promise<Array<string | undefined>> {
+	return await Promise.all(
+		keys.map(async (key, index) => {
+			const probe = probes[index]
+
+			return probe === undefined
+				? undefined
+				: await stored_basis(cache, key, probe, files[index] ?? '')
+		}),
+	)
+}
+
+// **A basis is read after the probes, so it is kept only while the tree still reads as it did at
+// `load`**: one read off an edit made mid-run would hold a verdict the probes never saw.
+async function bases_of(
+	cache: LoadedCache,
+	keys: ReadonlyArray<string>,
+	probes: ReadonlyArray<RedProbe | undefined>,
+	files: ReadonlyArray<string>,
+): Promise<Array<string | undefined>> {
+	const bases = await read_bases(cache, keys, probes, files)
+	const now = await read_tree(cache.base)
+	const is_steady = now.change === cache.change && now.test_contents === cache.test_contents
+
+	return is_steady ? bases : []
 }
 
 // Only the verdicts this run used are written, so the file never holds a hunk the branch has left behind.
@@ -114,11 +208,13 @@ async function save(
 	cache: LoadedCache,
 	keys: ReadonlyArray<string>,
 	probes: ReadonlyArray<RedProbe | undefined>,
+	files: ReadonlyArray<string>,
 ): Promise<void> {
+	const bases = await bases_of(cache, keys, probes, files)
 	const content: VerdictCache = {
 		test_contents: cache.test_contents,
 		change: cache.change,
-		entries: test_pinned_cache_logic.stored(keys, probes, cache.test_digests),
+		entries: test_pinned_cache_logic.stored(keys, probes, cache.test_digests, bases),
 	}
 
 	await mkdir(path.dirname(cache.file), { recursive: true })
