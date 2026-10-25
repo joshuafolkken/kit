@@ -5,12 +5,13 @@ import { markdown_section } from './markdown-section'
 // joshuafolkken/kit#4383: the priority `josh issue:file` applies, read from the body's one priority
 // declaration under its background heading (`issue-template.md` holds the criteria). An urgent or high
 // declaration must name its basis, so neither label is applied on a bare word. A run-time-shortening
-// Issue's reduction-per-merge line sets a floor — its share of the median lane time per merge — and so
-// does a causing-lane line, the net minutes of the lane the Issue's defect slowed
-// (joshuafolkken/kit#4749), and a security-finding or caused-park line sets a high one
-// (joshuafolkken/kit#4767): a declaration below the highest floor is refused, and a body that declares
-// none is filed at it. A priority label the filer typed (`kickoff new critical`) wins: the body is then
-// not judged at all.
+// Issue's reduction-per-merge line sets a floor — its share of the median lane time per merge — and a
+// security-finding or caused-park line sets a high one (joshuafolkken/kit#4767): a declaration below the
+// highest floor is refused, and a body that declares none is filed at it. A causing-lane line, the net
+// minutes of the lane the Issue's defect slowed (joshuafolkken/kit#4749), sets no floor
+// (joshuafolkken/kit#4870): it only ranks, and its run-time-shortening Issue is refused under the high
+// reduction, which would not pay back the lane its fix takes. A priority label the filer typed
+// (`kickoff new critical`) wins: the body is then not judged at all.
 
 type PriorityLevel = 'critical' | 'high' | 'normal'
 
@@ -20,7 +21,7 @@ interface LevelParser {
 	accepts: (basis: string) => boolean
 }
 
-// A background line that sets a floor, its well-formed shape, and the refusal for a malformed one.
+// A background line that sets a floor or ranks, its well-formed shape, and the refusal for a malformed one.
 interface FloorLine {
 	prefix: string
 	accepts: (line: string) => boolean
@@ -32,8 +33,8 @@ const DECLARATION_PREFIX = '- 優先度:'
 const NORMAL_LINE = '- 優先度: 通常'
 const CRITICAL_PATTERN = /^- 優先度: 緊急（(?<basis>.*)）$/u
 const HIGH_PATTERN = /^- 優先度: 高（(?<basis>.*)）$/u
-// An interrupt-filing condition number (`wip-cap.md`), a stated reduction or a causing lane's minutes.
-const CRITICAL_BASIS = /条件 ?[1-3]|短縮 ?\d|原因のレーン ?\d/u
+// An interrupt-filing condition number (`wip-cap.md`) or a stated reduction.
+const CRITICAL_BASIS = /条件 ?[1-3]|短縮 ?\d/u
 const PLACEHOLDER = /^<.*>$/u
 const REDUCTION_PREFIX = '- 1 マージあたりの短縮:'
 // A number with its percent sign, half- or full-width, glued to the word before it or not, one space
@@ -45,11 +46,9 @@ const LANE_PREFIX = '- 原因のレーン:'
 // The minutes are the lane's net time (`josh lane:net`), the number its Issue.
 const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
 // The minutes one cause of an overrun lost, ranked ahead of its causing lane's (joshuafolkken/kit#4861).
-// They set no floor: the causing-lane line alone does.
+// They set no floor, as the causing-lane line does not.
 const CAUSE_PREFIX = '- 原因の損失:'
 const CAUSE_LINE = /^- 原因の損失: (?<minutes>\d+(?:\.\d+)?) 分$/u
-const CRITICAL_LANE_MINUTES = 60
-const HIGH_LANE_MINUTES = 40
 const SECURITY_PREFIX = '- セキュリティ:'
 const PARK_PREFIX = '- 原因の park:'
 const PARK_LINE = /^- 原因の park: #[1-9]\d*$/u
@@ -59,7 +58,7 @@ const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	high: PRIORITY_HIGH_LABEL,
 	normal: undefined,
 }
-const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値> / 原因のレーン <分>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
+const DECLARATION_PROBLEM = `declare at most one priority under \`${BACKGROUND_HEADING}\`: \`- 優先度: 緊急（条件 <1-3> / 短縮 <値>）\`, \`- 優先度: 高（<根拠>）\` or \`${NORMAL_LINE}\` — an urgent or high one names its basis (\`issue-template.md\`)`
 
 const LANE_PROBLEM = `state a causing lane under \`${BACKGROUND_HEADING}\` as \`${LANE_PREFIX} <分> 分（#<N>）\` — the lane's net minutes from \`josh lane:net <N>\` (\`issue-template.md\`)`
 
@@ -70,10 +69,16 @@ const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}
 const PARK_PROBLEM = `state a caused park under \`${BACKGROUND_HEADING}\` as \`${PARK_PREFIX} #<N>\` — the Issue the defect parked or whose run it stopped (\`issue-template.md\`)`
 
 const FLOOR_DECLARATIONS: Readonly<Record<PriorityLevel, string>> = {
-	critical: '緊急（短縮 … / 原因のレーン …）',
-	high: '高（短縮 … / 原因のレーン … / セキュリティ … / 原因の park …）',
+	critical: '緊急（短縮 …）',
+	high: '高（短縮 … / セキュリティ … / 原因の park …）',
 	normal: '通常',
 }
+
+const WHOLE_PERCENT = 100
+// The merges a reduction under the high one takes to pay back one lane.
+const PAYBACK_MERGES = Math.ceil(WHOLE_PERCENT / HIGH_PERCENT)
+
+const SMALL_LANE_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue with a \`${LANE_PREFIX}\` line states a \`${REDUCTION_PREFIX}\` under ${String(HIGH_PERCENT)}% — about ${String(PAYBACK_MERGES)} merges before it pays back the lane its fix takes, so it is not filed: fold it into an open Issue, or leave the cause in the overrun investigation's result note (\`issue-template.md\`)`
 
 const REDUCTION_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue states \`${REDUCTION_PREFIX} <分>（レーン中央値 <分> の <%>）\` under \`${expected_effect_lint.HEADING}\` with its percentage filled in (\`issue-template.md\`)`
 
@@ -160,7 +165,8 @@ function is_park_line(line: string): boolean {
 	return PARK_LINE.test(line)
 }
 
-const LANE_FLOOR_LINE: FloorLine = {
+// Read for ranking, not a floor, as the cause-loss line below is.
+const LANE_RANK_LINE: FloorLine = {
 	prefix: LANE_PREFIX,
 	accepts: is_lane_line,
 	problem: LANE_PROBLEM,
@@ -178,9 +184,9 @@ const CAUSE_RANK_LINE: FloorLine = {
 	problem: CAUSE_PROBLEM,
 }
 
-// The refusal for the first floor or cause-loss line written in the wrong shape, or `undefined`.
+// The refusal for the first floor or rank line written in the wrong shape, or `undefined`.
 function malformed_problem(body: string): string | undefined {
-	return [LANE_FLOOR_LINE, CAUSE_RANK_LINE, ...HIGH_FLOOR_LINES].find((entry) =>
+	return [LANE_RANK_LINE, CAUSE_RANK_LINE, ...HIGH_FLOOR_LINES].find((entry) =>
 		background_lines(body, entry.prefix).some((line) => !entry.accepts(line)),
 	)?.problem
 }
@@ -215,27 +221,9 @@ function lost_minutes(body = ''): number {
 	return cause > 0 ? cause : lane_minutes(body)
 }
 
-// The floor a causing lane of `minutes` net time sets — strictly over each threshold.
-function minutes_floor(minutes: number): PriorityLevel {
-	if (minutes <= HIGH_LANE_MINUTES) return 'normal'
-
-	return minutes > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
-}
-
-// The label that floor carries, for a write that skips `issue:file` — a fold into an open Issue
-// (joshuafolkken/kit#4858) — or `undefined` at or under the high threshold.
-function lane_label(minutes: number): string | undefined {
-	return LABELS[minutes_floor(minutes)]
-}
-
-// The floor the longest causing lane sets.
-function lane_floor(body: string): PriorityLevel {
-	return minutes_floor(lane_minutes(body))
-}
-
-// The lowest level the Issue may declare: the highest of its reduction's, causing lane's and markers' floors.
+// The lowest level the Issue may declare: the higher of its reduction's and markers' floors.
 function floor_of(body: string): PriorityLevel {
-	const floors = [reduction_floor(body), lane_floor(body), marker_floor(body)]
+	const floors = [reduction_floor(body), marker_floor(body)]
 	const ranks = floors.map((level) => LEVELS.indexOf(level))
 
 	return LEVELS[Math.max(...ranks)] ?? 'normal'
@@ -254,9 +242,16 @@ function is_typed(labels: ReadonlyArray<string>): boolean {
 	)
 }
 
-// A run-time-shortening Issue must state its reduction as a percentage, or its floor could not be judged.
-function has_missing_reduction(body: string): boolean {
-	return expected_effect_lint.is_target(body) && reduction_percent(body) === undefined
+// A run-time-shortening Issue must state its reduction as a percentage, or its floor could not be
+// judged; one a causing lane prompted is refused under the high reduction (joshuafolkken/kit#4870).
+function reduction_problem(body: string): string | undefined {
+	if (!expected_effect_lint.is_target(body)) return undefined
+	const percent = reduction_percent(body)
+
+	if (percent === undefined) return REDUCTION_PROBLEM
+	const is_lane = background_lines(body, LANE_PREFIX).length > 0
+
+	return is_lane && percent < HIGH_PERCENT ? SMALL_LANE_PROBLEM : undefined
 }
 
 function floor_problem(body: string, level: PriorityLevel): string | undefined {
@@ -264,7 +259,7 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 
 	if (LEVELS.indexOf(level) >= LEVELS.indexOf(floor)) return undefined
 
-	return `the stated reduction per merge, causing lane, security finding or caused park ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${FLOOR_DECLARATIONS[floor]}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
+	return `the stated reduction per merge, security finding or caused park ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${FLOOR_DECLARATIONS[floor]}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
 }
 
 // Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list.
@@ -273,9 +268,8 @@ function problem(body: string, typed: ReadonlyArray<string>): string | undefined
 	const level = filed_level(body)
 
 	if (level === undefined) return DECLARATION_PROBLEM
-	if (has_missing_reduction(body)) return REDUCTION_PROBLEM
 
-	return malformed_problem(body) ?? floor_problem(body, level)
+	return reduction_problem(body) ?? malformed_problem(body) ?? floor_problem(body, level)
 }
 
 // The labels a new Issue is filed with — the filed level's label added unless one was typed.
@@ -289,10 +283,9 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 
 const issue_priority = {
 	CAUSE_PREFIX,
-	HIGH_LANE_MINUTES,
 	declared_level,
 	floor_of,
-	lane_label,
+	HIGH_PERCENT,
 	lane_minutes,
 	lost_minutes,
 	problem,
