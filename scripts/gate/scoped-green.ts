@@ -1,6 +1,6 @@
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { review_brief } from '#scripts/review/review-brief'
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -17,11 +17,13 @@ import { gate_tree, type GateTree } from './gate-tree'
 // reader is the checks' own re-run, which narrows to what moved since this record (`since-green.ts`).
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
-// moved" is `review_brief.matching_stamp` plus the base equality `gate_skip.reusable_green_gate`
+// moved" is `file_map_stamp.changed_since` plus the base equality `gate_skip.reusable_green_gate`
 // already compares and the inputs fingerprint each record carries (`verification-inputs.ts`), over the
-// same `FileMapStamp` shape written to the same kind of file. A second
-// definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
-// two commands would start disagreeing about one working tree.
+// same `FileMapStamp` shape written to the same kind of file. A second definition of "this tree is
+// unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where two commands would start
+// disagreeing about one working tree. The one deliberate difference: this reader ignores josh's own
+// `.josh/` run records, while the gate's own reuse (`gate_skip` via `review_brief.matching_stamp`)
+// does not — safe, because the gate still lints and tests those records.
 //
 // **It refuses `josh review:brief`, and now the local `josh gate` too, but never CI's**.
 // The brief was the first refusal point because it is where `review:attest`
@@ -90,15 +92,23 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 		: [lint, test]
 }
 
+// **A record josh itself keeps under `.josh/` does not unseat a green record** (joshuafolkken/kit#4905):
+// `metrics --accept` and the ship's own approval re-record write there after the pair passed, and the
+// preflight re-ran both checks over nothing but that bookkeeping. The gate still lints and tests the
+// whole change, and a later scoped run reads such a file as moved since its record.
+
 // **An unreadable record reads as an absent one, and that is the safe direction.** `read` swallows a
 // malformed or foreign file and answers `undefined`, so the two cases are indistinguishable here —
 // and the consequence of treating one as the other is a single 14-second scoped run, against the
 // alternative of briefing a review on a tree nothing has checked.
 function describes_tree(check: ScopedCheck, tree: Record<string, string>, base: string): boolean {
-	const stamp = review_brief.matching_stamp(check.stamp.read(check.source), tree)
+	const stamp = check.stamp.read(check.source)
 
 	return (
 		stamp !== undefined &&
+		file_map_stamp
+			.changed_since(stamp, tree)
+			.every((relative) => run_record_path.is_run_record(relative)) &&
 		file_map_stamp.describes_base(stamp, base) &&
 		check.stamp.describes_inputs(stamp)
 	)
