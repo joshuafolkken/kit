@@ -330,7 +330,6 @@ const lane_stats = {
 	in_window,
 	mean,
 	median,
-	merge_minutes,
 	peak,
 	row,
 	to_row,

@@ -33,18 +33,12 @@ function ended(result: string): Found {
 	return { filed: [], overrun_filed: [], minutes: 52, overrun, is_investigating: false }
 }
 
-const KEYED = ended(
-	`${run_event_overrun.none_result('all under 3%')}${run_event_overrun.small_causes_text([
-		{ key: 'run-ship-place', minutes: 13, cause: 'placed' },
-		{ key: 'test-network-guard', minutes: 11, cause: 'guarded' },
-		{ key: 'test:pinned', minutes: 8, cause: 'restarted' },
-	])}`,
-)
+const UNFILED = ended(run_event_overrun.none_result('waited on a slow CI run'))
 
 function done_lines(columns: number): Array<string> {
 	const active = [row_of(LONG, 'merged'), row_of(SHORT, 'merged'), row_of(PLAIN, 'done')]
 	const found = new Map([
-		[LONG, { ...KEYED, filed: [4912, 4913, 4914].map(String) }],
+		[LONG, { ...UNFILED, filed: [4912, 4913, 4914].map(String) }],
 		[SHORT, ended(run_event_overrun.FILED_RESULT)],
 	])
 	const lines = run_board_render
