@@ -40,6 +40,7 @@ import { shell_segments } from './shell-segments'
 // change. The Issue that filed this rule names `eval` for that reason.
 const VERIFICATION_COMMANDS: ReadonlySet<string> = new Set([
 	'check',
+	'check:related',
 	'cspell',
 	'cspell:dot',
 	'eval',

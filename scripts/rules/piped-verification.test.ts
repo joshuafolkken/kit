@@ -20,6 +20,8 @@ const PIPED_LISTING = 'git log --oneline -3 | head'
 const PIPED_ANSWER = 'pnpm josh review:brief --level-only | tail -1'
 const NO_VERIFICATION = 'ls -la'
 const PIPED_GREP = 'josh cspell:dot | grep -i error'
+// joshuafolkken/kit#4940: the related checks together are a check like any of their parts.
+const PIPED_CHECK_RELATED = 'pnpm josh check:related 2>&1 | tail -30'
 
 describe('is_masked_verification', () => {
 	it.each([
@@ -30,6 +32,8 @@ describe('is_masked_verification', () => {
 		// The alias is the same command, and it is derived from the command map rather than restated.
 		'pnpm josh ga | tail',
 		'pnpm josh gate | tail -40 | grep failed',
+		// joshuafolkken/kit#4940: the related checks together are a check like any of their parts.
+		PIPED_CHECK_RELATED,
 	])('reads %j as a masked verification', (command) => {
 		expect(piped_verification.is_masked_verification(command)).toBe(true)
 	})
@@ -150,6 +154,7 @@ const REWRITES: Array<[string, string]> = [
 	],
 	['pnpm josh lint | sort | uniq', `${WRAP}pnpm josh lint | sort | uniq)`],
 	['pnpm josh cspell:dot | wc -l', `${WRAP}pnpm josh cspell:dot | wc -l)`],
+	[PIPED_CHECK_RELATED, `${WRAP}${PIPED_CHECK_RELATED})`],
 ]
 
 describe('pipefail_input', () => {

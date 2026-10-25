@@ -9,7 +9,7 @@ Review results and successful pushes are never turn boundaries.
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then steps 2–3, the
-   round's fixes with `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
+   round's fixes, all made before one `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
@@ -44,7 +44,7 @@ Review results and successful pushes are never turn boundaries.
      `pnpm josh review:brief --round 2` beside CI.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
-   Outside step 0, a round-1 fix runs its scoped check and the gate before `git -y`.
+   Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.
    Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
    ['<category>:<severity>:<file> — <reason>' ...]` (each one quoted argument; none if clean). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
@@ -80,8 +80,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
   A lane child's resolution: markers removed → `pnpm josh check:related` → `pnpm josh ship --detach
   --review` (step 0), which records the merge commit and runs the gate.
 - **One related-check command answers once per tree** — run `pnpm josh check:related` after every
-  edit; it runs `lint:related`, `test:related`, `check` and `cspell:dot` together, never twice over an untouched
-  tree. In kit `pnpm josh lint:related` reports a metrics total grown past the
+  edit, a review round's fixes once after the last; it runs `lint:related`, `test:related`, `check` and `cspell:dot` together. In kit `pnpm josh lint:related` reports a metrics total grown past the
   merge-base; accept it with its reason before `pnpm josh ship`, whose pre-detach check otherwise stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
