@@ -11,6 +11,7 @@ const FROM_LANE: Filed = {
 	title: 'Count the seats again',
 	found_during: '3415',
 	is_run: true,
+	is_overrun: false,
 }
 const ELSEWHERE: Filed = {
 	reference: 'joshuafolkken/app-kit#12',
@@ -18,13 +19,13 @@ const ELSEWHERE: Filed = {
 	title: 'Fix (the) port',
 	found_during: undefined,
 	is_run: false,
+	is_overrun: false,
 }
+const FROM_LANE_TEXT = '#3438[bug][run] Count the seats again (found during #3415)'
 
 describe('run_event_filed', () => {
 	it('writes the reference, the kind, the run’s mark, the title and the child that found it', () => {
-		expect(run_event_filed.text_of(FROM_LANE)).toBe(
-			'#3438[bug][run] Count the seats again (found during #3415)',
-		)
+		expect(run_event_filed.text_of(FROM_LANE)).toBe(FROM_LANE_TEXT)
 	})
 
 	it('reads back what it writes, with a kind or without one', () => {
@@ -92,5 +93,26 @@ describe('run_event_filed run mark', () => {
 		const parsed = run_event_filed.parse('#7 [run] Lap')
 
 		expect(parsed).toStrictEqual({ ...ELSEWHERE, reference: '#7', title: '[run] Lap' })
+	})
+})
+
+// joshuafolkken/kit#4880: a lane's overrun investigation marks its own filings, and an event written
+// before the mark reads as the child's.
+describe('run_event_filed overrun mark', () => {
+	const FROM_OVERRUN: Filed = { ...FROM_LANE, is_overrun: true }
+
+	it('writes the overrun mark after the run mark and reads it back', () => {
+		expect(run_event_filed.text_of(FROM_OVERRUN)).toBe(
+			'#3438[bug][run][overrun] Count the seats again (found during #3415)',
+		)
+		expect(run_event_filed.parse(run_event_filed.text_of(FROM_OVERRUN))).toStrictEqual(FROM_OVERRUN)
+	})
+
+	it('reads an event written before the mark as the child’s', () => {
+		expect(run_event_filed.parse(FROM_LANE_TEXT)).toStrictEqual(FROM_LANE)
+	})
+
+	it('reads a title that opens with the overrun mark, written before the kind, as the title', () => {
+		expect(run_event_filed.parse('#7 [overrun] Lap')?.title).toBe('[overrun] Lap')
 	})
 })

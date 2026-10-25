@@ -454,7 +454,9 @@ logged once at confirmation, then `lane:close <N>` and the epic counters; a merg
 (`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
 event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
 a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`. The board's
-merged row ends `M′`, that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner) and the filed numbers; a 🏁 row keeps the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
+merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
+and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
+(`47′  4847  🔍 4856`); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
 a **usage-limit** child (OPEN, unparked, exit record shows a Claude usage limit stopped it) has it dropped, unparked and counted

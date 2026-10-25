@@ -53,6 +53,7 @@ beforeEach(() => {
 	block_finder.mockResolvedValue()
 	note_finder.mockResolvedValue()
 	vi.stubEnv(lane_child_marker.KEY, undefined)
+	vi.stubEnv(lane_child_marker.OVERRUN_KEY, undefined)
 })
 
 afterEach(() => {
@@ -143,6 +144,22 @@ describe('issue_file_cli.record — a named finder', () => {
 		expect(emit).toHaveBeenCalledWith(
 			run_event_stream.EVENT_KIND.FILED,
 			`#3438[] ${TITLE} (found during #77)`,
+		)
+	})
+})
+
+// joshuafolkken/kit#4880: a lane's overrun investigation marks its filing as its own.
+describe('issue_file_cli.record — the overrun mark', () => {
+	it('marks a filing from the lane’s overrun investigation as the overrun’s', async () => {
+		vi.stubEnv(lane_child_marker.KEY, FINDER)
+		vi.stubEnv(lane_child_marker.OVERRUN_KEY, '1')
+		is_run_member.mockResolvedValue(true)
+
+		await issue_file_cli.record(URL, filing_to(HERE), [])
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.FILED,
+			`#3438[][run][overrun] ${TITLE} (found during #${FINDER})`,
 		)
 	})
 })

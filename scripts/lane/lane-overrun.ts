@@ -21,7 +21,8 @@ import { lane_overrun_prompt } from './lane-overrun-prompt'
 // cause through `issue:file` — the causes one fix place shares as one issue, or folded into an open
 // issue touching the same files (joshuafolkken/kit#4858) — so the next lane starts without waiting on
 // it. The session carries the lane's child mark, which makes `issue:file` count its filings against the
-// lane (`issue-file-cap.ts`), and `--found-during` names the same origin. The launch and the session's result both go on the run's
+// lane (`issue-file-cap.ts`), and `--found-during` names the same origin; its overrun mark records the
+// filings as the investigation's, not the child's (joshuafolkken/kit#4880). The launch and the session's result both go on the run's
 // event stream as notes.
 
 const { EVENT_KIND } = run_event_stream
@@ -125,7 +126,7 @@ function launched(issue: number, minutes: number): string {
 	const request = {
 		argv: built.argv,
 		cwd,
-		env: lane_child_marker.env_for(String(issue)),
+		env: lane_child_marker.overrun_env_for(String(issue)),
 		log_path: log_path(issue),
 		profile: built.profile,
 	}

@@ -24,13 +24,14 @@ function event(kind: string, text: string): RunEvent {
 	return { pos: 1, at: AT, kind, text }
 }
 
-function filing(reference: string, found_during: string | undefined): RunEvent {
+function filing(reference: string, found_during: string | undefined, is_overrun = false): RunEvent {
 	const text = run_event_filed.text_of({
 		reference,
 		kind: 'bug',
 		title: 'Shorten the wait',
 		found_during,
 		is_run: true,
+		is_overrun,
 	})
 
 	return event(KIND.FILED, text)
@@ -38,6 +39,10 @@ function filing(reference: string, found_during: string | undefined): RunEvent {
 
 function filed(reference: string): RunEvent {
 	return filing(reference, String(CHILD))
+}
+
+function overrun_filed(reference: string): RunEvent {
+	return filing(reference, String(CHILD), true)
 }
 
 function started(issue = CHILD): RunEvent {
@@ -60,6 +65,7 @@ describe('run_board_found.found_of — the filings', () => {
 
 		expect(run_board_found.found_of(events, alive).get(CHILD)).toStrictEqual({
 			filed: ['4768', '4769', '4770'],
+			overrun_filed: [],
 			minutes: undefined,
 			overrun: undefined,
 			is_investigating: false,
@@ -74,6 +80,23 @@ describe('run_board_found.found_of — the filings', () => {
 
 	it('reads a filing found during no child as nobody’s', () => {
 		expect(run_board_found.found_of([filing('#4768', undefined)], alive).size).toBe(0)
+	})
+
+	// joshuafolkken/kit#4880: the overrun investigation's filings are kept apart from the child's own.
+	it('keeps the overrun investigation’s filings apart from the child’s own', () => {
+		const events = [filed('#4847'), overrun_filed('#4856'), filed('#4848')]
+		const found = run_board_found.found_of(events, alive).get(CHILD)
+
+		expect(found?.filed).toStrictEqual(['4847', '4848'])
+		expect(found?.overrun_filed).toStrictEqual(['4856'])
+	})
+
+	it('reads a filing written before the overrun mark as the child’s', () => {
+		const text = `#4847[bug][run] Shorten the wait (found during #${String(CHILD)})`
+		const found = run_board_found.found_of([event(KIND.FILED, text)], alive).get(CHILD)
+
+		expect(found?.filed).toStrictEqual(['4847'])
+		expect(found?.overrun_filed).toStrictEqual([])
 	})
 })
 

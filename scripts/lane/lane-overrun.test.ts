@@ -67,8 +67,12 @@ function launched_prompt(): string {
 	return mocks.resolve_in.mock.calls.map(([invocation]) => invocation).join('\n')
 }
 
-function launched_marks(): ReadonlyArray<string | undefined> {
-	return mocks.launch.mock.calls.map(([request]) => request.env['JOSH_LANE_CHILD'])
+// The lane's child mark and, joshuafolkken/kit#4880, the overrun mark its filings are recorded by.
+function launched_marks(): ReadonlyArray<ReadonlyArray<string | undefined>> {
+	return mocks.launch.mock.calls.map(([{ env }]) => [
+		env['JOSH_LANE_CHILD'],
+		env['JOSH_LANE_OVERRUN'],
+	])
 }
 
 function notes(): ReadonlyArray<string> {
@@ -138,10 +142,10 @@ describe('lane_overrun.investigate — a lane over 40 minutes', () => {
 		mocks.read_entries.mockReturnValue(lane(41))
 	})
 
-	it('launches a detached session carrying the lane mark, so its filings count against the lane', async () => {
+	it('launches a detached session carrying the lane mark and the overrun mark, so its filings count against the lane as the investigation’s', async () => {
 		await lane_overrun.investigate(ISSUE)
 
-		expect(launched_marks()).toStrictEqual([String(ISSUE)])
+		expect(launched_marks()).toStrictEqual([[String(ISSUE), '1']])
 	})
 
 	it('asks for filings against the lane with its causing-lane line', async () => {
