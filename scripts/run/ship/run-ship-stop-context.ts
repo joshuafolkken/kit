@@ -210,8 +210,9 @@ function has_prior(context: StopContext): boolean {
 
 // The block the ship-stop prompt carries between the next command and the closing invocation.
 //
-// **It fits the `budget` the prompt leaves it** — the prompt is one argv element, refused past
-// `MAX_VALUE_LENGTH` (joshuafolkken/kit#3964) — by dropping the excerpt's head first, since a check
+// **It fits the `budget` the prompt leaves it** — the prompt is one argv element, kept within
+// `MAX_VALUE_LENGTH` (joshuafolkken/kit#3964), well under the launch gate's prompt cap — by dropping
+// the excerpt's head first, since a check
 // reports its verdict last; the tail line always stays. Past that, the earlier findings go oldest first.
 function describe(
 	issue: string,
