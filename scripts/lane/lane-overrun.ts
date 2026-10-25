@@ -18,9 +18,10 @@ import { lane_net_time } from './lane-net-time'
 // (joshuafolkken/kit#4751). `run:merge` asks at each merge: a lane at or under the threshold — its long
 // total spent waiting on a person or an outage included — stops here, before any record of it is read.
 // An overrun launches a detached worker session that reads the lane's records and files each unfiled
-// cause through `issue:file`, so the next lane starts without waiting on it. The session carries the
-// lane's child mark, which makes `issue:file` count its filings against the lane (`issue-file-cap.ts`),
-// and `--found-during` names the same origin. The launch and the session's result both go on the run's
+// cause through `issue:file` — the causes one fix place shares as one issue, or folded into an open
+// issue touching the same files (joshuafolkken/kit#4858) — so the next lane starts without waiting on
+// it. The session carries the lane's child mark, which makes `issue:file` count its filings against the
+// lane (`issue-file-cap.ts`), and `--found-during` names the same origin. The launch and the session's result both go on the run's
 // event stream as notes.
 
 const { EVENT_KIND } = run_event_stream
@@ -92,11 +93,9 @@ function duplicate_lines(lane_line: string): ReadonlyArray<string> {
 	]
 }
 
-// One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
-function prompt(issue: number, minutes: number): string {
-	const cite = issue_cite.plain(issue)
+// What the session reads, and the four facts it traces each cause to.
+function reading(issue: number, cite: string, minutes: number): string {
 	const directories = transcript_directories(issue).join(', ') || 'none found'
-	const lane_line = `- 原因のレーン: ${String(minutes)} 分（${cite}）`
 
 	return [
 		`Investigate why lane ${cite} took ${String(minutes)} minutes of net time (dispatch to merge, less`,
@@ -106,12 +105,43 @@ function prompt(issue: number, minutes: number): string {
 		'and the run events (`pnpm josh run:event --from 0`), and find the causes that spent time other than',
 		'waiting. Trace each cause to what can fix it: the span it spent, the signal that led to the wrong call',
 		'or the wait (which command printed what), the `file:line` of the code or document that decided it, and',
-		`where to fix it. File each cause with \`pnpm josh issue:file --found-during ${String(issue)}\`, its body`,
-		`carrying those four and \`${lane_line}\` under its background heading — backlog ranking orders`,
-		'one priority by those minutes, so a filing without it falls behind every declared one.',
+		'where to fix it.',
+	].join(' ')
+}
+
+// Each lane pays a fixed review-to-merge cost, so causes one fix place shares are one issue. A fold
+// skips `issue:file`, so it carries the causing-lane line and the priority floor `issue:file` would set.
+function grouping(issue: number, lane_line: string, minutes: number): string {
+	const label = issue_priority.lane_label(minutes)
+	const labeling =
+		label === undefined ? '' : `, and give it the \`${label}\` label unless it carries a higher one`
+
+	return [
+		'Causes whose fixes touch the same file or mechanism are one issue, an acceptance criterion per',
+		'cause; causes fixed in different places are separate issues. Before filing one, look for an open',
+		'issue that touches the same files (`pnpm josh issue:scout "<title>" --body-file <draft.md>`, each',
+		'candidate read with `pnpm josh issue:read <N>`): when one does, fold its causes into it by',
+		'`.claude/skills/workflow-commands/issue-fold-existing.md` instead of filing, the appended part',
+		`carrying \`${lane_line}\`${labeling}; on a verdict other than \`fold\`, file as below.`,
+		'File each other issue with',
+		`\`pnpm josh issue:file --found-during ${String(issue)}\`, its body carrying those four per cause, and`,
+		`\`${lane_line}\` under its background heading — backlog ranking orders one priority by those minutes,`,
+		'so a filing without it falls behind every declared one.',
+	].join(' ')
+}
+
+// One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
+function prompt(issue: number, minutes: number): string {
+	const cite = issue_cite.plain(issue)
+	const lane_line = `- 原因のレーン: ${String(minutes)} 分（${cite}）`
+
+	return [
+		reading(issue, cite, minutes),
+		grouping(issue, lane_line, minutes),
 		...duplicate_lines(lane_line),
 		`Then record the result: \`pnpm josh run:event --append note "${run_event_overrun.ended_text(issue, '<result>')}"\`,`,
-		`the result being \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,
+		`the result being \`${run_event_overrun.folded_result(['<A>', '<B>'])}\` naming every issue you folded into`,
+		`when you folded any, else \`${run_event_overrun.FILED_RESULT}\` when you filed any, \`${run_event_overrun.recurred_result('<N>')}\``,
 		`when you only commented a recurrence on #<N>, else \`${run_event_overrun.none_result('<why, in about 15 characters>')}\`.`,
 	].join(' ')
 }

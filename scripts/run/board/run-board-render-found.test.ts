@@ -95,6 +95,17 @@ describe('run_board_render — a merged row’s net minutes', () => {
 	})
 })
 
+// joshuafolkken/kit#4858: causes folded into an open issue file none, so the result names it.
+describe('run_board_render — a merged row’s folded causes', () => {
+	it('says `↪N` for each issue folded into, before the filed numbers', () => {
+		const folded = run_event_overrun.folded_result([4801, 4802])
+		const line = done_line({ ...ended(folded), filed: ['4768'] })
+
+		expect(line).toMatch(/52′ 🔍 ↪4801, ↪4802 4768$/u)
+		expect(line).not.toContain('#4801')
+	})
+})
+
 describe('run_board_render — a merged row’s finished investigation', () => {
 	it('ends on 🔍 and the filed numbers, with no `#`', () => {
 		const line = done_line({ ...ended(run_event_overrun.FILED_RESULT), filed: FILED })

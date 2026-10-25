@@ -29,6 +29,12 @@ const FAILED_PATTERN = /^#(?<issue>\d+) overrun investigation failed: /u
 const FILED_RESULT = 'filed'
 const NONE_LEAD = 'none: '
 const RECURRED_PATTERN = /^recurred #(?<number>\d+)/u
+// The result of an investigation that appended causes to open Issues, which file no new one
+// (joshuafolkken/kit#4858); any it filed besides show as filings.
+const FOLDED_LEAD = 'folded '
+const FOLDED_SEPARATOR = ','
+const FOLDED_PATTERN = /^folded (?<list>#\d+(?:,#\d+)*)/u
+const NUMBER_PATTERN = /#(?<number>\d+)/gu
 
 function started_text(issue: number, minutes: number, outcome: string): string {
 	return `${issue_cite.plain(issue)} overran: ${String(minutes)} min net — ${outcome}`
@@ -70,6 +76,17 @@ function recurred_of(result: string): number | undefined {
 	const number = RECURRED_PATTERN.exec(result)?.groups?.['number']
 
 	return number === undefined ? undefined : Number(number)
+}
+
+function folded_result(issues: ReadonlyArray<number | string>): string {
+	return `${FOLDED_LEAD}${issues.map((issue) => issue_cite.plain(issue)).join(FOLDED_SEPARATOR)}`
+}
+
+// The Issues a `folded #A,#B` result appended to, else none; any text after the list is not read.
+function folded_of(result: string): ReadonlyArray<number> {
+	const list = FOLDED_PATTERN.exec(result)?.groups?.['list'] ?? ''
+
+	return [...list.matchAll(NUMBER_PATTERN)].map((match) => Number(match.groups?.['number']))
 }
 
 // The reason a `none: <reason>` result gives, else the result as it is.
@@ -125,6 +142,8 @@ const run_event_overrun = {
 	ended_text,
 	failed_text,
 	FILED_RESULT,
+	folded_of,
+	folded_result,
 	investigating,
 	none_result,
 	parse,

@@ -218,6 +218,38 @@ describe('lane_overrun.investigate — what the session does with a cause', () =
 	})
 })
 
+// joshuafolkken/kit#4858: each lane pays a fixed review-to-merge cost, so one fix place is one lane.
+describe('lane_overrun.investigate — how the session groups its causes', () => {
+	beforeEach(async () => {
+		mocks.read_entries.mockReturnValue(lane(41))
+		await lane_overrun.investigate(ISSUE)
+	})
+
+	it('files the causes one file or mechanism shares as one issue, one criterion per cause', () => {
+		expect(launched_prompt()).toContain(
+			'Causes whose fixes touch the same file or mechanism are one issue, an acceptance criterion per cause',
+		)
+	})
+
+	it('files the causes fixed in different places as separate issues', () => {
+		expect(launched_prompt()).toContain('causes fixed in different places are separate issues')
+	})
+
+	it('folds the causes into an open issue touching the same files instead of filing', () => {
+		expect(launched_prompt()).toContain('look for an open issue that touches the same files')
+		expect(launched_prompt()).toContain(
+			'fold its causes into it by `.claude/skills/workflow-commands/issue-fold-existing.md` instead of filing',
+		)
+		expect(launched_prompt()).toContain('on a verdict other than `fold`, file as below.')
+	})
+
+	it('carries the causing-lane line and the priority floor into the folded issue', () => {
+		expect(launched_prompt()).toContain(
+			`the appended part carrying \`- 原因のレーン: 41 分（#${String(ISSUE)}）\`, and give it the \`priority:high\` label unless it carries a higher one;`,
+		)
+	})
+})
+
 // joshuafolkken/kit#4818: the merged row says the result, so it comes in a shape the board reads.
 describe('lane_overrun.investigate — the result the session records', () => {
 	beforeEach(async () => {
@@ -227,7 +259,8 @@ describe('lane_overrun.investigate — the result the session records', () => {
 
 	it('asks for a result the board reads', () => {
 		expect(launched_prompt()).toContain(`"#${String(ISSUE)} overrun: <result>"`)
-		expect(launched_prompt()).toContain('`filed` when you filed any, `recurred #<N>`')
+		expect(launched_prompt()).toContain('`folded #<A>,#<B>` naming every issue you folded into')
+		expect(launched_prompt()).toContain('else `filed` when you filed any, `recurred #<N>`')
 		expect(launched_prompt()).toContain('`none: <why, in about 15 characters>`')
 	})
 })

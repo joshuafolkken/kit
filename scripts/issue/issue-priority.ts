@@ -185,13 +185,22 @@ function lane_minutes(body = ''): number {
 	return Math.max(0, ...minutes)
 }
 
-// The floor the longest causing lane sets — strictly over each threshold.
+// The floor a causing lane of `minutes` net time sets — strictly over each threshold.
+function minutes_floor(minutes: number): PriorityLevel {
+	if (minutes <= HIGH_LANE_MINUTES) return 'normal'
+
+	return minutes > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
+}
+
+// The label that floor carries, for a write that skips `issue:file` — a fold into an open Issue
+// (joshuafolkken/kit#4858) — or `undefined` at or under the high threshold.
+function lane_label(minutes: number): string | undefined {
+	return LABELS[minutes_floor(minutes)]
+}
+
+// The floor the longest causing lane sets.
 function lane_floor(body: string): PriorityLevel {
-	const longest = lane_minutes(body)
-
-	if (longest <= HIGH_LANE_MINUTES) return 'normal'
-
-	return longest > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
+	return minutes_floor(lane_minutes(body))
 }
 
 // The lowest level the Issue may declare: the highest of its reduction's, causing lane's and markers' floors.
@@ -252,6 +261,7 @@ const issue_priority = {
 	HIGH_LANE_MINUTES,
 	declared_level,
 	floor_of,
+	lane_label,
 	lane_minutes,
 	problem,
 	with_label,
