@@ -45,13 +45,28 @@ function grouping(origin: number | undefined, loss_lines: string): string {
 	].join(' ')
 }
 
-// A filing's priority is the reduction it states, and `issue:file` refuses one under the high share,
+// A defect is filed at any share, and so is a mechanism whose loss grew: an average share misses a
+// defect split into small causes and a hole that widens as `main` grows (joshuafolkken/kit#4910). Both
+// are filed with no time-shortening line, since `issue:file` refuses one under the floor beside a
+// causing lane. Only the time the work inherently takes is judged by the filing floor below.
+function class_lines(): ReadonlyArray<string> {
+	return [
+		'Sort each cause first: a defect — a tool did something unneeded or wrong (a rerun on an unchanged',
+		'tree, a lost scope) — or time the work inherently takes (CI wait, review). File a defect at any share',
+		'as `- 種別: 不具合`, with no `- 目的: 時間短縮` line and so no reduction percentage. A key',
+		`\`pnpm josh overrun:mechanisms\` marks \`${run_event_overrun.GROWN_MARK}\` lost more per merge than over the period`,
+		'of the same length before it: file its mechanism as one root-cause issue at any share the same way,',
+		'as `- 種別: 不具合` with no `- 目的: 時間短縮` line. The share rules below judge only the inherent time.',
+	]
+}
+
+// A filing's priority is the reduction it states, and `issue:file` refuses one under the filing floor,
 // which would not pay back the lane its fix takes (joshuafolkken/kit#4870). Such a cause is still
 // recorded under its mechanism's key, and the key's sum across lanes is judged before the cause is
 // dropped, since one mechanism losing a little in every lane is not small (joshuafolkken/kit#4886).
 // `sum_lines` say how the key's sum is reached: one lane's cause adds to it, a baseline's is it already.
 function small_cause_lines(sum_lines: ReadonlyArray<string>): ReadonlyArray<string> {
-	const percent = `${String(issue_priority.HIGH_PERCENT)}%`
+	const percent = `${String(issue_priority.FILING_FLOOR_PERCENT)}%`
 	const suffix = run_event_overrun.small_causes_text([
 		{ key: '<key>', minutes: '<minutes>', cause: '<cause, in a few words>' },
 	])
@@ -95,6 +110,7 @@ interface CauseHandling {
 function cause_handling(rules: CauseHandling): string {
 	return [
 		grouping(rules.origin, rules.loss_lines),
+		...class_lines(),
 		...small_cause_lines(rules.sum_lines),
 		...duplicate_lines(rules.loss_lines),
 		...result_lines(rules.template),

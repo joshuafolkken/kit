@@ -9,8 +9,8 @@ import { markdown_section } from './markdown-section'
 // security-finding or caused-park line sets a high one (joshuafolkken/kit#4767): a declaration below the
 // highest floor is refused, and a body that declares none is filed at it. A causing-lane line, the net
 // minutes of the lane the Issue's defect slowed (joshuafolkken/kit#4749), sets no floor
-// (joshuafolkken/kit#4870): it only ranks, and its run-time-shortening Issue is refused under the high
-// reduction, which would not pay back the lane its fix takes. A priority label the filer typed
+// (joshuafolkken/kit#4870): it only ranks, and its run-time-shortening Issue is refused under the filing
+// floor, which would not pay back the lane its fix takes. A priority label the filer typed
 // (`kickoff new critical`) wins: the body is then not judged at all.
 
 type PriorityLevel = 'critical' | 'high' | 'normal'
@@ -42,6 +42,9 @@ const REDUCTION_PREFIX = '- 1 マージあたりの短縮:'
 const PERCENT = /(?<![\d.])(?<value>[\d.]+) ?[%％]/gu
 const CRITICAL_PERCENT = 10
 const HIGH_PERCENT = 3
+// The share a run-time-shortening Issue's reduction must reach to be filed, apart from the high band
+// (joshuafolkken/kit#4910); a defect is filed without one.
+const FILING_FLOOR_PERCENT = 2
 const LANE_PREFIX = '- 原因のレーン:'
 // The minutes are the lane's net time (`josh lane:net`), the number its Issue.
 const LANE_LINE = /^- 原因のレーン: (?<minutes>\d+(?:\.\d+)?) 分（#[1-9]\d*）$/u
@@ -75,10 +78,10 @@ const FLOOR_DECLARATIONS: Readonly<Record<PriorityLevel, string>> = {
 }
 
 const WHOLE_PERCENT = 100
-// The merges a reduction under the high one takes to pay back one lane.
-const PAYBACK_MERGES = Math.ceil(WHOLE_PERCENT / HIGH_PERCENT)
+// The merges a reduction under the filing floor takes to pay back one lane.
+const PAYBACK_MERGES = Math.ceil(WHOLE_PERCENT / FILING_FLOOR_PERCENT)
 
-const SMALL_LANE_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue with a \`${LANE_PREFIX}\` line states a \`${REDUCTION_PREFIX}\` under ${String(HIGH_PERCENT)}% — about ${String(PAYBACK_MERGES)} merges before it pays back the lane its fix takes, so it is not filed: fold it into an open Issue, or leave the cause in the overrun investigation's result note (\`issue-template.md\`)`
+const SMALL_LANE_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue with a \`${LANE_PREFIX}\` line states a \`${REDUCTION_PREFIX}\` under ${String(FILING_FLOOR_PERCENT)}% — about ${String(PAYBACK_MERGES)} merges before it pays back the lane its fix takes, so it is not filed: fold it into an open Issue, or leave the cause in the overrun investigation's result note (\`issue-template.md\`)`
 
 const REDUCTION_PROBLEM = `a \`${expected_effect_lint.DECLARATION_LINE}\` Issue states \`${REDUCTION_PREFIX} <分>（レーン中央値 <分> の <%>）\` under \`${expected_effect_lint.HEADING}\` with its percentage filled in (\`issue-template.md\`)`
 
@@ -247,7 +250,7 @@ function is_typed(labels: ReadonlyArray<string>): boolean {
 }
 
 // A run-time-shortening Issue must state its reduction as a percentage, or its floor could not be
-// judged; one a causing lane prompted is refused under the high reduction (joshuafolkken/kit#4870).
+// judged; one a causing lane prompted is refused under the filing floor (joshuafolkken/kit#4870).
 function reduction_problem(body: string): string | undefined {
 	if (!expected_effect_lint.is_target(body)) return undefined
 	const percent = reduction_percent(body)
@@ -255,7 +258,7 @@ function reduction_problem(body: string): string | undefined {
 	if (percent === undefined) return REDUCTION_PROBLEM
 	const is_lane = background_lines(body, LANE_PREFIX).length > 0
 
-	return is_lane && percent < HIGH_PERCENT ? SMALL_LANE_PROBLEM : undefined
+	return is_lane && percent < FILING_FLOOR_PERCENT ? SMALL_LANE_PROBLEM : undefined
 }
 
 function floor_problem(body: string, level: PriorityLevel): string | undefined {
@@ -288,6 +291,7 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 const issue_priority = {
 	CAUSE_PREFIX,
 	declared_level,
+	FILING_FLOOR_PERCENT,
 	floor_of,
 	HIGH_PERCENT,
 	lane_minutes,

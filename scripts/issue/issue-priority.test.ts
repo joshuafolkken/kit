@@ -170,15 +170,15 @@ describe('issue_priority causing lane (joshuafolkken/kit#4749)', () => {
 })
 
 describe('issue_priority causing lane beside its reduction (joshuafolkken/kit#4870)', () => {
-	it('refuses a run-time-shortening Issue with a causing lane under a 3% reduction', () => {
-		const filed = issue_priority.problem(shortening('', '1%', lane_line('48')), [])
+	it('refuses a run-time-shortening Issue with a causing lane under the 2% filing floor', () => {
+		const filed = issue_priority.problem(shortening('', '1.9%', lane_line('48')), [])
 
-		expect(filed).toContain('under 3%')
-		expect(filed).toContain('about 34 merges')
+		expect(filed).toContain('under 2%')
+		expect(filed).toContain('about 50 merges')
 		expect(filed).toContain('fold it into an open Issue')
 	})
 
-	it('files a run-time-shortening Issue with no causing lane under a 3% reduction as before', () => {
+	it('files a run-time-shortening Issue with no causing lane under the filing floor as before', () => {
 		expect(issue_priority.problem(shortening('', '1%'), [])).toBeUndefined()
 		expect(issue_priority.floor_of(shortening('', '1%'))).toBe('normal')
 	})

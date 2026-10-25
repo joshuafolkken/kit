@@ -37,10 +37,15 @@ const FOLDED_SEPARATOR = ','
 const FOLDED_PATTERN = /^folded (?<list>#\d+(?:,#\d+)*)/u
 const NUMBER_PATTERN = /#(?<number>\d+)/gu
 // The causes too small to file that a result ends with (joshuafolkken/kit#4886), each keyed by its
-// mechanism so `josh overrun:mechanisms` sums one mechanism's losses across lanes.
-const SMALL_LEAD = ` — under ${String(issue_priority.HIGH_PERCENT)}%: `
+// mechanism so `josh overrun:mechanisms` sums one mechanism's losses across lanes. Written at the filing
+// floor and read at any, so a note written under an earlier floor still sums (joshuafolkken/kit#4910).
+const SMALL_LEAD = ` — under ${String(issue_priority.FILING_FLOOR_PERCENT)}%: `
+const SMALL_LEAD_PATTERN = / — under \d+(?:\.\d+)?%: /u
 const SMALL_SEPARATOR = '; '
 const SMALL_PATTERN = /^(?<key>\S+) (?<minutes>\d+(?:\.\d+)?) min: (?<cause>.+)$/u
+// The mark `josh overrun:mechanisms` gives a key that lost more than over the period before, and the
+// overrun prompt names to file at any share (joshuafolkken/kit#4910).
+const GROWN_MARK = 'grown'
 
 // A cause too small to file: its mechanism's key (e.g. `test:pinned`), its minutes, and a few words.
 interface SmallCause {
@@ -132,12 +137,12 @@ function small_cause(segment: string): ReadonlyArray<SmallCause> {
 
 // The keyed causes a result ends with; a segment written before the keys were (free text) is not read.
 function small_causes_of(result: string): ReadonlyArray<SmallCause> {
-	const at = result.indexOf(SMALL_LEAD)
+	const lead = SMALL_LEAD_PATTERN.exec(result)
 
-	if (at === -1) return []
+	if (lead === null) return []
 
 	return result
-		.slice(at + SMALL_LEAD.length)
+		.slice(lead.index + lead[0].length)
 		.split(SMALL_SEPARATOR)
 		.flatMap((segment) => small_cause(segment))
 }
@@ -209,6 +214,7 @@ const run_event_overrun = {
 	failed_text,
 	FILED_RESULT,
 	folded_of,
+	GROWN_MARK,
 	folded_result,
 	investigating,
 	none_result,
