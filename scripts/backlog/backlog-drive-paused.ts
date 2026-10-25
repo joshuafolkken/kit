@@ -1,7 +1,6 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
-import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_state, type LaneStateRecord } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -12,6 +11,7 @@ import { DEFAULT_SILENT_MINUTES } from '#scripts/run/run-liveness'
 import type { DrivePorts, OfferRead, PassResult } from './backlog-drive'
 import { backlog_drive_idle } from './backlog-drive-idle'
 import { backlog_overlap } from './backlog-overlap'
+import { backlog_plan_comment } from './backlog-plan-comment'
 
 // A run held only by paused lanes (joshuafolkken/kit#4270): nothing of this run in flight, nothing
 // dispatched, and a lane a person paused past the silent window `run:liveness` waits out declares a
@@ -86,12 +86,12 @@ function waiting_of(
 }
 
 /** The `paused` records whose declared paths a waiting candidate overlaps. */
-function holding(
+async function holding(
 	paused: ReadonlyArray<LaneStateRecord>,
 	issues: ReadonlyArray<OpenIssueData>,
 	records: ReadonlyArray<LaneStateRecord>,
-): Array<LaneStateRecord> {
-	const declared = lane_plan.with_plans(backlog_overlap.declared_of(issues), process.cwd())
+): Promise<Array<LaneStateRecord>> {
+	const declared = await backlog_plan_comment.declared_of(issues, process.cwd())
 	const waiting = waiting_of(issues, records)
 
 	return paused.filter((record) =>
@@ -107,7 +107,7 @@ async function held_by(ports: PausedPorts): Promise<Array<LaneStateRecord>> {
 
 	const issues = await ports.read_issues()
 
-	return issues === undefined ? [] : holding(paused, issues, records)
+	return issues === undefined ? [] : await holding(paused, issues, records)
 }
 
 function describe(records: ReadonlyArray<LaneStateRecord>): string {

@@ -17,11 +17,10 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
-import { lane_plan } from '#scripts/lane/lane-plan'
 import { lane_state } from '#scripts/lane/lane-state'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
-import { backlog_overlap } from './backlog-overlap'
+import { backlog_plan_comment } from './backlog-plan-comment'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank, type GateScope } from './backlog-rank'
 import { backlog_wait_cause } from './backlog-wait-cause'
@@ -359,13 +358,14 @@ function standalone_keys(context: PoolContext): ReadonlySet<string> {
 // `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
 // records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
 // A lane's recorded plan joins its body, so a candidate waits on the files a running lane plans to
-// edit as well as the ones its body names (joshuafolkken/kit#4864).
+// edit as well as the ones its body names (joshuafolkken/kit#4864), and a candidate's plan comment
+// joins its own (joshuafolkken/kit#4923).
 async function gate_scope(context: PoolContext): Promise<GateScope> {
 	const { issues } = context.opted_in
 
 	return {
 		standalone: standalone_keys(context),
-		declared: lane_plan.with_plans(backlog_overlap.declared_of(issues), process.cwd()),
+		declared: await backlog_plan_comment.declared_of(issues, process.cwd()),
 		lanes: await lane_state.read_states(issues.map((issue) => String(issue.number))),
 	}
 }
