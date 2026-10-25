@@ -78,6 +78,11 @@ function guide_problem(body: string, route: string | undefined): string | undefi
 	return is_excused(body, route) ? undefined : refusal(estimate)
 }
 
-const size_estimate = { guide_problem, problems }
+// The declared file count, or `undefined` when there is no estimate or it does not parse.
+function declared_files(body: string): number | undefined {
+	return parse(body)?.files
+}
+
+const size_estimate = { declared_files, guide_problem, problems }
 
 export { size_estimate }

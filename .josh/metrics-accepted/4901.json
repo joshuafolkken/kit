@@ -1,0 +1,8 @@
+{
+	"reason": "#4901 adds the issue:file refusal for a measurement follow-up filed without its start condition, and its line in measurement.md",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 28,
+		"ai_cost.on_demand_bytes": 243
+	}
+}
