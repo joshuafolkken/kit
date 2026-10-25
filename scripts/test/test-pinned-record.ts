@@ -24,6 +24,8 @@ type UnpinnedHunk = PinnedReport['unpinned'][number]
 interface PinnedSummary {
 	text: string
 	unpinned: ReadonlyArray<string>
+	// What a check still running reached so far; it is shown, never judged or remembered as the answer.
+	is_partial?: boolean
 }
 
 // A place's key leaves out its line, so merging the default branch in, which moves the line, keeps the
@@ -42,6 +44,13 @@ function summary_of(report: PinnedReport): PinnedSummary {
 		text: test_pinned_logic.report_text(report),
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
+}
+
+// What a check still running has reached so far (joshuafolkken/kit#4936): `note` says the rest is to come.
+function partial_summary(report: PinnedReport, note: string): PinnedSummary {
+	const summary = summary_of(report)
+
+	return { ...summary, text: `${note}\n${summary.text}`, is_partial: true }
 }
 
 // A check that could not run checked nothing, so it names no unpinned place and the run fails open.
@@ -103,6 +112,7 @@ const test_pinned_record = {
 	is_text_list,
 	not_run_summary,
 	parsed,
+	partial_summary,
 	read,
 	record_path,
 	summary_of,
