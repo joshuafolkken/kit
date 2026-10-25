@@ -1,0 +1,7 @@
+{
+	"reason": "#4915 adds the supervisor's sweep of lanes whose issue was closed as not planned (lane-withdraw-closed.ts) and the withdrawer attribution in lane-withdraw.ts",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 96
+	}
+}

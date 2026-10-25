@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { lane_close } from '#scripts/lane/lane-close'
+import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
@@ -54,6 +55,15 @@ function wake_session(
 	return result
 }
 
+// The lanes the supervisor ends each pass: closes left incomplete, and lanes whose issue was closed as
+// not planned (`lane-withdraw-closed.ts`), each withdrawal said on stderr.
+async function retry_closes(): Promise<void> {
+	await lane_close.retry_closes()
+	const notes = await lane_withdraw_closed.withdraw_closed()
+
+	for (const note of notes) note_to_stderr(note)
+}
+
 // **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
 // adopted for this process, so reading that owner as live would have every restarted pass wait on
 // itself and never drive again.
@@ -79,9 +89,7 @@ function ports_for(
 			wake_session(context, invocation, profile, { id: session_id, material }),
 		sleep: poll.sleep,
 		now: () => new Date(),
-		retry_closes: async () => {
-			await lane_close.retry_closes()
-		},
+		retry_closes,
 	}
 }
 

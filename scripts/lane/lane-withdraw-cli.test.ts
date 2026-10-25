@@ -23,6 +23,7 @@ function withdrawn(is_noted: boolean): WithdrawOutcome {
 		reaped: 1,
 		stash: undefined,
 		is_noted,
+		is_closed: false,
 		lane: 'closed',
 		residents: [],
 	}
