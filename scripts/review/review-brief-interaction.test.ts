@@ -27,6 +27,8 @@ const COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
 const OUTPUT_CAP = 30_000
 const INTERACTION_FLAG = '--interaction'
 const STALE_REFUSAL = 'issue-updated-after-round-one-sentinel'
+const INTERACTION_HEADING = '## Interaction review'
+const WHOLE_CHANGE = 'Target: the whole change'
 
 function stub_change(paths: ReadonlyArray<string>): void {
 	vi.spyOn(change_base, 'resolved').mockResolvedValue(COMMIT)
@@ -114,7 +116,7 @@ describe('review:brief --interaction', () => {
 		stub_change([DUE_FILE, OTHER_FILE])
 
 		await expect(review_brief_cli.run([INTERACTION_FLAG])).resolves.toBe(0)
-		expect(printed()).toContain('## Interaction review')
+		expect(printed()).toContain(INTERACTION_HEADING)
 		expect(printed()).toContain(`- ${DUE_FILE}`)
 		expect(printed()).not.toContain(`- ${OTHER_FILE}`)
 	})
@@ -138,13 +140,45 @@ describe('review:brief --interaction', () => {
 		await review_brief_cli.run([INTERACTION_FLAG])
 
 		expect(printed()).not.toContain(review_brief.RESUMED_HEADING)
-		expect(printed()).toContain('Target: the whole change')
+		expect(printed()).toContain(WHOLE_CHANGE)
 	})
 
 	it('reads an extra argument as a usage error', async () => {
 		stub_change([DUE_FILE])
 
 		await expect(review_brief_cli.run([INTERACTION_FLAG, 'extra'])).resolves.toBe(1)
+	})
+})
+
+// `josh run:review` hands `run_to` a writer, since its two briefs together exceed the Bash output cap
+// (joshuafolkken/kit#4863): every brief and the not-due line go to it, none to the console.
+describe('review:brief run_to', () => {
+	it('sends the code brief to emit, printing nothing', async () => {
+		stub_change([DUE_FILE, OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([], emit)).resolves.toBe(0)
+		expect(emit).toHaveBeenCalledTimes(1)
+		expect(String(emit.mock.calls[0]?.[0])).toContain(WHOLE_CHANGE)
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('sends the interaction brief to emit, printing nothing', async () => {
+		stub_change([DUE_FILE, OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([INTERACTION_FLAG], emit)).resolves.toBe(0)
+		expect(String(emit.mock.calls[0]?.[0])).toContain(INTERACTION_HEADING)
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('sends the not-due line to emit, printing nothing', async () => {
+		stub_change([OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([INTERACTION_FLAG], emit)).resolves.toBe(0)
+		expect(emit).toHaveBeenCalledWith(review_interaction.NOT_DUE_LINE)
+		expect(console.info).not.toHaveBeenCalled()
 	})
 })
 

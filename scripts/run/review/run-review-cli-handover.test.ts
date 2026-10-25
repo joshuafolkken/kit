@@ -1,3 +1,4 @@
+import type { Emit } from '#scripts/review/review-brief-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
@@ -7,15 +8,19 @@ import { run_review_cli } from './run-review-cli'
 
 const { branch, brief_run, handed_over, launch_gate, launch_pinned } = vi.hoisted(() => ({
 	branch: vi.fn<() => Promise<string>>(),
-	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
+	brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
 	handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
 	launch_gate: vi.fn(() => ({ kind: 'launched' })),
 	launch_pinned: vi.fn(() => ({ kind: 'launched' })),
 }))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
+vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { write_text_stamp: vi.fn() } }))
+vi.mock('#scripts/lane/lane-session-broker', () => ({
+	lane_session_broker: { review_paths: () => ({ brief: '/briefs/brief.md' }) },
+}))
 vi.mock('#scripts/review/review-brief-cli', () => ({
-	review_brief_cli: { run: brief_run, scoped_refusal: async () => undefined },
+	review_brief_cli: { run: brief_run, run_to: brief_run, scoped_refusal: async () => undefined },
 }))
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
@@ -85,7 +90,7 @@ describe('run_review_cli.run — a lane child after its recorded round 1', () =>
 		handed_over.mockResolvedValue(false)
 
 		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
-		expect(brief_run).toHaveBeenCalledWith([])
+		expect(brief_run).toHaveBeenCalledWith([], expect.any(Function))
 		expect(stderr_text()).not.toContain(SHIP_STEP)
 	})
 })

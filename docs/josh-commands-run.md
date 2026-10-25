@@ -484,10 +484,10 @@ or a child could not authenticate; it keeps `in-progress`, uncounted, for `/logi
 
 <!-- usage: run:review -->
 
-Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change).
+Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change).
 
 ```bash
-pnpm josh run:review                             # detach test:pinned and the gate, print the brief (the interaction brief after it where due), then launch a reviewer per brief
+pnpm josh run:review                             # detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief
 pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
@@ -498,11 +498,11 @@ pnpm josh run:review --pinned                    # read test:pinned alone once r
 
 It composes `josh gate` and `josh review:brief` and changes neither, so `review:attest --check`'s nonce/checkout contract is unchanged.
 Where this branch's issue owes an interaction review not yet recorded, the `review:brief --interaction`
-brief follows code's under its own header, so the round-1 reviewers run side by side and `josh ship`
-reuses both records; `--code-only` is the ship's own open, since the ship opens the interaction brief
-itself.
+brief is written to its own file after code's and both paths are printed, so the round-1 reviewers run
+side by side and `josh ship` reuses both records; `--code-only` is the ship's own open and prints code's
+brief, since the ship opens the interaction brief itself.
 
-The default waits only for the gate to _start_ and prints the brief;
+The default waits only for the gate to _start_ and writes the brief to a file and prints its path;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
 "a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it

@@ -50,7 +50,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',
 		description:
-			'Start test:pinned and the gate in the background and print the /code-review brief in one call so they overlap (--join to join them; it stops on an unpinned change)',
+			'Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
 		reference: [
 			'[--code-only] [--unpinned-ok "<reason>"] | --join | --pinned',
@@ -61,7 +61,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '',
-					note: 'detach test:pinned and the gate, print the brief (the interaction brief after it where due), then launch a reviewer per brief',
+					note: 'detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief',
 				},
 				{
 					arguments: '--code-only',
