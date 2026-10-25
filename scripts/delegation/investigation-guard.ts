@@ -24,8 +24,9 @@ const STAMP_PREFIX = 'josh-investigation-guard-'
 // **How the guard behaves for the session in hand, decided from the one-place enumeration**. It is
 // `refuse` in a dispatched lane child too (joshuafolkken/kit#3927): a hook denial returns to the model
 // as guidance, and the notice it replaced was measured not to move the reading. It wraps
-// `investigation_reads.should_block` here rather than inside it so the pure counting rule stays free of
-// process state and its own suite keeps testing it directly. A reviewer session stands down: reading
+// `investigation_reads.should_block` here rather than inside it so the counting rule stays free of the
+// session's switch state and its own suite keeps testing it directly — its only process read is the
+// branch diff it asks before a refusal. A reviewer session stands down: reading
 // the diff's files is its whole task, and it carries the lane's marker, so it would otherwise be refused
 // like the child it reviews — the stand-down `implementation-cut.ts` takes for the same session.
 function should_block(

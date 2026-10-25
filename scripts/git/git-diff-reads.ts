@@ -31,6 +31,16 @@ async function get_default_branch(): Promise<string> {
 
 const MERGE_BASE_COMMAND = 'merge-base'
 
+// The argument lists below are shared with `changed-paths-sync.ts`, so the hook-side synchronous
+// reading cannot drift from this one.
+function reference_check_arguments(reference: string): ReadonlyArray<string> {
+	return ['rev-parse', '--verify', '--quiet', reference]
+}
+
+function remote_reference_of(default_branch: string): string {
+	return `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
+}
+
 // **The ref the default branch is actually at**, which is not the same thing as its name.
 // `get_default_branch` returns the bare name, and git resolves that to the
 // *local* `refs/heads/<default>` — a ref nothing in this workflow advances, because merges happen on
@@ -43,16 +53,6 @@ const MERGE_BASE_COMMAND = 'merge-base'
 // with no `origin` — which is the reading every caller had before. The one case it reads differently
 // is a local default branch *ahead* of the remote, which this workflow does not produce and
 // `prevent-main-commit.ts` exists to stop.
-// The argument lists below are shared with `changed-paths-sync.ts`, so the hook-side synchronous
-// reading cannot drift from this one.
-function reference_check_arguments(reference: string): ReadonlyArray<string> {
-	return ['rev-parse', '--verify', '--quiet', reference]
-}
-
-function remote_reference_of(default_branch: string): string {
-	return `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
-}
-
 async function reference_exists(reference: string): Promise<boolean> {
 	try {
 		await git_spawn.read([...reference_check_arguments(reference)])

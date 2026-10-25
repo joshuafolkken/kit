@@ -1,0 +1,7 @@
+{
+	"reason": "A synchronous branch-diff reader (scripts/git/changed-paths-sync.ts) for the PreToolUse investigation hook, which cannot await, sharing its git argument lists with git-diff-reads.ts",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}
