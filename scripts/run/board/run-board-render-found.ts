@@ -10,9 +10,10 @@ import type { ItemState } from './run-board-status'
 // A done row's end after its time (joshuafolkken/kit#4772, joshuafolkken/kit#4818). A merged row says
 // its lane's net minutes — `?′` where there are none — what its overrun investigation came to, then the
 // numbers of the Issues filed during its child's work: `⏭` and why it was skipped, or 🔍 alone where it
-// filed, `∅` and why it did not, `∅ ↻#N` for a recurrence commented on, or 💥 for an investigation that
-// failed. While the investigation runs, the spinner stands for 🔍. A row its merge left no note on was
-// never asked. A done row that did not merge says only what was filed during it.
+// filed, `↪N` for each open Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did
+// not, `∅ ↻#N` for a recurrence commented on, or 💥 for an investigation that failed. While the
+// investigation runs, the spinner stands for 🔍. A row its merge left no note on was never asked. A done
+// row that did not merge says only what was filed during it.
 
 const { OVERRUN_MARK } = run_board_labels
 const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done'])
@@ -23,6 +24,7 @@ const UNKNOWN_MINUTES = '?'
 const SKIP_MARK = '⏭'
 const NONE_MARK = '∅'
 const RECURRED_MARK = '↻'
+const FOLDED_MARK = '↪'
 const FAILED_TEXT = `${OVERRUN_MARK} 💥`
 const NO_RECORD = 'no record'
 // The investigator writes its reason in about 15 characters; the row keeps no more.
@@ -53,8 +55,18 @@ function none_text(result: string): string {
 	return `${NONE_MARK} ${run_board_render_title.title_of(run_event_overrun.reason_of(result), REASON_LIMIT)}`
 }
 
+// The open Issues the investigation appended its causes to, each a link with no `#`.
+function folded_text(issues: ReadonlyArray<number>, header: BoardHeader): string {
+	const links = issues.map((issue) => `${FOLDED_MARK}${header.link(String(issue))}`)
+
+	return `${OVERRUN_MARK} ${links.join(SEPARATOR)}`
+}
+
 // The result decides, not whether anything was filed: the numbers also hold the child's own filings.
-function ended_text(result: string): string {
+function ended_text(result: string, header: BoardHeader): string {
+	const folded = run_event_overrun.folded_of(result)
+
+	if (folded.length > 0) return folded_text(folded, header)
 	if (result.startsWith(run_event_overrun.FILED_RESULT)) return OVERRUN_MARK
 
 	return `${OVERRUN_MARK} ${none_text(result)}`
@@ -73,7 +85,7 @@ function started_text(found: Found, header: BoardHeader): string {
 function outcome_text(found: Found, note: OverrunNote, header: BoardHeader): string {
 	if (note.kind === 'within') return ''
 	if (note.kind === 'skipped') return `${SKIP_MARK} ${note.reason}`
-	if (note.kind === 'ended') return ended_text(note.result)
+	if (note.kind === 'ended') return ended_text(note.result, header)
 
 	return note.kind === 'started' ? started_text(found, header) : FAILED_TEXT
 }

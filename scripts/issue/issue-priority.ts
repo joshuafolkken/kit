@@ -176,16 +176,26 @@ function marker_floor(body: string): PriorityLevel {
 	return is_marked ? 'high' : 'normal'
 }
 
-// The floor the longest causing lane sets — strictly over each threshold.
+// The floor a causing lane of `minutes` net time sets — strictly over each threshold.
+function minutes_floor(minutes: number): PriorityLevel {
+	if (minutes <= HIGH_LANE_MINUTES) return 'normal'
+
+	return minutes > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
+}
+
+// The label that floor carries, for a write that skips `issue:file` — a fold into an open Issue
+// (joshuafolkken/kit#4858) — or `undefined` at or under the high threshold.
+function lane_label(minutes: number): string | undefined {
+	return LABELS[minutes_floor(minutes)]
+}
+
+// The floor the longest causing lane sets.
 function lane_floor(body: string): PriorityLevel {
 	const minutes = background_lines(body, LANE_PREFIX)
 		.map((line) => Number(LANE_LINE.exec(line)?.groups?.['minutes']))
 		.filter((value) => Number.isFinite(value))
-	const longest = Math.max(0, ...minutes)
 
-	if (longest <= HIGH_LANE_MINUTES) return 'normal'
-
-	return longest > CRITICAL_LANE_MINUTES ? 'critical' : 'high'
+	return minutes_floor(Math.max(0, ...minutes))
 }
 
 // The lowest level the Issue may declare: the highest of its reduction's, causing lane's and markers' floors.
@@ -242,7 +252,14 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 	return [...labels, label]
 }
 
-const issue_priority = { HIGH_LANE_MINUTES, declared_level, floor_of, problem, with_label }
+const issue_priority = {
+	HIGH_LANE_MINUTES,
+	declared_level,
+	floor_of,
+	lane_label,
+	problem,
+	with_label,
+}
 
 export type { PriorityLevel }
 export { issue_priority }
