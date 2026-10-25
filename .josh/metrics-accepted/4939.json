@@ -1,0 +1,7 @@
+{
+	"reason": "check:related repeats the metrics growth notice above its verdict (#4939)",
+	"date": "2026-10-25",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}

@@ -9,6 +9,7 @@ import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { execa } from 'execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
+import { metrics_totals } from './metrics-totals'
 
 const execa_mock = vi.hoisted(() => vi.fn())
 
@@ -252,5 +253,51 @@ describe('check_related.report_results verdict line', () => {
 		expect(report.trimEnd().split('\n').at(-1)).toBe(
 			`${status_icons.FAIL_ICON} check:related failed: ${LINT_COMMAND}, ${TEST_COMMAND}`,
 		)
+	})
+})
+
+const GROWTH_NOTICE = `${metrics_totals.NOTICE_HEADING}\njosh metrics: 1 total(s) grew`
+
+function report_with_lint_output(lint_output: string): Array<string> {
+	const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+	const results = CHECK_COMMANDS.map((command): CheckResult => ({
+		command,
+		exit_code: 0,
+		output: command === LINT_COMMAND ? lint_output : `${command} output`,
+	}))
+
+	check_related.report_results(results)
+
+	return write.mock.calls
+		.map(([chunk]) => String(chunk))
+		.join('')
+		.trimEnd()
+		.split('\n')
+}
+
+// joshuafolkken/kit#4939: the notice sat inside the lint section, cut off by a tail of the output.
+describe('check_related.report_results metrics growth notice', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('repeats the lint section notice just above the verdict line', () => {
+		const lines = report_with_lint_output(`${LINT_OUTPUT}\n\n${GROWTH_NOTICE}\n`)
+
+		expect(lines.slice(-4)).toStrictEqual([
+			...GROWTH_NOTICE.split('\n'),
+			'',
+			`${status_icons.PASS_ICON} check:related passed`,
+		])
+	})
+
+	it('adds nothing above the verdict line when the lint section carries no notice', () => {
+		const lines = report_with_lint_output(LINT_OUTPUT)
+
+		expect(lines.slice(-3)).toStrictEqual([
+			`${CHECK_COMMANDS.at(-1) ?? ''} output`,
+			'',
+			`${status_icons.PASS_ICON} check:related passed`,
+		])
 	})
 })
