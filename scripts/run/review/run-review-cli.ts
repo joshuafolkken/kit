@@ -6,6 +6,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
+import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_pinned_record } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
@@ -75,6 +76,18 @@ async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewS
 	if (issue === undefined) return [CODE]
 
 	return review_interaction.round_one_slots(await review_interaction.status(issue))
+}
+
+// A lane child's reopen after a round 1 the ship reuses is refused before anything is launched
+// (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
+async function handover_refusal(is_code_only: boolean): Promise<string | undefined> {
+	if (is_code_only) return undefined
+	const issue = git_branch.issue_from_branch(await git_command.branch())
+	if (issue === undefined) return undefined
+
+	return (await review_lane_handover.is_handed_over(issue))
+		? review_lane_handover.refusal(issue)
+		: undefined
 }
 
 // Code's brief, then the interaction brief under its header — never after a code brief that refused.
@@ -215,6 +228,14 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 
 	if (reason === undefined && argv.length > 0) {
 		process.stderr.write(`${USAGE}\n`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const handover = await handover_refusal(is_code_only)
+
+	if (handover !== undefined) {
+		process.stderr.write(`${handover}\n`)
 
 		return FAILURE_EXIT_CODE
 	}

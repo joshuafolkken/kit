@@ -1,17 +1,16 @@
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_finding_text } from './review-finding-text'
 import { review_interaction } from './review-interaction'
+import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
 import { review_record_interaction } from './review-record-interaction'
 import { review_reviewed_tree } from './review-reviewed-tree'
-import { review_round_reuse } from './review-round-reuse'
 import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
@@ -182,25 +181,12 @@ interface CheckMode {
 	not_required: string
 }
 
-// A reuse question git could not answer reads as not reused: the lane then reviews the round itself,
-// which costs one review, rather than leaving it to a ship that may review it again detached.
-// The stale read inside it fails open in `review_round_reuse.is_stale_here`, as the ship's probe reads it.
-async function is_reused_here(issue: number): Promise<boolean> {
-	try {
-		return await review_round_reuse.is_reusable_here(issue)
-	} catch (error) {
-		error_text.trace_swallowed('review_record_cli.is_reused_here', error)
-
-		return false
-	}
-}
-
 // **A recorded code round also says whether `josh ship` reuses it** (joshuafolkken/kit#4763), from the
 // ship's own predicate: a round recorded before the tree moved — a `main:merge` that changed a file
 // the round covers included (joshuafolkken/kit#4829) — is
 // reviewed again by the ship, so the lane runs it itself rather than reading "recorded" as "done".
 async function code_recorded(issue: number): Promise<string> {
-	const is_reused = await is_reused_here(issue)
+	const is_reused = await review_lane_handover.is_reused_here(issue)
 
 	return [RECORDED_LINE, is_reused ? REUSED_LINE : REVIEW_AGAIN_LINE].join('\n')
 }
@@ -312,6 +298,14 @@ function unsettled_files(findings: ReadonlyArray<Finding>): ReadonlyArray<string
 		.map((finding) => finding.file)
 }
 
+// A lane child's round the ship reuses names the ship next (joshuafolkken/kit#4850), read after the
+// tree is stamped; an interaction pass now due follows it, since it is recorded before the ship.
+async function report_handover(issue: number): Promise<void> {
+	if (await review_lane_handover.is_handed_over(issue)) {
+		console.info(review_lane_handover.NEXT_STEP_LINE)
+	}
+}
+
 // A code round also records the tree its verdict stands for, which `josh ship` reuses while the tree
 // holds still (`review-reviewed-tree.ts`), and names an interaction review its fixes made due.
 async function append_round({
@@ -329,6 +323,7 @@ async function append_round({
 
 	if (kind === 'code') {
 		await review_reviewed_tree.record(unsettled_files(findings))
+		await report_handover(issue)
 		await review_record_interaction.report_due(issue, root)
 	}
 
