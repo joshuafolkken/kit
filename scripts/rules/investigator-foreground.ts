@@ -21,8 +21,11 @@ import { agent_model } from './agent-model'
 // background (64 of 64), the model wrote the field as the string `"false"`, and the parsed hook input
 // dropped it — so the refusal could never be met, and it blocked the very delegation the investigation
 // guard demands. A string value is the tell: across 1,700 dispatches in builds that declare the field
-// the model wrote a boolean every time. The refused call is on the tail by the reissue, so the reissue
-// passes.
+// the model wrote a boolean every time. A first call written bare leaves no string anywhere, so the
+// reissue it was refused into passes on the refused call's body instead (joshuafolkken/kit#4903).
+
+// The fields that make a reissue the same dispatch as the call it repeats.
+const BODY_FIELDS = ['description', 'prompt'] as const
 
 // `kit:investigator` is the consumer's spelling of the same definition.
 function is_investigator(call: GuardedCall): boolean {
@@ -51,14 +54,30 @@ function is_untyped_field(name: string, input: unknown): boolean {
 	return typeof input['run_in_background'] === 'string'
 }
 
+function field_of(input: unknown, key: string): unknown {
+	return json_value.is_record(input) ? input[key] : undefined
+}
+
+function is_same_dispatch(refused: GuardedCall, call: GuardedCall): boolean {
+	if (!is_background_investigator(refused)) return false
+
+	return BODY_FIELDS.every((key) => field_of(refused.input, key) === field_of(call.input, key))
+}
+
 // True when the call in hand or a subagent call on the tail wrote the field as a string — the tool
-// declares no `run_in_background`, so no dispatch in this session can run in the foreground.
+// declares no `run_in_background`, so no dispatch in this session can run in the foreground. A tail
+// dispatch this row refused with the same body makes the call in hand the reissue the refusal asked
+// for: the parsed input dropped the field, and the reissue is not on the tail yet.
 function lacks_background_field(tail: string, call: GuardedCall): boolean {
 	if (is_untyped_field(call.name, call.input)) return true
 
 	return time_transcript_line
 		.parse_text(tail)
-		.some((line) => line.blocks.some((block) => is_untyped_field(block.name, block.input)))
+		.some((line) =>
+			line.blocks.some(
+				(block) => is_untyped_field(block.name, block.input) || is_same_dispatch(block, call),
+			),
+		)
 }
 
 const INVESTIGATOR_FOREGROUND_REASON =
@@ -81,7 +100,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a subagent tool that declares no `run_in_background` (the field written as a string)',
+			'another agent type, `run_in_background: false` set, or a subagent tool that declares no `run_in_background` (the field written as a string, or the reissue of a refused dispatch with the same description and prompt)',
 	},
 }
 

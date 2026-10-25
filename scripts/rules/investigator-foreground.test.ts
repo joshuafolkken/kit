@@ -10,6 +10,7 @@ import { investigator_foreground } from './investigator-foreground'
 
 const PROMPT = 'Find where the guard reads the transcript'
 const INVESTIGATOR = 'investigator'
+const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
 
 function agent_call(
@@ -39,7 +40,7 @@ describe('investigator_foreground.is_background_investigator — the refusal', (
 		],
 		[
 			'another agent type in the background',
-			agent_call({ subagent_type: 'general-purpose', model: 'sonnet' }),
+			agent_call({ subagent_type: GENERAL_PURPOSE, model: 'sonnet' }),
 		],
 		['an absent type', agent_call({})],
 		['a type that only contains the name', agent_call({ subagent_type: 'investigator-x' })],
@@ -86,6 +87,45 @@ describe('investigator_foreground.lacks_background_field — the build without t
 		['a string on another tool', use_line({ command: 'ls', run_in_background: 'false' }, 'Bash')],
 	])('keeps refusing on %s, where the build declares the field', (_case, tail) => {
 		expect(investigator_foreground.lacks_background_field(tail, bare)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4903: the first reissue in that build drops the field from the parsed input and is
+// not on the tail yet, so only the refused dispatch with the same body there says it is the reissue.
+describe('investigator_foreground.lacks_background_field — the first reissue', () => {
+	const DESCRIPTION = 'Locate the guard'
+	const reissue = agent_call({ subagent_type: INVESTIGATOR, description: DESCRIPTION })
+
+	it('stands down on the reissue of a refused dispatch with the same body', () => {
+		const tail = use_line({ subagent_type: INVESTIGATOR, description: DESCRIPTION, prompt: PROMPT })
+
+		expect(investigator_foreground.ROW.already_satisfied(tail, reissue)).toBe(true)
+	})
+
+	it.each([
+		[
+			'another prompt',
+			use_line({ subagent_type: INVESTIGATOR, description: DESCRIPTION, prompt: 'Other work' }),
+		],
+		[
+			'another description',
+			use_line({ subagent_type: INVESTIGATOR, description: 'Other', prompt: PROMPT }),
+		],
+		[
+			'a foreground dispatch that ran',
+			use_line({
+				subagent_type: INVESTIGATOR,
+				description: DESCRIPTION,
+				prompt: PROMPT,
+				run_in_background: false,
+			}),
+		],
+		[
+			'another agent type',
+			use_line({ subagent_type: GENERAL_PURPOSE, description: DESCRIPTION, prompt: PROMPT }),
+		],
+	])('keeps refusing when the tail holds %s', (_case, tail) => {
+		expect(investigator_foreground.lacks_background_field(tail, reissue)).toBe(false)
 	})
 })
 
