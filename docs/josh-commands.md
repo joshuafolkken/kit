@@ -802,7 +802,7 @@ pnpm josh audit
 
 <!-- /usage -->
 
-The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`). With neither the audit exits non-zero and prints how to get one — never skipped.
+The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`) — in a linked work tree, the primary checkout's cache, so every work tree shares one binary and one failed-download record. With neither the audit exits non-zero and prints how to get one — never skipped.
 
 ### `josh overrides`
 

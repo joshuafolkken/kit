@@ -140,7 +140,7 @@ async function report(
 	is_forced: boolean,
 ): Promise<string> {
 	const logic = security_audit_provision_logic
-	const target_path = security_audit_logic.build_managed_binary_path(project_root, platform)
+	const target_path = security_audit.managed_binary_path(project_root, platform)
 	const existing = existing_scanner(target_path)
 	if (existing !== undefined) return logic.format_already_present(existing)
 

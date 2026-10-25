@@ -1,10 +1,13 @@
 import { accessSync, constants, statSync } from 'node:fs'
+import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { execaSync } from 'execa'
 import { security_audit_logic } from './security-audit-logic'
 import { security_audit_provision_logic } from './security-audit-provision-logic'
 
 const FAILURE_EXIT_CODE = 1
+const GIT_DIRECTORY_NAME = '.git'
 const UNKNOWN_VERSION = 'unknown'
 
 // execa reports `exitCode: undefined` only when the binary could not be spawned
@@ -56,11 +59,27 @@ interface ScannerChoice {
 	is_below_floor: boolean
 }
 
+// A linked work tree shares the primary checkout's managed scanner, so a lane neither downloads its
+// own copy at every session start nor keeps its own no-retry record (joshuafolkken/kit#4942). Where
+// the primary checkout cannot be named — a bare repository, a submodule, or no repository — the root
+// is the project's own. The primary checkout reads git's answer too, so it keys the no-retry record
+// on the same real path its lanes do even when it was entered through a symlink.
+function managed_root(project_root: string): string {
+	const common = git_common_directory.repository(project_root)
+	if (common === undefined || path.basename(common) !== GIT_DIRECTORY_NAME) return project_root
+
+	return path.dirname(common)
+}
+
+function managed_binary_path(project_root: string, platform: string): string {
+	return security_audit_logic.build_managed_binary_path(managed_root(project_root), platform)
+}
+
 // A provisioned copy counts only when it is both a real executable and at or above the floor: a
 // leftover from an earlier pinned version would otherwise be preferred over the PATH binary while
 // reading less of the lockfile than it should.
 function managed_scanner(project_root: string, platform: string): string | undefined {
-	const managed_path = security_audit_logic.build_managed_binary_path(project_root, platform)
+	const managed_path = managed_binary_path(project_root, platform)
 
 	return is_executable_file(managed_path) && meets_floor(managed_path) ? managed_path : undefined
 }
@@ -132,6 +151,7 @@ function run(): number {
 const security_audit = {
 	is_binary_available,
 	is_executable_file,
+	managed_binary_path,
 	meets_floor,
 	resolve_scanner,
 	run,
