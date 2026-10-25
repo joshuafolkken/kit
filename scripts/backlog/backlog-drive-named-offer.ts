@@ -7,6 +7,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import type { IssueState } from '#scripts/issue/issue-state'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_plan } from '#scripts/lane/lane-plan'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { backlog_budget } from './backlog-budget'
 import type { DriveState, OfferRead } from './backlog-drive'
@@ -138,12 +139,24 @@ async function not_run(
 	return named?.is_finish === true ? await only_end(carry, named) : named
 }
 
+// The issues in flight, with each named one whose yielded plan a running lane still holds: the offer
+// waits on it as on a lane, so the run does not relaunch it into the same yield (joshuafolkken/kit#4926).
+function holding(carry: RunCarry, in_flight: ReadonlyArray<string>): Array<string> {
+	const running = in_flight.map(Number)
+	const held = backlog_drive_named
+		.named_issues(carry)
+		.filter((issue) => lane_plan.is_yield_held(issue, running, process.cwd()))
+
+	return [...new Set([...in_flight, ...held.map(String)])]
+}
+
 async function read(
 	carry: RunCarry,
 	state: DriveState,
 	context: NamedContext,
 ): Promise<OfferRead | undefined> {
-	const named = backlog_drive_named.offer(carry, state, context.is_only)
+	const waiting = { ...state, in_flight: holding(carry, state.in_flight) }
+	const named = backlog_drive_named.offer(carry, waiting, context.is_only)
 	if (named?.verdict !== 'run') return await not_run(carry, named)
 	const budget = budget_offer(carry, state, context.forwarded)
 	if (budget.verdict !== 'run') return budget

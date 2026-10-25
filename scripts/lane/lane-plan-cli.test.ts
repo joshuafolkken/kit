@@ -114,6 +114,26 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 	})
 })
 
+describe('lane:plan — the yield mark of a plan recorded again', () => {
+	it('drops the yield mark once a later plan clears', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.yielded).toBeUndefined()
+	})
+
+	it('keeps the yield mark when a later plan meets a listing it could not read', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDING)
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+		fetch_opted_in.mockResolvedValue({ kind: 'unreadable' })
+		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.yielded).toBe(true)
+	})
+})
+
 describe('lane:plan — the hold of a lane it gives back', () => {
 	it('releases its hold before printing `yield` as its last answer', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)

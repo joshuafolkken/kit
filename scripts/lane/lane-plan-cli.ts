@@ -84,7 +84,7 @@ async function give_back(plan: LanePlan, clash: Clash, directory: string): Promi
 }
 
 function clear(plan: LanePlan, directory: string): number {
-	lane_plan.record({ ...plan, cleared: true }, directory)
+	lane_plan.record({ ...plan, cleared: true, yielded: undefined }, directory)
 	console.info('clear')
 
 	return SUCCESS_EXIT_CODE
@@ -109,11 +109,14 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 }
 
 // A lane that plans again — after a yield, or to add a file — keeps the place in line its first plan
-// took: a fresh time would hand the files it already holds to a lane that planned after it.
+// took: a fresh time would hand the files it already holds to a lane that planned after it. A yield
+// stays marked until the plan clears, so a check the listing could not answer keeps the plan its lane
+// yielded on.
 function placed(plan: LanePlan, directory: string): LanePlan {
 	const recorded = lane_plan.read(plan.issue, directory)
+	if (recorded === undefined) return plan
 
-	return recorded === undefined ? plan : { ...plan, planned_at: recorded.planned_at }
+	return { ...plan, planned_at: recorded.planned_at, yielded: recorded.yielded }
 }
 
 async function run(

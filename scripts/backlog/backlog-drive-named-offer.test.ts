@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_plan } from '#scripts/lane/lane-plan'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { expect, test, vi } from 'vitest'
 import { backlog_drive, type LoopPorts } from './backlog-drive'
@@ -49,6 +50,19 @@ test('offers a named epic child from the epic instead of launching the root', as
 	expect(epic).toHaveBeenCalledWith('1', state, CONTEXT.owner)
 	read.mockRestore()
 	epic.mockRestore()
+})
+
+// joshuafolkken/kit#4926: a declared issue that gave its lane back waits on its kept plan while the
+// lane it yielded to runs, rather than relaunching into the same yield.
+test('waits on a declared issue whose yielded plan a lane in flight still holds', async () => {
+	const state = backlog_drive.initial_state(['3'], ACTIVE)
+	const held = vi.spyOn(lane_plan, 'is_yield_held').mockImplementation((issue) => issue === 1)
+
+	const offer = await backlog_drive_named_offer.read(CARRY, state, CONTEXT)
+
+	expect(offer?.verdict).toBe('wait')
+	expect(held).toHaveBeenCalledWith(1, [3], process.cwd())
+	held.mockRestore()
 })
 
 function begin_named(target: string, directory: string): RunCarry | undefined {

@@ -116,3 +116,29 @@ describe('lane_plan.release', () => {
 		expect(lane_plan.read(LATER, DIRECTORY)).toBeUndefined()
 	})
 })
+
+describe('lane_plan.is_yield_held', () => {
+	// joshuafolkken/kit#4926: a named run holds a yielded issue back on its kept plan while an earlier
+	// lane in flight still plans one of its files.
+	it('holds a yielded plan while an earlier lane in flight plans one of its files', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, [EARLIER], DIRECTORY)).toBe(true)
+		expect(lane_plan.is_yield_held(LATER, [], DIRECTORY)).toBe(false)
+	})
+
+	it('holds no plan its lane did not yield on', () => {
+		lane_plan.record(EARLIER_PLAN, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, [EARLIER], DIRECTORY)).toBe(false)
+	})
+
+	it('holds no yielded plan that no lane in flight overlaps', () => {
+		lane_plan.record({ ...EARLIER_PLAN, paths: [RANK] }, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, yielded: true }, DIRECTORY)
+
+		expect(lane_plan.is_yield_held(LATER, [EARLIER], DIRECTORY)).toBe(false)
+	})
+})

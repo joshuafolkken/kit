@@ -1,7 +1,7 @@
 {
-	"reason": "A yield is booked its own run:merge outcome (yielded) and closed by run:merge, with the hold released and the plan kept as yielded — new code paths in lane-yield, run-merge, run-merge-cli and lane-plan-cli",
+	"reason": "Lane give-back on a planned-file clash, docs Markdown never clashing, and a named run holding a yielded issue back on its kept plan while the lane it yielded to runs",
 	"date": "2026-10-25",
 	"growth": {
-		"scripts.code_lines": 107
+		"scripts.code_lines": 137
 	}
 }

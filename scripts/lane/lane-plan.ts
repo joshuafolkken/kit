@@ -1,4 +1,4 @@
-import type { Declared } from '#scripts/backlog/backlog-overlap'
+import { backlog_overlap, type Declared } from '#scripts/backlog/backlog-overlap'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -107,7 +107,32 @@ function earlier_holders(
 	})
 }
 
-const lane_plan = { earlier_holders, is_uncleared, read, record, release, remove, with_plans }
+// Whether `issue` yielded on a plan that a lane in `in_flight` still holds one of its files ahead of —
+// what a named run holds the issue back on, as `backlog:next` does on the same kept plan
+// (joshuafolkken/kit#4926). Without it the run relaunches the issue at once, and the lane yields again.
+function is_yield_held(
+	issue: number,
+	in_flight: ReadonlyArray<number>,
+	directory: string,
+): boolean {
+	const plan = read(issue, directory)
+	if (plan?.yielded !== true) return false
+	const holders = earlier_holders(plan, in_flight, directory)
+	const declared = with_plans(new Map(holders.map((holder) => [holder, new Set()])), directory)
+
+	return backlog_overlap.path_clash(new Set(plan.paths), declared, holders) !== undefined
+}
+
+const lane_plan = {
+	earlier_holders,
+	is_uncleared,
+	is_yield_held,
+	read,
+	record,
+	release,
+	remove,
+	with_plans,
+}
 
 export { lane_plan }
 export type { LanePlan }
