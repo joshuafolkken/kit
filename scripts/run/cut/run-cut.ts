@@ -9,6 +9,7 @@ import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { json_value } from '#scripts/lib/json-value'
 import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
+import { run_cut_digest, type SessionDigest } from './run-cut-digest'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 
 // A lane child is a detached `fullrun #<N>` process, and the thinking it accumulates while
@@ -92,6 +93,8 @@ interface RunCut {
 	// record of the scalar fields alone parses, while a resume into implementation refuses to continue without it (`classify_resume`
 	// → `incomplete`), so a session is never silently continued lacking the instruction it needs.
 	handoff?: Handoff | undefined
+	// What the cut session read and decided, printed on the resume (joshuafolkken/kit#5040).
+	digest?: SessionDigest | undefined
 	// Set when `run:merge` found this cut still unadopted after every process of the lane had gone and
 	// relaunched its successor itself. The fallback fires once per cut: a
 	// successor that dies again before adopting is not relaunched a second time, so a lane that keeps
@@ -121,6 +124,8 @@ interface CutSpec {
 	// The instruction and work state to carry, absent for a pre-gate cut that resumes into the gate
 	// rather than into implementation.
 	handoff?: Handoff | undefined
+	// What the cut session read and decided, derived from its transcript (`run-cut-digest.ts`).
+	digest?: SessionDigest | undefined
 }
 
 // What the resume classifier is asked about, gathered from the fresh process's own git state so the
@@ -155,6 +160,7 @@ const run_cut_schema = z.object({
 	cut_at: z.string(),
 	is_handed_off: z.boolean().optional(),
 	handoff: run_cut_handoff.handoff_schema.optional(),
+	digest: run_cut_digest.session_digest_schema.optional(),
 	is_merge_relaunched: z.boolean().optional(),
 })
 
@@ -261,6 +267,7 @@ function fresh_cut(spec: CutSpec, now: Date): RunCut {
 		cut_at: now.toISOString(),
 		is_handed_off: true,
 		handoff: spec.handoff,
+		digest: spec.digest,
 	}
 }
 
@@ -283,6 +290,16 @@ function within_handoff_bound(cut: RunCut): boolean {
 // the exclusive-create's `busy`.
 function record_within_bound(spec: CutSpec, now: Date = new Date()): boolean {
 	return within_handoff_bound(fresh_cut(spec, now))
+}
+
+// An implementation cut carries what the session read and decided (`run-cut-digest.ts`); a digest the
+// bound cannot hold is dropped, so a cut is never refused for it, and a pre-gate cut never derives one.
+function with_digest(spec: CutSpec, digest_of: () => SessionDigest | undefined): CutSpec {
+	if (spec.handoff === undefined) return spec
+
+	const digested = { ...spec, digest: digest_of() }
+
+	return record_within_bound(digested) ? digested : spec
 }
 
 // **Create-exclusively, exactly as `run-hold.ts` claims a tree.** A record already here means a cut is
@@ -466,6 +483,7 @@ const run_cut = {
 	classify,
 	classify_resume,
 	current_state,
+	with_digest,
 	cut_path,
 	describe_cut,
 	end_cut,

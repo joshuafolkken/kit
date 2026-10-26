@@ -92,6 +92,10 @@
   - fires: `pnpm josh pretool:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. Every occurrence
   - silent: not a lane child, or the run goes through `pnpm josh` with single-worker eslint
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Lane child reading a spilled Bash result whole** (`lane-spilled-read`, `prompts/collaboration-workflow/output-bounds.md`)
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child's `Read` of a `tool-results/<id>.txt` file with no `offset` or `limit`. Every occurrence
+  - silent: not a lane child, another file, or a paginated `Read`
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Bare `pnpm josh git`** (`josh-git-bare`, `CLAUDE.md` → Git Rules)
   - fires: `pnpm josh pretool:guard` — `pnpm josh git` without `-y`, whose staging prompt cancels with no TTY. Every occurrence
   - silent: `pnpm josh git -y`
