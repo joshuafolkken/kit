@@ -29,6 +29,8 @@ function spy_steps(order: Array<string>, is_handed_over: boolean): void {
 	})
 	vi.spyOn(review_record_pinned, 'restart_if_moved').mockImplementation(async () => {
 		order.push('pinned')
+
+		return true
 	})
 }
 

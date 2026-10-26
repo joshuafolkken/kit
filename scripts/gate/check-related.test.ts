@@ -3,6 +3,7 @@ import { status_icons } from '#scripts/lib/status-icons'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
+import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
 import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -180,6 +181,7 @@ function launch_on(tree: string): void {
 	vi.spyOn(run_review_pinned_steps, 'clear').mockReturnValue(undefined)
 	vi.spyOn(run_review_pinned_steps, 'launch').mockReturnValue({ kind: 'launched', pid: 1 })
 	vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(FIXED_TREE)
+	vi.spyOn(run_review_pinned_join, 'settled_on_tree').mockResolvedValue(undefined)
 	vi.spyOn(console, 'info').mockReturnValue(undefined)
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 }
@@ -197,6 +199,10 @@ describe('check_related.run_all restarts test:pinned on a tree a fix moved', () 
 		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
 		expect(run_review_pinned_steps.launch).toHaveBeenCalledExactlyOnceWith(ROOT, REASON, FIXED_TREE)
 		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
+		expect(run_review_pinned_join.settled_on_tree).toHaveBeenCalledExactlyOnceWith(
+			ROOT,
+			check_related_pinned.WAIT_MS,
+		)
 	})
 
 	it('starts nothing when the check already runs on the current tree', async () => {
@@ -205,6 +211,7 @@ describe('check_related.run_all restarts test:pinned on a tree a fix moved', () 
 		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
 		expect(run_review_pinned_steps.launch).not.toHaveBeenCalled()
 		expect(console.info).not.toHaveBeenCalled()
+		expect(run_review_pinned_join.settled_on_tree).not.toHaveBeenCalled()
 	})
 
 	// A launch record outlives its issue in a reused checkout, and only a lane child's ship reads it;
@@ -227,10 +234,13 @@ describe('check_related.run_all restarts test:pinned on a tree a fix moved', () 
 
 const PINNED_NOTICE = 'unpinned 1 · unchecked 0\n  scripts/a.ts:10'
 
-async function run_all_lines(pinned_notice: string | undefined): Promise<Array<string>> {
+async function run_all_lines(
+	pinned_notice: string | undefined,
+	is_started = false,
+): Promise<Array<string>> {
 	const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
-	vi.spyOn(review_record_pinned, 'restart_in_lane').mockResolvedValue(undefined)
+	vi.spyOn(review_record_pinned, 'restart_in_lane').mockResolvedValue(is_started)
 	vi.spyOn(check_related_pinned, 'notice').mockResolvedValue(pinned_notice)
 	await check_related.run_all(ROOT, passing_check)
 
@@ -255,7 +265,14 @@ describe('check_related.run_all test:pinned verdict', () => {
 			'',
 			`${status_icons.PASS_ICON} check:related passed`,
 		])
-		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT)
+		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT, false)
+	})
+
+	// joshuafolkken/kit#4987: the verdict of the check this run started was not waited for.
+	it('asks for the verdict of the check this run started, so it is waited for', async () => {
+		await run_all_lines(PINNED_NOTICE, true)
+
+		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT, true)
 	})
 
 	it('adds nothing above the verdict line when no verdict is reached', async () => {
@@ -332,8 +349,16 @@ describe('check_related.report_results metrics growth notice', () => {
 		expect(lines.slice(-4)).toStrictEqual([
 			...GROWTH_NOTICE.split('\n'),
 			'',
-			`${status_icons.PASS_ICON} check:related passed`,
+			`${status_icons.PASS_ICON} check:related passed — ${check_related.METRICS_STOP}`,
 		])
+	})
+
+	// joshuafolkken/kit#4987: a tail of the last lines read `passed` alone, and the ship stopped on it.
+	it('names the ship stop and the accept form on the verdict line itself', () => {
+		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
+
+		expect(verdict).toContain('pre-detach')
+		expect(verdict).toContain('pnpm josh metrics --accept')
 	})
 
 	it('adds nothing above the verdict line when the lint section carries no notice', () => {
