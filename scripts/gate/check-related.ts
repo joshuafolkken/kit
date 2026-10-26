@@ -4,6 +4,7 @@ import { status_icons } from '#scripts/lib/status-icons'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
+import { check_related_pinned } from './check-related-pinned'
 import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
 
@@ -119,14 +120,15 @@ function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined
 	return output.slice(start).trimEnd()
 }
 
-function report_results(results: ReadonlyArray<CheckResult>): void {
+function report_results(results: ReadonlyArray<CheckResult>, pinned_notice?: string): void {
 	for (const result of results) {
 		report_result(result)
 	}
 
-	const notice = metrics_notice(results)
+	for (const notice of [metrics_notice(results), pinned_notice]) {
+		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
+	}
 
-	if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 	process.stdout.write(`\n${verdict_line(results)}\n`)
 }
 
@@ -137,12 +139,13 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // **The first check of a round-1 fix starts `josh test:pinned` again on the fixed tree**
 // (joshuafolkken/kit#4948): left to `josh review:record`, the restart came minutes before the ship, and
 // its pre-detach waited out a whole run. Started here, the check runs beside these four; a tree that did
-// not move, or a run outside a lane child, starts nothing.
+// not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
+// tree is printed above the verdict line (`check-related-pinned.ts`).
 async function run_all(root?: string, execute: CheckExecutor = execute_check): Promise<number> {
 	await review_record_pinned.restart_in_lane(root)
 	const results = await run_checks(execute)
 
-	report_results(results)
+	report_results(results, await check_related_pinned.notice(root))
 
 	return exit_code(results)
 }
