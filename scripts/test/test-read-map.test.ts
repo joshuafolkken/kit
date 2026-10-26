@@ -18,7 +18,7 @@ const mocked_common = vi.mocked(git_common_directory.repository)
 const ROOT = path.resolve('/repo')
 const DOCUMENT = path.join('docs', 'a.md')
 const NESTED_DOCUMENT = path.join('docs', 'guide', 'b.md')
-const DEEP_DOCUMENT = path.join('.josh', 'observations', 'c.md')
+const DEEP_DOCUMENT = path.join('prompts', 'sub', 'c.md')
 const READER = 'reader.ts'
 const WALKER = 'walker.ts'
 const LISTER = 'lister.ts'
@@ -35,13 +35,7 @@ const MAP: ReadMap = {
 	commit: 'abc',
 	dirty: { [DIRTY]: DIGEST_THEN },
 	change: [DIRTY],
-	directories: [
-		'.josh',
-		path.dirname(DEEP_DOCUMENT),
-		'docs',
-		path.join('docs', 'guide'),
-		'prompts',
-	],
+	directories: [path.dirname(DEEP_DOCUMENT), 'docs', path.join('docs', 'guide'), 'prompts'],
 	readers: {
 		[DOCUMENT]: [READER],
 		[test_read_trace.read_key('docs', 'walk')]: [WALKER],
@@ -178,9 +172,7 @@ describe('test_read_map.in_unread_directory', () => {
 	})
 
 	it('rejects a directory one of whose files a test read', () => {
-		const map = { ...MAP, readers: { [path.join('prompts', 'other.md')]: [READER] } }
-
-		expect(test_read_map.in_unread_directory(map, path.join('prompts', 'x.md'))).toBe(false)
+		expect(test_read_map.in_unread_directory(SHALLOW_ROOT_MAP, DEEP_DOCUMENT)).toBe(false)
 	})
 
 	it('rejects a directory a test listed or walked', () => {

@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { git_command } from '#scripts/git/git-command'
+import { file_reader } from '#scripts/lib/read-file'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { pure_files_entries } from './pure-files-entries'
 
 // joshuafolkken/kit#5001: rewriting one entry of `tools/test/pure-files.ts` ran the whole unit suite.
+
+vi.mock('#scripts/git/git-command', () => ({
+	git_command: { change_base: vi.fn(), show_file: vi.fn() },
+}))
 
 const KEPT = 'scripts/a/kept.test.ts'
 const ADDED = 'scripts/b/added.test.ts'
@@ -66,6 +72,37 @@ describe('pure_files_entries.tests_of', () => {
 })
 
 describe('pure_files_entries.read_moved', () => {
+	const BASE = 'b45e'
+	const CHANGED = [pure_files_entries.PURE_FILES_PATH]
+
+	beforeEach(() => {
+		vi.clearAllMocks()
+		vi.mocked(git_command.change_base).mockResolvedValue(BASE)
+		vi.mocked(git_command.show_file).mockResolvedValue(list_of([KEPT, REMOVED]))
+		vi.spyOn(file_reader, 'read_if_readable').mockReturnValue(list_of([KEPT, ADDED]))
+	})
+
+	it('answers the entries moved between the change base and the working tree', async () => {
+		await expect(pure_files_entries.read_moved('/repo', CHANGED)).resolves.toStrictEqual([
+			ADDED,
+			REMOVED,
+		])
+		expect(git_command.show_file).toHaveBeenCalledWith(`${BASE}:tools/test/pure-files.ts`)
+		expect(file_reader.read_if_readable).toHaveBeenCalledWith('/repo/tools/test/pure-files.ts')
+	})
+
+	it('answers undefined when the change base cannot be read', async () => {
+		vi.mocked(git_command.show_file).mockRejectedValue(new Error('bad object'))
+
+		await expect(pure_files_entries.read_moved('/repo', CHANGED)).resolves.toBeUndefined()
+	})
+
+	it('answers undefined when the working tree cannot be read', async () => {
+		vi.mocked(file_reader.read_if_readable).mockReturnValue(undefined)
+
+		await expect(pure_files_entries.read_moved('/repo', CHANGED)).resolves.toBeUndefined()
+	})
+
 	it('answers undefined when the list is not among the changed files', async () => {
 		await expect(pure_files_entries.read_moved('/repo', [KEPT])).resolves.toBeUndefined()
 	})

@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { pure_files_entries } from './pure-files-entries'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
@@ -10,7 +12,9 @@ import { test_unit_guard } from './test-unit-guard'
 // joshuafolkken/kit#4993: a main sync brought in `tools/test/test-state-guard.ts`, which every test
 // depends on, and a bare run after it went to the whole suite though this branch had not changed it.
 
-vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
+vi.mock('#scripts/git/git-command', () => ({
+	git_command: { change_base: vi.fn(), repository_root: vi.fn(), show_file: vi.fn() },
+}))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: {
 		read_changed_paths: vi.fn(),
@@ -97,6 +101,43 @@ describe('test_related.run_related_tests — a whole-suite file a main sync brou
 
 	it('still runs the whole suite when the branch change cannot be read', async () => {
 		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
+	})
+})
+
+// joshuafolkken/kit#5001: rewriting one entry of the pure-files list ran the whole suite.
+describe('test_related.run_related_tests — an entries-only edit of the pure-files list', () => {
+	const PURE_FILES = pure_files_entries.PURE_FILES_PATH
+	const LIST_OPEN = 'const PURE_FILES: ReadonlyArray<string> = [\n'
+	// A real test file the list leaves out, so the base that holds it differs by that entry alone.
+	const ENTRY = path.join('scripts', 'test', 'test-related.synced-whole-suite.test.ts')
+
+	beforeEach(() => {
+		const list_text = readFileSync(path.join(REPOSITORY_ROOT, PURE_FILES), 'utf8')
+
+		mocked_changed.mockResolvedValue([PURE_FILES])
+		mocked_moved.mockResolvedValue({ changed: [PURE_FILES], synced: [] })
+		vi.mocked(git_command.change_base).mockResolvedValue('b45e')
+		vi.mocked(git_command.show_file).mockResolvedValue(
+			list_text.replace(LIST_OPEN, () => `${LIST_OPEN}\t'${ENTRY}',\n`),
+		)
+	})
+
+	it('runs the moved entry and the list’s own tests rather than the whole suite', async () => {
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			...pure_files_entries.tests_of([ENTRY]).map((file) => path.join(REPOSITORY_ROOT, file)),
+			'--run',
+		])
+	})
+
+	it('still runs the whole suite when the change base cannot be read', async () => {
+		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
 
 		await test_related.run_related_tests([])
 
