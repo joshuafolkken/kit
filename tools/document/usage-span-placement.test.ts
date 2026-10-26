@@ -49,6 +49,18 @@ function placed(name: string, placed_entry: PlacedEntry): ReadonlyMap<string, st
 	return usage_span_placement.place_missing_spans(pages(), { [name]: placed_entry })
 }
 
+// The automation page after `rewrite`, with a span placed for a Maintenance command.
+function fresh_on_automation(rewrite: (page: string) => string): string | undefined {
+	const rewritten = new Map([
+		...pages(),
+		[AUTOMATION_PAGE, rewrite(pages().get(AUTOMATION_PAGE) ?? '')],
+	])
+
+	return usage_span_placement
+		.place_missing_spans(rewritten, { [FRESH_NEW]: maintenance_entry() })
+		.get(AUTOMATION_PAGE)
+}
+
 describe('placing the span of a command no page renders yet', () => {
 	it('puts a developer command on the developer page, after the commands sharing its prefix', () => {
 		const text = placed('lint:new', entry('Development', 'developer')).get(DEVELOPER_PAGE)
@@ -69,13 +81,7 @@ describe('placing the span of a command no page renders yet', () => {
 	})
 
 	it('finds its category section below the page title too', () => {
-		const titled = new Map([
-			...pages(),
-			[AUTOMATION_PAGE, `# Automation\n\n${pages().get(AUTOMATION_PAGE) ?? ''}`],
-		])
-		const text = usage_span_placement
-			.place_missing_spans(titled, { [FRESH_NEW]: maintenance_entry() })
-			.get(AUTOMATION_PAGE)
+		const text = fresh_on_automation((page) => `# Automation\n\n${page}`)
 
 		expect(text).toContain(ENDS_MAINTENANCE)
 	})
@@ -88,5 +94,33 @@ describe('placing the span of a command no page renders yet', () => {
 
 	it('leaves every page as it was when each command already has a span', () => {
 		expect(placed(STASH_PUSH, entry(AI_TOOLS, AUTOMATION))).toStrictEqual(pages())
+	})
+
+	it('keeps the rule closing its category section below the new section', () => {
+		const text = fresh_on_automation((page) => page.replace('## Git', '---\n\n## Git'))
+
+		expect(text).toContain(`${section(FRESH_NEW)}\n---\n\n## Git hooks`)
+	})
+})
+
+describe('naming the spans no command owns', () => {
+	it('names each span whose command is gone, with its page', () => {
+		const commands = {
+			lint: entry('Development', 'developer'),
+			[RULESET_CHECK]: maintenance_entry(),
+		}
+
+		expect(usage_span_placement.stale_spans(pages(), commands)).toStrictEqual([
+			`${BACKLOG_PAGE}: issue:read`,
+			`${BACKLOG_PAGE}: ${STASH_PUSH}`,
+			`${AUTOMATION_PAGE}: ${RESERVED_RUN}`,
+		])
+	})
+
+	it('names none when every span has its command', () => {
+		const spans = [...pages().values()].flatMap((text) => text.match(/(?<=usage: )\S+/gu) ?? [])
+		const commands = Object.fromEntries(spans.map((name) => [name, maintenance_entry()]))
+
+		expect(usage_span_placement.stale_spans(pages(), commands)).toStrictEqual([])
 	})
 })

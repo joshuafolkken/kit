@@ -17,8 +17,11 @@ const CATALOG_PAGE = 'docs/josh-command-catalog.md'
 const WHY_PAGE = 'docs/why.md'
 const SNAPSHOT_TEST = 'scripts/josh/josh-command-map.test.ts'
 
-function write_usage_pages(): void {
-	const pages = new Map(USAGE_PAGES.map((page) => [page, readFileSync(page_path(page), 'utf8')]))
+function read_usage_pages(): ReadonlyMap<string, string> {
+	return new Map(USAGE_PAGES.map((page) => [page, readFileSync(page_path(page), 'utf8')]))
+}
+
+function write_usage_pages(pages: ReadonlyMap<string, string>): void {
 	const placed = usage_span_placement.place_missing_spans(pages, COMMAND_MAP)
 
 	for (const [page, text] of placed) {
@@ -51,8 +54,20 @@ function report_bytes(): number {
 	return sizes.some((size) => derived_artifacts.is_over(size)) ? 1 : 0
 }
 
+// A span naming no command stops the run before anything is written: filling it would throw midway.
 async function main(): Promise<number> {
-	write_usage_pages()
+	const pages = read_usage_pages()
+	const stale = usage_span_placement.stale_spans(pages, COMMAND_MAP)
+
+	if (stale.length > 0) {
+		console.error(
+			`command:derive: rename or delete the section of each span naming no command:\n${stale.join('\n')}`,
+		)
+
+		return 1
+	}
+
+	write_usage_pages(pages)
 	writeFileSync(CATALOG_FILE, generate_catalog())
 	write_why_counts()
 	await update_snapshot()

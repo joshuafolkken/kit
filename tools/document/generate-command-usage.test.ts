@@ -86,7 +86,7 @@ describe('the usage spans cover the command map', () => {
 			generate_command_usage.usage_spans(page_text(page)),
 		)
 
-		const message = `a command has no usage span — run \`${generate_command_usage.REGENERATE_COMMAND}\``
+		const message = `a command has no usage span, or a span names no command — run \`${generate_command_usage.REGENERATE_COMMAND}\``
 
 		expect(sorted(spans), message).toEqual(sorted(Object.keys(COMMAND_MAP)))
 	})

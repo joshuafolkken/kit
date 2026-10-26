@@ -14,6 +14,7 @@ const DEVELOPER_PAGE = 'docs/josh-commands.md'
 const FALLBACK_PAGE = 'docs/josh-commands-automation.md'
 const SECTION_HEADING = /^#{2,3} /mu
 const CATEGORY_HEADING = /^## /mu
+const SECTION_RULE = '---\n\n'
 
 function prefix_of(name: string): string {
 	return name.split(':', 1)[0] ?? name
@@ -82,12 +83,30 @@ function insert_section(text: string, at: number, name: string): string {
 	return `${text.slice(0, at)}${section}${text.slice(at)}`
 }
 
+// A `---` rule closing a section closes the section the new one joins, so the new one goes above it.
+function above_rule(text: string, at: number): number {
+	const start = at - SECTION_RULE.length
+
+	return start >= 0 && text.startsWith(SECTION_RULE, start) ? start : at
+}
+
 function with_span(pages: Pages, name: string, entry: PlacedEntry): Pages {
 	const page = page_for(name, entry, pages)
 	const text = pages.get(page) ?? ''
 	const anchor = sibling_anchor(text, name) ?? category_anchor(text, entry.category)
 
-	return new Map([...pages, [page, insert_section(text, anchor, name)]])
+	return new Map([...pages, [page, insert_section(text, above_rule(text, anchor), name)]])
+}
+
+// `<page>: <name>` for each span naming no command — a renamed or removed command's section. Its
+// heading and prose are hand-written, so it is renamed or deleted by hand, never derived.
+function stale_spans(pages: Pages, commands: Readonly<Record<string, PlacedEntry>>): Array<string> {
+	return [...pages].flatMap(([page, text]) =>
+		generate_command_usage
+			.usage_spans(text)
+			.filter((name) => !Object.hasOwn(commands, name))
+			.map((name) => `${page}: ${name}`),
+	)
 }
 
 // Each page's text with an empty span section for every command no page renders yet; the generator
@@ -105,6 +124,6 @@ function place_missing_spans(pages: Pages, commands: Readonly<Record<string, Pla
 	return placed
 }
 
-const usage_span_placement = { place_missing_spans }
+const usage_span_placement = { place_missing_spans, stale_spans }
 
 export { usage_span_placement }

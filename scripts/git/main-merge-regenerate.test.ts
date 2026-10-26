@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { import_closure } from '#scripts/build/import-closure-fixture'
 import { describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3922: what `resolve` refuses before it touches anything — a conflict on a path
@@ -36,5 +37,14 @@ describe('the table of regenerated files', () => {
 		)
 
 		for (const header of headers) expect(header).toMatch(/generated/iu)
+	})
+
+	// A script with no main guard runs nothing, so the merge would conclude on the conflicted file.
+	it('runs a script that writes when run, not an imported module', () => {
+		const scripts = main_merge_regenerate.REGENERATED_FILES.map(
+			(entry) => entry.command.at(-1) ?? '',
+		)
+
+		for (const script of scripts) expect(import_closure.has_main_guard(script), script).toBe(true)
 	})
 })

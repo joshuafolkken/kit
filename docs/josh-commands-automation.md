@@ -830,8 +830,6 @@ pnpm josh latest:guard   # refuses inside a lane
 
 It fronts the `josh latest` chain.
 
----
-
 ### `josh command:derive`
 
 <!-- usage: command:derive -->
@@ -843,6 +841,8 @@ pnpm josh command:derive   # after adding, renaming or describing a command
 ```
 
 <!-- /usage -->
+
+---
 
 ## Git hooks
 
