@@ -63,7 +63,7 @@ const ROW = {
 		topic:
 			'`.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is refused one call earlier"',
 		fires:
-			"a dispatched lane child's `AskUserQuestion`; it hands over the park procedure. Every occurrence",
+			"a dispatched lane child's `AskUserQuestion`; it hands over the park procedure; the Stop hook also blocks a reply asking a person for the git index. Every occurrence",
 		quiet: 'not a lane child, or not an interactive tool',
 	},
 }

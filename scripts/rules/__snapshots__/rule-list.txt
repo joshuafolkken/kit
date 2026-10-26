@@ -45,7 +45,7 @@
   - silent: `exempt` (non-runtime only) or `satisfied` (tests included)
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child background push** (`lane-background`, `.claude/skills/workflow-commands/background-commands.md`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`; the Stop hook also blocks ending a turn with its background task or subagent unfinished. Every occurrence
   - silent: not a lane child, or the foreground `ship --detach`
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Idle run tail** (`run-tail`, `.claude/skills/workflow-commands/background-commands.md`)
@@ -65,7 +65,7 @@
   - silent: not a lane child, or not a stop notification
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child interactive ask** (`lane-interactive-ask`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is refused one call earlier")
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child's `AskUserQuestion`; it hands over the park procedure. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child's `AskUserQuestion`; it hands over the park procedure; the Stop hook also blocks a reply asking a person for the git index. Every occurrence
   - silent: not a lane child, or not an interactive tool
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Subagent model named** (`agent-model`, `.claude/skills/workflow-commands/delegation.md` → "A `general-purpose` subagent names its model")

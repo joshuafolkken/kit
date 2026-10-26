@@ -159,7 +159,8 @@ function observe_call(
 }
 
 // One transcript line, parsed once, as the things a reading is taken from: the calls it issued, the
-// bodies of the results the harness wrote back as failures, and the context a hook attached.
+// refusals the harness wrote back (failed results and Stop-hook blocks), and the context a hook
+// attached.
 interface DatedLine {
 	at_ms: number
 	message_id: string

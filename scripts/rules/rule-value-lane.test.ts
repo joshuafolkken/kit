@@ -61,11 +61,11 @@ describe('rule_value.measure — what a Stop hook delivers to a lane child', () 
 		expect(reading.refusals).toBe(1)
 	})
 
-	it('reads no refusal from a prompt that only quotes a Stop reason', () => {
+	it('reads no refusal from a prompt that is a Stop reason without the harness label', () => {
 		const quoted = JSON.stringify({
 			type: 'user',
 			timestamp: rule_value_fixture.TIMESTAMP,
-			message: { content: `why? ${lane_background.LANE_BACKGROUND_STOP_REASON}` },
+			message: { content: lane_background.LANE_BACKGROUND_STOP_REASON },
 		})
 
 		expect(reading_for(LANE_BACKGROUND, lane_run(quoted)).refusals).toBe(0)

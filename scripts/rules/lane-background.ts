@@ -232,7 +232,7 @@ const ROW = {
 		title: 'Lane child background push',
 		topic: '`.claude/skills/workflow-commands/background-commands.md`',
 		fires:
-			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence',
+			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`; the Stop hook also blocks ending a turn with its background task or subagent unfinished. Every occurrence',
 		quiet: 'not a lane child, or the foreground `ship --detach`',
 	},
 }
