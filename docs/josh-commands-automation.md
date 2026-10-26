@@ -908,6 +908,7 @@ Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_file
 
 - `cspell` and `eslint` write `.cspellcache.commit` and `.eslintcache.commit` (separate from the gate's caches).
 - `prettier` shares `.prettiercache` with `josh lint`, so a commit right after a green gate re-checks nothing.
+- `JOSH_PRE_COMMIT_LINT=off` skips all three; `josh ship` sets it for its local commit, whose tree the gate checks before the push.
 
 ### `josh pre-push-unit`
 

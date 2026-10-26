@@ -1,4 +1,5 @@
 import { core_budget } from '#scripts/gate/core-budget'
+import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import {
 	CSPELL_CACHE_FLAGS,
 	CSPELL_COMMIT_CACHE_FLAGS,
@@ -7,7 +8,7 @@ import {
 	ESLINT_COMMIT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('execa', () => ({ execa: vi.fn() }))
 vi.mock('#scripts/lint/eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
@@ -116,6 +117,28 @@ describe('pre_commit_lint.run', () => {
 		expect(await pre_commit_lint.run(['stylelint'])).toBe(pre_commit_lint.USAGE_ERROR_EXIT_CODE)
 		expect(mocked_execa).not.toHaveBeenCalled()
 	})
+})
+
+// joshuafolkken/kit#4985: `josh ship`'s local commit switches the hooks off — its gate runs them.
+describe('pre_commit_lint.run — switched off', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.restoreAllMocks()
+	})
+
+	it.each(['cspell', 'prettier', 'eslint'])(
+		'neither reserves the core budget nor runs %s',
+		async (tool) => {
+			const reservation = vi.spyOn(core_budget, 'with_command_reservation')
+
+			vi.stubEnv(pre_commit_lint_switch.SWITCH_ENV_KEY, 'off')
+
+			expect(await pre_commit_lint.run([tool, ...STAGED])).toBe(0)
+			expect(reservation).not.toHaveBeenCalled()
+			expect(mocked_execa).not.toHaveBeenCalled()
+			expect(mocked_run_or_cold).not.toHaveBeenCalled()
+		},
+	)
 })
 
 const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }

@@ -332,7 +332,7 @@ describe('test_related.run_related_tests — a metrics approval file this branch
 // joshuafolkken/kit#4912: a sync brought in ~430 files, and every test importing a synced module ran
 // again, though main's CI had run them against it.
 function split_into(left: Array<string>, shared: Array<string>): void {
-	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared })
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, meeting: [] })
 }
 
 describe('test_related.run_related_tests — a code module a main sync brought in', () => {

@@ -1,3 +1,4 @@
+import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
 
@@ -124,6 +125,20 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 		merge_mock.mockRejectedValue(new Error(FETCH_FAILED))
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toMatchObject({ code: OK })
+	})
+})
+
+// joshuafolkken/kit#4985: the gate or the scoped pair runs the lint hooks' checks over this tree,
+// including the commit of a ship relaunched after its conflict was resolved.
+describe('run_ship_sync.sync_stage — the local commit hooks', () => {
+	it('switches the pre-commit lint hooks off for the local commit', async () => {
+		tree.is_dirty = true
+
+		await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)
+
+		expect(josh_run_mock.mock.calls[0]?.[3]).toStrictEqual({
+			[pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off',
+		})
 	})
 })
 

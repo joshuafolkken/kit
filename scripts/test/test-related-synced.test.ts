@@ -19,7 +19,7 @@ const SHARED_HELPER = path.join('scripts', 'gate', 'since-green.ts')
 const BRANCH_DATA = path.join('docs', 'guide.md')
 const DATA_READER = path.join('scripts', 'document', 'guide-reader.ts')
 const COMPONENT = path.join('src', 'lib', 'Card.svelte')
-const NOTHING_LEFT = { left: [], shared: [] }
+const NOTHING_LEFT = { left: [], shared: [], meeting: [] }
 
 // The files whose imports reach each file, the file itself included: the shared test reaches the
 // synced module through a helper, and reads the branch's data file through a recorded reader.
@@ -95,6 +95,14 @@ describe('test_related_synced.split_with', () => {
 		expect(IMPORTERS[BRANCH_MODULE]).toEqual(expect.arrayContaining([...shared]))
 	})
 
+	// joshuafolkken/kit#4985: the lint settle reads the code between, which no test names.
+	it('meets at a branch module importing the synced one, though no test reaches both', () => {
+		const result = split_of([SYNCED_MODULE], [SHARED_HELPER])
+
+		expect(result.meeting).toEqual([SHARED_HELPER])
+		expect(result.shared).toEqual([])
+	})
+
 	it('keeps a branch test file that imports the synced module itself', () => {
 		expect(split_of([SYNCED_MODULE], [MAIN_ONLY_TEST]).shared).toEqual([MAIN_ONLY_TEST])
 	})
@@ -107,6 +115,7 @@ describe('test_related_synced.split — what it splits', () => {
 		await expect(split([BRANCH_MODULE])).resolves.toEqual({
 			left: [SYNCED_MODULE],
 			shared: [SHARED_TEST],
+			meeting: [SHARED_TEST],
 		})
 	})
 
@@ -116,6 +125,7 @@ describe('test_related_synced.split — what it splits', () => {
 		await expect(split([BRANCH_DATA])).resolves.toEqual({
 			left: [SYNCED_MODULE],
 			shared: [SHARED_TEST],
+			meeting: [SHARED_TEST],
 		})
 	})
 
