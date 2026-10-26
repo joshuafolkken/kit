@@ -53,7 +53,35 @@ describe('worktree_guard.WORKTREE_MUTATION_REASON', () => {
 		'Tier A',
 		// The owner's stated reason to keep the stash is the one case that still stops.
 		'unless the plan says why the owner keeps the stash: then stop and confirm',
+		// joshuafolkken/kit#4988: a refused single-file checkout/restore is led to the way back — for the
+		// run's own edit only, never another's uncommitted change.
+		worktree_guard.SINGLE_FILE_RESTORE,
+		"undo only this run's edit",
 	])('carries %j', (marker) => {
 		expect(worktree_guard.WORKTREE_MUTATION_REASON).toContain(marker)
+	})
+
+	// `rule-value.ts` credits a refusal by its reason's first 48 characters, so the opening the reason had
+	// before joshuafolkken/kit#4988 is kept for the refusals already delivered with it.
+	it('keeps the former opening for the refusals already delivered', () => {
+		expect(worktree_guard.ROW.former_reasons).toStrictEqual([
+			'⛔ unauthorized working-tree change: `git checkout --`, `git restore`',
+		])
+	})
+
+	// The guard is named by the text before the first colon (`time-transcript-line.ts`).
+	it('opens with its `headline:` name', () => {
+		expect(worktree_guard.WORKTREE_MUTATION_REASON).toMatch(
+			/^⛔ unauthorized working-tree change: /u,
+		)
+	})
+
+	// joshuafolkken/kit#4988: the single-file restore joined the reason; the stash guidance did not move.
+	it('keeps the stash guidance word for word', () => {
+		expect(worktree_guard.WORKTREE_MUTATION_REASON).toContain(
+			'A documented flow stashes with `pnpm josh stash:push "<message>"`; a handed-over stash is ' +
+				'`pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
+				'the plan says why the owner keeps the stash: then stop and confirm.',
+		)
 	})
 })

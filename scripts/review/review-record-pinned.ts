@@ -19,19 +19,28 @@ import { review_finding_ledger } from './review-finding-ledger'
 //
 // **The same tree starts nothing**, and so does a tree either side could not read, or a checkout with
 // no launch. The fix's first `josh check:related` runs this same restart (joshuafolkken/kit#4948), so a
-// record on the tree it checked takes over the check already running there.
+// record on the tree it checked takes over the check already running there. `check:related` alone
+// waits on the check it started (joshuafolkken/kit#4987), within a bound that keeps the verdict line
+// under a foreground Bash call's cap (`check-related-pinned.ts`).
 
 function started_line(): string {
-	return `test:pinned restarted in the background on the tree this round's fixes moved; \`josh ship\`'s pre-detach reads its answer, so nothing waits on it. Where it names unpinned places, the ship stops on them: pin each with a test that turns red without it, or ship with \`--unpinned-ok "<reason>"\`.`
+	return `test:pinned restarted in the background on the tree this round's fixes moved. Where it names unpinned places, the ship's pre-detach stops on them: pin each with a test that turns red without it, or ship with \`--unpinned-ok "<reason>"\`.`
 }
 
 // `root` is the checkout `josh run:review` keyed its launch to: the ledger root `review:record` writes
-// under is the same working directory, and a test's temporary root holds no launch.
-async function restart_if_moved(root: string = PROJECT_ROOT): Promise<void> {
+// under is the same working directory, and a test's temporary root holds no launch. Answers whether a
+// check was started.
+async function restart_if_moved(root: string = PROJECT_ROOT): Promise<boolean> {
 	try {
-		if (await run_review_pinned_join.restart_if_moved(root)) console.info(started_line())
+		const is_started = await run_review_pinned_join.restart_if_moved(root)
+
+		if (is_started) console.info(started_line())
+
+		return is_started
 	} catch (error) {
 		error_text.trace_swallowed('review_record_pinned.restart_if_moved', error)
+
+		return false
 	}
 }
 
@@ -55,11 +64,14 @@ async function is_restartable_before_record(root: string): Promise<boolean> {
 	return !(await is_round_recorded(root))
 }
 
-async function restart_in_lane(root: string = PROJECT_ROOT): Promise<void> {
+// Answers whether a check was started, so `check:related` waits on its answer (joshuafolkken/kit#4987).
+async function restart_in_lane(root: string = PROJECT_ROOT): Promise<boolean> {
 	try {
-		if (await is_restartable_before_record(root)) await restart_if_moved(root)
+		return (await is_restartable_before_record(root)) && (await restart_if_moved(root))
 	} catch (error) {
 		error_text.trace_swallowed('review_record_pinned.restart_in_lane', error)
+
+		return false
 	}
 }
 

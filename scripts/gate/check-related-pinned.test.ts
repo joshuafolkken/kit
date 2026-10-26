@@ -43,6 +43,34 @@ describe('check_related_pinned.notice', () => {
 
 		await expect(check_related_pinned.notice(ROOT)).resolves.toBeUndefined()
 	})
+})
+
+describe('check_related_pinned.notice — waiting on the check', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	// joshuafolkken/kit#4987: a probe still running when the four checks ended printed nothing.
+	it('waits for the verdict on this tree when this run started the check', async () => {
+		const settled = vi.spyOn(run_review_pinned_join, 'settled_on_tree').mockResolvedValue(UNPINNED)
+		const finished = vi.spyOn(run_review_pinned_join, 'finished_on_tree')
+
+		vi.spyOn(run_review_pinned_accepted, 'judge').mockResolvedValue({ kind: 'stop', text: REPORT })
+
+		await expect(check_related_pinned.notice(ROOT, true)).resolves.toBe(
+			`${REPORT.trimEnd()}\n${check_related_pinned.SHIP_HINT}`,
+		)
+		expect(settled).toHaveBeenCalledExactlyOnceWith(ROOT, check_related_pinned.WAIT_MS)
+		expect(finished).not.toHaveBeenCalled()
+	})
+
+	it('waits on nothing when this run started no check', async () => {
+		reached(undefined)
+		const settled = vi.spyOn(run_review_pinned_join, 'settled_on_tree')
+
+		await expect(check_related_pinned.notice(ROOT)).resolves.toBeUndefined()
+		expect(settled).not.toHaveBeenCalled()
+	})
 
 	it('prints nothing when a reason recorded earlier already accepts every place', async () => {
 		reached(UNPINNED)

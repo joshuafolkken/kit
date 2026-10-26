@@ -1,0 +1,7 @@
+{
+	"reason": "#4988: the worktree guard names a single-file restore (SINGLE_FILE_RESTORE), limited to the run's own edit, and keeps its former reason opening for rule-value credit",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}
