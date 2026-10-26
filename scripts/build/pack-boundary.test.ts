@@ -5,6 +5,7 @@ import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { HOOK_BUNDLES, STAGING_PREFIX } from './build-hooks'
+import { COMMANDS_TEST_PREFIX, DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
 import { hook_bundle_stamp } from './hook-bundle-stamp'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
@@ -30,9 +31,7 @@ const SCRIPTS_EXCLUSION_PREFIX = '!scripts/'
 const { VERIFIED_NAME } = hook_bundle_stamp
 const SHIPPED_HOOK = 'stop-guard.js'
 const MANIFEST_NAME = 'package.json'
-// `build-commands.test.ts` builds into a private `dist/` directory under this prefix (joshuafolkken/kit#5053).
-const COMMANDS_TEST_PREFIX = '.commands-test-'
-const SCRATCH_PREFIXES = [STAGING_PREFIX, COMMANDS_TEST_PREFIX]
+const SCRATCH_PREFIXES = [STAGING_PREFIX, COMMANDS_TEST_PREFIX, DISPATCH_TEST_PREFIX]
 
 interface PackageManifest {
 	files?: Array<string>
@@ -194,8 +193,8 @@ describe('a failed pnpm pack', () => {
 	})
 })
 
-// The hook cache, the build staging and the build-commands test output are rewritten by every hook
-// launch, build and test run, so a pack that lists them races their removal (joshuafolkken/kit#4243,
+// The hook cache, the build staging and the build tests' private `dist/` roots are rewritten by every
+// hook launch, build and test run, so a pack that lists them races their removal (joshuafolkken/kit#4243,
 // #5053). Packed from a copy of kit's `files`, so the patterns are checked without touching this
 // checkout's own `dist/`.
 function write_hook_scratch(directory: string): void {
@@ -229,7 +228,7 @@ function pack_with_hook_scratch(): Set<string> {
 }
 
 describe('the published package carries no per-machine hook scratch', () => {
-	it('ships the hook bundles but not the verified-inputs cache, the build staging or the build-commands test output', () => {
+	it('ships the hook bundles but not the verified-inputs cache, the build staging or the private output of the build tests', () => {
 		const packed = pack_with_hook_scratch()
 		const scratch = [...packed].filter(
 			(file) =>

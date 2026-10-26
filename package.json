@@ -77,7 +77,8 @@
 		"!**/*.golden.txt",
 		"!dist/hooks/.inputs-verified.json*",
 		"!dist/.hooks-staging-*",
-		"!dist/.commands-test-*"
+		"!dist/.commands-test-*",
+		"!dist/.dispatch-test-*"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",

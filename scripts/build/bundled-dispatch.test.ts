@@ -7,6 +7,7 @@ import { BUNDLED_COMMAND_DIRECTORY } from '#scripts/josh/josh-in-process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build_bin } from './build-bin'
 import { build_commands } from './build-commands'
+import { DISPATCH_TEST_PREFIX } from './distribution-scratch-fixture'
 import { SCRIPTS_DIR } from './import-closure-fixture'
 
 // Each `is_bundled` command answers the same through a built `dist/josh.js` as through the source
@@ -39,7 +40,7 @@ interface Answer {
 }
 
 mkdirSync(path.join(PACKAGE_DIR, 'dist'), { recursive: true })
-const package_root = mkdtempSync(path.join(PACKAGE_DIR, 'dist', '.dispatch-test-'))
+const package_root = mkdtempSync(path.join(PACKAGE_DIR, 'dist', DISPATCH_TEST_PREFIX))
 const built_josh = path.join(package_root, 'dist', 'josh.js')
 
 function link_package(): void {
