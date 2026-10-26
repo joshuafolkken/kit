@@ -9,11 +9,12 @@ import { whole_suite_files } from './whole-suite-files'
 
 // **A code module a main sync brought in reaches vitest only through a test this branch's change
 // reaches too** (joshuafolkken/kit#4912). Handed to `vitest related` as a moved file, such a module ran
-// every test importing it, and main's CI had already run those against it. The tests whose imports reach
-// both the synced module and this branch's own change — a code file of it, or a module the test-read
-// map records reading a non-code one — are where the two can meet, so they run; the rest are left to
-// main's CI. Every one of them is a test the branch's own change reaches, so the narrowing never reads
-// more than the whole branch does.
+// every test importing it, and main's CI had already run those against it. The tests where the two can
+// meet — whose imports reach both the synced module and this branch's own change — still run through
+// that change itself, which `vitest related` walks by its own graph, so the module is only left out.
+// `shared` names them as this graph reads them, but is never handed to vitest: the graph follows
+// type-only imports and ambient declarations too, and so reaches hundreds of tests the branch's change
+// never runs (joshuafolkken/kit#5066). Only `josh ship`'s settle reads it.
 //
 // **The import graph is TypeScript's, which drops an import it cannot resolve**, so only what it can
 // follow is left out. Nothing is left out where no graph can be built, the branch change or the map

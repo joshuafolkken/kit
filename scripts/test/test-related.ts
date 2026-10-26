@@ -157,10 +157,10 @@ function without_own_tests(
 	)
 }
 
-// The moved files handed on as explicit arguments: a synced module only this branch's change shares a
-// test with is replaced by that test (`test-related-synced.ts`).
+// The moved files handed on as explicit arguments, the synced modules the split left out taken away: a
+// test shared with this branch's change runs through that change (`test-related-synced.ts`).
 function narrowed_moved(moved: ReadonlyArray<string>, split: SyncedSplit): ReadonlyArray<string> {
-	return [...new Set([...moved.filter((file) => !split.left.includes(file)), ...split.shared])]
+	return moved.filter((file) => !split.left.includes(file))
 }
 
 // The reading's `since_map`: what this branch did not change. The synced modules left out join it and

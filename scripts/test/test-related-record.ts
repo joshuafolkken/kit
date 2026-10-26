@@ -71,8 +71,7 @@ async function with_test_count(
 	}
 }
 
-// The scope's files the record counted in no part — the map's readers, and the tests a synced module
-// shares with this branch's change.
+// The scope's files the record counted in no part — the map's readers.
 function readers_of(input: RunInput, counted: ReadonlySet<string>): number {
 	if (input.scope.mode !== 'related') return 0
 
@@ -86,9 +85,8 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 	return { trigger_files: input.scope.files.map((file) => path.relative(input.root, file)) }
 }
 
-// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): the tests a
-// synced module shares with it, and a synced file the split cannot vouch for, are in `changed` without
-// being this branch's change. Unread, it is what neither a main sync nor the map's tree joined.
+// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
+// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what neither a main sync nor the map's tree joined.
 function own_of(input: RunInput): ReadonlyArray<string> {
 	const { changed = [], branch } = input
 	const joined = new Set([...input.synced, ...input.since_map])
