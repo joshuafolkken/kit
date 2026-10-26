@@ -6,6 +6,7 @@ import { gate_tree } from '#scripts/gate/gate-tree'
 import type { josh_command } from '#scripts/josh/josh-run'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
+import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
@@ -66,6 +67,9 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 // No lane overlaps (pinned in `run-ship-overlap.test.ts`), so no test lists this repository's work trees.
 vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
+// No `--unpinned-ok` recorded for the branch (`run-ship-recorded-fixture.ts`), so no `--review` ship
+// carries this checkout's own.
+run_ship_recorded_fixture.isolate()
 
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
@@ -134,17 +138,20 @@ afterAll(() => {
 // joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief used to
 // resume past the review, so the relaunched followup was refused again.
 describe('josh ship — a restart after a stale review', () => {
+	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('reviews a pushed ship again, then follows up', async () => {
+		const reviewed = [TITLE, '--review']
+
 		josh_run_mock
 			.mockResolvedValueOnce({ code: OK, out: '' })
 			.mockResolvedValueOnce({ code: OK, out: '' })
 			.mockResolvedValueOnce({ code: FAILED, out: 'the issue changed after the review' })
-		await run_ship_cli.run([TITLE, '--review'])
+		await run_ship_cli.run(reviewed)
 		josh_run_mock.mockClear()
 		probe.read_state.mockResolvedValueOnce({ ...SHIPPED, is_review_stale: true })
 		probe.read_state.mockResolvedValue(SHIPPED)
 
-		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
+		expect(await run_ship_recorded_fixture.with_record(run_ship_cli.run, reviewed)).toBe(OK)
 		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true, [])
 		expect(commands()).toStrictEqual([`followup ${TITLE}`, REPORT])
 	})
