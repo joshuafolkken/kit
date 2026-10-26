@@ -238,6 +238,7 @@ describe('run_ship_overlap.await_overlap — only a real conflict is waited on',
 
 describe('run_ship_overlap.await_overlap — what a conflict is counted against', () => {
 	const CATALOG = 'docs/josh-command-catalog.md'
+	const BUDGET_TABLE = 'scripts/document/document-byte-budget.ts'
 
 	it('falls back to every shared path when the other lane head cannot be read', async () => {
 		spawn_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
@@ -258,6 +259,18 @@ describe('run_ship_overlap.await_overlap — what a conflict is counted against'
 		conflicts_mock.mockReturnValue([CATALOG])
 
 		expect(await run_ship_overlap.await_overlap(SELF, { sleeper: NO_SLEEP })).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#4976: the page-ceiling table is rewritten, not regenerated — a conflict outside
+	// its rows still stops the sync, so it is waited on.
+	it('counts a conflict on the page-ceiling table the sync may not resolve', async () => {
+		own_paths_mock.mockResolvedValue([BUDGET_TABLE])
+		lane_diffs({ [EARLIER]: [BUDGET_TABLE] })
+		conflicts_mock.mockReturnValue([BUDGET_TABLE])
+
+		const record = await run_ship_overlap.await_overlap(SELF, { sleeper: NO_SLEEP })
+
+		expect(record?.paths).toStrictEqual([BUDGET_TABLE])
 	})
 })
 

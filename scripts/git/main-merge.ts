@@ -70,7 +70,7 @@ interface MergeTarget {
 
 // A failure that left no unmerged path — a remote that cannot be reached, a hook that refused — is not
 // a conflict, so it is rethrown rather than reported as one with nothing to resolve. A conflict only on
-// generated files is regenerated and committed (`main-merge-regenerate.ts`), so it answers `undefined`
+// the files `main-merge-regenerate.ts` resolves is resolved and committed, so it answers `undefined`
 // and the merge reads as finished.
 async function unresolved_conflict(error: unknown): Promise<MergeOutcome | undefined> {
 	const files = main_merge_guard.unmerged_paths(await git_command.status())
