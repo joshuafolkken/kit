@@ -8,6 +8,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship, type ShipSection } from './run-ship'
 import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
@@ -18,6 +19,7 @@ import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
+import type { StepResult } from './run-ship-sync'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -324,6 +326,20 @@ function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
 	return { ...stop, preconditions: [...(stop.preconditions ?? []), lane_ledger.PRE_DETACH_STAGE] }
 }
 
+// The stop is the sync stage's, so it is recorded and resumed as that stage's `conflict` is; the
+// preflight's refusal, if any, still prints last.
+async function conflict_sections(
+	args: ShipArguments,
+	conflict: StepResult,
+	preflight: ShipSection,
+): Promise<ReadonlyArray<ShipSection>> {
+	const section = run_ship.section_of(run_ship.SYNC_HEADER, conflict)
+
+	await record_stop(args, STAGE.SYNC, section)
+
+	return [section, preflight]
+}
+
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
 // hand-off — a stop it finds is fixed by the same session instead of relaunching one from the
 // supervisor. Only the slow stages go to the supervisor, which re-asks the preflight itself. The fast
@@ -337,8 +353,15 @@ function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
 // metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
 // preflight stop of joshuafolkken/kit#4478. The stop records the pre-detach checks' red beside the
 // unmet kinds, so the ledger shows which refusals came with one.
+//
+// **A conflict with origin/main stops before the checks** (joshuafolkken/kit#5018): the supervisor's
+// sync would stop on it after them, so they would only be run again once it is resolved.
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
+	const conflict = await run_ship_conflict_probe.probe()
+
+	if (conflict !== undefined) return await conflict_sections(args, conflict, preflight)
+
 	const result = await run_ship_pre_detach_timed.checks(
 		args.number,
 		run_ship_pre_detach_pinned.checks_for(args),
