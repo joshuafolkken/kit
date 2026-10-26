@@ -144,3 +144,39 @@ describe('related_scope.resolve_scope — a test or data file that joined only f
 		expect(scope_of(since_map, since_map)).toMatchObject({ mode: 'none' })
 	})
 })
+
+// joshuafolkken/kit#5001: rewriting one entry of the pure-project list ran the whole unit suite.
+describe('related_scope.resolve_scope — an entries-only change of the pure-project list', () => {
+	const pure_list = path.join('tools', 'test', 'pure-files.ts')
+	const moved_entry = path.join(SCRIPTS_DIRECTORY, 'moved.test.ts')
+
+	function pure_scope(
+		pure_entries: ReadonlyArray<string> | undefined,
+	): ReturnType<typeof related_scope.resolve_scope> {
+		return related_scope.resolve_scope({
+			root: ROOT,
+			changed: [pure_list, SOURCE_FILE],
+			map: MAP,
+			recorded: new Set(),
+			is_present: () => true,
+			pure_entries,
+		})
+	}
+
+	it('runs the moved entries and the list’s own tests rather than the whole suite', () => {
+		expect(pure_scope([moved_entry])).toStrictEqual({
+			mode: 'related',
+			files: [
+				at(SOURCE_FILE),
+				at(path.join('tools', 'test', 'pure-files.test.ts')),
+				at(path.join('tools', 'test', 'classify-isolation.test.ts')),
+				at(moved_entry),
+			],
+			reason: '4 related file(s)',
+		})
+	})
+
+	it('still runs the whole suite when the list moved beyond its entries', () => {
+		expect(pure_scope(undefined)).toMatchObject({ mode: 'all', files: [at(pure_list)] })
+	})
+})

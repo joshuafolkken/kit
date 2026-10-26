@@ -284,24 +284,20 @@ describe('test_related.run_related_tests — a non-code file a main sync brought
 		expect(mocked_run).not.toHaveBeenCalled()
 	})
 
-	it('still runs the whole suite when this branch changed it too and a test read inside', async () => {
+	// joshuafolkken/kit#5001: a run record reaches only a test that read it by name, not one beside it.
+	it.each([
+		['this branch changed it too', [accepted]],
+		['the branch change cannot be read', []],
+	])('runs no test when %s and a test read beside it', async (_case, changed) => {
 		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [other_accepted]: [READER] }))
-		mocked_changed.mockResolvedValue([accepted])
-		mocked_moved.mockResolvedValue({ changed: [accepted], synced: [accepted] })
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
+		if (changed.length === 0) mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
+		else mocked_changed.mockResolvedValue(changed)
+		mocked_moved.mockResolvedValue({ changed, synced: [accepted] })
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual(['run'])
-	})
-
-	it('still runs the whole suite when the branch change cannot be read and a test read inside', async () => {
-		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [other_accepted]: [READER] }))
-		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
-		mocked_moved.mockResolvedValue({ changed: [], synced: [accepted] })
-
-		await test_related.run_related_tests([])
-
-		expect(vitest_arguments()).toEqual(['run'])
+		expect(mocked_run).not.toHaveBeenCalled()
 	})
 })
 
@@ -317,20 +313,19 @@ describe('test_related.run_related_tests — a metrics approval file this branch
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
 	})
 
-	it('runs no test for it when no recorded test read inside its directory', async () => {
+	// joshuafolkken/kit#5001: a listing of the directory reads the checkout around it, not the record.
+	it.each([
+		['no recorded test read inside its directory', {}],
+		[
+			'a module only lists the directory',
+			{ [test_read_trace.read_key(APPROVALS, 'listing')]: [metrics_reader] },
+		],
+	])('runs no test for it when %s', async (_case, readers) => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with(readers))
+
 		await test_related.run_related_tests([])
 
 		expect(mocked_run).not.toHaveBeenCalled()
-	})
-
-	it('runs the module that lists the approval directory rather than the whole suite', async () => {
-		const listing = test_read_trace.read_key(APPROVALS, 'listing')
-
-		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [listing]: [metrics_reader] }))
-
-		await test_related.run_related_tests([])
-
-		expect(vitest_arguments()).toEqual(['related', absolute(metrics_reader), '--run'])
 	})
 })
 

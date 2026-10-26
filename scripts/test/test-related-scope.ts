@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
+import { pure_files_entries } from './pure-files-entries'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { whole_suite_files } from './whole-suite-files'
 
@@ -105,6 +106,9 @@ interface ScopeRequest {
 	// The code files of `since_map` that name a file this change moved — the only ones of that part
 	// handed to vitest (joshuafolkken/kit#4532). See `is_code_input`.
 	naming_moved?: ReadonlySet<string>
+	// The entries a change of `tools/test/pure-files.ts` moved, when it moved nothing else there — the
+	// list then reaches those test files rather than every test (`pure-files-entries.ts`).
+	pure_entries?: ReadonlyArray<string> | undefined
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -208,13 +212,24 @@ function left_out(request: ScopeRequest, code: ReadonlyArray<string>): Array<str
 	return (request.since_map ?? []).filter((file) => !code.includes(file))
 }
 
-// `undefined` and `[]` are deliberately different inputs. The first says the change could not be
-// read; the second says it was read and held nothing to relate.
-function resolve_scope(request: ScopeRequest): RelatedScope {
+// The change with an entries-only `pure-files.ts` taken out of it, and the test files it reaches in
+// its place — it would send `vitest related` to every test.
+function without_pure_entries(
+	changed: ReadonlyArray<string>,
+	entries: ReadonlyArray<string> | undefined,
+): Selection {
+	if (entries === undefined) return { files: [], unread: changed }
+
+	const rest = changed.filter((file) => file !== pure_files_entries.PURE_FILES_PATH)
+
+	return { files: pure_files_entries.tests_of(entries), unread: rest }
+}
+
+function resolve_read(
+	request: ScopeRequest & { changed: ReadonlyArray<string> },
+	entry_tests: ReadonlyArray<string>,
+): RelatedScope {
 	const { changed, root } = request
-
-	if (changed === undefined) return all_scope(UNREADABLE_REASON)
-
 	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file) && is_moved(request, file))
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
@@ -227,10 +242,20 @@ function resolve_scope(request: ScopeRequest): RelatedScope {
 
 	if ('reason' in resolution) return all_scope(resolution.reason, resolution.triggers, root)
 
-	const files = [...code, ...code_readers(code, request.map), ...resolution.files]
+	const files = [...code, ...code_readers(code, request.map), ...resolution.files, ...entry_tests]
 	const unread = [...resolution.unread, ...left_out(request, code)]
 
 	return narrowed_scope({ files, unread }, request)
+}
+
+// `undefined` and `[]` are deliberately different inputs. The first says the change could not be
+// read; the second says it was read and held nothing to relate.
+function resolve_scope(request: ScopeRequest): RelatedScope {
+	if (request.changed === undefined) return all_scope(UNREADABLE_REASON)
+
+	const pure = without_pure_entries(request.changed, request.pure_entries)
+
+	return resolve_read({ ...request, changed: pure.unread }, pure.files)
 }
 
 function describe_scope(scope: RelatedScope, root: string): string {

@@ -9,6 +9,7 @@ import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { pure_files_entries } from './pure-files-entries'
 import { test_declared_logic } from './test-declared-logic'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
@@ -273,12 +274,14 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 async function scope_of(root: string, change: ChangeReading): Promise<RelatedScope> {
 	const recorded = await recorded_files(change)
 	const naming = naming_moved(root, change)
+	const pure_entries = await pure_files_entries.read_moved(root, change.changed)
 
 	return related_scope.resolve_scope({
 		root,
 		...change,
 		recorded,
 		naming_moved: naming,
+		pure_entries,
 		is_present: existsSync,
 	})
 }

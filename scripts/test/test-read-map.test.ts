@@ -18,7 +18,7 @@ const mocked_common = vi.mocked(git_common_directory.repository)
 const ROOT = path.resolve('/repo')
 const DOCUMENT = path.join('docs', 'a.md')
 const NESTED_DOCUMENT = path.join('docs', 'guide', 'b.md')
-const DEEP_DOCUMENT = path.join('.josh', 'observations', 'c.md')
+const DEEP_DOCUMENT = path.join('prompts', 'sub', 'c.md')
 const READER = 'reader.ts'
 const WALKER = 'walker.ts'
 const LISTER = 'lister.ts'
@@ -35,13 +35,7 @@ const MAP: ReadMap = {
 	commit: 'abc',
 	dirty: { [DIRTY]: DIGEST_THEN },
 	change: [DIRTY],
-	directories: [
-		'.josh',
-		path.dirname(DEEP_DOCUMENT),
-		'docs',
-		path.join('docs', 'guide'),
-		'prompts',
-	],
+	directories: [path.dirname(DEEP_DOCUMENT), 'docs', path.join('docs', 'guide'), 'prompts'],
 	readers: {
 		[DOCUMENT]: [READER],
 		[test_read_trace.read_key('docs', 'walk')]: [WALKER],
@@ -201,9 +195,11 @@ describe('test_read_map.in_unread_directory', () => {
 
 // joshuafolkken/kit#4734: a test reading the recording checkout's change through git read that lane's
 // own approval, so the next lane's approval beside it ran the whole suite. The approval is committed
-// on the recording branch, so `dirty` (the change since HEAD) does not hold it and `change` does.
+// on the recording branch, so `dirty` (the change since HEAD) does not hold it and `change` does. A
+// run record under `.josh/` now reaches only a read of itself (joshuafolkken/kit#5001), so the rule is
+// held here on a directory outside it.
 describe('test_read_map.in_unread_directory — a read of the recording tree’s change', () => {
-	const APPROVALS = path.join('.josh', 'metrics-accepted')
+	const APPROVALS = path.join('docs', 'approvals')
 	const RECORDED_APPROVAL = path.join(APPROVALS, '4714.json')
 	const NEW_APPROVAL = path.join(APPROVALS, '4734.json')
 	const RECORDED: ReadMap = {
@@ -233,6 +229,40 @@ describe('test_read_map.in_unread_directory — a read of the recording tree’s
 
 	it('still names the test that read the changed file as its reader', () => {
 		expect(test_read_map.readers_of(RECORDED, RECORDED_APPROVAL)).toEqual([READER])
+	})
+})
+
+// joshuafolkken/kit#5001: an observation or an accepted-metrics file a lane writes after its checks went
+// green ran every test that listed or walked the root or `.josh/`.
+describe('test_read_map — a run record under .josh/', () => {
+	const ACCEPTED = path.join('.josh', 'metrics-accepted')
+	const RECORD = path.join(ACCEPTED, '5001.json')
+	const SIBLING = path.join(ACCEPTED, '4986.json')
+	const WIDE: ReadMap = {
+		...MAP,
+		readers: {
+			[test_read_trace.read_key(ROOT_ENTRY, 'walk')]: [ROOT_WALKER],
+			[test_read_trace.read_key(ROOT_ENTRY, 'listing')]: [ROOT_LISTER],
+			[test_read_trace.read_key('.josh', 'walk')]: [WALKER],
+			[test_read_trace.read_key(path.dirname(RECORD), 'listing')]: [LISTER],
+			[SIBLING]: [READER],
+		},
+	}
+
+	it('reaches no test through a walk or a listing above it', () => {
+		expect(test_read_map.readers_of(WIDE, RECORD)).toEqual([])
+	})
+
+	it('reaches the test that read it by name', () => {
+		expect(test_read_map.readers_of(WIDE, SIBLING)).toEqual([READER])
+	})
+
+	it('lands where no test reads, whatever was listed or read beside it', () => {
+		expect(test_read_map.in_unread_directory(WIDE, RECORD)).toBe(true)
+	})
+
+	it('still reaches a file outside .josh/ through the walk of the root', () => {
+		expect(test_read_map.readers_of(WIDE, DOCUMENT)).toEqual([ROOT_WALKER])
 	})
 })
 
