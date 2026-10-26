@@ -156,6 +156,7 @@ jobs:
       reuse: ${{ steps.prove.outputs.reuse }}
       run-id: ${{ steps.prove.outputs.run-id }}
       pull-number: ${{ steps.prove.outputs.pull-number }}
+      author-association: ${{ steps.prove.outputs.author-association }}
     steps:
       - name: Prove the pushed tree passed PR Checks
         id: prove
@@ -171,7 +172,7 @@ jobs:
             exit 0
           fi
           if ! pull=$(printf '%s' "${pulls}" | jq -r --arg sha "${CURRENT_SHA}" \
-            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at] | @tsv else empty end'); then
+            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at, .author_association] | @tsv else empty end'); then
             echo '::notice::Could not parse the pull request; running the verification jobs.'
             exit 0
           fi
@@ -179,7 +180,7 @@ jobs:
             echo 'No unique merged pull request matched this push; running the verification jobs.'
             exit 0
           fi
-          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at <<< "${pull}"
+          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at author_association <<< "${pull}"
 
           if ! current_tree=$(gh api "repos/${REPOSITORY}/git/commits/${CURRENT_SHA}" --jq '.tree.sha') || \
             ! pr_tree=$(gh api "repos/${REPOSITORY}/git/commits/${head_sha}" --jq '.tree.sha'); then
@@ -225,6 +226,7 @@ jobs:
           echo 'reuse=true' >> "$GITHUB_OUTPUT"
           echo "run-id=${run_id}" >> "$GITHUB_OUTPUT"
           echo "pull-number=${pull_number}" >> "$GITHUB_OUTPUT"
+          echo "author-association=${author_association}" >> "$GITHUB_OUTPUT"
           echo "Reusing successful PR Checks for tree ${current_tree}."
 
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
@@ -411,6 +413,9 @@ jobs:
   # fresh key and saves the downloaded file in its post step; the prefix is checked before it becomes
   # a key. A missing artifact — a run from before this — or a prefix that is not a key saves nothing
   # and leaves the push green; the next pull request then restores an older entry, as it did before.
+  # Only a pull request whose author has write permission (OWNER / MEMBER / COLLABORATOR) is promoted:
+  # an outside author's run can write any `.eslintcache` it likes, and main's scope would then let
+  # later pull requests skip lint on that forged record (joshuafolkken/kit#5050).
   seed-eslint-cache:
     name: Seed ESLint Cache
     needs: reuse-pr-checks
@@ -427,7 +432,15 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ needs.reuse-pr-checks.outputs.run-id }}
           PULL_NUMBER: ${{ needs.reuse-pr-checks.outputs.pull-number }}
+          AUTHOR_ASSOCIATION: ${{ needs.reuse-pr-checks.outputs.author-association }}
         run: |
+          case "${AUTHOR_ASSOCIATION}" in
+            OWNER | MEMBER | COLLABORATOR) ;;
+            *)
+              echo "::notice::The pull request's author (${AUTHOR_ASSOCIATION:-unknown}) has no write permission; saving nothing."
+              exit 0
+              ;;
+          esac
           if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}"; then
             echo '::notice::The reused run left no ESLint cache; saving nothing.'
             exit 0

@@ -107,3 +107,30 @@ describe('a reused main push saves that cache', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#5050: an outside author's run can write any `.eslintcache`, so only a pull request
+// whose author has write permission is promoted to main's scope.
+describe('the seed promotes only a write-permission author', () => {
+	it('carries the author association from the reuse proof', () => {
+		const prove = ci_yml_fixture.step_run(ci_yml_fixture.find_step_by_id(job(REUSE_JOB), 'prove'))
+		const download = ci_yml_fixture.find_step_by_id(job(SEED_JOB), 'download')
+
+		expect(prove).toContain('.merged_at, .author_association] | @tsv')
+		expect(prove).toContain('echo "author-association=${author_association}" >> "$GITHUB_OUTPUT"')
+		expect(job(REUSE_JOB)?.outputs?.['author-association']).toBe(
+			'${{ steps.prove.outputs.author-association }}',
+		)
+		expect(download?.env?.['AUTHOR_ASSOCIATION']).toBe(
+			'${{ needs.reuse-pr-checks.outputs.author-association }}',
+		)
+	})
+
+	it('saves nothing for any other author, deciding before the download', () => {
+		const script = seed_script()
+
+		expect(script).toContain('OWNER | MEMBER | COLLABORATOR) ;;')
+		expect(script.indexOf('has no write permission; saving nothing.')).toBeLessThan(
+			script.indexOf('gh run download'),
+		)
+	})
+})
