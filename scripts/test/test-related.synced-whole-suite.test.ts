@@ -37,6 +37,9 @@ const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const REPOSITORY_ROOT = process.cwd()
 const FIXED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const STATE_GUARD = path.join('tools', 'test', 'test-state-guard.ts')
+// A real whole-suite file whose text names `UNIT_GUARD`, which vitest would widen to the whole suite.
+const NAMING_WORKERS = path.join('tools', 'test', 'vitest-config-workers.ts')
+const UNIT_GUARD = path.join('scripts', 'test', 'test-unit-guard.ts')
 const WHOLE_SUITE = ['run']
 const NOT_A_REPOSITORY = new Error('not a git repository')
 
@@ -73,6 +76,15 @@ describe('test_related.run_related_tests — a whole-suite file a main sync brou
 			path.join(REPOSITORY_ROOT, FIXED_SOURCE),
 			'--run',
 		])
+	})
+
+	it('never hands it to vitest for naming a file the branch moved', async () => {
+		mocked_changed.mockResolvedValue([UNIT_GUARD])
+		mocked_moved.mockResolvedValue({ changed: [UNIT_GUARD], synced: [NAMING_WORKERS] })
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', path.join(REPOSITORY_ROOT, UNIT_GUARD), '--run'])
 	})
 
 	it('still runs the whole suite when this branch changed it too', async () => {

@@ -122,6 +122,10 @@ async function explicit_change(
 	return { changed: [...named, ...since_map], map, since_map }
 }
 
+function is_whole_suite(file: string): boolean {
+	return whole_suite_files.WHOLE_SUITE_FILES.has(file)
+}
+
 // **A non-code file a main sync brought in is not this branch's change** (joshuafolkken/kit#4572), so it
 // joins `since_map`: it neither adds the tests reading it nor sends the run to the whole suite — main's
 // CI verified it. So does a synced file every test depends on, which the split cannot narrow
@@ -132,9 +136,7 @@ function synced_data(
 	synced: ReadonlyArray<string>,
 	branch: ReadonlyArray<string> | undefined,
 ): ReadonlyArray<string> {
-	const data = synced.filter(
-		(file) => !related_scope.is_relatable(file) || whole_suite_files.WHOLE_SUITE_FILES.has(file),
-	)
+	const data = synced.filter((file) => !related_scope.is_relatable(file) || is_whole_suite(file))
 
 	return data.filter((file) => !(branch ?? data).includes(file))
 }
@@ -250,13 +252,15 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 
 // **The code files of the change since the map that name a file this change moved** — read off their
 // text, the one place a file-system read added since the map's tree shows (`is_code_input` in
-// `test-related-scope.ts`, joshuafolkken/kit#4532). A file the tree no longer holds names nothing.
+// `test-related-scope.ts`, joshuafolkken/kit#4532). A file the tree no longer holds names nothing. A
+// file every test depends on is never one: handed to vitest it runs the whole suite unannounced, and
+// only this branch's own change of it may do that (joshuafolkken/kit#4993).
 function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> {
 	const { changed = [], since_map = [] } = change
 	const names = changed
 		.filter((file) => !since_map.includes(file))
 		.map((file) => path.basename(file))
-	const code = since_map.filter((file) => related_scope.is_relatable(file))
+	const code = since_map.filter((file) => related_scope.is_relatable(file) && !is_whole_suite(file))
 
 	// Each file's text is read once, however many names it is checked for.
 	return new Set(
