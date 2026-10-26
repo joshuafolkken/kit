@@ -1,5 +1,7 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { read_repo_file, read_unwrapped } from '#scripts/document/ai-document-fixture'
+import { agent_model } from '#scripts/rules/agent-model'
+import { investigator_foreground } from '#scripts/rules/investigator-foreground'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#969: the delegation policy is an enumeration in code and prose in the documents.
@@ -236,5 +238,49 @@ describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (
 	it('says a delegation resets the counter, and names what counts', () => {
 		expect(unwrapped.toLowerCase()).toContain(RESET_SENTENCE)
 		expect(unwrapped).toContain(READ_GUARD_COMMAND)
+	})
+})
+
+// joshuafolkken/kit#4963: `agent-model` and `investigator-foreground` refuse on every occurrence, so
+// the document keeps one line per rule: a pointer to its row, plus only what a call the hook lets
+// through never sees (the reason prints on a refusal alone). The field the refusal demands is left
+// to the reason; the review's model alias is not `agent-model`'s (a `reviewer` is a named type), so
+// it moved to the step that dispatches the review.
+const CHAIN_RULE_DOC = '.claude/skills/workflow-commands/chain-rule.md'
+const CONDENSED_POINTERS: ReadonlyArray<string> = [
+	'the `agent-model` row of `pnpm josh rule:list`',
+	'the `investigator-foreground` row of `pnpm josh rule:list`',
+]
+const FOREGROUND_FIELD = 'run_in_background: false'
+// [guidance, the hook reason that also carries it]
+const PASSING_CALL_GUIDANCE: ReadonlyArray<readonly [string, string]> = [
+	['`sonnet` for routine work, `opus` for judgment', agent_model.AGENT_MODEL_REASON],
+	['in the same message', investigator_foreground.INVESTIGATOR_FOREGROUND_REASON],
+]
+const REVIEW_MODEL_ALIAS = 'the alias of the `model=` id the brief prints'
+
+describe(`${DELEGATION_DOC} — condenses the hook-delivered rules to their rows`, () => {
+	const unwrapped = read_unwrapped(DELEGATION_DOC)
+
+	it.each(CONDENSED_POINTERS)(CARRIES_CASE, (pointer) => {
+		expect(unwrapped).toContain(pointer)
+	})
+
+	it('leaves the field the refusal demands to the hook reason', () => {
+		expect(unwrapped).not.toContain(FOREGROUND_FIELD)
+		expect(investigator_foreground.INVESTIGATOR_FOREGROUND_REASON).toContain(FOREGROUND_FIELD)
+	})
+
+	it.each(PASSING_CALL_GUIDANCE)(
+		'keeps %j, which a passing call never sees',
+		(guidance, reason) => {
+			expect(unwrapped).toContain(guidance)
+			expect(reason).toContain(guidance)
+		},
+	)
+
+	it('leaves the review model alias to the step that dispatches the review', () => {
+		expect(unwrapped).not.toContain('`model=`')
+		expect(read_unwrapped(CHAIN_RULE_DOC)).toContain(REVIEW_MODEL_ALIAS)
 	})
 })
