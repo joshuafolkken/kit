@@ -297,7 +297,9 @@ function stored_of(
 }
 
 // The verdicts to write back, keyed, each with its basis where one was read; a key with no verdict is
-// left out.
+// left out. A `stopped` verdict is left out too: the config that decides it is not a test file the
+// freshness rules watch, so a stale one would set the hunk aside after the config is fixed — it is
+// probed again on every run (#5043).
 function stored(
 	keys: ReadonlyArray<string>,
 	probes: ReadonlyArray<RedProbe | undefined>,
@@ -306,7 +308,7 @@ function stored(
 ): Record<string, StoredVerdict> {
 	const pairs = keys.flatMap((key, index) => {
 		const probe = probes[index]
-		if (probe === undefined) return []
+		if (probe === undefined || probe.verdict === 'stopped') return []
 
 		return [[key, stored_of(probe, digests, bases[index])] as const]
 	})

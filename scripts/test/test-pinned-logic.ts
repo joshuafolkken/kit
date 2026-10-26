@@ -1,4 +1,5 @@
 import { test_declared_logic } from './test-declared-logic'
+import type { RedProbe, RedVerdict } from './test-red-logic'
 import { related_scope } from './test-related-scope'
 
 // The pure half of `josh test:pinned` (joshuafolkken/kit#4516): read a `git diff -U0` into hunks, put
@@ -20,6 +21,9 @@ const STUB_GREEN_REASON = 'replacing its body with a throw left every related te
 const STUB_NO_TEST_REASON = 'no related test ran with its body replaced by a throw'
 const UNPARSED_REASON = 'an added file, and typescript is not installed to read its functions'
 const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
+const STOPPED_REASON = 'vitest stopped before any test ran with it reverted'
+const STOPPED_VERDICT: RedVerdict = 'stopped'
+const SETTLED_VERDICTS: ReadonlySet<RedVerdict> = new Set<RedVerdict>(['red', STOPPED_VERDICT])
 
 interface Hunk {
 	file: string
@@ -41,14 +45,20 @@ interface HunkSplit {
 	unchecked: ReadonlyArray<Hunk>
 }
 
-// A reverted hunk nothing went red on: `is_green` when its related tests ran and passed, otherwise none
-// ran at all — no related test, or a vitest that stopped before running one.
+// A reverted hunk nothing went red on: `is_green` when its related tests ran and passed, otherwise
+// vitest passed with no related test to run.
 interface UnpinnedHunk extends Hunk {
 	is_green: boolean
 }
 
-interface PinnedReport {
+interface HunkOutcome {
 	unpinned: ReadonlyArray<UnpinnedHunk>
+	// Hunks whose revert stopped vitest before any test ran (joshuafolkken/kit#5043) — a config that
+	// imports the file could not load. No test was asked, so it is neither pinned nor unpinned.
+	stopped: ReadonlyArray<Hunk>
+}
+
+interface PinnedReport extends HunkOutcome {
 	unchecked: ReadonlyArray<Hunk>
 	// Added files whose functions could not be read, so none of them was probed.
 	unparsed: ReadonlyArray<string>
@@ -145,6 +155,30 @@ function split(hunks: ReadonlyArray<Hunk>, max_hunks: number): HunkSplit {
 	return { checked: hunks.slice(0, max_hunks), unchecked: hunks.slice(max_hunks) }
 }
 
+// `green` and `no-test` leave a hunk unpinned: either way nothing went red when it was reverted. A hunk
+// with no verdict yet is neither.
+function unpinned_of(hunk: Hunk, probe: RedProbe | undefined): Array<UnpinnedHunk> {
+	if (probe === undefined || SETTLED_VERDICTS.has(probe.verdict)) return []
+
+	return [{ ...hunk, is_green: probe.verdict === 'green' }]
+}
+
+function stopped_of(hunk: Hunk, probe: RedProbe | undefined): Array<Hunk> {
+	return probe?.verdict === STOPPED_VERDICT ? [hunk] : []
+}
+
+// Each checked hunk by its verdict, in the hunks' order: `red` pins it, `stopped` sets it aside, and
+// any other leaves it unpinned.
+function outcome(
+	hunks: ReadonlyArray<Hunk>,
+	verdicts: ReadonlyArray<RedProbe | undefined>,
+): HunkOutcome {
+	return {
+		unpinned: hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index])),
+		stopped: hunks.flatMap((hunk, index) => stopped_of(hunk, verdicts[index])),
+	}
+}
+
 function location(hunk: Hunk): string {
 	const line = `${hunk.file}:${String(Math.max(hunk.new_start, 1))}`
 
@@ -166,16 +200,17 @@ function format(report: PinnedReport): string {
 	const unchecked = report.unchecked.map(
 		(hunk) => `unchecked ${location(hunk)} — ${unchecked_reason(report)}`,
 	)
+	const stopped = report.stopped.map((hunk) => `unchecked ${location(hunk)} — ${STOPPED_REASON}`)
 	const unparsed = report.unparsed.map((file) => `unchecked ${file} — ${UNPARSED_REASON}`)
 
-	return [...unpinned, ...unchecked, ...unparsed].join(LINE_BREAK)
+	return [...unpinned, ...unchecked, ...stopped, ...unparsed].join(LINE_BREAK)
 }
 
 // The counts line, then one line per unpinned or unchecked place — what `josh test:pinned` prints and
 // what `josh run:review` prints before round 1.
 function report_text(report: PinnedReport): string {
 	const unpinned = String(report.unpinned.length)
-	const unchecked = String(report.unchecked.length + report.unparsed.length)
+	const unchecked = String(report.unchecked.length + report.stopped.length + report.unparsed.length)
 	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, format(report)]
 
 	return `${lines.filter((line) => line !== '').join(LINE_BREAK)}${LINE_BREAK}`
@@ -186,11 +221,12 @@ const test_pinned_logic = {
 	format,
 	is_target,
 	location,
+	outcome,
 	parse_hunks,
 	report_text,
 	revert,
 	split,
 }
 
-export type { Hunk, PinnedReport, UnpinnedHunk }
+export type { Hunk, HunkOutcome, PinnedReport, UnpinnedHunk }
 export { test_pinned_logic }
