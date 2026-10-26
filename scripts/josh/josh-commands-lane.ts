@@ -283,6 +283,22 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'lane:breakdown': {
+		script: 'scripts/lane/lane-breakdown-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			"Print a merged lane's net time by stage, longest first, the implementation split by its tool calls",
+		category: 'AI tools',
+		reference: ['<issue>', 'maintainer', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '4970',
+					note: 'the breakdown the overrun investigation comments on the lane',
+				},
+			],
+		},
+	},
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 

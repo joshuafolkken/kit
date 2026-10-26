@@ -68,6 +68,7 @@ describe('run_board_found.found_of — the filings', () => {
 			overrun_filed: [],
 			minutes: undefined,
 			overrun: undefined,
+			longest: undefined,
 			is_investigating: false,
 		})
 	})
@@ -143,6 +144,28 @@ describe('run_board_found.found_of — the investigation', () => {
 		const found = run_board_found.found_of([started(), other], alive)
 
 		expect(found.get(CHILD)?.is_investigating).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4995: the longest stage rides the start note, and the end note does not drop it.
+describe('run_board_found.found_of — the longest stage', () => {
+	const longest = { name: 'implement', minutes: 51 }
+
+	function started_with_longest(): RunEvent {
+		const outcome = run_event_overrun.investigating(PID, START)
+
+		return event(KIND.NOTE, run_event_overrun.started_text(CHILD, MINUTES, outcome, longest))
+	}
+
+	it('keeps the longest stage past the end note', () => {
+		const ended = event(KIND.NOTE, run_event_overrun.ended_text(CHILD, 'filed'))
+		const found = run_board_found.found_of([started_with_longest(), ended], alive).get(CHILD)
+
+		expect(found?.longest).toStrictEqual(longest)
+	})
+
+	it('has none for a start note written without it', () => {
+		expect(run_board_found.found_of([started()], alive).get(CHILD)?.longest).toBeUndefined()
 	})
 })
 
