@@ -685,7 +685,7 @@ pnpm josh main:merge
 
 <!-- /usage -->
 
-**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on generated files (`scripts/git/main-merge-regenerate.ts`) is regenerated and committed; any other conflict, or uncommitted work on an incoming path, fails.
+**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on the files `scripts/git/main-merge-regenerate.ts` lists is resolved and committed; any other conflict, or uncommitted work on an incoming path, fails.
 
 ---
 

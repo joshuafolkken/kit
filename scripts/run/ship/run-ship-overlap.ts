@@ -39,8 +39,12 @@ const NAME_ONLY_ARGUMENTS = [
 	'--no-relative',
 	'--no-renames',
 ]
+// Only the regenerated entries: a rewritten one resolves some conflicts and refuses the rest, so its
+// conflict is still waited on.
 const REGENERATED_PATHS: ReadonlySet<string> = new Set(
-	main_merge_regenerate.REGENERATED_FILES.map((entry) => entry.path),
+	main_merge_regenerate.RESOLVED_FILES.filter((entry) => 'command' in entry).map(
+		(entry) => entry.path,
+	),
 )
 
 interface OverlapOptions {

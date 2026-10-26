@@ -1,0 +1,7 @@
+{
+	"reason": "main:merge resolves a page-ceiling conflict in document-byte-budget.ts itself (#4976): a new hunk resolver module, the resolved-file union, and the overlap wait kept for the rewritten table",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 77
+	}
+}

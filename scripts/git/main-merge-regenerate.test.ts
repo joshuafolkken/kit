@@ -11,8 +11,9 @@ vi.mock('./git-spawn', () => ({ git_spawn: { with_output: vi.fn() } }))
 const { execa } = await import('execa')
 const { git_spawn } = await import('./git-spawn')
 const { main_merge_regenerate } = await import('./main-merge-regenerate')
+const { main_merge_budget_conflict } = await import('./main-merge-budget-conflict')
 
-const [GENERATED = ''] = main_merge_regenerate.REGENERATED_FILES.map((entry) => entry.path)
+const [GENERATED = ''] = main_merge_regenerate.RESOLVED_FILES.map((entry) => entry.path)
 const HAND_WRITTEN = 'scripts/git/main-merge.ts'
 
 describe('refusing a merge regeneration cannot finish', () => {
@@ -28,13 +29,20 @@ describe('refusing a merge regeneration cannot finish', () => {
 })
 
 describe('the table of regenerated files', () => {
-	it('names only files whose header says they are generated', async () => {
+	it('regenerates only files whose header says they are generated', async () => {
+		const regenerated = main_merge_regenerate.RESOLVED_FILES.filter((entry) => 'command' in entry)
 		const headers = await Promise.all(
-			main_merge_regenerate.REGENERATED_FILES.map(
-				async (entry) => await readFile(entry.path, 'utf8'),
-			),
+			regenerated.map(async (entry) => await readFile(entry.path, 'utf8')),
 		)
 
 		for (const header of headers) expect(header).toMatch(/generated/iu)
+	})
+
+	// joshuafolkken/kit#4976: the page-ceiling table is resolved by its rewrite rule, not regenerated.
+	it('rewrites the page-ceiling table with its ceiling-row rule', () => {
+		expect(main_merge_regenerate.RESOLVED_FILES).toContainEqual({
+			path: main_merge_budget_conflict.BUDGET_TABLE_PATH,
+			rewrite: main_merge_budget_conflict.resolve,
+		})
 	})
 })
