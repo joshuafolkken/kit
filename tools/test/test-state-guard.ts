@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { GIT_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import type { TestProject } from 'vitest/node'
 
 // Environment variables that git reads from the environment. A test that sets these affects every
 // subsequent git command in the same worker when isolation is disabled.
@@ -10,6 +11,9 @@ const GIT_ENV_KEYS: ReadonlyArray<string> = [
 	'GIT_WORK_TREE',
 	'GIT_COMMON_DIR',
 ]
+const SNAPSHOT_FILE = /__snapshots__\/[^/]+\.snap$/u
+// The update state `--update` sets; the default `new` writes only snapshots that do not exist yet.
+const UPDATE_ALL = 'all'
 
 interface StateSnapshot {
 	branch: string
@@ -33,10 +37,22 @@ function capture_git_environment(): Record<string, string | undefined> {
 	return Object.fromEntries(GIT_ENV_KEYS.map((key) => [key, process.env[key]]))
 }
 
-function capture_state(): StateSnapshot {
+// `vitest --update` rewrites snapshot files by design — `josh command:derive` runs one to refresh the
+// command-map snapshot (#4970) — so an update run leaves them out of the comparison. Any other run,
+// and any other path, still counts.
+function tracked_status(status: string, is_snapshot_update: boolean): string {
+	if (!is_snapshot_update) return status
+
+	return status
+		.split('\n')
+		.filter((line) => !SNAPSHOT_FILE.test(line))
+		.join('\n')
+}
+
+function capture_state(is_snapshot_update = false): StateSnapshot {
 	return {
 		branch: run_git(['rev-parse', '--abbrev-ref', 'HEAD']),
-		status: run_git(['status', '--porcelain']),
+		status: tracked_status(run_git(['status', '--porcelain']), is_snapshot_update),
 		git_env: capture_git_environment(),
 	}
 }
@@ -68,11 +84,12 @@ function format_violations(before: StateSnapshot, after: StateSnapshot): string 
 	return `test-state-guard: tests mutated repository state:\n${lines.join('\n')}`
 }
 
-function setup(): () => void {
-	const before = capture_state()
+function setup(project: TestProject): () => void {
+	const is_snapshot_update = project.config.snapshotOptions.updateSnapshot === UPDATE_ALL
+	const before = capture_state(is_snapshot_update)
 
 	return function disarm(): void {
-		const after = capture_state()
+		const after = capture_state(is_snapshot_update)
 		const violation = format_violations(before, after)
 
 		if (violation !== undefined) throw new Error(violation)
@@ -84,6 +101,7 @@ const test_state_guard = {
 	capture_state,
 	env_diff: environment_diff,
 	format_violations,
+	tracked_status,
 }
 
 export type { StateSnapshot }

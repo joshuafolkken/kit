@@ -77,7 +77,7 @@ describe('the command catalog is up to date', () => {
 	it('names the regeneration command when the catalog is stale', () => {
 		expect(() => {
 			expect_catalog_current('stale', catalog)
-		}).toThrow('run `tsx tools/document/generate-catalog.ts`')
+		}).toThrow('run `pnpm josh command:derive`')
 	})
 
 	it('names the same regeneration command in the catalog heading', () => {

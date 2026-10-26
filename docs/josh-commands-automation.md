@@ -2,7 +2,7 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `pnpm josh command:derive` — edit the entry, not the span.
 
 ## Development
 
@@ -831,6 +831,18 @@ pnpm josh latest:guard   # refuses inside a lane
 It fronts the `josh latest` chain.
 
 ---
+
+### `josh command:derive`
+
+<!-- usage: command:derive -->
+
+Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings.
+
+```bash
+pnpm josh command:derive   # after adding, renaming or describing a command
+```
+
+<!-- /usage -->
 
 ## Git hooks
 

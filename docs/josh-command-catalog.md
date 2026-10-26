@@ -1,7 +1,7 @@
 # josh CLI — Command Catalog
 
 Auto-generated — do not edit.
-Run `tsx tools/document/generate-catalog.ts` to regenerate.
+Run `pnpm josh command:derive` to regenerate.
 
 ## Development
 
@@ -89,6 +89,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | --- | --- | --- | --- | --- |
 | `josh audit` · `josh a` | — | developer | processes | Run security audit |
 | `josh audit:provision` | — | automation | files, network | Install the pinned osv-scanner when the audit cannot find one (no-op if present) |
+| `josh command:derive` · `josh cdv` · **kit only** | — | maintainer | files | Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings |
 | `josh doctor` · `josh dr` | `[--fix]` | developer | files | Diagnose PATH shadowing of the global josh and show the discovered repository map (--fix reclaims a stale shim) |
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
 | `josh latest:corepack` · `josh lc` | — | developer | files, network | Update pnpm on the current major while preserving the integrity pin |

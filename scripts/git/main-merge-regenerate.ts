@@ -21,7 +21,7 @@ interface RegeneratedFile {
 const REGENERATED_FILES: ReadonlyArray<RegeneratedFile> = [
 	{
 		path: 'docs/josh-command-catalog.md',
-		command: ['pnpm', 'exec', 'tsx', 'tools/document/generate-catalog.ts'],
+		command: ['pnpm', 'exec', 'tsx', 'tools/document/generate-catalog-main.ts'],
 	},
 ]
 
