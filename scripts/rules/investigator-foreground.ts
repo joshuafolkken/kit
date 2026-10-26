@@ -72,32 +72,58 @@ function is_untyped_field(name: string, input: unknown): boolean {
 	return typeof input[BACKGROUND_FIELD] === 'string'
 }
 
-// The tail's spelling of the call in hand, or of a dispatch it repeats: the transcript keeps the field
-// the parsed input dropped, so a match is taken on the body whatever the tail wrote for the field.
-function is_same_dispatch(written: GuardedCall, call: GuardedCall): boolean {
-	if (!is_investigator(written)) return false
-
-	return BODY_FIELDS.every((key) => field_of(written.input, key) === field_of(call.input, key))
+// The ids of the tail's calls that have a result, and of those this row refused.
+interface TailResults {
+	answered: ReadonlySet<string>
+	refused: ReadonlySet<string>
 }
 
-// A dispatch this row refused although it wrote the field `false`, in either spelling.
-function is_dropped_foreground(block: Block, refused_ids: ReadonlySet<string>): boolean {
-	const written = field_of(block.input, BACKGROUND_FIELD)
+function results_of(blocks: ReadonlyArray<Block>): TailResults {
+	const results = blocks.filter((block) => block.result_id !== '')
+	const refused = results.filter((block) => block.refusal_guard === GUARD_LABEL)
 
-	return refused_ids.has(block.id) && is_investigator(block) && String(written) === 'false'
+	return {
+		answered: new Set(results.map((block) => block.result_id)),
+		refused: new Set(refused.map((block) => block.result_id)),
+	}
+}
+
+// The field written `false`, in either spelling.
+function writes_foreground(block: Block): boolean {
+	return String(field_of(block.input, BACKGROUND_FIELD)) === 'false'
+}
+
+function has_same_body(block: Block, call: GuardedCall): boolean {
+	return BODY_FIELDS.every((key) => field_of(block.input, key) === field_of(call.input, key))
+}
+
+// The call in hand is not answered yet, and its `false` there is the one the parsed input dropped.
+function is_pending_foreground(block: Block, results: TailResults): boolean {
+	return !results.answered.has(block.id) && writes_foreground(block)
+}
+
+// The call in hand on the tail, or a dispatch this row refused that it repeats. A same-body dispatch
+// that ran is not a tell: a build that declares the field still refuses a bare repeat of it.
+function is_same_dispatch(block: Block, call: GuardedCall, results: TailResults): boolean {
+	if (!is_investigator(block) || !has_same_body(block, call)) return false
+
+	return results.refused.has(block.id) || is_pending_foreground(block, results)
+}
+
+// A dispatch this row refused although it wrote the field `false`.
+function is_dropped_foreground(block: Block, results: TailResults): boolean {
+	return results.refused.has(block.id) && is_investigator(block) && writes_foreground(block)
 }
 
 function tail_shows_no_field(tail: string, call: GuardedCall): boolean {
 	const blocks = time_transcript_line.parse_text(tail).flatMap((line) => line.blocks)
-	const refused_ids = new Set(
-		blocks.filter((block) => block.refusal_guard === GUARD_LABEL).map((block) => block.result_id),
-	)
+	const results = results_of(blocks)
 
 	return blocks.some(
 		(block) =>
 			is_untyped_field(block.name, block.input) ||
-			is_same_dispatch(block, call) ||
-			is_dropped_foreground(block, refused_ids),
+			is_same_dispatch(block, call, results) ||
+			is_dropped_foreground(block, results),
 	)
 }
 

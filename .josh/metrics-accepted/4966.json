@@ -1,7 +1,7 @@
 {
-	"reason": "#4966: investigator-foreground remembers a build without run_in_background for the session and reads a dropped boolean false",
+	"reason": "#4966: investigator-foreground remembers a build without run_in_background for the session, reads a dropped boolean false, and matches a body only against a refused or unanswered dispatch",
 	"date": "2026-10-26",
 	"growth": {
-		"scripts.code_lines": 23
+		"scripts.code_lines": 41
 	}
 }

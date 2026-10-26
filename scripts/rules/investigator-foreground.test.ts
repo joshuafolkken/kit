@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { investigator_foreground } from './investigator-foreground'
 
@@ -60,7 +60,7 @@ describe('investigator_foreground.is_background_investigator — the refusal', (
 
 // joshuafolkken/kit#4889: a build whose subagent tool declares no `run_in_background` drops the field
 // from the parsed input, and the model writes it as a string there. The stand-down reads that string off
-// the call or the tail; a tail of boolean spellings is a build that declares it, so the refusal holds.
+// the call or the tail; a boolean spelling that ran is a build that declares it, so the refusal holds.
 const TIMESTAMP = '2026-10-25T08:50:55.976Z'
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'investigator-foreground-'))
 
@@ -85,24 +85,24 @@ function use_line(input: Record<string, unknown>, name = 'Agent', id = 'toolu_1'
 	})
 }
 
-// This row's refusal written back against the call `id`.
-function refusal_line(id: string): string {
+// A result written back against the call `id` — this row's refusal, or the unit's answer.
+function result_line(id: string, is_refused = true): string {
 	const content = [
 		{
 			type: 'tool_result',
 			tool_use_id: id,
-			is_error: true,
-			content: investigator_foreground.INVESTIGATOR_FOREGROUND_REASON,
+			is_error: is_refused,
+			content: is_refused ? investigator_foreground.INVESTIGATOR_FOREGROUND_REASON : 'Found it',
 		},
 	]
 
 	return JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { role: 'user', content } })
 }
 
-function refused_dispatch(input: Record<string, unknown>, id: string): string {
-	return [use_line({ subagent_type: INVESTIGATOR, ...input }, 'Agent', id), refusal_line(id)].join(
-		'\n',
-	)
+function refused_dispatch(input: Record<string, unknown>, id: string, is_refused = true): string {
+	const use = use_line({ subagent_type: INVESTIGATOR, ...input }, 'Agent', id)
+
+	return [use, result_line(id, is_refused)].join('\n')
 }
 
 describe('investigator_foreground.lacks_background_field — the build without the field', () => {
@@ -144,23 +144,33 @@ describe('investigator_foreground.lacks_background_field — the first reissue',
 	const reissue = agent_call({ subagent_type: INVESTIGATOR, description: DESCRIPTION })
 
 	it('stands down on the reissue of a refused dispatch with the same body', () => {
-		const tail = use_line({ subagent_type: INVESTIGATOR, description: DESCRIPTION, prompt: PROMPT })
+		const tail = refused_dispatch({ description: DESCRIPTION, prompt: PROMPT }, 'toolu_2')
 
 		expect(investigator_foreground.ROW.already_satisfied(tail, reissue, fresh_run())).toBe(true)
 	})
 
 	it.each([
-		[
-			'another prompt',
-			use_line({ subagent_type: INVESTIGATOR, description: DESCRIPTION, prompt: OTHER_PROMPT }),
-		],
-		[
-			'another description',
-			use_line({ subagent_type: INVESTIGATOR, description: 'Other', prompt: PROMPT }),
-		],
+		['another prompt', refused_dispatch({ description: DESCRIPTION, prompt: OTHER_PROMPT }, 'id')],
+		['another description', refused_dispatch({ description: 'Other', prompt: PROMPT }, 'id')],
 		[
 			'another agent type',
-			use_line({ subagent_type: GENERAL_PURPOSE, description: DESCRIPTION, prompt: PROMPT }),
+			[
+				use_line({ subagent_type: GENERAL_PURPOSE, description: DESCRIPTION, prompt: PROMPT }),
+				result_line('toolu_1'),
+			].join('\n'),
+		],
+		[
+			'the same body with no result yet, written bare',
+			use_line({ subagent_type: INVESTIGATOR, description: DESCRIPTION, prompt: PROMPT }),
+		],
+		// A build that declares the field: the dispatch ran, so a bare repeat of it is still refused.
+		[
+			'a foreground dispatch with the same body that ran',
+			refused_dispatch(
+				{ description: DESCRIPTION, prompt: PROMPT, run_in_background: false },
+				'toolu_2',
+				false,
+			),
 		],
 	])('keeps refusing when the tail holds %s', (_case, tail) => {
 		expect(lacks(tail, reissue)).toBe(false)
@@ -188,18 +198,25 @@ describe('investigator_foreground.lacks_background_field — a dropped boolean',
 	})
 
 	it('keeps refusing where that dispatch drew another guard', () => {
-		const tail = use_line(
+		const use = use_line(
 			{ subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT, run_in_background: false },
 			'Agent',
 			'toolu_2',
 		)
+		const content = [
+			{ type: 'tool_result', tool_use_id: 'toolu_2', is_error: true, content: '⛔ agent model: x' },
+		]
+		const other = JSON.stringify({ type: 'user', timestamp: TIMESTAMP, message: { content } })
 
-		expect(lacks(tail, bare)).toBe(false)
+		expect(lacks([use, other].join('\n'), bare)).toBe(false)
 	})
+})
 
-	// A reissue reworded after a refusal matches no body, so it is refused once; written with `false`, it
-	// is itself the refused dispatch the next one stands down on.
+// A reissue reworded after a refusal matches no body, so it is refused once; written with `false`, it
+// is itself the refused dispatch the next one stands down on.
+describe('investigator_foreground.lacks_background_field — a reworded reissue', () => {
 	it('refuses a reworded reissue once, then stands down on the next', () => {
+		const bare = agent_call({ subagent_type: INVESTIGATOR })
 		const refused_bare = refused_dispatch({ prompt: OTHER_PROMPT }, 'toolu_2')
 		const reworded = agent_call({ subagent_type: INVESTIGATOR, prompt: `${PROMPT} again` })
 		const after = refused_dispatch(
@@ -231,6 +248,24 @@ describe('investigator_foreground.lacks_background_field — remembered for the 
 		expect(lacks(string_tail, agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
 		expect(lacks('', background, run)).toBe(false)
 		expect(lacks(string_tail, background)).toBe(false)
+	})
+
+	// The delivered guard hands the row its session, so the remembered build reaches a live refusal.
+	it('stands the delivered guard down on an empty transcript once the build is remembered', () => {
+		const run = fresh_run()
+		const tool_input = { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT }
+		const payload = JSON.stringify({
+			transcript_path: run.transcript,
+			tool_name: 'Agent',
+			tool_input,
+		})
+
+		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
+		writeFileSync(run.transcript, '')
+
+		expect(delivered_rules.delivery(payload)).toBe(investigator_foreground.ROW.reason)
+		expect(lacks(string_tail, agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
+		expect(delivered_rules.delivery(payload)).toBeUndefined()
 	})
 })
 
