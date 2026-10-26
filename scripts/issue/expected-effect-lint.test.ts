@@ -98,6 +98,17 @@ describe('expected-effect lint — the four items', () => {
 	})
 })
 
+// joshuafolkken/kit#4958: `effect:audit` reads the stated values back.
+describe('expected-effect lint — value_of', () => {
+	it('answers the stated value, and nothing for an absent or placeholder item', () => {
+		const body = `${DECLARED_3902}## 期待効果\n\n- 効く率: 9 割\n- 1 回あたりの得: <浮く時間>\n`
+
+		expect(expected_effect_lint.value_of(body, '効く率')).toBe('9 割')
+		expect(expected_effect_lint.value_of(body, '1 回あたりの得')).toBeUndefined()
+		expect(expected_effect_lint.value_of(body, '外れたときの損')).toBeUndefined()
+	})
+})
+
 describe('expected-effect lint — the declaration', () => {
 	it('ignores the declaration outside the background section', () => {
 		const body = [...ISSUE_3902_BACKGROUND, ...ISSUE_3902_REST].join('\n')

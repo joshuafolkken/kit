@@ -83,6 +83,9 @@ const ALREADY_DONE_LABEL = 'already-done'
 // closes such an Issue, so the merge reference a sweep reads is missing; this label is what tells the
 // run's own close from a person's, so every sweep counts it as merged (`issue-merged.ts`).
 const MEASURED_LABEL = 'measured'
+// Rides beside `measured` when the measurement fell short of the expected effect it checked
+// (`josh issue:measured --unmet`); `josh effect:audit` reads it as the mechanism to retire or shrink.
+const MEASURED_UNMET_LABEL = 'measured:unmet'
 // Marks the Issue that tracks a repository's next release. An Issue whose
 // change reaches a consumer only once published is linked to it as a `blocked_by` blocker
 // (`josh issue:release`), so "merged but not yet released" is visible in the backlog. A run applies
@@ -256,6 +259,12 @@ const WORKFLOW_LABELS: ReadonlyArray<LabelDefinition> = [
 		description: 'Measurement-only — a run recorded the result and closed it',
 	},
 	{
+		name: MEASURED_UNMET_LABEL,
+		color: '6f42c1',
+		description:
+			'The measurement fell short of the expected effect — retire or shrink the mechanism',
+	},
+	{
 		name: DEFERRED_LABEL,
 		color: 'd4c5f9',
 		description: 'Set aside for now; never opted in to unattended execution',
@@ -373,6 +382,7 @@ const ALL_LABELS: ReadonlySet<string> = new Set([
 	NEEDS_HUMAN_REVIEW_LABEL,
 	ALREADY_DONE_LABEL,
 	MEASURED_LABEL,
+	MEASURED_UNMET_LABEL,
 	DEFERRED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
 	PRIORITY_HIGH_LABEL,
@@ -415,6 +425,7 @@ export {
 	INTERRUPT_ROUTE_LABEL,
 	label_name_of,
 	MEASURED_LABEL,
+	MEASURED_UNMET_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_BEFORE_LABEL,

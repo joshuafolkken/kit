@@ -97,6 +97,31 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'automation', ['network']],
 		usage: { examples: [{ arguments: '', note: 'every issue labelled bug, open or closed' }] },
 	},
+	'effect:audit': {
+		script: 'scripts/issue/effect-audit-cli.ts',
+		description:
+			'List closed run-time-shortening issues with their expected effect, follow-up measurement and result',
+		category: 'AI tools',
+		reference: ['[--days <N>] [--draft <issue>]', 'automation', ['network', 'files']],
+		usage: {
+			examples: [
+				{ arguments: '', note: 'issues closed in the last 30 days, one line each' },
+				{ arguments: '--days 7', note: 'a shorter window' },
+				{
+					arguments: '--draft 4896',
+					note: 'write the retirement candidate of a shortfall and print its issue:file line',
+				},
+			],
+			flags: [
+				{ names: ['--days <N>'], description: 'the window, in days back from now (default 30)' },
+				{
+					names: ['--draft <issue>'],
+					description:
+						'an issue whose measurement carries measured:unmet: write its retirement-candidate body to a temporary file',
+				},
+			],
+		},
+	},
 	'issue:fold': {
 		script: 'scripts/issue/issue-fold-main.ts',
 		description:

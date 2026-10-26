@@ -1,7 +1,7 @@
 import { epic_close } from '#scripts/epic/epic-close'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_evidence_exit, type EvidenceExit } from '#scripts/issue/issue-evidence-exit'
-import { MEASURED_LABEL } from '#scripts/issue/issue-labels'
+import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // The writes that complete a measurement-only Issue — the result comment, the `measured` label and
@@ -14,10 +14,10 @@ import { session_cite } from '#scripts/issue/session-cite'
 // close because it is what every sweep — `run:carry --end`, `run:tidy` — tells this close from a
 // person's by (`issue-merged.ts`); a close without it would be one they never count as merged.
 
-async function apply_label(issue_number: string): Promise<boolean> {
-	const write = await git_gh_command.issue_apply_label(issue_number, MEASURED_LABEL)
+async function apply_label(issue_number: string, label: string = MEASURED_LABEL): Promise<boolean> {
+	const write = await git_gh_command.issue_apply_label(issue_number, label)
 
-	if (!write.is_applied) console.error(`${MEASURED_LABEL} not applied: ${write.reason}`)
+	if (!write.is_applied) console.error(`${label} not applied: ${write.reason}`)
 
 	return write.is_applied
 }
@@ -37,13 +37,22 @@ async function label_and_close(issue_number: string): Promise<boolean> {
 	return (await apply_label(issue_number)) && (await close_issue(issue_number))
 }
 
-const MEASURED_EXIT: EvidenceExit = { command: 'issue:measured', finish: label_and_close }
+// A measurement that fell short carries `measured:unmet` too, put on first: the close is the last write.
+async function mark_unmet_and_close(issue_number: string): Promise<boolean> {
+	return (
+		(await apply_label(issue_number, MEASURED_UNMET_LABEL)) && (await label_and_close(issue_number))
+	)
+}
+
+const COMMAND = 'issue:measured'
+const MEASURED_EXIT: EvidenceExit = { command: COMMAND, finish: label_and_close }
+const MEASURED_UNMET_EXIT: EvidenceExit = { command: COMMAND, finish: mark_unmet_and_close }
 
 // The same writes for evidence composed in process, with no hold of its own to release.
 async function close(issue_number: string, evidence: string): Promise<boolean> {
 	return await issue_evidence_exit.write({ issue_number, evidence }, MEASURED_EXIT)
 }
 
-const issue_measured_close = { MEASURED_EXIT, close }
+const issue_measured_close = { MEASURED_EXIT, MEASURED_UNMET_EXIT, close }
 
 export { issue_measured_close }

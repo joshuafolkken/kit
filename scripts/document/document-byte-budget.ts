@@ -77,7 +77,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	{ path: 'docs/josh-commands-run.md', bytes: 81_920 },
-	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
+	// `josh effect:audit` (joshuafolkken/kit#4958) crossed the 57344 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 61_440 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block.
 	{ path: 'docs/josh-commands.md', bytes: 57_344 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
