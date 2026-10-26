@@ -1723,7 +1723,7 @@
 	"tools/cost/cost-run-split.test.ts": 91,
 	"tools/cost/cost-run-tree.test.ts": 24,
 	"tools/document/generate-command-usage.test.ts": 301,
-	"tools/document/issue-citation-budget.test.ts": 29,
+	"scripts/document/issue-citation-budget.test.ts": 29,
 	"tools/document/review-agent-type-document-rule.test.ts": 17,
 	"tools/document/single-source.test.ts": 13,
 	"tools/dogfood/dogfood-commit.test.ts": 1195,

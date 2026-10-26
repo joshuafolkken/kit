@@ -1,0 +1,8 @@
+{
+	"reason": "lint:related gains the command-reference long-line and issue-citation ratchet checks; the citation budget moves from tools/ to scripts/ so the shipped check reaches it (#4986)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 89,
+		"ai_cost.on_demand_bytes": 2
+	}
+}

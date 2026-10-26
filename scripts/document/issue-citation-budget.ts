@@ -47,7 +47,7 @@ const ISSUE_CITATION_BUDGET: ReadonlyArray<CitationBudget> = [
 	{ path: 'prompts/testing-guide.md', citations: 3 },
 ]
 
-const BUDGET_FILE = 'tools/document/issue-citation-budget.ts'
+const BUDGET_FILE = 'scripts/document/issue-citation-budget.ts'
 
 function count_citations(text: string): number {
 	return text.match(CITATION_PATTERN)?.length ?? 0

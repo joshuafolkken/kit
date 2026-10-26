@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { agent_read_documents } from '#scripts/document/ai-document-fixture'
-import { issue_citation_budget } from '#tools/document/issue-citation-budget'
 import { describe, expect, it } from 'vitest'
+import { issue_citation_budget } from './issue-citation-budget'
 
 const { ISSUE_CITATION_BUDGET, citation_violation, count_citations, recorded_citations_for } =
 	issue_citation_budget
@@ -54,7 +54,7 @@ describe('citation_violation — the ratchet', () => {
 		const message = citation_violation(EXAMPLE_PATH, RECORDED + 1, RECORDED)
 
 		expect(message).toContain('over its ceiling of 3')
-		expect(message).toContain('record 4 in tools/document/issue-citation-budget.ts')
+		expect(message).toContain('record 4 in scripts/document/issue-citation-budget.ts')
 	})
 
 	it('refuses a reduction left unrecorded, so the ceiling follows the count down', () => {
