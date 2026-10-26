@@ -238,3 +238,35 @@ describe.each(RULE_DOCS)('%s — carries the pre-implementation reading rule', (
 		expect(unwrapped).toContain(READ_GUARD_COMMAND)
 	})
 })
+
+// joshuafolkken/kit#4963: `agent-model` and `investigator-foreground` refuse on every occurrence, so
+// their remedy lives in the hook's reason and the document keeps a one-line pointer to the row. A
+// restated remedy is the copy that drifts; the review's model alias is not `agent-model`'s (a
+// `reviewer` is a named type), so it moved to the step that dispatches the review.
+const CHAIN_RULE_DOC = '.claude/skills/workflow-commands/chain-rule.md'
+const CONDENSED_POINTERS: ReadonlyArray<string> = [
+	'the `agent-model` row of `pnpm josh rule:list`',
+	'the `investigator-foreground` row of `pnpm josh rule:list`',
+]
+const HOOK_REMEDIES: ReadonlyArray<string> = [
+	'`sonnet` for routine work',
+	'run_in_background: false',
+]
+const REVIEW_MODEL_ALIAS = 'the alias of the `model=` id the brief prints'
+
+describe(`${DELEGATION_DOC} — condenses the hook-delivered rules to their rows`, () => {
+	const unwrapped = read_unwrapped(DELEGATION_DOC)
+
+	it.each(CONDENSED_POINTERS)(CARRIES_CASE, (pointer) => {
+		expect(unwrapped).toContain(pointer)
+	})
+
+	it.each(HOOK_REMEDIES)('leaves %j to the hook', (remedy) => {
+		expect(unwrapped).not.toContain(remedy)
+	})
+
+	it('leaves the review model alias to the step that dispatches the review', () => {
+		expect(unwrapped).not.toContain('`model=`')
+		expect(read_unwrapped(CHAIN_RULE_DOC)).toContain(REVIEW_MODEL_ALIAS)
+	})
+})
