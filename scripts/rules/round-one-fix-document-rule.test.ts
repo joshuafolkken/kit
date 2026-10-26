@@ -63,8 +63,26 @@ describe('chain-rule — a review round’s fixes are checked once', () => {
 	// and the earlier run added nothing the later one did not answer.
 	it('checks a round’s fixes with one check:related after the last, not one per finding', () => {
 		expect(read_unwrapped(CHAIN_RULE)).toContain(
-			"after every edit, a review round's fixes once after the last",
+			"once before `run:review`, a review round's fixes once after the last",
 		)
+	})
+})
+
+// joshuafolkken/kit#5024: chain-rule said check:related after every edit while CLAUDE.md's Code
+// Change Rules said re-run one check, and a lane child ran the minutes-long check:related per edit.
+describe('chain-rule — one check per edit while implementing, check:related once before the review', () => {
+	const ONE_CHECK = 'while implementing re-run one check'
+
+	it('chain-rule and CLAUDE.md both re-run one check per edit while implementing', () => {
+		expect(read_unwrapped(CHAIN_RULE)).toContain(ONE_CHECK)
+		expect(read_unwrapped('CLAUDE.md')).toContain(ONE_CHECK)
+	})
+
+	it('chain-rule runs check:related once before run:review, not after every edit', () => {
+		const content = read_unwrapped(CHAIN_RULE)
+
+		expect(content).toContain('`pnpm josh check:related` once before `run:review`')
+		expect(content).not.toContain('`pnpm josh check:related` after every edit')
 	})
 })
 
