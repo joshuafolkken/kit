@@ -19,6 +19,7 @@ import {
 import {
 	forget_pr_numbers,
 	git_gh_pr_read,
+	NO_PULL_REQUEST_MESSAGE,
 	UNREADABLE_PULL_REQUEST_MESSAGE,
 } from './git-gh-pr-read'
 
@@ -36,6 +37,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const PR_BODY = 'closes #1027'
 const MERGED_AT = '2026-10-04T00:00:00Z'
+const GH_TIMEOUT = 'gh api timed out after 30s'
 const NO_PULL_REQUEST = { [pr_lookup_path()]: EMPTY_LISTING }
 
 function stub(routes: Record<string, GhApiAnswer>): void {
@@ -307,6 +309,48 @@ describe.each([
 		mocked_api.mockRejectedValue(gh_failure())
 
 		await expect(read(PR_BRANCH)).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5012: the reason was swallowed, so a ship could neither retry the read nor say why
+// it stopped. Both comment readers share the one read below.
+describe('pr_get_comments prints why the listing could not be read', () => {
+	const read = git_gh_pr_read.pr_get_comments
+
+	it('warns with gh reason', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(vi.fn())
+
+		stub(
+			pr_routes(
+				{},
+				{
+					[pr_conversation_comments_path()]: async () => {
+						throw new Error(GH_TIMEOUT)
+					},
+				},
+			),
+		)
+		await read(PR_BRANCH)
+
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining(GH_TIMEOUT))
+	})
+
+	it('warns that the branch has no pull request', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(vi.fn())
+
+		stub(NO_PULL_REQUEST)
+		await read(PR_BRANCH)
+
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining(NO_PULL_REQUEST_MESSAGE))
+	})
+
+	it('warns with gh reason when the number lookup never answered', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(vi.fn())
+
+		mocked_api.mockRejectedValue(new Error(GH_TIMEOUT))
+		await read(PR_BRANCH)
+
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining(GH_TIMEOUT))
 	})
 })
 

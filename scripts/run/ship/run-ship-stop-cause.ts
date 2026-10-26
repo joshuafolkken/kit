@@ -1,4 +1,5 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import type { StopRecord } from '#scripts/lane/lane-ledger'
 import { run_ship_review, type StopFinding } from './run-ship-review'
@@ -39,6 +40,7 @@ const INFRA_STAGES: ReadonlySet<Stage> = new Set([
 const INFRA_PATTERNS: ReadonlyArray<RegExp> = [
 	/rate limit/iu,
 	new RegExp(NO_CHECKS_MESSAGE, 'u'),
+	new RegExp(UNREADABLE_COMMENTS_STOP, 'u'),
 	/\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND)\b/u,
 	/socket hang up/iu,
 	/could not resolve host/iu,
