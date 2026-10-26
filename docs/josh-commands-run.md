@@ -521,7 +521,8 @@ and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
 never drains (`--unpinned-ok`: above). The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
-while every place, keyed by file, function and the lines replaced and put in, is recorded. A scoped refusal launches
+while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
+`josh ship --review` given no reason carries it as its `--unpinned-ok`. A scoped refusal launches
 neither; a reopen stops the last check. A dispatched lane child whose round 1 is recorded on a tree
 `josh ship` reuses is refused before either launches, pointed at `josh ship --detach --review`, and
 `josh review:record` names the same next step after a code round the ship reuses. The overlap's reader is `chain-rule.md`.
@@ -564,7 +565,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 - `--notify-message <text>` — forwarded to `followup` alone.
 - `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
-- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok` if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
+- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 
 <!-- /usage -->
 

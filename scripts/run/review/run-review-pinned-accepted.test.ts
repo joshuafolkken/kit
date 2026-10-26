@@ -13,6 +13,7 @@ const REASON = 'the branch only logs'
 const SITE = 'scripts/a.ts 0123456789abcdef'
 const OTHER_SITE = 'scripts/b.ts 89abcdef01234567'
 const BRANCH = '4775-lane'
+const OTHER_BRANCH = 'other-branch'
 
 const scratch = { directory: '' }
 
@@ -69,7 +70,7 @@ describe('run_review_pinned_accepted.judge — the reason an earlier run accepte
 
 	it("stops on another branch's record", async () => {
 		await accept([SITE])
-		vi.mocked(git_command.branch).mockResolvedValue('other-branch')
+		vi.mocked(git_command.branch).mockResolvedValue(OTHER_BRANCH)
 
 		const verdict = await later([SITE])
 
@@ -83,5 +84,32 @@ describe('run_review_pinned_accepted.judge — the reason an earlier run accepte
 		const verdict = await later([SITE])
 
 		expect(verdict.kind).toBe('stop')
+	})
+})
+
+// joshuafolkken/kit#4974: the pre-detach check skips its probe under the reason this branch recorded.
+describe('run_review_pinned_accepted.recorded_reason', () => {
+	it("returns this branch's recorded reason", async () => {
+		await accept([SITE])
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBe(REASON)
+	})
+
+	it("returns none for another branch's record", async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockResolvedValue(OTHER_BRANCH)
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+
+	it('returns none when nothing was recorded', async () => {
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+
+	it('returns none when the branch could not be read', async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockRejectedValue(new Error('git failed'))
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
 	})
 })
