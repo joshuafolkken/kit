@@ -8,6 +8,7 @@ import {
 } from '#tools/document/generate-catalog'
 import { describe, expect, it } from 'vitest'
 import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-document-fixture'
+import { command_reference_line_budget } from './command-reference-line-budget'
 import { document_scan } from './document-scan'
 
 // Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
@@ -112,20 +113,12 @@ describe('the command catalog is up to date', () => {
 	})
 })
 
-// A reference entry is a short summary; the why behind it lives in the page's maintainer rationale
-// file. The pages once carried 137 lines over 400 characters (joshuafolkken/kit#3868); the ceiling
-// is a ratchet at the long lines left after condensing them, so lowering it is the only way it moves.
-const LONG_LINE_CHARACTERS = 400
-const MAX_LONG_LINES = 3
-
-function long_line_count(paths: ReadonlyArray<string>): number {
-	return paths
-		.flatMap((path) => read_document(path).split('\n'))
-		.filter((line) => line.length > LONG_LINE_CHARACTERS).length
-}
-
+// The ceiling and the count are `command-reference-line-budget.ts`'s, shared with `josh lint:related`.
 describe('the command reference keeps its entries short', () => {
 	it('keeps at most the ratcheted number of lines over the length limit', () => {
-		expect(long_line_count(COMMAND_REFERENCE_DOCS)).toBeLessThanOrEqual(MAX_LONG_LINES)
+		const { long_line_count, MAX_LONG_LINES } = command_reference_line_budget
+		const count = long_line_count(COMMAND_REFERENCE_DOCS.map((path) => read_document(path)))
+
+		expect(count).toBeLessThanOrEqual(MAX_LONG_LINES)
 	})
 })

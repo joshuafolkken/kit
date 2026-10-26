@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { document_byte_check } from '#scripts/document/document-byte-check'
+import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
@@ -32,9 +32,9 @@ vi.mock('#scripts/gate/since-green', () => ({
 }))
 // Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
 // unrelated document over its ceiling mid-work failed the whole-tree fallback case here
-// (joshuafolkken/kit#3208). The ceilings themselves are `document-byte-check.test.ts`.
-vi.mock('#scripts/document/document-byte-check', () => ({
-	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
+// (joshuafolkken/kit#3208). The ceilings are the suites of the checks `document-checks.ts` runs.
+vi.mock('#scripts/document/document-checks', () => ({
+	document_checks: { check_all: vi.fn(), check_files: vi.fn() },
 }))
 // Mocked so no case scans this checkout's real program; the scan is `unused-members-check.test.ts`.
 vi.mock('#scripts/exports/unused-members-check', () => ({
@@ -56,8 +56,8 @@ const mocked_scoped = vi.mocked(lint_parallel.run_lint_checks)
 const mocked_whole_tree = vi.mocked(lint_parallel.run_lint_parallel_checks)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
-const mocked_byte_all = vi.mocked(document_byte_check.check_all)
-const mocked_byte_files = vi.mocked(document_byte_check.check_files)
+const mocked_byte_all = vi.mocked(document_checks.check_all)
+const mocked_byte_files = vi.mocked(document_checks.check_files)
 const mocked_notice = vi.mocked(metrics_totals.growth_notice)
 const mocked_unused = vi.mocked(unused_members_check.run_unused_members)
 const mocked_structural = vi.mocked(structural_checks.run_structural)
@@ -237,7 +237,7 @@ describe('lint_related.run_related_lint', () => {
 	})
 })
 
-describe('lint_related.run_related_lint — the document byte check', () => {
+describe('lint_related.run_related_lint — the document checks', () => {
 	// The unused member check (joshuafolkken/kit#4645) falls back with it, to the whole program.
 	it('checks every budgeted document when lint fell back to the whole tree', async () => {
 		mocked_changed.mockResolvedValue([])
