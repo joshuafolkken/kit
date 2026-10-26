@@ -197,6 +197,62 @@ describe('core_budget.reserve — a waiting claim admits against its recent read
 	})
 })
 
+// joshuafolkken/kit#4982: on a saturated machine a claim waited out the two-minute cap though the load
+// never fell, then started at minimum width all the same. A wait whose load does not ease for a window
+// now starts then; one whose load keeps falling still waits.
+const STEP_MS = 300
+const STEPS_TO_CAP = 10
+const EASE_STEPS = 3
+const FALL_PER_STEP = 3
+
+// A held claim on a clock that each sleep steps by `STEP_MS`: how long it waited, and whether it
+// started past the budget.
+async function waited_ms(read_machine: () => Promise<MachineReading>): Promise<{
+	waited: number
+	is_overflow: boolean
+}> {
+	write_reserved(RESERVED)
+	write_waiter_ahead()
+
+	const clock = { value: 0 }
+	const handle = await core_budget.reserve(1, {
+		directory: probe.directory,
+		budget: CORES,
+		read_machine,
+		report: vi.fn(),
+		wait_cap_ms: STEP_MS * STEPS_TO_CAP,
+		ease_window_ms: STEP_MS * EASE_STEPS,
+		now: () => clock.value,
+		sleep: async () => {
+			clock.value += STEP_MS
+		},
+	})
+
+	core_budget.release(handle)
+
+	return { waited: clock.value, is_overflow: handle.admission.overflow !== undefined }
+}
+
+describe('core_budget.reserve — a wait that does not ease the load ends early', () => {
+	it('admits at minimum width before the cap while the load holds steady', async () => {
+		const run = await waited_ms(busy(CORES + 2))
+
+		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * EASE_STEPS)
+	})
+
+	it('keeps waiting to the cap while the load keeps falling', async () => {
+		const falling = Array.from(
+			{ length: STEPS_TO_CAP + 1 },
+			(_, step) => CORES + 2 + FALL_PER_STEP * (STEPS_TO_CAP - step),
+		)
+		const run = await waited_ms(busy_in_turn(falling))
+
+		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
+	})
+})
+
 // joshuafolkken/kit#4361: lanes took the machine to a load average of 25–34 on 11 cores while the first
 // waiter ignored outside load. A run queue past twice the cores beyond the ledger now holds it, read
 // afresh on every poll.

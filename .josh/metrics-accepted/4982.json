@@ -1,0 +1,7 @@
+{
+	"reason": "Core-budget wait admits early once the load stops easing (#4982): ease tracking, its window default and regression tests",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}
