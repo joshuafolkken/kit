@@ -127,17 +127,19 @@ function is_unauthorized_worktree_change(command: string): boolean {
 	return shell_segments.commands_of(command).some((segment) => is_unauthorized_segment(segment))
 }
 
-// The instruction in the shape a refusal can carry: the authorized route — for a stash, the message
-// form that is allowed; for one file, the restore. The refused command is the caller's own, so it is
-// not listed back. `pnpm josh git` and `pnpm josh stash:pop` are invisible to this trigger, so a run
-// that uses them is never refused.
+// The instruction in the shape a refusal can carry: the authorized route — for one file, the restore,
+// limited to this run's own edit (another's uncommitted change is never discarded); for a stash, the
+// message form that is allowed. The refused command is the caller's own, so it is not listed back.
+// The `headline:` opening is what `time-transcript-line.ts` names the guard by. `pnpm josh git` and
+// `pnpm josh stash:pop` are invisible to this trigger, so a run that uses them is never refused.
 const SINGLE_FILE_RESTORE = 'git show HEAD:<path> > <path>'
 const WORKTREE_MUTATION_REASON =
-	'⛔ unauthorized working-tree change. A documented flow stashes with ' +
+	"⛔ unauthorized working-tree change: undo only this run's edit with " +
+	`\`${SINGLE_FILE_RESTORE}\`. A documented flow stashes with ` +
 	'`pnpm josh stash:push "<message>"`; a handed-over ' +
 	'stash is `pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
-	'the plan says why the owner keeps the stash: then stop and confirm. One file goes back to HEAD ' +
-	`with \`${SINGLE_FILE_RESTORE}\`. It fires on every occurrence (\`operating-rules.md\`).`
+	'the plan says why the owner keeps the stash: then stop and confirm. It fires on every occurrence ' +
+	'(`operating-rules.md`).'
 // The opening before joshuafolkken/kit#4988, so `rule-value.ts` still credits a refusal it delivered.
 const FORMER_OPENING = '⛔ unauthorized working-tree change: `git checkout --`, `git restore`'
 

@@ -14,7 +14,9 @@ const HEAD_BODY = 'line one\n\nline three\n'
 const OTHER_EDIT = 'edited, kept\n'
 
 function git(...args: ReadonlyArray<string>): void {
-	execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: scratch })
+	const config = ['user.name=t', 'user.email=t@t', 'commit.gpgsign=false', 'maintenance.auto=false']
+
+	execFileSync('git', [...config.flatMap((entry) => ['-c', entry]), ...args], { cwd: scratch })
 }
 
 function restore_command(): string {
