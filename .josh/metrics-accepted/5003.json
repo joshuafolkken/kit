@@ -1,0 +1,7 @@
+{
+	"reason": "Shared ship test fixture isolating the CLI suites from the branch's recorded --unpinned-ok (#5003)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

@@ -7,6 +7,7 @@ import { run_ship_cli } from './run-ship-cli'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover } from './run-ship-handover'
 import { run_ship_probe } from './run-ship-probe'
+import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import { run_ship_relaunch } from './run-ship-relaunch'
 import { run_ship_stage } from './run-ship-stage'
 import { run_ship_steps, type Step } from './run-ship-steps'
@@ -53,7 +54,7 @@ beforeEach(() => {
 	vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(console, 'info').mockReturnValue()
-	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
+	run_ship_recorded_fixture.isolate()
 })
 
 afterEach(() => {
