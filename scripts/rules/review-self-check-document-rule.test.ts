@@ -27,6 +27,8 @@ const CATEGORY_STEMS: ReadonlyArray<string> = [
 	'Edge inputs and environments',
 	// joshuafolkken/kit#4479: wrong premises about another component, the top theme still stopping lanes.
 	'Claims about other components are checked in their code',
+	// joshuafolkken/kit#5021: a command a refusal tells the reader to run, broken outside the root.
+	'Commands your prose tells a reader to run are run',
 ]
 
 // The intro's count, indexed by the number of items, so adding an item without rewording
@@ -131,5 +133,26 @@ describe('the self-check question 1 and josh test:pinned', () => {
 		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
 		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.
 		expect(step).toContain('`3` on an `unpinned` line (its note names the `--unpinned-ok` call)')
+	})
+})
+
+// joshuafolkken/kit#5021: the reviewer reads the rubric, not the self-check, so the rubric's bug-risk
+// category points at the question that runs the commands the changed prose names.
+describe('the review rubric and the self-check question 10', () => {
+	it('the rubric bug-risk category points at question 10 of the self-check', () => {
+		const category = unwrapped(
+			document_section.section(
+				read_repo_file('prompts/review-rubric.md'),
+				'1. Bug risks & logic errors',
+			)?.text ?? '',
+		)
+
+		expect(category).toContain(`\`prompts/review.md\` → "${HEADING}", question 10`)
+	})
+
+	it('question 10 of the self-check is the one that runs the named commands', () => {
+		expect(raw_self_check_section()).toMatch(
+			/^10\. \*\*Commands your prose tells a reader to run/mu,
+		)
 	})
 })

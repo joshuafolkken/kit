@@ -7,6 +7,7 @@ import {
 	type ReviewComment,
 } from './git-ai-review-scan'
 import { git_gh_command } from './git-gh-command'
+import { is_retry_pending, note_unreadable_stop } from './git-gh-comments-unreadable'
 import { git_pr_confirmation, has_ignore_reason, type TelegramContext } from './git-pr-confirmation'
 
 interface AiReviewPullComment {
@@ -132,6 +133,19 @@ const UNREADABLE_COMMENTS_BODY =
 // never read the gate reports exactly like one that read it and found nothing.
 const UNREADABLE_COMMENTS_NOTE = 'AI reviewer comments could not be read; the scan was bypassed.'
 
+// An attempt the ship will run again sends no confirmation; the final one does (is_retry_pending).
+async function confirm_unreadable_stop(context: TelegramContext): Promise<void> {
+	note_unreadable_stop()
+	if (is_retry_pending()) return
+
+	await git_pr_confirmation.notify_confirmation({
+		context,
+		body: UNREADABLE_COMMENTS_BODY,
+		recommended: 'Re-run `pnpm josh followup` once the comments can be read',
+		alternatives: [IGNORE_ALTERNATIVE],
+	})
+}
+
 async function handle_unreadable_comments(input: {
 	branch_name: string
 	ignore_reason: string | undefined
@@ -146,12 +160,7 @@ async function handle_unreadable_comments(input: {
 		return [UNREADABLE_COMMENTS_NOTE]
 	}
 
-	await git_pr_confirmation.notify_confirmation({
-		context: input.context,
-		body: UNREADABLE_COMMENTS_BODY,
-		recommended: 'Re-run `pnpm josh followup` once the comments can be read',
-		alternatives: [IGNORE_ALTERNATIVE],
-	})
+	await confirm_unreadable_stop(input.context)
 
 	throw new Error(UNREADABLE_COMMENTS_BODY)
 }

@@ -1,4 +1,5 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { describe, expect, it } from 'vitest'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -32,6 +33,22 @@ describe('run_ship_stop_cause.cause_of', () => {
 })
 
 const RED_CHECK = 'CI / test failed'
+
+// joshuafolkken/kit#5012: a merge gate that stopped on reviewer comments it could not read is a read to
+// retry, read on the note the gate prints to the standard output, whatever gh's own reason said.
+describe('run_ship_stop_cause.cause_of — an unreadable comment listing', () => {
+	const STOPPED = `⚠️ ${UNREADABLE_COMMENTS_STOP}`
+
+	it('reads a followup the unreadable comments stopped as the infrastructure', () => {
+		const failed = { body: `${STOPPED}\n❌ Error: comments could not be read`, out: STOPPED }
+
+		expect(cause_of('followup', failed)).toBe(CAUSE.INFRA)
+	})
+
+	it('reads it as a check when only the standard error names it', () => {
+		expect(cause_of('followup', { body: STOPPED, out: RED_CHECK })).toBe(CAUSE.CHECK)
+	})
+})
 
 // joshuafolkken/kit#4589: a failed stage's body carries its stderr, where a poll warns of a transient
 // rate limit it then recovered from.

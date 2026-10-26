@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import type { ShipSection } from './run-ship'
 import type { Stage } from './run-ship-stage'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
@@ -35,13 +36,27 @@ function is_retryable(stage: Stage, section: ShipSection): boolean {
 	return run_ship_stop_cause.cause_of(stage, section) === run_ship_stop_cause.CAUSE.INFRA
 }
 
+// An attempt with a retry still left runs with `RETRY_PENDING_KEY` set, so its stop sends no
+// confirmation; the final attempt runs without it and sends the one confirmation.
+async function run_attempt(attempt: Attempt, retries_left: number): Promise<ShipSection> {
+	if (retries_left === 0) return await attempt()
+
+	process.env[RETRY_PENDING_KEY] = RETRY_PENDING_VALUE
+
+	try {
+		return await attempt()
+	} finally {
+		Reflect.deleteProperty(process.env, RETRY_PENDING_KEY)
+	}
+}
+
 async function retried(
 	stage: Stage,
 	attempt: Attempt,
 	hooks: RetryHooks = DEFAULT_HOOKS,
 	retries_left = MAX_INFRA_RETRIES,
 ): Promise<ShipSection> {
-	const section = await attempt()
+	const section = await run_attempt(attempt, retries_left)
 
 	if (retries_left === 0 || !is_retryable(stage, section)) return section
 
