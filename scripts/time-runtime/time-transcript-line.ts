@@ -135,6 +135,11 @@ function block_names(raw: TranscriptBlock): Pick<Block, 'type' | 'name' | 'id' |
 	}
 }
 
+// The body a refusal opens with, the harness's own label stripped — shared with `rule-value.ts`.
+function refusal_body(text: string): string {
+	return text.trimStart().replace(HOOK_ERROR_LABEL, '')
+}
+
 // **A refusal is identified by what its body opens with, never by what it carries inside**.
 // The hook denies a call on behalf of the one guard whose trigger fired and
 // writes that guard's reason back as the whole result, so the speaker is the token after the `⛔` and
@@ -146,7 +151,7 @@ function block_names(raw: TranscriptBlock): Pick<Block, 'type' | 'name' | 'id' |
 // label is stripped before the opening is read. Without it no live refusal
 // carried a guard: the fixtures wrote the bare `⛔` body and passed while every recorded one read `''`.
 function guard_from_refusal(text: string): string {
-	const trimmed = text.trimStart().replace(HOOK_ERROR_LABEL, '')
+	const trimmed = refusal_body(text)
 	if (!trimmed.startsWith(REFUSAL_MARKER)) return ''
 
 	const headline = trimmed.slice(REFUSAL_MARKER.length).split('\n', 1)[0]?.trimStart() ?? ''
@@ -282,6 +287,7 @@ const time_transcript_line = {
 	guard_from_refusal,
 	parse_line,
 	parse_text,
+	refusal_body,
 }
 
 export type { Block, TranscriptLine }
