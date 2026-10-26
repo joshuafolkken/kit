@@ -112,14 +112,24 @@ function loss_lines_of(issue: number, minutes: string): string {
 	return `\`- 原因のレーン: ${minutes} 分（${cite}）\` and \`${issue_priority.CAUSE_PREFIX} <分> 分\``
 }
 
+// The breakdown the overrun's prompt leads with orders the search (joshuafolkken/kit#4995); a stage no
+// fix shortens is named in the result, so the time no filing covers is still accounted for. Only the
+// overrun has a breakdown: the baseline shares `cause_handling`, not this.
+const STAGE_ORDER = [
+	'Search for causes stage by stage, in the order of the net time by stage above, longest first.',
+	`For each stage you judge not reducible, end the result with \`${run_event_overrun.NOT_REDUCIBLE_LEAD}<stage> (<why>)\`.`,
+].join(' ')
+
 // The handling of lane `issue`'s causes, its `minutes` of net time on each filing's ranked lines.
 function handling(issue: number, minutes: number): string {
-	return cause_handling({
+	const rules = cause_handling({
 		origin: issue,
 		loss_lines: loss_lines_of(issue, String(minutes)),
 		template: run_event_overrun.ended_text(issue, '<result>'),
 		scope: 'this lane alone, judged from its own record',
 	})
+
+	return `${STAGE_ORDER} ${rules}`
 }
 
 const lane_overrun_prompt = { cause_handling, handling, loss_lines_of }

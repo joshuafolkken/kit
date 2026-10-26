@@ -1,0 +1,132 @@
+import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
+import type { LaneSpan } from './lane-net-time'
+import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
+
+// The implementation stage of a lane's breakdown (joshuafolkken/kit#4995) split by what its tool calls
+// spent, read off the lane's transcripts: the main josh commands, the subagents, the reads and the rest
+// of Bash, and what no call spent — the edits and the thinking. A backgrounded call has no duration
+// (`lane-transcript-calls.ts`), so the wait on its result falls in the remainder; only its count shows.
+
+const REMAINDER = 'editing & thinking'
+const OTHER_BASH = 'other bash'
+const BASH_TOOL = 'Bash'
+const SUBAGENT = 'subagent'
+const READ = 'read'
+
+const TOOL_KINDS: ReadonlyMap<string, string> = new Map([
+	['Agent', SUBAGENT],
+	['Task', SUBAGENT],
+	['Read', READ],
+	['Grep', READ],
+	['Glob', READ],
+])
+
+const COMMAND_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
+	[/\bjosh main:merge\b/u, 'main:merge'],
+	[/\bjosh check:related\b/u, 'check:related'],
+	[/\bjosh gate\b/u, 'gate'],
+	[/\bjosh test(?::[\w-]+)?\b/u, 'test'],
+	[/\bjosh (?:lint|cspell)(?::[\w-]+)?\b/u, 'lint / cspell'],
+]
+
+interface ImplementDetail {
+	// Longest first, the remainder among them.
+	kinds: ReadonlyArray<Stage>
+	// The calls backgrounded inside the implementation.
+	background: number
+}
+
+function command_kind(command: string): string {
+	return COMMAND_KINDS.find(([pattern]) => pattern.test(command))?.[1] ?? OTHER_BASH
+}
+
+// The kind a call counts under, `undefined` for one that falls in the remainder (an edit included).
+function kind_of(call: ToolCall): string | undefined {
+	if (call.tool === BASH_TOOL) return command_kind(call.command ?? '')
+
+	return TOOL_KINDS.get(call.tool ?? '')
+}
+
+interface TimedPart extends Stage {
+	from_ms: number
+}
+
+// A call's own milliseconds, cut at the end of the span it started in.
+function timed_part(call: ToolCall, span: LaneSpan): ReadonlyArray<TimedPart> {
+	const name = kind_of(call)
+
+	if (name === undefined || call.duration_ms === undefined) return []
+
+	const ms = Math.min(call.duration_ms, span.to_ms - call.started_ms)
+
+	return [{ name, ms, from_ms: call.started_ms }]
+}
+
+// What neither a timed call nor a wait covers of the implementation's spans, each millisecond once.
+function remainder_ms(parts: ReadonlyArray<TimedPart>, breakdown: Breakdown): number {
+	const busy = parts.map((part) => ({ from_ms: part.from_ms, to_ms: part.from_ms + part.ms }))
+	const covering = [...busy, ...breakdown.waits]
+	const idle = breakdown.implement.map(
+		(span) => span.to_ms - span.from_ms - lane_breakdown.covered_ms(span, covering),
+	)
+
+	return idle.reduce((sum, ms) => sum + ms, 0)
+}
+
+function span_of(call: ToolCall, spans: ReadonlyArray<LaneSpan>): LaneSpan | undefined {
+	return spans.find((span) => call.started_ms >= span.from_ms && call.started_ms < span.to_ms)
+}
+
+function placed_of(
+	calls: ReadonlyArray<ToolCall>,
+	spans: ReadonlyArray<LaneSpan>,
+): Array<readonly [ToolCall, LaneSpan]> {
+	return calls.flatMap((call) => {
+		const span = span_of(call, spans)
+
+		return span === undefined ? [] : [[call, span] as const]
+	})
+}
+
+// The implementation split by the calls made inside it — parallel calls each count their own time, so
+// the kinds can add up to more — and the remainder, the time no call and no wait covered.
+function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDetail {
+	const placed = placed_of(calls, breakdown.implement)
+	const parts = placed.flatMap(([call, span]) => timed_part(call, span))
+	const remainder = { name: REMAINDER, ms: remainder_ms(parts, breakdown) }
+
+	return {
+		kinds: lane_breakdown.ranked([...parts, remainder]),
+		background: placed.filter(([call]) => call.background).length,
+	}
+}
+
+// The lane's own transcript directories — `<lane root slug>-<issue>` under `~/.claude/projects`.
+function transcript_directories(issue: number): ReadonlyArray<string> {
+	const main_cwd = cost_transcript.session_cwd(process.cwd())
+	const home = cost_transcript.home_directory()
+	const suffix = `-${String(issue)}`
+
+	return cost_transcript
+		.lane_transcript_directories(main_cwd, home)
+		.filter((directory) => directory.endsWith(suffix))
+}
+
+// The tool calls of `issue`'s lane sessions still written to once its implementation began.
+function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
+	const [first] = breakdown.implement
+	const last = breakdown.implement.at(-1)
+
+	if (first === undefined || last === undefined) return []
+
+	const window = { since_ms: first.from_ms, until_ms: last.to_ms }
+
+	return lane_transcript_stats.read_calls(transcript_directories(issue), window)
+}
+
+const lane_breakdown_implement = { of, read, transcript_directories }
+
+export { lane_breakdown_implement }
+export type { ImplementDetail }

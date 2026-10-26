@@ -34,6 +34,7 @@ const STARTED_NOTE: OverrunNote = {
 	minutes: MINUTES,
 	pid: 1,
 	start: undefined,
+	longest: undefined,
 }
 
 function row_of(status: ItemStatus): BoardRow {
@@ -53,7 +54,15 @@ const MERGED: ItemStatus = { state: 'merged', started_ms: STARTED, ended_ms: NOW
 function found_of(overrun: OverrunNote | undefined, extra: Partial<Found> = {}): Found {
 	const minutes = overrun !== undefined && 'minutes' in overrun ? overrun.minutes : undefined
 
-	return { filed: [], overrun_filed: [], minutes, overrun, is_investigating: false, ...extra }
+	return {
+		filed: [],
+		overrun_filed: [],
+		minutes,
+		overrun,
+		longest: undefined,
+		is_investigating: false,
+		...extra,
+	}
 }
 
 function ended(result: string): Found {
@@ -149,6 +158,14 @@ describe('run_board_render — a merged row’s recurrence', () => {
 })
 
 describe('run_board_render — a merged row’s finished investigation', () => {
+	// joshuafolkken/kit#4995: the lane's longest stage, kept from the start note, before its filings.
+	it('names the longest stage between 🔍 and the numbers it filed', () => {
+		const longest = { name: 'implement', minutes: 51 }
+		const found = { ...ended(run_event_overrun.FILED_RESULT), overrun_filed: FILED, longest }
+
+		expect(done_line(found)).toMatch(/52′ {2}🔍 implement 51′ · 4768, 4769, 4770$/u)
+	})
+
 	it('ends on 🔍 and the numbers it filed, with no `#`', () => {
 		const line = done_line({ ...ended(run_event_overrun.FILED_RESULT), overrun_filed: FILED })
 

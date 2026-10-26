@@ -7,6 +7,8 @@ import { lane_overrun_prompt } from './lane-overrun-prompt'
 
 const ISSUE = 4695
 const MINUTES = 65
+const TAKE_LEAD = 'Take at most the 5 causes'
+const STAGE_LEAD = 'stage by stage'
 
 function handling(): string {
 	return lane_overrun_prompt.handling(ISSUE, MINUTES)
@@ -31,13 +33,38 @@ describe('lane_overrun_prompt.handling — which causes are filed', () => {
 	it('picks the causes before grouping and filing them', () => {
 		const text = handling()
 
-		expect(text.indexOf('Take at most the 5 causes')).toBeLessThan(
-			text.indexOf('Causes whose fixes'),
-		)
+		expect(text.indexOf(TAKE_LEAD)).toBeLessThan(text.indexOf('Causes whose fixes'))
 	})
 
 	it('files a defect as a defect and any other cause as time shortening', () => {
 		expect(handling()).toContain('as `- 種別: 不具合`, any other cause as `- 目的: 時間短縮`.')
+	})
+})
+
+// joshuafolkken/kit#4995: the breakdown orders the search, and a stage no fix shortens is named.
+describe('lane_overrun_prompt.handling — the breakdown', () => {
+	it('searches the stages longest first before picking the causes', () => {
+		const text = handling()
+
+		expect(text).toContain('in the order of the net time by stage above, longest first.')
+		expect(text.indexOf(STAGE_LEAD)).toBeLessThan(text.indexOf(TAKE_LEAD))
+	})
+
+	it('names each stage judged not reducible, and why, in the result', () => {
+		expect(handling()).toContain(
+			'For each stage you judge not reducible, end the result with `; not reducible: <stage> (<why>)`.',
+		)
+	})
+
+	it('leaves the baseline handling without the stage order', () => {
+		const rules = lane_overrun_prompt.cause_handling({
+			origin: undefined,
+			loss_lines: '',
+			template: '',
+			scope: '',
+		})
+
+		expect(rules).not.toContain(STAGE_LEAD)
 	})
 })
 

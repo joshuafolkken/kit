@@ -108,6 +108,14 @@ describe('lane_net_time.net_ms — where a wait ends', () => {
 	it('has no net time before the lane merged', () => {
 		expect(net_minutes([dispatch(0), stop(10)])).toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4995: the check moved into `span_of`, which the breakdown reads too.
+	it('has no net time, nor a span, when the merge precedes the dispatch', () => {
+		const entries = [merge(0), dispatch(10)]
+
+		expect(net_minutes(entries)).toBeUndefined()
+		expect(lane_net_time.span_of(entries, ISSUE)).toBeUndefined()
+	})
 })
 
 describe('lane_net_time.net_minutes', () => {
@@ -119,6 +127,29 @@ describe('lane_net_time.net_minutes', () => {
 
 	it('has no minutes before the lane merged', () => {
 		expect(lane_net_time.net_minutes([dispatch(0)], [], ISSUE)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4995: the waits net time takes out are the intervals the breakdown excludes.
+describe('lane_net_time.waits', () => {
+	it('returns each park from its hold to the re-dispatch that ended it', () => {
+		const entries = [dispatch(0), dispatch(50), merge(64)]
+		const span = lane_net_time.span_of(entries, ISSUE)
+		const park = event(25, 'park', `#${String(ISSUE)} parked`)
+
+		expect(span).toBeDefined()
+		expect(lane_net_time.waits(entries, [park], ISSUE, span ?? { from_ms: 0, to_ms: 0 })).toEqual([
+			{ from_ms: Date.parse(at(25)), to_ms: Date.parse(at(50)) },
+		])
+	})
+
+	it("cuts a wait nothing resumed at the span's end, and leaves a hold outside the span out", () => {
+		const span = { from_ms: Date.parse(at(0)), to_ms: Date.parse(at(30)) }
+		const parks = [25, 40].map((minute) => event(minute, 'park', `#${String(ISSUE)} parked`))
+
+		expect(lane_net_time.waits([dispatch(0), merge(30)], parks, ISSUE, span)).toEqual([
+			{ from_ms: Date.parse(at(25)), to_ms: Date.parse(at(30)) },
+		])
 	})
 })
 

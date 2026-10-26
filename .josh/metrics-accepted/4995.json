@@ -1,0 +1,8 @@
+{
+	"reason": "lane:breakdown adds the per-stage net-time breakdown (calculation, overrun hand-off, board display) as a new feature; review round 1 adds the overlap-safe implementation remainder #4995",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 384,
+		"ai_cost.on_demand_bytes": 78
+	}
+}

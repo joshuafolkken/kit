@@ -12,15 +12,30 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 type OverrunNote =
 	| { kind: 'within'; issue: number; minutes: number }
 	| { kind: 'skipped'; issue: number; reason: string }
-	| { kind: 'started'; issue: number; minutes: number; pid: number; start: string | undefined }
+	| {
+			kind: 'started'
+			issue: number
+			minutes: number
+			pid: number
+			start: string | undefined
+			longest: Longest | undefined
+	  }
 	| { kind: 'ended'; issue: number; result: string }
 	| { kind: 'failed'; issue: number; minutes: number | undefined }
+
+// The lane's longest stage in whole minutes (joshuafolkken/kit#4995, `lane-breakdown.ts`); a start note
+// written before it was carried has none.
+interface Longest {
+	name: string
+	minutes: number
+}
 
 type Groups = Partial<Record<string, string>>
 
 const WITHIN_PATTERN = /^#(?<issue>\d+) net: (?<minutes>\d+) min$/u
 const SKIPPED_PATTERN = /^#(?<issue>\d+) overrun skipped: (?<reason>.+)$/u
-const OVERRAN_PATTERN = /^#(?<issue>\d+) overran: (?<minutes>\d+) min net — (?<outcome>.*)$/u
+const OVERRAN_PATTERN =
+	/^#(?<issue>\d+) overran: (?<minutes>\d+) min net(?:, longest (?<stage>.+?) (?<stage_minutes>\d+) min)? — (?<outcome>.*)$/u
 const INVESTIGATING_PATTERN = /^investigating in pid (?<pid>\d+)(?: started (?<start>.+))?$/u
 const ENDED_PATTERN = /^#(?<issue>\d+) overrun: (?<result>.*)$/u
 const FAILED_PATTERN = /^#(?<issue>\d+) overrun investigation failed: /u
@@ -28,6 +43,8 @@ const FAILED_PATTERN = /^#(?<issue>\d+) overrun investigation failed: /u
 // The result an investigation that filed records; the board shows the filings themselves.
 const FILED_RESULT = 'filed'
 const NONE_LEAD = 'none: '
+// What a result ends with for the stages the investigation judged not reducible (joshuafolkken/kit#4995).
+const NOT_REDUCIBLE_LEAD = '; not reducible: '
 const RECURRED_PATTERN = /^recurred #(?<number>\d+)/u
 // The result of an investigation that appended causes to open Issues, which file no new one
 // (joshuafolkken/kit#4858); any it filed besides show as filings.
@@ -36,8 +53,11 @@ const FOLDED_SEPARATOR = ','
 const FOLDED_PATTERN = /^folded (?<list>#\d+(?:,#\d+)*)/u
 const NUMBER_PATTERN = /#(?<number>\d+)/gu
 
-function started_text(issue: number, minutes: number, outcome: string): string {
-	return `${issue_cite.plain(issue)} overran: ${String(minutes)} min net — ${outcome}`
+function started_text(issue: number, minutes: number, outcome: string, longest?: Longest): string {
+	const stage =
+		longest === undefined ? '' : `, longest ${longest.name} ${String(longest.minutes)} min`
+
+	return `${issue_cite.plain(issue)} overran: ${String(minutes)} min net${stage} — ${outcome}`
 }
 
 function within_text(issue: number, minutes: number): string {
@@ -89,9 +109,18 @@ function folded_of(result: string): ReadonlyArray<number> {
 	return [...list.matchAll(NUMBER_PATTERN)].map((match) => Number(match.groups?.['number']))
 }
 
-// The reason a `none: <reason>` result gives, else the result as it is.
+// The reason a `none: <reason>` result gives, else the result as it is — its stages not reducible left
+// out.
 function reason_of(result: string): string {
-	return result.startsWith(NONE_LEAD) ? result.slice(NONE_LEAD.length) : result
+	const [lead = ''] = result.split(NOT_REDUCIBLE_LEAD)
+
+	return lead.startsWith(NONE_LEAD) ? lead.slice(NONE_LEAD.length) : lead
+}
+
+function longest_of(groups: Groups): Longest | undefined {
+	const name = groups['stage']
+
+	return name === undefined ? undefined : { name, minutes: Number(groups['stage_minutes']) }
 }
 
 function overran(groups: Groups): OverrunNote {
@@ -101,7 +130,10 @@ function overran(groups: Groups): OverrunNote {
 
 	if (launched === undefined) return { kind: 'failed', issue, minutes }
 
-	return { kind: 'started', issue, minutes, pid: Number(launched['pid']), start: launched['start'] }
+	const pid = Number(launched['pid'])
+	const longest = longest_of(groups)
+
+	return { kind: 'started', issue, minutes, pid, start: launched['start'], longest }
 }
 
 function within(groups: Groups): OverrunNote {
@@ -146,6 +178,7 @@ const run_event_overrun = {
 	folded_result,
 	investigating,
 	none_result,
+	NOT_REDUCIBLE_LEAD,
 	parse,
 	reason_of,
 	recurred_of,
@@ -156,4 +189,4 @@ const run_event_overrun = {
 }
 
 export { run_event_overrun }
-export type { OverrunNote }
+export type { Longest, OverrunNote }
