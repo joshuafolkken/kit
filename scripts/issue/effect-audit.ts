@@ -138,8 +138,8 @@ function background_lines(origin: string, measurements: string): ReadonlyArray<s
 	]
 }
 
-// The retirement candidate's body. The angle-bracket lines are what only the filer knows: `issue:lint`
-// refuses them until they are filled, and `issue:file`'s scout stops a duplicate.
+// The retirement candidate's body. The scale line is what only the filer knows: `issue:lint` refuses
+// it until it is filled, and `issue:file`'s scout stops a duplicate.
 function draft_body(row: AuditRow): string {
 	const origin = cite(row.origin)
 	const measurements = unmet_measurements(row)
@@ -151,7 +151,6 @@ function draft_body(row: AuditRow): string {
 		'',
 		`- ${origin} の期待効果: ${effect_text(row.origin.body)}`,
 		`- 計測 ${measurements} の結果: 届かなかった`,
-		'- 機構の所在: <ファイル・コマンド>',
 		'',
 		'## 期待結果',
 		'',

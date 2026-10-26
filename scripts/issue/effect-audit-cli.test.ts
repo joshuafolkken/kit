@@ -79,6 +79,7 @@ describe('effect_audit_cli.run — the listing', () => {
 
 		expect(await effect_audit_cli.run([], NOW_MS)).toBe(0)
 		expect(lines[0]).toMatch(/届かなかった 0 · 未計測 1$/u)
+		expect(lines.at(-1)).toMatch(/^\(1 follow-ups measure no issue: /u)
 	})
 
 	it('fails when a search cannot be read', async () => {
@@ -99,7 +100,19 @@ describe('effect_audit_cli.run — --draft', () => {
 		expect(readFileSync(file, 'utf8')).toContain('- 出どころ: #4897 の計測')
 	})
 
-	it('refuses an issue whose measurement did not fall short', async () => {
+	it.each([
+		['a measurement that reached it', [{ name: 'measured' }]],
+		['no recorded measurement', []],
+	])('refuses an issue of the window with %s', async (_case, labels) => {
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async (request: GhApiRequest) =>
+			page([request.path.includes('closed%3A') ? ORIGIN : { ...FOLLOW_UP, labels }]),
+		)
+
+		expect(await effect_audit_cli.run(['--draft', '4896'], NOW_MS)).toBe(1)
+		expect(lines[0]).toMatch(/is not an issue of the window whose measurement fell short$/u)
+	})
+
+	it('refuses a follow-up, which is no issue of the window', async () => {
 		expect(await effect_audit_cli.run(['--draft', '4897'], NOW_MS)).toBe(1)
 	})
 })

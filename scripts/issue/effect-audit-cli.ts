@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { defect_rate } from './defect-rate'
 import { effect_audit, type AuditRow, type FollowUp } from './effect-audit'
@@ -19,6 +20,7 @@ import { session_cite } from './session-cite'
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const DEFAULT_DAYS = 30
+const PULL_CONCURRENCY = 4
 const USAGE = 'Usage: josh effect:audit [--days <N>] [--draft <issue-number>]'
 const OPTIONS = { days: { type: 'string' }, draft: { type: 'string' } } as const
 
@@ -31,6 +33,12 @@ interface Audit {
 	rows: ReadonlyArray<AuditRow>
 	since: string
 	is_capped: boolean
+	unattributed: number
+}
+
+interface CitedFollowUp {
+	issue: SearchIssue
+	pr: number
 }
 
 function positive(text: string | undefined): number | undefined {
@@ -54,7 +62,8 @@ function parse_request(argv: ReadonlyArray<string>): AuditRequest | undefined {
 	return days === undefined ? undefined : with_draft(days, parsed.draft)
 }
 
-// The issue the cited pull request closes; an unreadable pull request leaves the follow-up unattributed.
+// The issue the cited pull request closes; an unreadable pull request leaves the follow-up unattributed,
+// and the listing counts it.
 async function measured_issue(pr: number): Promise<number | undefined> {
 	try {
 		const pull = await issue_sample_gate.read_source(pr)
@@ -65,18 +74,23 @@ async function measured_issue(pr: number): Promise<number | undefined> {
 	}
 }
 
-async function follow_up_of(issue: SearchIssue, pr: number): Promise<FollowUp> {
-	return { issue, measures: await measured_issue(pr) }
+// Each cited pull request is read once, a few at a time: the follow-up search spans every date.
+async function closes_by_pull(
+	prs: ReadonlyArray<number>,
+): Promise<ReadonlyMap<number, number | undefined>> {
+	const unique = [...new Set(prs)]
+	const closes = await bounded_pool.bounded_map(unique, PULL_CONCURRENCY, measured_issue)
+
+	return new Map(unique.map((pr, index) => [pr, closes[index]]))
 }
 
 async function follow_ups_of(candidates: ReadonlyArray<SearchIssue>): Promise<Array<FollowUp>> {
-	return await Promise.all(
-		candidates.flatMap((issue) => {
-			const pr = effect_audit.cited_pull(issue)
+	const cited = candidates
+		.map((issue) => ({ issue, pr: effect_audit.cited_pull(issue) }))
+		.filter((entry): entry is CitedFollowUp => entry.pr !== undefined)
+	const closes = await closes_by_pull(cited.map(({ pr }) => pr))
 
-			return pr === undefined ? [] : [follow_up_of(issue, pr)]
-		}),
-	)
+	return cited.map(({ issue, pr }) => ({ issue, measures: closes.get(pr) }))
 }
 
 async function read_audit(repo: string, days: number, now_ms: number): Promise<Audit | undefined> {
@@ -88,15 +102,23 @@ async function read_audit(repo: string, days: number, now_ms: number): Promise<A
 
 	if (origins === undefined || follow_ups === undefined) return undefined
 
-	const rows = effect_audit.rows(origins.issues, await follow_ups_of(follow_ups.issues))
+	const linked = await follow_ups_of(follow_ups.issues)
+	const rows = effect_audit.rows(origins.issues, linked)
+	const unattributed = linked.filter((follow_up) => follow_up.measures === undefined).length
 
-	return { rows, since, is_capped: origins.is_capped || follow_ups.is_capped }
+	return { rows, since, is_capped: origins.is_capped || follow_ups.is_capped, unattributed }
 }
 
 function print_audit(audit: Audit): number {
 	console.info(effect_audit.summary(audit.rows, audit.since))
 	for (const row of audit.rows) console.info(session_cite.text(effect_audit.format_row(row)))
 	if (audit.is_capped) console.info('(capped: the search served part of the window only)')
+
+	if (audit.unattributed > 0) {
+		console.info(
+			`(${String(audit.unattributed)} follow-ups measure no issue: their pull request could not be read or closes none)`,
+		)
+	}
 
 	return 0
 }
