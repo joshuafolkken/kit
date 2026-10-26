@@ -18,8 +18,9 @@ const FAILED_HEADING = 'failed tests:'
 const NONE_NAMED = '  (none named in the output — read the full output)'
 // A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace.
 const FAILED_FILE = /^(?:\|[^|]*\|\s+)?(?<file>\S+)/u
-// Through the core reservation, as a lane must run vitest (joshuafolkken/kit#5023).
-const RERUN_PREFIX = 'rerun failed: pnpm josh reserved-run 1 -- pnpm vitest run '
+// The guarded unit run, filtered to those files: it reserves its cores and ends a failure with this
+// same summary (joshuafolkken/kit#5023).
+const RERUN_PREFIX = 'rerun failed: pnpm josh test:unit '
 
 // One path per checkout and vitest mode, overwritten by each run, beside the gate's own log. **The
 // mode is in the name** because the gate's whole-suite `run` and a `related` run started beside it
