@@ -3,6 +3,7 @@ import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ShipArguments } from './run-ship-steps'
 
 const { run_mock, read_mock, clear_mock, pre_detach_checks, reusable_mock, on_tree_mock } =
 	vi.hoisted(() => ({
@@ -57,6 +58,19 @@ const UNPINNED: PinnedSummary = {
 	unpinned: ['scripts/issue/issue-file-cli.ts 0123456789abcdef'],
 }
 const CLEAR: PinnedSummary = { text: 'unpinned 0 · unchecked 0\n', unpinned: [] }
+const SKIPPED_NOTE_PREFIX =
+	'test:pinned not run before the detach; round 1 lists the unpinned places under --unpinned-ok: '
+const SHIP_ARGS: ShipArguments = {
+	title: 'Ship #4833',
+	number: ISSUE,
+	notify: [],
+	body: [],
+	body_path: undefined,
+	cites: [],
+	is_review: true,
+	is_detach: true,
+	unpinned_ok: [],
+}
 const PASSED: JoshResult = { code: OK, out: 'pre-detach checks passed' }
 
 function launched_token(): string | undefined {
@@ -65,6 +79,13 @@ function launched_token(): string | undefined {
 
 async function check(unpinned_ok: ReadonlyArray<string>): Promise<JoshResult> {
 	return await run_ship_pre_detach_pinned.pinned_check({ number: ISSUE, unpinned_ok })
+}
+
+async function carried(options: {
+	is_review: boolean
+	unpinned_ok: ReadonlyArray<string>
+}): Promise<ShipArguments> {
+	return await run_ship_pre_detach_pinned.with_recorded_reason({ ...SHIP_ARGS, ...options })
 }
 
 // The pinned check `checks_for` handed the pre-detach checks, run.
@@ -85,6 +106,7 @@ beforeEach(() => {
 	pre_detach_checks.mockReset().mockResolvedValue(PASSED)
 	reusable_mock.mockReset().mockResolvedValue(false)
 	on_tree_mock.mockReset().mockResolvedValue(undefined)
+	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockReset().mockResolvedValue(undefined)
 })
 
 // joshuafolkken/kit#4888: the tree `run:review` checked is not checked twice.
@@ -183,6 +205,48 @@ describe('run_ship_pre_detach_pinned.pinned_check under --unpinned-ok', () => {
 
 		expect(result.code).toBe(FAILED)
 		expect(run_mock).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#4974: a reason an earlier run on this branch accepted is the ship's --unpinned-ok.
+describe('run_ship_pre_detach_pinned.with_recorded_reason', () => {
+	beforeEach(() => {
+		vi.mocked(run_review_pinned_accepted.recorded_reason).mockResolvedValue(REASON)
+	})
+
+	it('carries the recorded reason, so the pinned check launches no josh test:pinned', async () => {
+		const args = await carried({ is_review: true, unpinned_ok: [] })
+		const result = await run_ship_pre_detach_pinned.pinned_check(args)
+
+		expect(args.unpinned_ok).toStrictEqual(UNPINNED_OK)
+		expect(result).toStrictEqual({ code: OK, out: `${SKIPPED_NOTE_PREFIX}${REASON}\n` })
+		expect(run_mock).not.toHaveBeenCalled()
+	})
+
+	it('leaves a ship with no recorded reason as it was, so the pinned check probes and stops', async () => {
+		vi.mocked(run_review_pinned_accepted.recorded_reason).mockResolvedValue(undefined)
+
+		const args = await carried({ is_review: true, unpinned_ok: [] })
+		const result = await run_ship_pre_detach_pinned.pinned_check(args)
+
+		expect(args.unpinned_ok).toStrictEqual([])
+		expect(result.code).toBe(FAILED)
+		expect(run_mock).toHaveBeenCalledOnce()
+	})
+
+	it('keeps a given --unpinned-ok and reads no record', async () => {
+		const given = [run_review_pinned.UNPINNED_OK_FLAG, 'given']
+		const args = await carried({ is_review: true, unpinned_ok: given })
+
+		expect(args.unpinned_ok).toStrictEqual(given)
+		expect(run_review_pinned_accepted.recorded_reason).not.toHaveBeenCalled()
+	})
+
+	it('reads no record without --review, where --unpinned-ok is refused', async () => {
+		const args = await carried({ is_review: false, unpinned_ok: [] })
+
+		expect(args.unpinned_ok).toStrictEqual([])
+		expect(run_review_pinned_accepted.recorded_reason).not.toHaveBeenCalled()
 	})
 })
 

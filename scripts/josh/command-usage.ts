@@ -2,7 +2,7 @@ import { canonical_command, COMMAND_MAP } from './josh-command-map'
 import type { CommandUsage } from './josh-command-types'
 
 // The single renderer of a command's usage. `josh help <command>` prints it and
-// `tools/document/generate-command-usage.ts` writes it between a reference page's usage markers,
+// `josh command:derive` writes it between a reference page's usage markers,
 // so the terminal and the page are one text (#3932). The usage itself sits on each command's entry
 // (#4185); which page renders it is the page's own `<!-- usage: <command> -->` span.
 

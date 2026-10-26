@@ -84,6 +84,20 @@ async function earlier_reason(unpinned: ReadonlyArray<string>): Promise<string |
 	}
 }
 
+// The reason this branch recorded, whatever places it held (joshuafolkken/kit#4974): a `josh ship
+// --review` given none carries it as its `--unpinned-ok`. One that could not be read is none.
+async function recorded_reason(): Promise<string | undefined> {
+	try {
+		const accepted = await recorded()
+
+		return accepted?.reason
+	} catch (error) {
+		error_text.trace_swallowed('run_review_pinned_accepted.recorded_reason', error)
+
+		return undefined
+	}
+}
+
 // `run_review_pinned.verdict_of`, with this run's reason recorded and, without one, the recorded reason
 // standing in for it.
 async function judge(summary: PinnedSummary, reason: string | undefined): Promise<PinnedVerdict> {
@@ -102,6 +116,6 @@ async function judge(summary: PinnedSummary, reason: string | undefined): Promis
 	return { kind: 'accepted', text: `${summary.text}${RECORDED_NOTE}${earlier}\n` }
 }
 
-const run_review_pinned_accepted = { RECORD_NAME, judge }
+const run_review_pinned_accepted = { RECORD_NAME, judge, recorded_reason }
 
 export { run_review_pinned_accepted }

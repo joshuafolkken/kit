@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`COMMAND_MAP — reference metadata > keeps every canonical command and alias stable 1`] = `
+exports[`COMMAND_MAP — reference metadata > keeps every canonical command and alias stable > regenerate: pnpm josh command:derive 1`] = `
 {
   "aliases": {
     "a": "audit",
@@ -12,6 +12,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "by": "bytes",
     "c": "check",
     "ca": "cost:audit",
+    "cdv": "command:derive",
     "cr": "check:related",
     "dr": "doctor",
     "eu": "exports:unused",
@@ -223,6 +224,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "command:derive": [
+      "",
+      "maintainer",
+      [
+        "files",
       ],
     ],
     "cost": [

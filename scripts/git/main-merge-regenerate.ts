@@ -32,7 +32,7 @@ type ResolvedFile = RegeneratedFile | RewrittenFile
 const RESOLVED_FILES: ReadonlyArray<ResolvedFile> = [
 	{
 		path: 'docs/josh-command-catalog.md',
-		command: ['pnpm', 'exec', 'tsx', 'tools/document/generate-catalog.ts'],
+		command: ['pnpm', 'exec', 'tsx', 'tools/document/generate-catalog-main.ts'],
 	},
 	{
 		path: main_merge_budget_conflict.BUDGET_TABLE_PATH,

@@ -1,5 +1,6 @@
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_wake_takeover } from '#scripts/run/wake/run-wake-takeover'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_cli } from './run-ship-cli'
@@ -52,6 +53,7 @@ beforeEach(() => {
 	vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(console, 'info').mockReturnValue()
+	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -77,5 +79,19 @@ describe('josh ship — a supervisor whose sync changed its code', () => {
 		expect(run_ship_relaunch.relaunch).not.toHaveBeenCalled()
 		expect(stages.review.run).toHaveBeenCalledOnce()
 		expect(run_ship_detach.mark_result).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#4974: a reason an earlier run on this branch accepted is the ship's --unpinned-ok.
+describe('josh ship — a --review ship given no reason', () => {
+	it("runs its stages under the branch's recorded reason", async () => {
+		supervise(false)
+		vi.mocked(run_review_pinned_accepted.recorded_reason).mockResolvedValue('only logs')
+
+		await run_ship_cli.run([TITLE, '--review'])
+
+		expect(run_ship_steps.steps).toHaveBeenCalledWith(
+			expect.objectContaining({ unpinned_ok: ['--unpinned-ok', 'only logs'] }),
+		)
 	})
 })

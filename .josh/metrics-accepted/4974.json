@@ -1,0 +1,8 @@
+{
+	"reason": "#4974: josh ship --review carries the branch's recorded --unpinned-ok reason (with_recorded_reason, recorded_reason) and the run docs say so",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 18,
+		"prose.long_paragraphs": 1
+	}
+}

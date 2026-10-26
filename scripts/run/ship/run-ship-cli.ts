@@ -381,7 +381,9 @@ async function record_supervised_result(
 	await run_ship_detach.mark_result(repository, args.number, run_ship.exit_code(sections))
 }
 
-async function run_ship_command(args: ShipArguments): Promise<number> {
+async function run_ship_command(given: ShipArguments): Promise<number> {
+	const args = await run_ship_pre_detach_pinned.with_recorded_reason(given)
+
 	if (should_detach(args)) {
 		if (!args.is_detach) console.error(LANE_CHILD_DETACH_NOTE)
 

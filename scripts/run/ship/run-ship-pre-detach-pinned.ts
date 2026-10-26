@@ -23,7 +23,8 @@ import type { ShipArguments } from './run-ship-steps'
 // own cores (`DIRECT_UNIT_CLAIM`) beside the other checks, and it probes only the hunks whose stored
 // verdict the per-checkout cache no longer holds (`test-pinned-cache-logic.ts`). Its answer comes
 // back through the record `--record` leaves (`test-pinned-record.ts`). Under
-// `--unpinned-ok "<reason>"` it runs only when the supervisor reuses round 1 (`pinned_check`).
+// `--unpinned-ok "<reason>"` — given, or carried from this branch's record (`with_recorded_reason`) —
+// it runs only when the supervisor reuses round 1 (`pinned_check`).
 // Without `--review` nothing after the detach asks `test:pinned`, and `--unpinned-ok` is refused there
 // (`run-ship-args.ts`), so the check is not asked.
 
@@ -32,6 +33,7 @@ const FAILURE_EXIT_CODE = 1
 const PINNED_COMMAND = ['josh', 'test:pinned', '--record']
 const SKIPPED_NOTE =
 	'test:pinned not run before the detach; round 1 lists the unpinned places under --unpinned-ok: '
+const CARRIED_NOTE = 'josh ship: --unpinned-ok carried from an earlier run on this branch: '
 
 type CheckOptions = Pick<ShipArguments, 'number' | 'unpinned_ok'>
 type PinnedOptions = CheckOptions & Pick<ShipArguments, 'is_review'>
@@ -94,6 +96,21 @@ function checks_for(options: PinnedOptions): () => Promise<JoshResult> {
 		})
 }
 
-const run_ship_pre_detach_pinned = { checks_for, pinned_check }
+// **A reason an earlier run on this branch accepted is this ship's `--unpinned-ok`** when it gives
+// none (joshuafolkken/kit#4974): the pre-detach check skips its probe under it, and the supervisor's
+// round 1 and its relaunch carry it, so a place the record lacks is listed and recorded after the
+// detach rather than stopping the ship there.
+async function with_recorded_reason(args: ShipArguments): Promise<ShipArguments> {
+	if (!args.is_review || args.unpinned_ok.length > 0) return args
+
+	const reason = await run_review_pinned_accepted.recorded_reason()
+
+	if (reason === undefined) return args
+	console.info(`${CARRIED_NOTE}${reason}`)
+
+	return { ...args, unpinned_ok: [run_review_pinned.UNPINNED_OK_FLAG, reason] }
+}
+
+const run_ship_pre_detach_pinned = { checks_for, pinned_check, with_recorded_reason }
 
 export { run_ship_pre_detach_pinned }
