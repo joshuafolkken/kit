@@ -12,6 +12,15 @@ import { fileURLToPath } from 'node:url'
 // makes has the test outermost, so a shared helper it reads through — every test importing it — is
 // never the reader (joshuafolkken/kit#4417). The test file is recorded beside it, because an async
 // callback (a directory walk inside a dependency) leaves no repository frame at all.
+//
+// **Only a module's evaluation makes a module the reader** (joshuafolkken/kit#5033). A read a named
+// function makes after an `await` has that function outermost, since the continuation drops the test
+// that called it: `import-graph.ts` read some 3,700 paths that way, and `vitest related` widened each
+// to every test importing it. Such a read belongs to the test running it, recorded beside, so an
+// outermost frame with a function name records no module. A module's top-level code runs with no
+// function name; so does an anonymous callback, which keeps the widening — the safe side. A top-level
+// `await` of a named function that reads after an `await` of its own narrows to the first importing
+// test; no module does that today, and CI's whole suite would catch the miss.
 
 type ReadRecords = Record<string, Array<string>>
 
@@ -95,16 +104,23 @@ function read_target(argument: unknown, cwd: string): string | undefined {
 	return undefined
 }
 
+// One call site: its script name, and the name of the function running there — empty for a module's
+// top-level code or an anonymous callback.
+interface CallFrame {
+	script_name: string
+	function_name: string
+}
+
 interface ReaderQuery {
 	root: string
-	// The script name of every call site, innermost first.
-	scripts: ReadonlyArray<string>
+	// Every call site, innermost first.
+	frames: ReadonlyArray<CallFrame>
 	// The recorder's own file, which is always the top frame and never the reader.
 	recorder: string
 }
 
-function frame_reader(query: ReaderQuery, script_name: string): string | undefined {
-	const file_path = script_path(script_name)
+function frame_reader(query: ReaderQuery, frame: CallFrame): string | undefined {
+	const file_path = script_path(frame.script_name)
 
 	if (file_path === undefined || file_path === query.recorder) return undefined
 
@@ -114,9 +130,11 @@ function frame_reader(query: ReaderQuery, script_name: string): string | undefin
 }
 
 function stack_reader(query: ReaderQuery): string | undefined {
-	return query.scripts
-		.map((script_name) => frame_reader(query, script_name))
-		.findLast((reader) => reader !== undefined)
+	const outermost = query.frames.findLast((frame) => frame_reader(query, frame) !== undefined)
+
+	if (outermost?.function_name !== '') return undefined
+
+	return frame_reader(query, outermost)
 }
 
 function add_reader(records: Map<string, Set<string>>, read_path: string, reader: string): void {
@@ -144,5 +162,5 @@ const test_read_trace = {
 	to_records,
 }
 
-export type { ReadKind, ReaderQuery, ReadRecords }
+export type { CallFrame, ReadKind, ReaderQuery, ReadRecords }
 export { test_read_trace }

@@ -20,6 +20,7 @@ import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_direct_tool } from './lane-direct-tool'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_spilled_read } from './lane-spilled-read'
 import { lane_split_park } from './lane-split-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
@@ -230,6 +231,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
 	timed_rerun.ROW,
 	lane_direct_tool.ROW,
+	lane_spilled_read.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
 	// The Bash-string gaps the deny glob cannot express, read by argv; `delivered-rules-bash.test.ts`

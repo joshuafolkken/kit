@@ -14,6 +14,7 @@ import { split_resolution } from '#scripts/split/split-resolution'
 import { run_cut, type RunCut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_decline } from './run-cut-decline'
+import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
 import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
@@ -182,12 +183,15 @@ async function write_cut(target: string, request: CutRequest): Promise<number | 
 	const loaded = run_cut_handoff.load_handoff(request.handoff_path, run_cut.MAX_HANDOFF_BYTES)
 	if (loaded.kind === 'bad') return report_bad_handoff(loaded.note)
 
-	const spec = {
+	const base = {
 		issue: request.issue,
 		branch: request.branch,
 		phase: request.phase,
 		handoff: loaded.handoff,
 	}
+	// The checkout, not `target`: the record lives in the temp root, and the transcript is filed by checkout.
+	const checkout = await run_cut.worktree_directory()
+	const spec = run_cut.with_digest(base, () => run_cut_digest.own_digest(checkout))
 
 	const spec_note =
 		spec_refusal(spec) ?? (await run_cut_review.unrecorded_refusal(request, loaded.handoff))

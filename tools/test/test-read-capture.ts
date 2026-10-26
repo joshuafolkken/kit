@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getCallSites } from 'node:util'
 import { threadId } from 'node:worker_threads'
-import { test_read_trace, type ReadKind } from '#scripts/test/test-read-trace'
+import { test_read_trace, type CallFrame, type ReadKind } from '#scripts/test/test-read-trace'
 import { afterAll, expect } from 'vitest'
 
 // What the worker setup file `test-read-recorder.ts` arms: recording which repository paths each test
@@ -52,8 +52,11 @@ const SYNC_READS = [
 ]
 const ASYNC_READS = ['readFile', 'readdir', 'stat', 'lstat', 'access', 'opendir']
 
-function caller_scripts(): Array<string> {
-	return getCallSites(STACK_DEPTH).map((site) => site.scriptName)
+function caller_frames(): Array<CallFrame> {
+	return getCallSites(STACK_DEPTH).map((site) => ({
+		script_name: site.scriptName,
+		function_name: site.functionName,
+	}))
 }
 
 function current_test(root: string): string | undefined {
@@ -64,7 +67,7 @@ function current_test(root: string): string | undefined {
 
 function call_readers(root: string): Array<string> {
 	const readers = [
-		test_read_trace.stack_reader({ root, scripts: caller_scripts(), recorder: RECORDER }),
+		test_read_trace.stack_reader({ root, frames: caller_frames(), recorder: RECORDER }),
 		current_test(root),
 	]
 

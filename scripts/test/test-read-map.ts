@@ -38,8 +38,9 @@ interface ReadMap {
 // Bumped whenever the shape, what a reader means or how `dirty` is digested changes, so a map an older
 // kit wrote reads as no map at all and the next full run writes it afresh. 6: `dirty` is
 // `input-fingerprint.ts`'s digest of every changed file (joshuafolkken/kit#4497). 7: `change`
-// (joshuafolkken/kit#4734).
-const MAP_VERSION = 7
+// (joshuafolkken/kit#4734). 8: a module is a reader only of what its evaluation read
+// (joshuafolkken/kit#5033).
+const MAP_VERSION = 8
 
 const MAP_FILE_STEM = 'test-read-map'
 const RECORD_EXTENSION = '.json'

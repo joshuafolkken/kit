@@ -1,0 +1,7 @@
+{
+	"reason": "Call frames carry the function name so a module is a reader only of what its evaluation read (#5033); a fixture module pins it",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

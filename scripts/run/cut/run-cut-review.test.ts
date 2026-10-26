@@ -120,6 +120,16 @@ describe('the implementation resume', () => {
 		expect(printed()).toContain('go')
 	})
 
+	// joshuafolkken/kit#5040: the resumed process is told what the cut session already read and decided.
+	it('prints the digest the cut carried', async () => {
+		const digest = { read: ['scripts/a.ts'], decisions: ['Auto-decided: x over y because z'] }
+
+		await run_cut_review.announce_resume({ ...cut_record(HANDOFF), digest }, true)
+
+		expect(printed()).toContain('  - scripts/a.ts')
+		expect(printed()).toContain('  - Auto-decided: x over y because z')
+	})
+
 	it('reads no record for a pre-gate resume', async () => {
 		await run_cut_review.announce_resume(cut_record(undefined), false)
 
