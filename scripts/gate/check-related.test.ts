@@ -361,6 +361,13 @@ describe('check_related.report_results metrics growth notice', () => {
 		expect(verdict).toContain('pnpm josh metrics --accept')
 	})
 
+	// The pre-detach re-records a total the branch approval names, so it does not stop on that one.
+	it('leaves out of the ship stop a total the branch approval already names', () => {
+		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
+
+		expect(verdict).toContain('unless the branch approval already names the total')
+	})
+
 	it('adds nothing above the verdict line when the lint section carries no notice', () => {
 		const lines = report_with_lint_output(LINT_OUTPUT)
 

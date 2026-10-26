@@ -16,7 +16,7 @@ const CHECKS: ReadonlyArray<string> = [
 	'cspell:dot',
 ]
 const METRICS_STOP =
-	'`josh ship`\'s pre-detach stops on the metrics notice above; settle it first (`pnpm josh metrics --accept --reason "<why>"`)'
+	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`)'
 
 interface CheckResult {
 	command: string
