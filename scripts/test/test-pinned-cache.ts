@@ -3,9 +3,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_spawn } from '#scripts/git/git-spawn'
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { atomic_write } from '#scripts/lib/atomic-write'
-import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
-import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from './test-declared-logic'
 import {
 	test_pinned_cache_logic,
@@ -31,8 +30,6 @@ const CACHE_NAME = 'josh-test-pinned-verdicts.json'
 const LINE_BREAK = '\n'
 // Peels a ref or tag to the commit it names, so a branch name and its SHA key the same change.
 const AS_COMMIT = '^{commit}'
-// The ledger's own directory only: its legacy paths sit under `docs/`, which a test does read.
-const OBSERVATION_PREFIX = `${OBSERVATION_LEDGER_DIRECTORY}/`
 
 interface TreeRead {
 	test_digests: ReadonlyMap<string, string>
@@ -110,22 +107,17 @@ function contents_digest(digests: ReadonlyMap<string, string>): string {
 	)
 }
 
-// A run's own record — an observation line or a `josh metrics` approval — which no test reads, so one
-// written after a probe keeps its `red` (joshuafolkken/kit#4856).
-function is_run_record(file: string): boolean {
-	return release_approval_prune.is_approval(file) || file.startsWith(OBSERVATION_PREFIX)
-}
-
 // The code change: `base` as a commit, and every non-test path changed since it with its content. A
 // test file is left out — a `red` rests on the test files it failed in, not on every test — and so is
-// a run record.
+// a run record, which no test reads, so one written after a probe keeps its `red`
+// (joshuafolkken/kit#4856, `run-record-path.ts`).
 async function code_change(base: string): Promise<CodeChange> {
 	const [commit, paths] = await Promise.all([
 		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
 	])
 	const code = paths.filter(
-		(file) => !test_declared_logic.is_test_file(file) && !is_run_record(file),
+		(file) => !test_declared_logic.is_test_file(file) && !run_record_path.is_run_record(file),
 	)
 
 	return { commit: commit.trim(), code, digests: await digests_of(code) }
