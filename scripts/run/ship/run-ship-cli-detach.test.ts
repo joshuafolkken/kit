@@ -1,6 +1,7 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
@@ -18,11 +19,9 @@ const merge_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
 	run_ship_probe: {
-		read_state: vi.fn().mockResolvedValue({
-			is_committed: false,
-			is_pushed: false,
-			is_merged: false,
-		}),
+		read_state: vi
+			.fn()
+			.mockResolvedValue({ is_committed: false, is_pushed: false, is_merged: false }),
 		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
@@ -79,6 +78,10 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 
 // No ship body draft unless a test hands one (the draft itself: `run-ship-body-draft.test.ts`).
 const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
+
+// No `--unpinned-ok` recorded for the branch (`run-ship-recorded-fixture.ts`), so no `--review` ship
+// carries this checkout's own.
+run_ship_recorded_fixture.isolate()
 
 const { run_ship_cli } = await import('./run-ship-cli')
 const { lane_ledger } = await import('#scripts/lane/lane-ledger')
@@ -139,8 +142,11 @@ describe('run_ship_cli.run — the ship body draft', () => {
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
+	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('launches the supervisor with the parsed request and runs no step itself', async () => {
-		expect(await run_ship_cli.run([TITLE, '--detach', '--review', '--cite', '2500'])).toBe(OK)
+		const argv = [TITLE, '--detach', '--review', '--cite', '2500']
+
+		expect(await run_ship_recorded_fixture.with_record(run_ship_cli.run, argv)).toBe(OK)
 		expect(detach_mock).toHaveBeenCalledWith(
 			expect.objectContaining({
 				title: TITLE,
