@@ -189,7 +189,7 @@ async function report({ input, ship_problems }: Gathered): Promise<number> {
 	// same failure, so a position missing its issue state is never read as a confident next step.
 	if (input.state === undefined) return FAILURE_EXIT_CODE
 
-	return run_step_section.print_for(action)
+	return run_step_section.print_for(action, input.is_lane_child)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

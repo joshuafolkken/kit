@@ -77,7 +77,7 @@ describe('lane instruction composition', () => {
 		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
 
 		expect(composed).toContain('レーン子では `josh ship` が回す')
-		expect(composed).toContain('chain-rule.md` → "Run the review-to-merge chain" step 0')
+		expect(composed).toContain('chain-rule.md` → "A lane child"')
 	})
 })
 

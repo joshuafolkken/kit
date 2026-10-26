@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/rules/worktree-guard.ts:135 | 2026-10-26 | #4988
