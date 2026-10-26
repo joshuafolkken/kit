@@ -1,7 +1,8 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
+import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 import { agent_model } from './agent-model'
 
 // An `investigator` dispatched without `run_in_background: false` is refused until it names it
@@ -23,9 +24,22 @@ import { agent_model } from './agent-model'
 // guard demands. A string value is the tell: across 1,700 dispatches in builds that declare the field
 // the model wrote a boolean every time. A first call written bare leaves no string anywhere, so the
 // reissue it was refused into passes on the refused call's body instead (joshuafolkken/kit#4903).
+//
+// **The build is a fact of the session, not of the tail** (joshuafolkken/kit#4966). Each tell is
+// recorded once against the transcript, so a stand-down outlives the 256 KiB window the tells are read
+// from. A boolean `false` the parsed input dropped is a tell too: the transcript keeps what the model
+// wrote, so a dispatch this row refused that wrote it there is one the field never reached.
 
+const INVESTIGATOR_FOREGROUND_REASON =
+	'⛔ investigator foreground: a background `investigator` leaves its result queued until a later turn. ' +
+	'Reissue the call with `run_in_background: false`, and put the reads of files this run will edit in the same message. ' +
+	'It fires on every occurrence (`.claude/skills/workflow-commands/delegation.md`).'
+
+const BACKGROUND_FIELD = 'run_in_background'
 // The fields that make a reissue the same dispatch as the call it repeats.
 const BODY_FIELDS = ['description', 'prompt'] as const
+const GUARD_LABEL = time_transcript_line.guard_from_refusal(INVESTIGATOR_FOREGROUND_REASON)
+const NO_FIELD_STAMP = hook_decision.create_refusal_stamp('josh-investigator-no-field-')
 
 // `kit:investigator` is the consumer's spelling of the same definition.
 function is_investigator(call: GuardedCall): boolean {
@@ -36,8 +50,12 @@ function is_investigator(call: GuardedCall): boolean {
 	return typeof type === 'string' && type.split(':').at(-1) === delegation_policy.INVESTIGATOR_AGENT
 }
 
+function field_of(input: unknown, key: string): unknown {
+	return json_value.is_record(input) ? input[key] : undefined
+}
+
 function is_foreground(call: GuardedCall): boolean {
-	return json_value.is_record(call.input) && call.input['run_in_background'] === false
+	return field_of(call.input, BACKGROUND_FIELD) === false
 }
 
 function is_background_investigator(call: GuardedCall): boolean {
@@ -51,39 +69,87 @@ function keeps_foreground(call: GuardedCall): boolean {
 function is_untyped_field(name: string, input: unknown): boolean {
 	if (!agent_model.SUBAGENT_TOOLS.has(name) || !json_value.is_record(input)) return false
 
-	return typeof input['run_in_background'] === 'string'
+	return typeof input[BACKGROUND_FIELD] === 'string'
 }
 
-function field_of(input: unknown, key: string): unknown {
-	return json_value.is_record(input) ? input[key] : undefined
+// The ids of the tail's calls that have a result, and of those this row refused.
+interface TailResults {
+	answered: ReadonlySet<string>
+	refused: ReadonlySet<string>
 }
 
-function is_same_dispatch(refused: GuardedCall, call: GuardedCall): boolean {
-	if (!is_background_investigator(refused)) return false
+function results_of(blocks: ReadonlyArray<Block>): TailResults {
+	const results = blocks.filter((block) => block.result_id !== '')
+	const refused = results.filter((block) => block.refusal_guard === GUARD_LABEL)
 
-	return BODY_FIELDS.every((key) => field_of(refused.input, key) === field_of(call.input, key))
+	return {
+		answered: new Set(results.map((block) => block.result_id)),
+		refused: new Set(refused.map((block) => block.result_id)),
+	}
 }
 
-// True when the call in hand or a subagent call on the tail wrote the field as a string — the tool
-// declares no `run_in_background`, so no dispatch in this session can run in the foreground. A tail
-// dispatch this row refused with the same body makes the call in hand the reissue the refusal asked
-// for: the parsed input dropped the field, and the reissue is not on the tail yet.
-function lacks_background_field(tail: string, call: GuardedCall): boolean {
-	if (is_untyped_field(call.name, call.input)) return true
-
-	return time_transcript_line
-		.parse_text(tail)
-		.some((line) =>
-			line.blocks.some(
-				(block) => is_untyped_field(block.name, block.input) || is_same_dispatch(block, call),
-			),
-		)
+// The field written `false`, in either spelling.
+function writes_foreground(block: Block): boolean {
+	return String(field_of(block.input, BACKGROUND_FIELD)) === 'false'
 }
 
-const INVESTIGATOR_FOREGROUND_REASON =
-	'⛔ investigator foreground: a background `investigator` leaves its result queued until a later turn. ' +
-	'Reissue the call with `run_in_background: false`, and put the reads of files this run will edit in the same message. ' +
-	'It fires on every occurrence (`.claude/skills/workflow-commands/delegation.md`).'
+function has_same_body(block: Block, call: GuardedCall): boolean {
+	return BODY_FIELDS.every((key) => field_of(block.input, key) === field_of(call.input, key))
+}
+
+// The call in hand is not answered yet, and its `false` there is the one the parsed input dropped.
+function is_pending_foreground(block: Block, results: TailResults): boolean {
+	return !results.answered.has(block.id) && writes_foreground(block)
+}
+
+// The call in hand on the tail, or a dispatch this row refused that it repeats. A same-body dispatch
+// that ran is not a tell: a build that declares the field still refuses a bare repeat of it.
+function is_same_dispatch(block: Block, call: GuardedCall, results: TailResults): boolean {
+	if (!is_investigator(block) || !has_same_body(block, call)) return false
+
+	return results.refused.has(block.id) || is_pending_foreground(block, results)
+}
+
+// A dispatch this row refused although it wrote the field `false`.
+function is_dropped_foreground(block: Block, results: TailResults): boolean {
+	return results.refused.has(block.id) && is_investigator(block) && writes_foreground(block)
+}
+
+function tail_shows_no_field(tail: string, call: GuardedCall): boolean {
+	const blocks = time_transcript_line.parse_text(tail).flatMap((line) => line.blocks)
+	const results = results_of(blocks)
+
+	return blocks.some(
+		(block) =>
+			is_untyped_field(block.name, block.input) ||
+			is_same_dispatch(block, call, results) ||
+			is_dropped_foreground(block, results),
+	)
+}
+
+function remember_no_field(run: GuardRun): boolean {
+	NO_FIELD_STAMP.record(NO_FIELD_STAMP.path(run.transcript), run.now_ms)
+
+	return true
+}
+
+function is_remembered(run: GuardRun): boolean {
+	return NO_FIELD_STAMP.last_ms(NO_FIELD_STAMP.path(run.transcript)) !== hook_decision.NEVER_MS
+}
+
+// True when this session's subagent tool declares no `run_in_background`, so no dispatch in it can run
+// in the foreground: the call in hand or a subagent call on the tail wrote the field as a string, the
+// tail holds the call in hand (or the dispatch it reissues) with the field the parsed input dropped,
+// or this row refused a dispatch that wrote it `false`. The first tell is recorded for the session. A
+// call that names the background explicitly came through a build that declares the field.
+function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	if (field_of(call.input, BACKGROUND_FIELD) === true) return false
+	if (is_remembered(run)) return true
+
+	const has_tell = is_untyped_field(call.name, call.input) || tail_shows_no_field(tail, call)
+
+	return has_tell && remember_no_field(run)
+}
 
 const ROW = {
 	id: 'investigator-foreground',
@@ -100,7 +166,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a subagent tool that declares no `run_in_background` (the field written as a string, or the reissue of a refused dispatch with the same description and prompt)',
+			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, or a refused dispatch that wrote it `false`) — remembered for the session',
 	},
 }
 
