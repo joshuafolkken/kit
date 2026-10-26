@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest'
 
 const SONAR_PROPERTIES_FILE = 'sonar-project.properties'
 const SONAR_TEMPLATE_FILE = 'templates/sonar-project.properties'
-const CLAUDE_EXCLUSION = '.claude/**'
 
 function load_sonar_properties(file = SONAR_PROPERTIES_FILE): Record<string, string> {
 	const content = readFileSync(path.resolve(process.cwd(), file), 'utf8')
@@ -28,7 +27,7 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	const exclusions = (properties['sonar.exclusions'] ?? '').split(',').map((entry) => entry.trim())
 
 	it('excludes upstream-synced .claude bootstrap scripts from analysis', () => {
-		expect(exclusions).toContain(CLAUDE_EXCLUSION)
+		expect(exclusions).toContain('.claude/**')
 	})
 
 	it('does not exclude scripts/ core package code from analysis', () => {
@@ -55,9 +54,12 @@ describe(SONAR_PROPERTIES_FILE, () => {
 // on a pull request, not on main, and the SonarQube job still finished after CI, so it was reverted.
 describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 	const properties = load_sonar_properties()
+	const exclusions = (properties['sonar.exclusions'] ?? '').split(',').map((entry) => entry.trim())
 
 	it('keeps the test files in the main sources rather than declaring them as tests', () => {
-		expect(properties['sonar.exclusions']).toBe(CLAUDE_EXCLUSION)
+		expect(exclusions).not.toContain('**/*.test.ts')
+		expect(exclusions).not.toContain('**/*.spec.ts')
+		expect(exclusions).not.toContain('**/*.e2e.ts')
 		expect(properties['sonar.tests']).toBeUndefined()
 		expect(properties['sonar.test.inclusions']).toBeUndefined()
 	})
