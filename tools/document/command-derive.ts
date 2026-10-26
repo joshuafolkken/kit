@@ -9,7 +9,7 @@ import { usage_span_placement } from './usage-span-placement'
 
 // `josh command:derive` — write every artifact derived from the command map in one run, then print
 // each written page's bytes beside its ceiling (#4970). The snapshot goes through vitest, its only
-// writer. The test file comes before `--update`: vitest 4's `--update` takes an optional value, so a
+// writer. The test file comes before `--update`: vitest's `--update` takes an optional value, so a
 // path after it is read as the update mode and the whole suite runs.
 
 const { page_path, USAGE_PAGES } = generate_command_usage

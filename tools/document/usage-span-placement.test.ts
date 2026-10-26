@@ -38,6 +38,13 @@ function entry(
 	return { category, reference: ['', audience, ['none']] }
 }
 
+function maintenance_entry(): PlacedEntry {
+	return entry('Maintenance', 'maintainer')
+}
+
+const FRESH_NEW = 'fresh:new'
+const ENDS_MAINTENANCE = `${section(RULESET_CHECK)}\n${section(FRESH_NEW)}\n## Git hooks`
+
 function placed(name: string, placed_entry: PlacedEntry): ReadonlyMap<string, string> {
 	return usage_span_placement.place_missing_spans(pages(), { [name]: placed_entry })
 }
@@ -56,9 +63,21 @@ describe('placing the span of a command no page renders yet', () => {
 	})
 
 	it('ends its category section on the automation page when no page shares its prefix', () => {
-		const text = placed('fresh:new', entry('Maintenance', 'maintainer')).get(AUTOMATION_PAGE)
+		const text = placed(FRESH_NEW, maintenance_entry()).get(AUTOMATION_PAGE)
 
-		expect(text).toContain(`${section(RULESET_CHECK)}\n${section('fresh:new')}\n## Git hooks`)
+		expect(text).toContain(ENDS_MAINTENANCE)
+	})
+
+	it('finds its category section below the page title too', () => {
+		const titled = new Map([
+			...pages(),
+			[AUTOMATION_PAGE, `# Automation\n\n${pages().get(AUTOMATION_PAGE) ?? ''}`],
+		])
+		const text = usage_span_placement
+			.place_missing_spans(titled, { [FRESH_NEW]: maintenance_entry() })
+			.get(AUTOMATION_PAGE)
+
+		expect(text).toContain(ENDS_MAINTENANCE)
 	})
 
 	it('appends to the automation page when its category has no section there', () => {
