@@ -1,0 +1,7 @@
+{
+	"reason": "check:related prints the test:pinned verdict reached on the tree (#4971): a new 15-line module",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}

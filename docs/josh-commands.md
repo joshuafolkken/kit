@@ -191,6 +191,8 @@ pnpm josh check:related
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all four, ends with one verdict line naming every check that failed, and exits non-zero if any fails. In kit, a metrics growth notice from `lint:related` is printed again just above that verdict line, so the end of the output still shows it.
 
+When a `josh test:pinned` launched on the current tree has already answered with unpinned places the ship's pre-detach would stop on, they are printed there too, with the `josh ship --review … --unpinned-ok "<reason>"` form, so the first ship can carry the reason; a check still running prints nothing and is not waited on.
+
 In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`.
 
 ### `josh behavior`

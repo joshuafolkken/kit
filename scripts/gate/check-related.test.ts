@@ -9,6 +9,7 @@ import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { execa } from 'execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
+import { check_related_pinned } from './check-related-pinned'
 import { metrics_totals } from './metrics-totals'
 
 const execa_mock = vi.hoisted(() => vi.fn())
@@ -221,6 +222,50 @@ describe('check_related.run_all restarts test:pinned on a tree a fix moved', () 
 		await expect(check_related.run_all(ROOT, passing_check)).resolves.toBe(0)
 		expect(run_review_pinned_steps.clear).not.toHaveBeenCalled()
 		expect(run_review_pinned_steps.launch).not.toHaveBeenCalled()
+	})
+})
+
+const PINNED_NOTICE = 'unpinned 1 · unchecked 0\n  scripts/a.ts:10'
+
+async function run_all_lines(pinned_notice: string | undefined): Promise<Array<string>> {
+	const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+	vi.spyOn(review_record_pinned, 'restart_in_lane').mockResolvedValue(undefined)
+	vi.spyOn(check_related_pinned, 'notice').mockResolvedValue(pinned_notice)
+	await check_related.run_all(ROOT, passing_check)
+
+	return write.mock.calls
+		.map(([chunk]) => String(chunk))
+		.join('')
+		.trimEnd()
+		.split('\n')
+}
+
+// joshuafolkken/kit#4971: the verdict test:pinned reached was read only by the ship's pre-detach.
+describe('check_related.run_all test:pinned verdict', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('prints the reached verdict just above the verdict line', async () => {
+		const lines = await run_all_lines(PINNED_NOTICE)
+
+		expect(lines.slice(-4)).toStrictEqual([
+			...PINNED_NOTICE.split('\n'),
+			'',
+			`${status_icons.PASS_ICON} check:related passed`,
+		])
+		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT)
+	})
+
+	it('adds nothing above the verdict line when no verdict is reached', async () => {
+		const lines = await run_all_lines(undefined)
+
+		expect(lines.slice(-3)).toStrictEqual([
+			'=== cspell:dot: passed ===',
+			'',
+			`${status_icons.PASS_ICON} check:related passed`,
+		])
 	})
 })
 
