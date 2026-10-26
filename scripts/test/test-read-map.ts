@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
 import { test_read_trace, type ReadRecords } from './test-read-trace'
@@ -153,7 +154,13 @@ function created_directories(
 // it. A directory new since the recording is also a new entry in the listing above it and a probe of
 // it that now answers differently; a directory that already existed reads the same to both, whatever
 // changed deeper down.
+//
+// **A run record reaches only a test that read it by name** (joshuafolkken/kit#5001): a test listing or
+// walking the root or `.josh/` reads the checkout around it, not the observation or accepted metrics
+// a lane writes after its checks went green, so those keys would run every such test for bookkeeping.
 function lookup_keys(relative: string, recorded: ReadonlySet<string>): Array<string> {
+	if (run_record_path.is_run_record(relative)) return [relative]
+
 	const directories = directories_above(relative)
 	const created = created_directories(directories, recorded)
 	const listed = [
@@ -184,8 +191,11 @@ function readers_of(map: ReadMap, relative: string): Array<string> {
 // **A read of the recording tree's own change does not count** (joshuafolkken/kit#4734): a test that
 // reads this checkout's change through git reads whatever file the recording lane held, so its own
 // `.josh/metrics-accepted/<N>.json` marked that directory read and sent the next lane's to the whole
-// suite. A listing or a walk of the directory, or a read of any other file there, still counts.
+// suite. A listing or a walk of the directory, or a read of any other file there, still counts — except
+// for a run record, which only a read of itself reaches (`lookup_keys`).
 function in_unread_directory(map: ReadMap, relative: string): boolean {
+	if (run_record_path.is_run_record(relative)) return true
+
 	const directory = path.dirname(relative)
 	const change = new Set(map.change)
 	const keys = Object.keys(map.readers).filter((key) => !change.has(key))
