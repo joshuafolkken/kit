@@ -94,7 +94,7 @@ describe('worktree-mutation — the discard and stash the deny list does not cov
 		['list', 'git stash list'],
 		['node route', 'pnpm josh stash:pop "fullrun: paused #1 for prerequisite #2"'],
 		// joshuafolkken/kit#4988: the single-file restore the refusal names passes every row.
-		['named restore', 'git show HEAD:src/app.ts > src/app.ts'],
+		['named restore', 'git diff -- src/app.ts | git apply -R'],
 	])('is silent on %s', (_name, command) => {
 		expect(delivered_for(`wts-${_name}`, command)).toBeUndefined()
 	})

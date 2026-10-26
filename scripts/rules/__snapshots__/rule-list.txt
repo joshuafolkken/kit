@@ -102,7 +102,7 @@
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Unauthorized work-tree mutation** (`worktree-mutation`, `operating-rules.md`)
   - fires: `pnpm josh pretool:guard` — `git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence
-  - silent: `git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`, `git show HEAD:<path> > <path>`
+  - silent: `git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`, `git diff -- <path> | git apply -R`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **No file body on the shell** (`file-body`, `file-edits.md`)
   - fires: `pnpm josh pretool:guard` — a heredoc write to an existing file, a writing `node -e` / interpreter heredoc, or `perl -0pi -e`. Every occurrence
