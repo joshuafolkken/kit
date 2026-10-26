@@ -143,7 +143,7 @@ Each guard is on by default; `off`, `0`, `false` or `no` turns that one guard of
 
 ## Variables kit sets itself
 
-kit sets these for the processes it starts, or writes them into a lane's own `.env`. They are listed so every variable the code reads is named here; do not set them by hand.
+kit sets these for the processes it starts, or writes them into a lane's own `.env`. They are listed so every variable the code reads is named here; do not set them by hand. The unit suite sets every `JOSH_SHIP_*` variable it inherits, `JOSH_LANE_CHILD` and `JOSH_LANE_OVERRUN` to an empty value, which their `=== '1'` and issue-number readers take as unset.
 
 | Variable                    | Set by                         | Meaning                                                                                                                                 |
 | --------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |

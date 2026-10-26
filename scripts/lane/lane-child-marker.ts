@@ -1,4 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { lane_child_mark_keys } from './lane-child-mark-keys'
 import { lane_paths } from './lane-paths'
 
 // The mark a dispatched lane child carries, so the pre-gate cut and a resume are decided from the
@@ -17,7 +18,7 @@ import { lane_paths } from './lane-paths'
 // equals the lane's own issue, so a leaked mark for another issue is read as absent. The name, the
 // meaning and the lifetime are documented once in
 // `.claude/skills/workflow-commands/pre-gate-cut.md`.
-const KEY = 'JOSH_LANE_CHILD'
+const { KEY, OVERRUN_KEY } = lane_child_mark_keys
 
 // **A dispatched child also asks for the five-minute prompt-cache TTL**. A
 // headless `claude -p` session on a subscription defaults to the one-hour TTL, whose writes bill at 2x
@@ -31,7 +32,6 @@ const CACHE_TTL = '5m'
 // **An overrun investigation also carries its own mark** (joshuafolkken/kit#4880): it runs as the
 // lane's child, so `issue:file` reads this one to record its filings as the investigation's rather than
 // the child's. The launcher sets it, so the record never rests on the model passing an argument.
-const OVERRUN_KEY = 'JOSH_LANE_OVERRUN'
 const OVERRUN_VALUE = '1'
 
 type MarkerSource = Readonly<Record<string, string | undefined>>

@@ -36,6 +36,7 @@ const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
 	'scripts/josh/process-identity.ts',
 	'scripts/josh/process-owner.ts',
 	'scripts/josh/stamp-file.ts',
+	'scripts/lane/lane-child-mark-keys.ts',
 	'scripts/lib/atomic-write.ts',
 	'scripts/lib/json-value.ts',
 	'scripts/lib/read-file.ts',
