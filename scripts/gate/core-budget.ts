@@ -9,7 +9,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { z } from 'zod'
-import { busy_average, type BusySample } from './busy-average'
+import { busy_average, type BusySample, type LoadEase } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { core_budget_timing, type TimingConfig } from './core-budget-timing'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
@@ -53,7 +53,7 @@ const MIN_BUDGET = 1
 // declared memory, and it counts as load from outside the ledger until it is gone.
 // `command`, `checkout`, `lane`, `lanes_root` and `wait_reason` name a waiting claim on `run:board`
 // (`core-wait.ts`). `is_unit` marks a unit suite's claim, which may be admitted narrowed to `granted`
-// past the wait cap (`core_admission.narrowed_weight`).
+// past the wait cap, or once outside load holding it does not ease (`core_admission.narrowed_weight`).
 const reservation_schema = process_owner_schema.extend({
 	weight: z.number(),
 	claimed_at: z.number(),
@@ -86,6 +86,7 @@ interface ReserveOptions {
 	report?: (line: string) => void
 	read_machine?: () => Promise<MachineReading>
 	wait_cap_ms?: number
+	ease_window_ms?: number
 	poll_interval_ms?: number
 	directory?: string
 	now?: () => number
@@ -188,6 +189,8 @@ interface WaitContext extends TimingConfig {
 	deadline: number
 	fields: ReservationFields
 	busy_samples: Array<BusySample>
+	// Unset until the first reading of the machine (`busy_average.with_ease`).
+	ease?: LoadEase | undefined
 }
 
 // **A claim alone in the ledger reads the machine too** (joshuafolkken/kit#4238): load outside the
@@ -210,6 +213,8 @@ async function current_budget(
 	)
 
 	const mean = busy_average.averaged(reading, context.busy_samples, ledger.cores)
+
+	context.ease = busy_average.with_ease(context.ease, mean.busy_cores, context.now())
 
 	return machine_capacity.machine_budget(context.budget, mean, ledger)
 }
@@ -250,21 +255,37 @@ function mark_waiting(context: WaitContext, reason: WaitReason): void {
 	if (previous === undefined) context.report(core_wait.wait_line(context.fields.command, reason))
 }
 
+// Past the cap a held claim runs regardless, and so does one only load outside the ledger holds once
+// that load has not eased for a window of the wait — waiting on gains it nothing. A claim a swap stall
+// holds is the exception to both.
+function is_wait_spent(
+	context: WaitContext,
+	reservations: ReadonlyArray<LiveReservation>,
+	budget: MachineBudget,
+): boolean {
+	if (core_admission.is_swap_held(context.key, reservations, budget)) return false
+
+	const now = context.now()
+
+	if (now >= context.deadline) return true
+
+	return (
+		busy_average.is_unrelieved(context.ease, now, context.ease_window_ms) &&
+		core_wait.is_outside_held(context.key, reservations, budget)
+	)
+}
+
 async function poll_admission(context: WaitContext): Promise<Admission | undefined> {
 	const reservations = live_reservations(context.directory)
 	const budget = await current_budget(context, reservations)
 	// A unit claim is admitted at the room the budget leaves rather than at full width — the first
-	// waiter, which load outside the ledger does not hold, as well as one past the wait cap.
+	// waiter, which load outside the ledger does not hold, as well as one whose wait is spent.
 	const granted = core_admission.narrowed_weight(context.key, reservations, budget.cores)
 	const reason = core_wait.hold_reason(context.key, reservations, budget, granted)
 
 	if (reason === undefined) return admit(context, undefined, granted)
 
-	// Past the cap a held claim runs regardless, except one a swap stall holds.
-	if (
-		context.now() >= context.deadline &&
-		!core_admission.is_swap_held(context.key, reservations, budget)
-	) {
+	if (is_wait_spent(context, reservations, budget)) {
 		const held = core_admission.with_grant(context.key, reservations, granted)
 
 		return admit(context, overflow_of(context, held, budget), granted)
@@ -275,7 +296,8 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 	return undefined
 }
 
-// Poll the ledger until this reservation is admitted, or until the wait cap admits it at minimum width.
+// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim only load
+// outside the ledger holds, that load not easing — admits it at minimum width.
 // A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
 // runs and the wait costs nothing.
 async function await_admission(context: WaitContext): Promise<Admission> {

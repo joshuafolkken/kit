@@ -62,3 +62,38 @@ describe('busy_average — the busy cores a waiting claim admits against', () =>
 		expect(busy_average.averaged(reading(1), released, 0).busy_cores).toBe(1)
 	})
 })
+
+// joshuafolkken/kit#4982: on a saturated machine a claim waited out the two-minute cap though the load
+// never fell. A wait now tracks when the load last eased, a whole core at a time.
+const WINDOW_MS = 1000
+
+describe('busy_average.with_ease — when the load a wait reads last eased', () => {
+	it('starts at the first reading, unrelieved once a window passes with no fall', () => {
+		const first = busy_average.with_ease(undefined, SATURATED, 0)
+		const ease = busy_average.with_ease(first, SATURATED, WINDOW_MS)
+
+		expect(ease).toStrictEqual({ level: SATURATED, eased_at: 0 })
+		expect(busy_average.is_unrelieved(ease, WINDOW_MS, WINDOW_MS)).toBe(true)
+	})
+
+	it('restarts the window on a fall of a whole core', () => {
+		const ease = busy_average.with_ease({ level: SATURATED, eased_at: 0 }, SATURATED - 1, STEP_MS)
+
+		expect(ease).toStrictEqual({ level: SATURATED - 1, eased_at: STEP_MS })
+		expect(busy_average.is_unrelieved(ease, WINDOW_MS, WINDOW_MS)).toBe(false)
+	})
+
+	it('counts neither a fall under a core nor a rise as easing', () => {
+		const start = { level: SATURATED, eased_at: 0 }
+
+		expect(busy_average.with_ease(start, SATURATED - 0.5, STEP_MS)).toBe(start)
+		expect(busy_average.with_ease(start, SATURATED + 1, STEP_MS)).toBe(start)
+	})
+
+	it('never judges a wait unrelieved where the machine is unread', () => {
+		const ease = busy_average.with_ease(undefined, undefined, 0)
+
+		expect(ease).toBeUndefined()
+		expect(busy_average.is_unrelieved(ease, WINDOW_MS, WINDOW_MS)).toBe(false)
+	})
+})

@@ -269,7 +269,7 @@ function total_weight(reservations: ReadonlyArray<LedgerEntry>): number {
 	return sum_load(reservations).cores
 }
 
-// **The weight a unit claim admitted past the wait cap may take: the cores the admitted claims leave
+// **The weight a unit claim admitted past its wait (the cap, or outside load that does not ease) may take: the cores the admitted claims leave
 // free, never below one worker and never above what it asked for.** Admitting it at full width put the
 // ledger past the machine (joshuafolkken/kit#4235); a unit suite is the one tool whose width follows a
 // number, so it narrows instead. `undefined` for any other claim, and for one that fits as asked.

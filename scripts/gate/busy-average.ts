@@ -52,7 +52,39 @@ function averaged(
 	return { ...reading, busy_cores: ledger_cores + total / samples.length }
 }
 
-const busy_average = { AVERAGE_WINDOW_MS, averaged, with_reading }
+// **A wait that does not ease the load gains nothing by going on** (joshuafolkken/kit#4982). On a
+// saturated machine the load never falls, and a claim that waits out the cap only starts at minimum
+// width two minutes late. A wait keeps the lowest mean busy count it has read and when it last fell; a
+// fall under a whole core is noise, not easing.
+const EASE_CORES = 1
 
-export type { BusySample }
+interface LoadEase {
+	level: number
+	eased_at: number
+}
+
+// `ease` once the mean `busy_cores` read at `now` is added. An unread machine changes nothing, so a wait
+// that cannot read the load is never judged unrelieved.
+function with_ease(
+	ease: LoadEase | undefined,
+	busy_cores: number | undefined,
+	now: number,
+): LoadEase | undefined {
+	if (busy_cores === undefined) return ease
+
+	if (ease === undefined || busy_cores <= ease.level - EASE_CORES) {
+		return { level: busy_cores, eased_at: now }
+	}
+
+	return ease
+}
+
+// Whether the load has not eased for `window_ms` of the wait.
+function is_unrelieved(ease: LoadEase | undefined, now: number, window_ms: number): boolean {
+	return ease !== undefined && now - ease.eased_at >= window_ms
+}
+
+const busy_average = { AVERAGE_WINDOW_MS, averaged, is_unrelieved, with_ease, with_reading }
+
+export type { BusySample, LoadEase }
 export { busy_average }

@@ -84,6 +84,36 @@ describe('core_wait.hold_reason — whether an admitted claim still waits', () =
 	})
 })
 
+// joshuafolkken/kit#4982: a wait whose load does not ease ends early only where that load is outside
+// the ledger; the ledger's own claims give their room back.
+describe('core_wait.is_outside_held — whether only load outside the ledger holds a claim', () => {
+	const own: LedgerEntry = {
+		key: 'own',
+		reservation: { weight: CORES, claimed_at: 0, is_unit: true },
+	}
+
+	it('answers yes for a claim busy load beyond the ledger narrows', () => {
+		const busy = { cores: 1, memory_mb: MEMORY_MB, busy_excess: CORES - 1 }
+
+		expect(core_wait.is_outside_held('own', [own], busy)).toBe(true)
+	})
+
+	it('answers yes for a claim an overloaded run queue holds', () => {
+		const lone = { ...own, reservation: { weight: 1, claimed_at: 0 } }
+		const overloaded = { cores: CORES, memory_mb: MEMORY_MB, is_overloaded: true }
+
+		expect(core_wait.is_outside_held('own', [lone], overloaded)).toBe(true)
+	})
+
+	it('answers no for a claim the running claims hold', () => {
+		const ledger = [entry('first', CORES, 0), entry('second', 1, 0)]
+
+		expect(
+			core_wait.is_outside_held('second', ledger, { cores: CORES, memory_mb: MEMORY_MB }),
+		).toBe(false)
+	})
+})
+
 describe('core_wait.wait_line — what a waiting command prints', () => {
 	it('names the command and the reason', () => {
 		expect(core_wait.wait_line('lint', 'pressure')).toBe(
