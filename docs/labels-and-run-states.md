@@ -23,6 +23,7 @@ The labels you put on an Issue to steer the agent, the labels a run puts on it f
 | `run:stalled`    | The run parked the Issue on a mechanical failure: fix the cause, then resume it with `fullrun #N` or remove the label; the backlog skips it until then. |
 | `already-done`   | The work is already merged — [below](#already-done--the-exit-for-work-that-is-already-merged).                                                          |
 | `measured`       | A measurement-only Issue a run closed itself with `josh issue:measured`: the result is commented on it, and no pull request was needed.                 |
+| `measured:unmet` | Set with `measured` by `josh issue:measured --unmet`: the measurement fell short of the expected effect it checked. `josh effect:audit` reads it.       |
 | `epic`           | The Issue tracks child Issues and the order they land in.                                                                                               |
 
 ### `needs-human-review` — the opposite label

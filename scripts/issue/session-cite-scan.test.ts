@@ -128,6 +128,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-triage.ts', 1],
 	['issue/defect-origin.ts', 2],
 	['issue/defect-report-format.ts', 1],
+	// The audit row `effect-audit-cli.ts` prints through `session_cite.text`, the token a follow-up's
+	// body is matched on, and the retirement-candidate draft written to a file.
+	['issue/effect-audit.ts', 1],
 	// The hand-off report body, which `run-report-cli.ts` links before printing and sending.
 	['run/run-report-handoff.ts', 1],
 	['run/run-stage.ts', 2],

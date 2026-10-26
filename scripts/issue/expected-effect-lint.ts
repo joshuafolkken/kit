@@ -29,22 +29,32 @@ function item_value(line: string, label: string): string | undefined {
 	return line.slice(prefix.length).trim()
 }
 
-function has_item(lines: ReadonlyArray<string>, label: string): boolean {
-	return lines.some((line) => {
-		const value = item_value(line.trim(), label)
+function is_stated(value: string | undefined): value is string {
+	return value !== undefined && value.length > 0 && !PLACEHOLDER.test(value)
+}
 
-		return value !== undefined && value.length > 0 && !PLACEHOLDER.test(value)
-	})
+function stated_value(lines: ReadonlyArray<string>, label: string): string | undefined {
+	return lines.map((line) => item_value(line.trim(), label)).find((value) => is_stated(value))
+}
+
+function effect_lines(body: string): ReadonlyArray<string> {
+	const section = markdown_section.section_lines(body, HEADING).join('\n')
+
+	return markdown_section.unfenced_lines(section)
+}
+
+// The value the body's expected-effect section states for one item, or undefined when it states none.
+function value_of(body: string, label: string): string | undefined {
+	return stated_value(effect_lines(body), label)
 }
 
 // Every expected-effect problem a body has, or an empty array. A body without the declaration has none.
 function problems(body: string): ReadonlyArray<string> {
 	if (!is_target(body)) return []
 	if (!markdown_section.has_line(body, HEADING)) return [`missing heading: ${HEADING}`]
-	const section = markdown_section.section_lines(body, HEADING).join('\n')
-	const lines = markdown_section.unfenced_lines(section)
+	const lines = effect_lines(body)
 
-	return ITEM_LABELS.filter((label) => !has_item(lines, label)).map(
+	return ITEM_LABELS.filter((label) => stated_value(lines, label) === undefined).map(
 		(label) => `missing expected-effect item: - ${label}: <value>`,
 	)
 }
@@ -53,7 +63,9 @@ const expected_effect_lint = {
 	DECLARATION_LINE,
 	HEADING,
 	ITEM_LABELS,
+	is_target,
 	problems,
+	value_of,
 }
 
 export { expected_effect_lint }

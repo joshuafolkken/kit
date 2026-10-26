@@ -1,0 +1,3 @@
+- rf:comments | low | scripts/rules/investigator-foreground.ts:169 | 2026-10-26 | #4966
+- rf:tests | low | scripts/rules/investigator-foreground.test.ts:42 | 2026-10-26 | #4966
+- rf:bug-risks | low | scripts/rules/investigator-foreground.ts:115 | 2026-10-26 | #4966

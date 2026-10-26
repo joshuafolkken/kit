@@ -183,6 +183,7 @@ const issue_sample_gate = {
 	cited_number,
 	prime,
 	problems,
+	read_source,
 	reason_of,
 	reset,
 	wait_of,

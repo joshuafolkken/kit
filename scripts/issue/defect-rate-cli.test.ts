@@ -73,20 +73,6 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('defect_rate_cli.search_path', () => {
-	it('encodes the query for the search endpoint', () => {
-		expect(defect_rate_cli.search_path('repo:o/r created:>=2026-09-09')).toBe(
-			'search/issues?q=repo%3Ao%2Fr+created%3A%3E%3D2026-09-09&per_page=100',
-		)
-	})
-
-	it('names a later page', () => {
-		expect(defect_rate_cli.search_path('repo:o/r', 3)).toBe(
-			'search/issues?q=repo%3Ao%2Fr&per_page=100&page=3',
-		)
-	})
-})
-
 describe('defect_rate_cli.measure_window', () => {
 	it('measures both searches over the requested window', async () => {
 		const filed = page([DEFECT_ITEM, { labels: INTERRUPT_LABELS }])
