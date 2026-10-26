@@ -1,16 +1,15 @@
-import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_cite } from './issue-cite'
 import { has_label_name, MEASURED_LABEL, MEASURED_UNMET_LABEL } from './issue-labels'
+import { issue_sample_gate } from './issue-sample-gate'
 import type { SearchIssue } from './issue-search'
 
 // joshuafolkken/kit#4958: a run-time-shortening issue states its expected effect at filing
 // (`expected-effect-lint.ts`), and nothing read it again once merged. This sets each closed one beside
-// the follow-up measurements that cite it — issues with a run condition line naming `#<N>` — and their
-// recorded verdict: `measured:unmet` fell short, `measured` alone reached it, anything else is not
-// measured yet. A shortfall is drafted as a retirement candidate for `issue:file`.
+// the follow-up measurements of it — issues whose run condition names the pull request that closed it
+// — and their recorded verdict: `measured:unmet` fell short, `measured` alone reached it, anything else
+// is not measured yet. A shortfall is drafted as a retirement candidate for `issue:file`.
 
-const FOLLOW_UP_PREFIX = '- 実施可能条件:'
 const EFFECT_LABELS: ReadonlyArray<string> = ['効く率', '1 回あたりの得', '外れたときの損']
 const NO_VALUE = '—'
 const RESULTS = ['met', 'unmet', 'unmeasured'] as const
@@ -21,6 +20,13 @@ interface AuditRow {
 	origin: SearchIssue
 	follow_ups: ReadonlyArray<SearchIssue>
 	result: EffectResult
+}
+
+// A follow-up and the issue it measures: the one its run condition's pull request closes. A body
+// naming other issues (a parent, lanes it compares against) measures none of them.
+interface FollowUp {
+	issue: SearchIssue
+	measures: number | undefined
 }
 
 const RESULT_WORDS: Readonly<Record<EffectResult, string>> = {
@@ -46,15 +52,9 @@ function follow_up_query(repo: string): string {
 	return `repo:${repo} is:issue "実施可能条件" in:body`
 }
 
-function is_follow_up(issue: SearchIssue): boolean {
-	return issue.body.split('\n').some((line) => line.trimStart().startsWith(FOLLOW_UP_PREFIX))
-}
-
-function cites_origin(issue: SearchIssue, origin: SearchIssue): boolean {
-	return (
-		issue.number !== origin.number &&
-		git_gh_issue_list.has_token_occurrence(issue.body, cite(origin))
-	)
+// The pull request a follow-up's run condition names, or `undefined` for an issue that declares none.
+function cited_pull(issue: SearchIssue): number | undefined {
+	return issue_sample_gate.cited_number(issue.body)
 }
 
 // One shortfall outweighs any reach: a mechanism some measurement found wanting is the one to look at.
@@ -66,18 +66,18 @@ function result_of(follow_ups: ReadonlyArray<SearchIssue>): EffectResult {
 		: 'unmeasured'
 }
 
-function row_of(origin: SearchIssue, follow_ups: ReadonlyArray<SearchIssue>): AuditRow {
-	const cited = follow_ups.filter((issue) => cites_origin(issue, origin))
+function row_of(origin: SearchIssue, follow_ups: ReadonlyArray<FollowUp>): AuditRow {
+	const measuring = follow_ups
+		.filter((follow_up) => follow_up.measures === origin.number)
+		.map((follow_up) => follow_up.issue)
 
-	return { origin, follow_ups: cited, result: result_of(cited) }
+	return { origin, follow_ups: measuring, result: result_of(measuring) }
 }
 
 function rows(
 	origins: ReadonlyArray<SearchIssue>,
-	candidates: ReadonlyArray<SearchIssue>,
+	follow_ups: ReadonlyArray<FollowUp>,
 ): ReadonlyArray<AuditRow> {
-	const follow_ups = candidates.filter((issue) => is_follow_up(issue))
-
 	return origins
 		.filter((origin) => expected_effect_lint.is_target(origin.body))
 		.map((origin) => row_of(origin, follow_ups))
@@ -165,6 +165,7 @@ function draft_body(row: AuditRow): string {
 }
 
 const effect_audit = {
+	cited_pull,
 	draft_body,
 	draft_title,
 	follow_up_query,
@@ -174,5 +175,5 @@ const effect_audit = {
 	summary,
 }
 
-export type { AuditRow, EffectResult }
+export type { AuditRow, EffectResult, FollowUp }
 export { effect_audit }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effect_audit } from './effect-audit'
+import { effect_audit, type FollowUp } from './effect-audit'
 import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from './issue-labels'
 import type { SearchIssue } from './issue-search'
 
@@ -26,12 +26,11 @@ function issue(number: number, body: string, labels: ReadonlyArray<string> = [])
 	return { number, title: `Issue ${String(number)}`, state: 'closed', body, labels }
 }
 
-function follow_up(labels: ReadonlyArray<string>, cited: number = ORIGIN): SearchIssue {
-	return issue(
-		FOLLOW_UP,
-		`## 背景\n\n- 実施可能条件: #4899 のマージ後 10 マージ\n\n#${String(cited)} の効果`,
-		labels,
-	)
+// The body names a bystander as well, the way a measurement names its parent or the lanes it compares.
+const FOLLOW_UP_BODY = `## 背景\n\n- 実施可能条件: #4899 のマージ後 10 マージ\n\n#${String(ORIGIN)} の効果。比較: #${String(OTHER)}`
+
+function follow_up(labels: ReadonlyArray<string>, measures: number = ORIGIN): FollowUp {
+	return { issue: issue(FOLLOW_UP, FOLLOW_UP_BODY, labels), measures }
 }
 
 describe('effect_audit.rows — the verdict', () => {
@@ -56,12 +55,26 @@ describe('effect_audit.rows — the verdict', () => {
 		])
 	})
 
-	it('counts neither a citation inside a longer number nor an issue with no run condition', () => {
-		const lookalike = follow_up([MEASURED_LABEL], Number(`${String(ORIGIN)}1`))
-		const no_condition = issue(OTHER, `#${String(ORIGIN)} の続き`, [MEASURED_LABEL])
-		const [row] = effect_audit.rows([issue(ORIGIN, ORIGIN_BODY)], [lookalike, no_condition])
+	it('credits a follow-up only to the issue it measures, not to another issue its body names', () => {
+		const rows = effect_audit.rows(
+			[issue(ORIGIN, ORIGIN_BODY), issue(OTHER, ORIGIN_BODY)],
+			[follow_up([MEASURED_LABEL, MEASURED_UNMET_LABEL])],
+		)
+		const verdicts = rows.map((row) => [row.origin.number, row.follow_ups.length, row.result])
 
-		expect(row?.follow_ups).toStrictEqual([])
+		expect(verdicts).toStrictEqual([
+			[ORIGIN, 1, 'unmet'],
+			[OTHER, 0, 'unmeasured'],
+		])
+	})
+})
+
+describe('effect_audit.cited_pull — what makes an issue a follow-up', () => {
+	it('reads the pull request of the run condition, and nothing from a bare mention', () => {
+		const mention = issue(OTHER, `#${String(ORIGIN)} の続き`)
+
+		expect(effect_audit.cited_pull(issue(FOLLOW_UP, FOLLOW_UP_BODY))).toBe(4899)
+		expect(effect_audit.cited_pull(mention)).toBeUndefined()
 	})
 })
 

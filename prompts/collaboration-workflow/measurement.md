@@ -32,7 +32,7 @@ PR の効果を測る後続 Issue を起票するとき:
 ## 期待効果に届かなかったとき
 
 - 計測が期待効果に届かなかった → `pnpm josh issue:measured <N> --unmet --evidence-file <path>`。
-- 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`、表示された `issue:file` の行で起票する（重複は scout が止める）。
+- 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`（元 Issue が 30 日より前に閉じたときは `--days <N>` を足す）、表示された `issue:file` の行で起票する（重複は scout が止める）。
 - 時間短縮 Issue の効果を一覧する → `pnpm josh effect:audit [--days <N>]`。
 
 ## 手元で再実行してよいとき

@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { defect_rate } from './defect-rate'
-import { effect_audit, type AuditRow } from './effect-audit'
-import { issue_search } from './issue-search'
+import { effect_audit, type AuditRow, type FollowUp } from './effect-audit'
+import { issue_sample_gate } from './issue-sample-gate'
+import { issue_search, type SearchIssue } from './issue-search'
 import { session_cite } from './session-cite'
 
 // `josh effect:audit [--days <N>] [--draft <N>]` — every run-time-shortening issue closed in the window,
@@ -53,6 +54,31 @@ function parse_request(argv: ReadonlyArray<string>): AuditRequest | undefined {
 	return days === undefined ? undefined : with_draft(days, parsed.draft)
 }
 
+// The issue the cited pull request closes; an unreadable pull request leaves the follow-up unattributed.
+async function measured_issue(pr: number): Promise<number | undefined> {
+	try {
+		const pull = await issue_sample_gate.read_source(pr)
+
+		return pull.closes
+	} catch {
+		return undefined
+	}
+}
+
+async function follow_up_of(issue: SearchIssue, pr: number): Promise<FollowUp> {
+	return { issue, measures: await measured_issue(pr) }
+}
+
+async function follow_ups_of(candidates: ReadonlyArray<SearchIssue>): Promise<Array<FollowUp>> {
+	return await Promise.all(
+		candidates.flatMap((issue) => {
+			const pr = effect_audit.cited_pull(issue)
+
+			return pr === undefined ? [] : [follow_up_of(issue, pr)]
+		}),
+	)
+}
+
 async function read_audit(repo: string, days: number, now_ms: number): Promise<Audit | undefined> {
 	const since = defect_rate.window_start(now_ms, days)
 	const [origins, follow_ups] = await Promise.all([
@@ -62,7 +88,7 @@ async function read_audit(repo: string, days: number, now_ms: number): Promise<A
 
 	if (origins === undefined || follow_ups === undefined) return undefined
 
-	const rows = effect_audit.rows(origins.issues, follow_ups.issues)
+	const rows = effect_audit.rows(origins.issues, await follow_ups_of(follow_ups.issues))
 
 	return { rows, since, is_capped: origins.is_capped || follow_ups.is_capped }
 }

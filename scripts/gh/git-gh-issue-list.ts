@@ -248,9 +248,7 @@ async function issue_list(request: IssueListRequest): Promise<IssueListOutcome> 
 // be the one way back to a silently shortened answer, so it is removed rather than left for someone
 // to reach for. Every caller now receives the whole outcome and decides what truncation means for
 // it — `git-gh-issue.ts` records that decision, caller by caller.
-// `has_token_occurrence` is shared with `effect-audit.ts`, which matches a follow-up's `#<N>` the same way.
 const git_gh_issue_list = {
-	has_token_occurrence,
 	issue_list,
 }
 
