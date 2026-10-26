@@ -1,6 +1,6 @@
 import { run_event_baseline } from '#scripts/run/event/run-event-baseline'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_baseline } from './lane-baseline'
 import type { LedgerEntry } from './lane-ledger'
 
@@ -53,8 +53,11 @@ function launched_prompt(): string {
 	return mocks.resolve_in.mock.calls.map(([invocation]) => invocation).join('\n')
 }
 
+afterEach(() => vi.unstubAllEnvs())
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.target.mockResolvedValue('/state/lane-ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])
 	mocks.emit.mockResolvedValue()
@@ -170,4 +173,20 @@ describe('lane_baseline.investigate — the prompt', () => {
 
 		expect(mocks.launch.mock.calls.map(([request]) => request.env)).toStrictEqual([{}])
 	})
+})
+
+// joshuafolkken/kit#5044: the investigations are off unless `JOSH_LANE_INVESTIGATION` is on.
+describe('lane_baseline.investigate — the switch off', () => {
+	it.each([undefined, 'off'])(
+		'launches and notes nothing at a due merge with %j',
+		async (value) => {
+			vi.stubEnv('JOSH_LANE_INVESTIGATION', value)
+			mocks.read_entries.mockReturnValue(merges(30))
+
+			await lane_baseline.investigate(ISSUE)
+
+			expect(mocks.launch).not.toHaveBeenCalled()
+			expect(emitted()).toStrictEqual([])
+		},
+	)
 })

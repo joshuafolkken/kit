@@ -2,6 +2,7 @@ import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_baseline } from '#scripts/run/event/run-event-baseline'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { lane_investigation_switch } from './lane-investigation-switch'
 import { lane_ledger } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
@@ -15,7 +16,8 @@ import { lane_stage_stats } from './lane-stage-stats'
 // by the overrun investigation's filing rules — the same prompt part, a cause's reducible minutes cut
 // from one median merge rather than one lane (joshuafolkken/kit#4928). Its filings name no lane they
 // were found during. The launch and the session's result go on the run's event stream as notes, which
-// `run:board` shows.
+// `run:board` shows. It runs only while `JOSH_LANE_INVESTIGATION` is on (`lane-investigation-switch.ts`);
+// off by default, a due bucket launches nothing and notes nothing (joshuafolkken/kit#5044).
 
 const { EVENT_KIND } = run_event_stream
 const BASELINE_MERGES = 30
@@ -107,6 +109,8 @@ async function investigate_baseline(issue: number): Promise<void> {
 
 // Never fails the merge it follows: an error is a note on the stream, not a refused merge.
 async function investigate(issue: number): Promise<void> {
+	if (!lane_investigation_switch.is_on()) return
+
 	try {
 		await investigate_baseline(issue)
 	} catch (error) {

@@ -1,0 +1,7 @@
+{
+	"reason": "test:related names and records only the branch's own change after a main sync (#5041)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 10
+	}
+}
