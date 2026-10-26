@@ -4,6 +4,7 @@ import path from 'node:path'
 import { threadId } from 'node:worker_threads'
 import { test_read_trace } from '#scripts/test/test-read-trace'
 import { test_read_capture, type RecorderState } from '#tools/test/test-read-capture'
+import { test_read_capture_fixture } from '#tools/test/test-read-capture-fixture'
 import { describe, expect, it, onTestFinished } from 'vitest'
 
 // joshuafolkken/kit#4065: what the read recorder writes is what the test-read map is built from, so
@@ -35,6 +36,16 @@ describe('test_read_capture.record_read', () => {
 		test_read_capture.record_read(state, READ_FILE)
 
 		expect(test_read_trace.to_records(state.records)[READ_FILE]).toContain(THIS_TEST)
+	})
+
+	// joshuafolkken/kit#5033: the module was recorded beside the test, and `vitest related` widened the
+	// read to every test importing it.
+	it('records a read a module’s named function made after an await under the test alone', async () => {
+		const state = fresh_state()
+
+		await test_read_capture_fixture.record_after_await(state, READ_FILE)
+
+		expect(test_read_trace.to_records(state.records)[READ_FILE]).toEqual([THIS_TEST])
 	})
 
 	// joshuafolkken/kit#4071
