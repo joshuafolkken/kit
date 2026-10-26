@@ -5,16 +5,16 @@
 This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` up to the pull request: a `prrun` never issues `pnpm josh ship` or a merging `pnpm josh followup` — it opens the pull request with `pnpm josh git -y` and ends by `prrun.md` → "The difference — the end of the run". The record below is reference only.
 Review results and successful pushes are never turn boundaries.
 
-0. **A lane child**: `pnpm josh main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
+0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
    the implementer's self-check"), `pnpm josh check:related` (the scoped lint/test pair plus the type check and dotfile spelling), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (step 1) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then steps 2–3, the
-   round's fixes, all made before one `pnpm josh check:related`, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
+   round's fixes, no `check:related` after them, `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
-   `check` or `metrics` before it, by hand: ship reuses the scoped pair green on this tree and base
-   and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
+   `check:related`, `check` or `metrics` before it or a re-detach, by hand: ship reuses the scoped
+   pair green on this tree and base (no fix, main unmoved) and runs the gate after its sync (`scripts/run/ship/run-ship-steps.ts`); a standalone `check` or
    `metrics` leaves no record it reuses. A stop no session waits on relaunches a child
    whose prompt carries the failed output's tail and the changed files (`pnpm josh ship --log <N>` when
    the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
@@ -70,18 +70,18 @@ These are the gate → review → PR → merge facts other documents cite; this 
 
 - **The gate runs beside this review, not in front of it** — started with the review, joined before the
   commit. A red gate is fixed and re-run whatever the review concluded.
-- **origin/main is merged in before the gate** — `pnpm josh main:merge` is the last edit, so the scoped
+- **origin/main is merged in before the gate** — `pnpm josh main:merge` (in a lane, ship's sync) is the last edit, so the scoped
   pair and the gate run once over it; a conflict fires `backlogrun-recovery.md` → "Conflicts are not
   predicted" early. **This is the one place a conflicted merge's procedure is written**: `main:merge`
   refuses when uncommitted changes touch a path the default branch also changed, or the index holds
   unresolved or staged paths — commit first with `pnpm josh git -y`, rerun, and **never stash around the
   merge**. A merge stopped on a conflict: remove the markers, then `pnpm josh git -y` stages the
   resolution and records the merge commit — **Tier A**; a lane child never asks a person for `git add`.
-  A lane child's resolution: markers removed → `pnpm josh check:related` → `pnpm josh ship --detach
-  --review` (step 0), which records the merge commit and runs the gate.
+  A lane child's resolution of ship's `conflict` stop: markers removed → the re-detach the stop
+  prints (step 0), which records the merge commit and runs the scoped pair and the gate.
 - **One related-check command answers once per tree** — run `pnpm josh check:related` after every
-  edit, a review round's fixes once after the last; it runs `lint:related`, `test:related`, `check` and `cspell:dot` together. In kit `pnpm josh lint:related` reports a metrics total grown past the
-  merge-base; accept it with its reason before `pnpm josh ship`, whose pre-detach check otherwise stops.
+  edit, a review round's fixes once after the last (in a lane, none after `run:review`); it runs `lint:related`, `test:related`, `check` and `cspell:dot`. In kit `lint:related` reports a metrics total past the
+  merge-base; accept it with its reason before `pnpm josh ship`, or its pre-detach check stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against
   the open pull request.
