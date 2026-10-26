@@ -270,12 +270,13 @@ function offer_wait(child: EpicChild, read: ReasonRead, pool: Pool): RowReason |
 }
 
 // `📅 3/10`: the merges the ledger recorded after the declared pull request merged, of those the body
-// waits on; `📅 4313` while that pull request has not merged or its merge is unread.
+// waits on; `📅 4313` while that pull request has not merged or its merge is unread — the cited issue
+// for a condition waiting on the pull request that closes it.
 function sample_wait_of(child: EpicChild): RowReason | undefined {
 	const wait = issue_sample_gate.wait_of(child.body)
 
 	if (wait === undefined) return undefined
-	if (wait.kind !== 'short') return { icon: WAIT_ICONS.not_before, issues: [String(wait.pr)] }
+	if (wait.kind !== 'short') return { icon: WAIT_ICONS.not_before, issues: [String(wait.cited)] }
 
 	return { icon: WAIT_ICONS.not_before, value: `${String(wait.counted)}/${String(wait.needed)}` }
 }

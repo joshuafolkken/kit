@@ -52,9 +52,15 @@ function follow_up_query(repo: string): string {
 	return `repo:${repo} is:issue "実施可能条件" in:body`
 }
 
-// The pull request a follow-up's run condition names, or `undefined` for an issue that declares none.
+// The pull request a follow-up's run condition names, or `undefined` for an issue that declares none
+// or cites the issue whose closing pull request it waits on.
 function cited_pull(issue: SearchIssue): number | undefined {
-	return issue_sample_gate.cited_number(issue.body)
+	return issue_sample_gate.cited_via(issue.body, 'pull')
+}
+
+// The issue a follow-up's run condition names by the issue form — the issue it measures, unread.
+function cited_issue(issue: SearchIssue): number | undefined {
+	return issue_sample_gate.cited_via(issue.body, 'issue')
 }
 
 // One shortfall outweighs any reach: a mechanism some measurement found wanting is the one to look at.
@@ -164,6 +170,7 @@ function draft_body(row: AuditRow): string {
 }
 
 const effect_audit = {
+	cited_issue,
 	cited_pull,
 	draft_body,
 	draft_title,

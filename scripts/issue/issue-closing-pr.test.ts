@@ -61,6 +61,17 @@ describe('issue_closing_pr.read_closing_pr', () => {
 	})
 })
 
+describe('issue_closing_pr.read_closing_number', () => {
+	it('answers the closing pull request by its number, and undefined without one', async () => {
+		exec_gh_api
+			.mockResolvedValueOnce(line(CLOSING_URL, `closes #${ISSUE}`))
+			.mockResolvedValueOnce('')
+
+		expect(await issue_closing_pr.read_closing_number(Number(ISSUE))).toBe(2768)
+		expect(await issue_closing_pr.read_closing_number(Number(ISSUE))).toBeUndefined()
+	})
+})
+
 // A reopened issue still carries its earlier attempt's merged reference; only a later one closes it.
 describe('issue_closing_pr.read_closing_pr — a reopened issue', () => {
 	const REOPENED = JSON.stringify({ reopened: true })

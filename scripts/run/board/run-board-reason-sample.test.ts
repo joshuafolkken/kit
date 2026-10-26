@@ -58,7 +58,8 @@ describe('run_board_reason.reader — a row waiting on its declared samples', ()
 	it('says the merges counted of those the body waits on', () => {
 		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({
 			kind: 'short',
-			pr: PR,
+			cited: PR,
+			via: 'pull',
 			counted: 3,
 			needed: 10,
 		})
@@ -66,8 +67,8 @@ describe('run_board_reason.reader — a row waiting on its declared samples', ()
 		expect(reason()).toStrictEqual({ icon: WAIT_ICONS.not_before, value: '3/10' })
 	})
 
-	it('names the pull request while it has not merged', () => {
-		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({ kind: 'unmerged', pr: PR })
+	it.each(['pull', 'issue'] as const)('names the cited %s while it has not merged', (via) => {
+		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({ kind: 'unmerged', cited: PR, via })
 
 		expect(reason()).toStrictEqual({ icon: WAIT_ICONS.not_before, issues: [String(PR)] })
 	})

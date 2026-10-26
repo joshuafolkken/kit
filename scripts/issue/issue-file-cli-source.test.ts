@@ -41,16 +41,25 @@ const BODY = [
 // joshuafolkken/kit#4901: a measurement follow-up — no file to change, a criterion reading
 // `lane:stats` about a cited change — with no start condition at all.
 const measurement_path = path.join(work, 'measurement.md')
-const MEASUREMENT_BODY = [
+const MEASUREMENT_BACKGROUND = [
 	'## 背景',
 	'',
 	'- 種別: 非不具合',
 	JUDGEMENT_NOT_NEEDED,
 	'- 規模見積もり: 約 0 ファイル / 0 行（テスト除く）',
-	'',
-	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] #4896 後の `pnpm josh lane:stats` の中央値を記録する\n',
-].join('\n')
+]
+const MEASUREMENT_REST =
+	'\n## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] #4896 後の `pnpm josh lane:stats` の中央値を記録する\n'
+const MEASUREMENT_BODY = [...MEASUREMENT_BACKGROUND, MEASUREMENT_REST].join('\n')
 
+// joshuafolkken/kit#5051: the same follow-up, citing the issue whose closing pull request it waits on.
+const closing_path = path.join(work, 'closing.md')
+const CLOSING_CONDITION = `- 実施可能条件: #${String(CITED)} を閉じる PR のマージ後 10 マージ`
+
+writeFileSync(
+	closing_path,
+	[...MEASUREMENT_BACKGROUND, CLOSING_CONDITION, MEASUREMENT_REST].join('\n'),
+)
 writeFileSync(measurement_path, MEASUREMENT_BODY)
 writeFileSync(body_path, BODY)
 writeFileSync(origin_path, `${BODY}\n## Origin\n\n${HERE}#2808\n`)
@@ -66,9 +75,7 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(HERE)
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
-	vi.spyOn(issue_closing_pr, 'read_closing_pr').mockResolvedValue(
-		`https://github.com/${HERE}/pull/${String(CLOSING)}`,
-	)
+	vi.spyOn(issue_closing_pr, 'read_closing_number').mockResolvedValue(CLOSING)
 	exec_gh_api.mockResolvedValue(JSON.stringify({ number: CITED }))
 })
 
@@ -102,6 +109,22 @@ describe('issue_file_cli.run — a start condition citing an issue', () => {
 		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(FAILURE_EXIT_CODE)
 		expect(exec_gh_api).toHaveBeenCalledWith({
 			path: git_gh_api_path.issue_api_path(String(CITED), THERE),
+		})
+	})
+})
+
+// joshuafolkken/kit#5051: a lane files its measurement follow-up before the pull request closing its
+// issue exists — `josh ship` wants the deferral row first — by citing the issue's closing pull request.
+describe('issue_file_cli.run — a measurement follow-up citing the closing pull request of an issue', () => {
+	it('passes the start condition checks unread and reaches the scout', async () => {
+		scout.mockResolvedValueOnce(undefined)
+
+		await issue_file_cli.run(argv_of(closing_path, '--label', 'run:lane'))
+
+		expect(vi.mocked(console.error).mock.calls.join('\n')).not.toContain('実施可能条件')
+		expect(scout).toHaveBeenCalledTimes(1)
+		expect(exec_gh_api).not.toHaveBeenCalledWith({
+			path: git_gh_api_path.issue_api_path(String(CITED)),
 		})
 	})
 })
