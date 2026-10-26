@@ -34,6 +34,8 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_mock } }))
 // The pre-detach checks' own branches are pinned in `run-ship-pre-detach.test.ts`; here they pass.
 vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_mock } }))
+// The conflict probe (`run-ship-cli-conflict.test.ts`) finds none, so no test fetches the default branch.
+vi.mock('./run-ship-conflict-probe', () => ({ run_ship_conflict_probe: { probe: vi.fn() } }))
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi
@@ -101,6 +103,8 @@ const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
 const LIVE_EVIDENCE = 'live-evidence'
 const TYPE_ERROR = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
+const INDEX_SIGNATURE_ERROR =
+	'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature'
 
 const info_lines: Array<string> = []
 
@@ -294,10 +298,7 @@ describe('run_ship_cli.run — the infrastructure retry', () => {
 // joshuafolkken/kit#3222: a type error or a red document test returns to the lane child too.
 describe('run_ship_cli.run — the type check and document tests run before the hand-off', () => {
 	it.each([
-		[
-			'a type error',
-			'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature',
-		],
+		['a type error', INDEX_SIGNATURE_ERROR],
 		['a red document test', 'FAIL scripts/document/entry-read-set.test.ts > names every document'],
 	])('does not detach and reports %s', async (_label, output) => {
 		is_lane_child_mock.mockReturnValue(true)
