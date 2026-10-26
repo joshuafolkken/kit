@@ -207,6 +207,7 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 	it('runs the map readers of a moved non-code file and the source changed since the map', async () => {
 		vi.mocked(test_read_map.read_map).mockReturnValue(map_with({ [document]: [document_reader] }))
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([document_source, document])
+		mocked_changed.mockResolvedValue([document])
 		mocked_moved.mockResolvedValue(changed_only(document))
 
 		await test_related.run_related_tests([])
