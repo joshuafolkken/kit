@@ -19,9 +19,9 @@ const FAILED_DIGEST = 'digest-t'
 const TEST_DIGESTS = new Map([[FAILED_TEST, FAILED_DIGEST]])
 const RED: StoredVerdict = { verdict: 'red', tests: { [FAILED_TEST]: FAILED_DIGEST } }
 const RED_PROBE = { verdict: 'red', failed: [FAILED_TEST] }
-const ONLY_TESTS_SAME: Freshness = { is_same_change: false, is_unchanged: true }
-const ONLY_CODE_SAME: Freshness = { is_same_change: true, is_unchanged: false }
-const ALL_SAME: Freshness = { is_same_change: true, is_unchanged: true }
+const ONLY_TESTS_SAME: Freshness = { is_same_change: false, is_unchanged: true, is_pruned: false }
+const ONLY_CODE_SAME: Freshness = { is_same_change: true, is_unchanged: false, is_pruned: false }
+const ALL_SAME: Freshness = { is_same_change: true, is_unchanged: true, is_pruned: false }
 
 function fresh(entry: StoredVerdict | undefined, freshness: Freshness): unknown {
 	return test_pinned_cache_logic.fresh_verdict(entry, freshness, TEST_DIGESTS)
@@ -103,11 +103,34 @@ describe('test_pinned_cache_logic.entries_of', () => {
 		expect(test_pinned_cache_logic.freshness_of(text, now)).toEqual({
 			is_same_change: true,
 			is_unchanged: false,
+			is_pruned: false,
 		})
 		expect(test_pinned_cache_logic.freshness_of('', now)).toEqual({
 			is_same_change: false,
 			is_unchanged: false,
+			is_pruned: false,
 		})
+	})
+})
+
+// joshuafolkken/kit#5004: the `green` hunks a cache recorded, and the code change with them reverted.
+describe('test_pinned_cache_logic.greens_of and a pruned change', () => {
+	const text = JSON.stringify({ test_contents: 'contents', change: 'change', entries: {} })
+	const green = [{ file: 'a.ts', old_lines: [], new_lines: ['loose'] }]
+	const recorded = JSON.stringify({ ...JSON.parse(text), pruned: 'p', green })
+	const now = { change: 'other', test_contents: 'other', pruned: 'p' }
+
+	it('reads the green hunks recorded, and none from a cache that recorded none', () => {
+		expect(test_pinned_cache_logic.greens_of(recorded)).toEqual(green)
+		expect(test_pinned_cache_logic.greens_of(text)).toEqual([])
+	})
+
+	it('reads the pruned change the same only where one was recorded and one is read now', () => {
+		const unread = { ...now, pruned: undefined }
+
+		expect(test_pinned_cache_logic.freshness_of(recorded, now).is_pruned).toBe(true)
+		expect(test_pinned_cache_logic.freshness_of(text, now).is_pruned).toBe(false)
+		expect(test_pinned_cache_logic.freshness_of(text, unread).is_pruned).toBe(false)
 	})
 })
 
@@ -139,9 +162,29 @@ describe('test_pinned_cache_logic.fresh_verdict on a red verdict', () => {
 	})
 })
 
+// joshuafolkken/kit#5004: the code change since differs only by lines removed from `green` hunks.
+describe('test_pinned_cache_logic.fresh_verdict past a pruned change', () => {
+	const pruned: Freshness = { is_same_change: false, is_unchanged: false, is_pruned: true }
+
+	it('keeps a red verdict while the failed test file is the same, and drops it once that changed', () => {
+		const edited = new Map([[FAILED_TEST, 'digest-u']])
+
+		expect(fresh(RED, pruned)).toEqual(RED_PROBE)
+		expect(test_pinned_cache_logic.fresh_verdict(RED, pruned, edited)).toBeUndefined()
+	})
+
+	it('holds a green verdict on the test files alone, whatever the pruned change reads', () => {
+		expect(fresh({ verdict: 'green', tests: {} }, pruned)).toBeUndefined()
+	})
+})
+
 describe('test_pinned_cache_logic.fresh_verdict on any other verdict', () => {
 	it('keeps a green or test-less verdict while no test file changed, whatever else changed', () => {
-		const tests_changed: Freshness = { is_same_change: false, is_unchanged: false }
+		const tests_changed: Freshness = {
+			is_same_change: false,
+			is_unchanged: false,
+			is_pruned: false,
+		}
 
 		expect(fresh({ verdict: 'green', tests: {} }, ONLY_TESTS_SAME)).toEqual({
 			verdict: 'green',
@@ -200,7 +243,7 @@ describe('test_pinned_cache_logic.stored', () => {
 
 // joshuafolkken/kit#4873: past the tree-wide digests, a verdict holds while its own basis is the same.
 describe('test_pinned_cache_logic.fresh_verdict with a basis', () => {
-	const none_same: Freshness = { is_same_change: false, is_unchanged: false }
+	const none_same: Freshness = { is_same_change: false, is_unchanged: false, is_pruned: false }
 	const green: StoredVerdict = { verdict: 'green', tests: {}, basis: 'b' }
 	const red: StoredVerdict = { ...RED, basis: 'r' }
 

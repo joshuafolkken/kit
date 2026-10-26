@@ -57,14 +57,16 @@ function is_stop(entry: LedgerEntry): entry is StopEntry {
 	return entry.kind === lane_ledger.KIND.STOP
 }
 
+// The issue a run event's text names first, `NaN` where it names none.
+function issue_of(event: RunEvent): number {
+	return Number(EVENT_ISSUE.exec(event.text)?.[1])
+}
+
 // Every run event of `kind`, with the issue its text names first.
 function events_of(events: ReadonlyArray<RunEvent>, kind: string): Array<IssueAt> {
 	return events
 		.filter((event) => event.kind === kind)
-		.map((event) => ({
-			issue: Number(EVENT_ISSUE.exec(event.text)?.[1]),
-			at_ms: Date.parse(event.at),
-		}))
+		.map((event) => ({ issue: issue_of(event), at_ms: Date.parse(event.at) }))
 }
 
 function parks_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
@@ -171,6 +173,6 @@ function table(
 	].join('\n')
 }
 
-const lane_stop_stats = { REASONS, ends_of, events_of, table, wait_ms }
+const lane_stop_stats = { REASONS, ends_of, events_of, issue_of, table, wait_ms }
 
 export { lane_stop_stats }

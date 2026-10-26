@@ -25,6 +25,8 @@ import type { RedProbe, RedVerdict } from './test-red-logic'
 // and each failed test's import closure; for any other, the tests whose imports reach the hunk's file,
 // with their content. An edit outside them keeps the verdict; with no basis — no import graph, no
 // failed file recorded — only the tree-wide digests hold it, as before.
+// **A `red` verdict also holds while `pruned` reads the same** (joshuafolkken/kit#5004): the code
+// change since differs only by lines removed from `green` hunks (`test-pinned-prune-logic.ts`).
 
 const DIGEST_ALGORITHM = 'sha256'
 const LINE_BREAK = '\n'
@@ -56,16 +58,27 @@ interface Recheck {
 // What the cache knows of a hunk: a verdict, one to recheck against a few tests, or nothing.
 type Known = RedProbe | Recheck | undefined
 
+// A `green` hunk as the cache records it: its file, its base lines and the lines it held.
+interface GreenHunk {
+	file: string
+	old_lines: Array<string>
+	new_lines: Array<string>
+}
+
+// `pruned` is the code change with every `green` hunk in `green` reverted.
 interface VerdictCache {
 	test_contents: string
 	change: string
 	entries: Record<string, StoredVerdict>
+	pruned?: string | undefined
+	green?: Array<GreenHunk> | undefined
 }
 
 // What the work tree holds now, set against what the cache was written under.
 interface Freshness {
 	is_same_change: boolean
 	is_unchanged: boolean
+	is_pruned: boolean
 }
 
 const STORED_SCHEMA = z.object({
@@ -74,10 +87,17 @@ const STORED_SCHEMA = z.object({
 	basis: z.string().optional(),
 	related: z.record(z.string(), z.string()).optional(),
 })
+const GREEN_SCHEMA = z.object({
+	file: z.string(),
+	old_lines: z.array(z.string()),
+	new_lines: z.array(z.string()),
+})
 const CACHE_SCHEMA = z.object({
 	test_contents: z.string(),
 	change: z.string(),
 	entries: z.record(z.string(), STORED_SCHEMA),
+	pruned: z.string().optional(),
+	green: z.array(GREEN_SCHEMA).optional(),
 })
 
 function digest_of(text: string): string {
@@ -124,16 +144,23 @@ function entries_of(text: string): Record<string, StoredVerdict> {
 	return json_value.parse_with(text, CACHE_SCHEMA)?.entries ?? {}
 }
 
-// How `text` was written against the work tree now; an unreadable cache was written under nothing.
+// The `green` hunks the cache recorded; an unreadable cache recorded none.
+function greens_of(text: string): Array<GreenHunk> {
+	return json_value.parse_with(text, CACHE_SCHEMA)?.green ?? []
+}
+
+// How `text` was written against the work tree now; an unreadable cache was written under nothing, and
+// one with no `pruned` recorded never reads the same as one pruned now.
 function freshness_of(
 	text: string,
-	now: Pick<VerdictCache, 'change' | 'test_contents'>,
+	now: Pick<VerdictCache, 'change' | 'pruned' | 'test_contents'>,
 ): Freshness {
 	const cache = json_value.parse_with(text, CACHE_SCHEMA)
 
 	return {
 		is_same_change: cache?.change === now.change,
 		is_unchanged: cache?.test_contents === now.test_contents,
+		is_pruned: cache?.pruned !== undefined && cache.pruned === now.pruned,
 	}
 }
 
@@ -154,6 +181,12 @@ function is_based(entry: StoredVerdict, basis: string | undefined): boolean {
 	return entry.basis !== undefined && entry.basis === basis
 }
 
+// The code a `red` verdict was reached on reads the same, or differs only by lines removed from `green`
+// hunks.
+function is_same_code(freshness: Freshness): boolean {
+	return freshness.is_same_change || freshness.is_pruned
+}
+
 function holds(
 	entry: StoredVerdict,
 	freshness: Freshness,
@@ -161,7 +194,7 @@ function holds(
 	basis: string | undefined,
 ): boolean {
 	if (entry.verdict !== 'red') return freshness.is_unchanged || is_based(entry, basis)
-	const is_same = freshness.is_same_change || is_based(entry, basis)
+	const is_same = is_same_code(freshness) || is_based(entry, basis)
 
 	return is_same && holds_tests(entry.tests, freshness, digests)
 }
@@ -288,6 +321,7 @@ const test_pinned_cache_logic = {
 	entries_of,
 	fresh_verdict,
 	freshness_of,
+	greens_of,
 	hunk_key,
 	is_recheck,
 	recheck_of,
@@ -299,5 +333,5 @@ const test_pinned_cache_logic = {
 	test_set_of,
 }
 
-export type { Basis, Freshness, Known, Recheck, StoredVerdict, VerdictCache }
+export type { Basis, Freshness, GreenHunk, Known, Recheck, StoredVerdict, VerdictCache }
 export { test_pinned_cache_logic }

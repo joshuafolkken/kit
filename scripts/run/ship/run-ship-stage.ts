@@ -242,6 +242,13 @@ function started_of(text: string): ReadonlyArray<string> | undefined {
 	return text.split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
 }
 
+// The stage word and the phase word of a line `event_text` wrote, `''` where the line has none.
+function words_of(text: string): { stage: string; phase: string } {
+	const [, stage = '', phase = ''] = text.split(WORD_SEPARATOR, WORD_COUNT)
+
+	return { stage, phase }
+}
+
 // A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in,
 // so the event stream reads the cause without anyone opening the report.
 const CONFLICT = 'conflict'
@@ -271,6 +278,7 @@ const run_ship_stage = {
 	read_started,
 	record_path,
 	started_of,
+	words_of,
 	stop_reason,
 }
 

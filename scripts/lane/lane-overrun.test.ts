@@ -8,6 +8,7 @@ import { lane_overrun } from './lane-overrun'
 
 const mocks = vi.hoisted(() => ({
 	all_events: vi.fn(),
+	comment: vi.fn<(issue: string, body: string) => Promise<boolean>>(),
 	emit: vi.fn<(kind: string, text: string) => Promise<void>>(),
 	launch: vi.fn<(request: { env: Readonly<Record<string, string>> }) => unknown>(),
 	read_entries: vi.fn(),
@@ -28,6 +29,9 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch: mocks.launch, note_of: (error: Error) => error.message },
 }))
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { issue_try_comment: mocks.comment },
+}))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: mocks.resolve_in } }))
 vi.mock('#scripts/josh/process-identity', () => ({
 	process_identity: { read_start: mocks.read_start },
@@ -47,6 +51,8 @@ const MINUTE_MS = 60_000
 const PID = 321
 const START = Date.parse('2026-10-24T03:00:00.000Z')
 const OWN_TRANSCRIPTS = '/home/.claude/projects/-kit-lanes-4695'
+// joshuafolkken/kit#4995: a lane with no stage event is all start to plan, its longest stage.
+const OVERRAN = `#${String(ISSUE)} overran: 41 min net, longest start to plan 41 min`
 
 function at(minute: number): string {
 	return new Date(START + minute * MINUTE_MS).toISOString()
@@ -83,6 +89,7 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	mocks.target.mockResolvedValue('/ledger.jsonl')
 	mocks.all_events.mockResolvedValue([])
+	mocks.comment.mockResolvedValue(true)
 	mocks.transcripts.mockReturnValue([OWN_TRANSCRIPTS, '/home/.claude/projects/-kit-lanes-14695'])
 	mocks.resolve_in.mockReturnValue({ kind: 'argv', argv: { command: 'claude', args: [] } })
 	mocks.launch.mockReturnValue({ kind: 'launched', pid: PID })
@@ -290,9 +297,7 @@ describe('lane_overrun.investigate — the record of an overrun', () => {
 	it('records the launch and asks the session to record its result', async () => {
 		await lane_overrun.investigate(ISSUE)
 
-		expect(notes()).toStrictEqual([
-			`#${String(ISSUE)} overran: 41 min net — investigating in pid 321`,
-		])
+		expect(notes()).toStrictEqual([`${OVERRAN} — investigating in pid 321`])
 		expect(launched_prompt()).toContain('pnpm josh run:event --append note')
 	})
 
@@ -302,9 +307,7 @@ describe('lane_overrun.investigate — the record of an overrun', () => {
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.read_start).toHaveBeenCalledWith(PID)
-		expect(notes()).toStrictEqual([
-			`#${String(ISSUE)} overran: 41 min net — investigating in pid 321 started proc:9876`,
-		])
+		expect(notes()).toStrictEqual([`${OVERRAN} — investigating in pid 321 started proc:9876`])
 	})
 
 	it('records a launch that failed', async () => {
@@ -312,9 +315,7 @@ describe('lane_overrun.investigate — the record of an overrun', () => {
 
 		await lane_overrun.investigate(ISSUE)
 
-		expect(notes()).toStrictEqual([
-			`#${String(ISSUE)} overran: 41 min net — not investigated: no pid`,
-		])
+		expect(notes()).toStrictEqual([`${OVERRAN} — not investigated: no pid`])
 	})
 
 	it('records an error rather than failing the merge', async () => {
@@ -388,6 +389,6 @@ describe('lane_overrun.investigate — a lane already investigated or refused a 
 		await lane_overrun.investigate(ISSUE)
 
 		expect(mocks.launch).not.toHaveBeenCalled()
-		expect(notes()).toStrictEqual([`#${String(ISSUE)} overran: 41 min net — not investigated: x`])
+		expect(notes()).toStrictEqual([`${OVERRAN} — not investigated: x`])
 	})
 })

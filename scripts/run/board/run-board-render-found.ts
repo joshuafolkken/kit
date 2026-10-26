@@ -9,7 +9,8 @@ import type { ItemState } from './run-board-status'
 // A done row's end after its time (joshuafolkken/kit#4772, joshuafolkken/kit#4818). A merged row says
 // its lane's net minutes — `?′` where there are none — the numbers of the Issues its child filed, then
 // what its overrun investigation came to and the numbers it filed (joshuafolkken/kit#4880), each group
-// two spaces apart: `⏭` and why it was skipped, or 🔍 and the numbers it filed, `↪N` for each open
+// two spaces apart: `⏭` and why it was skipped, or 🔍, the lane's longest stage and the numbers it filed
+// (`🔍 implement 51′ · 4983`), `↪N` for each open
 // Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻N` for a
 // recurrence commented on, or 💥 for an investigation that failed. While the investigation runs, the spinner stands for 🔍.
 // A row its merge left no note on was never asked. A done row that did not merge says only what was
@@ -19,6 +20,7 @@ const { OVERRUN_MARK } = run_board_labels
 const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done'])
 const SEPARATOR = ', '
 const GROUP_SEPARATOR = '  '
+const LONGEST_SEPARATOR = ' · '
 const MINUTES_WIDTH = 3
 const MINUTE_MARK = '′'
 const UNKNOWN_MINUTES = '?'
@@ -105,14 +107,23 @@ function joined(parts: ReadonlyArray<string>, separator: string): string {
 	return parts.filter((part) => part !== '').join(separator)
 }
 
-// What the investigation came to, then the Issues it filed.
+// The lane's longest stage its start note carried (joshuafolkken/kit#4995), else nothing.
+function longest_text(found: Found | undefined): string {
+	const longest = found?.longest
+
+	return longest === undefined ? '' : `${longest.name} ${String(longest.minutes)}${MINUTE_MARK}`
+}
+
+// What the investigation came to, its lane's longest stage, then the Issues it filed.
 function investigation_text(found: Found | undefined, header: BoardHeader): string {
 	const outcome =
 		found?.overrun === undefined
 			? `${SKIP_MARK} ${NO_RECORD}`
 			: outcome_text(found, found.overrun, header)
 
-	return joined([outcome, links_of(found?.overrun_filed ?? [], header)], ' ')
+	const filed = links_of(found?.overrun_filed ?? [], header)
+
+	return joined([outcome, joined([longest_text(found), filed], LONGEST_SEPARATOR)], ' ')
 }
 
 // The minutes, the child's own filings, then the investigation, each group apart by two spaces.

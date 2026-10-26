@@ -33,6 +33,9 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch: mocks.launch, note_of: (error: Error) => error.message },
 }))
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { issue_try_comment: async () => true },
+}))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: mocks.resolve_in } }))
 vi.mock('#scripts/josh/process-identity', () => ({
 	process_identity: { read_start: () => undefined },
