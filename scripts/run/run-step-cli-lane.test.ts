@@ -101,6 +101,14 @@ describe('run_step_cli.run — a lane child', () => {
 		expect(lane_plan_line_mock).toHaveBeenCalledWith(ISSUE, true)
 	})
 
+	// joshuafolkken/kit#5016: the whole chain under implement led a lane child into step 1's main:merge.
+	it('prints its own step of the chain under implement, never the main:merge step', async () => {
+		await run_step_cli.run([ISSUE])
+
+		expect(printed_lines().join('\n')).toContain('0. **A lane child**')
+		expect(printed_lines().join('\n')).not.toContain('1. Run `pnpm josh main:merge`.')
+	})
+
 	it('prints no lane:plan command away from implement', async () => {
 		lane_plan_line_mock.mockResolvedValue(LANE_PLAN_LINE)
 		stream([{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` }])
