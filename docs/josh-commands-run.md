@@ -458,7 +458,9 @@ event (the start note carrying the longest stage, which the board draws after �
 a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
 lane ledger launches one baseline investigation of the median lane — the stages and sub-stages that spend the most per merge
 in `lane:stats --period 3`, its causes filed by the overrun's rules (at most five, the largest reducible minutes first, each 1 minute or more) — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
-its wording `run-event-baseline.ts`), a finding on the board. The board's
+its wording `run-event-baseline.ts`), a finding on the board. Both investigations are off by default and run only while
+`JOSH_LANE_INVESTIGATION` is `on` ([environment variables](./environment-variables.md#runs)): off, a lane over 40 minutes notes
+`#N overrun skipped: disabled (JOSH_LANE_INVESTIGATION is not on)` with no breakdown comment or launch, no failed launch is retried, the other notes are unchanged, and a due baseline launches and notes nothing. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
 (`47′  4847  🔍 implement 31′ · 4856`); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,

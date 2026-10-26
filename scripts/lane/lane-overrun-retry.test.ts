@@ -1,6 +1,6 @@
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
@@ -9,6 +9,7 @@ import { lane_overrun } from './lane-overrun'
 
 const mocks = vi.hoisted(() => ({
 	all_events: vi.fn(),
+	comment: vi.fn(async () => true),
 	emit: vi.fn<(kind: string, text: string) => Promise<void>>(),
 	launch: vi.fn<(request: { env: Readonly<Record<string, string>> }) => unknown>(),
 	read_entries: vi.fn(),
@@ -34,7 +35,7 @@ vi.mock('#scripts/run/detached-launch', () => ({
 	detached_launch: { launch: mocks.launch, note_of: (error: Error) => error.message },
 }))
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
-	git_gh_issue_write: { issue_try_comment: async () => true },
+	git_gh_issue_write: { issue_try_comment: mocks.comment },
 }))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { resolve_in: mocks.resolve_in } }))
 vi.mock('#scripts/josh/process-identity', () => ({
@@ -88,8 +89,11 @@ function launched_lanes(): ReadonlyArray<string | undefined> {
 	return mocks.launch.mock.calls.map(([{ env }]) => env['JOSH_LANE_CHILD'])
 }
 
+afterEach(() => vi.unstubAllEnvs())
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.all_events.mockResolvedValue([])
 	mocks.read_entries.mockReturnValue(lane(70))
 	mocks.transcripts.mockReturnValue([TRANSCRIPTS])
@@ -146,5 +150,39 @@ describe('lane_overrun.investigate — a lane whose launch failed', () => {
 		expect(notes().some((text) => text.startsWith(`#${String(OTHER)} overrun skipped: `))).toBe(
 			true,
 		)
+	})
+})
+
+// joshuafolkken/kit#5044: the investigations are off unless `JOSH_LANE_INVESTIGATION` is on.
+describe('lane_overrun.investigate — the switch off', () => {
+	it.each([undefined, 'off'])('only notes the skip of an overrun with %j', async (value) => {
+		vi.stubEnv('JOSH_LANE_INVESTIGATION', value)
+		mocks.all_events.mockResolvedValue([failed_launch(1)])
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(mocks.launch).not.toHaveBeenCalled()
+		expect(mocks.comment).not.toHaveBeenCalled()
+		expect(notes()).toStrictEqual([
+			`#${String(ISSUE)} overrun skipped: disabled (JOSH_LANE_INVESTIGATION is not on)`,
+		])
+	})
+
+	it('still notes the net minutes of a lane within 40 minutes, which the board draws', async () => {
+		vi.stubEnv('JOSH_LANE_INVESTIGATION', undefined)
+		mocks.read_entries.mockReturnValue(lane(30))
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(notes()).toStrictEqual([`#${String(ISSUE)} net: 30 min`])
+	})
+
+	it('retries no earlier lane whose launch failed', async () => {
+		vi.stubEnv('JOSH_LANE_INVESTIGATION', undefined)
+		mocks.all_events.mockResolvedValue([failed_launch(1)])
+
+		await lane_overrun.investigate(OTHER)
+
+		expect(notes()).toStrictEqual([`#${String(OTHER)} overrun skipped: no dispatch`])
 	})
 })

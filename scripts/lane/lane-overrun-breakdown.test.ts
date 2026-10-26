@@ -1,5 +1,5 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
@@ -77,8 +77,11 @@ function notes(): ReadonlyArray<string> {
 	return mocks.emit.mock.calls.map(([, text]) => text)
 }
 
+afterEach(() => vi.unstubAllEnvs())
+
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.stubEnv('JOSH_LANE_INVESTIGATION', 'on')
 	mocks.all_events.mockResolvedValue([plan()])
 	mocks.read_entries.mockReturnValue(lane(61))
 	mocks.comment.mockResolvedValue(true)
