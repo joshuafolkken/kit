@@ -102,7 +102,7 @@ async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 
 	if (branch === undefined) return { changed, map }
 
-	return { changed, map, branch, since_map: changed.filter((file) => !branch.includes(file)) }
+	return { changed, map, since_map: changed.filter((file) => !branch.includes(file)) }
 }
 
 // Explicit file arguments win over the git reading, which is what makes the narrowing testable by

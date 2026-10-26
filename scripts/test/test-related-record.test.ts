@@ -87,15 +87,17 @@ describe("test_related_record.record_of — the branch's own change", () => {
 	it('counts as the change only its files, and a shared test as a reader', () => {
 		const shared_test = 'scripts/shared.test.ts'
 		const not_vouched = 'tools/gone.ts'
+		const base = related_input()
 		const input: RunInput = {
-			...related_input(),
+			...base,
+			scope: { ...base.scope, files: [...base.scope.files, path.join(ROOT, shared_test)] },
 			changed: [OWN_CHANGE, SYNCED_CHANGE, SINCE_MAP_CHANGE, shared_test, not_vouched],
 			synced: [SYNCED_CHANGE, not_vouched],
 			branch: [OWN_CHANGE],
 		}
 		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
 
-		expect(record).toMatchObject({ changed: 1, synced: 2, since_map: 1, readers: 1 })
+		expect(record).toMatchObject({ changed: 1, synced: 2, since_map: 1, readers: 2 })
 	})
 })
 

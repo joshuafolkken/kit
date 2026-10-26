@@ -21,8 +21,8 @@ interface RunInput {
 	// The part of `changed` a main sync brought in, empty outside a since-green reading.
 	synced: ReadonlyArray<string>
 	// The part of `changed` the change since the test-read map's tree joined to the named or moved
-	// files — main merges that landed after the map among them — never the run's own change. It holds
-	// the synced non-code files as well, which the record counts as `synced` alone.
+	// files — main merges that landed after the map among them. A file of `branch` in it counts as
+	// `changed`; it holds the synced non-code files as well, which the record counts as `synced` alone.
 	since_map: ReadonlyArray<string>
 	// This branch's own change from its merge base, where it was read.
 	branch?: ReadonlyArray<string> | undefined

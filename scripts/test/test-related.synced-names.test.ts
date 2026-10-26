@@ -37,7 +37,7 @@ const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 const REPOSITORY_ROOT = process.cwd()
 const OWN_SOURCE = path.join('scripts', 'test', 'test-related-record.ts')
 const OWN_TEST = path.join('scripts', 'test', 'test-related.synced-names.test.ts')
-// What main deleted: its basename is `test-related.ts`, which `MAIN_SOURCE`'s text names.
+// What main deleted: its basename is `test-related.ts`, which a comment in `MAIN_SOURCE` names.
 const DELETED_BY_MAIN = path.join('tools', 'gone', 'test-related.ts')
 const MAIN_SOURCE = path.join('scripts', 'test', 'test-related-main.ts')
 const SHARED_TEST = path.join('scripts', 'test', 'test-related-scope.test.ts')
