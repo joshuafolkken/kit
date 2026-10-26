@@ -250,8 +250,12 @@ function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<Issu
 // each of them; the file opens with its imports, so under this test nothing claims it. Position is
 // what separates the two, so no count of how many signatures appear is needed — and a body naming
 // several can no longer be attributed to any of them.
+//
+// **The harness's own label is not the body.** It writes a deny as `PreToolUse:<Tool> hook error: ⛔ …`,
+// so the label is stripped before the opening is read; compared raw, no recorded refusal matched
+// (joshuafolkken/kit#4961).
 function refused_id(text: string): string | undefined {
-	const body = text.trimStart()
+	const body = time_transcript_line.refusal_body(text)
 	const found = delivered_rules.MEASURED_RULES.find((rule) =>
 		[rule.reason, ...(rule.former_reasons ?? [])].some((reason) =>
 			body.startsWith(reason.slice(0, REASON_SIGNATURE_LENGTH)),

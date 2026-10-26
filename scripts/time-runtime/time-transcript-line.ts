@@ -145,8 +145,12 @@ function block_names(raw: TranscriptBlock): Pick<Block, 'type' | 'name' | 'id' |
 // **The harness writes the reason behind its own label** — `PreToolUse:Edit hook error: ⛔ …` — so that
 // label is stripped before the opening is read. Without it no live refusal
 // carried a guard: the fixtures wrote the bare `⛔` body and passed while every recorded one read `''`.
+function refusal_body(text: string): string {
+	return text.trimStart().replace(HOOK_ERROR_LABEL, '')
+}
+
 function guard_from_refusal(text: string): string {
-	const trimmed = text.trimStart().replace(HOOK_ERROR_LABEL, '')
+	const trimmed = refusal_body(text)
 	if (!trimmed.startsWith(REFUSAL_MARKER)) return ''
 
 	const headline = trimmed.slice(REFUSAL_MARKER.length).split('\n', 1)[0]?.trimStart() ?? ''
@@ -282,6 +286,7 @@ const time_transcript_line = {
 	guard_from_refusal,
 	parse_line,
 	parse_text,
+	refusal_body,
 }
 
 export type { Block, TranscriptLine }
