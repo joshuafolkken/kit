@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
@@ -6,6 +7,7 @@ import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { figure_format } from '#scripts/lib/figure-format'
+import { json_value } from '#scripts/lib/json-value'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
@@ -133,6 +135,32 @@ function uncut_run_issue(state: LaneCostState): string | undefined {
 	return state.carried()?.issue === issue ? undefined : issue
 }
 
+function file_path_of(call: GuardedCall): string {
+	if (!json_value.is_record(call.input)) return ''
+
+	const value = call.input['file_path']
+
+	return typeof value === 'string' ? value : ''
+}
+
+// **The handoff the refusal asks for is never refused** (joshuafolkken/kit#4975). Only a reissue
+// inside the window passed, so a run that ran a check between the refusal and the handoff `Write`
+// could not write it, and `run:cut --impl` relaunched on the previous cut's stale handoff.
+function is_handoff_write(call: GuardedCall, directory: string, issue: string): boolean {
+	const handoff = path.resolve(directory, run_cut_handoff.handoff_path_of(issue))
+
+	return path.resolve(directory, file_path_of(call)) === handoff
+}
+
+// The uncut run an edit would be refused for — none where the edit is that run's own handoff.
+function refusable_issue(call: GuardedCall, state: LaneCostState): string | undefined {
+	const issue = uncut_run_issue(state)
+
+	if (issue === undefined) return undefined
+
+	return is_handoff_write(call, state.directory, issue) ? undefined : issue
+}
+
 // **An unmeasurable session is cut in a lane and left alone outside one.** A lane child's safety net is
 // the pre-gate direction below; a held run outside a lane is a person's own session, so only a measured
 // `over` interrupts it — a provider with no transcript would otherwise refuse every edit it makes.
@@ -161,7 +189,7 @@ function is_over_threshold_edit(
 ): boolean {
 	if (!is_edit_tool(call.name)) return false
 
-	const issue = uncut_run_issue(state)
+	const issue = refusable_issue(call, state)
 
 	if (issue === undefined) return false
 
@@ -230,7 +258,8 @@ const ROW = {
 			'`.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold"',
 		fires:
 			'an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing',
-		quiet: 'not a lane child, a non-editing tool, already cut, or under the threshold',
+		quiet:
+			"not a lane child, a non-editing tool, the run's own handoff file, already cut, or under the threshold",
 	},
 }
 

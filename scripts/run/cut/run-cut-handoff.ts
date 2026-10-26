@@ -165,10 +165,18 @@ function describe_handoff(handoff: Handoff): string {
 // untracked non-ignored file, cannot commit the note with the code. A refusal that asked for "a file"
 // and named no place got one written beside the code and committed (joshuafolkken/kit#3603).
 const HANDOFF_PATH = '.josh/tmp/handoff-<N>.json'
+const ISSUE_PLACEHOLDER = '<N>'
+
+// The handoff path for one issue, relative to the checkout — the path `HANDOFF_PATH` tells the run
+// to write, so the implementation-cut guard can let that one write through.
+function handoff_path_of(issue: string): string {
+	return HANDOFF_PATH.replace(ISSUE_PLACEHOLDER, () => issue)
+}
 
 const run_cut_handoff = {
 	HANDOFF_FORMAT,
 	HANDOFF_PATH,
+	handoff_path_of,
 	carried_findings,
 	describe_handoff,
 	handoff_schema,

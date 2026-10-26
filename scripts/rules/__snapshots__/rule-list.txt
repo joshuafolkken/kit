@@ -138,7 +138,7 @@
   - not automated: the right act is another command, whose arguments the call does not carry
 - **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
-  - silent: not a lane child, a non-editing tool, already cut, or under the threshold
+  - silent: not a lane child, a non-editing tool, the run's own handoff file, already cut, or under the threshold
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Question 0 and the ordering question before writing a rule into prose** (`rule-body`, `residency.md`)
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` to `CLAUDE.md` / `prompts/**/*.md` / `.claude/skills/**/*.md` appending at least the threshold. Refused until both `pnpm josh oracle:list` and `pnpm josh run:step` ran
