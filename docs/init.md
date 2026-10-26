@@ -152,7 +152,8 @@ The following table describes the `full` profile. The profile table above lists 
 kit ships with permission prompts off, so the unattended commands (`fullrun`, `backlogrun`, …) do not stall:
 
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
-- `.claude/settings.json` sets `permissions.defaultMode` to `bypassPermissions` with `Bash(*)` allowed.
+- `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is.
+- `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
 
 The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
 
@@ -165,13 +166,12 @@ With the prompts off, text the agent reads can run with your permissions. An ins
 
 kit does not turn on Claude Code's sandbox by default ([#4022](https://github.com/joshuafolkken/kit/issues/4022)). The `gh` token stays reachable through github.com, which an allowlist has to keep, so the sandbox would not stop a leak through GitHub; and on macOS it breaks the `gh` and SSH `git push` calls `pnpm josh` makes.
 
-**Since Claude Code v2.1.257, a `permissions.defaultMode` of `bypassPermissions` is ignored in `.claude/settings.json` and `.claude/settings.local.json`.** For an unattended run on a current CLI, set it in `~/.claude/settings.json` or pass `--permission-mode bypassPermissions`. `backlogrun` passes that flag to the sessions it starts.
+**Since Claude Code v2.1.257, a `permissions.defaultMode` of `bypassPermissions` is ignored in `.claude/settings.json` and `.claude/settings.local.json`.** For an unattended run on a current CLI, set it in `~/.claude/settings.json` or pass `--permission-mode bypassPermissions`. On an older CLI, set it in `~/.claude/settings.json` or `.claude/settings.local.json`.
 
 **To opt out, decide before the first session:**
 
 - To keep the prompts in the VS Code extension, set `"claudeCode.initialPermissionMode": "default"` and `"claudeCode.allowDangerouslySkipPermissions": false` in your `.vscode/settings.json`. Set the values rather than deleting the keys — `josh sync` adds a missing key back.
-- On a Claude Code older than v2.1.257, override `permissions.defaultMode` in `.claude/settings.local.json`, not the project file — `josh sync` resets kit's keys there ([sync.md](./sync.md)).
-- To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` in either file; kit does not ship that key, so it survives a sync.
+- To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` in `.claude/settings.json` or `.claude/settings.local.json`; kit does not ship that key, so it survives a sync.
 
 ### tsconfig merge strategy
 

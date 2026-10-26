@@ -246,10 +246,12 @@ const UNBLOCKED_COMMANDS: ReadonlyArray<string> = [
 ]
 
 describe('.claude/settings.json — permissions', () => {
-	it('keeps defaultMode set to bypassPermissions', () => {
+	// Claude Code v2.1.257 and later ignore a project file's defaultMode, so kit ships none and a
+	// sync leaves the project's own mode as it is (joshuafolkken/kit#4997).
+	it('does not ship a defaultMode', () => {
 		const settings = load_settings()
 
-		expect(settings.permissions.defaultMode).toBe('bypassPermissions')
+		expect(settings.permissions).not.toHaveProperty('defaultMode')
 	})
 
 	it('allows all Bash commands via wildcard so per-command entries do not accumulate', () => {

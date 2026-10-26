@@ -154,14 +154,24 @@ describe('merge_claude_settings — permissions', () => {
 		expect(merged.permissions['allow']).toEqual(['Bash(*)', OWN_ALLOW])
 	})
 
-	it("sets a scalar kit ships back to kit's value and keeps a key kit does not ship", () => {
+	it.each(['plan', 'default', 'acceptEdits'])("keeps a project's own defaultMode: %s", (mode) => {
 		const merged = merged_with((settings) => {
-			settings.permissions['defaultMode'] = 'plan'
+			settings.permissions['defaultMode'] = mode
 			settings.permissions['disableBypassPermissionsMode'] = 'disable'
 		})
 
-		expect(merged.permissions['defaultMode']).toBe(parse(DISTRIBUTED).permissions['defaultMode'])
+		expect(merged.permissions['defaultMode']).toBe(mode)
 		expect(merged.permissions['disableBypassPermissionsMode']).toBe('disable')
+	})
+
+	it('leaves the bypassPermissions defaultMode an earlier sync wrote as it is', () => {
+		const existing = existing_with((settings) => {
+			settings.permissions = { defaultMode: 'bypassPermissions', ...settings.permissions }
+		})
+		const merged = parse(merge_claude_settings(existing, DISTRIBUTED))
+
+		expect(merged.permissions['defaultMode']).toBe('bypassPermissions')
+		expect(merged).toEqual(parse(existing))
 	})
 })
 

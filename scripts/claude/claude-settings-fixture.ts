@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url'
 const SETTINGS_PATH = fileURLToPath(new URL('../../.claude/settings.json', import.meta.url))
 
 interface PermissionsBlock {
-	defaultMode: string
 	allow: ReadonlyArray<string>
 	deny: ReadonlyArray<string>
 }
