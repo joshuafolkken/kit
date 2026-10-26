@@ -46,12 +46,12 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 
 **`.claude/settings.json` is merged, not overwritten**: sync replaces kit's entries and keeps the ones your project added, so a shared hook or permission can live in the committed file.
 
-| Part of the file                        | What sync does                                                                                                                                                |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. Every other hook stays, after kit's.                                       |
-| `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed.           |
-| Other keys kit ships                    | Set to kit's value (`permissions.defaultMode`, for example). Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay. |
-| Keys kit does not ship                  | Left as they are.                                                                                                                                             |
+| Part of the file                        | What sync does                                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. Every other hook stays, after kit's.                             |
+| `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed. |
+| Other keys kit ships                    | Set to kit's value. Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay.                                |
+| Keys kit does not ship                  | Left as they are (`permissions.defaultMode`, for example).                                                                                          |
 
 - A hook is kit's when its command runs kit's hook launcher (`scripts/hooks/run-hook.sh`) or the installed `dist/josh.js`, or is exactly one of the six `pnpm josh <command>` hooks kit distributed before 2026-09-13 (`audit:provision`, `batch:guard`, `format:edited`, `investigation:guard`, `rule:guard`, `session:lang`).
 - A kit `deny` cannot be removed from the project file: the list is part of the verification gate's guardrail. If one is wrong for your project, open an issue on kit.

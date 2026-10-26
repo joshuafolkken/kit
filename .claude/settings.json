@@ -1,6 +1,5 @@
 {
 	"permissions": {
-		"defaultMode": "bypassPermissions",
 		"allow": ["Bash(*)"],
 		"deny": [
 			"Bash(rm -rf *)",
