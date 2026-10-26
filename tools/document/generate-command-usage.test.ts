@@ -74,7 +74,7 @@ describe('generate command usage', () => {
 	it('names the regeneration command when a page is stale', () => {
 		expect(() => {
 			expect_page_current(STALE_PAGE)
-		}).toThrow('run `tsx tools/document/generate-command-usage.ts`')
+		}).toThrow('run `pnpm josh command:derive`')
 	})
 })
 
@@ -86,7 +86,9 @@ describe('the usage spans cover the command map', () => {
 			generate_command_usage.usage_spans(page_text(page)),
 		)
 
-		expect(sorted(spans)).toEqual(sorted(Object.keys(COMMAND_MAP)))
+		const message = `a command has no usage span, or a span names no command — run \`${generate_command_usage.REGENERATE_COMMAND}\``
+
+		expect(sorted(spans), message).toEqual(sorted(Object.keys(COMMAND_MAP)))
 	})
 
 	it('renders exactly the developer-audience commands on the developer page', () => {

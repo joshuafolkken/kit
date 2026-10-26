@@ -1,0 +1,8 @@
+{
+	"reason": "new kit-only command:derive (#4970): its script, tests, the stale-span stop and the split-out generate-catalog-main entry add code lines; the generated catalog row carries the standard kit-only bold marker",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 202,
+		"prose.excess_bold": 1
+	}
+}

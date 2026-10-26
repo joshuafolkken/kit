@@ -70,6 +70,19 @@ describe('test_state_guard.format_violations', () => {
 	})
 })
 
+describe('test_state_guard.tracked_status', () => {
+	const source_line = ' M src/source.ts'
+	const status = ` M scripts/a/__snapshots__/a.test.ts.snap\n${source_line}`
+
+	it('leaves snapshot files out of an update run', () => {
+		expect(test_state_guard.tracked_status(status, true)).toBe(source_line)
+	})
+
+	it('keeps snapshot files in any other run', () => {
+		expect(test_state_guard.tracked_status(status, false)).toBe(status)
+	})
+})
+
 describe('test_state_guard.env_diff', () => {
 	it('returns empty array when env is unchanged', () => {
 		expect(test_state_guard.env_diff(EMPTY_GIT_ENV, EMPTY_GIT_ENV)).toEqual([])

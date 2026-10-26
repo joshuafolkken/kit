@@ -72,6 +72,7 @@ const ALIASES: Record<string, string> = {
 	ov: 'overrides',
 	a: 'audit',
 	rt: 'reconcile-templates',
+	cdv: 'command:derive',
 	u: 'latest',
 	lc: 'latest:corepack',
 	lu: 'latest:update',

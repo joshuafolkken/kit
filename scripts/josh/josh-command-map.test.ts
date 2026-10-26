@@ -125,7 +125,8 @@ describe('COMMAND_MAP — reference metadata', () => {
 			Object.entries(COMMAND_MAP).map(([name, entry]) => [name, entry.reference]),
 		)
 
-		expect({ aliases: ALIASES, references }).toMatchSnapshot()
+		// The hint is printed with a mismatch, so a stale snapshot names the command that rewrites it (#4970).
+		expect({ aliases: ALIASES, references }).toMatchSnapshot('regenerate: pnpm josh command:derive')
 	})
 })
 

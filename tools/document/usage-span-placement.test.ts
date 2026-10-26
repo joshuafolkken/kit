@@ -1,0 +1,126 @@
+import type { CommandEntry } from '#scripts/josh/josh-command-map'
+import { describe, expect, it } from 'vitest'
+import { usage_span_placement } from './usage-span-placement'
+
+type PlacedEntry = Pick<CommandEntry, 'category' | 'reference'>
+
+const DEVELOPER_PAGE = 'docs/josh-commands.md'
+const BACKLOG_PAGE = 'docs/josh-commands-backlog.md'
+const AUTOMATION_PAGE = 'docs/josh-commands-automation.md'
+const AUTOMATION: CommandEntry['reference'][1] = 'automation'
+const AI_TOOLS: CommandEntry['category'] = 'AI tools'
+const STASH_PUSH = 'stash:push'
+const RULESET_CHECK = 'ruleset:check'
+const RESERVED_RUN = 'reserved-run'
+
+function section(name: string): string {
+	return `### \`josh ${name}\`\n\n<!-- usage: ${name} -->\n<!-- /usage -->\n`
+}
+
+function pages(): ReadonlyMap<string, string> {
+	return new Map([
+		[DEVELOPER_PAGE, `# Dev\n\n## Development\n\n${section('lint')}\n## Project\n\n`],
+		[
+			BACKLOG_PAGE,
+			`## Issues\n\n${section('issue:read')}\n#### Detail\n\nmore\n\n${section(STASH_PUSH)}`,
+		],
+		[
+			AUTOMATION_PAGE,
+			`## Maintenance\n\n${section(RULESET_CHECK)}\n## Git hooks\n\n${section(RESERVED_RUN)}`,
+		],
+	])
+}
+
+function entry(
+	category: CommandEntry['category'],
+	audience: CommandEntry['reference'][1],
+): PlacedEntry {
+	return { category, reference: ['', audience, ['none']] }
+}
+
+function maintenance_entry(): PlacedEntry {
+	return entry('Maintenance', 'maintainer')
+}
+
+const FRESH_NEW = 'fresh:new'
+const ENDS_MAINTENANCE = `${section(RULESET_CHECK)}\n${section(FRESH_NEW)}\n## Git hooks`
+
+function placed(name: string, placed_entry: PlacedEntry): ReadonlyMap<string, string> {
+	return usage_span_placement.place_missing_spans(pages(), { [name]: placed_entry })
+}
+
+// The automation page after `rewrite`, with a span placed for a Maintenance command.
+function fresh_on_automation(rewrite: (page: string) => string): string | undefined {
+	const rewritten = new Map([
+		...pages(),
+		[AUTOMATION_PAGE, rewrite(pages().get(AUTOMATION_PAGE) ?? '')],
+	])
+
+	return usage_span_placement
+		.place_missing_spans(rewritten, { [FRESH_NEW]: maintenance_entry() })
+		.get(AUTOMATION_PAGE)
+}
+
+describe('placing the span of a command no page renders yet', () => {
+	it('puts a developer command on the developer page, after the commands sharing its prefix', () => {
+		const text = placed('lint:new', entry('Development', 'developer')).get(DEVELOPER_PAGE)
+
+		expect(text).toContain(`${section('lint')}\n${section('lint:new')}\n## Project`)
+	})
+
+	it('puts any other command after the last section of its prefix, keeping that section whole', () => {
+		const text = placed('issue:new', entry(AI_TOOLS, AUTOMATION)).get(BACKLOG_PAGE)
+
+		expect(text).toContain(`more\n\n${section('issue:new')}\n${section(STASH_PUSH)}`)
+	})
+
+	it('ends its category section on the automation page when no page shares its prefix', () => {
+		const text = placed(FRESH_NEW, maintenance_entry()).get(AUTOMATION_PAGE)
+
+		expect(text).toContain(ENDS_MAINTENANCE)
+	})
+
+	it('finds its category section below the page title too', () => {
+		const text = fresh_on_automation((page) => `# Automation\n\n${page}`)
+
+		expect(text).toContain(ENDS_MAINTENANCE)
+	})
+
+	it('appends to the automation page when its category has no section there', () => {
+		const text = placed('bump:new', entry('Versioning', AUTOMATION)).get(AUTOMATION_PAGE)
+
+		expect(text?.endsWith(`${section(RESERVED_RUN)}\n${section('bump:new')}`)).toBe(true)
+	})
+
+	it('leaves every page as it was when each command already has a span', () => {
+		expect(placed(STASH_PUSH, entry(AI_TOOLS, AUTOMATION))).toStrictEqual(pages())
+	})
+
+	it('keeps the rule closing its category section below the new section', () => {
+		const text = fresh_on_automation((page) => page.replace('## Git', '---\n\n## Git'))
+
+		expect(text).toContain(`${section(FRESH_NEW)}\n---\n\n## Git hooks`)
+	})
+})
+
+describe('naming the spans no command owns', () => {
+	it('names each span whose command is gone, with its page', () => {
+		const commands = {
+			lint: entry('Development', 'developer'),
+			[RULESET_CHECK]: maintenance_entry(),
+		}
+
+		expect(usage_span_placement.stale_spans(pages(), commands)).toStrictEqual([
+			`${BACKLOG_PAGE}: issue:read`,
+			`${BACKLOG_PAGE}: ${STASH_PUSH}`,
+			`${AUTOMATION_PAGE}: ${RESERVED_RUN}`,
+		])
+	})
+
+	it('names none when every span has its command', () => {
+		const spans = [...pages().values()].flatMap((text) => text.match(/(?<=usage: )\S+/gu) ?? [])
+		const commands = Object.fromEntries(spans.map((name) => [name, maintenance_entry()]))
+
+		expect(usage_span_placement.stale_spans(pages(), commands)).toStrictEqual([])
+	})
+})

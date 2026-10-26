@@ -73,7 +73,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'docs/josh-commands-automation.md', bytes: 45_056 },
+	// `command:derive`'s usage section (joshuafolkken/kit#4970) crossed the 45056 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
 	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	{ path: 'docs/josh-commands-run.md', bytes: 81_920 },
