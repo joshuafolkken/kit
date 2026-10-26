@@ -17,7 +17,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 4. Run `pnpm josh ms`, then update dependencies only where the `run:prep` report answers
    `latest: required` — `latest-gate.md` is its single source, and on `required` load the
    `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it refuses
-   in a lane, and `pnpm josh main:merge` brings the latest default in during the gate. The parent runs
+   in a lane, and ship's sync brings the latest default in before its gate. The parent runs
    `pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
    `backlogrun-child.md` are the single sources.
 5. Implement. The `plan` event `run:board` draws 📝 from is written by code — by `run:entry` for a

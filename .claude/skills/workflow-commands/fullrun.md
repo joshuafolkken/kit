@@ -17,7 +17,7 @@ run's next single action. `chain-rule.md`, `followup.md`, `background-commands.m
 
 - **A lane child asks whether it is a resume first — `pnpm josh run:cut --resume <N>`** (`run:entry` asks it
   before the hold); on `resume` it skips the title, plan, hold and implementation and goes to the gate. At the pre-gate
-  boundary — immediately after `pnpm josh main:merge`, before the gate — it takes the cut with
+  boundary of `chain-rule.md` step 1 — step 0's ship fallen through, before the gate — it takes the cut with
   `pnpm josh run:cut <N>` (the ordered step in `chain-rule.md`, which names the cut's single source),
   and it records any park on the Issue before the stop notify. A run that is not a lane child never
   reads the cut's document.
