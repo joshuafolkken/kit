@@ -96,7 +96,8 @@ async function names_pressure(): Promise<void> {
 }
 
 // joshuafolkken/kit#4451: the wait cap released a lone claim into the swap stall it waited on. Each poll
-// runs past the cap; the stall lasts three of them, and the claim starts only once it passes.
+// runs past the cap; the stall lasts three of them, and the claim starts only once it passes. Its load
+// never eases either, and that does not release it before the stall passes (joshuafolkken/kit#4982).
 const STALL_POLLS = 3
 const WAIT_CAP_MS = 10
 
@@ -109,6 +110,7 @@ async function waits_out_a_stall_past_the_cap(): Promise<void> {
 		report: vi.fn<(line: string) => void>(),
 		read_machine: async () => (clock.polls < STALL_POLLS ? PRESSURED : UNREAD),
 		wait_cap_ms: WAIT_CAP_MS,
+		ease_window_ms: WAIT_CAP_MS,
 		now: () => clock.now,
 		sleep: async () => {
 			clock.now += WAIT_CAP_MS

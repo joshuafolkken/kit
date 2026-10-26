@@ -1,0 +1,7 @@
+{
+	"reason": "test:related leaves a whole-suite file only a main sync moved to main's CI (#4993)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

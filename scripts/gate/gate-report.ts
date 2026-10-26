@@ -209,7 +209,8 @@ function format_failure_actions(failed: ReadonlyArray<GateStepResult>): string {
 }
 
 // **A check that started past the core budget is said in the summary, not only in the log**.
-// The wait cap admits a check that waited two minutes whatever the budget says,
+// The wait cap admits a check that waited two minutes whatever the budget says — sooner where outside
+// load holds it and does not ease —
 // so a gate that ran over-subscribed would otherwise look exactly like one that fitted.
 function format_budget_notes(results: ReadonlyArray<GateStepResult>): string {
 	const lines = results.flatMap((result) =>
