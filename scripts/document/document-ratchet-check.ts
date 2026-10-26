@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import { project_checks } from '#scripts/gate/project-checks'
 import { command_reference_line_budget } from './command-reference-line-budget'
 import { issue_citation_budget } from './issue-citation-budget'
 
@@ -13,6 +14,9 @@ import { issue_citation_budget } from './issue-citation-budget'
 // It reads no change of its own: `lint:related` hands in the files it already resolved. The citation
 // check holds the documents the budget records; a document with no entry, and the whole-list checks
 // (a stale or a zero entry), stay with the gate's test, which knows the agent-read set.
+//
+// Both ratchets are kit's: the budget records kit's paths, and a consumer's own file at one of them
+// holds its own count, so a consumer root is checked by neither.
 
 const LABEL = 'document ratchet'
 
@@ -74,6 +78,7 @@ function report(messages: ReadonlyArray<string | undefined>): number {
 // The check over a resolved change: the long-line ceiling when it touches a command reference page,
 // and the citation count of every changed file the budget records. An unrelated change reads nothing.
 function check_files(root: string, absolute_files: ReadonlyArray<string>): number {
+	if (!project_checks.is_kit_repository(root)) return 0
 	const long_line = touches_command_reference(root, absolute_files)
 		? long_line_message(root)
 		: undefined
@@ -83,6 +88,7 @@ function check_files(root: string, absolute_files: ReadonlyArray<string>): numbe
 
 // The whole-tree fallback: the long-line ceiling and every recorded document, a superset of any change.
 function check_all(root: string): number {
+	if (!project_checks.is_kit_repository(root)) return 0
 	const absolute_files = issue_citation_budget.ISSUE_CITATION_BUDGET.map((entry) =>
 		path.join(root, entry.path),
 	)

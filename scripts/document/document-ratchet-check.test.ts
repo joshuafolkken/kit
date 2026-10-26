@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { KIT_PACKAGE_NAME } from '#scripts/version/kit-descriptor'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { command_reference_line_budget } from './command-reference-line-budget'
 import { document_ratchet_check } from './document-ratchet-check'
@@ -91,5 +92,17 @@ describe('document_ratchet_check.check_all', () => {
 		write(REFERENCE_PAGE, Array.from({ length: MAX_LONG_LINES + 1 }, () => LONG_LINE).join('\n'))
 
 		expect(document_ratchet_check.check_all(root)).toBe(1)
+	})
+})
+
+describe('document_ratchet_check — a consumer root', () => {
+	it('checks neither ratchet, since the budget holds kit’s paths and not the consumer’s files', () => {
+		write('package.json', JSON.stringify({ devDependencies: { [KIT_PACKAGE_NAME]: '*' } }))
+		write(REFERENCE_PAGE, Array.from({ length: MAX_LONG_LINES + 1 }, () => LONG_LINE).join('\n'))
+		const changed = write(CITING_PAGE, citations(recorded_citations_for(CITING_PAGE) + 1))
+
+		expect(document_ratchet_check.check_files(root, [changed])).toBe(0)
+		expect(document_ratchet_check.check_all(root)).toBe(0)
+		expect(written_output()).toBe('')
 	})
 })
