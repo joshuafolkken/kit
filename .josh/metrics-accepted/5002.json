@@ -1,0 +1,8 @@
+{
+	"reason": "run:review --join reads a probe it restarted on a moved tree without the 120s grace, with its own pending note, and the test:pinned tree key skips run records via run_record_path; prompts/review.md and docs prose describe the restarted-check hand-off to the ship's pre-detach (#5002)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 10,
+		"ai_cost.on_demand_bytes": 46
+	}
+}

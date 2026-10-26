@@ -71,24 +71,32 @@ function errored(): string {
 		.join('')
 }
 
-// joshuafolkken/kit#4878: the join after a round-1 fix reads the fixed tree's check.
+// joshuafolkken/kit#4878: the join after a round-1 fix reads the fixed tree's check;
+// joshuafolkken/kit#5002: as it stands, never waiting the grace on a probe it just started.
 describe('run --join on a tree a round-1 fix moved', () => {
-	it('starts the check again on the fixed tree before it waits', async () => {
-		const fixed_tree = 'fixed-tree'
+	const fixed_tree = 'fixed-tree'
 
+	beforeEach(() => {
 		vi.mocked(run_review_pinned_steps.launched_tree).mockReturnValue('briefed-tree')
 		vi.spyOn(run_review_pinned_tree, 'key').mockResolvedValue(fixed_tree)
 		vi.spyOn(run_review_pinned_steps, 'clear').mockReturnValue(undefined)
+		vi.spyOn(run_review_pinned_steps, 'is_pending').mockReturnValue(false)
+	})
+
+	it('starts the check again on the fixed tree and reads it without waiting', async () => {
 		const launch = vi
 			.spyOn(run_review_pinned_steps, 'launch')
 			.mockReturnValue({ kind: 'launched', pid: 1 })
+		const answer_now = vi.spyOn(run_review_pinned_steps, 'answer_now').mockReturnValue(undefined)
 
 		await run_review_cli.run(['--join'])
 
 		expect(launch).toHaveBeenCalledWith(expect.any(String), undefined, fixed_tree)
-		expect(launch.mock.invocationCallOrder[0]).toBeLessThan(
-			vi.mocked(run_review_pinned_steps.wait_for_answer).mock.invocationCallOrder[0] ?? 0,
+		expect(answer_now).toHaveBeenCalledWith(
+			expect.any(String),
+			expect.stringContaining('started again on the moved tree'),
 		)
+		expect(run_review_pinned_steps.wait_for_answer).not.toHaveBeenCalled()
 	})
 })
 

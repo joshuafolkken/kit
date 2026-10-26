@@ -519,7 +519,8 @@ The default waits only for the gate to _start_ and writes the brief to a file an
 (a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
-never drains (`--unpinned-ok`: above). The reason and places `--unpinned-ok` accepted stay for the
+never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
+it is left running for the ship's pre-detach, as under `--fixing`. The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
 while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
 `josh ship --review` given no reason carries it as its `--unpinned-ok`. A scoped refusal launches

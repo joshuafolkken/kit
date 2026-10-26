@@ -99,6 +99,32 @@ describe('run_review_pinned_join.wait_for_join on a tree a round-1 fix moved', (
 	})
 })
 
+// joshuafolkken/kit#5002: `--join` without `--fixing` started the check again on the moved tree, then
+// waited the grace on a probe that never ends within it.
+describe('run_review_pinned_join.wait_for_join on a moved tree with no fixes to make', () => {
+	it('waits no grace on the check it started again and leaves it running', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, BRIEFED_TREE)
+		const now = vi.fn(() => 0)
+
+		const answer = await run_review_pinned_join.wait_for_join(ROOT, now)
+
+		expect(now).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.launched_tree(ROOT)).toBe(FIXED_TREE)
+		expect(process.kill).not.toHaveBeenCalledWith(-FIXED_PID, 'SIGTERM')
+		expect(answer?.unpinned).toStrictEqual([])
+		expect(answer?.text).toContain('started again on the moved tree')
+		expect(answer?.text).not.toContain(FIXING_TEXT)
+	})
+
+	it('still waits the grace for the answer on an unmoved tree', async () => {
+		run_review_pinned_steps.launch(ROOT, REASON, FIXED_TREE)
+		const waited = vi.spyOn(run_review_pinned_steps, 'wait_for_answer').mockResolvedValue(ANSWER)
+
+		expect(await run_review_pinned_join.wait_for_join(ROOT)).toStrictEqual(ANSWER)
+		expect(waited).toHaveBeenCalledWith(ROOT, undefined)
+	})
+})
+
 // joshuafolkken/kit#4895: the join waited out the grace on a tree round 1's fixes were about to move.
 describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () => {
 	it('waits no grace on a running check and leaves it running', async () => {
