@@ -18,7 +18,9 @@ import { fileURLToPath } from 'node:url'
 // that called it: `import-graph.ts` read some 3,700 paths that way, and `vitest related` widened each
 // to every test importing it. Such a read belongs to the test running it, recorded beside, so an
 // outermost frame with a function name records no module. A module's top-level code runs with no
-// function name; so does an anonymous callback, which keeps the widening — the safe side.
+// function name; so does an anonymous callback, which keeps the widening — the safe side. A top-level
+// `await` of a named function that reads after an `await` of its own narrows to the first importing
+// test; no module does that today, and CI's whole suite would catch the miss.
 
 type ReadRecords = Record<string, Array<string>>
 
@@ -103,7 +105,7 @@ function read_target(argument: unknown, cwd: string): string | undefined {
 }
 
 // One call site: its script name, and the name of the function running there — empty for a module's
-// top-level code.
+// top-level code or an anonymous callback.
 interface CallFrame {
 	script_name: string
 	function_name: string
