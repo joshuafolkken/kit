@@ -54,7 +54,7 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 | Keys kit does not ship                  | Left as they are.                                                                                                                                             |
 
 - A hook is kit's when its command runs kit's hook launcher (`scripts/hooks/run-hook.sh`) or the installed `dist/josh.js`, or is exactly one of the six `pnpm josh <command>` hooks kit distributed before 2026-09-13 (`audit:provision`, `batch:guard`, `format:edited`, `investigation:guard`, `rule:guard`, `session:lang`).
-- A kit `deny` cannot be removed from the project file: the list guards the verification gate. If one is wrong for your project, open an issue on kit.
+- A kit `deny` cannot be removed from the project file: the list is part of the verification gate's guardrail. If one is wrong for your project, open an issue on kit.
 - An entry kit stops shipping inside an object (an `env` variable, an `enabledPlugins` entry) cannot be told from one you added, so it stays until you delete it. A withdrawn `allow` / `deny` entry is the exception: kit names it and sync removes it.
 - `josh sync --force` replaces the file with the distributed one, dropping your additions.
 - A file that is not a JSON object is replaced with the distributed one. The merge rewrites the file as plain JSON, so comments in it are not kept.

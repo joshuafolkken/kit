@@ -34,7 +34,7 @@ And because kit is a package, `josh sync` brings every project up to the latest 
 
 #### What kit does
 
-**Dangerous operations are physically blocked by deny rules**: force push, branch deletion, index operations including `git add`, `git reset`, PR merges, `rm -rf`, `sudo`. Shared-state changes nobody asked for simply cannot run.
+**Deny rules refuse the habitual form of dangerous operations**: force push, branch deletion, index operations including `git add`, `git reset`, PR merges, `rm -rf`, `sudo`. They are a guardrail, not a sandbox — they match the start of a command, so another spelling gets through ([what that means for you](./init.md#claude-code-permission-mode)).
 
 On top of that, a workflow never starts unless you type its keyword. A conversational request like "clear the backlog" or "implement this" does not start one — and the agent is forbidden from asking "shall I run it?", because a yes to that question would be a back door. If you want it to run, you type the keyword.
 
