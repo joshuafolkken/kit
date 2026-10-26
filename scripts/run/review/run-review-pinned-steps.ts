@@ -264,12 +264,16 @@ async function wait_for_answer(
 }
 
 // The answer as it stands, waiting nothing and stopping nothing; `undefined` when no check was launched.
-function answer_now(root: string = PROJECT_ROOT): PinnedSummary | undefined {
+// A check still running answers with `pending_note`, why it was not waited on.
+function answer_now(
+	root: string = PROJECT_ROOT,
+	pending_note: string = FIXING_NOTE,
+): PinnedSummary | undefined {
 	const launched = read_launch(root)
 
 	if (launched === undefined) return undefined
 
-	return read_answer(root, launched) ?? test_pinned_record.not_run_summary(new Error(FIXING_NOTE))
+	return read_answer(root, launched) ?? test_pinned_record.not_run_summary(new Error(pending_note))
 }
 
 // Whether the last check left its answer, rather than ending without one or never being launched.
@@ -311,6 +315,7 @@ async function wait_alone(
 }
 
 const run_review_pinned_steps = {
+	FIXING_NOTE,
 	answer_now,
 	carry_reason,
 	clear,

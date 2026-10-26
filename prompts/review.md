@@ -24,8 +24,8 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 ## Before round 1 — the implementer's self-check
 
 Answer these nine over your own diff before the scoped pair that precedes round 1 — question 1 once
-`pnpm josh run:review --join` prints its lines after the review, or, under `--join --fixing`, the
-ship's pre-detach — and fix what an
+`pnpm josh run:review --join` prints its lines after the review, or, under `--join --fixing` or a
+check `--join` restarted on a moved tree, the ship's pre-detach — and fix what an
 answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
 fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
 tests and the round cap are unchanged.

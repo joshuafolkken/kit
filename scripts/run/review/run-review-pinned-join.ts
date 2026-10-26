@@ -26,6 +26,8 @@ type Pause = () => Promise<void>
 
 const PENDING_NOTE =
 	'`josh test:pinned` is still running; the hunks below are unpinned by the verdicts it already reached; the round is not stopped on them:'
+const RESTARTED_NOTE =
+	"started again on the moved tree — it is left running for the ship's pre-detach to read"
 
 // The current tree's digest when it differs from the launch's; `undefined` when nothing is to start.
 async function moved_tree(root: string): Promise<string | undefined> {
@@ -81,17 +83,29 @@ async function cached_summary(): Promise<PinnedSummary | undefined> {
 
 // A check still running answers with what the shared cache already holds for the hunks that did not
 // move (joshuafolkken/kit#4936), so round 1 can pin them in its own fixes.
-async function fixing_answer(root: string): Promise<PinnedSummary | undefined> {
+async function fixing_answer(root: string, note: string): Promise<PinnedSummary | undefined> {
 	const cached = run_review_pinned_steps.is_pending(root) ? await cached_summary() : undefined
 
-	return cached ?? run_review_pinned_steps.answer_now(root)
+	return cached ?? run_review_pinned_steps.answer_now(root, note)
+}
+
+// Restarts the check on a moved tree whatever the round, then why the join waits no grace on it;
+// `undefined` when it does wait.
+async function graceless_note(root: string, is_fixing: boolean): Promise<string | undefined> {
+	const is_fresh = await is_restarted(root)
+
+	if (is_fixing) return run_review_pinned_steps.FIXING_NOTE
+
+	return is_fresh ? RESTARTED_NOTE : undefined
 }
 
 // `--join`'s read: the current tree's answer, never a pre-fix tree's. `undefined` when no check was
 // launched. **A ship's own round restarts nothing and leaves nothing running**: under its supervisor
 // no `--pinned` read follows, and the check would hold cores the ship's gate waits on
 // (`review-record-code-round.ts`). **A round 1 with fixes to make waits no grace**
-// (joshuafolkken/kit#4895): the fix moves the tree, so this tree's late answer would go unused.
+// (joshuafolkken/kit#4895): the fix moves the tree, so this tree's late answer would go unused. **Nor
+// does a check it just started again** (joshuafolkken/kit#5002), `--fixing` or not: a fresh probe never
+// ends within the grace, and the ship's pre-detach reads it on this tree.
 async function wait_for_join(
 	root: string = PROJECT_ROOT,
 	now?: Clock,
@@ -101,11 +115,11 @@ async function wait_for_join(
 		return await run_review_pinned_steps.wait_for_answer(root, now, false)
 	}
 
-	await is_restarted(root)
+	const note = await graceless_note(root, is_fixing)
 
-	return is_fixing
-		? await fixing_answer(root)
-		: await run_review_pinned_steps.wait_for_answer(root, now)
+	return note === undefined
+		? await run_review_pinned_steps.wait_for_answer(root, now)
+		: await fixing_answer(root, note)
 }
 
 // A tree git could not read is not the launch's, so the caller runs its own check.
