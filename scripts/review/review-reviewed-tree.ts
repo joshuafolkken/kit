@@ -57,7 +57,7 @@ async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 //
 // **A base the ship's sync moved is unmoved for every path the default branch left alone**
 // (joshuafolkken/kit#4829): with every recorded digest matching, only a synced path the round covers
-// changes what it read. Main's other paths are the scoped pair's, the gate's and CI's to check.
+// and round 2 would execute changes what it read (joshuafolkken/kit#4984). Main's other paths are the scoped pair's, the gate's and CI's to check.
 //
 // **A `josh metrics` approval the branch rewrote is no move** (joshuafolkken/kit#4788): the ship's
 // pre-detach re-record writes it after `review:record`, and it is data `josh metrics` derives and the
@@ -110,8 +110,24 @@ function unsettled_by(cause: string, path?: string): Standing {
 	return { movement: MOVEMENT.UNSETTLED, cause: path === undefined ? cause : `${cause}: ${path}` }
 }
 
+// **A covered file the default branch changed is no move where round 2 would not execute it**
+// (joshuafolkken/kit#4984): documentation, a prompt or an inert path — a generated usage heading main
+// rewrote under the lane's own — changes no runtime the round's verdict covers. Its digest moved with
+// the sync, so it is no move in the changed half either. One a recorded High cites stays moved.
+function is_synced_unexecuted(stamp: FileMapStamp, parts: MovedParts, path: string): boolean {
+	const is_settled = stamp.files[path] !== UNSETTLED_DIGEST
+
+	return is_settled && parts.synced.includes(path) && review_round2.is_unexecuted(path, [])
+}
+
+function is_executed_cover(stamp: FileMapStamp, path: string): boolean {
+	return Object.hasOwn(stamp.files, path) && !review_round2.is_unexecuted(path, [])
+}
+
 function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
-	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
+	return parts.changed.filter(
+		(path) => !is_no_move(stamp, tree, path) && !is_synced_unexecuted(stamp, parts, path),
+	)
 }
 
 // **Round 2 reads a move only where its own delta holds it**: it diffs from the round-1 brief's stamp
@@ -160,7 +176,7 @@ async function standing(
 
 	if (parts === undefined) return unsettled_by(CAUSE.UNREAD)
 
-	const synced = parts.synced.find((path) => Object.hasOwn(stamp.files, path))
+	const synced = parts.synced.find((path) => is_executed_cover(stamp, path))
 
 	if (synced !== undefined) return unsettled_by(CAUSE.SYNCED, synced)
 
