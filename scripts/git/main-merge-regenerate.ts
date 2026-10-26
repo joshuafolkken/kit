@@ -97,7 +97,16 @@ async function resolve(
 	return true
 }
 
-const main_merge_regenerate = { RESOLVED_FILES, resolve }
+// Whether a merge stopping on exactly `files` is one `resolve` would try to finish — asked before any
+// merge, by `josh ship`'s conflict probe, so it never stops on a conflict the sync resolves.
+function is_resolvable(
+	files: ReadonlyArray<string>,
+	table: ReadonlyArray<ResolvedFile> = RESOLVED_FILES,
+): boolean {
+	return resolved_for(files, table).length > 0
+}
+
+const main_merge_regenerate = { RESOLVED_FILES, is_resolvable, resolve }
 
 export type { RegeneratedFile, ResolvedFile, RewrittenFile }
 export { main_merge_regenerate }
