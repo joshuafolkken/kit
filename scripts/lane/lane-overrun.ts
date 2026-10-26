@@ -13,6 +13,7 @@ import { lane_breakdown, type Breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import { lane_child_marker } from './lane-child-marker'
+import { lane_investigation_switch } from './lane-investigation-switch'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
@@ -27,12 +28,14 @@ import { lane_tail_stats } from './lane-tail-stats'
 // it. The session carries the lane's child mark, which makes `issue:file` count its filings against the
 // lane (`issue-file-cap.ts`), and `--found-during` names the same origin; its overrun mark records the
 // filings as the investigation's, not the child's (joshuafolkken/kit#4880). The launch and the session's result both go on the run's
-// event stream as notes.
+// event stream as notes. It runs only while `JOSH_LANE_INVESTIGATION` is on (`lane-investigation-switch.ts`);
+// off by default, an overrun leaves a skipped note in place of the launch (joshuafolkken/kit#5044).
 
 const { EVENT_KIND } = run_event_stream
 const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
 const NO_LEDGER = 'no ledger'
+const DISABLED = 'disabled (JOSH_LANE_INVESTIGATION is not on)'
 
 // A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
 // `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already.
@@ -213,6 +216,8 @@ async function note_text(issue: number, net: LaneNet): Promise<string> {
 	const is_over = lane_tail_stats.is_overrun(net.minutes)
 
 	if (!is_over) return run_event_overrun.within_text(issue, net.minutes)
+	// The switch off, an overrun leaves its skip: no breakdown comment and no launch.
+	if (!lane_investigation_switch.is_on()) return run_event_overrun.skipped_text(issue, DISABLED)
 
 	return await overran_text(issue, net)
 }
@@ -245,8 +250,12 @@ async function investigate_with_retries(issue: number): Promise<void> {
 	}
 }
 
+// With the switch off a lane still notes its net minutes, which `run:board` draws; no earlier lane is
+// retried.
 async function investigate(issue: number): Promise<void> {
-	await guarded(issue, investigate_with_retries)
+	const pass = lane_investigation_switch.is_on() ? investigate_with_retries : investigate_lane
+
+	await guarded(issue, pass)
 }
 
 const lane_overrun = { investigate, launch }
