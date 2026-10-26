@@ -30,7 +30,14 @@ function row_of(number: number, state: ItemState): BoardRow {
 function ended(result: string): Found {
 	const overrun = { kind: 'ended' as const, issue: LONG, result }
 
-	return { filed: [], overrun_filed: [], minutes: 52, overrun, is_investigating: false }
+	return {
+		filed: [],
+		overrun_filed: [],
+		minutes: 52,
+		overrun,
+		longest: undefined,
+		is_investigating: false,
+	}
 }
 
 const UNFILED = ended(run_event_overrun.none_result('waited on a slow CI run'))

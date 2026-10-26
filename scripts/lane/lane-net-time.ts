@@ -23,7 +23,8 @@ function entries_of(entries: ReadonlyArray<LedgerEntry>, issue: number): Array<L
 	return entries.filter((entry) => 'issue' in entry && entry.issue === issue)
 }
 
-// The first dispatch of `issue` to its merge, or `undefined` while either is missing.
+// The first dispatch of `issue` to its merge, or `undefined` while either is missing or the merge comes
+// first.
 function span_of(entries: ReadonlyArray<LedgerEntry>, issue: number): LaneSpan | undefined {
 	const of_issue = entries_of(entries, issue)
 	const from = of_issue.find((entry) => lane_stage_stats.is_dispatch(entry))
@@ -31,7 +32,9 @@ function span_of(entries: ReadonlyArray<LedgerEntry>, issue: number): LaneSpan |
 
 	if (from === undefined || to === undefined) return undefined
 
-	return { from_ms: Date.parse(from.at), to_ms: Date.parse(to.at) }
+	const span = { from_ms: Date.parse(from.at), to_ms: Date.parse(to.at) }
+
+	return span.to_ms < span.from_ms ? undefined : span
 }
 
 function holds_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
@@ -49,6 +52,29 @@ function held_ms(hold: IssueAt, ends: ReadonlyArray<IssueAt>, to_ms: number): nu
 	return Math.min(lane_stop_stats.wait_ms(hold, ends) ?? left_ms, left_ms)
 }
 
+// The waits `net_ms` takes out of `span`, each from its hold to its end, cut at the merge — the
+// intervals `josh lane:breakdown` counts as excluded (`lane-breakdown.ts`).
+function waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	const holds = holds_of(events)
+	const inside = holds.filter(
+		(hold) => hold.issue === issue && hold.at_ms >= span.from_ms && hold.at_ms < span.to_ms,
+	)
+
+	return inside.map((hold) => {
+		const ends = lane_stop_stats.ends_of(
+			entries,
+			holds.filter((other) => other.at_ms > hold.at_ms),
+		)
+
+		return { from_ms: hold.at_ms, to_ms: hold.at_ms + held_ms(hold, ends, span.to_ms) }
+	})
+}
+
 /**
  * The net milliseconds of `issue`'s lane, or `undefined` when the ledger holds no dispatch and merge of
  * it. `events` is the run's event stream, read for the parks and outages.
@@ -60,22 +86,12 @@ function net_ms(
 ): number | undefined {
 	const span = span_of(entries, issue)
 
-	if (span === undefined || span.to_ms < span.from_ms) return undefined
+	if (span === undefined) return undefined
 
-	const holds = holds_of(events)
-	const inside = holds.filter(
-		(hold) => hold.issue === issue && hold.at_ms >= span.from_ms && hold.at_ms < span.to_ms,
+	return waits(entries, events, issue, span).reduce(
+		(left, wait) => left - (wait.to_ms - wait.from_ms),
+		span.to_ms - span.from_ms,
 	)
-	const waits = inside.map((hold) => {
-		const ends = lane_stop_stats.ends_of(
-			entries,
-			holds.filter((other) => other.at_ms > hold.at_ms),
-		)
-
-		return held_ms(hold, ends, span.to_ms)
-	})
-
-	return waits.reduce((left, wait) => left - wait, span.to_ms - span.from_ms)
 }
 
 // The net time in whole minutes, rounded up — the number a causing-lane line declares.
@@ -100,6 +116,7 @@ function missing_reason(entries: ReadonlyArray<LedgerEntry>, issue: number): str
 	return 'cause unknown'
 }
 
-const lane_net_time = { missing_reason, net_minutes, net_ms }
+const lane_net_time = { missing_reason, net_minutes, net_ms, span_of, waits }
 
 export { lane_net_time }
+export type { LaneSpan }

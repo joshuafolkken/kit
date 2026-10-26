@@ -25,6 +25,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "i": "init",
     "l": "lint",
     "lad": "lane:adopt",
+    "lbd": "lane:breakdown",
     "lc": "latest:corepack",
     "lli": "lane:limit",
     "ln": "lines",
@@ -572,6 +573,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       [
         "files",
         "processes",
+      ],
+    ],
+    "lane:breakdown": [
+      "<issue>",
+      "maintainer",
+      [
+        "none",
       ],
     ],
     "lane:close": [

@@ -26,7 +26,26 @@ describe('run_event_overrun — the start note', () => {
 			minutes: MINUTES,
 			pid: PID,
 			start: undefined,
+			longest: undefined,
 		})
+	})
+})
+
+// joshuafolkken/kit#4995: the start note carries the lane's longest stage for the board.
+describe('run_event_overrun — the start note’s longest stage', () => {
+	it('reads the longest stage back, a spaced name included', () => {
+		const longest = { name: 'between ship stages', minutes: 12 }
+		const text = run_event_overrun.started_text(
+			ISSUE,
+			MINUTES,
+			run_event_overrun.investigating(PID, START),
+			longest,
+		)
+
+		expect(text).toBe(
+			`#4711 overran: 55 min net, longest between ship stages 12 min — investigating in pid 3616 started ${START}`,
+		)
+		expect(run_event_overrun.parse(text)).toMatchObject({ kind: 'started', start: START, longest })
 	})
 
 	it('reads a launched session’s pid and start time back', () => {
@@ -123,5 +142,12 @@ describe('run_event_overrun — the result', () => {
 
 		expect(run_event_overrun.reason_of(run_event_overrun.none_result(reason))).toBe(reason)
 		expect(run_event_overrun.reason_of(bare)).toBe(bare)
+	})
+
+	// joshuafolkken/kit#4995: the board cuts the reason short, so the stages after it must not crowd it.
+	it('leaves the stages judged not reducible out of the reason', () => {
+		const result = `${run_event_overrun.none_result('CI wait')}${run_event_overrun.NOT_REDUCIBLE_LEAD}ship review (CI)`
+
+		expect(run_event_overrun.reason_of(result)).toBe('CI wait')
 	})
 })
