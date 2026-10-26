@@ -166,7 +166,8 @@ describe('issue_priority.lane_minutes', () => {
 	})
 })
 
-// joshuafolkken/kit#4861: the minutes one cause lost rank it within its lane, and set no floor.
+// joshuafolkken/kit#4861: the minutes one cause lost rank it within its lane; their sum's floor is
+// `issue-priority-loss.test.ts`'s (joshuafolkken/kit#4960).
 describe('issue_priority.lost_minutes', () => {
 	const CAUSE_LINE = '- 原因の損失: 16 分\n'
 
@@ -202,11 +203,9 @@ describe('issue_priority.lost_minutes', () => {
 		expect(issue_priority.problem(body('', CAUSE_LINE), [])).toBeUndefined()
 	})
 
-	it('sets no floor, nor does the causing lane beside it', () => {
-		const short_lane = body('', `${lane_line('30')}- 原因の損失: 90 分\n`)
+	it('sets no floor below the summed minutes, however long the causing lane beside it', () => {
 		const long_lane = body('', `${lane_line('98')}- 原因の損失: 2 分\n`)
 
-		expect(issue_priority.floor_of(short_lane)).toBe('normal')
 		expect(issue_priority.floor_of(long_lane)).toBe('normal')
 	})
 })

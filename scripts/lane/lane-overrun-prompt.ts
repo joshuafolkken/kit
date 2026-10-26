@@ -10,10 +10,12 @@ import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 // (joshuafolkken/kit#4928).
 const MAX_FILINGS = 5
 const MIN_MINUTES = 1
+const PRIORITY_COMMAND = 'pnpm josh issue:priority <N>'
 
 // What a duplicate refusal leads to. A recurrence appends its own cause-loss line to the open issue's
 // body, because the backlog ranking reads them only there and sums them (joshuafolkken/kit#4859,
-// joshuafolkken/kit#4928).
+// joshuafolkken/kit#4928); the sum can then reach the high floor, which a body edit does not label
+// (joshuafolkken/kit#4960).
 function duplicate_lines(loss_lines: string): ReadonlyArray<string> {
 	return [
 		'On a duplicate refusal, read each candidate with `pnpm josh issue:read <N>`: one that only fixes',
@@ -21,7 +23,8 @@ function duplicate_lines(loss_lines: string): ReadonlyArray<string> {
 		'fixes the same mechanism is not filed again but gets a comment recording the recurrence with those four',
 		`and ${loss_lines}, and gets those lines added under its background heading too, the cause-loss line`,
 		`appended beside the ones already there, since ranking sums every \`${issue_priority.CAUSE_PREFIX}\` line`,
-		'and reads only the body (`gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`); one',
+		'and reads only the body (`gh api -X PATCH repos/{owner}/{repo}/issues/<N> -F body=@<file>`). Then',
+		`run \`${PRIORITY_COMMAND}\`, which labels it once the sum reaches the high floor. One`,
 		'closed before this lane yet recurring here is filed anew as a recurrence, its number in `--distinct`.',
 		'A cap refusal is final: stop filing.',
 	]
@@ -35,7 +38,8 @@ function file_command(origin: number | undefined): string {
 }
 
 // Each lane pays a fixed review-to-merge cost, so causes one fix place shares are one issue. A fold
-// skips `issue:file`, so it carries the ranked lines; the lane's minutes give it no label.
+// skips `issue:file`, so it carries the ranked lines; the lane's minutes give it no label, and the
+// fold applies the cause-loss floor with `issue:priority` (`issue-fold-existing.md`).
 function grouping(origin: number | undefined, loss_lines: string): string {
 	return [
 		'Causes whose fixes touch the same file or mechanism are one issue, an acceptance criterion per',

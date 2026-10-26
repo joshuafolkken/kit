@@ -62,6 +62,13 @@ describe('lane_overrun_prompt.handling — a recurrence', () => {
 			'the cause-loss line appended beside the ones already there, since ranking sums every `- 原因の損失:` line',
 		)
 	})
+
+	// joshuafolkken/kit#4960: the body edit applies no label, so the floor is re-read after it.
+	it('re-reads the floor with issue:priority after the body edit', () => {
+		expect(handling()).toContain(
+			'-F body=@<file>`). Then run `pnpm josh issue:priority <N>`, which labels it once the sum reaches the high floor.',
+		)
+	})
 })
 
 describe("lane_overrun_prompt.handling — the lane's minutes", () => {

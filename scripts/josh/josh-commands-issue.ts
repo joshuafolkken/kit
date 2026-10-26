@@ -29,6 +29,13 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<issue>', 'automation', ['network']],
 		usage: { examples: [{ arguments: '3773' }] },
 	},
+	'issue:priority': {
+		script: 'scripts/issue/issue-priority-cli.ts',
+		description: 'Apply priority:high to an issue whose body reached the high floor after filing',
+		category: 'AI tools',
+		reference: ['<issue>', 'automation', ['network']],
+		usage: { examples: [{ arguments: '4960' }] },
+	},
 	'issue:read': {
 		script: 'scripts/issue/issue-read-main.ts',
 		description: "Print each issue's title, body and every comment on it, in one call",
