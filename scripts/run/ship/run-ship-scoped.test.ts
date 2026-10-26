@@ -4,6 +4,7 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn<() => Array<string>>())
 const reusable_mock = vi.hoisted(() => vi.fn<() => object | undefined>())
 const rerecord_mock = vi.hoisted(() => vi.fn(async () => false))
+const settle_mock = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => undefined))
 const read_tree_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<{ files: Record<string, string>; base: string }> => ({
 		files: {},
@@ -16,6 +17,7 @@ vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: read_tr
 vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { rerecord: rerecord_mock } }))
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
 vi.mock('#scripts/gate/gate-skip', () => ({ gate_skip: { reusable_green_gate: reusable_mock } }))
+vi.mock('./run-ship-synced-scope', () => ({ run_ship_synced_scope: { settle: settle_mock } }))
 
 const { run_ship_scoped } = await import('./run-ship-scoped')
 
@@ -36,6 +38,34 @@ beforeEach(() => {
 	missing_mock.mockReset().mockReturnValue([])
 	rerecord_mock.mockClear()
 	read_tree_mock.mockClear()
+	settle_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4985: a pair stale only because a merge moved the base, over files that share
+// nothing with the branch, runs nothing and says why.
+describe('run_ship_scoped.scoped_pair — after a merge with the default branch', () => {
+	const SETTLED = 'scoped pair: lint:related and test:related not re-run — no overlap.'
+
+	it('runs neither check when the merge shares nothing with the branch', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		missing_mock.mockReturnValue([LINT, TEST])
+		settle_mock.mockResolvedValue(SETTLED)
+
+		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: OK, out: SETTLED })
+		expect(commands()).toStrictEqual([])
+		expect(write).toHaveBeenCalledWith(`${SETTLED}\n`)
+		expect(settle_mock).toHaveBeenCalledWith({ files: {}, base: 'base' }, [LINT, TEST])
+		write.mockRestore()
+	})
+
+	it('runs the stale checks when the merge meets the branch', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([LINT, TEST])
+	})
 })
 
 describe('run_ship_scoped.scoped_pair', () => {

@@ -72,3 +72,19 @@ describe('josh_command.josh_run — the captured pnpm josh subprocess', () => {
 		expect(result.code).toBe(FALLBACK_EXIT)
 	})
 })
+
+// joshuafolkken/kit#4985: `josh ship` switches the local commit's lint hooks off this way.
+describe('josh_command.josh_run — the environment', () => {
+	it('adds the given variables to the environment the subprocess inherits', async () => {
+		const environment = { JOSH_PRE_COMMIT_LINT: 'off' }
+
+		stub(OK, '')
+
+		await josh_command.josh_run([BUDGET], false, undefined, environment)
+
+		expect(mocked_execa).toHaveBeenCalledWith(PNPM, [JOSH, BUDGET], {
+			...PIPED,
+			env: environment,
+		})
+	})
+})

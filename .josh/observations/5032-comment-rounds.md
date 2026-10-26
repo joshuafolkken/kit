@@ -1,0 +1,1 @@
+- rf:assumptions | low | scripts/run/board/run-board-lane-time.ts:14 | 2026-10-26 | #5032

@@ -12,9 +12,11 @@ import { gate_tree, type GateTree } from './gate-tree'
 // tree neither check has read return their findings one round trip at a time; one call running both
 // checks first returns most of them at once.
 //
-// **It fixes when the checks run, never whether they run.** Nothing here skips a check or
+// **It fixes when the checks run, and only one writer decides whether.** Nothing here skips a check or
 // reinterprets its output, and `josh gate` still runs its four checks exactly as before. The one other
 // reader is the checks' own re-run, which narrows to what moved since this record (`since-green.ts`).
+// The one writer without a run behind it is `josh ship`'s scoped pair after a merge with the default
+// branch that shares nothing with the branch (`run-ship-synced-scope.ts`, joshuafolkken/kit#4985).
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
 // moved" is `file_map_stamp.changed_since` plus the base equality `gate_skip.reusable_green_gate`
@@ -186,8 +188,9 @@ function refusal(missing: ReadonlyArray<string>, next_step: string): string {
 		'282 seconds, 31% of the run, picking up one lint rule and one failing test at a time after its ' +
 		'review had already started. Run them in one call — ' +
 		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — ${next_step} ` +
-		'The record fixes when the checks run and never whether they run: nothing is skipped or reused ' +
-		'because of it. `prompts/review.md` → "The scoped checks answer on the last edit".'
+		'The record fixes when the checks run: only a merge with the default branch sharing nothing ' +
+		"with this branch's change is recorded without a run. " +
+		'`.claude/skills/workflow-commands/chain-rule.md` → "Orchestration facts single-sourced here".'
 	)
 }
 

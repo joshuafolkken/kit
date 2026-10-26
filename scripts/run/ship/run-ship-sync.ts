@@ -4,6 +4,7 @@ import {
 	FAILURE_REASON_CONFLICT,
 } from '#scripts/gh/git-pr-checks-eval'
 import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
+import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -80,10 +81,18 @@ function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string
 // it once the gate is green. A merge that changed the tree is checked by that gate, so the push never
 // carries an unchecked merge and the gate's record names the merge base the push carries. A refusal
 // left — a fetch that failed — does not stop the ship: the commit stage and the followup merge again.
+// The pre-commit prettier, cspell and eslint are switched off for it: the gate or the scoped pair runs
+// the same checks over this tree before anything is pushed, and the hooks only waited for the core
+// budget to repeat them (joshuafolkken/kit#4985).
 async function commit_locally(title: string, is_dirty: boolean): Promise<JoshResult | undefined> {
 	if (!is_dirty) return undefined
 
-	const commit = await josh(['git', '-y', '--skip-push', '--skip-pr', title])
+	const commit = await josh_command.josh_run(
+		['git', '-y', '--skip-push', '--skip-pr', title],
+		should_forward_stderr,
+		undefined,
+		{ [pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off' },
+	)
 
 	return commit.code === SUCCESS_EXIT_CODE ? undefined : commit
 }

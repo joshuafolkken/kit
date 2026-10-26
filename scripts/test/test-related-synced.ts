@@ -23,10 +23,12 @@ import { whole_suite_files } from './whole-suite-files'
 // on is not split either: `test-related.ts` leaves it to main's CI unless this branch changed it too.
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests that run in their place,
-// both repository-root-relative.
+// `meeting` every file whose imports reach both — `shared` and the code between, which `josh ship`'s
+// lint settle reads (joshuafolkken/kit#4985) — all repository-root-relative.
 interface SyncedSplit {
 	left: ReadonlyArray<string>
 	shared: ReadonlyArray<string>
+	meeting: ReadonlyArray<string>
 }
 
 // What the split is read from: the synced modules this branch did not change, the code of its own
@@ -38,7 +40,7 @@ interface SplitInputs {
 	universe: ReadonlyArray<string>
 }
 
-const NOTHING_LEFT: SyncedSplit = { left: [], shared: [] }
+const NOTHING_LEFT: SyncedSplit = { left: [], shared: [], meeting: [] }
 const UNRESOLVED_EXTENSION = '.svelte'
 
 function is_unresolved(file: string): boolean {
@@ -73,12 +75,12 @@ function own_of(
 function split_with(graph: ImportGraph, inputs: SplitInputs): SyncedSplit {
 	const { root, main_only, own, universe } = inputs
 	const from_branch = graph.importers(own, universe)
-	const shared = [...graph.importers(main_only, universe)]
+	const meeting = [...graph.importers(main_only, universe)]
 		.filter((file) => from_branch.has(file))
 		.map((file) => path.relative(root, file))
-		.filter((file) => test_declared_logic.is_test_file(file))
+	const shared = meeting.filter((file) => test_declared_logic.is_test_file(file))
 
-	return { left: main_only.map((file) => path.relative(root, file)), shared }
+	return { left: main_only.map((file) => path.relative(root, file)), shared, meeting }
 }
 
 function absolute_in(root: string, files: ReadonlyArray<string>): Array<string> {

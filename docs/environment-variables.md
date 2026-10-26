@@ -103,11 +103,12 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 
 ### Git hooks
 
-| Variable                  | Required | Default | Used when                                                                                                                                                            |
-| ------------------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `JOSH_PRE_PUSH_FORCE`     | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                   |
-| `JOSH_PRE_COMMIT_FORCE`   | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)). |
-| `JOSH_SECRETLINT_REQUIRE` | No       | off     | `1` makes `josh secretlint-scan` fail rather than skip when secretlint is not installed; the CI `Secret Scan` job sets it.                                           |
+| Variable                  | Required | Default | Used when                                                                                                                                                                                                                          |
+| ------------------------- | -------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JOSH_PRE_PUSH_FORCE`     | No       | off     | `1` runs the pre-push unit suite even on a tree already recorded green ([`josh pre-push-unit`](./josh-commands-automation.md#josh-pre-push-unit)).                                                                                 |
+| `JOSH_PRE_COMMIT_FORCE`   | No       | off     | `1` runs the pre-commit type check even on a tree already recorded green ([`josh pre-commit-type-check`](./josh-commands-automation.md#josh-pre-commit-type-check)).                                                               |
+| `JOSH_PRE_COMMIT_LINT`    | No       | on      | `off` skips the pre-commit prettier, cspell and eslint hooks; `josh ship` sets it for its local commit, whose tree the gate checks before the push ([`josh pre-commit-lint`](./josh-commands-automation.md#josh-pre-commit-lint)). |
+| `JOSH_SECRETLINT_REQUIRE` | No       | off     | `1` makes `josh secretlint-scan` fail rather than skip when secretlint is not installed; the CI `Secret Scan` job sets it.                                                                                                         |
 
 ### Unit tests
 
