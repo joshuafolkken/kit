@@ -68,11 +68,15 @@ class OperationCancelledError extends Error {
 	}
 }
 
+// The head of the line a failed command names the error it ended on with — read back by a stopped
+// `josh ship` stage (joshuafolkken/kit#5052).
+const FAILURE_PREFIX = '❌ Error:'
+
 function display_failure(error: unknown): void {
 	const error_message = error_text.message_of(error)
 
 	console.error('')
-	console.error('❌ Error:', error_message)
+	console.error(FAILURE_PREFIX, error_message)
 
 	if (error instanceof Error && error.cause !== undefined) {
 		display_error_details(error.cause)
@@ -118,6 +122,7 @@ function handle(error: unknown): void {
 }
 
 const git_error = {
+	FAILURE_PREFIX,
 	handle,
 }
 

@@ -1,6 +1,8 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
+import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
+import { git_error } from '#scripts/git/git-error'
 import { describe, expect, it } from 'vitest'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 
@@ -57,6 +59,32 @@ describe('run_ship_stop_cause.cause_of — the standard output a stage kept', ()
 		const failed = { body: `${RED_CHECK}\n${RATE_LIMITED}`, out: RED_CHECK }
 
 		expect(cause_of('followup', failed)).toBe(CAUSE.CHECK)
+	})
+})
+
+// joshuafolkken/kit#5052: a request gh found transient to its last attempt notes so on stderr alone.
+describe('run_ship_stop_cause.cause_of — a gh request whose retries ran out', () => {
+	const EMPTY_ANSWER = 'unexpected end of JSON input'
+	const RETRY_NOTE = `gh: request failed transiently (attempt 1/3: ${EMPTY_ANSWER}) — retrying in 2000 ms`
+	const SPENT = gh_retry.spent_note(EMPTY_ANSWER)
+	const { FAILURE_PREFIX } = git_error
+
+	it('reads a followup stopped on it as the infrastructure, though its stdout names none', () => {
+		const failed = { body: `${RETRY_NOTE}\n${SPENT}\n${FAILURE_PREFIX} ${EMPTY_ANSWER}`, out: '' }
+
+		expect(cause_of('followup', failed)).toBe(CAUSE.INFRA)
+	})
+
+	it('reads a red check whose stderr notes only a recovered retry as a check', () => {
+		expect(cause_of('followup', { body: `${RETRY_NOTE}\n${RED_CHECK}`, out: RED_CHECK })).toBe(
+			CAUSE.CHECK,
+		)
+	})
+
+	it('reads a red check stopped on after a caught spent request as a check', () => {
+		const body = `${SPENT}\n${RED_CHECK}\n${FAILURE_PREFIX} ${RED_CHECK}`
+
+		expect(cause_of('followup', { body, out: RED_CHECK })).toBe(CAUSE.CHECK)
 	})
 })
 
