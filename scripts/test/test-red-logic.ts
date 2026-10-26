@@ -12,7 +12,7 @@ import { test_declared_logic } from './test-declared-logic'
 // that test catches anything — the added and changed tests run against the merge-base, and at least one
 // of them has to fail there.
 
-type RedVerdict = 'red' | 'green' | 'no-test' | 'test-only'
+type RedVerdict = 'red' | 'green' | 'no-test' | 'stopped' | 'test-only'
 
 // One run's verdict and the test files that failed in it.
 interface RedProbe {
@@ -89,17 +89,19 @@ function failed_files(report: string, roots: ReadonlyArray<string>): Array<strin
 		.flatMap((result) => relative_in(roots, result.name))
 }
 
-// `no-test` when nothing ran; otherwise a failing run is `red` — the test caught the pre-fix tree — and
-// a passing one is `green`.
+// `no-test` when nothing ran and vitest passed with no tests; `stopped` when nothing ran and it failed
+// anyway — its config could not load, so no test was ever asked (joshuafolkken/kit#5043). Otherwise a
+// failing run is `red` — the test caught the pre-fix tree — and a passing one is `green`.
 function verdict_for(test_count: number, is_failed: boolean): RedVerdict {
-	if (test_count === 0) return 'no-test'
+	if (test_count === 0) return is_failed ? 'stopped' : 'no-test'
 
 	return is_failed ? 'red' : 'green'
 }
 
 // Only `green` on a declared bug fix is refused. `no-test` is already `josh test:declared`'s refusal
-// when a runtime file changed, a declared fix that touched only docs has nothing to reproduce, and a
-// `test-only` fix runs the same code on the merge-base as on HEAD.
+// when a runtime file changed, a declared fix that touched only docs has nothing to reproduce, a
+// `stopped` run asked no test, so it is neither red evidence nor green, and a `test-only` fix runs the
+// same code on the merge-base as on HEAD.
 function is_refused(body: string, verdict: RedVerdict): boolean {
 	return verdict === 'green' && is_bug_fix(body)
 }

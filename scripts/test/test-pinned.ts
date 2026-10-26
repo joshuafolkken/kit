@@ -11,8 +11,8 @@ import { test_pinned_functions } from './test-pinned-functions'
 import {
 	test_pinned_logic,
 	type Hunk,
+	type HunkOutcome,
 	type PinnedReport,
-	type UnpinnedHunk,
 } from './test-pinned-logic'
 import { test_pinned_probe, type Probe } from './test-pinned-probe'
 import { test_pinned_reach } from './test-pinned-reach'
@@ -39,7 +39,8 @@ interface RunOptions {
 	is_cached_only: boolean
 }
 
-const NO_REPORT = { unpinned: [], unchecked: [], unparsed: [] } as const
+const NO_OUTCOME: HunkOutcome = { unpinned: [], stopped: [] }
+const NO_REPORT = { ...NO_OUTCOME, unchecked: [], unparsed: [] } as const
 
 // `--diff-filter=M`: an added file's one hunk is the whole file, and reverting it is a missing module
 // every importer fails on, which says nothing about the tests — its functions are probed instead
@@ -103,23 +104,16 @@ async function verdicts_on(
 	return verdicts
 }
 
-// Green and no-test both leave a hunk unpinned: either way nothing went red when it was reverted.
-function unpinned_of(hunk: Hunk, probe: RedProbe | undefined): Array<UnpinnedHunk> {
-	if (probe === undefined || probe.verdict === 'red') return []
-
-	return [{ ...hunk, is_green: probe.verdict === 'green' }]
-}
-
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
 // stored again, so a rerun on the same tree starts no vitest. `is_cached_only` runs no probe: only the
 // verdicts the cache holds are read, and nothing is written.
-async function unpinned_on(
+async function outcome_on(
 	base: string,
 	paths: ReadonlyArray<string>,
 	hunks: ReadonlyArray<Hunk>,
 	is_cached_only: boolean,
-): Promise<Array<UnpinnedHunk>> {
-	if (hunks.length === 0) return []
+): Promise<HunkOutcome> {
+	if (hunks.length === 0) return NO_OUTCOME
 	const cache = await test_pinned_cache.load(base, hunks)
 	const keys = await keys_of(hunks)
 	const files = hunks.map((hunk) => hunk.file)
@@ -128,7 +122,7 @@ async function unpinned_on(
 		? known.map((entry) => held_of(entry))
 		: await verdicts_on(paths, hunks, known, test_pinned_cache.writer(cache, keys))
 
-	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
+	return test_pinned_logic.outcome(hunks, verdicts)
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.
@@ -192,9 +186,9 @@ async function report_on(
 	)
 	const probes = await read_probes(base, targets)
 	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, has_runner ? max_hunks : 0)
-	const unpinned = await unpinned_on(base, paths, checked, is_cached_only)
+	const outcome = await outcome_on(base, paths, checked, is_cached_only)
 
-	return { unpinned, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
+	return { ...outcome, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
 }
 
 async function report(options: RunOptions): Promise<PinnedReport> {

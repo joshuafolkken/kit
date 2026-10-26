@@ -18,7 +18,7 @@ const FAILED_TEST = 'a.test.ts'
 const FAILED_DIGEST = 'digest-t'
 const TEST_DIGESTS = new Map([[FAILED_TEST, FAILED_DIGEST]])
 const RED: StoredVerdict = { verdict: 'red', tests: { [FAILED_TEST]: FAILED_DIGEST } }
-const RED_PROBE = { verdict: 'red', failed: [FAILED_TEST] }
+const RED_PROBE = { verdict: 'red' as const, failed: [FAILED_TEST] }
 const ONLY_TESTS_SAME: Freshness = { is_same_change: false, is_unchanged: true, is_pruned: false }
 const ONLY_CODE_SAME: Freshness = { is_same_change: true, is_unchanged: false, is_pruned: false }
 const ALL_SAME: Freshness = { is_same_change: true, is_unchanged: true, is_pruned: false }
@@ -205,6 +205,13 @@ describe('test_pinned_cache_logic.fresh_verdict on any other verdict', () => {
 describe('test_pinned_cache_logic.stored', () => {
 	it('keys each verdict with its failed test files digested, and leaves out a key with none', () => {
 		const probes = [{ verdict: 'red' as const, failed: [FAILED_TEST] }, undefined]
+
+		expect(test_pinned_cache_logic.stored(['a', 'b'], probes, TEST_DIGESTS)).toEqual({ a: RED })
+	})
+
+	// joshuafolkken/kit#5043: a stale `stopped` would set an unpinned hunk aside once its config loads.
+	it('leaves out a stopped verdict, so the hunk is probed again on the next run', () => {
+		const probes = [RED_PROBE, { verdict: 'stopped' as const, failed: [] }]
 
 		expect(test_pinned_cache_logic.stored(['a', 'b'], probes, TEST_DIGESTS)).toEqual({ a: RED })
 	})
