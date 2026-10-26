@@ -17,6 +17,7 @@
 - ファイルは範囲を指定する（`sed -n '120,180p' <file>`、または `Read` の `offset` / `limit`）
 - 一覧は件数を絞る（`--limit`、`| head -30`）、JSON は必要な項目だけ取り出す（`gh api … --jq '…'`）
 - 全量が要るときは、ファイルへ落として（`> <file>`）から範囲を読む
+- 退避された `tool-results/<id>.txt` → `grep -n` ／ `sed -n` で読む（`lane-spilled-read` 行、`pnpm josh rule:list`）
 
 ## 切り詰められた出力を、完全な出力として読まない
 

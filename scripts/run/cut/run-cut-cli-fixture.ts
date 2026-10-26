@@ -15,6 +15,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
+import { run_cut_digest } from './run-cut-digest'
 
 // What the `josh run:cut` CLI suites share: the scratch repository, the spied git and lane reads, and
 // the per-test reset — so the setup-boundary suite runs on the same harness as the main suite rather
@@ -75,6 +76,9 @@ const split_refusal = vi.spyOn(split_resolution, 'ledger_refusal')
 // round is attested unless a case says so (joshuafolkken/kit#4868).
 const is_attested_on = vi.spyOn(review_attest, 'is_attested_on')
 const record_check = vi.spyOn(review_record, 'check')
+// The digest is read off the session's real transcript; no case carries one unless it says so
+// once (joshuafolkken/kit#5040).
+const own_digest = vi.spyOn(run_cut_digest, 'own_digest').mockReturnValue(undefined)
 const info = vi.spyOn(console, 'info').mockReturnValue()
 
 const errors = vi.spyOn(console, 'error').mockReturnValue()
@@ -177,6 +181,7 @@ const run_cut_cli_fixture = {
 	split_refusal,
 	is_attested_on,
 	record_check,
+	own_digest,
 	emit,
 	verdict,
 	printed_errors,

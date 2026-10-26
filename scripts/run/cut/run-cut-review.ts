@@ -3,6 +3,7 @@ import { review_attest } from '#scripts/review/review-attest'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { review_record } from '#scripts/review/review-record'
 import { run_cut, type RunCut } from './run-cut'
+import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 
 // The review round an implementation cut has to carry across the process boundary
@@ -83,6 +84,10 @@ async function announce_resume(cut_record: RunCut, is_implementation: boolean): 
 	if (cut_record.handoff !== undefined) {
 		console.error(run_cut_handoff.describe_handoff(cut_record.handoff))
 	}
+
+	const digest = run_cut_digest.describe_digest(cut_record.digest)
+
+	if (digest !== undefined) console.error(digest)
 
 	if (!is_implementation) return
 
