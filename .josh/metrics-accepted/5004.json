@@ -1,0 +1,7 @@
+{
+	"reason": "#5004: test:pinned records green hunks and a pruned change so a red verdict outlives removed unpinned lines; new prune-logic module and its tests",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 139
+	}
+}

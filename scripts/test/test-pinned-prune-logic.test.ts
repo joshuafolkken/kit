@@ -1,0 +1,96 @@
+import { describe, expect, it } from 'vitest'
+import { test_pinned_cache_logic, type GreenHunk } from './test-pinned-cache-logic'
+import type { Hunk } from './test-pinned-logic'
+import { test_pinned_prune_logic } from './test-pinned-prune-logic'
+
+// joshuafolkken/kit#5004: a `red` verdict outlives lines removed from a `green` hunk, and nothing else.
+
+const FILE = 'a.ts'
+const COMMIT = 'commit-a'
+const BASE = 'one\ntwo\n'
+// `red` adds `pinned` after line 1; `green` adds `loose` and `spare` after line 2.
+const BEFORE = 'one\npinned\ntwo\nloose\nspare\n'
+const RED: Hunk = { file: FILE, new_start: 2, new_count: 1, old_lines: [], new_lines: ['pinned'] }
+const GREEN: Hunk = {
+	file: FILE,
+	new_start: 4,
+	new_count: 2,
+	old_lines: [],
+	new_lines: ['loose', 'spare'],
+}
+const RECORD: GreenHunk = { file: FILE, old_lines: [], new_lines: ['loose', 'spare'] }
+const GREENS = [RECORD]
+// `BEFORE` with every line of the green hunk removed.
+const WITHOUT_GREEN = 'one\npinned\ntwo\n'
+
+// The code change and contents of a work tree whose only changed file holds `content`.
+function pruned(content: string, hunks: ReadonlyArray<Hunk>, greens = GREENS): string {
+	const is_changed = content !== BASE
+	const code = {
+		commit: COMMIT,
+		code: is_changed ? [FILE] : [],
+		digests: new Map(is_changed ? [[FILE, test_pinned_cache_logic.digest_of(content)]] : []),
+	}
+
+	return test_pinned_prune_logic.pruned_of(code, new Map([[FILE, content]]), hunks, greens)
+}
+
+const RECORDED = pruned(BEFORE, [RED, GREEN])
+
+describe('test_pinned_prune_logic.greens_of', () => {
+	it('records only the line hunks whose verdict is green', () => {
+		const stub = { ...GREEN, function_name: 'run' }
+
+		expect(
+			test_pinned_prune_logic.greens_of([RED, GREEN, stub], ['red', 'green', 'green']),
+		).toEqual(GREENS)
+	})
+})
+
+describe('test_pinned_prune_logic.is_remnant', () => {
+	it('takes a green hunk whose lines were only removed, or none', () => {
+		expect(test_pinned_prune_logic.is_remnant(GREEN, RECORD)).toBe(true)
+		expect(test_pinned_prune_logic.is_remnant({ ...GREEN, new_lines: ['spare'] }, RECORD)).toBe(
+			true,
+		)
+		expect(test_pinned_prune_logic.is_remnant({ ...GREEN, new_lines: [] }, RECORD)).toBe(true)
+	})
+
+	it('refuses a hunk with a line added or reordered, other base lines, another file or a stub', () => {
+		for (const hunk of [
+			{ ...GREEN, new_lines: ['loose', 'extra'] },
+			{ ...GREEN, new_lines: ['spare', 'loose'] },
+			{ ...GREEN, old_lines: ['two'] },
+			{ ...GREEN, file: 'b.ts' },
+			{ ...GREEN, function_name: 'run' },
+		]) {
+			expect(test_pinned_prune_logic.is_remnant(hunk, RECORD)).toBe(false)
+		}
+	})
+})
+
+describe('test_pinned_prune_logic.pruned_of', () => {
+	it('reads the same once every line of the green hunk is removed', () => {
+		expect(pruned(WITHOUT_GREEN, [RED])).toBe(RECORDED)
+	})
+
+	it('reads the same once one of its lines is removed, the rest left as a hunk of its own', () => {
+		const rest: Hunk = { ...GREEN, new_count: 1, new_lines: ['spare'] }
+
+		expect(pruned('one\npinned\ntwo\nspare\n', [RED, rest])).toBe(RECORDED)
+	})
+
+	it('reads the same when the removal leaves the file as its base', () => {
+		const only_green = pruned('one\ntwo\nloose\nspare\n', [{ ...GREEN, new_start: 3 }])
+
+		expect(pruned(BASE, [])).toBe(only_green)
+	})
+
+	it('reads differently after any other edit, or with no green hunk recorded', () => {
+		const added: Hunk = { ...GREEN, new_count: 1, new_lines: ['extra'] }
+
+		expect(pruned('one\npinned\ntwo\nextra\n', [RED, added])).not.toBe(RECORDED)
+		expect(pruned('one\npinned!\ntwo\n', [{ ...RED, new_lines: ['pinned!'] }])).not.toBe(RECORDED)
+		expect(pruned(BEFORE, [RED, GREEN], [])).not.toBe(RECORDED)
+	})
+})

@@ -10,8 +10,8 @@ import {
 // edited since, while the code change is the same.
 const OLD_TEST = 'a.test.ts'
 const NEW_TEST = 'b.test.ts'
-const SAME_CHANGE: Freshness = { is_same_change: true, is_unchanged: false }
-const OTHER_CHANGE: Freshness = { is_same_change: false, is_unchanged: false }
+const SAME_CHANGE: Freshness = { is_same_change: true, is_unchanged: false, is_pruned: false }
+const OTHER_CHANGE: Freshness = { is_same_change: false, is_unchanged: false, is_pruned: false }
 const GREEN: StoredVerdict = {
 	verdict: 'green',
 	tests: {},

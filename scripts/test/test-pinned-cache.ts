@@ -15,7 +15,9 @@ import {
 	type StoredVerdict,
 	type VerdictCache,
 } from './test-pinned-cache-logic'
-import { test_pinned_reach, type Reach, type ReachInputs } from './test-pinned-reach'
+import type { Hunk } from './test-pinned-logic'
+import { test_pinned_prune_logic, type CodeChange } from './test-pinned-prune-logic'
+import { test_pinned_reach, type Reach } from './test-pinned-reach'
 import type { RedProbe } from './test-red-logic'
 
 // The reads and writes of `josh test:pinned`'s verdict cache (joshuafolkken/kit#4706); what a key is and
@@ -34,17 +36,22 @@ const OBSERVATION_PREFIX = `${OBSERVATION_LEDGER_DIRECTORY}/`
 
 interface TreeRead {
 	test_digests: ReadonlyMap<string, string>
-	code: Omit<ReachInputs, 'test_digests'>
+	code: CodeChange
 	test_contents: string
 	change: string
 }
 
+// `hunks` are the run's own, and `contents` each of their files and each recorded `green` hunk's file
+// as `load` read them, so `pruned` is written off the tree the verdicts were reached on.
 interface LoadedCache extends VerdictCache {
 	file: string
 	base: string
 	freshness: Freshness
 	test_digests: ReadonlyMap<string, string>
 	reach: Reach
+	code: CodeChange
+	hunks: ReadonlyArray<Hunk>
+	contents: ReadonlyMap<string, string>
 }
 
 // A verdict reached by a run, with the index of the key it answers.
@@ -67,6 +74,14 @@ async function read_text(file: string): Promise<string> {
 	return existsSync(file) ? await readFile(file, 'utf8') : ''
 }
 
+// The content of each named file the work tree still holds.
+async function contents_of(files: ReadonlyArray<string>): Promise<Map<string, string>> {
+	const existing = [...new Set(files)].filter((file) => existsSync(file))
+	const texts = await Promise.all(existing.map(async (file) => await readFile(file, 'utf8')))
+
+	return new Map(existing.map((file, index) => [file, texts[index] ?? '']))
+}
+
 // Every test file in the work tree, tracked or untracked but not ignored.
 async function test_files(): Promise<Array<string>> {
 	const listed = await test_pinned_reach.work_tree_files()
@@ -76,11 +91,11 @@ async function test_files(): Promise<Array<string>> {
 
 // The digest of each named file the work tree still holds.
 async function digests_of(files: ReadonlyArray<string>): Promise<Map<string, string>> {
-	const existing = [...new Set(files)].filter((file) => existsSync(file))
-	const texts = await Promise.all(existing.map(async (file) => await readFile(file, 'utf8')))
-	const digests = texts.map((text) => test_pinned_cache_logic.digest_of(text))
+	const contents = await contents_of(files)
 
-	return new Map(existing.map((file, index) => [file, digests[index] ?? '']))
+	return new Map(
+		[...contents].map(([file, text]) => [file, test_pinned_cache_logic.digest_of(text)]),
+	)
 }
 
 // Each test file's content digest, keyed by its path.
@@ -104,7 +119,7 @@ function is_run_record(file: string): boolean {
 // The code change: `base` as a commit, and every non-test path changed since it with its content. A
 // test file is left out — a `red` rests on the test files it failed in, not on every test — and so is
 // a run record.
-async function code_change(base: string): Promise<Omit<ReachInputs, 'test_digests'>> {
+async function code_change(base: string): Promise<CodeChange> {
 	const [commit, paths] = await Promise.all([
 		git_spawn.read(['rev-parse', '--verify', `${base}${AS_COMMIT}`]),
 		changed_paths.read_changed_since(base),
@@ -125,15 +140,44 @@ async function read_tree(base: string): Promise<TreeRead> {
 	return { test_digests, code, test_contents, change }
 }
 
-async function load(base: string): Promise<LoadedCache> {
-	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
-	const [text, tree] = await Promise.all([read_text(file), read_tree(base)])
-	const { test_digests, code, test_contents, change } = tree
-	const entries = test_pinned_cache_logic.entries_of(text)
-	const freshness = test_pinned_cache_logic.freshness_of(text, { change, test_contents })
-	const reach = test_pinned_reach.create({ ...code, test_digests })
+// The cache file's text and what the work tree holds now, with the files `hunks` and the recorded
+// `green` hunks sit in.
+async function read_all(
+	file: string,
+	base: string,
+	hunks: ReadonlyArray<Hunk>,
+): Promise<[string, TreeRead, Map<string, string>]> {
+	const text = await read_text(file)
+	const greens = test_pinned_cache_logic.greens_of(text)
+	const files = [...hunks, ...greens].map((hunk) => hunk.file)
 
-	return { file, base, test_contents, change, entries, freshness, test_digests, reach }
+	return [text, ...(await Promise.all([read_tree(base), contents_of(files)]))]
+}
+
+// `hunks` are the ones this run checks; `pruned` is read now against the `green` hunks the cache recorded.
+async function load(base: string, hunks: ReadonlyArray<Hunk>): Promise<LoadedCache> {
+	const file = path.resolve(await git_spawn.read(['rev-parse', '--git-path', CACHE_NAME]))
+	const [text, tree, contents] = await read_all(file, base, hunks)
+	const { test_digests, code, test_contents, change } = tree
+	const greens = test_pinned_cache_logic.greens_of(text)
+	const pruned = test_pinned_prune_logic.pruned_of(code, contents, hunks, greens)
+	const freshness = test_pinned_cache_logic.freshness_of(text, { change, pruned, test_contents })
+	const reach = test_pinned_reach.create({ ...code, test_digests })
+	const entries = test_pinned_cache_logic.entries_of(text)
+
+	return {
+		file,
+		base,
+		test_contents,
+		change,
+		entries,
+		freshness,
+		test_digests,
+		reach,
+		code,
+		hunks,
+		contents,
+	}
 }
 
 // What a verdict on a hunk of `file` rests on now: the failed tests' closures for a `red`, the tests
@@ -216,11 +260,24 @@ async function is_steady(cache: LoadedCache): Promise<boolean> {
 	return now.change === cache.change && now.test_contents === cache.test_contents
 }
 
-function write(cache: LoadedCache, entries: Record<string, StoredVerdict>): void {
+// Each `green` hunk among `probes` is recorded, with the code change those hunks reverted.
+function write(
+	cache: LoadedCache,
+	entries: Record<string, StoredVerdict>,
+	probes: ReadonlyArray<RedProbe | undefined>,
+): void {
+	const { code, contents, hunks } = cache
+	const green = test_pinned_prune_logic.greens_of(
+		hunks,
+		probes.map((probe) => probe?.verdict),
+	)
+	const pruned = test_pinned_prune_logic.pruned_of(code, contents, hunks, green)
 	const content: VerdictCache = {
 		test_contents: cache.test_contents,
 		change: cache.change,
 		entries,
+		pruned,
+		green,
 	}
 
 	atomic_write.replace_file(cache.file, `${JSON.stringify(content)}${LINE_BREAK}`)
@@ -251,14 +308,12 @@ async function settle(state: WriterState, reached: ReadonlyArray<Reached>): Prom
 		bases[index] = is_kept ? read[position] : undefined
 	}
 
-	write(cache, test_pinned_cache_logic.stored(keys, probes, cache.test_digests, bases))
+	write(cache, test_pinned_cache_logic.stored(keys, probes, cache.test_digests, bases), probes)
 }
 
-function writer(
-	cache: LoadedCache,
-	keys: ReadonlyArray<string>,
-	files: ReadonlyArray<string>,
-): CacheWriter {
+// `keys` name the hunks `load` was given, in their order.
+function writer(cache: LoadedCache, keys: ReadonlyArray<string>): CacheWriter {
+	const files = cache.hunks.map((hunk) => hunk.file)
 	const state: WriterState = { cache, keys, files, probes: [], bases: [] }
 	const queue = { last: Promise.resolve() }
 
