@@ -1,4 +1,3 @@
-import { issue_cite } from '#scripts/issue/issue-cite'
 import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import type { Found } from './run-board-found'
 import type { BoardHeader } from './run-board-header'
@@ -11,7 +10,7 @@ import type { ItemState } from './run-board-status'
 // its lane's net minutes — `?′` where there are none — the numbers of the Issues its child filed, then
 // what its overrun investigation came to and the numbers it filed (joshuafolkken/kit#4880), each group
 // two spaces apart: `⏭` and why it was skipped, or 🔍 and the numbers it filed, `↪N` for each open
-// Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻#N` for a
+// Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻N` for a
 // recurrence commented on, or 💥 for an investigation that failed. While the investigation runs, the spinner stands for 🔍.
 // A row its merge left no note on was never asked. A done row that did not merge says only what was
 // filed during it.
@@ -54,11 +53,12 @@ function minutes_text(found: Found | undefined): string {
 	return `${minutes.padStart(MINUTES_WIDTH)}${MINUTE_MARK}`
 }
 
-// An investigation that filed nothing: the recurrence it commented on, else why it did not.
-function none_text(result: string): string {
+// An investigation that filed nothing: the recurrence it commented on, a link with no `#` and its mark
+// outside it (joshuafolkken/kit#4956), else why it did not.
+function none_text(result: string, header: BoardHeader): string {
 	const recurred = run_event_overrun.recurred_of(result)
 
-	if (recurred !== undefined) return `${NONE_MARK} ${RECURRED_MARK}${issue_cite.plain(recurred)}`
+	if (recurred !== undefined) return `${NONE_MARK} ${RECURRED_MARK}${header.link(String(recurred))}`
 
 	const why = run_board_render_title.title_of(run_event_overrun.reason_of(result), REASON_LIMIT)
 
@@ -80,7 +80,7 @@ function ended_text(result: string, header: BoardHeader): string {
 	if (folded.length > 0) return folded_text(folded, header)
 	if (result.startsWith(run_event_overrun.FILED_RESULT)) return OVERRUN_MARK
 
-	return `${OVERRUN_MARK} ${none_text(result)}`
+	return `${OVERRUN_MARK} ${none_text(result, header)}`
 }
 
 // A started session still running turns the spinner, one gone without its end note failed, and one

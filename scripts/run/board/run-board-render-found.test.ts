@@ -5,6 +5,7 @@ import { run_board_fit } from './run-board-fit'
 import type { Found } from './run-board-found'
 import type { BoardHeader } from './run-board-header'
 import type { BoardRow } from './run-board-layout'
+import { run_board_link } from './run-board-link'
 import { run_board_render } from './run-board-render'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import type { ItemStatus } from './run-board-status'
@@ -21,6 +22,7 @@ const STILL = '🔍'
 const FILED = ['4768', '4769', '4770']
 const MINUTES = 52
 const RECURRED = 'recurred #4790'
+const REPO = 'joshuafolkken/kit'
 const CI_WAIT = 'none: CI wait'
 const NARROW = 100
 const SQUEEZED = 87
@@ -124,6 +126,28 @@ describe('run_board_render — a merged row’s folded causes', () => {
 	})
 })
 
+// joshuafolkken/kit#4956: a terminal that picks up `↻#4790` as one word opens a workspace search, so
+// the number alone is the link.
+function markdown(text: string, url: string): string {
+	return `[${text}](${url})`
+}
+
+describe('run_board_render — a merged row’s recurrence', () => {
+	it('says `∅ ↻N`, the number through the header’s link and the mark outside it', () => {
+		const link = run_board_link.linker(REPO, markdown)
+
+		expect(done_line(ended(RECURRED), { link })).toMatch(
+			/52′ {2}🔍 ∅ ↻\[4790\]\(https:\/\/github\.com\/joshuafolkken\/kit\/issues\/4790\)$/u,
+		)
+	})
+
+	it('keeps the plain number where the repository is unread', () => {
+		const link = run_board_link.linker(undefined, markdown)
+
+		expect(done_line(ended(RECURRED), { link })).toMatch(/52′ {2}🔍 ∅ ↻4790$/u)
+	})
+})
+
 describe('run_board_render — a merged row’s finished investigation', () => {
 	it('ends on 🔍 and the numbers it filed, with no `#`', () => {
 		const line = done_line({ ...ended(run_event_overrun.FILED_RESULT), overrun_filed: FILED })
@@ -140,10 +164,6 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 		expect(done_line(ended('none: waited on a slow CI run'))).toMatch(
 			/52′ {2}🔍 ∅ waited on a slo…$/u,
 		)
-	})
-
-	it('says `∅ ↻#N` for a recurrence commented on', () => {
-		expect(done_line(ended(RECURRED))).toMatch(/52′ {2}🔍 ∅ ↻#4790$/u)
 	})
 
 	it('says 💥 for a launch that failed', () => {
@@ -239,7 +259,7 @@ describe('run_board_render — a merged row’s own filings before its outcome',
 	it('says the recurrence after them', () => {
 		const line = done_line({ ...ended(RECURRED), filed: FILED })
 
-		expect(line).toMatch(/52′ {2}4768, 4769, 4770 {2}🔍 ∅ ↻#4790$/u)
+		expect(line).toMatch(/52′ {2}4768, 4769, 4770 {2}🔍 ∅ ↻4790$/u)
 	})
 })
 
