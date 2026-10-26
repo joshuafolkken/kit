@@ -66,6 +66,19 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 	})
 })
 
+describe('rule_value_cli.render_parts — the candidates beside the table', () => {
+	it('carries no candidates when nothing measurable was found', () => {
+		expect(rule_value_cli.render_parts([])).toStrictEqual({ table: rule_value_cli.NO_TARGETS })
+	})
+
+	it('keeps the table one line per rule and puts the candidates apart from it', () => {
+		const parts = rule_value_cli.render_parts([[rule_value_fixture.session(COMMENTS_READ)]])
+
+		expect(parts.table.split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
+		expect(parts.candidates).toMatch(/^candidates:\n {2}retire .*\n {2}condense /u)
+	})
+})
+
 // The two readers are spied on the real namespace, so the rest of the module — the roots and paths
 // its transitive importers need — stays intact. The returned list records each file as it is read.
 function spy_readers(): Array<SessionFile> {
