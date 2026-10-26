@@ -66,6 +66,19 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 	})
 })
 
+describe('rule_value_cli.render_parts — the candidates beside the table', () => {
+	it('carries no candidates when nothing measurable was found', () => {
+		expect(rule_value_cli.render_parts([])).toStrictEqual({ table: rule_value_cli.NO_TARGETS })
+	})
+
+	it('keeps the table one line per rule and puts the candidates apart from it', () => {
+		const parts = rule_value_cli.render_parts([[rule_value_fixture.session(COMMENTS_READ)]])
+
+		expect(parts.table.split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
+		expect(parts.candidates).toMatch(/^candidates:\n {2}retire .*\n {2}condense /u)
+	})
+})
+
 // The two readers are spied on the real namespace, so the rest of the module — the roots and paths
 // its transitive importers need — stays intact. The returned list records each file as it is read.
 function spy_readers(): Array<SessionFile> {
@@ -211,6 +224,32 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 			expect(rule_value_cli.run_rule_value([], cwd)).toBe(0)
 			expect(stdout).toHaveBeenCalledExactlyOnceWith(`${rule_value_cli.NO_TARGETS}\n`)
 			expect(existsSync(rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE))).toBe(false)
+		} finally {
+			vi.restoreAllMocks()
+			rmSync(cwd, { recursive: true, force: true })
+		}
+	})
+})
+
+describe('rule_value_cli.run_rule_value — the candidates stay out of the cache', () => {
+	it('stores the table alone when a run was measured', () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+
+		spy_readers()
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([
+			fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1'),
+		])
+
+		try {
+			rule_value_cli.run_rule_value(['--refresh'], cwd)
+
+			const cached = readFileSync(
+				rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE),
+				'utf8',
+			)
+
+			expect(cached).not.toContain('candidates:')
+			expect(cached.trimEnd().split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
 		} finally {
 			vi.restoreAllMocks()
 			rmSync(cwd, { recursive: true, force: true })
