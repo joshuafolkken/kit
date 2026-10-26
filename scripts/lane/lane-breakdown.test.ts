@@ -118,6 +118,17 @@ describe('lane_breakdown.of — waits and resumes', () => {
 		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(entries, events, ISSUE))
 	})
 
+	it('moves a host sleep inside the implementation to the excluded time and counts it apart', () => {
+		const sleep = { ...event(40, 'sleep', 'host slept 10.0 min'), elapsed_ms: 10 * MINUTE_MS }
+		const events = [...events_4970(), sleep]
+		const breakdown = lane_breakdown.of(lane(), events, ISSUE)
+
+		expect(stage_minutes(breakdown, IMPLEMENT)).toBe(41)
+		expect(breakdown?.slept_ms).toBe(10 * MINUTE_MS)
+		expect(breakdown?.excluded_ms).toBe(10 * MINUTE_MS)
+		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(lane(), events, ISSUE))
+	})
+
 	it('keeps the implementation one stage across a cut and its resume', () => {
 		const cut = [event(30, 'cut', `${LANE} cut`), event(31, 'resume', `${LANE} resume`)]
 		const breakdown = lane_breakdown.of(lane(), [...events_4970(), ...cut], ISSUE)

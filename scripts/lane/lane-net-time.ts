@@ -1,6 +1,7 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import type { LedgerEntry } from './lane-ledger'
+import { lane_sleep } from './lane-sleep'
 import type { IssueAt } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stop_stats } from './lane-stop-stats'
@@ -8,7 +9,8 @@ import { lane_stop_stats } from './lane-stop-stats'
 // A lane's net time (joshuafolkken/kit#4749): from its issue's first dispatch to its merge, less the
 // waits no fix in the lane shortens — a park (the issue waits on a person's decision), an outage and a
 // usage-limit stop (joshuafolkken/kit#4745), each until the issue's next ship stage, re-dispatch or
-// another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`). A ship
+// another of the two, the wait `josh lane:stats` derives for a stop (`lane-stop-stats.ts`) — and the
+// host's sleeps (joshuafolkken/kit#5032), whatever the issue (`lane-sleep.ts`). A ship
 // stop is not taken out: a relaunched child works through its wait. `josh lane:net` prints it, and a
 // causing-lane line declares it (`issue-priority.ts`).
 
@@ -52,9 +54,7 @@ function held_ms(hold: IssueAt, ends: ReadonlyArray<IssueAt>, to_ms: number): nu
 	return Math.min(lane_stop_stats.wait_ms(hold, ends) ?? left_ms, left_ms)
 }
 
-// The waits `net_ms` takes out of `span`, each from its hold to its end, cut at the merge — the
-// intervals `josh lane:breakdown` counts as excluded (`lane-breakdown.ts`).
-function waits(
+function hold_waits(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 	issue: number,
@@ -73,6 +73,44 @@ function waits(
 
 		return { from_ms: hold.at_ms, to_ms: hold.at_ms + held_ms(hold, ends, span.to_ms) }
 	})
+}
+
+// `spans` oldest first with every overlap joined, so a park the host slept through is taken out once.
+function joined(spans: ReadonlyArray<LaneSpan>): Array<LaneSpan> {
+	const sorted = spans.toSorted((left, right) => left.from_ms - right.from_ms)
+
+	const kept: Array<LaneSpan> = []
+
+	for (const next of sorted) {
+		const last = kept.at(-1)
+
+		if (last === undefined || next.from_ms > last.to_ms) kept.push({ ...next })
+		else last.to_ms = Math.max(last.to_ms, next.to_ms)
+	}
+
+	return kept
+}
+
+// The host's sleeps (joshuafolkken/kit#5032) cut to `span` and joined: a sleep stops every lane,
+// whatever its issue.
+function slept(events: ReadonlyArray<RunEvent>, span: LaneSpan): Array<LaneSpan> {
+	const cut = lane_sleep.spans(events).map((sleep) => ({
+		from_ms: Math.max(sleep.from_ms, span.from_ms),
+		to_ms: Math.min(sleep.to_ms, span.to_ms),
+	}))
+
+	return joined(cut.filter((sleep) => sleep.to_ms > sleep.from_ms))
+}
+
+// The waits `net_ms` takes out of `span` — each hold from itself to its end, cut at the merge, and each
+// sleep of the host — the intervals `josh lane:breakdown` counts as excluded (`lane-breakdown.ts`).
+function waits(
+	entries: ReadonlyArray<LedgerEntry>,
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Array<LaneSpan> {
+	return joined([...hold_waits(entries, events, issue, span), ...slept(events, span)])
 }
 
 /**
@@ -116,7 +154,7 @@ function missing_reason(entries: ReadonlyArray<LedgerEntry>, issue: number): str
 	return 'cause unknown'
 }
 
-const lane_net_time = { missing_reason, net_minutes, net_ms, span_of, waits }
+const lane_net_time = { missing_reason, net_minutes, net_ms, slept, span_of, waits }
 
 export { lane_net_time }
 export type { LaneSpan }

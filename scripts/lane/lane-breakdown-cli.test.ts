@@ -57,7 +57,7 @@ describe('lane_breakdown_cli.run', () => {
 				'',
 				'- implement 51.0 min (editing & thinking 51.0 min)',
 				'- start to plan 10.0 min',
-				'- waits taken out (park, outage, usage limit) 0.0 min',
+				'- waits taken out (park, outage, usage limit, host sleep) 0.0 min, of which host sleep 0.0 min',
 			].join('\n'),
 		)
 	})

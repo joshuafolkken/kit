@@ -187,7 +187,7 @@ Measure a lane limit: a per-repository ledger holds merges, gates, each lane's d
 
 ## `josh lane:net` in detail
 
-Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is.
+Each wait runs from the park, outage or usage-limit stop to the issue's next ship stage, re-dispatch or next of the two — the wait `josh lane:stats` derives for a stop — and a wait nothing ended stops at the merge. A ship stop's wait stays in: the relaunched child spends it on the fix. The minutes are the whole number an Issue's `- 原因のレーン: <分> 分（#<N>）` line declares (`prompts/collaboration-workflow/issue-template.md`). A usage-limit stop is read off its `usage-limit` event on the run's stream (joshuafolkken/kit#4745), as an outage is. The host's sleep is taken out of every lane it falls in, whatever the issue (joshuafolkken/kit#5032): `backlog:drive`'s load sampler records a `sleep` event when the gap between its once-a-minute ticks exceeds three intervals, spanning from the tick that was due to the late one (`lane-sleep.ts`). Overlapping waits — a park the host slept through, or an outage and a park — are joined and taken out once.
 
 ## `josh cost` in detail
 
