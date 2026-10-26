@@ -86,7 +86,8 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 }
 
 // **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): a synced file
-// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what neither a main sync nor the map's tree joined.
+// the split cannot vouch for is in `changed` without being this branch's change. Unread, it is what
+// neither a main sync nor the map's tree joined.
 function own_of(input: RunInput): ReadonlyArray<string> {
 	const { changed = [], branch } = input
 	const joined = new Set([...input.synced, ...input.since_map])

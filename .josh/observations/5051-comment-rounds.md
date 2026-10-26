@@ -1,0 +1,3 @@
+- rf:project-conventions | low | prompts/collaboration-workflow/issue-template.md:81 | 2026-10-26 | #5051
+- rf:bug-risks | low | scripts/issue/issue-sample-gate.ts:130 | 2026-10-26 | #5051
+- rf:performance | low | scripts/issue/issue-sample-gate.ts:127 | 2026-10-26 | #5051

@@ -133,8 +133,8 @@ function is_whole_suite(file: string): boolean {
 // joins `since_map`: it neither adds the tests reading it nor sends the run to the whole suite — main's
 // CI verified it. So does a synced file every test depends on, which the split cannot narrow
 // (joshuafolkken/kit#4993): main's CI ran the whole suite on it, and this branch's own tests run on it
-// anyway. Any other synced module is `test-related-synced.ts`'s: only the tests it shares with this
-// branch's change run for it. A branch change git cannot read marks nothing.
+// anyway. Any other synced module is `test-related-synced.ts`'s: only this branch's change runs for it,
+// where the two meet. A branch change git cannot read marks nothing.
 function synced_data(
 	synced: ReadonlyArray<string>,
 	branch: ReadonlyArray<string> | undefined,
@@ -157,10 +157,19 @@ function without_own_tests(
 	)
 }
 
-// The moved files handed on as explicit arguments, the synced modules the split left out taken away: a
-// test shared with this branch's change runs through that change (`test-related-synced.ts`).
-function narrowed_moved(moved: ReadonlyArray<string>, split: SyncedSplit): ReadonlyArray<string> {
-	return moved.filter((file) => !split.left.includes(file))
+// The moved files handed on as explicit arguments, the synced modules the split left out taken away.
+// Where one meets this branch's change, the change runs in its place (`test-related-synced.ts`) — named
+// even when only the sync moved, since a green branch side would otherwise run nothing.
+function narrowed_moved(
+	moved: ReadonlyArray<string>,
+	split: SyncedSplit,
+	branch: ReadonlyArray<string> | undefined,
+	map: ReadMap | undefined,
+): ReadonlyArray<string> {
+	const kept = moved.filter((file) => !split.left.includes(file))
+	const own = split.shared.length === 0 ? [] : test_related_synced.own_of(branch, map)
+
+	return [...new Set([...kept, ...(own ?? [])])]
 }
 
 // The reading's `since_map`: what this branch did not change. The synced modules left out join it and
@@ -205,7 +214,7 @@ async function since_green_change(
 
 	const branch = await branch_change()
 	const split = await test_related_synced.split(root, parts.synced, branch, map)
-	const change = await explicit_change(root, narrowed_moved(moved, split), map)
+	const change = await explicit_change(root, narrowed_moved(moved, split, branch, map), map)
 
 	if (change.map === undefined) return undefined
 

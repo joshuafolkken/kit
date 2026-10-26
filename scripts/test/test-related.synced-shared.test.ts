@@ -70,6 +70,12 @@ function absolute(file: string): string {
 	return path.join(REPOSITORY_ROOT, file)
 }
 
+const OWN_ARGUMENTS = [
+	'related',
+	...[...OWN_CHANGE, ...READERS].map((file) => absolute(file)),
+	'--run',
+]
+
 function moved(changed: ReadonlyArray<string>, synced: ReadonlyArray<string>): void {
 	mocked_moved.mockResolvedValue({ changed: [...changed], synced: [...synced] })
 }
@@ -107,11 +113,7 @@ describe('test_related.run_related_tests — the tests a main sync shares with t
 	it('hands vitest the branch change and its readers alone, no shared test', async () => {
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual([
-			'related',
-			...[...OWN_CHANGE, ...READERS].map((file) => absolute(file)),
-			'--run',
-		])
+		expect(vitest_arguments()).toEqual(OWN_ARGUMENTS)
 	})
 
 	it("counts only the branch change's readers as the ledger's readers", async () => {
@@ -120,7 +122,6 @@ describe('test_related.run_related_tests — the tests a main sync shares with t
 		await test_related.run_related_tests([])
 
 		const input = record_run.mock.calls[0]?.[0]
-
 		const result = { elapsed_ms: 0, test_files: undefined }
 
 		expect(input && test_related_record.record_of(input, result)).toMatchObject({
@@ -142,7 +143,30 @@ describe('test_related.run_related_tests — the tests a main sync shares with t
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).not.toEqual(WHOLE_SUITE)
-		expect(vitest_arguments()).not.toContain(absolute(SHARED[0] ?? ''))
+		expect(vitest_arguments()).toEqual(OWN_ARGUMENTS)
+	})
+})
+
+// A green branch side the sync alone moved: the change still runs where main's modules meet it.
+describe('test_related.run_related_tests — a sync that alone moved the tree', () => {
+	it('hands vitest the branch change in place of the modules when only the sync moved', async () => {
+		moved([], SYNCED)
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(OWN_ARGUMENTS)
+	})
+
+	it('runs no test when only the sync moved and the modules meet no test of the change', async () => {
+		moved([], SYNCED)
+		vi.spyOn(test_related_synced, 'split').mockResolvedValue({
+			left: SYNCED,
+			shared: [],
+			meeting: [],
+		})
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_run).not.toHaveBeenCalled()
 	})
 })
