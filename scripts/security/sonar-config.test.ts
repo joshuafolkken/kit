@@ -64,6 +64,8 @@ describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 
 		expect(test_inclusions).toStrictEqual(test_patterns)
 		expect(properties['sonar.tests']).toBe('.')
+		// Once sonar.tests is set the scanner no longer defaults sonar.sources to the base directory.
+		expect(properties['sonar.sources']).toBe('.')
 	})
 
 	it('keeps the declared test files out of the main sources', () => {
