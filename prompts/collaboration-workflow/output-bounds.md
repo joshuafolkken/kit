@@ -17,13 +17,14 @@
 - ファイルは範囲を指定する（`sed -n '120,180p' <file>`、または `Read` の `offset` / `limit`）
 - 一覧は件数を絞る（`--limit`、`| head -30`）、JSON は必要な項目だけ取り出す（`gh api … --jq '…'`）
 - 全量が要るときは、ファイルへ落として（`> <file>`）から範囲を読む
+- 退避された `tool-results/<id>.txt` → `grep -n` ／ `sed -n` で読む（`lane-spilled-read` 行、`pnpm josh rule:list`）
 
 ## 切り詰められた出力を、完全な出力として読まない
 
 **検証ゲートと差分は、切り詰められた結果で判断しない。**
 
 - `pnpm josh gate` は合否の 1 行を末尾に出す。失敗の内訳が切れたら、合否行の直前の `full output: <path>` のファイルを読む（joshuafolkken/kit#1227）
-- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。再実行しない（`scripts/test/vitest-failure-summary.ts`）
+- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。読むための再実行はしない。直したら、まず要約の `rerun failed:` 行で失敗したファイルだけを回し、関連集合の全体は最後の `check:related` で 1 回だけ回す（`scripts/test/vitest-failure-summary.ts`）
 - 差分には判定行が無い。差分はファイルへ落としてから範囲で読む（`git diff main...HEAD > /tmp/diff.patch && wc -l /tmp/diff.patch`）
 
 ## 検証コマンドをパイプに繋がない（joshuafolkken/kit#1556）

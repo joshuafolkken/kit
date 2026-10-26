@@ -69,6 +69,7 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'lane-switch-main': [SUBSHELL, HEREDOC],
 	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.
 	'lane-direct-tool': [],
+	'lane-spilled-read': [],
 	'implementation-cut': [],
 }
 

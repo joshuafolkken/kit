@@ -16,6 +16,11 @@ const UNIT_LOG_HEADER = 'vitest'
 const FAILED_LINE = /^FAIL\s+(?<name>\S.*)$/u
 const FAILED_HEADING = 'failed tests:'
 const NONE_NAMED = '  (none named in the output — read the full output)'
+// A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace.
+const FAILED_FILE = /^(?:\|[^|]*\|\s+)?(?<file>\S+)/u
+// The guarded unit run, filtered to those files: it reserves its cores and ends a failure with this
+// same summary (joshuafolkken/kit#5023).
+const RERUN_PREFIX = 'rerun failed: pnpm josh test:unit '
 
 // One path per checkout and vitest mode, overwritten by each run, beside the gate's own log. **The
 // mode is in the name** because the gate's whole-suite `run` and a `related` run started beside it
@@ -38,9 +43,22 @@ function failed_tests(output: string): ReadonlyArray<string> {
 	return [...new Set(names.filter((name) => name !== undefined))]
 }
 
+// The files the failed names belong to, each once — what to run after a fix, before the whole related
+// set again (joshuafolkken/kit#5023).
+function failed_files(names: ReadonlyArray<string>): ReadonlyArray<string> {
+	const files = names.map((name) => FAILED_FILE.exec(name)?.groups?.['file'])
+
+	return [...new Set(files.filter((file) => file !== undefined))]
+}
+
+function name_lines(names: ReadonlyArray<string>): ReadonlyArray<string> {
+	if (names.length === 0) return [NONE_NAMED]
+
+	return [...names.map((name) => `  ${name}`), `${RERUN_PREFIX}${failed_files(names).join(' ')}`]
+}
+
 function format_failure_summary(output: string, log_path: string | undefined): string {
-	const names = failed_tests(output)
-	const lines = names.length === 0 ? [NONE_NAMED] : names.map((name) => `  ${name}`)
+	const lines = name_lines(failed_tests(output))
 
 	return `${[FAILED_HEADING, ...lines].join('\n')}\n${gate_log.format_log_notice(log_path)}`
 }
@@ -58,6 +76,13 @@ function report(
 	if (exit_code !== 0) process.stdout.write(format_failure_summary(output, log_path))
 }
 
-const vitest_failure_summary = { failed_tests, format_failure_summary, report, unit_log_path }
+const vitest_failure_summary = {
+	RERUN_PREFIX,
+	failed_files,
+	failed_tests,
+	format_failure_summary,
+	report,
+	unit_log_path,
+}
 
 export { vitest_failure_summary }
