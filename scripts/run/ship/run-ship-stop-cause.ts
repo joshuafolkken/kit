@@ -1,6 +1,8 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
+import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
+import { git_error } from '#scripts/git/git-error'
 import type { StopRecord } from '#scripts/lane/lane-ledger'
 import { run_ship_review, type StopFinding } from './run-ship-review'
 import { run_ship_stage, type Stage } from './run-ship-stage'
@@ -86,12 +88,41 @@ function infra_text({ body, out = body }: StoppedOutput): string {
 	return out
 }
 
+const FAILURE_LINE = new RegExp(`^${git_error.FAILURE_PREFIX} `, 'gmu')
+const REPORTED_LINE = new RegExp(
+	`^(?:${git_error.FAILURE_PREFIX}|${git_error.DETAILS_PREFIX}) (?<message>.*)$`,
+	'gmu',
+)
+
+// The failure the stage ended on — the last `❌ Error:` line — and the cause logged under it: a caller
+// that wraps a spent request (a merge whose read-back failed too, a timed-out exec) ends on its own
+// message, with the request's beneath.
+function final_failures(body: string): ReadonlyArray<string> {
+	const last = [...body.matchAll(FAILURE_LINE)].at(-1)
+	if (last === undefined) return []
+
+	return [...body.slice(last.index).matchAll(REPORTED_LINE)].map(
+		({ groups }) => groups?.['message'] ?? '',
+	)
+}
+
+// A gh request transient to its last attempt notes so on stderr — gh's own transient verdict, never a
+// second list of its errors (joshuafolkken/kit#5052). A caller may catch it and stop later on a red
+// check, so the note counts only when it names the failure the stage ended on, or that failure's cause.
+function is_spent_stop(body: string): boolean {
+	return final_failures(body).some((message) => body.includes(gh_retry.spent_note(message)))
+}
+
+function is_infra_stop(failed: StoppedOutput): boolean {
+	return is_infra(infra_text(failed)) || is_spent_stop(failed.body)
+}
+
 // A gate an infrastructure stage ran itself tags its red as a check: its output is test output, where
 // a title naming a rate limit is no outage (joshuafolkken/kit#4825).
 function stage_cause(stage: Stage, failed: StoppedOutput): Cause {
 	if (failed.cause === CAUSE.CHECK || !INFRA_STAGES.has(stage)) return CAUSE.CHECK
 
-	return is_infra(infra_text(failed)) ? CAUSE.INFRA : CAUSE.CHECK
+	return is_infra_stop(failed) ? CAUSE.INFRA : CAUSE.CHECK
 }
 
 function cause_of(stage: Stage, failed: StoppedOutput): Cause {

@@ -105,6 +105,11 @@ describe('test_red_logic.verdict_for', () => {
 		expect(test_red_logic.verdict_for(2, true)).toBe('red')
 		expect(test_red_logic.verdict_for(2, false)).toBe('green')
 	})
+
+	// joshuafolkken/kit#5043: a config that could not load ran nothing and failed — not a missing test.
+	it('answers stopped, never no-test or red, when nothing ran and vitest failed', () => {
+		expect(test_red_logic.verdict_for(0, true)).toBe('stopped')
+	})
 })
 
 describe('test_red_logic.is_refused', () => {
@@ -112,6 +117,7 @@ describe('test_red_logic.is_refused', () => {
 		expect(test_red_logic.is_refused(BUG_BODY, 'green')).toBe(true)
 		expect(test_red_logic.is_refused(BUG_BODY, 'red')).toBe(false)
 		expect(test_red_logic.is_refused(BUG_BODY, 'no-test')).toBe(false)
+		expect(test_red_logic.is_refused(BUG_BODY, 'stopped')).toBe(false)
 		expect(test_red_logic.is_refused(BUG_BODY, 'test-only')).toBe(false)
 		expect(test_red_logic.is_refused(BEHAVIOR_BODY, 'green')).toBe(false)
 	})

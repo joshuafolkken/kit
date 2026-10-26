@@ -32,6 +32,8 @@ const SERVER_ERROR_FLOOR = 500
 // wait logs anyone in.
 const GH_AUTH_REQUIRED_EXIT_CODE = 4
 
+const SPENT_NOTE = 'gh: request failed transiently on every attempt'
+
 // gh's own summary line for a failed request, e.g. `gh: Server Error (HTTP 502)`. It is the only
 // place the status is written when the body is an HTML error page rather than GitHub's JSON document.
 const SUMMARY_STATUS_PATTERN = /\(HTTP (?<status>\d{3})\)/u
@@ -100,6 +102,17 @@ function retry_delay(error: unknown, attempt: number): number | undefined {
 	return is_transient(error) ? RETRY_DELAYS_MS[attempt - 1] : undefined
 }
 
+// The line a request transient to its last attempt leaves on stderr, naming the failure by the first
+// line of its message: a stopped `josh ship` stage that ended on that failure reads it as the
+// infrastructure (joshuafolkken/kit#5052). A recovered retry writes none.
+function spent_note(message: string): string {
+	return `${SPENT_NOTE} (${message})`
+}
+
+function note_spent(error: unknown, attempt: number, hooks: RetryHooks): void {
+	if (attempt === MAX_ATTEMPTS && is_transient(error)) hooks.note(spent_note(first_line(error)))
+}
+
 async function with_retry<T>(
 	request: () => Promise<T>,
 	hooks: RetryHooks = DEFAULT_HOOKS,
@@ -110,7 +123,10 @@ async function with_retry<T>(
 	} catch (error) {
 		const wait_ms = retry_delay(error, attempt)
 
-		if (wait_ms === undefined) throw error
+		if (wait_ms === undefined) {
+			note_spent(error, attempt, hooks)
+			throw error
+		}
 
 		hooks.note(retry_note(error, attempt, wait_ms))
 		await hooks.wait(wait_ms)
@@ -119,7 +135,7 @@ async function with_retry<T>(
 	}
 }
 
-const gh_retry = { MAX_ATTEMPTS, RETRY_DELAYS_MS, is_transient, with_retry }
+const gh_retry = { MAX_ATTEMPTS, RETRY_DELAYS_MS, is_transient, spent_note, with_retry }
 
 export type { RetryHooks }
 export { gh_retry }

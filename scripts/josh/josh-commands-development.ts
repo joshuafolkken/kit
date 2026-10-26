@@ -221,10 +221,10 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	'test:red': {
 		script: 'scripts/test/test-red-main.ts',
 		description:
-			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only',
+			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/stopped/test-only',
 		category: 'Development',
 		reference: ['', 'developer', ['git', 'processes']],
-		usage: { examples: [{ arguments: '', note: 'red, green, no-test or test-only' }] },
+		usage: { examples: [{ arguments: '', note: 'red, green, no-test, stopped or test-only' }] },
 	},
 	'test:pinned': {
 		script: 'scripts/test/test-pinned-main.ts',

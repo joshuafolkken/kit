@@ -154,7 +154,16 @@ kit ships with permission prompts off, so the unattended commands (`fullrun`, `b
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
 - `.claude/settings.json` sets `permissions.defaultMode` to `bypassPermissions` with `Bash(*)` allowed.
 
-The `permissions.deny` list and the `pretool-guard` hook still refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable). A script that opens the file itself is outside both.
+The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
+
+The deny list matches the start of a command, so `git -C . …` or `command git …` passes it. The hook reads git's own arguments past those, but a git command inside `bash -c '…'`, a `python -c` one-liner or a script that opens the file itself still gets through. A command they let through is not thereby permitted.
+
+With the prompts off, text the agent reads can run with your permissions. An instruction planted in an Issue, a pull request, a comment or a dependency's README may be followed, and the guardrail does not stop it. Two measures keep the exposure small:
+
+- `pnpm josh issue:read` withholds a comment from an author without write access and marks such an author's Issue body as a report, not an instruction; the workflows read Issues through it.
+- Give `gh` only the scopes the work needs — for example `gh auth refresh --remove-scopes delete_repo,admin:public_key`.
+
+kit does not turn on Claude Code's sandbox by default ([#4022](https://github.com/joshuafolkken/kit/issues/4022)). The `gh` token stays reachable through github.com, which an allowlist has to keep, so the sandbox would not stop a leak through GitHub; and on macOS it breaks the `gh` and SSH `git push` calls `pnpm josh` makes.
 
 **Since Claude Code v2.1.257, a `permissions.defaultMode` of `bypassPermissions` is ignored in `.claude/settings.json` and `.claude/settings.local.json`.** For an unattended run on a current CLI, set it in `~/.claude/settings.json` or pass `--permission-mode bypassPermissions`. `backlogrun` passes that flag to the sessions it starts.
 

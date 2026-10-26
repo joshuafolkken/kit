@@ -24,6 +24,7 @@ const GIT_FAILED = new Error('git failed')
 const FIXING_TEXT = 'round 1 has fixes to make'
 const EMPTY_REPORT: PinnedReport = {
 	unpinned: [],
+	stopped: [],
 	unchecked: [],
 	unparsed: [],
 	max_hunks: test_pinned_logic.DEFAULT_MAX_HUNKS,
