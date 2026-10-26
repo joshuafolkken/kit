@@ -1,6 +1,11 @@
 // cspell:words coderabbit coderabbitai
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+	RETRY_PENDING_KEY,
+	RETRY_PENDING_VALUE,
+	UNREADABLE_COMMENTS_STOP,
+} from './git-gh-comments-unreadable'
+import {
 	handle_ai_review_findings,
 	UNREADABLE_COMMENTS_BODY,
 	UNREADABLE_COMMENTS_NOTE,
@@ -59,8 +64,11 @@ const CODERABBIT_ACTIONABLE_COMMENT = {
 
 const BLOCKER_MESSAGE_REGEX = /AI reviewer findings remain unresolved/u
 
+// `josh ship` sets the retry key around an attempt it will re-run, its gate's unit suite included.
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.unstubAllEnvs()
+	vi.stubEnv(RETRY_PENDING_KEY, undefined)
 })
 
 describe('handle_ai_review_findings — no blockers', () => {
@@ -215,6 +223,47 @@ describe('handle_ai_review_findings — comments that could not be read', () => 
 			handle_ai_review_findings({ ...INPUT, ignore_reason: IGNORE_REASON }),
 		).resolves.toEqual([UNREADABLE_COMMENTS_NOTE])
 		expect(mocked_pr_comment).toHaveBeenCalledWith(BRANCH, expect.stringContaining(IGNORE_REASON))
+	})
+})
+
+// joshuafolkken/kit#5012: `josh ship` re-runs the followup in place on this stop, read on the standard
+// output — so only the stop prints it, never a bypass that carries on.
+describe('handle_ai_review_findings — the unreadable stop on the standard output', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	it('prints the stop before refusing', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow()
+		expect(info).toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_STOP))
+	})
+
+	it('prints nothing for an ignore reason that carries on', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await handle_ai_review_findings({ ...INPUT, ignore_reason: IGNORE_REASON })
+		expect(info).not.toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_STOP))
+	})
+})
+
+// joshuafolkken/kit#5012: an attempt `josh ship` will run again sends no confirmation, so a read that
+// recovers on the retry never reaches a person.
+describe('handle_ai_review_findings — the unreadable stop on an attempt the ship retries', () => {
+	const INPUT = { branch_name: BRANCH, ignore_reason: undefined, context: CONTEXT }
+
+	it('prints the stop and refuses without a confirmation', async () => {
+		vi.stubEnv(RETRY_PENDING_KEY, RETRY_PENDING_VALUE)
+		const info = vi.spyOn(console, 'info').mockImplementation(vi.fn())
+
+		mocked_pr_get_comments.mockResolvedValue(undefined)
+
+		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
+		expect(info).toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_STOP))
+		expect(mocked_telegram_send).not.toHaveBeenCalled()
 	})
 })
 
