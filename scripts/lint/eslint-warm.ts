@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { resolve_tsx_runner } from '#scripts/josh/josh-logic'
+import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { eslint_daemon } from './eslint-daemon'
 
 // Warms a fresh checkout's eslint daemon before its first edit (joshuafolkken/kit#4720). A cold
@@ -27,8 +28,13 @@ function warm_target(project_root: string): string {
 	return first === undefined || first === '' ? FALLBACK_TARGET : first
 }
 
+// Bounded, so a daemon that never answers ends the detached warm-up instead of orphaning it
+// (joshuafolkken/kit#5047); a timed-out warm-up leaves the first edit cold, as before.
 async function warm(project_root: string): Promise<void> {
-	await eslint_daemon.run(['exec', 'eslint', warm_target(project_root)], { project_root })
+	await eslint_daemon.run(['exec', 'eslint', warm_target(project_root)], {
+		project_root,
+		timeout_ms: LINT_TIMEOUT_MS,
+	})
 }
 
 function ignore_error(): void {
@@ -37,7 +43,12 @@ function ignore_error(): void {
 
 // Detached and unreferenced, so the caller neither waits for the lint nor keeps its process alive
 // for it. Best-effort: nothing here may fail the caller.
+//
+// **A test run starts none** (joshuafolkken/kit#5047): suites drive a real `lane open` in scratch
+// trees, and one that forgot to mock this module left a detached warm-up behind each time.
 function start(project_root: string): void {
+	if (process.env['VITEST'] !== undefined) return
+
 	try {
 		const runner = resolve_tsx_runner()
 		const options = { cwd: project_root, detached: true, stdio: 'ignore' } as const

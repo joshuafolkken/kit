@@ -230,11 +230,12 @@ describe('eslint_daemon.remember_after_edit', () => {
 })
 
 describe('eslint_daemon.run', () => {
+	// joshuafolkken/kit#5047: the bound reaches the process, so a daemon that never answers is killed.
 	it('forwards the eslint arguments to the daemon from the project root', async () => {
 		current_checkout()
 		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
 
-		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toEqual({
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toEqual({
 			exit_code: 1,
 			stdout: 'report',
 			output: 'report',
@@ -242,7 +243,7 @@ describe('eslint_daemon.run', () => {
 		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith(
 			process.execPath,
 			[CLI, '--quiet', TARGET],
-			expect.objectContaining({ cwd: project_root }),
+			expect.objectContaining({ cwd: project_root, timeout: 5 }),
 		)
 		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ env: { ESLINT_D_MISS: 'fail' } })
 	})
