@@ -23,7 +23,7 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 
 ## Before round 1 — the implementer's self-check
 
-Answer these nine over your own diff before the scoped pair that precedes round 1 — question 1 once
+Answer these ten over your own diff before the scoped pair that precedes round 1 — question 1 once
 `pnpm josh run:review --join` prints its lines after the review, or, under `--join --fixing`, the
 ship's pre-detach — and fix what an
 answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
@@ -55,6 +55,9 @@ tests and the round cap are unchanged.
    comment makes about another component's behavior (what a stage does, who enforces a limit, which
    repository it runs in), open that component's code and confirm it; then name each context the
    change runs in — kit and a consumer, and a predecessor that died midway leaving its record behind.
+10. **Commands your prose tells a reader to run are run** — for every command a refusal, hint or
+    document you added or changed tells a reader to run, run it as written from a cwd other than the
+    root, with an absolute path, a relative path and an empty input, and check each result.
 
 The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
 merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".

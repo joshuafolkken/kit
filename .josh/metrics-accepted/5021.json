@@ -1,0 +1,9 @@
+{
+	"reason": "#5021 adds self-check question 10 to prompts/review.md (bold stem like its siblings, counted by the item-count test) and its rubric pointer",
+	"date": "2026-10-26",
+	"growth": {
+		"rules.lines": 5,
+		"ai_cost.on_demand_bytes": 432,
+		"prose.excess_bold": 1
+	}
+}
