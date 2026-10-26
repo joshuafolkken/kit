@@ -98,6 +98,9 @@ interface DeliveredRule {
 	// Openings the reason had before it was reworded, so `rule-value.ts` still credits a refusal
 	// delivered with the old text while those transcripts remain in its window.
 	former_reasons?: ReadonlyArray<string>
+	// The reasons a Stop hook sends a turn back with on this row's behalf, so `rule-value.ts` counts
+	// that block as this row's refusal.
+	stop_reasons?: ReadonlyArray<string>
 }
 
 // Scored but possibly delivered by its own guard inside `pretool-guard.ts` (batching, investigation) — joining `DELIVERED_RULES`
