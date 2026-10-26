@@ -95,6 +95,25 @@ function hold_reason(
 	return core_admission.is_too_narrow(key, reservations, granted) ? 'cpu' : undefined
 }
 
+// **Whether only load from outside the ledger holds the claim** (joshuafolkken/kit#4982): with that load
+// gone — its busy cores handed back and no run-queue overload — the claim would be admitted at a width
+// that is not too narrow. A claim the ledger or memory holds is not, and waits for its room to come back.
+function is_outside_held(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+): boolean {
+	const unloaded = {
+		...budget,
+		cores: budget.cores + (budget.busy_excess ?? 0),
+		busy_excess: 0,
+		is_overloaded: false,
+	}
+	const granted = core_admission.narrowed_weight(key, reservations, unloaded.cores)
+
+	return hold_reason(key, reservations, unloaded, granted) === undefined
+}
+
 // The line a waiting command prints once, when its wait starts.
 function wait_line(command: string | undefined, reason: WaitReason): string {
 	return `⏳ ${command ?? 'a step'} waits for the core budget — ${REASON_TEXT[reason]}`
@@ -155,6 +174,7 @@ function waits_of(
 const core_wait = {
 	WAIT_REASONS,
 	hold_reason,
+	is_outside_held,
 	wait_line,
 	wait_reason,
 	waits_of,

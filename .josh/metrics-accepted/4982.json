@@ -1,0 +1,7 @@
+{
+	"reason": "Core-budget wait admits early once outside load holding it stops easing (#4982): ease tracking, the outside-held check, its window default and regression tests",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 58
+	}
+}
