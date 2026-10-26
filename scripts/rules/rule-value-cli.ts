@@ -4,6 +4,7 @@ import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-tr
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_cache } from './rule-value-cache'
+import { rule_value_candidates } from './rule-value-candidates'
 
 // `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule.
 // `rule_value.measure` was public but had no caller outside its own test, so
@@ -108,26 +109,43 @@ function row(reading: RuleReading): string {
 	return [id, reached, rate_text(reading), refused, ...rewritten].join(COLUMN_GAP)
 }
 
+// `candidates` is set only where something measurable was found, so `NO_TARGETS` stays the whole answer.
+interface Rendered {
+	table: string
+	candidates?: string
+}
+
 // The reading as text, or `NO_TARGETS` when nothing measurable was found — never an empty output that
 // would read as a broken command.
 // The runs are counted as `measure` consumes them, since a lazy source cannot be asked its length
 // up front.
-function render(runs: Iterable<ReadonlyArray<string>>): string {
+function render_parts(runs: Iterable<ReadonlyArray<string>>): Rendered {
 	const tally: Tally = { runs: 0 }
 	const readings = rule_value.measure(counted(runs, tally))
 
-	if (tally.runs === 0) return NO_TARGETS
+	if (tally.runs === 0) return { table: NO_TARGETS }
 
-	return readings.map((reading) => row(reading)).join('\n')
+	const judged = rule_value_candidates.judge(readings, tally.runs)
+
+	return {
+		table: readings.map((reading) => row(reading)).join('\n'),
+		candidates: rule_value_candidates.render(judged, tally.runs),
+	}
 }
 
-// `--refresh` is the detached measurement the `backlogrun` loop head starts: the reading goes to the
-// cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`).
-function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
-	const reading = render(gather_runs(cwd))
+function render(runs: Iterable<ReadonlyArray<string>>): string {
+	return render_parts(runs).table
+}
 
-	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(reading, cwd)
-	else process.stdout.write(`${reading}\n`)
+// `--refresh` is the detached measurement the `backlogrun` loop head starts: the table goes to the
+// cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`). The candidates are read
+// when a rule is retired, not at the loop head, so they print to stdout only and the cache keeps its
+// shape.
+function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
+	const { table, candidates } = render_parts(gather_runs(cwd))
+
+	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(table, cwd)
+	else process.stdout.write(`${[table, candidates].filter(Boolean).join('\n\n')}\n`)
 
 	return 0
 }
@@ -139,6 +157,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 const rule_value_cli = {
 	group_by_run,
 	render,
+	render_parts,
 	row,
 	run_rule_value,
 	runs_of,
