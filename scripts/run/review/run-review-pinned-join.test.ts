@@ -111,8 +111,10 @@ describe('run_review_pinned_join.wait_for_join with round-1 fixes to make', () =
 		expect(process.kill).not.toHaveBeenCalled()
 		expect(answer?.unpinned).toStrictEqual([])
 		expect(answer?.text).toContain(FIXING_TEXT)
-		// joshuafolkken/kit#4948: the fix's `check:related` restarts it, not `review:record` alone.
-		expect(answer?.text).toContain('`josh check:related` starts it again')
+		// joshuafolkken/kit#4983: a lane child runs no `check:related` after round 1's fixes, so the note
+		// names the `review:record` that restarts it.
+		expect(answer?.text).toContain("the round's `josh review:record` starts it again")
+		expect(answer?.text).not.toContain('`josh check:related`')
 	})
 
 	it('reads the answer the check already left', async () => {

@@ -23,4 +23,4 @@ Rationale behind `.claude/skills/workflow-commands/fullrun-steps.md`.
 `pnpm josh ms` refuses in a lane, as a raw `git switch main` does: the primary checkout holds the
 default branch, so the switch fails with `already used by worktree`. Nothing is lost by skipping it —
 the lane was branched from a fresh default before it opened, and the latest default is brought in
-during the gate by `pnpm josh main:merge`.
+before the gate by `pnpm josh ship`'s sync.

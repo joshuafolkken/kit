@@ -78,7 +78,8 @@ describe('chain-rule — a lane child leaves the merge and the last check to shi
 	it('step 0 runs no check:related after the round’s fixes or before a re-detach', () => {
 		const step = lane_step()
 
-		expect(step).toContain("round's fixes, no `check:related` after them")
+		// The interaction brief refuses a tree the scoped pair has not passed, as round 1's does.
+		expect(step).toContain("round's fixes, no `check:related` after them unless a brief follows")
 		expect(step).toContain('`check:related`, `check` or `metrics` before it or a re-detach')
 		expect(step).not.toContain('all made before one `pnpm josh check:related`')
 	})

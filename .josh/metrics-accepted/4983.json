@@ -1,7 +1,7 @@
 {
-	"reason": "chain-rule step 0 now states that ship's sync merges main and stops on conflict, and when ship reuses the scoped-pair green, in place of the lane child's own main:merge and final check:related (#4983)",
+	"reason": "Lane chain rule now names when check:related is skipped and when a following brief still needs it; review FIXING_NOTE names review:record",
 	"date": "2026-10-26",
 	"growth": {
-		"ai_cost.on_demand_bytes": 98
+		"ai_cost.on_demand_bytes": 192
 	}
 }

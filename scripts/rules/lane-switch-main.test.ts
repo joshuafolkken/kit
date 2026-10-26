@@ -186,9 +186,10 @@ describe('delivered_rules.delivery — outside a lane checkout', () => {
 
 describe('LANE_SWITCH_MAIN_REASON', () => {
 	it.each([
-		// The next command it hands back (acceptance 2): continue on the current branch, main:merge later.
+		// The next command it hands back (acceptance 2): continue on the current branch, ship's sync merges
+		// later (joshuafolkken/kit#4983: a lane child runs no `main:merge`).
 		['keep implementing on the current branch'],
-		['pnpm josh main:merge'],
+		["`pnpm josh ship`'s sync brings the default in before its gate"],
 		// Why the call cannot succeed.
 		['already used by worktree'],
 		// The pointers to the procedure, never a resident document.
