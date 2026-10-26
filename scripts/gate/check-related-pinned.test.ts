@@ -20,6 +20,7 @@ describe('check_related_pinned.notice', () => {
 
 	it('lists the unpinned places with the ship form when the verdict on this tree stops the ship', async () => {
 		reached(UNPINNED)
+		vi.spyOn(run_review_pinned_accepted, 'judge').mockResolvedValue({ kind: 'stop', text: REPORT })
 
 		await expect(check_related_pinned.notice(ROOT)).resolves.toBe(
 			`${REPORT.trimEnd()}\n${check_related_pinned.SHIP_HINT}`,
