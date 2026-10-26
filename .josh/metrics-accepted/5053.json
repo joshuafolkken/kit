@@ -1,0 +1,7 @@
+{
+	"reason": "Shared dist/ scratch prefixes (distribution-scratch-fixture.ts) so the build tests and pack-boundary cannot drift (#5053)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
