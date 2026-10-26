@@ -154,9 +154,9 @@ kit ships with permission prompts off, so the unattended commands (`fullrun`, `b
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
 - `.claude/settings.json` sets `permissions.defaultMode` to `bypassPermissions` with `Bash(*)` allowed.
 
-The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They match the start of a command to refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
+The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
 
-Another spelling of the same action gets through — `bash -c '…'`, `command git …`, `git -C . …`, or a script that opens the file itself. A command they let through is not thereby permitted.
+The deny list matches the start of a command, so `git -C . …` or `command git …` passes it. The hook reads git's own arguments past those, but a git command inside `bash -c '…'`, a `python -c` one-liner or a script that opens the file itself still gets through. A command they let through is not thereby permitted.
 
 With the prompts off, text the agent reads can run with your permissions. An instruction planted in an Issue, a pull request, a comment or a dependency's README may be followed, and the guardrail does not stop it. Two measures keep the exposure small:
 

@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/test/vitest-failure-summary.ts:20 | 2026-10-26 | #5023
