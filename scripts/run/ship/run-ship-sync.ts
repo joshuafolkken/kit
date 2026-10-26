@@ -1,10 +1,13 @@
+import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import {
 	FAILURE_MESSAGE_PREFIX,
 	FAILURE_REASON_CHECKS,
 	FAILURE_REASON_CONFLICT,
 } from '#scripts/gh/git-pr-checks-eval'
+import { git_command } from '#scripts/git/git-command'
 import { main_merge, type MergeOutcome } from '#scripts/git/main-merge'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
+import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -33,6 +36,9 @@ const CURRENT_SUFFIX = ' brings nothing in'
 const MERGED_PREFIX = 'merged '
 const MERGED_GATE_NOTE =
 	'the default branch moved since the sync; the tree merged with it fails the gate:'
+const PUSHED_NOTE = 'pushed the merge ahead of the gate, so CI runs beside it'
+const PUSH_FAILED_NOTE =
+	'the push ahead of the gate failed; the commit stage pushes after the gate:'
 
 // A stage's result, plus the paths a stopped merge left unmerged — carried to the stop prompt.
 // `is_skipped` marks a stage that found nothing to do — a review round with nothing to review, a gate
@@ -45,6 +51,11 @@ interface StepResult extends JoshResult {
 	conflicts?: ReadonlyArray<string>
 	preconditions?: ReadonlyArray<string>
 	cause?: Cause
+}
+
+// The push of a tree already committed, with no pull request touched.
+function push_argv(title: string): ReadonlyArray<string> {
+	return ['git', '-y', '--skip-commit', '--skip-pr', title]
 }
 
 async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
@@ -77,10 +88,10 @@ function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string
 
 // Uncommitted work is committed locally first, never stashed: the merge guard refuses uncommitted work
 // the default branch also touches, and a merge deferred past it met its conflict only after the gate,
-// both review rounds and CI (joshuafolkken/kit#4708). The commit is not pushed — the commit stage pushes
-// it once the gate is green. A merge that changed the tree is checked by that gate, so the push never
-// carries an unchecked merge and the gate's record names the merge base the push carries. A refusal
-// left — a fetch that failed — does not stop the ship: the commit stage and the followup merge again.
+// both review rounds and CI (joshuafolkken/kit#4708). The commit is not pushed here: a tree the sync
+// leaves unmerged goes out at the commit stage once the gate is green (`push_ahead` pushes a merged
+// one). A refusal left — a fetch that failed — does not stop the ship: the commit stage and the
+// followup merge again.
 // The pre-commit prettier, cspell and eslint are switched off for it: the gate or the scoped pair runs
 // the same checks over this tree before anything is pushed, and the hooks only waited for the core
 // budget to repeat them (joshuafolkken/kit#4985).
@@ -95,6 +106,39 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 	)
 
 	return commit.code === SUCCESS_EXIT_CODE ? undefined : commit
+}
+
+// **A merge the sync made is pushed at once onto an open pull request, ahead of the gate**
+// (joshuafolkken/kit#5067): CI and SonarQube start from this push, and pushed after the gate they ran
+// behind it, leaving the followup minutes of waiting. Only the pull request's own branch moves; the
+// merge still needs the gate, the review attest and a green CI, and a red gate stops the ship before
+// the followup as before, the next push replacing the commit. Its pre-push hook runs the related tests
+// (`pre-push-related-switch.ts`), since the gate over this same tree runs the whole suite next. A
+// branch with no open pull request pushes nothing here: CI runs on pull requests only. An unmoved
+// default branch pushes nothing either, so the commit stage stays the one push; a merged one makes it
+// two, and CI and the review bots run again on the second. A failed push stops nothing: the commit
+// stage pushes the gated tree.
+async function push_ahead(title: string): Promise<string> {
+	const push = await josh_command.josh_run(push_argv(title), should_forward_stderr, undefined, {
+		[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
+	})
+
+	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')
+}
+
+// An unreadable pull request reads as none: the commit stage pushes after the gate either way.
+async function has_open_pull(): Promise<boolean> {
+	try {
+		return (await git_gh_pr_read.pr_get_number(await git_command.branch())) !== undefined
+	} catch {
+		return false
+	}
+}
+
+async function pushed_note(outcome: MergeOutcome, title: string): Promise<string> {
+	if (outcome.kind !== 'merged' || !(await has_open_pull())) return ''
+
+	return await push_ahead(title)
 }
 
 // The merge waits first for any lane whose open pull request changes the same paths
@@ -114,7 +158,8 @@ async function sync_stage(issue: string, title: string, is_dirty: boolean): Prom
 
 	if (outcome.kind === 'conflict') return conflict_result(outcome.files, waited)
 
-	const out = [waited, sync_note(outcome)].filter((line) => line !== '').join('\n')
+	const pushed = await pushed_note(outcome, title)
+	const out = [waited, sync_note(outcome), pushed].filter((line) => line !== '').join('\n')
 
 	return { code: SUCCESS_EXIT_CODE, out }
 }
@@ -153,7 +198,7 @@ async function push_merged(title: string): Promise<StepResult | undefined> {
 
 	if (gate !== undefined) return gate
 
-	const push = await josh(['git', '-y', '--skip-commit', '--skip-pr', title])
+	const push = await josh(push_argv(title))
 
 	return push.code === SUCCESS_EXIT_CODE ? undefined : push
 }
@@ -238,6 +283,8 @@ const run_ship_sync = {
 	CONFLICT_NOTE,
 	MAX_MERGE_RETRIES,
 	MERGED_GATE_NOTE,
+	PUSHED_NOTE,
+	PUSH_FAILED_NOTE,
 	catch_up,
 	followup_stage,
 	sync_stage,

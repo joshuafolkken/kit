@@ -69,6 +69,10 @@ const run_guarded_unit = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
 
 vi.mock('#scripts/test/test-unit-guard', () => ({ test_unit_guard: { run_guarded_unit } }))
 
+const run_related_tests = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
+
+vi.mock('#scripts/test/test-related', () => ({ test_related: { run_related_tests } }))
+
 const { pre_push_unit } = await import('./pre-push-unit')
 
 const { capture_stdout } = gate_test_fixture
@@ -308,6 +312,51 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 	})
 })
 
+// joshuafolkken/kit#5067: `josh ship` pushes its sync merge ahead of the gate, whose whole suite runs
+// over the same tree next, so that push asks for the related tests instead.
+describe('a push ahead of its gate runs the related tests', () => {
+	const RELATED_ENV = 'JOSH_PRE_PUSH_RELATED'
+
+	beforeEach(() => {
+		vi.stubEnv(RELATED_ENV, '1')
+	})
+
+	it('runs the related tests, not the whole suite, when no record covers the push', async () => {
+		const [code, text] = await run_hook()
+
+		expect(code).toBe(0)
+		expect(run_related_tests).toHaveBeenCalledWith([])
+		expect(suite_run_count()).toBe(NOTHING_RAN)
+		expect(text).toContain('running the related unit tests')
+	})
+
+	it('still reuses a record that covers the push', async () => {
+		record_green(CHANGED_TREE, BASE)
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+	})
+
+	it('runs the whole suite when the escape hatch is set too', async () => {
+		vi.stubEnv(FORCE_ENV, '1')
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+		expect(suite_run_count()).toBe(SUITE_RAN)
+	})
+
+	it('runs the whole suite without the switch', async () => {
+		vi.stubEnv(RELATED_ENV, '')
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+		expect(suite_run_count()).toBe(SUITE_RAN)
+	})
+})
+
 // The hook's line names this command, so a command that is not registered is a push that fails on
 // every repository the config reaches.
 // joshuafolkken/kit#3874: a push's whole suite ran beside other lanes' gates without a place in the core
@@ -338,6 +387,20 @@ describe('the whole suite holds a place in the core budget', () => {
 		await run_hook()
 
 		expect(reservation).not.toHaveBeenCalled()
+	})
+
+	it('reserves the same weight before it runs the related tests ahead of the gate', async () => {
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockImplementation(async (_weight, run) => await run())
+
+		vi.stubEnv('JOSH_PRE_PUSH_RELATED', '1')
+		await run_hook()
+
+		expect(reservation).toHaveBeenCalledTimes(1)
+		expect(reservation.mock.calls[0]?.[2]?.command).toBe('pre-push test:related')
+		expect(reservation.mock.calls[0]?.[2]?.is_unit).toBe(true)
+		expect(run_related_tests).toHaveBeenCalledWith([])
 	})
 })
 

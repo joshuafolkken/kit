@@ -928,6 +928,8 @@ The result is reused when [`josh gate`](josh-commands.md#josh-gate) recorded tha
 JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
 ```
 
+With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate.
+
 **Output:** on reuse, prints that the tree is already green.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-push-unit` in detail".

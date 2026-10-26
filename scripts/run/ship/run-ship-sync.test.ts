@@ -7,6 +7,9 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const scoped_mock = vi.hoisted(() => vi.fn())
 const overlap_mock = vi.spyOn(run_ship_overlap, 'await_overlap')
 
+// An open pull request, so a merge the sync made is pushed ahead of the gate.
+vi.mock('#scripts/gh/git-gh-pr-read', () => ({ git_gh_pr_read: { pr_get_number: async () => 1 } }))
+vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: async () => '3221-lane' } }))
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_gate: scoped_mock } }))
@@ -68,7 +71,7 @@ describe('run_ship_sync.sync_stage — the wait for an overlapping lane', () => 
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
 			code: OK,
-			out: `${run_ship_overlap.note(WAITED)}\nmerged main`,
+			out: `${run_ship_overlap.note(WAITED)}\nmerged main\n${run_ship_sync.PUSHED_NOTE}`,
 		})
 		expect(overlap_mock).toHaveBeenCalledWith(ISSUE)
 	})
@@ -92,17 +95,17 @@ describe('run_ship_sync.sync_stage — the merge before the commit', () => {
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 
-	// joshuafolkken/kit#3307: the gate stage after the sync checks the merged tree, so its record pins
-	// the merge base the push carries.
+	// joshuafolkken/kit#3307: the gate stage after the sync checks the merged tree. Its push goes ahead of
+	// that gate (joshuafolkken/kit#5067, pinned in `run-ship-sync-early-push.test.ts`).
 	it('leaves the merged tree to the gate stage that follows, and goes on without stopping', async () => {
 		merge_mock.mockResolvedValue(MERGED)
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
 			code: OK,
-			out: MERGED_NOTE,
+			out: `${MERGED_NOTE}\n${run_ship_sync.PUSHED_NOTE}`,
 		})
 		expect(scoped_mock).not.toHaveBeenCalled()
-		expect(josh_run_mock).not.toHaveBeenCalled()
+		expect(commands()).toStrictEqual([PUSH])
 	})
 
 	it('stops on a conflict, naming the unmerged paths', async () => {
@@ -151,9 +154,9 @@ describe('run_ship_sync.sync_stage — the local commit before the merge', () =>
 
 		expect(await run_ship_sync.sync_stage(ISSUE, TITLE, tree.is_dirty)).toStrictEqual({
 			code: OK,
-			out: MERGED_NOTE,
+			out: `${MERGED_NOTE}\n${run_ship_sync.PUSHED_NOTE}`,
 		})
-		expect(commands()).toStrictEqual([LOCAL_COMMIT])
+		expect(commands()).toStrictEqual([LOCAL_COMMIT, PUSH])
 		expect(josh_run_mock.mock.invocationCallOrder[0]).toBeLessThan(
 			merge_mock.mock.invocationCallOrder[0] ?? 0,
 		)
