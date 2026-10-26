@@ -77,6 +77,27 @@ describe('lane_net_time.net_ms', () => {
 	})
 })
 
+// joshuafolkken/kit#5032: a host sleep the sampler recorded at the wake, `minutes` long from `minute`.
+function sleep(minute: number, minutes: number): RunEvent {
+	return { ...event(minute + minutes, 'sleep', 'host slept'), elapsed_ms: minutes * MINUTE_MS }
+}
+
+describe('lane_net_time.net_ms — host sleep', () => {
+	it('takes out a host sleep inside the lane, whatever issue the lane is', () => {
+		expect(net_minutes([dispatch(0), merge(55)], [sleep(10, 15)])).toBe(40)
+	})
+
+	it('takes out only the part of a host sleep inside the lane', () => {
+		expect(net_minutes([dispatch(0), merge(55)], [sleep(50, 15)])).toBe(50)
+	})
+
+	it('takes out a park the host slept through once', () => {
+		const park = event(10, 'park', `#${String(ISSUE)} parked`)
+
+		expect(net_minutes([dispatch(0), dispatch(40), merge(60)], [park, sleep(20, 30)])).toBe(20)
+	})
+})
+
 describe('lane_net_time.net_ms — where a wait ends', () => {
 	it('ends a park at the next ship stage', () => {
 		const park = event(10, 'park', `#${String(ISSUE)} parked`)
