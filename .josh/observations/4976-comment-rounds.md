@@ -1,0 +1,2 @@
+- rf:comments | low | scripts/git/main-merge-regenerate.ts:81 | 2026-10-26 | #4976
+- rf:comments | low | scripts/run/ship/run-ship-sync.ts:9 | 2026-10-26 | #4976

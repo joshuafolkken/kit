@@ -207,11 +207,14 @@ const FALL_PER_STEP = 3
 
 // A held claim on a clock that each sleep steps by `STEP_MS`: how long it waited, and whether it
 // started past the budget.
-async function waited_ms(read_machine: () => Promise<MachineReading>): Promise<{
+async function waited_ms(
+	read_machine: () => Promise<MachineReading>,
+	reserved = RESERVED,
+): Promise<{
 	waited: number
 	is_overflow: boolean
 }> {
-	write_reserved(RESERVED)
+	write_reserved(reserved)
 	write_waiter_ahead()
 
 	const clock = { value: 0 }
@@ -247,6 +250,15 @@ describe('core_budget.reserve — a wait that does not ease the load ends early'
 			(_, step) => CORES + 2 + FALL_PER_STEP * (STEPS_TO_CAP - step),
 		)
 		const run = await waited_ms(busy_in_turn(falling))
+
+		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
+	})
+
+	// The ledger's own claims fill the machine and the reading is steady: their room comes back once
+	// one ends, so the claim waits for it rather than starting narrow.
+	it('keeps a claim the ledger holds waiting to the cap on a steady load', async () => {
+		const run = await waited_ms(busy(CORES), CORES)
 
 		expect(run.is_overflow).toBe(true)
 		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
