@@ -7,6 +7,7 @@ import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { review_attest } from './review-attest'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
+import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_round2 } from './review-round2'
 import { review_stamps } from './review-stamps'
 
@@ -42,12 +43,14 @@ function settled_files(
 	return { ...files, ...Object.fromEntries(cited) }
 }
 
-// Swallowed: no record re-runs the ship's round 1 over the whole change — wider, never narrower.
+// Swallowed: no record re-runs the ship's round 1 over the whole change — wider, never narrower. The
+// blobs let a sync's change to a covered document carry onto the new base (`carried_paths`).
 async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 	try {
 		const { files, base } = await gate_tree.read_gate_tree()
+		const blobs = review_round_one_blobs.capture(Object.keys(files))
 
-		review_stamps.reviewed_stamp.write(settled_files(files, unsettled), undefined, base)
+		review_stamps.reviewed_stamp.write(settled_files(files, unsettled), undefined, base, blobs)
 	} catch {
 		/* no record widens the next round rather than narrowing it */
 	}
@@ -57,7 +60,8 @@ async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 //
 // **A base the ship's sync moved is unmoved for every path the default branch left alone**
 // (joshuafolkken/kit#4829): with every recorded digest matching, only a synced path the round covers
-// changes what it read. Main's other paths are the scoped pair's, the gate's and CI's to check.
+// changes what it read — unless round 2 would not execute it and main alone moved it
+// (joshuafolkken/kit#4984). Main's other paths are the scoped pair's, the gate's and CI's to check.
 //
 // **A `josh metrics` approval the branch rewrote is no move** (joshuafolkken/kit#4788): the ship's
 // pre-detach re-record writes it after `review:record`, and it is data `josh metrics` derives and the
@@ -110,6 +114,28 @@ function unsettled_by(cause: string, path?: string): Standing {
 	return { movement: MOVEMENT.UNSETTLED, cause: path === undefined ? cause : `${cause}: ${path}` }
 }
 
+// **A covered file only the default branch moved is no move where round 2 would not execute it**
+// (joshuafolkken/kit#4984): documentation, a prompt or an inert path — a generated usage heading main
+// rewrote beside the lane's own. Its recorded blob carried onto the new base reproduces the file now
+// only where main's change is all that moved it (`review-round-one-blobs.ts`); a lane edit since the
+// record, a carry git cannot make, or a path a recorded High cites stays moved.
+function is_carry_candidate(stamp: FileMapStamp, path: string): boolean {
+	const is_settled = Object.hasOwn(stamp.files, path) && stamp.files[path] !== UNSETTLED_DIGEST
+
+	return is_settled && review_round2.is_unexecuted(path, [])
+}
+
+function carried_paths(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
+	const candidates = parts.synced.filter((path) => is_carry_candidate(stamp, path))
+	const { blobs, base: from } = stamp
+	const delta =
+		candidates.length === 0
+			? undefined
+			: review_round_one_blobs.carried_delta({ blobs, from, to: tree.base, paths: candidates })
+
+	return delta === undefined ? [] : candidates.filter((path) => !delta.includes(path))
+}
+
 function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
 	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
 }
@@ -160,11 +186,16 @@ async function standing(
 
 	if (parts === undefined) return unsettled_by(CAUSE.UNREAD)
 
-	const synced = parts.synced.find((path) => Object.hasOwn(stamp.files, path))
+	const carried = carried_paths(stamp, tree, parts)
+	const synced = parts.synced.find(
+		(path) => Object.hasOwn(stamp.files, path) && !carried.includes(path),
+	)
 
 	if (synced !== undefined) return unsettled_by(CAUSE.SYNCED, synced)
 
-	return moved_standing(stamp, moved_files(stamp, tree, parts), tree, briefed)
+	const moved = moved_files(stamp, tree, parts).filter((path) => !carried.includes(path))
+
+	return moved_standing(stamp, moved, tree, briefed)
 }
 
 async function movement(
