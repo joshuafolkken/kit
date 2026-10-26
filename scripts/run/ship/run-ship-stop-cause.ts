@@ -88,21 +88,29 @@ function infra_text({ body, out = body }: StoppedOutput): string {
 	return out
 }
 
-const FAILURE_LINE = new RegExp(`^${git_error.FAILURE_PREFIX} (?<message>.*)$`, 'gmu')
+const FAILURE_LINE = new RegExp(`^${git_error.FAILURE_PREFIX} `, 'gmu')
+const REPORTED_LINE = new RegExp(
+	`^(?:${git_error.FAILURE_PREFIX}|${git_error.DETAILS_PREFIX}) (?<message>.*)$`,
+	'gmu',
+)
 
-function final_failure(body: string): string | undefined {
-	const { message } = [...body.matchAll(FAILURE_LINE)].at(-1)?.groups ?? {}
+// The failure the stage ended on — the last `❌ Error:` line — and the cause logged under it: a caller
+// that wraps a spent request (a merge whose read-back failed too, a timed-out exec) ends on its own
+// message, with the request's beneath.
+function final_failures(body: string): ReadonlyArray<string> {
+	const last = [...body.matchAll(FAILURE_LINE)].at(-1)
+	if (last === undefined) return []
 
-	return message
+	return [...body.slice(last.index).matchAll(REPORTED_LINE)].map(
+		({ groups }) => groups?.['message'] ?? '',
+	)
 }
 
 // A gh request transient to its last attempt notes so on stderr — gh's own transient verdict, never a
 // second list of its errors (joshuafolkken/kit#5052). A caller may catch it and stop later on a red
-// check, so the note counts only when it names the failure the stage ended on.
+// check, so the note counts only when it names the failure the stage ended on, or that failure's cause.
 function is_spent_stop(body: string): boolean {
-	const message = final_failure(body)
-
-	return message !== undefined && body.includes(gh_retry.spent_note(message))
+	return final_failures(body).some((message) => body.includes(gh_retry.spent_note(message)))
 }
 
 function is_infra_stop(failed: StoppedOutput): boolean {

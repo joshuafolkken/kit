@@ -25,13 +25,18 @@ function get_cause_message(cause: unknown): string | undefined {
 	return undefined
 }
 
+// The heads of the lines a failed command names the error it ended on, and that error's cause, with —
+// read back by a stopped `josh ship` stage (joshuafolkken/kit#5052).
+const FAILURE_PREFIX = '❌ Error:'
+const DETAILS_PREFIX = '💡 Details:'
+
 function display_error_details(cause: unknown): void {
 	const cause_message = get_cause_message(cause)
 
 	if (cause_message === undefined || cause_message.length === 0) return
 
 	console.error('')
-	console.error('💡 Details:', cause_message)
+	console.error(DETAILS_PREFIX, cause_message)
 }
 
 const FAILURE_EXIT_CODE = 1
@@ -67,10 +72,6 @@ class OperationCancelledError extends Error {
 		this.name = 'OperationCancelledError'
 	}
 }
-
-// The head of the line a failed command names the error it ended on with — read back by a stopped
-// `josh ship` stage (joshuafolkken/kit#5052).
-const FAILURE_PREFIX = '❌ Error:'
 
 function display_failure(error: unknown): void {
 	const error_message = error_text.message_of(error)
@@ -122,6 +123,7 @@ function handle(error: unknown): void {
 }
 
 const git_error = {
+	DETAILS_PREFIX,
 	FAILURE_PREFIX,
 	handle,
 }

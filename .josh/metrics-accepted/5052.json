@@ -1,7 +1,7 @@
 {
-	"reason": "#5052: a spent transient gh request is read as an infra ship stop only when it is the failure the stage ended on",
+	"reason": "#5052: a spent transient gh request is read as an infra ship stop when it is the failure the stage ended on or that failure's logged cause",
 	"date": "2026-10-26",
 	"growth": {
-		"scripts.code_lines": 26
+		"scripts.code_lines": 34
 	}
 }

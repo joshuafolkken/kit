@@ -1,5 +1,6 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
+import { MERGE_UNCONFIRMED_MESSAGE } from '#scripts/gh/git-gh-pr'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
@@ -67,7 +68,7 @@ describe('run_ship_stop_cause.cause_of — a gh request whose retries ran out', 
 	const EMPTY_ANSWER = 'unexpected end of JSON input'
 	const RETRY_NOTE = `gh: request failed transiently (attempt 1/3: ${EMPTY_ANSWER}) — retrying in 2000 ms`
 	const SPENT = gh_retry.spent_note(EMPTY_ANSWER)
-	const { FAILURE_PREFIX } = git_error
+	const { DETAILS_PREFIX, FAILURE_PREFIX } = git_error
 
 	it('reads a followup stopped on it as the infrastructure, though its stdout names none', () => {
 		const failed = { body: `${RETRY_NOTE}\n${SPENT}\n${FAILURE_PREFIX} ${EMPTY_ANSWER}`, out: '' }
@@ -79,6 +80,12 @@ describe('run_ship_stop_cause.cause_of — a gh request whose retries ran out', 
 		expect(cause_of('followup', { body: `${RETRY_NOTE}\n${RED_CHECK}`, out: RED_CHECK })).toBe(
 			CAUSE.CHECK,
 		)
+	})
+
+	it('reads a followup stopped on a failure caused by it as the infrastructure', () => {
+		const unconfirmed = `${FAILURE_PREFIX} ${MERGE_UNCONFIRMED_MESSAGE}\n\n${DETAILS_PREFIX} ${EMPTY_ANSWER}`
+
+		expect(cause_of('followup', { body: `${SPENT}\n${unconfirmed}`, out: '' })).toBe(CAUSE.INFRA)
 	})
 
 	it('reads a red check stopped on after a caught spent request as a check', () => {
