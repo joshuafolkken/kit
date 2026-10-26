@@ -50,6 +50,29 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	})
 })
 
+// joshuafolkken/kit#5072: the taint analysis reads production code only once the test files are tests.
+describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
+	const properties = load_sonar_properties()
+	const test_inclusions = (properties['sonar.test.inclusions'] ?? '').split(',')
+	const cpd_exclusions = (properties['sonar.cpd.exclusions'] ?? '').split(',')
+	const exclusions = (properties['sonar.exclusions'] ?? '').split(',')
+
+	it('declares the test files with the test extensions of sonar.cpd.exclusions', () => {
+		const test_patterns = cpd_exclusions.filter((pattern) =>
+			/\.(test|spec|e2e)\.ts$/u.test(pattern),
+		)
+
+		expect(test_inclusions).toStrictEqual(test_patterns)
+		expect(properties['sonar.tests']).toBe('.')
+		// Once sonar.tests is set the scanner no longer defaults sonar.sources to the base directory.
+		expect(properties['sonar.sources']).toBe('.')
+	})
+
+	it('keeps the declared test files out of the main sources', () => {
+		expect(exclusions).toStrictEqual(expect.arrayContaining(test_inclusions))
+	})
+})
+
 // joshuafolkken/kit#3047: ESLint's `no-await-in-loop` is the gate for S9382, and SonarJS does not read
 // the `eslint-disable-next-line` comments that record each intentional sequential await.
 describe.each([SONAR_PROPERTIES_FILE, SONAR_TEMPLATE_FILE])('%s S9382 suppression', (file) => {
