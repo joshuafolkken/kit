@@ -54,6 +54,17 @@ describe('git_error.handle', () => {
 	})
 })
 
+// joshuafolkken/kit#5052: a stopped ship stage reads the failure and its cause back by these prefixes.
+describe('git_error.FAILURE_PREFIX', () => {
+	it('is the head of the line a failure is logged with', () => {
+		expect(git_error.FAILURE_PREFIX).toBe(ERROR_PREFIX)
+	})
+
+	it('has the head of the line its cause is logged with beside it', () => {
+		expect(git_error.DETAILS_PREFIX).toBe(DETAILS_PREFIX)
+	})
+})
+
 describe('git_error.handle — a branch mismatch', () => {
 	it('renders both branch names and sets a failing exit code', () => {
 		git_error.handle(

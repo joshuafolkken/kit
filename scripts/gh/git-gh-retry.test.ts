@@ -5,8 +5,9 @@ import { gh_retry, type RetryHooks } from './git-gh-retry'
 // joshuafolkken/kit#4717: a request GitHub failed transiently — a 5xx, or no answer at all — is asked
 // again a bounded number of times, one log line per retry; a 4xx, a timeout and a non-gh error are not.
 
-const { MAX_ATTEMPTS, RETRY_DELAYS_MS, is_transient, with_retry } = gh_retry
+const { MAX_ATTEMPTS, RETRY_DELAYS_MS, is_transient, spent_note, with_retry } = gh_retry
 const BAD_GATEWAY = 'gh: Server Error (HTTP 502)'
+const EMPTY_ANSWER = 'unexpected end of JSON input'
 const OK = 'ok'
 const SERVER_ERROR_STATUS = 503
 const NOT_FOUND_STATUS = 404
@@ -55,7 +56,7 @@ describe('gh_retry.with_retry', () => {
 		expect(recorded.notes[0]).toContain(BAD_GATEWAY)
 	})
 
-	it('throws the last failure once every attempt failed, one log line per retry', async () => {
+	it('throws the last failure once every attempt failed, one log line per retry and one when spent', async () => {
 		const last = gh_error(BAD_GATEWAY)
 		const request = failing_then([gh_error(BAD_GATEWAY), gh_error(BAD_GATEWAY), last])
 		const recorded = hooks()
@@ -63,7 +64,7 @@ describe('gh_retry.with_retry', () => {
 		await expect(with_retry(request, recorded)).rejects.toBe(last)
 		expect(request).toHaveBeenCalledTimes(MAX_ATTEMPTS)
 		expect(recorded.waits).toEqual(RETRY_DELAYS_MS)
-		expect(recorded.notes).toHaveLength(MAX_ATTEMPTS - 1)
+		expect(recorded.notes).toHaveLength(MAX_ATTEMPTS)
 	})
 
 	it('does not retry a 4xx', async () => {
@@ -74,6 +75,25 @@ describe('gh_retry.with_retry', () => {
 		await expect(with_retry(request, recorded)).rejects.toBe(not_found)
 		expect(request).toHaveBeenCalledTimes(1)
 		expect(recorded.notes).toEqual([])
+	})
+})
+
+// joshuafolkken/kit#5052: a request transient to its last attempt leaves the line a stopped ship stage
+// reads as the infrastructure; a recovered one leaves none.
+describe('gh_retry.with_retry — a spent retry', () => {
+	it('notes a request transient to its last attempt as spent, naming its failure', async () => {
+		const request = failing_then(Array.from({ length: MAX_ATTEMPTS }, () => gh_error(EMPTY_ANSWER)))
+		const recorded = hooks()
+
+		await expect(with_retry(request, recorded)).rejects.toThrow(EMPTY_ANSWER)
+		expect(recorded.notes.at(-1)).toBe(spent_note(EMPTY_ANSWER))
+	})
+
+	it('notes no spent retry when a retry recovers', async () => {
+		const recorded = hooks()
+
+		await with_retry(failing_then([gh_error(EMPTY_ANSWER)]), recorded)
+		expect(recorded.notes).not.toContain(spent_note(EMPTY_ANSWER))
 	})
 })
 
