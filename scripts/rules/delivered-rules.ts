@@ -79,8 +79,8 @@ interface DeliveredRule {
 	reason: string
 	about: RuleAbout
 	// A stand-down when an earlier act on the tail already satisfied the rule; checked first, so a
-	// satisfied call spends no record.
-	already_satisfied?: (tail: string, call: GuardedCall) => boolean
+	// satisfied call spends no record. `run` names the session, for a stand-down that outlives the tail.
+	already_satisfied?: (tail: string, call: GuardedCall, run: GuardRun) => boolean
 	// For a rule that binds on every occurrence instead of once per run. `at_ms` is this row's own last
 	// refusal, so an immediate reissue can be let through.
 	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number) => boolean
@@ -330,7 +330,7 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 		delivered_at_ms: number,
 		run: GuardRun,
 	): boolean {
-		if (already_satisfied?.(tail, call) === true) return false
+		if (already_satisfied?.(tail, call, run) === true) return false
 		if (decide === undefined) return true
 
 		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
