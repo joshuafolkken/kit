@@ -57,16 +57,34 @@ describe('vitest_failure_summary.format_failure_summary', () => {
 			'failed tests:',
 			`  ${FIRST}`,
 			`  ${SECOND}`,
+			`${vitest_failure_summary.RERUN_PREFIX}scripts/a.test.ts scripts/b.test.ts`,
 			`${gate_log.LOG_NOTICE_PREFIX}${LOG_PATH}`,
 			'',
 		])
 	})
 
-	it('says no name was found rather than printing an empty list', () => {
+	it('says no name was found and prints no rerun command', () => {
 		const summary = vitest_failure_summary.format_failure_summary('crashed', undefined)
 
 		expect(summary).toContain('none named in the output')
+		expect(summary).not.toContain(vitest_failure_summary.RERUN_PREFIX)
 		expect(summary.endsWith(`${gate_log.LOG_FAILED_NOTICE}\n`)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5023: a lane that fixed one failed file reran the whole related set to confirm it.
+describe('vitest_failure_summary.failed_files', () => {
+	it('names each failed file once, whether a test or a load failed', () => {
+		expect(vitest_failure_summary.failed_files([FIRST, SECOND, FIRST])).toStrictEqual([
+			'scripts/a.test.ts',
+			'scripts/b.test.ts',
+		])
+	})
+
+	it('drops the workspace project label', () => {
+		const labelled = '|isolated| scripts/c.test.ts > suite > reads the env'
+
+		expect(vitest_failure_summary.failed_files([labelled])).toStrictEqual(['scripts/c.test.ts'])
 	})
 })
 

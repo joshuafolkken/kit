@@ -24,7 +24,7 @@
 **検証ゲートと差分は、切り詰められた結果で判断しない。**
 
 - `pnpm josh gate` は合否の 1 行を末尾に出す。失敗の内訳が切れたら、合否行の直前の `full output: <path>` のファイルを読む（joshuafolkken/kit#1227）
-- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。再実行しない（`scripts/test/vitest-failure-summary.ts`）
+- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。読むための再実行はしない。直したら、まず要約の `rerun failed:` 行で失敗したファイルだけを回し、関連集合の全体は最後の `check:related` で 1 回だけ回す（`scripts/test/vitest-failure-summary.ts`）
 - 差分には判定行が無い。差分はファイルへ落としてから範囲で読む（`git diff main...HEAD > /tmp/diff.patch && wc -l /tmp/diff.patch`）
 
 ## 検証コマンドをパイプに繋がない（joshuafolkken/kit#1556）
