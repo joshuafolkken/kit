@@ -152,7 +152,7 @@ The following table describes the `full` profile. The profile table above lists 
 kit ships with permission prompts off, so the unattended commands (`fullrun`, `backlogrun`, …) do not stall:
 
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
-- `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is.
+- `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is. A file synced before kit stopped shipping it keeps the `bypassPermissions` line; that line is now yours, and deleting it survives a sync.
 - `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
 
 The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).

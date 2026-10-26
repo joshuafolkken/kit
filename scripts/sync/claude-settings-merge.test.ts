@@ -164,7 +164,7 @@ describe('merge_claude_settings — permissions', () => {
 		expect(merged.permissions['disableBypassPermissionsMode']).toBe('disable')
 	})
 
-	it('leaves the bypassPermissions defaultMode an earlier sync wrote as it is', () => {
+	it('keeps the bypassPermissions defaultMode an earlier sync wrote, value unchanged', () => {
 		const existing = existing_with((settings) => {
 			settings.permissions = { defaultMode: 'bypassPermissions', ...settings.permissions }
 		})
