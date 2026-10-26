@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const SONAR_PROPERTIES_FILE = 'sonar-project.properties'
 const SONAR_TEMPLATE_FILE = 'templates/sonar-project.properties'
+const CLAUDE_EXCLUSION = '.claude/**'
 
 function load_sonar_properties(file = SONAR_PROPERTIES_FILE): Record<string, string> {
 	const content = readFileSync(path.resolve(process.cwd(), file), 'utf8')
@@ -27,7 +28,7 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	const exclusions = (properties['sonar.exclusions'] ?? '').split(',').map((entry) => entry.trim())
 
 	it('excludes upstream-synced .claude bootstrap scripts from analysis', () => {
-		expect(exclusions).toContain('.claude/**')
+		expect(exclusions).toContain(CLAUDE_EXCLUSION)
 	})
 
 	it('does not exclude scripts/ core package code from analysis', () => {
@@ -50,26 +51,15 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	})
 })
 
-// joshuafolkken/kit#5072: the taint analysis reads production code only once the test files are tests.
+// joshuafolkken/kit#5073: declaring the test files as tests (#5072) cut the taint analysis by about 27s
+// on a pull request, not on main, and the SonarQube job still finished after CI, so it was reverted.
 describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 	const properties = load_sonar_properties()
-	const test_inclusions = (properties['sonar.test.inclusions'] ?? '').split(',')
-	const cpd_exclusions = (properties['sonar.cpd.exclusions'] ?? '').split(',')
-	const exclusions = (properties['sonar.exclusions'] ?? '').split(',')
 
-	it('declares the test files with the test extensions of sonar.cpd.exclusions', () => {
-		const test_patterns = cpd_exclusions.filter((pattern) =>
-			/\.(test|spec|e2e)\.ts$/u.test(pattern),
-		)
-
-		expect(test_inclusions).toStrictEqual(test_patterns)
-		expect(properties['sonar.tests']).toBe('.')
-		// Once sonar.tests is set the scanner no longer defaults sonar.sources to the base directory.
-		expect(properties['sonar.sources']).toBe('.')
-	})
-
-	it('keeps the declared test files out of the main sources', () => {
-		expect(exclusions).toStrictEqual(expect.arrayContaining(test_inclusions))
+	it('keeps the test files in the main sources rather than declaring them as tests', () => {
+		expect(properties['sonar.exclusions']).toBe(CLAUDE_EXCLUSION)
+		expect(properties['sonar.tests']).toBeUndefined()
+		expect(properties['sonar.test.inclusions']).toBeUndefined()
 	})
 })
 
