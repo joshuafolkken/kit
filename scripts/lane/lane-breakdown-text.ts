@@ -6,7 +6,8 @@ import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
-const EXCLUDED = 'waits taken out (park, outage, usage limit)'
+const EXCLUDED = 'waits taken out (park, outage, usage limit, host sleep)'
+const SLEPT = 'of which host sleep'
 
 interface Report {
 	breakdown: Breakdown
@@ -34,7 +35,8 @@ function stage_text(stage: Stage, detail: ImplementDetail): string {
 
 function entries_of(report: Report): Array<string> {
 	const { breakdown, detail } = report
-	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}`
+	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
+	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${slept}`
 
 	return [...breakdown.stages.map((stage) => stage_text(stage, detail)), excluded]
 }

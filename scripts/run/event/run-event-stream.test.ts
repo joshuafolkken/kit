@@ -146,13 +146,25 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 	})
 })
 
+const STOPPED_TEXT = '#7 ship stopped at gate'
+
 // joshuafolkken/kit#4765: the stop stays the position `run:step` answers.
 describe('run_event_stream.read_last — a failed relaunch', () => {
 	it('skips a failed relaunch so the ship stop stays the position', () => {
 		const target = fresh_target()
 
-		run_event_stream.append(target, KIND.SHIP_STOP, '#7 ship stopped at gate', AT)
+		run_event_stream.append(target, KIND.SHIP_STOP, STOPPED_TEXT, AT)
 		run_event_stream.append(target, KIND.RELAUNCH_FAILED, '#7 could not be relaunched: x', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.SHIP_STOP)
+	})
+
+	// joshuafolkken/kit#5032: the sampler's sleep lands while a lane stands at its stop.
+	it('skips a host sleep so the ship stop stays the position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STOP, STOPPED_TEXT, AT)
+		run_event_stream.append(target, KIND.SLEEP, 'host slept 30.0 min', AT)
 
 		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.SHIP_STOP)
 	})

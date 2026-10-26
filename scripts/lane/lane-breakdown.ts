@@ -32,6 +32,8 @@ interface Breakdown {
 	stages: ReadonlyArray<Stage>
 	// The waits taken out, together.
 	excluded_ms: number
+	// The host's sleeps among them (joshuafolkken/kit#5032).
+	slept_ms: number
 	// The waits taken out, each — the implementation's split leaves them out of its remainder too.
 	waits: ReadonlyArray<LaneSpan>
 	// The implementation's spans, waits left in — the window its tool calls are read in.
@@ -132,6 +134,10 @@ function ranked(parts: ReadonlyArray<Stage>): Array<Stage> {
 		.toSorted((left, right) => right.ms - left.ms)
 }
 
+function spans_ms(spans: ReadonlyArray<LaneSpan>): number {
+	return spans.reduce((sum, span) => sum + span.to_ms - span.from_ms, 0)
+}
+
 /**
  * `issue`'s lane by stage, or `undefined` when the ledger holds no dispatch and merge of it — the same
  * span and waits `lane_net_time.net_ms` reads, so the stages add up to it.
@@ -154,7 +160,8 @@ function of(
 
 	return {
 		stages: ranked(parts),
-		excluded_ms: waits.reduce((sum, wait) => sum + wait.to_ms - wait.from_ms, 0),
+		excluded_ms: spans_ms(waits),
+		slept_ms: spans_ms(lane_net_time.slept(events, span)),
 		waits,
 		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
 	}

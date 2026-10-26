@@ -1,0 +1,7 @@
+{
+	"reason": "Host sleep detection and its subtraction from lane net time (#5032) is new behavior: a sleep event, its recorder/reader module and the interval join",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 86
+	}
+}

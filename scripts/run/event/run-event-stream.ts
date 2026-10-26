@@ -171,6 +171,10 @@ const EVENT_KIND = {
 	// closed the issue through `issue:measured` — no lane was launched for it (joshuafolkken/kit#4621).
 	// `run:board` draws it merged. A trace: the parent's position is the drive's, not this close.
 	MEASURED: 'measured',
+	// The host slept while `backlog:drive` sampled its load (joshuafolkken/kit#5032): the sampler's timer
+	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
+	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
+	SLEEP: 'sleep',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -195,6 +199,7 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.PAUSED_NOTICE,
 	EVENT_KIND.MEASURED,
 	EVENT_KIND.RELAUNCH_FAILED,
+	EVENT_KIND.SLEEP,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
@@ -215,7 +220,8 @@ const event_schema = z.object({
 	kind: z.string(),
 	text: z.string(),
 	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
-	// reader never has to find its launch again. An event written before it has none.
+	// reader never has to find its launch again. An event written before it has none. A `sleep` event
+	// carries the sleep's length here.
 	elapsed_ms: z.number().optional(),
 })
 
