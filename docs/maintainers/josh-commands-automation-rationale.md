@@ -154,7 +154,7 @@ A recorded code round also says whether `josh ship` reuses it as its round 1 (jo
 
 The answer is for this tree: run `pnpm josh main:merge` before the check for the answer the ship's sync reaches. A merge that moves only the base keeps the round as it stands (joshuafolkken/kit#4829) — every recorded digest matches and no path the default branch changed is a recorded file round 2 would execute; a recorded base git can no longer resolve reads as `Not reused`.
 
-A covered document, prompt or inert path the default branch changed is no move, unless a recorded High cites it (joshuafolkken/kit#4984).
+A covered document, prompt or inert path only the default branch moved is no move: the round's recorded blob, carried onto the new base, reproduces the file now. One the lane edited since the record, a carry git cannot make, or one a recorded High cites still reads as a default-branch change (joshuafolkken/kit#4984).
 
 A reuse question git cannot answer reads as `Not reused`; an issue that cannot be read reads as fresh, as in the ship, and `josh followup` still refuses a stale review. The exit code does not change.
 

@@ -34,6 +34,9 @@ vi.mock('./review-attest', () => ({
 	review_attest: { is_attested_on: attested_mock, is_briefed_since: briefed_since_mock },
 }))
 vi.mock('./review-checkout', () => ({ review_checkout: { read_checkout: checkout_mock } }))
+vi.mock('./review-round-one-blobs', () => ({
+	review_round_one_blobs: { capture: () => undefined, carried_delta: () => undefined },
+}))
 
 const { review_reviewed_tree } = await import('./review-reviewed-tree')
 
@@ -191,19 +194,6 @@ describe('review_reviewed_tree.movement of a file a recorded High cites', () => 
 		['a prompt, fixed', PROMPT, { [FILE]: 'x', [PROMPT]: 'p' }, UNSETTLED],
 	])('answers the movement for one %s', async (_case, path, files, expected) => {
 		expect(await review_reviewed_tree.movement(cited(path), { files, base: BASE })).toBe(expected)
-	})
-})
-
-describe('review_reviewed_tree.movement on a base the sync moved', () => {
-	const { UNSETTLED } = review_reviewed_tree.MOVEMENT
-
-	// Round 2's carried delta leaves out what the default branch changed, so round 1 reads it again.
-	it('answers unsettled when the default branch changed a recorded file', async () => {
-		git_read_mock.mockResolvedValue(`${FILE}\0`)
-
-		expect(
-			await review_reviewed_tree.movement(STAMP, { files: { [FILE]: 'x' }, base: 'new' }),
-		).toBe(UNSETTLED)
 	})
 })
 
