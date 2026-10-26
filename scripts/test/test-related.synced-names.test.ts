@@ -52,7 +52,11 @@ function absolute(file: string): string {
 
 function with_map(): void {
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left: [], shared: [SHARED_TEST] })
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({
+		left: [],
+		shared: [SHARED_TEST],
+		meeting: [SHARED_TEST],
+	})
 	vi.spyOn(test_read_map, 'read_map').mockReturnValue({
 		version: test_read_map.MAP_VERSION,
 		commit: 'f00dcafe',
