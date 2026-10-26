@@ -1,4 +1,5 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { unit_setup_files } from '#scripts/test/unit-setup-files'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
@@ -47,22 +48,41 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // tests after a fix it applies, and its `JOSH_AGENT_ROLE` would make both cut guards stand down on a
 // delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
 // the role itself.
-const PROXY_ENV: Record<string, string> = Object.fromEntries(
-	[...agent_session_environment.PROXY_KEYS, agent_session_environment.PROXY_CERTIFICATE_KEY].map(
-		(key) => [key, ''],
-	),
-)
+//
+// **Every inherited ship mark and every lane mark is blanked without a list here**
+// (joshuafolkken/kit#5029): the supervisor sets `JOSH_SHIP_RETRY_PENDING` around a retried attempt,
+// and a hand-kept list let it reach the gate's run alone. Any `JOSH_SHIP_*` key the config process
+// inherits is blanked by its prefix, and the lane marks are read from where the launcher composes them.
+const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
 
-const ENV: Record<string, string> = {
-	...PROXY_ENV,
-	[agent_session_environment.AGENT_PID_KEY]: '',
-	CLAUDE_CODE_SESSION_ID: 'vitest-session',
-	CODEX_THREAD_ID: '',
-	JOSH_AGENT_PROVIDER: '',
-	JOSH_AGENT_ROLE: '',
-	JOSH_LANE_CHILD: '',
-	JOSH_SHIP_SUPERVISED: '',
+type EnvironmentSource = Readonly<Record<string, string | undefined>>
+
+function blank(keys: ReadonlyArray<string>): Record<string, string> {
+	return Object.fromEntries(keys.map((key) => [key, '']))
 }
+
+function inherited_ship_marks(source: EnvironmentSource): ReadonlyArray<string> {
+	return Object.keys(source).filter((key) => SHIP_MARK.test(key))
+}
+
+function unit_environment(source: EnvironmentSource): Record<string, string> {
+	return {
+		...blank([
+			...agent_session_environment.PROXY_KEYS,
+			agent_session_environment.PROXY_CERTIFICATE_KEY,
+		]),
+		...blank(inherited_ship_marks(source)),
+		...blank(lane_child_mark_keys.MARK_KEYS),
+		[agent_session_environment.AGENT_PID_KEY]: '',
+		CLAUDE_CODE_SESSION_ID: 'vitest-session',
+		CODEX_THREAD_ID: '',
+		JOSH_AGENT_PROVIDER: '',
+		JOSH_AGENT_ROLE: '',
+		JOSH_SHIP_SUPERVISED: '',
+	}
+}
+
+const ENV: Record<string, string> = unit_environment(process.env)
 
 // **The packages most test files load are pre-bundled into one file each** (joshuafolkken/kit#4301).
 // An isolated file starts a fresh module graph, so each of them re-imports these from their many
@@ -156,6 +176,7 @@ const unit_projects = {
 	OPTIMIZED_DEPENDENCIES,
 	PURE_PROJECT,
 	UNIT_PROJECTS,
+	unit_environment,
 }
 
 export type { UnitProject, UnitProjectTest }
