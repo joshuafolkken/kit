@@ -25,6 +25,14 @@ import { shell_segments } from './shell-segments'
 // stash with `git stash apply`, and the lane parked on how to apply it instead of popping by message;
 // the reason now says the substitution is the run's own to make (joshuafolkken/kit#3648).
 //
+// **The refusal names the way back for a single file.** A lane that refused `git checkout -- <file>`
+// reverted its own edit by hand with `Edit` and left a line behind, so a green record landed on the
+// wrong tree (joshuafolkken/kit#4988). The named restore writes HEAD's bytes over that one file, carries
+// no body inline (`file-edits.md`), and no row refuses it. It reverses the file's unstaged diff, so a
+// staged change (the user's) stays, `<path>` is read from the shell's directory like any pathspec,
+// nothing is emptied before git runs (a `git show HEAD:<path> > <path>` redirect is), and an untracked
+// path has no diff to reverse.
+//
 // **It fires on every occurrence**, for the reason `git-force.ts` does: discarding the working tree is
 // destructive each time it is issued.
 
@@ -122,33 +130,40 @@ function is_unauthorized_worktree_change(command: string): boolean {
 	return shell_segments.commands_of(command).some((segment) => is_unauthorized_segment(segment))
 }
 
-// The instruction in the shape a refusal can carry: what the command touches, the authorized route,
-// and — for a stash — the message form that is allowed. `pnpm josh git` and `pnpm josh stash:pop` are
-// invisible to this trigger, so a run that uses them is never refused.
+// The instruction in the shape a refusal can carry: the authorized route — for one file, the restore,
+// limited to this run's own edit (another's uncommitted change is never discarded); for a stash, the
+// message form that is allowed. The refused command is the caller's own, so it is not listed back.
+// The `headline:` opening is what `time-transcript-line.ts` names the guard by. `pnpm josh git` and
+// `pnpm josh stash:pop` are invisible to this trigger, so a run that uses them is never refused.
+const SINGLE_FILE_RESTORE = 'git diff -- <path> | git apply -R'
 const WORKTREE_MUTATION_REASON =
-	'⛔ unauthorized working-tree change: `git checkout --`, `git restore`, `git clean -f`, ' +
-	'`git stash`. A documented flow stashes with `pnpm josh stash:push "<message>"`; a handed-over ' +
+	"⛔ unauthorized working-tree change: undo only this run's edit: " +
+	`\`${SINGLE_FILE_RESTORE}\`. A documented flow stashes with ` +
+	'`pnpm josh stash:push "<message>"`; a handed-over ' +
 	'stash is `pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
 	'the plan says why the owner keeps the stash: then stop and confirm. It fires on every occurrence ' +
 	'(`operating-rules.md`).'
+// The opening before joshuafolkken/kit#4988, so `rule-value.ts` still credits a refusal it delivered.
+const FORMER_OPENING = '⛔ unauthorized working-tree change: `git checkout --`, `git restore`'
 
 const ROW = {
 	id: 'worktree-mutation',
 	is_trigger: bash_triggers.on_bash_command(is_unauthorized_worktree_change),
 	reason: WORKTREE_MUTATION_REASON,
+	former_reasons: [FORMER_OPENING],
 	decide: (): boolean => true,
 	about: {
 		title: 'Unauthorized work-tree mutation',
 		topic: '`operating-rules.md`',
 		fires:
 			'`git checkout -- <path>` / `git restore <path>` / forced `git clean -f` / an unauthorized `git stash` (bare, push without a message, positional pop). Every occurrence',
-		quiet:
-			'`git stash push -m`, `git stash list`, `pnpm josh git`, `pnpm josh stash:push`, `pnpm josh stash:pop`',
+		quiet: `\`git stash push -m\`, \`git stash list\`, \`pnpm josh git\`, \`pnpm josh stash:push\`, \`pnpm josh stash:pop\`, \`${SINGLE_FILE_RESTORE}\``,
 	},
 }
 
 const worktree_guard = {
 	ROW,
+	SINGLE_FILE_RESTORE,
 	WORKTREE_MUTATION_REASON,
 	is_unauthorized_worktree_change,
 	touches_worktree,

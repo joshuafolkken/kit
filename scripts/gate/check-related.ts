@@ -15,6 +15,8 @@ const CHECKS: ReadonlyArray<string> = [
 	gate_plan.TYPE_CHECK_TARGET,
 	'cspell:dot',
 ]
+const METRICS_STOP =
+	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`)'
 
 interface CheckResult {
 	command: string
@@ -100,12 +102,20 @@ function report_result(result: CheckResult): void {
 
 // The verdict is the last line, as every josh check prints it, so a reader of the tail sees every
 // check that failed rather than only the section that finished last (joshuafolkken/kit#4940).
-function verdict_line(results: ReadonlyArray<CheckResult>): string {
+function checks_line(results: ReadonlyArray<CheckResult>): string {
 	const failed = results.filter((result) => result.exit_code !== 0).map((result) => result.command)
 
 	if (failed.length === 0) return `${status_icons.PASS_ICON} check:related passed`
 
 	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
+}
+
+// A notice is never a failure, so a passing verdict line alone hid it from a reader of the last lines,
+// and the ship's pre-detach stopped on it (joshuafolkken/kit#4987).
+function verdict_line(results: ReadonlyArray<CheckResult>, has_metrics_notice: boolean): string {
+	const line = checks_line(results)
+
+	return has_metrics_notice ? `${line} — ${METRICS_STOP}` : line
 }
 
 // `josh lint:related` ends its section with the metrics growth notice, which the sections after it
@@ -125,11 +135,13 @@ function report_results(results: ReadonlyArray<CheckResult>, pinned_notice?: str
 		report_result(result)
 	}
 
-	for (const notice of [metrics_notice(results), pinned_notice]) {
+	const metrics = metrics_notice(results)
+
+	for (const notice of [metrics, pinned_notice]) {
 		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 	}
 
-	process.stdout.write(`\n${verdict_line(results)}\n`)
+	process.stdout.write(`\n${verdict_line(results, metrics !== undefined)}\n`)
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -140,17 +152,24 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // (joshuafolkken/kit#4948): left to `josh review:record`, the restart came minutes before the ship, and
 // its pre-detach waited out a whole run. Started here, the check runs beside these four; a tree that did
 // not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
-// tree is printed above the verdict line (`check-related-pinned.ts`).
+// tree is printed above the verdict line, waited for when this run started it (`check-related-pinned.ts`).
 async function run_all(root?: string, execute: CheckExecutor = execute_check): Promise<number> {
-	await review_record_pinned.restart_in_lane(root)
+	const is_started = await review_record_pinned.restart_in_lane(root)
 	const results = await run_checks(execute)
 
-	report_results(results, await check_related_pinned.notice(root))
+	report_results(results, await check_related_pinned.notice(root, is_started))
 
 	return exit_code(results)
 }
 
-const check_related = { execute_check, exit_code, report_results, run_all, run_checks }
+const check_related = {
+	METRICS_STOP,
+	execute_check,
+	exit_code,
+	report_results,
+	run_all,
+	run_checks,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await check_related.run_all()

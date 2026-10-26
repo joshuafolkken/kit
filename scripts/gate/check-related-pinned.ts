@@ -1,25 +1,40 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
+import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 
 // **`check:related` prints the `josh test:pinned` verdict it finds already reached on this tree**
 // (joshuafolkken/kit#4971): read only by the ship's pre-detach, it stopped the first `josh ship` on
 // unpinned places, and the ship ran its preflight and pre-detach again once the reason was added.
-// Nothing is waited on: a check still running, or one on another tree, prints nothing here.
+// **A check this run started is waited on** (joshuafolkken/kit#4987): one still probing when the four
+// checks ended printed nothing, and the ship stopped on it again. One it did not start is read as it
+// stands, and one on another tree prints nothing here.
 
 const SHIP_HINT =
 	'Pin each unpinned place above with a test that turns red without it, or give the first ship its reason: `pnpm josh ship "<title> #<N>" --review … --unpinned-ok "<reason>"`.'
+// The wait's bound keeps the four checks plus it under a foreground Bash call's 600-second cap, so the
+// verdict line is never cut off; a check past it is left running for the ship's pre-detach.
+const WAIT_MS = 240_000
+
+async function reached(root: string, is_started: boolean): Promise<PinnedSummary | undefined> {
+	if (is_started) return await run_review_pinned_join.settled_on_tree(root, WAIT_MS)
+
+	return await run_review_pinned_join.finished_on_tree(root)
+}
 
 // The unpinned places the ship's pre-detach would stop on, with the `--unpinned-ok` form;
 // `undefined` when no answer is reached on this tree or it stops nothing.
-async function notice(root: string = PROJECT_ROOT): Promise<string | undefined> {
-	const summary = await run_review_pinned_join.finished_on_tree(root)
+async function notice(
+	root: string = PROJECT_ROOT,
+	is_started = false,
+): Promise<string | undefined> {
+	const summary = await reached(root, is_started)
 	if (summary === undefined) return undefined
 	const verdict = await run_review_pinned_accepted.judge(summary, undefined)
 
 	return verdict.kind === 'stop' ? `${summary.text.trimEnd()}\n${SHIP_HINT}` : undefined
 }
 
-const check_related_pinned = { SHIP_HINT, notice }
+const check_related_pinned = { SHIP_HINT, WAIT_MS, notice }
 
 export { check_related_pinned }
