@@ -9,11 +9,12 @@ import { whole_suite_files } from './whole-suite-files'
 
 // **A code module a main sync brought in reaches vitest only through a test this branch's change
 // reaches too** (joshuafolkken/kit#4912). Handed to `vitest related` as a moved file, such a module ran
-// every test importing it, and main's CI had already run those against it. The tests whose imports reach
-// both the synced module and this branch's own change — a code file of it, or a module the test-read
-// map records reading a non-code one — are where the two can meet, so they run; the rest are left to
-// main's CI. Every one of them is a test the branch's own change reaches, so the narrowing never reads
-// more than the whole branch does.
+// every test importing it, and main's CI had already run those against it. The tests where the two can
+// meet — whose imports reach both the synced module and this branch's own change — run through that
+// change in its place (`own_of`), which `vitest related` walks by its own graph. `shared` names them as
+// this graph reads them, but is never handed to vitest: the graph follows type-only imports and
+// ambient declarations too, and so reaches hundreds of tests the branch's change never runs
+// (joshuafolkken/kit#5066). Its being empty says the two never meet.
 //
 // **The import graph is TypeScript's, which drops an import it cannot resolve**, so only what it can
 // follow is left out. Nothing is left out where no graph can be built, the branch change or the map
@@ -22,7 +23,7 @@ import { whole_suite_files } from './whole-suite-files'
 // moved file. Each of those runs the tests importing it, as before. A synced module every test depends
 // on is not split either: `test-related.ts` leaves it to main's CI unless this branch changed it too.
 
-// `left` are the synced modules no longer handed to vitest, `shared` the tests that run in their place,
+// `left` are the synced modules no longer handed to vitest, `shared` the tests where they meet the change,
 // `meeting` every file whose imports reach both — `shared` and the code between, which `josh ship`'s
 // lint settle reads (joshuafolkken/kit#4985) — all repository-root-relative.
 interface SyncedSplit {
@@ -128,7 +129,7 @@ async function split(
 	}
 }
 
-const test_related_synced = { split, split_with }
+const test_related_synced = { own_of, split, split_with }
 
 export type { SyncedSplit }
 export { test_related_synced }

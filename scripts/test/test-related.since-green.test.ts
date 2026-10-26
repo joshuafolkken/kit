@@ -342,7 +342,9 @@ describe('test_related.run_related_tests — a code module a main sync brought i
 		mocked_moved.mockResolvedValue({ changed: [FIXED_SOURCE], synced: [UNTOUCHED_SOURCE] })
 	})
 
-	it('hands vitest the tests it shares with the branch change in place of the module', async () => {
+	// joshuafolkken/kit#5066: the import graph's shared tests were handed on too, 612 of them for a change
+	// `vitest related` walks to 126.
+	it('hands vitest the branch change alone in place of the module, never the shared tests', async () => {
 		split_into([UNTOUCHED_SOURCE], [SCOPE_TEST])
 
 		await test_related.run_related_tests([])
@@ -350,7 +352,6 @@ describe('test_related.run_related_tests — a code module a main sync brought i
 		expect(vitest_arguments()).toEqual([
 			'related',
 			absolute(FIXED_SOURCE),
-			absolute(SCOPE_TEST),
 			absolute(BRANCH_TEST),
 			'--run',
 		])
