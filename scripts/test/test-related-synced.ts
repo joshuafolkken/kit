@@ -18,8 +18,9 @@ import { whole_suite_files } from './whole-suite-files'
 // **The import graph is TypeScript's, which drops an import it cannot resolve**, so only what it can
 // follow is left out. Nothing is left out where no graph can be built, the branch change or the map
 // cannot be read, the branch changed a file every test depends on, or the work tree holds a
-// component TypeScript does not resolve; a synced module that is gone, is one every test depends on,
-// or is such a component stays a moved file. Each of those runs the tests importing it, as before.
+// component TypeScript does not resolve; a synced module that is gone or is such a component stays a
+// moved file. Each of those runs the tests importing it, as before. A synced module every test depends
+// on is not split either: `test-related.ts` leaves it to main's CI unless this branch changed it too.
 
 // `left` are the synced modules no longer handed to vitest, `shared` the tests that run in their place,
 // both repository-root-relative.
