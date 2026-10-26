@@ -107,12 +107,16 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		reference: [EVIDENCE_REFERENCE, 'automation', ['network', 'files']],
+		reference: [`${EVIDENCE_REFERENCE} [--unmet]`, 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{
 					arguments: '4452 --evidence-file .josh/tmp/measured.md',
 					note: 'comment, label, close, release — in that order',
+				},
+				{
+					arguments: '4452 --unmet --evidence-file .josh/tmp/measured.md',
+					note: 'the measurement fell short of the expected effect: measured:unmet as well',
 				},
 			],
 			flags: [
@@ -120,6 +124,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: [EVIDENCE_FILE],
 					description:
 						'the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.',
+				},
+				{
+					names: ['--unmet'],
+					description:
+						'the measurement fell short of the expected effect it checked; adds the measured:unmet label `josh effect:audit` reads',
 				},
 			],
 		},

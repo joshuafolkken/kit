@@ -29,6 +29,12 @@ PR の効果を測る後続 Issue を起票するとき:
 
 計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file <path>`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
 
+## 期待効果に届かなかったとき
+
+- 計測が期待効果に届かなかった → `pnpm josh issue:measured <N> --unmet --evidence-file <path>`。
+- 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`（元 Issue が 30 日より前に閉じたときは `--days <N>` を足す）、表示された `issue:file` の行で起票する（重複は scout が止める）。
+- 時間短縮 Issue の効果を一覧する → `pnpm josh effect:audit [--days <N>]`。
+
 ## 手元で再実行してよいとき
 
 記録で答えられない問い（記録の無い変更前後の比較など）に限る。

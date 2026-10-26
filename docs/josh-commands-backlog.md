@@ -315,12 +315,14 @@ See `issue-comments.md` → "When the work turns out to be already merged". Step
 Complete a measurement-only issue: post the result, label it measured, close it, release the hold.
 
 ```bash
-pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md   # comment, label, close, release — in that order
+pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md           # comment, label, close, release — in that order
+pnpm josh issue:measured 4452 --unmet --evidence-file .josh/tmp/measured.md   # the measurement fell short of the expected effect: measured:unmet as well
 ```
 
 **Options:**
 
 - `--evidence-file <path>` — the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.
+- `--unmet` — the measurement fell short of the expected effect it checked; adds the measured:unmet label `josh effect:audit` reads
 
 <!-- /usage -->
 
@@ -399,6 +401,31 @@ pnpm josh defect:report   # every issue labelled bug, open or closed
 <!-- /usage -->
 
 Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
+
+### `josh effect:audit`
+
+<!-- usage: effect:audit -->
+
+List closed run-time-shortening issues with their expected effect, follow-up measurement and result.
+
+```bash
+pnpm josh effect:audit                # issues closed in the last 30 days, one line each
+pnpm josh effect:audit --days 7       # a shorter window
+pnpm josh effect:audit --draft 4896   # write the retirement candidate of a shortfall and print its issue:file line
+```
+
+**Options:**
+
+- `--days <N>` — the window, in days back from now (default 30)
+- `--draft <issue>` — an issue whose measurement carries measured:unmet: write its retirement-candidate body to a temporary file
+
+<!-- /usage -->
+
+One line per closed `- 目的: 時間短縮` issue of the window: its expected effect (`効く率` · `1 回あたりの得` · `外れたときの損`), the follow-up measurements that cite it with a `- 実施可能条件:` line, and the result, then a tally.
+
+The result reads the follow-ups' labels: `届かなかった` when one carries `measured:unmet` ([`josh issue:measured --unmet`](#josh-issuemeasured)), `届いた` when one carries `measured`, `未計測` otherwise.
+
+`--draft <issue>` takes an issue whose result is `届かなかった`, writes its retirement-candidate body to a temporary file and prints the `josh issue:file` line to file it; any other result is refused. The body's angle-bracket lines are left for the filer, and `issue:file`'s scout stops a duplicate. When to run it: `prompts/collaboration-workflow/measurement.md` → "期待効果に届かなかったとき".
 
 ### `josh report:lint`
 

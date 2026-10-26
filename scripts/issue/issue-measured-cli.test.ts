@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { MEASURED_LABEL } from '#scripts/issue/issue-labels'
+import { MEASURED_LABEL, MEASURED_UNMET_LABEL } from '#scripts/issue/issue-labels'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_measured_cli } from './issue-measured-cli'
 
@@ -91,6 +91,20 @@ describe('issue_measured_cli.run — the completion in order', () => {
 		expect(issue_apply_label).toHaveBeenCalledWith(ISSUE, MEASURED_LABEL)
 		expect(issue_close).toHaveBeenCalledWith(ISSUE, undefined)
 		expect(release).toHaveBeenCalledWith(['--release', ISSUE])
+	})
+})
+
+// joshuafolkken/kit#4958: a measurement that fell short says so on the issue, for `effect:audit`.
+describe('issue_measured_cli.run — --unmet', () => {
+	it('labels it measured:unmet before measured, then closes and releases as before', async () => {
+		const code = await issue_measured_cli.run([ISSUE, '--unmet', FLAG, EVIDENCE_FILE])
+
+		expect(code).toBe(0)
+		expect(calls).toStrictEqual(['comment', 'label', 'label', 'close', 'epics', 'release'])
+		expect(issue_apply_label.mock.calls.map((call) => call[1])).toStrictEqual([
+			MEASURED_UNMET_LABEL,
+			MEASURED_LABEL,
+		])
 	})
 })
 
