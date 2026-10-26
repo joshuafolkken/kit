@@ -175,6 +175,45 @@ describe('test_pinned.run after a hunk changed', () => {
 	)
 })
 
+// joshuafolkken/kit#5004: the usual fix for an unpinned hunk is removing its lines, which changes the
+// code change and the pinned hunk's failed-test closure both.
+describe('test_pinned.run after lines of the unpinned hunk were removed', () => {
+	it(
+		'keeps the pinned verdict without starting vitest once the unpinned hunk is removed whole',
+		async () => {
+			await build_change_branch()
+			const first = await run_report()
+			const [unpinned] = first.unpinned
+
+			expect(unpinned).toBeDefined()
+			if (unpinned === undefined) return
+			await write(DRIVER_FILE, test_pinned_logic.revert(CHANGED_DRIVER, unpinned))
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			const report = await run_report()
+
+			expect(runs).not.toHaveBeenCalled()
+			expect(report.unpinned).toEqual([])
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'probes only what is left of the unpinned hunk once one of its lines is removed',
+		async () => {
+			await build_change_branch()
+			await run_report()
+			await write(DRIVER_FILE, CHANGED_DRIVER.replace(/^\treturn argv.*\n/mu, ''))
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(1)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
 describe('test_pinned.run after a source between the test and the hunk changed', () => {
 	it(
 		'reuses the pinned verdict while nothing changed, then reports the hunk unpinned once no test reaches it',

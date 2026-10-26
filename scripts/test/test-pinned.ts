@@ -120,13 +120,13 @@ async function unpinned_on(
 	is_cached_only: boolean,
 ): Promise<Array<UnpinnedHunk>> {
 	if (hunks.length === 0) return []
-	const cache = await test_pinned_cache.load(base)
+	const cache = await test_pinned_cache.load(base, hunks)
 	const keys = await keys_of(hunks)
 	const files = hunks.map((hunk) => hunk.file)
 	const known = await test_pinned_cache.known(cache, keys, files)
 	const verdicts = is_cached_only
 		? known.map((entry) => held_of(entry))
-		: await verdicts_on(paths, hunks, known, test_pinned_cache.writer(cache, keys, files))
+		: await verdicts_on(paths, hunks, known, test_pinned_cache.writer(cache, keys))
 
 	return hunks.flatMap((hunk, index) => unpinned_of(hunk, verdicts[index]))
 }
