@@ -57,7 +57,8 @@ tests and the round cap are unchanged.
    change runs in — kit and a consumer, and a predecessor that died midway leaving its record behind.
 10. **Commands your prose tells a reader to run are run** — for every command a refusal, hint or
     document you added or changed tells a reader to run, run it as written from a cwd other than the
-    root, with an absolute path, a relative path and an empty input, and check each result.
+    root, with an absolute path, a relative path and an empty input, and check each result — in a
+    scratch copy (`mktemp -d`) when it writes, deletes, files or pushes, never on the lane's files.
 
 The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
 merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".
