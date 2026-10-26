@@ -3,15 +3,22 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { hook_context_line } from './hook-context-line'
 import { permission_guards } from './permission-guards'
 import { piped_verification } from './piped-verification'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
 
 // The transcript shapes, shared with every row's own suite so the two cannot drift apart.
-const { TIMESTAMP, assistant_line, call_line, reading_for, result_line, session, tool_use_block } =
-	rule_value_fixture
+const {
+	TIMESTAMP,
+	assistant_line,
+	call_line,
+	context_line,
+	reading_for,
+	result_line,
+	session,
+	tool_use_block,
+} = rule_value_fixture
 const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
 const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
 const TRIGGER_TIMESTAMP = '2026-09-09T00:00:09.000Z'
@@ -172,12 +179,6 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 
 // joshuafolkken/kit#3570: a rewritten call leaves only the note the hook attached.
 const PIPED_VERIFICATION = 'piped-verification'
-
-function context_line(content: string): string {
-	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
-
-	return JSON.stringify({ type: 'attachment', timestamp: TIMESTAMP, attachment })
-}
 
 describe('rule_value.measure — a rewrite is a delivery', () => {
 	it('counts the rewrite note as a rewrite, not a refusal', () => {

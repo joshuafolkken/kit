@@ -1,0 +1,7 @@
+{
+	"reason": "rule:value strips the harness hook label off refusals and lane-background declares its rewrite note; context_line moved into the shared fixture (#4961)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}
