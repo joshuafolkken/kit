@@ -35,9 +35,6 @@ const KIND = run_event_stream.EVENT_KIND
 const { STAGE } = run_ship_stage
 // A launched child is investigating until a later record says otherwise — no event marks the start.
 const LAUNCHED_PHASE: Phase = 'investigate'
-const WORD_SEPARATOR = ' '
-const STAGE_INDEX = 1
-const PHASE_INDEX = 2
 
 // `josh ship`'s stages, each its own phase; the preflight is the ship's own start.
 const SHIP_PHASES: Readonly<Partial<Record<string, Phase>>> = {
@@ -62,12 +59,12 @@ const KIND_PHASES: Readonly<Partial<Record<string, Phase>>> = {
 
 // The word after the issue — `#<N> <stage> <phase>` carries the stage second.
 function stage_word_of(event: RunEvent): string {
-	return event.text.split(WORD_SEPARATOR)[STAGE_INDEX] ?? ''
+	return run_ship_stage.words_of(event.text).stage
 }
 
 // The word after the stage — whether it started, succeeded, failed or was passed over.
 function phase_word_of(event: RunEvent): string {
-	return event.text.split(WORD_SEPARATOR)[PHASE_INDEX] ?? ''
+	return run_ship_stage.words_of(event.text).phase
 }
 
 // A stage marks its phase when it starts; its `done`, and one a resumed ship passed over, mark none.

@@ -1,6 +1,6 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
-import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { process_identity } from '#scripts/josh/process-identity'
@@ -9,6 +9,9 @@ import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { lane_breakdown, type Breakdown } from './lane-breakdown'
+import { lane_breakdown_implement } from './lane-breakdown-implement'
+import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
@@ -31,8 +34,11 @@ const LOG_PREFIX = 'josh-lane-overrun-'
 const LOG_SUFFIX = '.log'
 const NO_LEDGER = 'no ledger'
 
-// A lane's net minutes, or why there are none (joshuafolkken/kit#4818).
-type LaneNet = { kind: 'minutes'; minutes: number } | { kind: 'missing'; reason: string }
+// A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
+// `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already.
+type LaneNet =
+	| { kind: 'minutes'; minutes: number; breakdown: Breakdown; is_commented: boolean }
+	| { kind: 'missing'; reason: string }
 
 // A launch that failed is retried once, at the next `run:merge` (joshuafolkken/kit#4930).
 const MAX_LAUNCH_FAILURES = 2
@@ -80,13 +86,21 @@ function retried_lanes(events: ReadonlyArray<RunEvent>, issue: number): Readonly
 		.map((note) => note.issue)
 }
 
+// A pass that noted the lane before launched nothing it recorded, but it may have commented.
+function is_commented(events: ReadonlyArray<RunEvent>, issue: number): boolean {
+	return overrun_notes(events).some((note) => note.issue === issue)
+}
+
 function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): LaneNet {
 	const entries = lane_ledger.read_entries(path)
 	const minutes = lane_net_time.net_minutes(entries, events, issue)
+	const breakdown = lane_breakdown.of(entries, events, issue)
 
-	if (minutes !== undefined) return { kind: 'minutes', minutes }
+	if (minutes === undefined || breakdown === undefined) {
+		return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
+	}
 
-	return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
+	return { kind: 'minutes', minutes, breakdown, is_commented: is_commented(events, issue) }
 }
 
 // The net time of a lane not yet noted, or `undefined` when its note is on the stream already.
@@ -100,19 +114,10 @@ async function net_of(issue: number): Promise<LaneNet | undefined> {
 	return path === undefined ? { kind: 'missing', reason: NO_LEDGER } : net_in(path, events, issue)
 }
 
-function transcript_directories(issue: number): ReadonlyArray<string> {
-	const main_cwd = cost_transcript.session_cwd(process.cwd())
-	const home = cost_transcript.home_directory()
-	const suffix = `-${String(issue)}`
-
-	return cost_transcript
-		.lane_transcript_directories(main_cwd, home)
-		.filter((directory) => directory.endsWith(suffix))
-}
-
 // What the session reads, and the four facts it traces each cause to.
 function reading(issue: number, cite: string, minutes: number): string {
-	const directories = transcript_directories(issue).join(', ') || 'none found'
+	const directories =
+		lane_breakdown_implement.transcript_directories(issue).join(', ') || 'none found'
 
 	return [
 		`Investigate why lane ${cite} took ${String(minutes)} minutes of net time (dispatch to merge, less`,
@@ -127,10 +132,12 @@ function reading(issue: number, cite: string, minutes: number): string {
 }
 
 // One line: `detached_launch` lets a prompt break lines, but a single line keeps the log header whole.
-function prompt(issue: number, minutes: number): string {
+// The breakdown leads, so the search starts from the longest stage (joshuafolkken/kit#4995).
+function prompt(issue: number, minutes: number, report: Report): string {
 	const reads = reading(issue, issue_cite.plain(issue), minutes)
+	const stages = lane_breakdown_text.line(report)
 
-	return `${reads} ${lane_overrun_prompt.handling(issue, minutes)}`
+	return `${stages} ${reads} ${lane_overrun_prompt.handling(issue, minutes)}`
 }
 
 function note_failure(issue: number): (note: string) => void {
@@ -171,18 +178,34 @@ function launch(investigation: Investigation): string {
 		: `not investigated: ${result.note}`
 }
 
-function launched(issue: number, minutes: number): string {
+function launched(issue: number, minutes: number, report: Report): string {
 	return launch({
 		env: lane_child_marker.overrun_env_for(String(issue)),
-		prompt: prompt(issue, minutes),
+		prompt: prompt(issue, minutes, report),
 		log_prefix: `${LOG_PREFIX}${String(issue)}-`,
 		on_failure: note_failure(issue),
 	})
 }
 
+type OverranNet = Extract<LaneNet, { kind: 'minutes' }>
+
+// The breakdown goes on the lane's Issue before the session starts, once across the lane's passes; a
+// refused comment costs the comment, not the investigation.
+async function overran_text(issue: number, net: OverranNet): Promise<string> {
+	const report = lane_breakdown_text.report_of(issue, net.breakdown)
+	const comment = lane_breakdown_text.comment(issue, net.minutes, report)
+
+	if (!net.is_commented) await git_gh_issue_write.issue_try_comment(String(issue), comment)
+
+	const outcome = launched(issue, net.minutes, report)
+	const longest = lane_breakdown.longest_of(net.breakdown)
+
+	return run_event_overrun.started_text(issue, net.minutes, outcome, longest)
+}
+
 // The note every merged lane leaves: its net minutes at or under the threshold, why it has none, or the
 // launch of its overrun's investigation.
-function note_text(issue: number, net: LaneNet): string {
+async function note_text(issue: number, net: LaneNet): Promise<string> {
 	if (net.kind === 'missing') return run_event_overrun.skipped_text(issue, net.reason)
 	// The threshold sets no priority: each filing is ranked by its causes' reducible minutes
 	// (joshuafolkken/kit#4928). `lane:stats` counts the lanes over it on dispatch-to-merge time, not
@@ -191,7 +214,7 @@ function note_text(issue: number, net: LaneNet): string {
 
 	if (!is_over) return run_event_overrun.within_text(issue, net.minutes)
 
-	return run_event_overrun.started_text(issue, net.minutes, launched(issue, net.minutes))
+	return await overran_text(issue, net)
 }
 
 async function investigate_lane(issue: number): Promise<void> {
@@ -199,7 +222,7 @@ async function investigate_lane(issue: number): Promise<void> {
 
 	if (net === undefined) return
 
-	await run_event_stream_emit.emit(EVENT_KIND.NOTE, note_text(issue, net))
+	await run_event_stream_emit.emit(EVENT_KIND.NOTE, await note_text(issue, net))
 }
 
 // Never fails the merge it follows: an error is a note on the stream, not a refused merge.

@@ -453,15 +453,15 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 Confirms the child from GitHub and does its post-merge steps: a **merged**
 child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
 logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
-(`lane:net`) launches a detached session that files its unfiled causes against the lane, recorded as a `note`
-event (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
+(`lane:net`) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
+event (the start note carrying the longest stage, which the board draws after 🔍) (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
 a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
 lane ledger launches one baseline investigation of the median lane — the stages and sub-stages that spend the most per merge
 in `lane:stats --period 3`, its causes filed by the overrun's rules (at most five, the largest reducible minutes first, each 1 minute or more) — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
 its wording `run-event-baseline.ts`), a finding on the board. The board's
 merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
 and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
-(`47′  4847  🔍 4856`); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
+(`47′  4847  🔍 implement 31′ · 4856`); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
 a **usage-limit** child (OPEN, unparked, exit record shows a Claude usage limit stopped it) has it dropped, unparked and counted
@@ -1008,6 +1008,20 @@ pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
 The whole minutes are what an Issue's `- 原因のレーン:` line declares; a lane the ledger holds no dispatch and merge of exits non-zero.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
+
+#### `josh lane:breakdown`
+
+<!-- usage: lane:breakdown -->
+
+Print a merged lane's net time by stage, longest first, the implementation split by its tool calls.
+
+```bash
+pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation comments on the lane
+```
+
+<!-- /usage -->
+
+The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
 ### `josh lane:plan`
 

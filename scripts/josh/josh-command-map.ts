@@ -90,6 +90,7 @@ const ALIASES: Record<string, string> = {
 	lst: 'lane:stats',
 	lva: 'lane:value',
 	lnt: 'lane:net',
+	lbd: 'lane:breakdown',
 	lli: 'lane:limit',
 	lrs: 'lane:restart',
 	lwd: 'lane:withdraw',

@@ -1,7 +1,11 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { run_event_filed } from '#scripts/run/event/run-event-filed'
-import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
+import {
+	run_event_overrun,
+	type Longest,
+	type OverrunNote,
+} from '#scripts/run/event/run-event-overrun'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 
 // What a done row says after its time (joshuafolkken/kit#4772, joshuafolkken/kit#4818): the Issues
@@ -19,6 +23,8 @@ interface Found {
 	minutes: number | undefined
 	// The child's latest overrun note.
 	overrun: OverrunNote | undefined
+	// The longest stage the overrun's start note carried (joshuafolkken/kit#4995), kept past its end note.
+	longest: Longest | undefined
 	// The latest note is the investigation's start and its session is alive; `undefined` where its start
 	// token could not be read, so neither its life nor its death is known.
 	is_investigating: boolean | undefined
@@ -38,6 +44,7 @@ const NONE: Found = {
 	overrun_filed: [],
 	minutes: undefined,
 	overrun: undefined,
+	longest: undefined,
 	is_investigating: false,
 }
 
@@ -75,6 +82,7 @@ function noted(found: Found, note: OverrunNote, is_live: IsLive): Found {
 		...found,
 		minutes: minutes_of(note, found.minutes),
 		overrun: note,
+		longest: note.kind === 'started' ? note.longest : found.longest,
 		is_investigating: note.kind === 'started' ? is_live(note.pid, note.start) : false,
 	}
 }
