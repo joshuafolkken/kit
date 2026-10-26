@@ -72,6 +72,13 @@ source's pointer is trimmed to its trigger under "trimming is moving" without wa
 license it. A rule shown as `-` declares no compliance test: it is **unmeasured**, not zero, and that
 alone does not make it a candidate.
 
+**Its `candidates:` section is evidence, not a permit** (joshuafolkken/kit#4959). Retirement was
+otherwise argued only from copies, so a rule no run ever reached, or one whose hook already refuses
+every occurrence, stayed in the documents with nothing to point at. `retire` lists measurable rows only,
+because an unmeasured row's trigger is the violation and its `reached 0` means the guard was never
+crossed — the failure-not-recurring case above. Each candidate still goes through an Issue of its own
+that retires, condenses or records why it stays.
+
 ## The resident-rule list
 
 **This list covers the resident rules that have a procedure on the on-demand side** — a skill or an
