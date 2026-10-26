@@ -230,3 +230,29 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 		}
 	})
 })
+
+describe('rule_value_cli.run_rule_value — the candidates stay out of the cache', () => {
+	it('stores the table alone when a run was measured', () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+
+		spy_readers()
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([
+			fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1'),
+		])
+
+		try {
+			rule_value_cli.run_rule_value(['--refresh'], cwd)
+
+			const cached = readFileSync(
+				rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE),
+				'utf8',
+			)
+
+			expect(cached).not.toContain('candidates:')
+			expect(cached.trimEnd().split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
+		} finally {
+			vi.restoreAllMocks()
+			rmSync(cwd, { recursive: true, force: true })
+		}
+	})
+})

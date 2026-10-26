@@ -109,16 +109,16 @@ function row(reading: RuleReading): string {
 	return [id, reached, rate_text(reading), refused, ...rewritten].join(COLUMN_GAP)
 }
 
-// The reading as text, or `NO_TARGETS` when nothing measurable was found — never an empty output that
-// would read as a broken command.
-// The runs are counted as `measure` consumes them, since a lazy source cannot be asked its length
-// up front.
 // `candidates` is set only where something measurable was found, so `NO_TARGETS` stays the whole answer.
 interface Rendered {
 	table: string
 	candidates?: string
 }
 
+// The reading as text, or `NO_TARGETS` when nothing measurable was found — never an empty output that
+// would read as a broken command.
+// The runs are counted as `measure` consumes them, since a lazy source cannot be asked its length
+// up front.
 function render_parts(runs: Iterable<ReadonlyArray<string>>): Rendered {
 	const tally: Tally = { runs: 0 }
 	const readings = rule_value.measure(counted(runs, tally))

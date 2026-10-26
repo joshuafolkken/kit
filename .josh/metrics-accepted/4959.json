@@ -2,8 +2,10 @@
 	"reason": "rule:value gains the retire/condense candidates section (#4959)",
 	"date": "2026-10-26",
 	"growth": {
-		"scripts.code_lines": 69,
+		"scripts.code_lines": 71,
 		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 275
+		"ai_cost.on_demand_bytes": 284,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
 	}
 }

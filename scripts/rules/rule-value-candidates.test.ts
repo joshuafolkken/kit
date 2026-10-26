@@ -25,14 +25,22 @@ describe('rule_value_candidates.retire_candidates — reached 0 over enough runs
 	const unmeasured = reading(EVERY_OCCURRENCE)
 	const reached = reading('direct-issue-read', { sessions: 1 })
 
-	it('lists both an unreached and an unmeasured rule once the window reaches the threshold', () => {
+	it('lists an unreached measurable rule once the window reaches the threshold', () => {
 		const ids = rule_value_candidates.retire_candidates(
-			[unreached, unmeasured, reached],
+			[unreached, reached],
 			MIN_RUNS_FOR_RETIREMENT,
 		)
 
+		expect(unreached.is_measurable).toBe(true)
+		expect(ids).toStrictEqual([ONCE_PER_RUN])
+	})
+
+	// Its trigger is the violation, so `reached 0` reads "never broken", not "never arose".
+	it('never lists an unmeasured rule, however many runs', () => {
+		const ids = rule_value_candidates.retire_candidates([unmeasured], MIN_RUNS_FOR_RETIREMENT)
+
 		expect(unmeasured.is_measurable).toBe(false)
-		expect(ids).toStrictEqual([ONCE_PER_RUN, EVERY_OCCURRENCE])
+		expect(ids).toStrictEqual([])
 	})
 
 	it('judges nothing below the threshold', () => {
