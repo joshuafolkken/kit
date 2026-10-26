@@ -30,6 +30,9 @@ const SCRIPTS_EXCLUSION_PREFIX = '!scripts/'
 const { VERIFIED_NAME } = hook_bundle_stamp
 const SHIPPED_HOOK = 'stop-guard.js'
 const MANIFEST_NAME = 'package.json'
+// `build-commands.test.ts` builds into a private `dist/` directory under this prefix (joshuafolkken/kit#5053).
+const COMMANDS_TEST_PREFIX = '.commands-test-'
+const SCRATCH_PREFIXES = [STAGING_PREFIX, COMMANDS_TEST_PREFIX]
 
 interface PackageManifest {
 	files?: Array<string>
@@ -191,21 +194,25 @@ describe('a failed pnpm pack', () => {
 	})
 })
 
-// The hook cache and the build staging are rewritten by every hook launch and build, so a pack that
-// lists them races their removal (joshuafolkken/kit#4243). Packed from a copy of kit's `files`, so
-// the patterns are checked without touching this checkout's own `dist/`.
+// The hook cache, the build staging and the build-commands test output are rewritten by every hook
+// launch, build and test run, so a pack that lists them races their removal (joshuafolkken/kit#4243,
+// #5053). Packed from a copy of kit's `files`, so the patterns are checked without touching this
+// checkout's own `dist/`.
 function write_hook_scratch(directory: string): void {
 	const hooks = path.join(directory, 'dist', 'hooks')
-	const staging = path.join(directory, 'dist', `${STAGING_PREFIX}abc123`)
 
 	mkdirSync(hooks, { recursive: true })
-	mkdirSync(staging)
 
 	for (const name of [SHIPPED_HOOK, VERIFIED_NAME, `${VERIFIED_NAME}.4243`]) {
 		writeFileSync(path.join(hooks, name), '{}')
 	}
 
-	writeFileSync(path.join(staging, 'chunk-ABC.js'), '')
+	for (const prefix of SCRATCH_PREFIXES) {
+		const scratch = path.join(directory, 'dist', `${prefix}abc123`)
+
+		mkdirSync(scratch)
+		writeFileSync(path.join(scratch, 'chunk-ABC.js'), '')
+	}
 }
 
 function pack_with_hook_scratch(): Set<string> {
@@ -222,10 +229,11 @@ function pack_with_hook_scratch(): Set<string> {
 }
 
 describe('the published package carries no per-machine hook scratch', () => {
-	it('ships the hook bundles but neither the verified-inputs cache nor the build staging', () => {
+	it('ships the hook bundles but not the verified-inputs cache, the build staging or the build-commands test output', () => {
 		const packed = pack_with_hook_scratch()
 		const scratch = [...packed].filter(
-			(file) => file.includes(VERIFIED_NAME) || file.includes(STAGING_PREFIX),
+			(file) =>
+				file.includes(VERIFIED_NAME) || SCRATCH_PREFIXES.some((prefix) => file.includes(prefix)),
 		)
 
 		expect(packed.has(`dist/hooks/${SHIPPED_HOOK}`)).toBe(true)

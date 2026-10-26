@@ -76,7 +76,8 @@
 		"!**/__snapshots__",
 		"!**/*.golden.txt",
 		"!dist/hooks/.inputs-verified.json*",
-		"!dist/.hooks-staging-*"
+		"!dist/.hooks-staging-*",
+		"!dist/.commands-test-*"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",
