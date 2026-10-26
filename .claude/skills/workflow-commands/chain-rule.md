@@ -81,7 +81,7 @@ These are the gate → review → PR → merge facts other documents cite; this 
   prints (step 0), which records the merge commit and runs the scoped pair and the gate.
 - **One related-check command answers once per tree** — while implementing re-run one check per edit
   (`lint:related` / `cspell:dot` / `test:related <file>`), then `pnpm josh check:related` once
-  before `run:review`, a review round's fixes once after the last (in a lane, none after `run:review`); it adds `check`. In kit `lint:related` reports a metrics total past the
+  before `run:review`, a review round's fixes once after the last (in a lane, none after `run:review`); `check:related` is those three plus `check`. In kit `lint:related` reports a metrics total past the
   merge-base; accept it with its reason before `pnpm josh ship`, or its pre-detach check stops.
 - **The pull request opens between the rounds, so CI runs beside round 2** — round 1 runs on the
   uncommitted tree and its High/Medium fixes land before the commit; the verification pass runs against

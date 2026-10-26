@@ -1,8 +1,8 @@
 {
-	"reason": "#5024: chain-rule's related-check rule now names the one check an edit re-runs, so CLAUDE.md and chain-rule agree",
+	"reason": "#5024: chain-rule's related-check rule now names the one check an edit re-runs and what check:related adds, so CLAUDE.md and chain-rule agree",
 	"date": "2026-10-26",
 	"growth": {
-		"ai_cost.on_demand_bytes": 64,
+		"ai_cost.on_demand_bytes": 92,
 		"prose.long_paragraphs": 1
 	}
 }
