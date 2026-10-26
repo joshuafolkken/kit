@@ -1,0 +1,7 @@
+{
+	"reason": "scripts.code_lines +77: pure-files entry narrowing for test:related (#5001)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 77
+	}
+}
