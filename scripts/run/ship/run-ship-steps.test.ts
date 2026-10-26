@@ -89,6 +89,17 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 		])
 	})
 
+	// joshuafolkken/kit#5067: the sync pushes its merge ahead of the gate, so the merge still waits on
+	// that gate — a red one stops the ship (`run-ship-cli.test.ts`) before the followup merges anything.
+	it('puts the gate between the sync push and the followup, with or without --review', () => {
+		for (const is_review of [false, true]) {
+			const stages = run_ship_steps.steps({ ...ARGS, is_review }).map((step) => step.stage)
+
+			expect(stages.indexOf(STAGE.SYNC)).toBeLessThan(stages.indexOf(STAGE.GATE))
+			expect(stages.indexOf(STAGE.GATE)).toBeLessThan(stages.indexOf(STAGE.FOLLOWUP))
+		}
+	})
+
 	it('always starts with the exported preflight step', () => {
 		expect(run_ship_steps.steps(ARGS)[0]).toBe(run_ship_steps.PREFLIGHT_STEP)
 	})

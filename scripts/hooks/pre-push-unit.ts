@@ -6,6 +6,7 @@ import { gate_skip, type GateReuse } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { hook_gate_reuse } from '#scripts/gate/hook-gate-reuse'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
+import { pre_push_related_switch } from './pre-push-related-switch'
 
 // The pre-push hook's unit run, which does not re-run a suite a green gate already covers: the gate
 // writes its record down, and re-running `vitest run` on a tree it just printed green is the bulk of
@@ -125,18 +126,65 @@ function format_miss(reason: string): string {
 	return `↻ running the whole unit suite — the green gate record does not cover this push: ${reason}.`
 }
 
-// **The whole suite claims its place in the core budget, the one `josh test:unit` claims.** Without it
-// a push's suite ran beside other lanes' gates off the ledger, so their admission saw its workers only
-// as foreign load (joshuafolkken/kit#3874). Only the miss reserves: a reused record runs nothing, and a
+// **A unit run claims its place in the core budget, the one `josh test:unit` claims.** Without it a
+// push's run went beside other lanes' gates off the ledger, so their admission saw its workers only as
+// foreign load (joshuafolkken/kit#3874). Only the miss reserves: a reused record runs nothing, and a
 // claim there could make a push wait out a full ledger for a suite it then skips.
-async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+async function run_reserved(command: string, run: () => Promise<number>): Promise<number> {
 	const claim = gate_plan.DIRECT_UNIT_CLAIM
 
-	return await core_budget.with_command_reservation(
-		claim.core_weight(),
+	return await core_budget.with_command_reservation(claim.core_weight(), run, {
+		memory_mb: claim.memory_mb(),
+		command,
+		is_unit: claim.is_unit_claim,
+	})
+}
+
+async function run_reserved_suite(vitest_arguments: ReadonlyArray<string>): Promise<number> {
+	return await run_reserved(
+		'pre-push test:unit',
 		async () => await test_unit_guard.run_guarded_unit(process.cwd(), vitest_arguments),
-		{ memory_mb: claim.memory_mb(), command: 'pre-push test:unit', is_unit: claim.is_unit_claim },
 	)
+}
+
+// **A push its caller makes ahead of the gate runs the related tests, not the whole suite**
+// (joshuafolkken/kit#5067). `josh ship` pushes the tree its sync merged with the default branch onto an
+// open pull request so CI starts beside the gate, and the gate that follows runs the whole suite over
+// that same tree; the push itself only needs what this branch's change reaches. Only the caller sets
+// it, `--force` and the escape hatch still win, and a narrowed run asked for its own arguments rather
+// than this scope.
+function is_related_requested(extra_arguments: ReadonlyArray<string>): boolean {
+	const { SWITCH_ENV_KEY, SWITCH_ON } = pre_push_related_switch
+
+	if (process.env[SWITCH_ENV_KEY] !== SWITCH_ON || extra_arguments.length > 0) return false
+
+	return !hook_gate_reuse.is_force_requested(FORCE_ENV)
+}
+
+function format_related(reason: string): string {
+	return `↻ running the related unit tests — the push runs ahead of its gate, and the green gate record does not cover it: ${reason}.`
+}
+
+// Imported only on this path, so every other push leaves the import graph `test-related.ts` loads alone.
+async function run_related(): Promise<number> {
+	const { test_related } = await import('#scripts/test/test-related')
+
+	return await run_reserved(
+		'pre-push test:related',
+		async () => await test_related.run_related_tests([]),
+	)
+}
+
+async function run_miss(reason: string, extra_arguments: ReadonlyArray<string>): Promise<number> {
+	if (is_related_requested(extra_arguments)) {
+		process.stdout.write(`${format_related(reason)}\n`)
+
+		return await run_related()
+	}
+
+	process.stdout.write(`${format_miss(reason)}\n`)
+
+	return await run_reserved_suite(forwarded_arguments(extra_arguments))
 }
 
 async function run_pre_push_unit(
@@ -145,11 +193,7 @@ async function run_pre_push_unit(
 ): Promise<number> {
 	const reuse = push_reuse(await read_push_tree(), extra_arguments, source)
 
-	if ('miss' in reuse) {
-		process.stdout.write(`${format_miss(reuse.miss)}\n`)
-
-		return await run_reserved_suite(forwarded_arguments(extra_arguments))
-	}
+	if ('miss' in reuse) return await run_miss(reuse.miss, extra_arguments)
 
 	process.stdout.write(`${format_skip(reuse.stamp.taken_at)}\n`)
 
