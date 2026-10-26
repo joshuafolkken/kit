@@ -64,8 +64,11 @@ const CODERABBIT_ACTIONABLE_COMMENT = {
 
 const BLOCKER_MESSAGE_REGEX = /AI reviewer findings remain unresolved/u
 
+// `josh ship` sets the retry key around an attempt it will re-run, its gate's unit suite included.
 beforeEach(() => {
 	vi.clearAllMocks()
+	vi.unstubAllEnvs()
+	vi.stubEnv(RETRY_PENDING_KEY, undefined)
 })
 
 describe('handle_ai_review_findings — no blockers', () => {
@@ -261,7 +264,6 @@ describe('handle_ai_review_findings — the unreadable stop on an attempt the sh
 		await expect(handle_ai_review_findings(INPUT)).rejects.toThrow(UNREADABLE_COMMENTS_BODY)
 		expect(info).toHaveBeenCalledWith(expect.stringContaining(UNREADABLE_COMMENTS_STOP))
 		expect(mocked_telegram_send).not.toHaveBeenCalled()
-		vi.unstubAllEnvs()
 	})
 })
 
