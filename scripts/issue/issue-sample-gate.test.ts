@@ -21,6 +21,10 @@ function body_with(line: string): string {
 }
 
 const GATED_BODY = body_with(`- 実施可能条件: #${String(PR)} のマージ後 ${String(NEEDED)} マージ`)
+const CITED_PULL = { cited: PR, via: 'pull' } as const
+const CLOSING_BODY = body_with(
+	`- 実施可能条件: #${String(SOURCE_ISSUE)} を閉じる PR のマージ後 ${String(NEEDED)} マージ`,
+)
 
 const state = { directory: '' }
 
@@ -38,8 +42,11 @@ function ledger_with(merge_times: ReadonlyArray<string>): string {
 }
 
 function ports_of(merged_at: string | undefined, ledger: string | undefined): PrimePorts {
+	const read = { merged_at, closes: SOURCE_ISSUE }
+
 	return {
-		pull: vi.fn<PrimePorts['pull']>().mockResolvedValue({ merged_at, closes: SOURCE_ISSUE }),
+		pull: vi.fn<PrimePorts['pull']>().mockResolvedValue(read),
+		closing: vi.fn<PrimePorts['closing']>().mockResolvedValue(read),
 		ledger_path: vi.fn<PrimePorts['ledger_path']>().mockResolvedValue(ledger),
 	}
 }
@@ -55,13 +62,13 @@ afterEach(() => {
 
 describe('issue_sample_gate.wait_of', () => {
 	it('waits on a body nobody primed', () => {
-		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({ kind: 'unread', pr: PR })
+		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({ kind: 'unread', ...CITED_PULL })
 	})
 
 	it('waits while the pull request has not merged', async () => {
 		await issue_sample_gate.prime([GATED_BODY], ports_of(undefined, undefined))
 
-		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({ kind: 'unmerged', pr: PR })
+		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({ kind: 'unmerged', ...CITED_PULL })
 	})
 
 	it('counts only the merges recorded after the pull request merged', async () => {
@@ -71,7 +78,8 @@ describe('issue_sample_gate.wait_of', () => {
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({
 			kind: 'short',
-			pr: PR,
+			cited: PR,
+			via: 'pull',
 			counted: 1,
 			needed: NEEDED,
 		})
@@ -84,7 +92,9 @@ describe('issue_sample_gate.wait_of', () => {
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toBeUndefined()
 	})
+})
 
+describe('issue_sample_gate.wait_of without a condition', () => {
 	it('declares nothing for a body without the line', () => {
 		expect(issue_sample_gate.wait_of(body_with(''))).toBeUndefined()
 	})
@@ -101,7 +111,8 @@ describe("issue_sample_gate.wait_of on the pull request's own merge", () => {
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({
 			kind: 'short',
-			pr: PR,
+			cited: PR,
+			via: 'pull',
 			counted: 1,
 			needed: NEEDED,
 		})
@@ -164,9 +175,60 @@ describe('issue_not_before with a sample condition', () => {
 	})
 })
 
+// joshuafolkken/kit#5051: a lane files its follow-up before its own pull request exists, citing the
+// issue whose closing pull request the samples are counted after.
+describe('issue_sample_gate with the issue form', () => {
+	it('waits on the closing pull request until it merges', async () => {
+		const ports = ports_of(undefined, undefined)
+
+		await issue_sample_gate.prime([CLOSING_BODY], ports)
+
+		expect(ports.closing).toHaveBeenCalledWith(SOURCE_ISSUE)
+		expect(ports.pull).not.toHaveBeenCalled()
+		expect(issue_not_before.waiting_reason(CLOSING_BODY)).toBe(
+			`until the pull request closing #${String(SOURCE_ISSUE)} merges`,
+		)
+	})
+
+	it('counts the merges after the closing pull request, not its own', async () => {
+		const ledger = ledger_of([
+			{ at: AFTER, issue: SOURCE_ISSUE },
+			{ at: AFTER, issue: 1 },
+		])
+
+		await issue_sample_gate.prime([CLOSING_BODY], ports_of(MERGED_AT, ledger))
+
+		expect(issue_sample_gate.wait_of(CLOSING_BODY)).toStrictEqual({
+			kind: 'short',
+			cited: SOURCE_ISSUE,
+			via: 'issue',
+			counted: 1,
+			needed: NEEDED,
+		})
+	})
+
+	it('reads the issue apart from a pull request of the same number', async () => {
+		const pull_body = body_with(`- 実施可能条件: #${String(SOURCE_ISSUE)} のマージ後 1 マージ`)
+		const ports = ports_of(MERGED_AT, undefined)
+
+		await issue_sample_gate.prime([CLOSING_BODY, pull_body], ports)
+
+		expect(ports.closing).toHaveBeenCalledTimes(1)
+		expect(ports.pull).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('issue_sample_gate.cited_via', () => {
+	it('names the cited number by its form only', () => {
+		expect(issue_sample_gate.cited_via(CLOSING_BODY, 'issue')).toBe(SOURCE_ISSUE)
+		expect(issue_sample_gate.cited_via(CLOSING_BODY, 'pull')).toBeUndefined()
+		expect(issue_sample_gate.cited_via(GATED_BODY, 'pull')).toBe(PR)
+	})
+})
+
 describe('the sample declaration in issue:lint', () => {
-	it('accepts the declared shape', () => {
-		expect(issue_lint_cli.problems(GATED_BODY)).toEqual([])
+	it.each([GATED_BODY, CLOSING_BODY])('accepts the declared shape', (body) => {
+		expect(issue_lint_cli.problems(body)).toEqual([])
 	})
 
 	it.each(['#4313 のマージ後 0 マージ', '4313 のマージ後 3 マージ', '#4313 の 3 日後', ''])(
@@ -174,7 +236,7 @@ describe('the sample declaration in issue:lint', () => {
 		(value) => {
 			const found = issue_lint_cli.problems(body_with(`- 実施可能条件: ${value}`))
 
-			expect(found).toEqual([expect.stringContaining('のマージ後 <K> マージ')])
+			expect(found).toEqual([expect.stringContaining(issue_sample_gate.CLOSING_FORMAT)])
 		},
 	)
 })

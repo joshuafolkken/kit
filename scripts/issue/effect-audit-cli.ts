@@ -84,13 +84,17 @@ async function closes_by_pull(
 	return new Map(unique.map((pr, index) => [pr, closes[index]]))
 }
 
+// A follow-up citing the issue form names what it measures itself; only a cited pull request is read.
 async function follow_ups_of(candidates: ReadonlyArray<SearchIssue>): Promise<Array<FollowUp>> {
 	const cited = candidates
 		.map((issue) => ({ issue, pr: effect_audit.cited_pull(issue) }))
 		.filter((entry): entry is CitedFollowUp => entry.pr !== undefined)
 	const closes = await closes_by_pull(cited.map(({ pr }) => pr))
+	const by_issue = candidates
+		.map((issue) => ({ issue, measures: effect_audit.cited_issue(issue) }))
+		.filter(({ measures }) => measures !== undefined)
 
-	return cited.map(({ issue, pr }) => ({ issue, measures: closes.get(pr) }))
+	return [...cited.map(({ issue, pr }) => ({ issue, measures: closes.get(pr) })), ...by_issue]
 }
 
 async function read_audit(repo: string, days: number, now_ms: number): Promise<Audit | undefined> {

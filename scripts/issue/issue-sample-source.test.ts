@@ -2,6 +2,7 @@ import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
+import { issue_sample_gate } from './issue-sample-gate'
 import { issue_sample_source } from './issue-sample-source'
 
 // joshuafolkken/kit#4460: a start condition citing an issue number reads as a pull request that is
@@ -12,10 +13,8 @@ const CLOSING = 4448
 const MERGED_AT = '2026-10-21T17:57:37Z'
 const THERE = 'joshuafolkken/app-kit'
 const PLAIN_HINT = 'whose merge it waits on'
-const CLOSING_URL = `https://github.com/joshuafolkken/kit/pull/${String(CLOSING)}`
-
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
-const closing_pr = vi.spyOn(issue_closing_pr, 'read_closing_pr')
+const closing_pr = vi.spyOn(issue_closing_pr, 'read_closing_number')
 
 function body_with(line: string): string {
 	return `## 背景\n\n- 種別: 非不具合\n${line}\n\n## 現象\n`
@@ -34,7 +33,7 @@ afterEach(() => {
 describe('issue_sample_source.problem — an issue number', () => {
 	it('refuses it and cites the pull request that closed it', async () => {
 		cited_as({ number: CITED })
-		closing_pr.mockResolvedValue(CLOSING_URL)
+		closing_pr.mockResolvedValue(CLOSING)
 
 		const problem = await issue_sample_source.problem(GATED_BODY)
 
@@ -43,7 +42,7 @@ describe('issue_sample_source.problem — an issue number', () => {
 		expect(exec_gh_api).toHaveBeenCalledWith({
 			path: git_gh_api_path.issue_api_path(String(CITED)),
 		})
-		expect(closing_pr).toHaveBeenCalledWith(String(CITED))
+		expect(closing_pr).toHaveBeenCalledWith(CITED)
 	})
 
 	it('reads another repository’s number there, with no closing pull request looked up', async () => {
@@ -59,11 +58,24 @@ describe('issue_sample_source.problem — an issue number', () => {
 		expect(closing_pr).not.toHaveBeenCalled()
 	})
 
-	it('refuses it with no closing pull request to cite', async () => {
+	it('refuses it with no closing pull request to cite, pointing at the issue form', async () => {
 		cited_as({ number: CITED })
 		closing_pr.mockResolvedValue(undefined)
 
-		expect(await issue_sample_source.problem(GATED_BODY)).toContain(PLAIN_HINT)
+		const problem = await issue_sample_source.problem(GATED_BODY)
+
+		expect(problem).toContain(PLAIN_HINT)
+		expect(problem).toContain(issue_sample_gate.CLOSING_FORMAT)
+	})
+})
+
+// joshuafolkken/kit#5051: a lane files its follow-up before the pull request that closes its issue exists.
+describe('issue_sample_source.problem — the issue form', () => {
+	it('passes it unread, as it cites the issue whose closing pull request it waits on', async () => {
+		const body = body_with(`- 実施可能条件: #${String(CITED)} を閉じる PR のマージ後 10 マージ`)
+
+		expect(await issue_sample_source.problem(body)).toBeUndefined()
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
 

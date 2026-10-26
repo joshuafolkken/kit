@@ -13,7 +13,7 @@ import { size_estimate } from './size-estimate'
 
 const RECORD_READERS: ReadonlyArray<string> = ['lane:stats', 'actions/runs']
 const CITATION_PATTERN = /#[1-9]\d*/u
-const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\` under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
+const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
 
 function measures_a_change(criterion: string): boolean {
 	return (

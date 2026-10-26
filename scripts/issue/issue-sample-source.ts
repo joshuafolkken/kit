@@ -15,7 +15,7 @@ import { session_cite } from './session-cite'
 
 interface SourcePorts {
 	is_pull: (number: number, repo: string | undefined) => Promise<boolean | undefined>
-	closing_pr: (issue: number) => Promise<string | undefined>
+	closing_pr: (issue: number) => Promise<number | undefined>
 }
 
 async function read_is_pull(
@@ -33,15 +33,14 @@ async function read_is_pull(
 	}
 }
 
-// The closing pull request's number, read off the URL `read_closing_pr` answers.
-async function read_closing_pr(issue: number): Promise<string | undefined> {
-	const url = await issue_closing_pr.read_closing_pr(String(issue))
-
-	return url?.slice(url.lastIndexOf('/') + 1)
+async function read_closing_number(issue: number): Promise<number | undefined> {
+	return await issue_closing_pr.read_closing_number(issue)
 }
 
-const DEFAULT_PORTS: SourcePorts = { is_pull: read_is_pull, closing_pr: read_closing_pr }
+const DEFAULT_PORTS: SourcePorts = { is_pull: read_is_pull, closing_pr: read_closing_number }
 
+// No merged closing pull request yet — the lane filing ahead of its own (joshuafolkken/kit#5051) —
+// points at the form that waits on the pull request to come.
 async function hint_of(
 	issue: number,
 	repo: string | undefined,
@@ -49,19 +48,21 @@ async function hint_of(
 ): Promise<string> {
 	const closing = repo === undefined ? await ports.closing_pr(issue) : undefined
 
-	if (closing === undefined) return 'cite the pull request whose merge it waits on'
+	if (closing === undefined) {
+		return `cite the pull request whose merge it waits on, or write \`${issue_sample_gate.CLOSING_FORMAT}\` to wait on the one that closes it`
+	}
 
 	return `cite the pull request that closed it: ${session_cite.issue(closing)}`
 }
 
-// The refusal for a condition citing an issue, or `undefined` when it cites a pull request, cites
-// nothing, or cannot be read.
+// The refusal for a pull request condition citing an issue, or `undefined` when it cites a pull
+// request, cites nothing, uses the issue form, or cannot be read.
 async function problem(
 	body: string,
 	repo?: string,
 	ports: SourcePorts = DEFAULT_PORTS,
 ): Promise<string | undefined> {
-	const number = issue_sample_gate.cited_number(body)
+	const number = issue_sample_gate.cited_via(body, 'pull')
 
 	if (number === undefined || (await ports.is_pull(number, repo)) !== false) return undefined
 	const cited = session_cite.issue(number, undefined, repo)

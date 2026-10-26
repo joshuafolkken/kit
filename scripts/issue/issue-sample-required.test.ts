@@ -30,6 +30,7 @@ describe('issue_sample_required.problem — a measurement follow-up with no star
 		const found = issue_sample_required.problem(body_of(NO_FILES, [MEASURING, FOLLOW_UP]))
 
 		expect(found).toContain(issue_sample_gate.DECLARATION)
+		expect(found).toContain(issue_sample_gate.CLOSING_FORMAT)
 	})
 
 	it.each([
