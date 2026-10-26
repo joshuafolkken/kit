@@ -49,6 +49,7 @@ afterEach(() => {
 
 const CLEAN_REPORT: PinnedReport = {
 	unpinned: [],
+	stopped: [],
 	unchecked: [],
 	unparsed: [],
 	max_hunks: 20,

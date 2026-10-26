@@ -10,7 +10,7 @@ import { test_red_logic, type RedProbe, type RedVerdict } from './test-red-logic
 import { vitest_cache_directory } from './vitest-cache-directory'
 
 // `josh test:red` — run the added and changed Vitest files against the pre-fix tree and print `red`,
-// `green`, `no-test` or `test-only`.
+// `green`, `no-test`, `stopped` or `test-only`.
 //
 // **The pre-fix tree is a detached worktree at the merge-base, never the caller's checkout**
 // (`base-tree.ts`). The tests are copied in from the working tree, so what runs is the new test
@@ -23,7 +23,7 @@ const REPORT_NAME = 'report.json'
 const CACHE_NAME = 'vite-cache'
 const VITEST_BIN = path.join(base_tree.NODE_MODULES, '.bin', 'vitest')
 const USAGE =
-	'Usage: josh test:red — prints red / green / no-test / test-only for the changed tests on the merge-base'
+	'Usage: josh test:red — prints red / green / no-test / stopped / test-only for the changed tests on the merge-base'
 
 interface RedRun {
 	verdict: RedVerdict

@@ -311,10 +311,10 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:declared` 
 
 <!-- usage: test:red -->
 
-Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only.
+Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/stopped/test-only.
 
 ```bash
-pnpm josh test:red   # red, green, no-test or test-only
+pnpm josh test:red   # red, green, no-test, stopped or test-only
 ```
 
 <!-- /usage -->

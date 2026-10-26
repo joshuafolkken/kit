@@ -13,6 +13,7 @@ it('checks nothing when there is no merge-base', async () => {
 
 	expect(await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)).toMatchObject({
 		unpinned: [],
+		stopped: [],
 		unchecked: [],
 		unparsed: [],
 	})

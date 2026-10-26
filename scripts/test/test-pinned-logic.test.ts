@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { test_pinned_logic, type Hunk } from './test-pinned-logic'
+import { test_pinned_logic, type Hunk, type PinnedReport } from './test-pinned-logic'
 
 const DRIVER = 'scripts/run/driver.ts'
+const EMPTY_REPORT: PinnedReport = {
+	unpinned: [],
+	stopped: [],
+	unchecked: [],
+	unparsed: [],
+	max_hunks: 1,
+	has_runner: true,
+}
 
 const MODIFIED_DIFF = [
 	`diff --git a/${DRIVER} b/${DRIVER}`,
@@ -119,11 +127,9 @@ describe('test_pinned_logic.split and format', () => {
 
 	it('prints unpinned and unchecked hunks as file:line, a line-0 deletion as line 1', () => {
 		const report = {
+			...EMPTY_REPORT,
 			unpinned: [{ ...first, is_green: true }],
 			unchecked: [second],
-			unparsed: [],
-			max_hunks: 1,
-			has_runner: true,
 		}
 
 		expect(test_pinned_logic.format(report)).toBe(
@@ -133,16 +139,42 @@ describe('test_pinned_logic.split and format', () => {
 	})
 
 	it('says no related test ran rather than green when nothing ran with the hunk reverted', () => {
-		const report = {
-			unpinned: [{ ...first, is_green: false }],
-			unchecked: [],
-			unparsed: [],
-			max_hunks: 1,
-			has_runner: true,
-		}
+		const report = { ...EMPTY_REPORT, unpinned: [{ ...first, is_green: false }] }
 
 		expect(test_pinned_logic.format(report)).toBe(
 			'unpinned a.ts:3 — no related test ran with it reverted',
+		)
+	})
+})
+
+// joshuafolkken/kit#5043: a revert that stops vitest (its config could not load) is not "no related test".
+describe('test_pinned_logic.outcome and a stopped hunk', () => {
+	const hunks = ['a.ts', 'b.ts', 'c.ts', 'd.ts', 'e.ts'].map((file) => hunk({ file, new_start: 3 }))
+	const [, green, no_test, stopped] = hunks
+
+	it('sets a stopped hunk aside, pins a red one and leaves green and no-test unpinned', () => {
+		const verdicts = [
+			{ verdict: 'red', failed: [] },
+			{ verdict: 'green', failed: [] },
+			{ verdict: 'no-test', failed: [] },
+			{ verdict: 'stopped', failed: [] },
+			undefined,
+		] as const
+
+		expect(test_pinned_logic.outcome(hunks, verdicts)).toEqual({
+			unpinned: [
+				{ ...green, is_green: true },
+				{ ...no_test, is_green: false },
+			],
+			stopped: [stopped],
+		})
+	})
+
+	it('prints a hunk whose revert stopped vitest as unchecked, never as unpinned', () => {
+		const report = { ...EMPTY_REPORT, stopped: [hunk({ file: 'a.ts', new_start: 3 })] }
+
+		expect(test_pinned_logic.report_text(report)).toBe(
+			'unpinned 0 · unchecked 1\nunchecked a.ts:3 — vitest stopped before any test ran with it reverted\n',
 		)
 	})
 })
@@ -151,28 +183,17 @@ describe('test_pinned_logic.format with nothing left, and on an added file funct
 	const first = hunk({ file: 'a.ts', new_start: 3 })
 
 	it('prints nothing when every checked hunk is pinned and none is left over', () => {
-		expect(
-			test_pinned_logic.format({
-				unpinned: [],
-				unchecked: [],
-				unparsed: [],
-				max_hunks: 1,
-				has_runner: true,
-			}),
-		).toBe('')
+		expect(test_pinned_logic.format(EMPTY_REPORT)).toBe('')
 	})
 
 	it('names the function and says its body was replaced, green or not run', () => {
 		const stub = { ...first, function_name: 'tree.discard' }
 		const report = {
+			...EMPTY_REPORT,
 			unpinned: [
 				{ ...stub, is_green: true },
 				{ ...stub, is_green: false },
 			],
-			unchecked: [],
-			unparsed: [],
-			max_hunks: 1,
-			has_runner: true,
 		}
 
 		expect(test_pinned_logic.format(report)).toBe(
@@ -186,13 +207,7 @@ describe('test_pinned_logic.report_text', () => {
 	const one_unchecked = 'unpinned 0 · unchecked 1\n'
 
 	it('counts an added file it could not read as unchecked and lists it', () => {
-		const report = {
-			unpinned: [],
-			unchecked: [],
-			unparsed: ['added.ts'],
-			max_hunks: 1,
-			has_runner: true,
-		}
+		const report = { ...EMPTY_REPORT, unparsed: ['added.ts'] }
 
 		expect(test_pinned_logic.report_text(report)).toBe(
 			`${
@@ -203,9 +218,8 @@ describe('test_pinned_logic.report_text', () => {
 
 	it('says no vitest ran a hunk it left unchecked for want of one, rather than naming the cap', () => {
 		const report = {
-			unpinned: [],
+			...EMPTY_REPORT,
 			unchecked: [hunk({ file: 'a.ts', new_start: 3 })],
-			unparsed: [],
 			max_hunks: 20,
 			has_runner: false,
 		}
@@ -216,8 +230,6 @@ describe('test_pinned_logic.report_text', () => {
 	})
 
 	it('prints only the counts when nothing is unpinned or unchecked', () => {
-		const report = { unpinned: [], unchecked: [], unparsed: [], max_hunks: 1, has_runner: true }
-
-		expect(test_pinned_logic.report_text(report)).toBe('unpinned 0 · unchecked 0\n')
+		expect(test_pinned_logic.report_text(EMPTY_REPORT)).toBe('unpinned 0 · unchecked 0\n')
 	})
 })

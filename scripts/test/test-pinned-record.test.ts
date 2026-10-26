@@ -12,6 +12,7 @@ const EARLIER_TOKEN = 'launch-0'
 const HUNK = { file: 'a.ts', new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const REPORT: PinnedReport = {
 	unpinned: [HUNK],
+	stopped: [],
 	unchecked: [],
 	unparsed: [],
 	max_hunks: 20,

@@ -17,7 +17,8 @@ const USAGE = [
 	'Usage: josh test:pinned [--max <n>] [--record <token>] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
-	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)});`,
+	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
+	'  or where its revert stopped vitest before any test ran;',
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`',
 ].join('\n')
 
