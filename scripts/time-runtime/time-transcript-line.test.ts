@@ -1,6 +1,6 @@
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { describe, expect, it } from 'vitest'
-import { time_transcript_line } from './time-transcript-line'
+import { time_transcript_line, type TranscriptLine } from './time-transcript-line'
 
 const { BRANCH } = time_transcript_fixture
 
@@ -51,14 +51,18 @@ describe('time_transcript_line.guard_from_refusal', () => {
 	})
 })
 
-function stop_guard_of(content: string): string | undefined {
+function user_turn(content: string): TranscriptLine | undefined {
 	const line = JSON.stringify({
 		type: 'user',
 		timestamp: '2026-10-09T00:00:00.000Z',
 		message: { role: 'user', content },
 	})
 
-	return time_transcript_line.parse_line(line)?.stop_guard
+	return time_transcript_line.parse_line(line)
+}
+
+function stop_guard_of(content: string): string | undefined {
+	return user_turn(content)?.stop_guard
 }
 
 describe('time_transcript_line stop guard', () => {
@@ -74,6 +78,12 @@ describe('time_transcript_line stop guard', () => {
 
 	it('reads no guard from feedback that is not a refusal', () => {
 		expect(stop_guard_of('Stop hook feedback:\nplease continue')).toBe('')
+	})
+
+	it('keeps the whole reason, its label stripped, as the stop feedback', () => {
+		const turn = user_turn('Stop hook feedback:\n⛔ lane agent stop: wait\n')
+
+		expect(turn?.stop_feedback).toBe('⛔ lane agent stop: wait')
 	})
 })
 

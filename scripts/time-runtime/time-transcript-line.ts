@@ -118,6 +118,9 @@ interface TranscriptLine {
 	// every line lacking an id would otherwise fall into one bucket spanning the whole file.
 	message_id: string
 	blocks: Array<Block>
+	// The reason a Stop-hook block sent this turn back with, its label stripped, or `''` for every
+	// other line.
+	stop_feedback: string
 	// The guard whose Stop-hook block sent this turn back, or `''` for every other line
 	// — read the way `Block.refusal_guard` is, off the reason's opening.
 	stop_guard: string
@@ -162,12 +165,12 @@ function guard_from_refusal(text: string): string {
 
 // **Only the harness's own feedback line counts.** It writes a Stop block back as a user turn whose
 // whole body is `Stop hook feedback:` and the reason, so a prompt that merely quotes one never opens
-// with the label and reads `''`.
-function stop_guard_of(data: TranscriptRecord): string {
+// with the label and reads `''`. The reason is kept whole, so `rule-value.ts` can match it to its row.
+function stop_feedback_of(data: TranscriptRecord): string {
 	const content = data.message?.content
 	if (typeof content !== 'string' || !STOP_FEEDBACK_LABEL.test(content)) return ''
 
-	return guard_from_refusal(content.replace(STOP_FEEDBACK_LABEL, ''))
+	return content.replace(STOP_FEEDBACK_LABEL, '').trim()
 }
 
 function token_lines_of(text: string): Array<string> {
@@ -259,12 +262,15 @@ function to_line(data: TranscriptRecord): TranscriptLine | undefined {
 
 	if (timestamp_ms === undefined) return undefined
 
+	const stop_feedback = stop_feedback_of(data)
+
 	return {
 		type: data.type ?? '',
 		timestamp_ms,
 		branch: data.gitBranch ?? UNKNOWN_BRANCH,
 		finished_background: finished_background(data),
-		stop_guard: stop_guard_of(data),
+		stop_feedback,
+		stop_guard: guard_from_refusal(stop_feedback),
 		...message_fields(data.message),
 	}
 }

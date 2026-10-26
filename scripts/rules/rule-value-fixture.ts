@@ -46,6 +46,15 @@ function result_line(content: string, timestamp: string = TIMESTAMP): string {
 	})
 }
 
+// The user turn the harness writes back where a Stop hook blocked the turn's end (joshuafolkken/kit#4978).
+function stop_line(reason: string, timestamp: string = TIMESTAMP): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp,
+		message: { role: 'user', content: `Stop hook feedback:\n${reason}` },
+	})
+}
+
 // The note a hook attaches where it rewrites a call instead of refusing it (joshuafolkken/kit#3570).
 function context_line(content: string, timestamp: string = TIMESTAMP): string {
 	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
@@ -76,6 +85,7 @@ const rule_value_fixture = {
 	context_line,
 	result_line,
 	session,
+	stop_line,
 	tool_use_block,
 }
 

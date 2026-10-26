@@ -225,11 +225,14 @@ const ROW = {
 	// `pretool-guard.ts` rewrites a lone `josh ship` to the foreground rather than refusing it; this is
 	// the note it attaches, so `rule-value.ts` counts that rewrite as this row's delivery.
 	rewrite_note: FOREGROUND_NOTE,
+	// The Stop hook delivers the same rule at the turn's end, for the background task or subagent the
+	// turn would kill.
+	stop_reasons: [LANE_BACKGROUND_STOP_REASON, LANE_AGENT_STOP_REASON],
 	about: {
 		title: 'Lane child background push',
 		topic: '`.claude/skills/workflow-commands/background-commands.md`',
 		fires:
-			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`. Every occurrence',
+			'a dispatched lane child backgrounding `josh gate` / `git` / `followup` / `ship`; it hands over `pnpm josh ship --detach`; the Stop hook also blocks ending a turn with its background task or subagent unfinished. Every occurrence',
 		quiet: 'not a lane child, or the foreground `ship --detach`',
 	},
 }
