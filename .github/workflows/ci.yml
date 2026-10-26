@@ -413,7 +413,7 @@ jobs:
   # fresh key and saves the downloaded file in its post step; the prefix is checked before it becomes
   # a key. A missing artifact — a run from before this — or a prefix that is not a key saves nothing
   # and leaves the push green; the next pull request then restores an older entry, as it did before.
-  # Only a pull request whose author has write permission (OWNER / MEMBER / COLLABORATOR) is promoted:
+  # Only a pull request whose author holds a trusted association (OWNER / MEMBER / COLLABORATOR) is promoted:
   # an outside author's run can write any `.eslintcache` it likes, and main's scope would then let
   # later pull requests skip lint on that forged record (joshuafolkken/kit#5050).
   seed-eslint-cache:
@@ -437,7 +437,7 @@ jobs:
           case "${AUTHOR_ASSOCIATION}" in
             OWNER | MEMBER | COLLABORATOR) ;;
             *)
-              echo "::notice::The pull request's author (${AUTHOR_ASSOCIATION:-unknown}) has no write permission; saving nothing."
+              echo "::notice::The pull request's author association (${AUTHOR_ASSOCIATION:-unknown}) is not trusted; saving nothing."
               exit 0
               ;;
           esac

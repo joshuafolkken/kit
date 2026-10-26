@@ -1,4 +1,16 @@
-import { describe, expect, it } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowJob } from './ci-yml-fixture'
 
 // joshuafolkken/kit#4449: a main push that reuses a pull request's Checks skips `static-checks`, so
@@ -52,11 +64,11 @@ describe('the pull request run hands its ESLint cache over', () => {
 
 	it('uploads the cache file and the prefix only on a pull request', () => {
 		const upload = ci_yml_fixture.find_upload(job(STATIC_JOB), UPLOAD_ARTIFACT)
-		const path = String(upload_input(ci_yml_fixture.UPLOAD_PATH_INPUT))
+		const upload_path = String(upload_input(ci_yml_fixture.UPLOAD_PATH_INPUT))
 
 		expect(upload?.if).toBe(PULL_REQUEST_ONLY)
-		expect(path).toContain(CACHE_PATH)
-		expect(path).toContain(PREFIX_FILE)
+		expect(upload_path).toContain(CACHE_PATH)
+		expect(upload_path).toContain(PREFIX_FILE)
 		expect(upload_input('include-hidden-files')).toBe(true)
 	})
 
@@ -109,8 +121,52 @@ describe('a reused main push saves that cache', () => {
 })
 
 // joshuafolkken/kit#5050: an outside author's run can write any `.eslintcache`, so only a pull request
-// whose author has write permission is promoted to main's scope.
-describe('the seed promotes only a write-permission author', () => {
+// whose author holds a trusted association is promoted to main's scope. The download step runs
+// under `bash -e`, as a runner does, with a stub `gh` that hands back a valid prefix file, so a row
+// reads what the script actually does rather than what its text contains.
+const TRUSTED = ['OWNER', 'MEMBER', 'COLLABORATOR']
+const UNTRUSTED = ['CONTRIBUTOR', 'FIRST_TIME_CONTRIBUTOR', 'NONE', '']
+const STUB_PREFIX = 'Linux-eslint-cache-v24.1.0-0a1b-2c3d-'
+const work_directory = mkdtempSync(path.join(tmpdir(), 'seed-eslint-cache-'))
+
+afterAll(() => {
+	rmSync(work_directory, { recursive: true, force: true })
+})
+
+function write_stub_gh(directory: string): void {
+	const stub = path.join(directory, 'bin', 'gh')
+
+	mkdirSync(path.dirname(stub), { recursive: true })
+	writeFileSync(stub, `#!/bin/sh\nprintf '%s\\n' '${STUB_PREFIX}' > ${PREFIX_FILE}\n`)
+	chmodSync(stub, 0o755)
+}
+
+function run_download(association: string): { did_download: boolean; output: string } {
+	const directory = mkdtempSync(path.join(work_directory, 'run-'))
+	const output_path = path.join(directory, 'output')
+
+	write_stub_gh(directory)
+	writeFileSync(output_path, '')
+	const result = spawnSync('bash', ['-e', '-c', seed_script()], {
+		cwd: directory,
+		env: {
+			...process.env,
+			PATH: `${path.join(directory, 'bin')}${path.delimiter}${process.env['PATH'] ?? ''}`,
+			GITHUB_OUTPUT: output_path,
+			AUTHOR_ASSOCIATION: association,
+		},
+		encoding: 'utf8',
+	})
+
+	expect(result.status, result.stderr).toBe(0)
+
+	return {
+		did_download: existsSync(path.join(directory, PREFIX_FILE)),
+		output: readFileSync(output_path, 'utf8'),
+	}
+}
+
+describe('the seed promotes only a trusted author association', () => {
 	it('carries the author association from the reuse proof', () => {
 		const prove = ci_yml_fixture.step_run(ci_yml_fixture.find_step_by_id(job(REUSE_JOB), 'prove'))
 		const download = ci_yml_fixture.find_step_by_id(job(SEED_JOB), 'download')
@@ -125,12 +181,17 @@ describe('the seed promotes only a write-permission author', () => {
 		)
 	})
 
-	it('saves nothing for any other author, deciding before the download', () => {
-		const script = seed_script()
+	it.each(TRUSTED)('downloads and hands the prefix on for %s', (association) => {
+		const { did_download, output } = run_download(association)
 
-		expect(script).toContain('OWNER | MEMBER | COLLABORATOR) ;;')
-		expect(script.indexOf('has no write permission; saving nothing.')).toBeLessThan(
-			script.indexOf('gh run download'),
-		)
+		expect(did_download).toBe(true)
+		expect(output).toBe(`prefix=${STUB_PREFIX}\n`)
+	})
+
+	it.each(UNTRUSTED)('neither downloads nor saves for "%s", and stays green', (association) => {
+		const { did_download, output } = run_download(association)
+
+		expect(did_download).toBe(false)
+		expect(output).toBe('')
 	})
 })
