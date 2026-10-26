@@ -17,6 +17,8 @@ import { execa } from 'execa'
 //
 // **`timeout_ms` bounds a read made from inside a loop**: the step is killed and
 // its exit reads as a failure, so a hung network call ends a pass instead of the loop around it.
+//
+// **`environment` adds to the inherited one** for that one step — a switch the step's hooks read.
 
 const PNPM = 'pnpm'
 const JOSH = 'josh'
@@ -29,15 +31,31 @@ interface JoshResult {
 	err?: string
 }
 
+interface ExtraOptions {
+	timeout?: number
+	env?: Readonly<Record<string, string>>
+}
+
+function extra_options(
+	timeout_ms: number | undefined,
+	environment: Readonly<Record<string, string>> | undefined,
+): ExtraOptions {
+	return {
+		...(timeout_ms !== undefined && { timeout: timeout_ms }),
+		...(environment !== undefined && { env: environment }),
+	}
+}
+
 async function josh_run(
 	args: ReadonlyArray<string>,
 	should_forward_stderr = false,
 	timeout_ms?: number,
+	environment?: Readonly<Record<string, string>>,
 ): Promise<JoshResult> {
 	const result = await execa(PNPM, [JOSH, ...args], {
 		reject: false,
 		stderr: should_forward_stderr ? FORWARDED_STDERR : 'pipe',
-		...(timeout_ms !== undefined && { timeout: timeout_ms }),
+		...extra_options(timeout_ms, environment),
 	})
 
 	return {

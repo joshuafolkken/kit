@@ -3,6 +3,7 @@ import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { run_ship_synced_scope } from './run-ship-synced-scope'
 
 // The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
 // green record for this tree: the preflight stage at the start, the review rounds, and the gate
@@ -38,10 +39,18 @@ async function rerecorded_tree(): Promise<GateTree> {
 // Only the checks with no green record for this tree run — the same question `review:brief` and the
 // local gate refuse on — so a fresh record costs nothing and a stale or absent one costs a scoped run
 // instead of a stop and a relaunched session. A check that genuinely fails still stops the ship, its
-// output forwarded to the ship log.
+// output forwarded to the ship log. A pair stale only because a merge with the default branch moved the
+// base runs nothing when the merge shares nothing with the branch (`run-ship-synced-scope.ts`).
 async function scoped_pair(): Promise<JoshResult> {
 	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
+	const settled = await run_ship_synced_scope.settle(tree, scripts)
+
+	if (settled !== undefined) {
+		process.stdout.write(`${settled}\n`)
+
+		return { code: SUCCESS_EXIT_CODE, out: settled }
+	}
 
 	return await run_phases(
 		scripts.map(
