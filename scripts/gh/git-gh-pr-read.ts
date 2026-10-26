@@ -1,4 +1,6 @@
+import { error_text } from '#scripts/lib/error-message'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { note_unreadable_comments } from './git-gh-comments-unreadable'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
@@ -301,25 +303,39 @@ async function pr_view(branch_name: string): Promise<string> {
 	return JSON.stringify(git_gh_pr_rest.to_pr_info(read.pull))
 }
 
+// gh's own reason for a lookup that never answered, or that the branch has no pull request at all.
+function unresolved_reason(read: Exclude<PullNumberRead, { kind: 'read' }>): string {
+	return read.kind === 'unreadable' ? error_text.message_of(read.cause) : NO_PULL_REQUEST_MESSAGE
+}
+
 // `undefined` when the listing could not be read — a failed request, or a PR whose number could not
 // be resolved. Not `'[]'`.
 //
 // The two are the same string to a caller, and the callers are the merge gate: a rate limit would
 // arrive as "no reviewer left a finding" and the PR merge with the gate never actually read.
 // The direction is what makes it worse than the epic auto-close's version of
-// the same misread — that one only failed to close something.
+// the same misread — that one only failed to close something. Either failure warns its reason
+// (`git-gh-comments-unreadable.ts`).
 async function read_comments(
 	branch_name: string,
 	to_path: (pr_number: string) => string,
 	to_json: (raw: string) => string,
 ): Promise<string | undefined> {
-	const pr_number = await resolve_pr_number(branch_name)
-	if (pr_number === undefined) return undefined
-	const path = `${to_path(String(pr_number))}${COMMENTS_QUERY}`
+	const read = await read_pr_number(branch_name)
+
+	if (read.kind !== 'read') {
+		note_unreadable_comments(branch_name, unresolved_reason(read))
+
+		return undefined
+	}
+
+	const path = `${to_path(String(read.pr_number))}${COMMENTS_QUERY}`
 
 	try {
 		return to_json(await git_gh_exec.exec_gh_api({ path, should_paginate: true }))
-	} catch {
+	} catch (error) {
+		note_unreadable_comments(branch_name, error_text.message_of(error))
+
 		return undefined
 	}
 }
