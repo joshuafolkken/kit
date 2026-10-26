@@ -222,6 +222,9 @@ const ROW = {
 	is_trigger: (call: GuardedCall): boolean => is_background_long_run(call),
 	reason: LANE_BACKGROUND_REASON,
 	decide: (): boolean => true,
+	// `pretool-guard.ts` rewrites a lone `josh ship` to the foreground rather than refusing it; this is
+	// the note it attaches, so `rule-value.ts` counts that rewrite as this row's delivery.
+	rewrite_note: FOREGROUND_NOTE,
 	about: {
 		title: 'Lane child background push',
 		topic: '`.claude/skills/workflow-commands/background-commands.md`',

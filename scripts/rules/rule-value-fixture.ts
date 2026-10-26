@@ -1,4 +1,5 @@
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
+import { hook_context_line } from './hook-context-line'
 import { rule_value, type RuleReading } from './rule-value'
 
 // The transcript shapes `rule_value.measure` reads, built once for every suite that scores a rule.
@@ -45,6 +46,13 @@ function result_line(content: string, timestamp: string = TIMESTAMP): string {
 	})
 }
 
+// The note a hook attaches where it rewrites a call instead of refusing it (joshuafolkken/kit#3570).
+function context_line(content: string, timestamp: string = TIMESTAMP): string {
+	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
+
+	return JSON.stringify({ type: 'attachment', timestamp, attachment })
+}
+
 // One run's worth of lone calls, in the order given.
 function session(...commands: ReadonlyArray<string>): string {
 	return commands.map((command) => call_line(command)).join('\n')
@@ -65,6 +73,7 @@ const rule_value_fixture = {
 	reading_for,
 	assistant_line,
 	call_line,
+	context_line,
 	result_line,
 	session,
 	tool_use_block,
