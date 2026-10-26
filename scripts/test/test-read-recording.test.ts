@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
 import { test_read_trace } from './test-read-trace'
+import { related_scope, type RelatedScope } from './test-related-scope'
 
 // joshuafolkken/kit#4065: only a green run of the whole suite may replace the map, because a map
 // entry is read as "nothing else reads this file".
@@ -64,6 +65,15 @@ describe('test_read_recording.is_recordable', () => {
 		[[]],
 	])('records no narrowed, sharded or filtered run %j', (arguments_) => {
 		expect(test_read_recording.is_recordable(arguments_)).toBe(false)
+	})
+
+	// joshuafolkken/kit#5041: a `josh test:related` run that fell back to the whole suite refreshes the map.
+	it('records the whole-suite fallback of a narrowed run', () => {
+		const scope: RelatedScope = { mode: 'all', files: [], reason: related_scope.NO_MAP_REASON }
+
+		expect(
+			test_read_recording.is_recordable(related_scope.vitest_arguments(scope, ['--maxWorkers=3'])),
+		).toBe(true)
 	})
 })
 

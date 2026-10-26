@@ -24,6 +24,8 @@ interface RunInput {
 	// files — main merges that landed after the map among them — never the run's own change. It holds
 	// the synced non-code files as well, which the record counts as `synced` alone.
 	since_map: ReadonlyArray<string>
+	// This branch's own change from its merge base, where it was read.
+	branch?: ReadonlyArray<string> | undefined
 }
 
 interface RunResult {
@@ -69,15 +71,12 @@ async function with_test_count(
 	}
 }
 
-// The scope's files the change did not name — the map's readers and the code readers it added.
-function readers_of(input: RunInput, changed: ReadonlySet<string>): number {
+// The scope's files the record counted in no part — the map's readers, and the tests a synced module
+// shares with this branch's change.
+function readers_of(input: RunInput, counted: ReadonlySet<string>): number {
 	if (input.scope.mode !== 'related') return 0
 
-	return input.scope.files.filter((file) => !changed.has(path.relative(input.root, file))).length
-}
-
-function part_of(part: ReadonlyArray<string>, changed: ReadonlySet<string>): number {
-	return part.filter((file) => changed.has(file)).length
+	return input.scope.files.filter((file) => !counted.has(path.relative(input.root, file))).length
 }
 
 // The changed files that sent a full-suite run there, repository-root-relative, or none.
@@ -87,20 +86,39 @@ function triggers_of(input: RunInput): Partial<TestRelatedRecord> {
 	return { trigger_files: input.scope.files.map((file) => path.relative(input.root, file)) }
 }
 
+// **The run's own change is the branch's, where it was read** (joshuafolkken/kit#5041): the tests a
+// synced module shares with it, and a synced file the split cannot vouch for, are in `changed` without
+// being this branch's change. Unread, it is what neither a main sync nor the map's tree joined.
+function own_of(input: RunInput): ReadonlyArray<string> {
+	const { changed = [], branch } = input
+	const joined = new Set([...input.synced, ...input.since_map])
+
+	return changed.filter((file) => branch?.includes(file) ?? !joined.has(file))
+}
+
+// The input split into its counted parts, each file in one. A synced non-code file is in `since_map`
+// too (`synced_data` in `test-related.ts`), counted as synced alone.
+function parts_of(input: RunInput): Record<'own' | 'synced' | 'since_map', ReadonlyArray<string>> {
+	const own = own_of(input)
+	const rest = (input.changed ?? []).filter((file) => !own.includes(file))
+
+	return {
+		own,
+		synced: rest.filter((file) => input.synced.includes(file)),
+		since_map: rest.filter(
+			(file) => input.since_map.includes(file) && !input.synced.includes(file),
+		),
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
-	const changed = new Set(input.changed)
-	const synced = part_of(input.synced, changed)
-	// A synced non-code file is in `since_map` too (`synced_data` in `test-related.ts`), counted once.
-	const since_map = part_of(
-		input.since_map.filter((file) => !input.synced.includes(file)),
-		changed,
-	)
+	const { own, synced, since_map } = parts_of(input)
 	const record = {
 		scope: related_scope.scope_kind(input.scope),
-		changed: changed.size - synced - since_map,
-		synced,
-		since_map,
-		readers: readers_of(input, changed),
+		changed: own.length,
+		synced: synced.length,
+		since_map: since_map.length,
+		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}

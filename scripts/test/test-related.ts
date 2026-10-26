@@ -44,10 +44,12 @@ function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
 // The change a narrowing reads, and the map it reads it against. `is_unmoved` is the since-green
 // reading's positive fact that nothing moved since this command was last green on this checkout.
 // `synced` is the part of the change a main sync brought in, kept for the run's ledger record, and
-// `since_map` the part the change since the map's tree joined to what this change moved.
+// `since_map` the part the change since the map's tree joined to what this change moved. `branch` is
+// this branch's own change from its merge base, where it was read.
 type ChangeReading = Pick<ScopeRequest, 'changed' | 'map' | 'since_map'> & {
 	is_unmoved?: true
 	synced?: ReadonlyArray<string>
+	branch?: ReadonlyArray<string> | undefined
 }
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
@@ -100,7 +102,7 @@ async function map_change(root: string, map: ReadMap): Promise<ChangeReading> {
 
 	if (branch === undefined) return { changed, map }
 
-	return { changed, map, since_map: changed.filter((file) => !branch.includes(file)) }
+	return { changed, map, branch, since_map: changed.filter((file) => !branch.includes(file)) }
 }
 
 // Explicit file arguments win over the git reading, which is what makes the narrowing testable by
@@ -177,7 +179,7 @@ function moved_reading(
 	]
 	const changed = [...new Set([...(change.changed ?? []), ...split.left])]
 
-	return { ...change, changed, since_map: [...new Set(since_map)], synced: parts.synced }
+	return { ...change, changed, since_map: [...new Set(since_map)], synced: parts.synced, branch }
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
@@ -255,11 +257,13 @@ async function recorded_files(change: ChangeReading): Promise<ReadonlySet<string
 // text, the one place a file-system read added since the map's tree shows (`is_code_input` in
 // `test-related-scope.ts`, joshuafolkken/kit#4532). A file the tree no longer holds names nothing. A
 // file every test depends on is never one: handed to vitest it runs the whole suite unannounced, and
-// only this branch's own change of it may do that (joshuafolkken/kit#4993).
+// only this branch's own change of it may do that (joshuafolkken/kit#4993). **Only this branch's own
+// change names**, where it was read: a main sync's file — a shared test, or one main deleted — would
+// match main's own sources, which vitest widens to hundreds of tests (joshuafolkken/kit#5041).
 function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> {
-	const { changed = [], since_map = [] } = change
+	const { changed = [], since_map = [], branch = changed } = change
 	const names = changed
-		.filter((file) => !since_map.includes(file))
+		.filter((file) => !since_map.includes(file) && branch.includes(file))
 		.map((file) => path.basename(file))
 	const code = since_map.filter((file) => related_scope.is_relatable(file) && !is_whole_suite(file))
 
@@ -340,9 +344,9 @@ async function read_run_input(
 	const change = await read_change(root, command_arguments)
 	const scope = await resolve_change(root, change)
 
-	const { changed, synced = [], since_map = [] } = change
+	const { changed, synced = [], since_map = [], branch } = change
 
-	return { scope, root, changed, synced, since_map }
+	return { scope, root, changed, synced, since_map, branch }
 }
 
 // Every run is timed and counted into the lane ledger (joshuafolkken/kit#4465).
