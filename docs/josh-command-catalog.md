@@ -136,6 +136,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh doc:read` | `<file>` | automation | none | Read a whole document safely: print it, or point at the Read tool when over the Bash cap |
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
 | `josh edit:files` | `<plan-path \| ->` | automation | none | Apply several content-addressed edits from a plan in one call |
+| `josh effect:audit` | `[--days <N>] [--draft <issue>]` | automation | network, files | List closed run-time-shortening issues with their expected effect, follow-up measurement and result |
 | `josh epic` | `<title> <issue...> [--ordered]` | automation | network | Create an epic issue from its child issue numbers |
 | `josh epic:audit` | `<epic>` | automation | network | Audit an epic's children against each other for contradictions |
 | `josh epic:bundle` | `<issue> [--apply]` | automation | network | Say whether a newly filed issue belongs with ones already in the backlog |
@@ -151,7 +152,7 @@ Run `tsx tools/document/generate-catalog.ts` to regenerate.
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
 | `josh issue:fold-existing` | `<assessment.json> [--json]` | automation | none | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
-| `josh issue:measured` | `<issue> --evidence-file <path>` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
+| `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
 | `josh issue:priority` | `<issue>` | automation | network | Apply priority:high to an issue whose body reached the high floor after filing |
 | `josh issue:read` | `<issue...>` | automation | network | Print each issue's title, body and every comment on it, in one call |
