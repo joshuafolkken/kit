@@ -89,6 +89,20 @@ describe('effect_audit_cli.run — the listing', () => {
 	})
 })
 
+describe('effect_audit_cli.run — a follow-up citing the issue form', () => {
+	it('credits it to that issue, reading no pull request', async () => {
+		const body = `## 背景\n\n- 実施可能条件: #${String(ORIGIN.number)} を閉じる PR のマージ後 10 マージ`
+
+		vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async (request: GhApiRequest) =>
+			page([request.path.includes('closed%3A') ? ORIGIN : { ...FOLLOW_UP, body }]),
+		)
+
+		expect(await effect_audit_cli.run([], NOW_MS)).toBe(0)
+		expect(lines[0]).toMatch(/届かなかった 1 · 未計測 0$/u)
+		expect(issue_sample_gate.read_source).not.toHaveBeenCalled()
+	})
+})
+
 describe('effect_audit_cli.run — --draft', () => {
 	it('writes the candidate and prints the issue:file line that files it', async () => {
 		expect(await effect_audit_cli.run(['--draft', '4896'], NOW_MS)).toBe(0)

@@ -2,6 +2,7 @@ import { read_pull } from '#scripts/gh/git-gh-pr-read'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { issue_cite } from './issue-cite'
+import { issue_closing_pr } from './issue-closing-pr'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#4414: a follow-up measurement waits on samples, not on the calendar — a busy day
@@ -14,23 +15,34 @@ import { markdown_section } from './markdown-section'
 // the wait needs — when the pull request merged — is read ahead by `prime`, once per pull request per
 // process, wherever bodies first arrive. A body nobody primed reads as waiting: offering it early is
 // the defect this guards, and the next primed read releases it.
+//
+// joshuafolkken/kit#5051: a lane files its measurement follow-up before its own pull request exists —
+// `josh ship` wants the deferral row first. So the condition may cite the issue instead (`CLOSING_FORMAT`),
+// and `prime` resolves the merged pull request that closes it; until one exists the body waits as
+// unmerged.
 
 const BACKGROUND_HEADING = '## 背景'
 const PREFIX = '- 実施可能条件:'
-const CONDITION_PATTERN = /^#(?<pr>[1-9]\d*) のマージ後 (?<count>[1-9]\d*) マージ$/u
+const CONDITION_PATTERN =
+	/^#(?<cited>[1-9]\d*) (?<closing>を閉じる PR )?のマージ後 (?<count>[1-9]\d*) マージ$/u
 const VALUE_FORMAT = '#<PR> のマージ後 <K> マージ'
+const CLOSING_FORMAT = '#<issue> を閉じる PR のマージ後 <K> マージ'
 const DECLARATION = `${PREFIX} ${VALUE_FORMAT}`
-const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` with K at least 1`
+const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` or \`${CLOSING_FORMAT}\` with K at least 1`
+
+// `pull` cites the pull request itself, `issue` the issue whose closing pull request it waits on.
+type Via = 'pull' | 'issue'
 
 interface Condition {
-	pr: number
+	cited: number
+	via: Via
 	count: number
 }
 
 type SampleWait =
-	| { kind: 'unread'; pr: number }
-	| { kind: 'unmerged'; pr: number }
-	| { kind: 'short'; pr: number; counted: number; needed: number }
+	| { kind: 'unread'; cited: number; via: Via }
+	| { kind: 'unmerged'; cited: number; via: Via }
+	| { kind: 'short'; cited: number; via: Via; counted: number; needed: number }
 
 // One pull request as read: `merged_at` absent is one found unmerged, read again as it may merge since.
 // `closes` is the issue its body closes, whose ledger merge is the pull request's own.
@@ -39,8 +51,10 @@ interface PullRead {
 	closes: number | undefined
 }
 
+// `closing` reads the pull request that closes an issue; one not merged yet reads as unmerged.
 interface PrimePorts {
 	pull: (pr: number) => Promise<PullRead>
+	closing: (issue: number) => Promise<PullRead>
 	ledger_path: () => Promise<string | undefined>
 }
 
@@ -48,9 +62,9 @@ interface LedgerState {
 	path: string | undefined
 }
 
-// A pull request with no entry was never read.
+// A cited number with no entry was never read. Keyed by `key_of`, as one number may be cited both ways.
 
-const pull_by_number = new Map<number, PullRead>()
+const pull_by_key = new Map<string, PullRead>()
 const ledger: LedgerState = { path: undefined }
 
 function declared_value(body: string): string | undefined {
@@ -63,6 +77,10 @@ function declared_value(body: string): string | undefined {
 	return line?.slice(PREFIX.length).trim()
 }
 
+function via_of(groups: Partial<Record<string, string>>): Via {
+	return groups['closing'] === undefined ? 'pull' : 'issue'
+}
+
 // The declared condition, or `undefined` when there is none or it does not parse — a malformed one is
 // refused by `issue:lint`, and holding a hand-edited one forever would lose the issue silently.
 function condition_of(body = ''): Condition | undefined {
@@ -70,12 +88,23 @@ function condition_of(body = ''): Condition | undefined {
 
 	if (groups === undefined) return undefined
 
-	return { pr: Number(groups['pr']), count: Number(groups['count']) }
+	return { cited: Number(groups['cited']), via: via_of(groups), count: Number(groups['count']) }
 }
 
 // The number the declared condition cites, or `undefined` when there is none or it does not parse.
 function cited_number(body: string): number | undefined {
-	return condition_of(body)?.pr
+	return condition_of(body)?.cited
+}
+
+// The number cited by the given form only — the issue form cites an issue by design.
+function cited_via(body: string, via: Via): number | undefined {
+	const condition = condition_of(body)
+
+	return condition?.via === via ? condition.cited : undefined
+}
+
+function key_of({ cited, via }: Pick<Condition, 'cited' | 'via'>): string {
+	return `${via}:${String(cited)}`
 }
 
 function problems(body: string): ReadonlyArray<string> {
@@ -94,19 +123,47 @@ async function read_source(pr: number): Promise<PullRead> {
 	}
 }
 
-const DEFAULT_PORTS: PrimePorts = { pull: read_source, ledger_path: lane_ledger.target }
+// The merged pull request closing the issue; `closes` is the issue itself, whichever pull request it is.
+async function read_closing_source(issue: number): Promise<PullRead> {
+	const pr = await issue_closing_pr.read_closing_number(issue)
+
+	if (pr === undefined) return { merged_at: undefined, closes: issue }
+
+	const { merged_at } = await read_source(pr)
+
+	return { merged_at, closes: issue }
+}
+
+const DEFAULT_PORTS: PrimePorts = {
+	pull: read_source,
+	closing: read_closing_source,
+	ledger_path: lane_ledger.target,
+}
 
 // A failed read stays unread, so the next prime asks again.
-async function remember(pr: number, ports: PrimePorts): Promise<void> {
+async function remember(condition: Condition, ports: PrimePorts): Promise<void> {
+	const key = key_of(condition)
+	const read = condition.via === 'pull' ? ports.pull : ports.closing
+
 	try {
-		pull_by_number.set(pr, await ports.pull(pr))
+		pull_by_key.set(key, await read(condition.cited))
 	} catch {
-		pull_by_number.delete(pr)
+		pull_by_key.delete(key)
 	}
 }
 
-function is_merge_known(pr: number): boolean {
-	return pull_by_number.get(pr)?.merged_at !== undefined
+function is_merge_known(condition: Condition): boolean {
+	return pull_by_key.get(key_of(condition))?.merged_at !== undefined
+}
+
+function unread_of(bodies: ReadonlyArray<string | undefined>): Array<Condition> {
+	const unread = bodies
+		.map((body) => condition_of(body))
+		.filter(
+			(condition): condition is Condition => condition !== undefined && !is_merge_known(condition),
+		)
+
+	return [...new Map(unread.map((condition) => [key_of(condition), condition])).values()]
 }
 
 // Reads ahead what the bodies' conditions need. Nothing is read for bodies that declare none.
@@ -114,16 +171,14 @@ async function prime(
 	bodies: ReadonlyArray<string | undefined>,
 	ports: PrimePorts = DEFAULT_PORTS,
 ): Promise<void> {
-	const unread = bodies
-		.map((body) => condition_of(body)?.pr)
-		.filter((pr): pr is number => pr !== undefined && !is_merge_known(pr))
+	const unread = unread_of(bodies)
 
 	if (unread.length === 0) return
 
 	ledger.path = await ports.ledger_path()
 	await Promise.all(
-		[...new Set(unread)].map(async (pr) => {
-			await remember(pr, ports)
+		unread.map(async (condition) => {
+			await remember(condition, ports)
 		}),
 	)
 }
@@ -149,40 +204,49 @@ function wait_of(body?: string): SampleWait | undefined {
 
 	if (condition === undefined) return undefined
 
-	const { pr, count } = condition
-	const pull = pull_by_number.get(pr)
+	const { cited, via, count } = condition
+	const pull = pull_by_key.get(key_of(condition))
 
-	if (pull === undefined) return { kind: 'unread', pr }
+	if (pull === undefined) return { kind: 'unread', cited, via }
 
 	const { merged_at, closes } = pull
 
-	if (merged_at === undefined) return { kind: 'unmerged', pr }
+	if (merged_at === undefined) return { kind: 'unmerged', cited, via }
 
 	const counted = merges_after({ merged_at, closes })
 
-	return counted >= count ? undefined : { kind: 'short', pr, counted, needed: count }
+	return counted >= count ? undefined : { kind: 'short', cited, via, counted, needed: count }
+}
+
+function subject_of({ cited, via }: SampleWait): string {
+	const plain = issue_cite.plain(cited)
+
+	return via === 'pull' ? plain : `the pull request closing ${plain}`
 }
 
 // Why the body waits, for a reader that cites the issue itself.
 function reason_of(wait: SampleWait): string {
-	const pr = issue_cite.plain(wait.pr)
+	const subject = subject_of(wait)
 
-	if (wait.kind === 'unread') return `until the merge of ${pr} is read`
-	if (wait.kind === 'unmerged') return `until ${pr} merges`
+	if (wait.kind === 'unread') return `until the merge of ${subject} is read`
+	if (wait.kind === 'unmerged') return `until ${subject} merges`
 
-	return `${String(wait.counted)}/${String(wait.needed)} merges after ${pr}`
+	return `${String(wait.counted)}/${String(wait.needed)} merges after ${subject}`
 }
 
 function reset(): void {
-	pull_by_number.clear()
+	pull_by_key.clear()
 	ledger.path = undefined
 }
 
 const issue_sample_gate = {
 	DECLARATION,
+	CLOSING_FORMAT,
 	cited_number,
+	cited_via,
 	prime,
 	problems,
+	read_closing: read_closing_source,
 	read_source,
 	reason_of,
 	reset,

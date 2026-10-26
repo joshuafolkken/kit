@@ -76,6 +76,15 @@ describe('effect_audit.cited_pull — what makes an issue a follow-up', () => {
 		expect(effect_audit.cited_pull(issue(FOLLOW_UP, FOLLOW_UP_BODY))).toBe(4899)
 		expect(effect_audit.cited_pull(mention)).toBeUndefined()
 	})
+
+	it('reads the issue form as the issue it measures, citing no pull request', () => {
+		const body = `## 背景\n\n- 実施可能条件: #${String(ORIGIN)} を閉じる PR のマージ後 10 マージ`
+		const by_issue = issue(FOLLOW_UP, body)
+
+		expect(effect_audit.cited_issue(by_issue)).toBe(ORIGIN)
+		expect(effect_audit.cited_pull(by_issue)).toBeUndefined()
+		expect(effect_audit.cited_issue(issue(FOLLOW_UP, FOLLOW_UP_BODY))).toBeUndefined()
+	})
 })
 
 describe('effect_audit.format_row and summary', () => {
