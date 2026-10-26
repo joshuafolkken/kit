@@ -120,3 +120,15 @@ describe('review_record_cli.run --check — a round whose delta is left to round
 		expect(out).not.toContain(RUN_REVIEW)
 	})
 })
+
+// joshuafolkken/kit#4983: a lane child no longer runs main:merge before the ship, so the line names
+// what the ship's own sync does rather than sending the child to merge.
+describe('review_record_cli.run --check — a reused round and the default branch', () => {
+	it('leaves the default-branch merge to the ship', async () => {
+		reusable_mock.mockResolvedValue({ reuse: 'held' })
+		const { out } = await check_output()
+
+		expect(out).toContain('the ship then reviews round 1 again itself')
+		expect(out).not.toContain('main:merge')
+	})
+})

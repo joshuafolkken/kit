@@ -62,9 +62,40 @@ describe('chain-rule — a review round’s fixes are checked once', () => {
 	// joshuafolkken/kit#4949: a lane child ran check:related after each round-1 finding it fixed,
 	// and the earlier run added nothing the later one did not answer.
 	it('checks a round’s fixes with one check:related after the last, not one per finding', () => {
-		expect(lane_step()).toContain("round's fixes, all made before one `pnpm josh check:related`")
 		expect(read_unwrapped(CHAIN_RULE)).toContain(
 			"after every edit, a review round's fixes once after the last",
 		)
+	})
+})
+
+// joshuafolkken/kit#4983: ship's sync merges main and its scoped pair re-checks the tree, so a lane
+// child's own main:merge and its last check:related before the ship were run twice.
+describe('chain-rule — a lane child leaves the merge and the last check to ship', () => {
+	it('step 0 runs no main:merge and names the conflict stop ship returns', () => {
+		expect(lane_step()).toContain("(no `main:merge`: ship's sync merges main, stopping `conflict`)")
+	})
+
+	it('step 0 runs no check:related after the round’s fixes or before a re-detach', () => {
+		const step = lane_step()
+
+		// The interaction brief refuses a tree the scoped pair has not passed, as round 1's does.
+		expect(step).toContain("round's fixes, no `check:related` after them unless a brief follows")
+		expect(step).toContain('`check:related`, `check` or `metrics` before it or a re-detach')
+		expect(step).not.toContain('all made before one `pnpm josh check:related`')
+	})
+
+	it('step 0 says when ship reuses the pre-review green', () => {
+		expect(lane_step()).toContain(
+			'ship reuses the scoped pair green on this tree and base (no fix, main unmoved)',
+		)
+	})
+
+	it('a lane child resolves ship’s conflict stop without check:related', () => {
+		const content = read_unwrapped(CHAIN_RULE)
+
+		expect(content).toContain(
+			"A lane child's resolution of ship's `conflict` stop: markers removed → the re-detach the stop prints",
+		)
+		expect(content).not.toContain('markers removed → `pnpm josh check:related`')
 	})
 })

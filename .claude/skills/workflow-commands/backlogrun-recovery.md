@@ -44,7 +44,7 @@ On a person's instruction to drop a running child, run `pnpm josh lane:withdraw 
 
 ## Conflicts are not predicted
 
-**This path is the fallback**: every `fullrun` runs `pnpm josh main:merge` ahead of the gate
+**This path is the fallback**: every `fullrun` merges origin/main ahead of the gate
 (`chain-rule.md` → "origin/main is merged in before the gate"), so it covers an overlap that lands on
 `main` *after* it. **Nothing here forecasts which children will overlap** — a conflicting pull request
 comes back `mergeStateStatus: DIRTY`, which `git-pr-checks-eval.ts` reads as a **failure**, so `pnpm josh
