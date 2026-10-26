@@ -1,0 +1,7 @@
+{
+	"reason": "run:step prints a lane child its own chain step (#5016): a lane-child section table for implement and a stopped ship",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}

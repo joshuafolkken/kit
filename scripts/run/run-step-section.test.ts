@@ -26,6 +26,13 @@ function resolves(document: string, heading: string): boolean {
 	return markdown !== undefined && document_section.section(markdown, heading) !== undefined
 }
 
+function printed(): string {
+	return vi
+		.mocked(console.info)
+		.mock.calls.map((call) => String(call[0]))
+		.join('\n')
+}
+
 describe('run_step_section — the one table of governing sections', () => {
 	it.each([...run_step_section.GOVERNING_SECTIONS])(
 		'resolves the %s row against the shipped documents',
@@ -49,13 +56,46 @@ describe('run_step_section — the one table of governing sections', () => {
 	it('prints nothing and succeeds for an action with no row', () => {
 		const action = { kind: 'verdict' as const, line: run_step.WAIT }
 
-		expect(run_step_section.print_for(action)).toBe(SUCCESS)
+		expect(run_step_section.print_for(action, false)).toBe(SUCCESS)
 		expect(console.info).not.toHaveBeenCalled()
 	})
 
 	it('prints the entry read, the split assessment, verbatim', () => {
 		expect(run_step_section.print_section(run_step_section.ENTRY)).toBe(SUCCESS)
 		expect(String(vi.mocked(console.info).mock.calls[0]?.[0])).toMatch(/^## The question/u)
+	})
+})
+
+describe('run_step_section — a lane child reads its own step of the chain', () => {
+	const implement = { kind: 'verdict' as const, line: run_step.IMPLEMENT }
+	const MAIN_MERGE_STEP = '1. Run `pnpm josh main:merge`.'
+
+	it.each([...run_step_section.LANE_CHILD_SECTIONS])(
+		'resolves the lane child %s row against the shipped documents',
+		(_key, reference) => {
+			expect(resolves(reference.document, reference.heading)).toBe(true)
+		},
+	)
+
+	it('prints step 0 under implement, through its ship, and never the main:merge step', () => {
+		expect(run_step_section.print_for(implement, true)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).toContain('`failed` → step 1.')
+		expect(printed()).not.toContain(MAIN_MERGE_STEP)
+	})
+
+	it('prints step 0, not the main:merge step, after a stopped ship', () => {
+		const ship_log = { kind: 'command' as const, line: 'pnpm josh ship --log 5016' }
+
+		expect(run_step_section.print_for(ship_log, true)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).not.toContain(MAIN_MERGE_STEP)
+	})
+
+	it('prints the whole chain under implement outside a lane', () => {
+		expect(run_step_section.print_for(implement, false)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## Run the review-to-merge chain/u)
+		expect(printed()).toContain(MAIN_MERGE_STEP)
 	})
 })
 
@@ -96,6 +136,13 @@ describe('run_step_section — a consumer-shaped root', () => {
 		'prints the %s row from the kit package when the root ships no copy',
 		(key) => {
 			expect(run_step_section.print_section(key, root)).toBe(SUCCESS)
+		},
+	)
+
+	it.each([...run_step_section.LANE_CHILD_SECTIONS.keys()])(
+		'prints the lane child %s row from the kit package when the root ships no copy',
+		(key) => {
+			expect(run_step_section.print_section(key, root, true)).toBe(SUCCESS)
 		},
 	)
 })
