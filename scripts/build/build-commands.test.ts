@@ -5,6 +5,7 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { josh_in_process } from '#scripts/josh/josh-in-process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build_commands, bundled_scripts } from './build-commands'
+import { COMMANDS_TEST_PREFIX } from './distribution-scratch-fixture'
 import { import_closure, SCRIPTS_DIR } from './import-closure-fixture'
 
 const BUILD_TIMEOUT = 60_000
@@ -18,7 +19,7 @@ const SECTION_HEADING = '## Communication'
 // its own `import.meta.url` resolves the same root, and a `pnpm build` running beside this suite never
 // empties the directory under it.
 mkdirSync(DIST_DIR, { recursive: true })
-const out_directory = mkdtempSync(path.join(DIST_DIR, '.commands-test-'))
+const out_directory = mkdtempSync(path.join(DIST_DIR, COMMANDS_TEST_PREFIX))
 
 beforeAll(async () => {
 	await build_commands(out_directory)

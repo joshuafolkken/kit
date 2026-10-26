@@ -1,0 +1,7 @@
+{
+	"reason": "Bound the eslint warm-up and skip it under a test run, so neither leaves an orphaned process (#5047)",
+	"date": "2026-10-26",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}
