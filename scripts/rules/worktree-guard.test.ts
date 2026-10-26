@@ -53,7 +53,18 @@ describe('worktree_guard.WORKTREE_MUTATION_REASON', () => {
 		'Tier A',
 		// The owner's stated reason to keep the stash is the one case that still stops.
 		'unless the plan says why the owner keeps the stash: then stop and confirm',
+		// joshuafolkken/kit#4988: a refused single-file checkout/restore is led to the way back.
+		worktree_guard.SINGLE_FILE_RESTORE,
 	])('carries %j', (marker) => {
 		expect(worktree_guard.WORKTREE_MUTATION_REASON).toContain(marker)
+	})
+
+	// joshuafolkken/kit#4988: the single-file restore joined the reason; the stash guidance did not move.
+	it('keeps the stash guidance word for word', () => {
+		expect(worktree_guard.WORKTREE_MUTATION_REASON).toContain(
+			'A documented flow stashes with `pnpm josh stash:push "<message>"`; a handed-over stash is ' +
+				'`pnpm josh stash:pop "<message>"`; record the substitution on the Issue (Tier A) unless ' +
+				'the plan says why the owner keeps the stash: then stop and confirm.',
+		)
 	})
 })
