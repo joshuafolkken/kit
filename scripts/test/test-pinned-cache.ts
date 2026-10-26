@@ -160,7 +160,8 @@ async function load(base: string, hunks: ReadonlyArray<Hunk>): Promise<LoadedCac
 	const [text, tree, contents] = await read_all(file, base, hunks)
 	const { test_digests, code, test_contents, change } = tree
 	const greens = test_pinned_cache_logic.greens_of(text)
-	const pruned = test_pinned_prune_logic.pruned_of(code, contents, hunks, greens)
+	const remnants = test_pinned_prune_logic.remnants_of(hunks, greens)
+	const pruned = test_pinned_prune_logic.pruned_of(code, contents, remnants, greens)
 	const freshness = test_pinned_cache_logic.freshness_of(text, { change, pruned, test_contents })
 	const reach = test_pinned_reach.create({ ...code, test_digests })
 	const entries = test_pinned_cache_logic.entries_of(text)
@@ -267,11 +268,12 @@ function write(
 	probes: ReadonlyArray<RedProbe | undefined>,
 ): void {
 	const { code, contents, hunks } = cache
-	const green = test_pinned_prune_logic.greens_of(
+	const reached = test_pinned_prune_logic.greens_reached(
 		hunks,
 		probes.map((probe) => probe?.verdict),
 	)
-	const pruned = test_pinned_prune_logic.pruned_of(code, contents, hunks, green)
+	const green = reached.map((hunk) => test_pinned_prune_logic.record_of(hunk))
+	const pruned = test_pinned_prune_logic.pruned_of(code, contents, reached, green)
 	const content: VerdictCache = {
 		test_contents: cache.test_contents,
 		change: cache.change,

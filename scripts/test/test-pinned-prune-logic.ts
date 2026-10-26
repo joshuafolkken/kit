@@ -5,7 +5,8 @@ import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 // the line a `green` probe named changes the code change and the failed test's import closure both, yet
 // that line could be reverted with every test green, so the other hunks' `red` verdicts still hold.
 //
-// **The cache records each `green` hunk and `pruned`: the code change with those hunks reverted.** A
+// **The cache records each `green` hunk and `pruned`: the code change with exactly those hunks
+// reverted.** A
 // later run reverts each of its own hunks that is only what is left of a recorded one — the same base
 // lines, its lines a subsequence of that one's — and a `pruned` that reads the same means the code
 // change since differs only by lines removed from `green` hunks. Any other edit reads differently. A
@@ -26,18 +27,17 @@ function is_line_hunk(hunk: Hunk): boolean {
 	return hunk.function_name === undefined
 }
 
-// The line hunks whose verdict is `green`, as the cache records them.
-function greens_of(
+// The line hunks whose verdict is `green` — the ones the cache records, and the only ones its `pruned`
+// reverts: a hunk that only resembles one stays, so removing it later reads as an edit.
+function greens_reached(
 	hunks: ReadonlyArray<Hunk>,
 	verdicts: ReadonlyArray<string | undefined>,
-): Array<GreenHunk> {
-	return hunks
-		.filter((hunk, index) => verdicts[index] === 'green' && is_line_hunk(hunk))
-		.map((hunk) => ({
-			file: hunk.file,
-			old_lines: hunk.old_lines,
-			new_lines: hunk.new_lines ?? [],
-		}))
+): Array<Hunk> {
+	return hunks.filter((hunk, index) => verdicts[index] === 'green' && is_line_hunk(hunk))
+}
+
+function record_of(hunk: Hunk): GreenHunk {
+	return { file: hunk.file, old_lines: hunk.old_lines, new_lines: hunk.new_lines ?? [] }
 }
 
 // Every line of `part` sits in `whole`, in the same order.
@@ -73,19 +73,23 @@ function reverted(content: string, hunks: ReadonlyArray<Hunk>): string {
 	return text
 }
 
-// The digest of each `green` hunk's file now, with the hunks that are what is left of one reverted; a
-// file the work tree no longer holds has none.
+// The hunks a later run reverts: each one that is only what is left of a recorded `green` hunk.
+function remnants_of(hunks: ReadonlyArray<Hunk>, greens: ReadonlyArray<GreenHunk>): Array<Hunk> {
+	return hunks.filter((hunk) => greens.some((green) => is_remnant(hunk, green)))
+}
+
+// The digest of each `green` hunk's file now, with `reverts` reverted; a file the work tree no longer
+// holds has none.
 function pruned_digests(
 	contents: ReadonlyMap<string, string>,
-	hunks: ReadonlyArray<Hunk>,
+	reverts: ReadonlyArray<Hunk>,
 	greens: ReadonlyArray<GreenHunk>,
 ): Map<string, string> {
-	const remnants = hunks.filter((hunk) => greens.some((green) => is_remnant(hunk, green)))
 	const files = [...new Set(greens.map((green) => green.file))]
 	const pairs = files.flatMap((file) => {
 		const content = contents.get(file)
 		if (content === undefined) return []
-		const own = remnants.filter((hunk) => hunk.file === file)
+		const own = reverts.filter((hunk) => hunk.file === file)
 
 		return [[file, test_pinned_cache_logic.digest_of(reverted(content, own))] as const]
 	})
@@ -93,22 +97,22 @@ function pruned_digests(
 	return new Map(pairs)
 }
 
-// The code change with every remnant of `greens` reverted. Each `green` file is listed whether or not it
-// still differs from the base, so one a removal put back reads the same as one a revert did.
+// The code change with `reverts` reverted. Each `green` file is listed whether or not it still differs
+// from the base, so one a removal put back reads the same as one a revert did.
 function pruned_of(
 	code: CodeChange,
 	contents: ReadonlyMap<string, string>,
-	hunks: ReadonlyArray<Hunk>,
+	reverts: ReadonlyArray<Hunk>,
 	greens: ReadonlyArray<GreenHunk>,
 ): string {
-	const pruned = pruned_digests(contents, hunks, greens)
+	const pruned = pruned_digests(contents, reverts, greens)
 	const digests = new Map([...code.digests, ...pruned])
 	const paths = [...new Set([...code.code, ...pruned.keys()])]
 
 	return test_pinned_cache_logic.change_of(code.commit, paths, digests)
 }
 
-const test_pinned_prune_logic = { greens_of, is_remnant, pruned_of }
+const test_pinned_prune_logic = { greens_reached, record_of, is_remnant, remnants_of, pruned_of }
 
 export type { CodeChange }
 export { test_pinned_prune_logic }

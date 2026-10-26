@@ -22,9 +22,16 @@ const RECORD: GreenHunk = { file: FILE, old_lines: [], new_lines: ['loose', 'spa
 const GREENS = [RECORD]
 // `BEFORE` with every line of the green hunk removed.
 const WITHOUT_GREEN = 'one\npinned\ntwo\n'
+// The base with only the green hunk added.
+const ONLY_GREEN = 'one\ntwo\nloose\nspare\n'
+const GREEN_ALONE: Hunk = { ...GREEN, new_start: 3 }
 
-// The code change and contents of a work tree whose only changed file holds `content`.
-function pruned(content: string, hunks: ReadonlyArray<Hunk>, greens = GREENS): string {
+// The `pruned` of a work tree whose only changed file holds `content`, with `reverts` reverted.
+function pruned_with(
+	content: string,
+	reverts: ReadonlyArray<Hunk>,
+	greens: ReadonlyArray<GreenHunk>,
+): string {
 	const is_changed = content !== BASE
 	const code = {
 		commit: COMMIT,
@@ -32,18 +39,37 @@ function pruned(content: string, hunks: ReadonlyArray<Hunk>, greens = GREENS): s
 		digests: new Map(is_changed ? [[FILE, test_pinned_cache_logic.digest_of(content)]] : []),
 	}
 
-	return test_pinned_prune_logic.pruned_of(code, new Map([[FILE, content]]), hunks, greens)
+	return test_pinned_prune_logic.pruned_of(code, new Map([[FILE, content]]), reverts, greens)
 }
 
-const RECORDED = pruned(BEFORE, [RED, GREEN])
+// As a later run reads it: each of `hunks` that is a remnant of `greens` reverted.
+function pruned(content: string, hunks: ReadonlyArray<Hunk>, greens = GREENS): string {
+	return pruned_with(content, test_pinned_prune_logic.remnants_of(hunks, greens), greens)
+}
 
-describe('test_pinned_prune_logic.greens_of', () => {
-	it('records only the line hunks whose verdict is green', () => {
+// As the run that reached `verdicts` records it: exactly its `green` hunks reverted.
+function recorded(content: string, hunks: ReadonlyArray<Hunk>, verdicts: Array<string>): string {
+	const reached = test_pinned_prune_logic.greens_reached(hunks, verdicts)
+
+	return pruned_with(
+		content,
+		reached,
+		reached.map((hunk) => test_pinned_prune_logic.record_of(hunk)),
+	)
+}
+
+const RECORDED = recorded(BEFORE, [RED, GREEN], ['red', 'green'])
+
+describe('test_pinned_prune_logic.greens_reached', () => {
+	it('takes only the line hunks whose verdict is green', () => {
 		const stub = { ...GREEN, function_name: 'run' }
+		const reached = test_pinned_prune_logic.greens_reached(
+			[RED, GREEN, stub],
+			['red', 'green', 'green'],
+		)
 
-		expect(
-			test_pinned_prune_logic.greens_of([RED, GREEN, stub], ['red', 'green', 'green']),
-		).toEqual(GREENS)
+		expect(reached).toEqual([GREEN])
+		expect(reached.map((hunk) => test_pinned_prune_logic.record_of(hunk))).toEqual(GREENS)
 	})
 })
 
@@ -81,7 +107,7 @@ describe('test_pinned_prune_logic.pruned_of', () => {
 	})
 
 	it('reads the same when the removal leaves the file as its base', () => {
-		const only_green = pruned('one\ntwo\nloose\nspare\n', [{ ...GREEN, new_start: 3 }])
+		const only_green = pruned(ONLY_GREEN, [GREEN_ALONE])
 
 		expect(pruned(BASE, [])).toBe(only_green)
 	})
@@ -92,5 +118,13 @@ describe('test_pinned_prune_logic.pruned_of', () => {
 		expect(pruned('one\npinned\ntwo\nextra\n', [RED, added])).not.toBe(RECORDED)
 		expect(pruned('one\npinned!\ntwo\n', [{ ...RED, new_lines: ['pinned!'] }])).not.toBe(RECORDED)
 		expect(pruned(BEFORE, [RED, GREEN], [])).not.toBe(RECORDED)
+	})
+
+	it('reads differently once a red hunk that resembles a green one is removed', () => {
+		// `red` adds `loose` after line 1, a subsequence of the green hunk on the same base lines.
+		const lookalike: Hunk = { ...RED, new_lines: ['loose'] }
+		const before = recorded('one\nloose\ntwo\nloose\nspare\n', [lookalike, GREEN], ['red', 'green'])
+
+		expect(pruned(ONLY_GREEN, [GREEN_ALONE])).not.toBe(before)
 	})
 })
