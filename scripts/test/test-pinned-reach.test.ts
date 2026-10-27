@@ -23,6 +23,7 @@ const USER_FILE = 'user.test.ts'
 const USER_CONTENT = "import './outside'\nimport { it } from 'vitest'\n\nit('runs', () => {})\n"
 // A code file nothing imports, as a CLI a test spawns: the graph cannot tie it to any test.
 const ROOT_FILE = 'cli.ts'
+const ROOT_EDITED = 'export const cli = 1\n'
 const ROOT_IMPORTING_OUTSIDE = "export { outside } from './outside'\n"
 const FIXTURE_FILE = 'fixture.json'
 const UNPINNED_HUNK = `${DRIVER_FILE}:6`
@@ -71,6 +72,11 @@ async function build_with_app(): Promise<void> {
 		TEST_FILE,
 		test_pinned_fixture.DEFAULT_PATH_TEST.replace(`./${DRIVER_FILE}`, './app.js'),
 	)
+}
+
+// The test naming `cli.ts` in a string, as one spawning it does.
+async function name_root_in_test(): Promise<void> {
+	await write(TEST_FILE, `${test_pinned_fixture.DEFAULT_PATH_TEST}const CLI = '${ROOT_FILE}'\n`)
 }
 
 function extra_test(title: string): string {
@@ -211,10 +217,13 @@ describe('test_pinned.run over an import graph after an edit the failed test res
 	)
 
 	it(
-		'checks the pinned hunk again after a code file nothing imports changed',
+		'checks the pinned hunk again after a code file nothing imports, which the failed test names, changed',
 		async () => {
-			await after_first_run()
-			await write(ROOT_FILE, 'export const cli = 1\n')
+			await build_with_graph()
+			await name_root_in_test()
+			await write(ROOT_FILE, 'export const cli = 0\n')
+			await run_report()
+			await write(ROOT_FILE, ROOT_EDITED)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()
@@ -228,9 +237,10 @@ describe('test_pinned.run over an import graph after an edit the failed test res
 // The round-2 fix: a module a spawned CLI imports runs past every test's import closure.
 describe('test_pinned.run over an import graph after an edit a spawned CLI rests on', () => {
 	it(
-		'checks the pinned hunk again after a module only a code file nothing imports reaches changed',
+		'checks the pinned hunk again after a module only a CLI the failed test names reaches changed',
 		async () => {
 			await build_with_outside(ROOT_FILE, ROOT_IMPORTING_OUTSIDE)
+			await name_root_in_test()
 			await run_report()
 			await write_outside(1)
 			const runs = vi.spyOn(test_red, 'probe_in')
@@ -238,6 +248,38 @@ describe('test_pinned.run over an import graph after an edit a spawned CLI rests
 			await run_report()
 
 			expect(runs).toHaveBeenCalledTimes(1)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5261: a review fix outside what the failed test runs leaves its red held.
+describe('test_pinned.run over an import graph after an edit no failed test can start', () => {
+	it(
+		'keeps the pinned verdict without starting vitest after a code file nothing imports changed',
+		async () => {
+			await after_first_run()
+			await write(ROOT_FILE, ROOT_EDITED)
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			await run_report()
+
+			expect(runs).not.toHaveBeenCalled()
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'keeps the pinned verdict without starting vitest after a module only an unnamed CLI reaches changed',
+		async () => {
+			await build_with_outside(ROOT_FILE, ROOT_IMPORTING_OUTSIDE)
+			const first = await run_report()
+
+			await write_outside(1)
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			expect(await run_report()).toEqual(first)
+			expect(runs).not.toHaveBeenCalled()
 		},
 		RUN_TIMEOUT,
 	)
