@@ -12,6 +12,7 @@ import {
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
+import { time_format } from '#scripts/time-runtime/time-format'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 import { eslint_daemon } from './eslint-daemon'
 import { lint_gate_scope } from './lint-gate-scope'
@@ -42,6 +43,11 @@ interface LintRunOptions {
 
 const COLD_RUN: LintRunOptions = { warm_daemon: false }
 
+interface LintPair {
+	prettier: BufferedProcessResult
+	eslint: BufferedProcessResult
+}
+
 // The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
 async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessResult> {
 	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
@@ -62,8 +68,13 @@ async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
 	})
 }
 
+// execa strips the child's final newline, so each output is closed here: unclosed, the next tool's
+// output, or the timing line, would start on the same line as prettier's last one.
 function write_output(result: BufferedProcessResult): void {
-	if (result.output) process.stdout.write(result.output)
+	const { output } = result
+	if (!output) return
+
+	process.stdout.write(output.endsWith('\n') ? output : `${output}\n`)
 }
 
 function skipped(check: string, reason: string): BufferedProcessResult {
@@ -118,22 +129,57 @@ function lint_exit_code(prettier: BufferedProcessResult, eslint: BufferedProcess
 // and through the same basic-project skip, so a narrowed run never reaches a tool the whole-tree
 // run would have skipped. The skip reasons answer nothing for a full
 // project, so the one path serves both profiles.
-async function run_lint_checks(
+async function run_lint_pair(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
 	cache_file: string,
-	options: LintRunOptions = COLD_RUN,
-): Promise<number> {
+	options: LintRunOptions,
+): Promise<LintPair> {
 	const directory = process.cwd()
 	const [prettier, eslint] = await Promise.all([
 		run_prettier(directory, prettier_args),
 		run_checked_eslint(directory, { args: eslint_args, cache_file, ...options }),
 	])
 
+	return { prettier, eslint }
+}
+
+function write_lint_pair({ prettier, eslint }: LintPair): number {
 	write_output(with_ran_notice('prettier', prettier, eslint))
 	write_output(with_ran_notice('eslint', eslint, prettier))
 
 	return lint_exit_code(prettier, eslint)
+}
+
+async function run_lint_checks(
+	prettier_args: ReadonlyArray<string>,
+	eslint_args: ReadonlyArray<string>,
+	cache_file: string,
+	options: LintRunOptions = COLD_RUN,
+): Promise<number> {
+	return write_lint_pair(await run_lint_pair(prettier_args, eslint_args, cache_file, options))
+}
+
+// joshuafolkken/kit#5116: the gate times `lint` as one step, and the two tools run side by side, so
+// the step's seconds name neither tool as the long pole. This line, the gate's lint alone, does.
+function timing_line({ prettier, eslint }: LintPair): string {
+	const prettier_seconds = time_format.format_seconds(prettier.elapsed_ms)
+	const eslint_seconds = time_format.format_seconds(eslint.elapsed_ms)
+
+	return `lint timing — prettier ${prettier_seconds} · eslint ${eslint_seconds}\n`
+}
+
+async function run_timed_lint_checks(
+	prettier_args: ReadonlyArray<string>,
+	eslint_args: ReadonlyArray<string>,
+	cache_file: string,
+): Promise<number> {
+	const pair = await run_lint_pair(prettier_args, eslint_args, cache_file, COLD_RUN)
+	const exit_code = write_lint_pair(pair)
+
+	process.stdout.write(timing_line(pair))
+
+	return exit_code
 }
 
 async function run_lint_parallel_checks(): Promise<number> {
@@ -150,11 +196,13 @@ async function run_changed_lint_checks(): Promise<number> {
 
 	process.stdout.write(`${lint_gate_scope.describe_scope(scope, root)}\n`)
 
-	if (scope.mode === 'all') return await run_lint_parallel_checks()
+	if (scope.mode === 'all') {
+		return await run_timed_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE)
+	}
 
 	const narrowed = lint_gate_scope.narrowed_run(scope.files)
 
-	return await run_lint_checks(narrowed.prettier, narrowed.eslint, narrowed.eslint_cache_file)
+	return await run_timed_lint_checks(narrowed.prettier, narrowed.eslint, narrowed.eslint_cache_file)
 }
 
 async function run_lint_command(command_arguments: ReadonlyArray<string>): Promise<number> {
