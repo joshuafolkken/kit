@@ -59,6 +59,10 @@ describe('reviewer_foreground.ROW — delivered by the rule guard', () => {
 		expect(guard_remedy.is_rewrite(reviewer_foreground.ROW.id)).toBe(true)
 	})
 
+	it('refuses every occurrence the rewrite cannot reach', () => {
+		expect(reviewer_foreground.ROW.decide()).toBe(true)
+	})
+
 	it('scores a foreground dispatch as kept and reaches every reviewer dispatch', () => {
 		const kept = agent_call({ subagent_type: REVIEWER, run_in_background: false })
 		const missed = agent_call({ subagent_type: VERIFICATION })
