@@ -12,7 +12,7 @@ import { shell_segments } from './shell-segments'
 //
 // **Once per run.** The rule allows one re-run when the record cannot answer, so the reissue goes
 // through. On that reissue `lane-direct-tool` still refuses a lane child's `time`-prefixed heavy tool
-// (`git_argv` skips the timer) and points it at `pnpm josh reserved-run`, the overlap
+// (`git_argv` skips the timer), never wrapping it, and points it at `pnpm josh reserved-run`, the overlap
 // `delivered-rules.ts` admits. A `hyperfine "<command>"` carries the tool inside a quoted argument,
 // which `lane-direct-tool` does not read, so in a lane that reissue is not budgeted.
 

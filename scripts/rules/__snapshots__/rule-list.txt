@@ -97,9 +97,9 @@
   - silent: the duration is read from the Actions jobs or `pnpm josh lane:stats`
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child running a heavy tool directly** (`lane-direct-tool`, `docs/josh-commands-automation.md` → `josh reserved-run`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` (bare, `pnpm exec`, `npx`, inside `sh -c`), or eslint with `--concurrency` other than `off` / `1` by any path, `reserved-run` included. A one-command line is rewritten behind `pnpm josh reserved-run <weight> --` at the gate's weight; a chained, piped, redirected or env-prefixed line and a multi-worker eslint are refused, every occurrence
   - silent: not a lane child, or the run goes through `pnpm josh` with single-worker eslint
-  - not automated: the right act is another command, whose arguments the call does not carry
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Lane child reading a spilled Bash result whole** (`lane-spilled-read`, `prompts/collaboration-workflow/output-bounds.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child's `Read` of a `tool-results/<id>.txt` file with no `offset` or `limit`. Every occurrence
   - silent: not a lane child, another file, or a paginated `Read`

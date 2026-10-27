@@ -986,7 +986,9 @@ The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install 
 - Memory: `--memory`, else the wrapped tool's `MEMORY_MB` times its `--concurrency` / `--maxWorkers`, `sh -c` read too (`scripts/gate/command-memory.ts`); a command it does not know reserves none.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
 - A missing separator, a non-integer weight, a malformed `--memory`, or no command is a usage error (exit `1`).
-- A dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1` by any path, is refused by the `lane-direct-tool` row of `pnpm josh rule:list` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
+- A lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1`, meets the `lane-direct-tool` row of `pnpm josh rule:list`; an interactive session outside a lane does not.
+- The row rewrites a one-command line behind this command at the gate's weight, and refuses any other line, pointing at `josh lint:related` / `test:related` / `cspell:dot`.
+- The command runs in the directory it was typed in (pnpm's `INIT_CWD`), not the package root.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh reserved-run` in detail".
 

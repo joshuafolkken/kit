@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { core_weights } from '#scripts/gate/core-weights'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -25,6 +26,7 @@ const ESLINT_FOUR = `${PNPM_EXEC_ESLINT} --concurrency 4`
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_direct_tool.LANE_DIRECT_TOOL_REASON
+const CORES = 8
 const WORK_DIRECTORY = mkdtempSync(path.join(tmpdir(), 'lane-direct-tool-'))
 // The suite pins its working directory to the non-lane WORK_DIRECTORY per test: the trigger reads the
 // live process.cwd(), so a run started inside a lane worktree would otherwise fire on every silence case.
@@ -201,9 +203,94 @@ describe('LANE_DIRECT_TOOL_REASON', () => {
 		['pnpm josh test:related'],
 		['pnpm josh cspell:dot'],
 		['pnpm josh reserved-run <weight> -- <command>'],
+		['wrapped for you'],
 		['every occurrence'],
 	])('carries %j', (marker) => {
 		expect(REASON).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#5147: the reissue the refusal asked for is made by the hook.
+describe('reserved_command', () => {
+	it.each([
+		['pnpm exec eslint scripts/a.ts', core_weights.CORE_WEIGHTS.lint],
+		['pnpm tsc -p .', core_weights.CORE_WEIGHTS.type_check],
+		['npx cspell scripts/a.ts', core_weights.CORE_WEIGHTS.spell_check],
+		['pnpm exec vitest run --maxWorkers 3 scripts/a.test.ts', 3],
+		['vitest run scripts/a.test.ts', CORES - 1],
+		["sh -c 'eslint . --concurrency off'", core_weights.CORE_WEIGHTS.lint],
+		['pnpm exec eslint "a b.ts" 2>&1', core_weights.CORE_WEIGHTS.lint],
+		['pnpm exec eslint "a;b.ts"', core_weights.CORE_WEIGHTS.lint],
+	])('wraps %j at its gate weight', (command, weight) => {
+		expect(lane_direct_tool.reserved_command(command, CORES)).toBe(
+			`pnpm josh reserved-run ${String(weight)} -- ${command}`,
+		)
+	})
+
+	it.each([
+		[ESLINT_FOUR],
+		['pnpm exec eslint . --concurrency auto'],
+		['pnpm exec eslint . && git status'],
+		['pnpm exec vitest run | tail -5'],
+		['pnpm exec eslint . > out.txt'],
+		['(cd scripts && pnpm exec eslint .)'],
+		['CI=1 pnpm exec vitest run'],
+		['pnpm exec eslint $(git diff --name-only)'],
+		['pnpm exec eslint . # lint'],
+		['time pnpm exec eslint .'],
+		['/usr/bin/time -p pnpm exec vitest run'],
+		[LINT_RELATED],
+		[JOSH_RESERVED],
+		['git commit -m "run eslint"'],
+	])('leaves %j unwrapped', (command) => {
+		expect(lane_direct_tool.reserved_command(command, CORES)).toBeUndefined()
+	})
+})
+
+describe('reserved_input', () => {
+	beforeEach(() => {
+		mkdirSync(LANE_DIRECTORY, { recursive: true })
+		process.chdir(LANE_DIRECTORY)
+		process.env[lane_child_marker.KEY] = ISSUE
+	})
+
+	afterAll(() => {
+		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+	})
+
+	it('rewrites a lane child direct run, keeping the other input fields', () => {
+		const input = { command: PNPM_EXEC_ESLINT, description: 'Lint' }
+
+		expect(lane_direct_tool.reserved_input({ name: BASH, input })).toStrictEqual({
+			command: `pnpm josh reserved-run ${String(core_weights.CORE_WEIGHTS.lint)} -- ${PNPM_EXEC_ESLINT}`,
+			description: 'Lint',
+		})
+	})
+
+	it('leaves a non-Bash call alone', () => {
+		expect(
+			lane_direct_tool.reserved_input({ name: 'Read', input: { command: PNPM_EXEC_ESLINT } }),
+		).toBeUndefined()
+	})
+
+	it('passes the rewritten line through the refusal', () => {
+		const rewritten = lane_direct_tool.reserved_input({
+			name: BASH,
+			input: { command: PNPM_EXEC_ESLINT },
+		})
+
+		expect(lane_direct_tool.is_lane_direct_tool(String(rewritten?.['command']), true)).toBe(false)
+	})
+})
+
+describe('reserved_input — outside a lane checkout', () => {
+	it('rewrites nothing', () => {
+		process.chdir(WORK_DIRECTORY)
+		Reflect.deleteProperty(process.env, lane_child_marker.KEY)
+
+		expect(
+			lane_direct_tool.reserved_input({ name: BASH, input: { command: PNPM_EXEC_ESLINT } }),
+		).toBeUndefined()
 	})
 })
 

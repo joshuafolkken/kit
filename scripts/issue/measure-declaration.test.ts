@@ -63,6 +63,26 @@ describe('measure_declaration.problems', () => {
 	})
 })
 
+// joshuafolkken/kit#5144: a follow-up states its measurement — a declaration line, or a reason for none.
+describe('measure_declaration.is_stated', () => {
+	it.each([
+		['a declaration', DECLARED],
+		['a malformed declaration line', `${BACKGROUND}- 計測宣言: count <= 5\n`],
+		['a reason for none', `${BACKGROUND}- 計測宣言なし: 外部サービスの画面でしか見えない\n`],
+	])('holds for %s', (_case, body) => {
+		expect(measure_declaration.is_stated(body)).toBe(true)
+	})
+
+	it.each([
+		['no line', `${BACKGROUND}- 種別: 非不具合\n`],
+		['an empty reason', `${BACKGROUND}- 計測宣言なし:\n`],
+		['a reason outside the background', `## 現象\n\n- 計測宣言なし: 外部の値\n`],
+		['a reason in a fence', `${BACKGROUND}\`\`\`\n- 計測宣言なし: 外部の値\n\`\`\`\n`],
+	])('fails for %s', (_case, body) => {
+		expect(measure_declaration.is_stated(body)).toBe(false)
+	})
+})
+
 describe('measure_declaration.judge', () => {
 	const declaration = { command: 'echo', operator: '<=', threshold: 5 } as const
 

@@ -1,0 +1,8 @@
+{
+	"reason": "Round-1 review fixes: INIT_CWD directory for reserved-run and excluding time-prefixed lines from the lane-direct-tool rewrite",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 74,
+		"ai_cost.resident_bytes": 118
+	}
+}
