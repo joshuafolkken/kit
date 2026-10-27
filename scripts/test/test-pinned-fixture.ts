@@ -95,9 +95,15 @@ async function open_template<T>(
 	const workspace = git_fixture_workspace.open_workspace(prefix)
 
 	process.chdir(workspace.workspace)
-	await build()
 
-	return { workspace, first: await first_run() }
+	try {
+		await build()
+
+		return { workspace, first: await first_run() }
+	} catch (error) {
+		await git_fixture_workspace.close_workspace(workspace)
+		throw error
+	}
 }
 
 // Into the current directory, the workspace a test opened; answers the template's first report.

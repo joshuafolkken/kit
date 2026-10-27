@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { step_zero_notice } from '#scripts/hooks/step-zero-notice'
 import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 import { build_hooks, HOOK_BUNDLES, outfile_for } from './build-hooks'
@@ -90,6 +91,9 @@ function new_transcript(): string {
 	const transcript_path = path.join(mkdtempSync(path.join(directory, 'transcript-')), 't.jsonl')
 
 	writeFileSync(transcript_path, TRANSCRIPT_LINE)
+	onTestFinished(() => {
+		rmSync(step_zero_notice.stamp_path(transcript_path), { force: true })
+	})
 
 	return transcript_path
 }
@@ -295,7 +299,7 @@ describe('Codex adapter bundle', () => {
 			const source_file = path.join(format_directory, 'source.json')
 			const bundle_file = path.join(format_directory, 'bundle.json')
 			// Concurrent: each side formats its own file, and the posttool path never reads the Step 0
-			// stamp the sequential pretool parity runs have to clear between them.
+			// stamp.
 			const [source, bundle] = await Promise.all([
 				format_with_entrypoint(source_file, TSX_BIN, CODEX_ADAPTER_SOURCE),
 				format_with_entrypoint(bundle_file, 'node', CODEX_ADAPTER_BUNDLE),
