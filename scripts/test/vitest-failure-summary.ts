@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { gate_log } from '#scripts/gate/gate-log'
+import { verification_tail } from '#scripts/gate/verification-tail'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 
@@ -16,6 +17,7 @@ const UNIT_LOG_HEADER = 'vitest'
 const FAILED_LINE = /^FAIL\s+(?<name>\S.*)$/u
 const FAILED_HEADING = 'failed tests:'
 const NONE_NAMED = '  (none named in the output — read the full output)'
+const NONE_NAMED_VERDICT = 'none named'
 // A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace.
 const FAILED_FILE = /^(?:\|[^|]*\|\s+)?(?<file>\S+)/u
 // The guarded unit run, filtered to those files: it reserves its cores and ends a failure with this
@@ -57,14 +59,28 @@ function name_lines(names: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [...names.map((name) => `  ${name}`), `${RERUN_PREFIX}${failed_files(names).join(' ')}`]
 }
 
-function format_failure_summary(output: string, log_path: string | undefined): string {
-	const lines = name_lines(failed_tests(output))
+// The verdict names the failed files, so the last line alone says what to fix (joshuafolkken/kit#5162).
+function format_failure_summary(
+	output: string,
+	log_path: string | undefined,
+	label: string = UNIT_LOG_HEADER,
+): string {
+	const names = failed_tests(output)
+	const failures = `${[FAILED_HEADING, ...name_lines(names)].join('\n')}\n`
+	const failed = names.length === 0 ? [NONE_NAMED_VERDICT] : failed_files(names)
+	const verdict = verification_tail.format_verdict(label, failed)
 
-	return `${[FAILED_HEADING, ...lines].join('\n')}\n${gate_log.format_log_notice(log_path)}`
+	return verification_tail.format_tail({ failures, log: { path: log_path }, verdict })
 }
 
-// Written on every run, as the gate's is, headed by the run's own invocation; printed only when the
-// run failed, since a green run's answer is already its last line.
+function format_green_summary(log_path: string | undefined, label: string): string {
+	const verdict = verification_tail.format_verdict(label, [])
+
+	return verification_tail.format_tail({ failures: '', log: { path: log_path }, verdict })
+}
+
+// Written on every run, as the gate's is, headed by the run's own invocation, and ended as every josh
+// check ends (`verification-tail.ts`): a green run's last line is its verdict, not vitest's counts.
 function report(
 	vitest_arguments: ReadonlyArray<string>,
 	output: string,
@@ -73,7 +89,13 @@ function report(
 ): void {
 	const header = [UNIT_LOG_HEADER, ...vitest_arguments].join(' ')
 	const log_path = gate_log.write_gate_log([{ header, output }], target)
-	if (exit_code !== 0) process.stdout.write(format_failure_summary(output, log_path))
+	const label = [UNIT_LOG_HEADER, ...vitest_arguments.slice(0, 1)].join(' ')
+	const summary =
+		exit_code === 0
+			? format_green_summary(log_path, label)
+			: format_failure_summary(output, log_path, label)
+
+	process.stdout.write(summary)
 }
 
 const vitest_failure_summary = {

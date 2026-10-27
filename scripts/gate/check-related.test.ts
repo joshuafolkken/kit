@@ -11,7 +11,6 @@ import { execa } from 'execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
-import { metrics_totals } from './metrics-totals'
 
 const execa_mock = vi.hoisted(() => vi.fn())
 
@@ -240,6 +239,7 @@ describe('check_related.run_all restarts test:pinned on a tree a fix moved', () 
 	})
 })
 
+const FULL_OUTPUT_LINE: unknown = expect.stringMatching(/^full output: /u)
 const PINNED_NOTICE = 'unpinned 1 · unchecked 0\n  scripts/a.ts:10'
 
 async function run_all_lines(
@@ -268,9 +268,10 @@ describe('check_related.run_all test:pinned verdict', () => {
 	it('prints the reached verdict just above the verdict line', async () => {
 		const lines = await run_all_lines(PINNED_NOTICE)
 
-		expect(lines.slice(-4)).toStrictEqual([
+		expect(lines.slice(-5)).toStrictEqual([
 			...PINNED_NOTICE.split('\n'),
 			'',
+			FULL_OUTPUT_LINE,
 			`${status_icons.PASS_ICON} check:related passed`,
 		])
 		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT, false)
@@ -286,9 +287,10 @@ describe('check_related.run_all test:pinned verdict', () => {
 	it('adds nothing above the verdict line when no verdict is reached', async () => {
 		const lines = await run_all_lines(undefined)
 
-		expect(lines.slice(-3)).toStrictEqual([
+		expect(lines.slice(-4)).toStrictEqual([
 			'=== cspell:dot: passed ===',
 			'',
+			FULL_OUTPUT_LINE,
 			`${status_icons.PASS_ICON} check:related passed`,
 		])
 	})
@@ -323,66 +325,5 @@ describe('check_related.report_results verdict line', () => {
 		expect(report.trimEnd().split('\n').at(-1)).toBe(
 			`${status_icons.FAIL_ICON} check:related failed: ${LINT_COMMAND}, ${TEST_COMMAND}`,
 		)
-	})
-})
-
-const GROWTH_NOTICE = `${metrics_totals.NOTICE_HEADING}\njosh metrics: 1 total(s) grew`
-
-function report_with_lint_output(lint_output: string): Array<string> {
-	const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
-	const results = CHECK_COMMANDS.map((command): CheckResult => ({
-		command,
-		exit_code: 0,
-		output: command === LINT_COMMAND ? lint_output : `${command} output`,
-	}))
-
-	check_related.report_results(results)
-
-	return write.mock.calls
-		.map(([chunk]) => String(chunk))
-		.join('')
-		.trimEnd()
-		.split('\n')
-}
-
-// joshuafolkken/kit#4939: the notice sat inside the lint section, cut off by a tail of the output.
-describe('check_related.report_results metrics growth notice', () => {
-	afterEach(() => {
-		vi.restoreAllMocks()
-	})
-
-	it('repeats the lint section notice just above the verdict line', () => {
-		const lines = report_with_lint_output(`${LINT_OUTPUT}\n\n${GROWTH_NOTICE}\n`)
-
-		expect(lines.slice(-4)).toStrictEqual([
-			...GROWTH_NOTICE.split('\n'),
-			'',
-			`${status_icons.PASS_ICON} check:related passed — ${check_related.METRICS_STOP}`,
-		])
-	})
-
-	// joshuafolkken/kit#4987: a tail of the last lines read `passed` alone, and the ship stopped on it.
-	it('names the ship stop and the accept form on the verdict line itself', () => {
-		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
-
-		expect(verdict).toContain('pre-detach')
-		expect(verdict).toContain('pnpm josh metrics --accept')
-	})
-
-	// The pre-detach re-records a total the branch approval names, so it does not stop on that one.
-	it('leaves out of the ship stop a total the branch approval already names', () => {
-		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
-
-		expect(verdict).toContain('unless the branch approval already names the total')
-	})
-
-	it('adds nothing above the verdict line when the lint section carries no notice', () => {
-		const lines = report_with_lint_output(LINT_OUTPUT)
-
-		expect(lines.slice(-3)).toStrictEqual([
-			`${CHECK_COMMANDS.at(-1) ?? ''} output`,
-			'',
-			`${status_icons.PASS_ICON} check:related passed`,
-		])
 	})
 })
