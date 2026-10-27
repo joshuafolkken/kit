@@ -93,7 +93,7 @@ function decide(_call: unknown, run: GuardRun): boolean {
 const ROUND_ONE_CHECK_RELATED_REASON =
 	"⛔ round-one check:related: round 1's fixes need no `check:related` — ship's pre-detach reruns the " +
 	'scoped pair on the fixed tree; refused on every occurrence. Go on to `pnpm josh run:review --join`; ' +
-	'`--join --fixing` if another brief follows (`.claude/skills/workflow-commands/chain-rule.md` → "A lane child").'
+	'`--join --fixing` while round 1 has fixes to make (`.claude/skills/workflow-commands/chain-rule.md` → "A lane child").'
 
 // It declares no `keeps`: skipping the check is the absence of a call, so the row is reported
 // unmeasured rather than scored on an act that does not exist (`lane-split-park.ts`).
