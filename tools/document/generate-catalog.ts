@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
+import { ALIASES } from '#scripts/josh/josh-aliases'
 import {
-	ALIASES,
 	CATEGORY_ORDER,
 	COMMAND_MAP,
 	type CommandCategory,

@@ -1,4 +1,5 @@
-import { canonical_command, COMMAND_MAP } from './josh-command-map'
+import { canonical_command } from './josh-aliases'
+import { COMMAND_MAP } from './josh-command-map'
 import type { CommandUsage } from './josh-command-types'
 
 // The single renderer of a command's usage. `josh help <command>` prints it and
