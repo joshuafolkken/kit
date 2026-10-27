@@ -13,7 +13,7 @@ const ROWS: ReadonlyArray<StopRule> = [
 		id: 'stop-notify',
 		about: {
 			title: 'Stop notification',
-			topic: '`CLAUDE.md` → "Mid-workflow stop notification"',
+			topic: '`rule-delivery.md` → "stop-notify"',
 			entry: STOP_GUARD,
 			fires:
 				'a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails',

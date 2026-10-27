@@ -127,8 +127,8 @@ const STOP_NOTIFY_REASON =
 	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
 	'Telegram was sent this turn. Send ' +
 	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\' ' +
-	'--recommended "<choice>" --alternative "<choice>"` (`CLAUDE.md` → "Mid-workflow stop ' +
-	'notification"), then confirm in one line that it was sent — do not repeat your previous reply.'
+	'--recommended "<choice>" --alternative "<choice>"` (`rule-delivery.md` → "stop-notify"), ' +
+	'then confirm in one line that it was sent — do not repeat your previous reply.'
 
 // **A clean tree that still holds is a tree the next run will trample.** `working-tree-hold.md`: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop

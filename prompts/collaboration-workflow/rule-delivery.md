@@ -18,6 +18,14 @@
 
 引き金が発火しないターンでは何も起きないのが仕様で、各項目の発火しない状態は「規則が守られている状態」と一致させる。一致が取れない規則は常駐に残す。
 
+## stop-notify — 途中停止の通知（`confirmation`）
+
+`CLAUDE.md` → "Mid-workflow stop notification" の本文（`pnpm josh rule:list` の `stop-notify` 行）。保持中のランが判断待ちで止まるとき、Stop フックの `pnpm josh stop:guard` が `confirmation` を送る — 理由を先頭に、末尾は `Recommended: <choice>`。フックが停止を拒否したときだけ自分で送る:
+
+```bash
+pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
+```
+
 ## 配送は 1 ラン 1 回
 
 配送文はラン 1 回につき 1 度しか出ないので、**「同じ呼び出しをもう一度出せ」と明記する**。例外: 繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）— その配送文にはそれぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する。バッチングと調査の 2 ガードは違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）。前提の証拠を読めないときは拒否する。
