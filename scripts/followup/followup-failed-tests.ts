@@ -26,6 +26,8 @@ const SEGMENT_SEPARATOR = '.'
 const OBSERVATION_SLUG = 'followup-unrelated-test-rerun'
 const OBSERVATION_DEPTH = 'd1'
 const NAME_SEPARATOR = '; '
+const UNNAMED_ISSUE =
+	'Did not record the failed tests outside the change: the branch names no issue to post them on.'
 
 const RERUN_VERDICT = 'rerun'
 const KEPT_VERDICT = 'kept'
@@ -126,7 +128,13 @@ async function record(
 	failures: ReadonlyArray<UnrelatedFailure>,
 	issue: number | undefined,
 ): Promise<void> {
-	if (issue === undefined || failures.length === 0) return
+	if (failures.length === 0) return
+
+	if (issue === undefined) {
+		console.info(`⚠️ ${UNNAMED_ISSUE}`)
+
+		return
+	}
 
 	try {
 		console.info(`📝 Recorded the failed tests outside the change: ${await post(failures, issue)}`)
