@@ -31,6 +31,15 @@ describe('size_estimate.problems', () => {
 		expect(problems).toEqual([expect.stringContaining(MALFORMED_HINT)])
 	})
 
+	// joshuafolkken/kit#5225: the refusal's last line is an example the check admits as pasted.
+	it('ends the malformed refusal in a one-line example it admits', () => {
+		const [found = ''] = size_estimate.problems(body_with('- 規模見積もり: 多い'))
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(example).toMatch(/^- 規模見積もり: 約 /u)
+		expect(size_estimate.problems(body_with(example))).toEqual([])
+	})
+
 	it('accepts a well-formed estimate', () => {
 		expect(size_estimate.problems(UNDER_GUIDE)).toEqual([])
 	})

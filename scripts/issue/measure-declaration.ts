@@ -15,7 +15,9 @@ const DECLARATION = `${PREFIX} \`<command>\` <=|<|>=|> <number>`
 const VALUE_PATTERN =
 	/^`(?<command>[^`\s][^`]*)`\s*(?<operator><=|>=|<|>)\s*(?<threshold>-?\d+(?:\.\d+)?)$/u
 const NUMBER_PATTERN = /^-?\d+(?:\.\d+)?$/u
-const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}`
+// The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
+const EXAMPLE = `${PREFIX} \`pnpm josh lane:net 5168\` <= 40`
+const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const declaration_schema = z.object({
 	command: z.string().trim(),
 	operator: z.enum(['<=', '<', '>=', '>']),

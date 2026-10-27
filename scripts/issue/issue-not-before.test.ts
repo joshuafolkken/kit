@@ -86,6 +86,15 @@ describe('the start-time declaration in issue:lint', () => {
 
 		expect(found).toEqual([expect.stringContaining('YYYY-MM-DDTHH:MMZ')])
 	})
+
+	// joshuafolkken/kit#5225: the refusal's last line is an example the lint admits as pasted.
+	it('ends the refusal in a one-line example the lint admits', () => {
+		const [found = ''] = issue_lint_cli.problems(body_with('- 実施可能日: tomorrow'))
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(example).toMatch(/^- 実施可能日: \d{4}-/u)
+		expect(issue_lint_cli.problems(body_with(example))).toEqual([])
+	})
 })
 
 describe('a start condition written as its own heading in issue:lint', () => {

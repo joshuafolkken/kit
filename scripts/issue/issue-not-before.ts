@@ -13,7 +13,10 @@ const PREFIX = '- 実施可能日:'
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u
 // What `toISOString` writes after the minutes the declaration spells.
 const ISO_TAIL = ':00.000Z'
-const MALFORMED = `\`${PREFIX}\` must be a UTC time written YYYY-MM-DDTHH:MMZ`
+// The refusal ends in a line ready to paste (joshuafolkken/kit#5225); a far-future date, so the
+// example never reads as already due.
+const EXAMPLE = `${PREFIX} 2099-01-01T09:00Z`
+const MALFORMED = `\`${PREFIX}\` must be a UTC time written YYYY-MM-DDTHH:MMZ\n${EXAMPLE}`
 const HEADING_MARKS = /^#{1,6}\s+/u
 // joshuafolkken/kit#4438: a start condition written as its own heading is never read — every reader
 // sees only the declaration line under the background heading — so the issue is offered at once.
