@@ -5,6 +5,8 @@ import { gate_plan } from '#scripts/gate/gate-plan'
 import { gate_skip, type GateReuse } from '#scripts/gate/gate-skip'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { hook_gate_reuse } from '#scripts/gate/hook-gate-reuse'
+import type { PushMissRecord } from '#scripts/lane/lane-ledger-schema'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { pre_push_related_switch } from './pre-push-related-switch'
 
@@ -175,14 +177,26 @@ async function run_related(): Promise<number> {
 	)
 }
 
-async function run_miss(reason: string, extra_arguments: ReadonlyArray<string>): Promise<number> {
+// joshuafolkken/kit#5234: the miss's kind goes to the lane ledger, so `lane:stats` counts the suites a
+// push ran and why beside the gate's own fallbacks.
+async function record_miss(scope: PushMissRecord['scope'], kind: string): Promise<void> {
+	await lane_ledger_write.record_push_miss({ scope, reason: kind })
+}
+
+async function run_miss(
+	reason: string,
+	kind: string,
+	extra_arguments: ReadonlyArray<string>,
+): Promise<number> {
 	if (is_related_requested(extra_arguments)) {
 		process.stdout.write(`${format_related(reason)}\n`)
+		await record_miss('related', kind)
 
 		return await run_related()
 	}
 
 	process.stdout.write(`${format_miss(reason)}\n`)
+	await record_miss('whole', kind)
 
 	return await run_reserved_suite(forwarded_arguments(extra_arguments))
 }
@@ -191,9 +205,17 @@ async function run_pre_push_unit(
 	extra_arguments: ReadonlyArray<string> = [],
 	source?: string,
 ): Promise<number> {
-	const reuse = push_reuse(await read_push_tree(), extra_arguments, source)
+	const tree = await read_push_tree()
+	const reuse = push_reuse(tree, extra_arguments, source)
 
-	if ('miss' in reuse) return await run_miss(reuse.miss, extra_arguments)
+	if ('miss' in reuse) {
+		const kind = hook_gate_reuse.miss_kind(reuse.miss, {
+			carry_miss: tree.carry_miss,
+			force_env: FORCE_ENV,
+		})
+
+		return await run_miss(reuse.miss, kind, extra_arguments)
+	}
 
 	process.stdout.write(`${format_skip(reuse.stamp.taken_at)}\n`)
 

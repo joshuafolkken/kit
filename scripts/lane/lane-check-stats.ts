@@ -1,5 +1,11 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import { lane_ledger, type GateCheckRecord, type GateEntry, type LedgerEntry } from './lane-ledger'
+import {
+	lane_ledger,
+	type GateCheckRecord,
+	type GateEntry,
+	type LedgerEntry,
+	type PushMissEntry,
+} from './lane-ledger'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
@@ -15,7 +21,8 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // would stand for a run that tested nothing.
 //
 // **The fallbacks are broken down by why** in a second table, one row per reason kind, so a slow unit
-// leg can be read as the full suite it ran and the reason it had to.
+// leg can be read as the full suite it ran and the reason it had to. A pre-push hook that ran a suite
+// over a record it could not reuse joins it, prefixed `pre-push <scope>:`.
 
 const DECIMALS = 1
 const WHOLE_GATE_LABEL = 'gate (whole)'
@@ -69,8 +76,21 @@ function whole_gate(gate: GateEntry): GateCheckRecord {
 	}
 }
 
-function fallback_table(checks: ReadonlyArray<GateCheckRecord>): string {
-	const reasons = checks.map((check) => check.fallback).filter((reason) => reason !== undefined)
+function is_push_miss(entry: LedgerEntry): entry is PushMissEntry {
+	return entry.kind === lane_ledger.KIND.PUSH_MISS
+}
+
+// A pre-push hook's miss, told apart from the gate's own fallbacks by its scope (joshuafolkken/kit#5234).
+function push_reason(miss: PushMissEntry): string {
+	return `pre-push ${miss.scope}: ${miss.reason}`
+}
+
+function fallback_table(
+	checks: ReadonlyArray<GateCheckRecord>,
+	misses: ReadonlyArray<PushMissEntry>,
+): string {
+	const fallbacks = checks.map((check) => check.fallback).filter((reason) => reason !== undefined)
+	const reasons = [...fallbacks, ...misses.map((miss) => push_reason(miss))]
 	const kinds = [...new Set(reasons)]
 	const rows = kinds.map((kind) =>
 		lane_stats.to_row([kind, String(reasons.filter((reason) => reason === kind).length)]),
@@ -81,14 +101,15 @@ function fallback_table(checks: ReadonlyArray<GateCheckRecord>): string {
 
 // The period's tables: `entries` is the whole ledger, filtered here to `window`.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const gates = lane_stats.in_window(entries, window).filter(is_gate)
+	const windowed = lane_stats.in_window(entries, window)
+	const gates = windowed.filter(is_gate)
 	const checks = gates.flatMap((gate) => gate.checks ?? [])
 	const rows = [...gates.map((gate) => whole_gate(gate)), ...checks]
 	const labels = [...new Set(rows.map((row) => row.label))]
 
 	return [
 		[...header(COLUMNS), ...labels.map((label) => check_row(label, rows))].join('\n'),
-		fallback_table(checks),
+		fallback_table(checks, windowed.filter(is_push_miss)),
 	].join('\n\n')
 }
 
