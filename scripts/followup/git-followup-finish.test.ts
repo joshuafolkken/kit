@@ -1,3 +1,4 @@
+import { deferred_answer } from '#scripts/git/deferred-answer-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // The run's tail, tested against the module that owns it rather than through the entry point
@@ -154,6 +155,35 @@ describe('print_completion - merge gating', () => {
 		await git_followup_finish.print_completion('42', true)
 
 		expect(vi.mocked(console.info).mock.calls.at(-1)?.[0]).toBe(PENDING_SENTINEL)
+	})
+})
+
+// #5131: the tail after the stage block was a fixed cost no row showed, and its two reads ran in turn.
+describe('print_completion - the completion stage row', () => {
+	it('prints the completion stage row first', async () => {
+		await git_followup_finish.print_completion('42', true)
+
+		const first = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(first.startsWith(`followup stage: completion `)).toBe(true)
+		expect(first.endsWith(' s')).toBe(true)
+	})
+
+	it('starts the pending-release read before the next-issue read settles', async () => {
+		const next_issues = deferred_answer<Array<string>>()
+
+		fetch_next_issue_lines_mock.mockReturnValueOnce(next_issues.promise)
+		const completion = git_followup_finish.print_completion('42', true)
+
+		await vi.waitFor(() => {
+			expect(pending_release_mock).toHaveBeenCalledTimes(1)
+		})
+		next_issues.answer([NEXT_ISSUES_HEADER])
+		await completion
+
+		const printed = vi.mocked(console.info).mock.calls.map((call) => String(call[0]))
+
+		expect(printed.slice(-2)).toStrictEqual([NEXT_ISSUES_HEADER, PENDING_SENTINEL])
 	})
 })
 

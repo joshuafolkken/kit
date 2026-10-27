@@ -967,7 +967,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used.
 
 ```bash
 pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
@@ -978,6 +978,10 @@ pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
 `review-fix` from `run:review` on, each call's span counted from the previous call's end.
+
+Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
+claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
+runs with no `cpu_ms` left out. It only reports: a core weight is changed in its own Issue, from this table.
 
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 

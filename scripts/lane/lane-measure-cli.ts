@@ -10,6 +10,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
+import { lane_claim_stats } from './lane-claim-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
@@ -163,6 +164,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),
 		lane_check_stats.table(entries, window),
+		lane_claim_stats.table(entries, window),
 		lane_test_related_stats.table(entries, window),
 		lane_test_related_stats.trigger_table(entries, window),
 		lane_transcript_stats.table(calls, window),

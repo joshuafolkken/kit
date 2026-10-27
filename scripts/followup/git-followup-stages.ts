@@ -70,6 +70,9 @@ const STAGE = {
 	telegram: 'telegram',
 	telegram_and_merge: 'telegram-and-merge',
 	completion_and_epic_close: 'completion-and-epic-close',
+	// The completion tail `git-followup-finish.ts` prints after this block (#5131): the next-issue list
+	// and the unreleased-merge count. Printed as its own row there, since the block is already out.
+	completion: 'completion',
 	// The lap that was still running when a stage threw. `followup` exits non-zero on an AI-review
 	// blocker and on a red check, and those are the runs whose wait is longest — reporting nothing for
 	// them would leave the measurement blind to exactly the invocations worth measuring.
@@ -172,6 +175,7 @@ const git_followup_stages = {
 	new_log,
 	lap,
 	total_ms,
+	format_stage,
 	format_stages,
 	print_stages,
 	record_waits,

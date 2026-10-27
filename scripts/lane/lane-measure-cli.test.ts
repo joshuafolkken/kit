@@ -217,6 +217,29 @@ describe('lane_measure_cli.run — stats core waits', () => {
 	})
 })
 
+// joshuafolkken/kit#5138: and what each gate check claimed against the cores it used.
+describe('lane_measure_cli.run — stats core claims', () => {
+	it('prints the per-check claim-versus-measured table', async () => {
+		const context = fresh_context()
+		const claim = { requested: 2, granted: 2, waited_ms: 3000 }
+		const check = { label: 'lint', elapsed_ms: 10_000, is_passed: true, cpu_ms: 15_000, claim }
+
+		lane_ledger.append(context.ledger_path, {
+			kind: 'gate',
+			at: AT,
+			elapsed_ms: 10_000,
+			is_passed: true,
+			checks: [check],
+		})
+
+		await lane_measure_cli.run(['stats', '--period', '2'], context)
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| lint | 2.0 | 1 | 1.5 | 1.5 | 1.5 | 3.0 |')
+	})
+})
+
 // joshuafolkken/kit#4064: and why round 2 ran or was skipped.
 describe('lane_measure_cli.run — stats round 2', () => {
 	it('prints the per-verdict-and-code table', async () => {
