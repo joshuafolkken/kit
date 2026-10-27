@@ -2,6 +2,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { error_text } from '#scripts/lib/error-message'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_pinned, type PinnedVerdict } from './run-review-pinned'
 
@@ -115,7 +116,9 @@ async function judge(summary: PinnedSummary, reason: string | undefined): Promis
 
 	if (earlier === undefined) return run_review_pinned.verdict_of(summary, undefined)
 
-	return { kind: 'accepted', text: `${summary.text}${RECORDED_NOTE}${earlier}\n` }
+	const note = `${RECORDED_NOTE}${earlier}\n`
+
+	return { kind: 'accepted', text: test_pinned_logic.report_text(summary, note) }
 }
 
 const run_review_pinned_accepted = { RECORD_NAME, judge, recorded_reason }

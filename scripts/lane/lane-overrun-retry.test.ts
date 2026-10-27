@@ -169,7 +169,7 @@ describe('lane_overrun.investigate — the switch off', () => {
 		])
 	})
 
-	// joshuafolkken/kit#5132: the board hides a row by this reason, so writer and reader share it.
+	// joshuafolkken/kit#5132: the board draws this reason with the switch on, so writer and reader share it.
 	it('notes the skip with the reason the board reads', async () => {
 		vi.stubEnv('JOSH_LANE_INVESTIGATION', undefined)
 		mocks.all_events.mockResolvedValue([failed_launch(1)])

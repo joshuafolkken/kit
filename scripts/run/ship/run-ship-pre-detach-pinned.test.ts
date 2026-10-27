@@ -1,7 +1,7 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
-import type { PinnedReport } from '#scripts/test/test-pinned-logic'
+import { test_pinned_logic, type PinnedReport } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipArguments } from './run-ship-steps'
@@ -278,7 +278,10 @@ describe('run_ship_pre_detach_pinned.pinned_check under --unpinned-ok on a probe
 
 		expect(result).toStrictEqual({
 			code: OK,
-			out: `${test_pinned_record.summary_of(HELD).text}Unpinned accepted by the implementer: ${REASON}\n`,
+			out: test_pinned_logic.report_text(
+				test_pinned_record.summary_of(HELD),
+				`Unpinned accepted by the implementer: ${REASON}\n`,
+			),
 		})
 		expect(run_mock).not.toHaveBeenCalled()
 		expect(on_tree_mock).not.toHaveBeenCalled()

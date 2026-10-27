@@ -8,7 +8,7 @@ import type { LocalRead } from './run-board-read'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#5132: the board reads `JOSH_LANE_INVESTIGATION` as `run:merge` does, and a merged
-// row its merge skipped for the switch hides the skip only while the switch stays off.
+// row hides its skip only while the switch stays off (joshuafolkken/kit#5194: whatever its note).
 
 const { LOCAL, START, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick

@@ -30,6 +30,19 @@ describe('check_related_pinned.notice', () => {
 		expect(check_related_pinned.SHIP_HINT).toContain('--unpinned-ok "<reason>"')
 	})
 
+	// joshuafolkken/kit#5188: the ship form and the full list sit above the counts line, which ends it.
+	it('ends on the counts line, with the ship form and the full list path above it', async () => {
+		const places = 'unpinned scripts/a.ts:10 — green\nunchecked 3 — over the 20-hunk cap\n'
+		const counts = 'unpinned 1 · unchecked 3'
+
+		reached({ text: places, counts, log: { path: 'LOG' }, unpinned: ['a'] })
+		vi.spyOn(run_review_pinned_accepted, 'judge').mockResolvedValue({ kind: 'stop', text: places })
+
+		await expect(check_related_pinned.notice(ROOT)).resolves.toBe(
+			`${places}${check_related_pinned.SHIP_HINT}\nfull output: LOG\n${counts}`,
+		)
+	})
+
 	it('prints nothing when no verdict is reached on this tree', async () => {
 		reached(undefined)
 		const judge = vi.spyOn(run_review_pinned_accepted, 'judge')

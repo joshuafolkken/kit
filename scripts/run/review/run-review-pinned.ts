@@ -1,3 +1,4 @@
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 
 // The round-1 check of `josh run:review` (joshuafolkken/kit#4647): `josh test:pinned` over the change,
@@ -34,14 +35,16 @@ function ok_reason_of(argv: ReadonlyArray<string>): string | undefined {
 	return reason.trim() === '' ? undefined : reason
 }
 
-// The join's answer on the background check, judged by the reason it was launched with.
+// The join's answer on the background check, judged by the reason it was launched with; its note goes
+// above the counts line (`test_pinned_logic.report_text`), so a `tail` keeps what to do.
 function verdict_of(summary: PinnedSummary, reason: string | undefined): PinnedVerdict {
-	const { text } = summary
+	const { report_text } = test_pinned_logic
 
-	if (summary.unpinned.length === 0) return { kind: 'clear', text }
-	if (reason === undefined) return { kind: 'stop', text: `${text}${STOP_NOTE}\n` }
+	if (summary.unpinned.length === 0) return { kind: 'clear', text: report_text(summary) }
+	if (reason === undefined) return { kind: 'stop', text: report_text(summary, `${STOP_NOTE}\n`) }
+	const note = `Unpinned accepted by the implementer: ${reason}\n`
 
-	return { kind: 'accepted', text: `${text}Unpinned accepted by the implementer: ${reason}\n` }
+	return { kind: 'accepted', text: report_text(summary, note) }
 }
 
 const run_review_pinned = { STOP_NOTE, UNPINNED_OK_FLAG, ok_reason_of, verdict_of }

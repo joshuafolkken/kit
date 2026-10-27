@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { PinnedReport } from './test-pinned-logic'
 import { test_pinned_record } from './test-pinned-record'
@@ -27,9 +27,32 @@ afterEach(() => {
 describe('test_pinned_record', () => {
 	it('reduces a report to its printed text and its unpinned places', () => {
 		expect(test_pinned_record.summary_of(REPORT)).toStrictEqual({
-			text: 'unpinned 1 · unchecked 0\nunpinned a.ts:4 — reverting it left every related test green\n',
+			text: 'unpinned a.ts:4 — reverting it left every related test green\n',
+			counts: 'unpinned 1 · unchecked 0',
+			log: undefined,
 			unpinned: [expect.stringMatching(/^a\.ts [\da-f]{16}$/u)],
 		})
+	})
+
+	// joshuafolkken/kit#5188: the printed report folds the unchecked places, so the full list is kept.
+	it('keeps the full list of a report it folds, and reads its path back', () => {
+		const summary = test_pinned_record.summary_of({ ...REPORT, unchecked: [HUNK, HUNK] }, ROOT)
+		const path = summary.log?.path ?? ''
+
+		test_pinned_record.write(TOKEN, summary, ROOT)
+
+		expect(summary.text).toContain('unchecked 2 — over the 20-hunk cap\n')
+		expect(readFileSync(path, 'utf8')).toContain('unchecked a.ts:4 — over the 20-hunk cap')
+		expect(test_pinned_record.read(TOKEN, ROOT)?.log).toStrictEqual({ path })
+		rmSync(path, { force: true })
+	})
+
+	it('keeps no list for a partial answer, since the finished check names the shared one', () => {
+		const summary = test_pinned_record.partial_summary({ ...REPORT, unchecked: [HUNK] }, 'NOTE')
+
+		expect(summary.log).toBeUndefined()
+		expect(summary.text).toMatch(/^NOTE\nunpinned a\.ts:4/u)
+		expect(summary.is_partial).toBe(true)
 	})
 })
 
@@ -80,11 +103,12 @@ describe('test_pinned_record — the record', () => {
 
 	// joshuafolkken/kit#5153: a check cut at its first unpinned hunk is read back as one.
 	it('reads back a cut answer as cut', () => {
-		const summary = test_pinned_record.summary_of({ ...REPORT, cut: [HUNK] })
+		const summary = test_pinned_record.summary_of({ ...REPORT, cut: [HUNK] }, ROOT)
 
 		test_pinned_record.write(TOKEN, summary, ROOT)
 
 		expect(test_pinned_record.read(TOKEN, ROOT)?.is_cut).toBe(true)
+		rmSync(summary.log?.path ?? '', { force: true })
 	})
 
 	it("reads nothing of another launch's answer", () => {

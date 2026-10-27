@@ -1,7 +1,9 @@
+import { gate_log } from '#scripts/gate/gate-log'
+import type { KeptLog } from '#scripts/gate/verification-tail'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { test_pinned_cache_logic } from './test-pinned-cache-logic'
-import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
+import { test_pinned_logic, type PinnedReport, type ReportParts } from './test-pinned-logic'
 
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
 // the printed report and its unpinned count, keyed to the checkout. `run:review` starts the check in
@@ -17,13 +19,16 @@ const TOKEN_KEY_LENGTH = 16
 const SITE_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
 const FIRST_UNPINNED_FLAG = '--first-unpinned'
+const LIST_PREFIX = 'josh-test-pinned-list-'
+const LIST_SUFFIX = '.log'
+const LIST_HEADER = 'josh test:pinned — every unpinned and unchecked place'
 
 type UnpinnedHunk = PinnedReport['unpinned'][number]
 
 // `unpinned` holds one key per unpinned place (`site_of`); an identical place in the same file takes its
 // occurrence number, so a copy added later is a place no record holds.
-interface PinnedSummary {
-	text: string
+// `text`, `counts` and `log` are the printed report's parts (`test_pinned_logic.report_text`).
+interface PinnedSummary extends ReportParts {
 	unpinned: ReadonlyArray<string>
 	// What a check still running reached so far; it is shown, never judged or remembered as the answer.
 	is_partial?: boolean
@@ -43,18 +48,34 @@ function site_of(hunk: UnpinnedHunk): string {
 	return `${place} ${key}`
 }
 
-function summary_of(report: PinnedReport): PinnedSummary {
+// **The full list goes to a log once any place is folded** (joshuafolkken/kit#5188): the printed report
+// counts the unchecked places by reason, so the list is kept where a `tail` cannot cut it.
+function kept_log(report: PinnedReport, root: string): KeptLog | undefined {
+	if (!test_pinned_logic.has_unchecked(report)) return undefined
+	const output = test_pinned_logic.format(report)
+	const target = stamp_file.stamp_path(LIST_PREFIX, root, LIST_SUFFIX)
+
+	return { path: gate_log.write_gate_log([{ header: LIST_HEADER, output }], target) }
+}
+
+function summary_with(report: PinnedReport, log: KeptLog | undefined): PinnedSummary {
 	const summary = {
-		text: test_pinned_logic.report_text(report),
+		...test_pinned_logic.report_parts(report),
+		log,
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
 
 	return report.cut === undefined ? summary : { ...summary, is_cut: true }
 }
 
-// What a check still running has reached so far (joshuafolkken/kit#4936): `note` says the rest is to come.
+function summary_of(report: PinnedReport, root: string = PROJECT_ROOT): PinnedSummary {
+	return summary_with(report, kept_log(report, root))
+}
+
+// What a check still running has reached so far (joshuafolkken/kit#4936): `note` says the rest is to
+// come. It keeps no list: the per-checkout list log is the finished check's, which its record names.
 function partial_summary(report: PinnedReport, note: string): PinnedSummary {
-	const summary = summary_of(report)
+	const summary = summary_with(report, undefined)
 
 	return { ...summary, text: `${note}\n${summary.text}`, is_partial: true }
 }
@@ -80,12 +101,28 @@ function is_text_list(value: unknown): value is Array<string> {
 	return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
+// A kept log's path, absent from the record when its write failed.
+function log_of(value: unknown): KeptLog | undefined {
+	if (typeof value !== 'object' || value === null) return undefined
+	const kept = value as Record<string, unknown>
+
+	return { path: typeof kept['path'] === 'string' ? kept['path'] : undefined }
+}
+
+// The counts line and the log: absent from a check that could not run.
+function tail_of(record: Record<string, unknown>): Pick<PinnedSummary, 'counts' | 'log'> {
+	const { counts, log } = record
+
+	return typeof counts === 'string' ? { counts, log: log_of(log) } : {}
+}
+
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
 	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
+	const summary = { text, unpinned, ...tail_of(record) }
 
-	return is_cut === true ? { text, unpinned, is_cut } : { text, unpinned }
+	return is_cut === true ? { ...summary, is_cut } : summary
 }
 
 function parsed(raw: string): Record<string, unknown> | undefined {

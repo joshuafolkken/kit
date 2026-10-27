@@ -30,6 +30,7 @@ import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
 import { reviewer_foreground } from './reviewer-foreground'
+import { round_one_check_related } from './round-one-check-related'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
@@ -149,6 +150,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		},
 	},
 	raw_field_body.ROW,
+	// Before `piped-verification`, whose rewrite would run under `pipefail` a check that must not run.
+	round_one_check_related.ROW,
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),

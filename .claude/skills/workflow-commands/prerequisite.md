@@ -64,5 +64,5 @@ is (`docs/josh-commands-run.md` → `josh run:pause`). Name the comment's pop in
 
 **Automatic filing is capped at 10 Issues per originating work item** at every entry point;
 `pnpm josh issue:file` refuses the eleventh, and `--found-during <N>` names an origin the checkout
-does not (`docs/josh-commands-backlog.md` → "`josh issue:file`", step 5). On reaching it, stop
+does not (`docs/josh-commands-backlog.md` → "`josh issue:file`", step 2). On reaching it, stop
 and report. `kickoff` is exempt — it never implements, so it never discovers one.
