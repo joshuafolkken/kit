@@ -3,7 +3,7 @@ import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable
 import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
-import type { StopRecord } from '#scripts/lane/lane-ledger'
+import type { StopRecord } from '#scripts/lane/lane-ledger-schema'
 import { run_ship_review, type StopFinding } from './run-ship-review'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 

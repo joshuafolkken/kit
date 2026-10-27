@@ -34,9 +34,17 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 	return { review_interaction: { ...review_interaction, status: interaction_status_mock } }
 })
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_round_one: record_round_one_mock, record_round_two: vi.fn() },
-}))
+vi.mock('#scripts/lane/lane-ledger-write', async (import_original) => {
+	const { lane_ledger_write } = await import_original<Record<'lane_ledger_write', object>>()
+
+	return {
+		lane_ledger_write: {
+			...lane_ledger_write,
+			record_round_one: record_round_one_mock,
+			record_round_two: vi.fn(),
+		},
+	}
+})
 vi.mock('#scripts/review/review-reviewed-tree', () => ({
 	review_reviewed_tree: {
 		discard: discard_mock,

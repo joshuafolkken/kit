@@ -86,7 +86,7 @@ const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
 run_ship_recorded_fixture.isolate()
 
 const { run_ship_cli } = await import('./run-ship-cli')
-const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
@@ -242,7 +242,7 @@ describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
 	it('records the preflight stop of a lane child to the lane ledger', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
 
 		is_lane_child_mock.mockReturnValue(true)
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
@@ -275,7 +275,7 @@ describe('run_ship_cli.run — the preflight refusal beside red pre-detach check
 	})
 
 	it('records the red pre-detach checks beside the unmet preconditions', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
 
 		await run_ship_cli.run([TITLE, '--detach'])
 

@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { lane_ledger, type TestRelatedRecord } from '#scripts/lane/lane-ledger'
+import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
 
@@ -127,7 +128,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 
 // Best-effort, as every ledger write is.
 async function record_run(input: RunInput, result: RunResult, ledger?: string): Promise<void> {
-	await lane_ledger.record_test_related(record_of(input, result), ledger)
+	await lane_ledger_write.record_test_related(record_of(input, result), ledger)
 }
 
 const test_related_record = { record_of, record_run, with_test_count }

@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_ledger } from './test-pinned-ledger'
@@ -13,7 +13,7 @@ afterEach(() => {
 describe('test_pinned_ledger.record', () => {
 	it('writes one test-pinned row with the lane, the held count and each probe', async () => {
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue('5078')
-		const write = vi.spyOn(lane_ledger, 'record_test_pinned').mockResolvedValue()
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
 		await test_pinned_ledger.record(3, [PROBE], 2000)
 
@@ -22,7 +22,7 @@ describe('test_pinned_ledger.record', () => {
 
 	it('leaves the lane out of a run outside a lane', async () => {
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
-		const write = vi.spyOn(lane_ledger, 'record_test_pinned').mockResolvedValue()
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
 		await test_pinned_ledger.record(0, [], 10)
 

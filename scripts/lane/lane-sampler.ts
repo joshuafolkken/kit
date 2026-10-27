@@ -1,4 +1,4 @@
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_load } from './lane-load'
 import type { LaneSpan } from './lane-net-time'
 import { lane_sleep } from './lane-sleep'
@@ -27,7 +27,7 @@ interface MeasureContext {
 async function take(context: MeasureContext = {}): Promise<void> {
 	const at = new Date(context.now_ms ?? Date.now()).toISOString()
 
-	await lane_ledger.record(await lane_load.sample(at), context.ledger_path)
+	await lane_ledger_write.record(await lane_load.sample(at), context.ledger_path)
 }
 
 // A timer tick has no caller to raise into, and a sample that could not be read must never end the run

@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_wake_takeover } from '#scripts/run/wake/run-wake-takeover'
@@ -51,7 +51,7 @@ beforeEach(() => {
 		is_merged: false,
 	})
 	stub_supervisor()
-	vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+	vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(console, 'info').mockReturnValue()
 	run_ship_recorded_fixture.isolate()

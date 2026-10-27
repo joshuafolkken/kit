@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { json_value } from '#scripts/lib/json-value'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { z } from 'zod'
@@ -63,7 +63,7 @@ function write(destination: string, stop: ReviewStop): void {
 	mkdirSync(path.dirname(destination), { recursive: true })
 
 	for (const finding of stop.findings) {
-		lane_ledger.append(destination, {
+		lane_ledger_write.append(destination, {
 			at,
 			issue: stop.issue,
 			stage: stop.stage,

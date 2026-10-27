@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,7 +12,7 @@ const { SHIP_STAGE } = run_event_stream.EVENT_KIND
 
 beforeEach(() => {
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue(undefined)
-	vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue(undefined)
+	vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -29,7 +29,7 @@ describe('run_ship_pre_detach_timed.checks', () => {
 			[SHIP_STAGE, '#4382 pre-detach start'],
 			[SHIP_STAGE, '#4382 pre-detach done'],
 		])
-		expect(vi.mocked(lane_ledger.record_stage).mock.calls[0]?.[0]).toMatchObject({
+		expect(vi.mocked(lane_ledger_write.record_stage).mock.calls[0]?.[0]).toMatchObject({
 			stage: 'pre-detach',
 			issue: Number(ISSUE),
 		})
@@ -42,6 +42,6 @@ describe('run_ship_pre_detach_timed.checks', () => {
 			SHIP_STAGE,
 			'#4382 pre-detach failed',
 		)
-		expect(lane_ledger.record_stage).toHaveBeenCalledOnce()
+		expect(lane_ledger_write.record_stage).toHaveBeenCalledOnce()
 	})
 })

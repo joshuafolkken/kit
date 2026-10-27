@@ -43,8 +43,8 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 	return { review_interaction: { ...review_interaction, status: async () => undefined } }
 })
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_round_one: vi.fn(), record_round_two: vi.fn() },
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_round_one: vi.fn(), record_round_two: vi.fn() },
 }))
 vi.mock('#scripts/review/review-stop-log', () => ({
 	review_stop_log: { record: stop_log_record, read: () => [] },
