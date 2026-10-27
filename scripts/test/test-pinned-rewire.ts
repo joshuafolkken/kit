@@ -22,7 +22,7 @@ interface Token {
 function is_called(api: TypeScriptApi, parent: Node, node: Identifier): boolean {
 	if (!api.isCallExpression(parent) && !api.isNewExpression(parent)) return false
 
-	return parent.expression === node || parent.arguments?.some((item) => item === node) === true
+	return parent.expression === node || parent.arguments?.includes(node) === true
 }
 
 // A read of the name's value: the object of a member access, a callee or an argument. Any other
