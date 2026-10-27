@@ -50,18 +50,27 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	})
 })
 
-// joshuafolkken/kit#5073: declaring the test files as tests (#5072) cut the taint analysis by about 27s
-// on a pull request, not on main, and the SonarQube job still finished after CI, so it was reverted.
+// joshuafolkken/kit#5083: the taint analysis reads production code only once the test files are tests
+// (#5072), judged by the job time rather than by finishing before Checks (#5073).
 describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 	const properties = load_sonar_properties()
-	const exclusions = (properties['sonar.exclusions'] ?? '').split(',').map((entry) => entry.trim())
+	const test_inclusions = (properties['sonar.test.inclusions'] ?? '').split(',')
+	const cpd_exclusions = (properties['sonar.cpd.exclusions'] ?? '').split(',')
+	const exclusions = (properties['sonar.exclusions'] ?? '').split(',')
 
-	it('keeps the test files in the main sources rather than declaring them as tests', () => {
-		expect(exclusions).not.toContain('**/*.test.ts')
-		expect(exclusions).not.toContain('**/*.spec.ts')
-		expect(exclusions).not.toContain('**/*.e2e.ts')
-		expect(properties['sonar.tests']).toBeUndefined()
-		expect(properties['sonar.test.inclusions']).toBeUndefined()
+	it('declares the test files with the test extensions of sonar.cpd.exclusions', () => {
+		const test_patterns = cpd_exclusions.filter((pattern) =>
+			/\.(test|spec|e2e)\.ts$/u.test(pattern),
+		)
+
+		expect(test_inclusions).toStrictEqual(test_patterns)
+		expect(properties['sonar.tests']).toBe('.')
+		// Once sonar.tests is set the scanner no longer defaults sonar.sources to the base directory.
+		expect(properties['sonar.sources']).toBe('.')
+	})
+
+	it('keeps the declared test files out of the main sources', () => {
+		expect(exclusions).toStrictEqual(expect.arrayContaining(test_inclusions))
 	})
 })
 
