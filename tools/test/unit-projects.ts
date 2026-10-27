@@ -1,6 +1,7 @@
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { unit_setup_files } from '#scripts/test/unit-setup-files'
+import { vitest_cli_excludes } from '#scripts/test/vitest-cli-excludes'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
 
@@ -152,20 +153,28 @@ function unit_project(spec: UnitProjectSpec): UnitProject {
 	}
 }
 
-const UNIT_PROJECTS: ReadonlyArray<UnitProject> = [
-	unit_project({
-		name: PURE_PROJECT,
-		include: PURE_FILES,
-		isolate: false,
-		globalSetup: STATE_GUARD,
-	}),
-	unit_project({
-		name: ISOLATED_PROJECT,
-		include: VITEST_INCLUDE_GLOBS,
-		isolate: true,
-		exclude: [...MAIN_EXCLUDE, ...PURE_FILES],
-	}),
-]
+// A command line's `--exclude` narrows both projects (`vitest-cli-excludes.ts`).
+function unit_projects_for(argv: ReadonlyArray<string>): ReadonlyArray<UnitProject> {
+	const excluded = vitest_cli_excludes.cli_excludes(argv)
+
+	return [
+		unit_project({
+			name: PURE_PROJECT,
+			include: PURE_FILES,
+			isolate: false,
+			exclude: excluded,
+			globalSetup: STATE_GUARD,
+		}),
+		unit_project({
+			name: ISOLATED_PROJECT,
+			include: VITEST_INCLUDE_GLOBS,
+			isolate: true,
+			exclude: [...MAIN_EXCLUDE, ...PURE_FILES, ...excluded],
+		}),
+	]
+}
+
+const UNIT_PROJECTS: ReadonlyArray<UnitProject> = unit_projects_for(process.argv)
 
 const unit_projects = {
 	...unit_setup_files,
@@ -177,6 +186,7 @@ const unit_projects = {
 	PURE_PROJECT,
 	UNIT_PROJECTS,
 	unit_environment,
+	unit_projects_for,
 }
 
 export type { UnitProject, UnitProjectTest }

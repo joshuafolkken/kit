@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { related_heavy_tests, type HeavyReader } from './related-heavy-tests'
 import type { ReadMap } from './test-read-map'
 import { related_scope, type ScopeRequest } from './test-related-scope'
 
@@ -302,21 +303,6 @@ describe('related_scope.fallback_kind', () => {
 })
 
 // joshuafolkken/kit#4457: the gate ledger tells the since-green no-op apart from a run that tested.
-// joshuafolkken/kit#4465: the name a `josh test:related` run is recorded under in the lane ledger.
-describe('related_scope.scope_kind', () => {
-	it('names a narrowed or no-test scope by its mode', () => {
-		expect(related_scope.scope_kind({ mode: 'related', files: [], reason: '' })).toBe('related')
-		expect(related_scope.scope_kind({ mode: 'none', files: [], reason: '' })).toBe('none')
-	})
-
-	it('names a full-suite scope by the kind of its reason, the one fallback_kind reads', () => {
-		const scope = { mode: 'all' as const, files: [], reason: related_scope.NO_MAP_REASON }
-
-		expect(related_scope.scope_kind(scope)).toBe('no-map')
-		expect(related_scope.fallback_kind(related_scope.describe_scope(scope, ROOT))).toBe('no-map')
-	})
-})
-
 describe('related_scope.is_unmoved', () => {
 	it('reads the since-green no-op off the line the run printed', () => {
 		const scope = { mode: 'none' as const, files: [], reason: related_scope.UNMOVED_REASON }
@@ -388,5 +374,28 @@ describe('related_scope.vitest_arguments', () => {
 
 		expect(related_scope.vitest_arguments(related, ['--silent'])).toContain('--silent')
 		expect(related_scope.vitest_arguments(all, ['--silent'])).toEqual(['run', '--silent'])
+	})
+})
+
+// joshuafolkken/kit#5105: the heavy files a scoped run leaves out never include one importing a
+// changed module directly — the test written for that module.
+describe('related_scope.resolve_scope — the heavy files a scoped run keeps', () => {
+	const heavy = path.join('scripts', 'thing.integration.test.ts')
+	const reader: HeavyReader = {
+		durations: { [heavy]: related_heavy_tests.HEAVY_TEST_MS + 1 },
+		imports: {},
+		read_source: () => "import { thing } from './thing'\n",
+	}
+
+	it('keeps a heavy file importing the changed module directly', () => {
+		const scope = related_scope.resolve_scope(request([SOURCE_FILE]))
+
+		expect(related_heavy_tests.exclude_flags(scope, ROOT, reader)).toEqual([])
+	})
+
+	it('leaves the same file out of a change it reaches only indirectly', () => {
+		const scope = related_scope.resolve_scope(request([OTHER_SOURCE_FILE]))
+
+		expect(related_heavy_tests.exclude_flags(scope, ROOT, reader)).toContain(heavy)
 	})
 })

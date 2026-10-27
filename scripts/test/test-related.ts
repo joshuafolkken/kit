@@ -10,6 +10,7 @@ import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { pure_files_entries } from './pure-files-entries'
+import { related_heavy_tests } from './related-heavy-tests'
 import { test_declared_logic } from './test-declared-logic'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
@@ -332,7 +333,10 @@ async function run_scope(
 
 	return await test_unit_guard.run_guarded_vitest(
 		process.cwd(),
-		related_scope.vitest_arguments(scope, changed_file_scope.flags_of(command_arguments)),
+		related_scope.vitest_arguments(scope, [
+			...changed_file_scope.flags_of(command_arguments),
+			...related_heavy_tests.exclude_flags(scope, root),
+		]),
 		related_scope.COMMAND_NAME,
 		description,
 	)

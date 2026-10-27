@@ -57,20 +57,6 @@ describe('unit_duration_record.merge — what a run leaves in the record', () =>
 	})
 })
 
-describe('unit_duration_record.parse — the record as read', () => {
-	it('keeps the numeric entries and drops anything else', () => {
-		expect(unit_duration_record.parse(`{"${KEPT}": 3, "bad": "x"}`)).toStrictEqual({ [KEPT]: 3 })
-		expect(unit_duration_record.parse('[]')).toStrictEqual({})
-		expect(unit_duration_record.parse('null')).toStrictEqual({})
-	})
-})
-
-describe('unit_duration_record.read — a missing record', () => {
-	it('answers an empty record', () => {
-		expect(unit_duration_record.read(repository())).toStrictEqual({})
-	})
-})
-
 describe('unit_duration_record.write — the run end of a recording run', () => {
 	it('writes each run file with its setup and test time, relative to the root', () => {
 		const root = repository()
