@@ -74,18 +74,17 @@ describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 	})
 })
 
-// joshuafolkken/kit#5084: the new taint engine re-analyzes every file on any change; the legacy one
-// keeps a per-file cache, and the taint rules stay on.
+// joshuafolkken/kit#5093: neither `sonar.jasmin.internal.*` key switched to a legacy engine —
+// `.disabled` left JsSecuritySensorV2 running (#5091), `.js.ts.disabled` turned the taint analysis off.
 describe(`${SONAR_PROPERTIES_FILE} taint engine`, () => {
 	const properties = load_sonar_properties()
 
-	it('runs the taint analysis on the legacy engine', () => {
-		expect(properties['sonar.jasmin.internal.js.ts.disabled']).toBe('true')
-	})
+	it('leaves the taint analysis on', () => {
+		const jasmin_keys = Object.keys(properties).filter((key) =>
+			key.startsWith('sonar.jasmin.internal.'),
+		)
 
-	// joshuafolkken/kit#5091: this key left JsSecuritySensorV2 running.
-	it('drops the key that did not switch the engine', () => {
-		expect(properties['sonar.jasmin.internal.disabled']).toBeUndefined()
+		expect(jasmin_keys).toEqual([])
 	})
 
 	it('keeps the taint rules analyzed on every file', () => {
