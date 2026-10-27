@@ -40,8 +40,8 @@ Review results and successful pushes are never turn boundaries.
 4. Route the attested verdict mechanically:
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
    - High/Medium round 1: fix it, then ask `pnpm josh review:round2 --round-1-closed`. On `skip`, record
-     the skip on the Issue. On `required`, open the PR first and run the verification pass from
-     `pnpm josh review:brief --round 2` beside CI, as `reviewer-verification`.
+     the skip on the Issue. On `required`, open the PR first and run round 2 from
+     `pnpm josh review:brief --round 2` beside CI as `reviewer-verification` (`kit:` in a consumer).
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.
