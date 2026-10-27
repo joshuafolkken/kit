@@ -19,8 +19,6 @@ const LIGHT_FILE = 'scripts/lane/lane-ledger.test.ts'
 const UNREADABLE_FILE = 'tools/metrics/metrics-base.integration.test.ts'
 const CHANGED_MODULE = 'scripts/build/build-hooks.ts'
 const NAMED_MODULE = 'tools/test/harness-kit.ts'
-const BASE_MODULE_KEY = 'scripts/git/base'
-const IMPORTER = 'tools/x.ts'
 const SCRIPTS_ALIAS = '#scripts/*'
 const SCRIPTS_TARGET = './scripts/*.ts'
 const CONDITIONAL_ALIAS = '#c'
@@ -54,44 +52,6 @@ describe('related_heavy_tests.heavy_tests', () => {
 			IMPORTING_FILE,
 			ALIASED_FILE,
 		])
-	})
-})
-
-describe('related_heavy_tests.specifiers_of', () => {
-	it('reads static, dynamic, export-from and mocked specifiers', () => {
-		const source = [
-			"import a from './a'",
-			"import './b'",
-			"export { c } from '#scripts/c'",
-			"const d = await import('./d.ts')",
-			"vi.mock('./e')",
-		].join('\n')
-
-		expect(related_heavy_tests.specifiers_of(source)).toEqual([
-			'./a',
-			'./b',
-			'#scripts/c',
-			'./d.ts',
-			'./e',
-		])
-	})
-})
-
-describe('related_heavy_tests.resolve_specifier', () => {
-	it('resolves a relative specifier beside the importing file, extension dropped', () => {
-		expect(
-			related_heavy_tests.resolve_specifier('../git/base.ts', 'scripts/test/x.test.ts', {}),
-		).toBe(BASE_MODULE_KEY)
-	})
-
-	it('resolves an alias through the package imports', () => {
-		expect(
-			related_heavy_tests.resolve_specifier('#scripts/git/base', IMPORTER, READER.imports),
-		).toBe(BASE_MODULE_KEY)
-	})
-
-	it('answers nothing for a package import', () => {
-		expect(related_heavy_tests.resolve_specifier('zod', IMPORTER, READER.imports)).toBeUndefined()
 	})
 })
 

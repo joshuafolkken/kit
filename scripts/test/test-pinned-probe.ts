@@ -1,12 +1,15 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
+import { direct_importers } from './direct-importers'
+import { related_heavy_tests } from './related-heavy-tests'
 import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
 import { test_pinned_ledger, type ProbeTime } from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
+import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_worker_share } from './unit-worker-share'
 
@@ -19,6 +22,7 @@ import { unit_worker_share } from './unit-worker-share'
 
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
+const NO_TEST: RedProbe = { verdict: 'no-test', failed: [], ran: 0 }
 
 // One hunk to probe, with the index of its verdict among the caller's hunks.
 interface Probe {
@@ -29,11 +33,37 @@ interface Probe {
 
 type OnVerdict = (index: number, verdict: RedProbe) => Promise<void>
 
-function selection_of(probe: Probe, workers: number): Array<string> {
+// A hunk's related tests in the tree at `root`, narrowed by `josh test:related`'s rule
+// (joshuafolkken/kit#5122): a file every test imports reaches the test files importing it directly, not
+// the whole suite, and the heavy files a hunk reaches only indirectly are left out. `undefined` when the
+// hunk reaches no test.
+async function related_selection(
+	root: string,
+	file: string,
+): Promise<ReadonlyArray<string> | undefined> {
+	const importers = await direct_importers.every_test_importers(root, [file])
+	const files = importers.get(file) ?? [file]
+
+	if (files.length === 0) return undefined
+
+	// vitest is handed the paths relative to the tree it runs in, as the exclusion reads them.
+	const scope: RelatedScope = { mode: 'related', files, reason: '' }
+	const placed: RelatedScope = { ...scope, files: files.map((test) => path.join(root, test)) }
+
+	return related_scope.vitest_arguments(scope, related_heavy_tests.exclude_flags(placed, root))
+}
+
+async function selection_of(
+	root: string,
+	probe: Probe,
+	workers: number,
+): Promise<Array<string> | undefined> {
 	const tests =
 		probe.recheck === undefined
-			? ['related', probe.hunk.file, '--run']
+			? await related_selection(root, probe.hunk.file)
 			: ['run', ...probe.recheck.recheck]
+
+	if (tests === undefined) return undefined
 
 	return [...tests, ...unit_worker_share.worker_arguments([], workers)]
 }
@@ -41,13 +71,17 @@ function selection_of(probe: Probe, workers: number): Array<string> {
 // The verdict with this one hunk reverted. The file is put back before the next hunk runs, or that
 // hunk's tests would also see this revert.
 async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
+	const selection = await selection_of(tree.tree, probe, workers)
+
+	if (selection === undefined) return NO_TEST
+
 	const target = path.join(tree.tree, probe.hunk.file)
 	const content = await readFile(target, 'utf8')
 
 	await writeFile(target, test_pinned_logic.revert(content, probe.hunk))
 
 	try {
-		const verdict = await test_red.probe_in(tree, selection_of(probe, workers))
+		const verdict = await test_red.probe_in(tree, selection)
 
 		return probe.recheck === undefined
 			? verdict
@@ -130,7 +164,7 @@ async function checked_on(
 	return verdicts
 }
 
-const test_pinned_probe = { checked_on }
+const test_pinned_probe = { checked_on, selection_of }
 
 export type { Probe }
 export { test_pinned_probe }
