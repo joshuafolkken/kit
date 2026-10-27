@@ -56,7 +56,7 @@ Invoking `fullrun` is itself the explicit authorization to merge.
   reflexively: a SHA pin flagged "not matching the tag" is checked with `gh api
   repos/<owner>/<repo>/commits/<tag> --jq '.sha'`, and the bypass cites that command.
 - **The merge is `followup`'s, not yours** — `.claude/settings.json` refuses `gh pr merge` and its
-  `gh api` spellings (`CLAUDE.md` → "Git Rules"). Do **not** pass `--delete-branch` unless asked.
+  `gh api` spellings (`operating-rules.md` → "git-rules"). Do **not** pass `--delete-branch` unless asked.
 - **A failed merge** (branch protection, a conflict) is reported and stops the run — never retried with
   other flags. To skip the merge, use `kickoff` or say "do not merge" in the same turn and pass
   `--no-merge`.

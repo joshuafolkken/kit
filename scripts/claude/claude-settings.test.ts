@@ -379,10 +379,13 @@ describe('docs/maintainers/sync-rationale.md — deny rationale', () => {
 // joshuafolkken/kit#2896, `docs/maintainers/sync-rationale.md`) and the Japanese
 // workflow prompt (both pinned by the suites below); what stays resident in `CLAUDE.md` is the
 // criterion a no-hook agent cannot infer from the deny list — the deny is narrower than the rule, and
-// the tool letting a command through is not permission.
-const AI_DOC_MARKERS: ReadonlyArray<string> = [
-	'the deny is narrower than the rule',
-	'never read "the tool let me" as permission',
+// the tool letting a command through is not permission. joshuafolkken/kit#5165 moved that criterion
+// with the rest of the Git Rules body to `operating-rules.md` → "git-rules", the source the hook rows
+// cite; `CLAUDE.md` keeps the pointer.
+const GIT_RULES_SOURCE = 'prompts/collaboration-workflow/operating-rules.md'
+const GIT_RULES_MARKERS: ReadonlyArray<string> = [
+	'deny は規則より狭い',
+	'ツールが通したことを許可と読まない',
 ]
 
 // joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
@@ -416,11 +419,17 @@ describe('pnpm josh rule:list — guard rows the workflow prompt points at', () 
 	})
 })
 
-describe.each(AI_DOCS)('%s — deny rule reaches every paired doc', (document_path) => {
-	const content = read_repo_file(document_path)
+describe(`${GIT_RULES_SOURCE} — the deny rule reaches the Git Rules source`, () => {
+	const content = read_repo_file(GIT_RULES_SOURCE)
 
-	it.each(AI_DOC_MARKERS)('states %j', (marker) => {
+	it.each(GIT_RULES_MARKERS)('states %j', (marker) => {
 		expect(content).toContain(marker)
+	})
+})
+
+describe.each(AI_DOCS)('%s — points at the Git Rules source', (document_path) => {
+	it('names operating-rules.md → "git-rules"', () => {
+		expect(read_repo_file(document_path)).toContain(`\`${GIT_RULES_SOURCE}\` → "git-rules"`)
 	})
 })
 

@@ -40,7 +40,7 @@
   - fires: `pnpm josh pretool:guard` — a `Bash` whose only purpose is waiting (`sleep` alone, or `echo` / `:` / `date`) while a timer is live or before the interval. Every occurrence
   - silent: no hand-made wait timer — `run:progress` holds the one clock
   - not automated: the right act is another command, whose arguments the call does not carry
-- **Test declaration** (`test-declared`, `CLAUDE.md` → Code Change Rules)
+- **Test declaration** (`test-declared`, `testing-guide.md` → "0. Per-Requirement Test Coverage (MANDATORY)")
   - fires: `pnpm josh pretool:guard` — `pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`
   - silent: `exempt` (non-runtime only) or `satisfied` (tests included)
   - not automated: the right act is another command, whose arguments the call does not carry
@@ -100,7 +100,7 @@
   - fires: `pnpm josh pretool:guard` — a dispatched lane child's `Read` of a `tool-results/<id>.txt` file with no `offset` or `limit`. Every occurrence
   - silent: not a lane child, another file, or a paginated `Read`
   - not automated: the right act is another command, whose arguments the call does not carry
-- **Bare `pnpm josh git`** (`josh-git-bare`, `CLAUDE.md` → Git Rules)
+- **Bare `pnpm josh git`** (`josh-git-bare`, `operating-rules.md` → "git-rules")
   - fires: `pnpm josh pretool:guard` — `pnpm josh git` without `-y`, whose staging prompt cancels with no TTY. Every occurrence
   - silent: `pnpm josh git -y`
   - not automated: the right act is another command, whose arguments the call does not carry
@@ -128,11 +128,11 @@
   - fires: `pnpm josh pretool:guard` — a `Read`, `Edit` or `Write` of `.env` (or a shell read or write of it), or an `Edit` / `Write` of `.claude/settings.json` outside kit. Every occurrence
   - silent: kit itself, or the user's `~/.claude/settings.json`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
-- **Direct PR creation** (`direct-pr-create`, `CLAUDE.md` → Git Rules)
+- **Direct PR creation** (`direct-pr-create`, `operating-rules.md` → "git-rules")
   - fires: `pnpm josh pretool:guard` — `gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence
   - silent: `pnpm josh pr`, or reading a PR — the path that writes `closes #N`
   - not automated: the right act is another command, whose arguments the call does not carry
-- **Direct PR merge** (`pr-merge`, `CLAUDE.md` → Git Rules)
+- **Direct PR merge** (`pr-merge`, `operating-rules.md` → "git-rules")
   - fires: `pnpm josh pretool:guard` — `gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence
   - silent: `pnpm josh followup` and `pnpm josh observations:flush`, which merge in their own process
   - not automated: the right act is another command, whose arguments the call does not carry
@@ -164,7 +164,7 @@
   - fires: `pnpm josh pretool:guard` — the `Read` / `Bash` that makes the third read of a file the run will not edit; fires **again** once reads pile up to the threshold again
   - silent: reads under the threshold — nothing to delegate yet
   - not automated: the right act is another command, whose arguments the call does not carry
-- **Stop notification** (`stop-notify`, `CLAUDE.md` → "Mid-workflow stop notification")
+- **Stop notification** (`stop-notify`, `rule-delivery.md` → "stop-notify")
   - fires: `pnpm josh stop:guard` — a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails
   - silent: no hold, a `confirmation` notify on the tail, or a pre-gate cut taken
   - not automated: the hook sends the notify itself; it blocks only when the send fails
