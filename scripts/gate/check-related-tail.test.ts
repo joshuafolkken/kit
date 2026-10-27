@@ -97,7 +97,7 @@ describe('check_related.report_results metrics accept', () => {
 	it('tells the reader the accept needs no check:related re-run', () => {
 		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
 
-		expect(verdict).toContain('no `check:related` re-run after it')
+		expect(verdict).toContain('the accept needs no `check:related` re-run')
 	})
 })
 
