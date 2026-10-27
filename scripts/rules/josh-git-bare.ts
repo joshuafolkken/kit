@@ -68,7 +68,7 @@ const ROW = {
 	decide: (): boolean => true,
 	about: {
 		title: 'Bare `pnpm josh git`',
-		topic: '`CLAUDE.md` → Git Rules',
+		topic: '`operating-rules.md` → "git-rules"',
 		fires:
 			'`pnpm josh git` without `-y`, whose staging prompt cancels with no TTY. Every occurrence',
 		quiet: '`pnpm josh git -y`',

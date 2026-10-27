@@ -40,9 +40,8 @@ describe('rule-delivery.md — the Stop hook is a second entry on the one founda
 })
 
 describe('stop_rules — each delivered text names its single source', () => {
-	it('the stop notification reason points at the CLAUDE.md rule', () => {
-		expect(stop_rules.STOP_NOTIFY_REASON).toContain('Mid-workflow stop notification')
-		expect(stop_rules.STOP_NOTIFY_REASON).toContain('CLAUDE.md')
+	it('the stop notification reason points at rule-delivery.md', () => {
+		expect(stop_rules.STOP_NOTIFY_REASON).toContain('`rule-delivery.md` → "stop-notify"')
 	})
 
 	it('the hold release reason points at working-tree-hold.md', () => {

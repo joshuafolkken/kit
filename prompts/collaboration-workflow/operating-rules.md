@@ -11,9 +11,18 @@
 - 修正できたら修正内容を、できなかったら失敗チェック名・原因・未解決である旨を `--notify-message` に書く。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告でも失敗を「成功」として扱わない
 
+### git-rules — コミット・共有状態・index・PR
+
+`CLAUDE.md` → "Git Rules" の本文。フックが拒否・書き換えする（`pnpm josh rule:list` の `josh-git-bare`・`direct-pr-create`・`pr-merge` 行と `.claude/settings.json` の deny）。
+
+- **コミットは指示されたときだけ。** マージ・ブランチ削除・force push などの共有状態の変更は、そのターンで指示されたときだけ。例外は `fullrun` / `backlogrun` の起動で、`pnpm josh followup` 経由のマージを認める（`prrun` は認めない）。deny は規則より狭い — ツールが通したことを許可と読まない
+- **git index は自分の判断で変えない** — 明示の指示か `pnpm josh git` 経由だけ（下記 "no-self-staging"）
+- **コミットは `pnpm josh git`、PR は `pnpm josh pr`** — `gh pr create` の直接実行は `direct-pr-create` 行が拒否する。GitHub 操作は `gh api`（REST） — [`gh-rest.md`](./gh-rest.md)
+- **作業ツリーの前提で動く前に `git status`（と `git stash list`）をその場で実行する**
+
 ### 指示されていない行動は取らない
 
-`CLAUDE.md` → "Git Rules" の細則。対象には共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更も含む。
+上記 "git-rules" の細則。対象には共有ブランチへの push・外部通知の追加送信・リポジトリ設定の変更も含む。
 
 - auto-merge の本文は [`followup.md`](../../.claude/skills/workflow-commands/followup.md)、`backlogrun` の子への継承は [`backlogrun-child.md`](../../.claude/skills/workflow-commands/backlogrun-child.md)
 - `kickoff` / `pnpm josh followup` 単独実行は文書化されたスコープで終了する。PR が OPEN のまま完了したら状態を報告して停止する
@@ -23,7 +32,7 @@
 
 ### no-self-staging — git index を勝手に変更しない（自律 staging の禁止）
 
-`CLAUDE.md` → "Git Rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない。
+上記 "git-rules" の細則。index には履歴がなく、上書きされたステージ状態は復元できない。
 
 - **調査目的の staging はしない。** 読み取り専用コマンドを使う: `git status --short`、`git diff` / `git diff --stat` / `git diff HEAD`、`git diff --staged`、未追跡ファイルは `git diff --no-index /dev/null <new-file>` か直接読む
 - staging してよいのは次の 2 ケースだけ。それ以外は実行せずに確認する:
