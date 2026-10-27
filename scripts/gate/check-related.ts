@@ -9,6 +9,7 @@ import run_parallel from 'run-parallel'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import { check_related_section, type CheckResult } from './check-related-section'
+import { check_related_unplanned } from './check-related-unplanned'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
@@ -172,6 +173,7 @@ function report_reused(reused: ReadonlySet<string>): void {
 
 interface ReportOptions {
 	pinned_notice?: string | undefined
+	unplanned_notice?: string | undefined
 	reused?: ReadonlySet<string>
 	log_target?: string
 	is_full?: boolean
@@ -194,7 +196,7 @@ function report_results(results: ReadonlyArray<CheckResult>, options: ReportOpti
 
 	const metrics = metrics_notice(results)
 
-	report_notices([metrics, pinned_notice])
+	report_notices([metrics, pinned_notice, options.unplanned_notice])
 
 	const log = { path: write_log(results, log_target) }
 	const verdict = verdict_line(results, metrics !== undefined, reused)
@@ -231,6 +233,7 @@ async function run_all(
 	report_results(results, {
 		is_full,
 		pinned_notice: await check_related_pinned.notice(root, is_started),
+		unplanned_notice: await check_related_unplanned.notice(),
 		reused,
 	})
 

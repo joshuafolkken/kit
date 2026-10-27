@@ -90,5 +90,6 @@ export type {
 	TestRelatedRecord,
 	UnitFileRecord,
 	UnitFilesEntry,
+	UnplannedNoticeEntry,
 } from './lane-ledger-schema'
 export { lane_ledger }
