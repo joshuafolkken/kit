@@ -1,4 +1,3 @@
-import { spawnSync } from 'node:child_process'
 import {
 	existsSync,
 	mkdirSync,
@@ -13,6 +12,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { ESLINT_CACHE_FILE, ESLINT_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import type { BufferedProcessResult } from '#scripts/lib/buffered-process'
+import { execa } from 'execa'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
 
@@ -67,25 +67,27 @@ writeFileSync(path.join(project, 'tsconfig.json'), JSON.stringify(TSCONFIG))
 writeFileSync(path.join(project, CALLER), CALLER_SOURCE)
 writeFileSync(path.join(project, REFERENCED), TYPED_VALUE)
 
-// A process of its own per run: the type program a process builds is kept for its lifetime.
-function run_eslint(cache_flags: ReadonlyArray<string>): BufferedProcessResult {
+// A process of its own per run: the type program a process builds is kept for its lifetime. An
+// uncached run (`UNCACHED_FLAGS` names no `--cache`) reads and writes no cache file, so it starts
+// beside a cached one.
+async function run_eslint(cache_flags: ReadonlyArray<string>): Promise<BufferedProcessResult> {
 	const eslint_bin = path.join(
 		path.dirname(createRequire(import.meta.url).resolve('eslint/package.json')),
 		'bin/eslint.js',
 	)
-	const child = spawnSync(
+	const child = await execa(
 		process.execPath,
 		[eslint_bin, '--config', config_file, ...cache_flags, CALLER],
-		{ cwd: project, encoding: 'utf8' },
+		{ cwd: project, reject: false, stripFinalNewline: false },
 	)
 
-	return { output: child.stdout, exit_code: child.status ?? undefined, elapsed_ms: 0 }
+	return { output: child.stdout, exit_code: child.exitCode, elapsed_ms: 0 }
 }
 
 async function run_guarded(): Promise<BufferedProcessResult> {
 	return await eslint_cache_dependencies.guard(
 		ESLINT_CACHE_FILE,
-		async () => run_eslint(ESLINT_CACHE_FLAGS),
+		async () => await run_eslint(ESLINT_CACHE_FLAGS),
 		project,
 	)
 }
@@ -112,16 +114,20 @@ describe('eslint_cache_dependencies.guard — the imports unchanged', () => {
 })
 
 describe('eslint_cache_dependencies.guard — only the imported file changed', () => {
-	it('is the stale green an unguarded cached run answers', () => {
+	it('is the stale green an unguarded cached run answers', async () => {
 		writeFileSync(path.join(project, REFERENCED), ANY_VALUE)
 
-		expect(run_eslint(ESLINT_CACHE_FLAGS).exit_code).toBe(0)
-		expect(run_eslint(UNCACHED_FLAGS).output).toContain(UNSAFE_ASSIGNMENT_RULE)
+		const [cached, uncached] = await Promise.all([
+			run_eslint(ESLINT_CACHE_FLAGS),
+			run_eslint(UNCACHED_FLAGS),
+		])
+
+		expect(cached.exit_code).toBe(0)
+		expect(uncached.output).toContain(UNSAFE_ASSIGNMENT_RULE)
 	})
 
 	it('answers red as the uncached run does', async () => {
-		const uncached = run_eslint(UNCACHED_FLAGS)
-		const guarded = await run_guarded()
+		const [uncached, guarded] = await Promise.all([run_eslint(UNCACHED_FLAGS), run_guarded()])
 
 		expect(guarded.exit_code).toBe(uncached.exit_code)
 		expect(guarded.exit_code).toBe(1)
