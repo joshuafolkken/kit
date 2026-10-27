@@ -232,6 +232,49 @@ describe('lane_stop_stats.table — the unmet preconditions', () => {
 	})
 })
 
+// joshuafolkken/kit#5203: an `unplanned` stop after the same issue's `check:related` printed the answer
+// counts apart, so the stops the earlier notice did not prevent are a number.
+function notice(minutes_before: number, issue = ISSUE): LedgerEntry {
+	return {
+		kind: 'unplanned-notice',
+		at: minutes_before_now(minutes_before),
+		issue,
+		files: ['scripts/gate/gate-plan.ts'],
+	}
+}
+
+function unplanned_stop(minutes_before: number, issue = ISSUE): LedgerEntry {
+	return {
+		kind: 'stop',
+		at: minutes_before_now(minutes_before),
+		issue,
+		reason: PREFLIGHT,
+		preconditions: ['unplanned'],
+	}
+}
+
+describe('lane_stop_stats.table — an unplanned stop after the check:related notice', () => {
+	it('counts an unplanned stop after the notice as noticed, one before it or on another issue as not', () => {
+		const entries = [
+			notice(40),
+			unplanned_stop(30),
+			unplanned_stop(50),
+			unplanned_stop(20, OTHER_ISSUE),
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('unplanned 2, unplanned (noticed) 1')
+	})
+
+	it('leaves every other precondition of a noticed stop as it is', () => {
+		const entries = [
+			notice(40),
+			{ ...stop(PREFLIGHT, 30), preconditions: [LIVE_EVIDENCE, 'unplanned'] },
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('live-evidence 1, unplanned (noticed) 1')
+	})
+})
+
 // joshuafolkken/kit#4426: a review stop counts under each kind of blocking finding it listed, so the
 // kind worth catching before the review is a number; a stop no finding decided counts under its cause.
 describe('lane_stop_stats.table — the blocking finding kinds', () => {

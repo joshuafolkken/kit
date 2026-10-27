@@ -19,6 +19,7 @@ import {
 	type TestPinnedRecord,
 	type TestRelatedRecord,
 	type UnitFileRecord,
+	type UnplannedNoticeRecord,
 } from './lane-ledger-schema'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
@@ -197,6 +198,13 @@ async function record_split_filed(filed: SplitFiledRecord, path?: string): Promi
 	await record({ kind: KIND.SPLIT_FILED, at: now_iso(), ...filed }, path)
 }
 
+async function record_unplanned_notice(
+	notice: UnplannedNoticeRecord,
+	path?: string,
+): Promise<void> {
+	await record({ kind: KIND.UNPLANNED_NOTICE, at: now_iso(), ...notice }, path)
+}
+
 const lane_ledger_write = {
 	CI_WAIT_STAGE,
 	CODERABBIT_RATE_LIMIT_STAGE,
@@ -225,6 +233,7 @@ const lane_ledger_write = {
 	record_test_pinned,
 	record_test_related,
 	record_unit_files,
+	record_unplanned_notice,
 	target,
 	target_of,
 }

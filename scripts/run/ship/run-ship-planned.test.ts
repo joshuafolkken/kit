@@ -55,6 +55,25 @@ describe('run_ship_planned.unplanned_of', () => {
 	})
 })
 
+// joshuafolkken/kit#5203: `check:related` reads the same answer, with the issue and the files it records.
+describe('run_ship_planned.unplanned', () => {
+	it('returns the issue, the unplanned files and the problem text the preflight prints', async () => {
+		const found = await run_ship_planned.unplanned()
+
+		expect(found).toMatchObject({ issue: ISSUE, files: [UNPLANNED] })
+		expect([found?.text]).toStrictEqual(await run_ship_planned.problems())
+	})
+
+	it('returns undefined for a lane with no plan record, or with only test and document changes', async () => {
+		read_mock.mockReturnValueOnce(undefined)
+
+		await expect(run_ship_planned.unplanned()).resolves.toBeUndefined()
+		paths_mock.mockResolvedValue(NON_CODE)
+
+		await expect(run_ship_planned.unplanned()).resolves.toBeUndefined()
+	})
+})
+
 describe('run_ship_planned.problems', () => {
 	it('names the unplanned file and the re-plan command listing every path', async () => {
 		const [problem] = await run_ship_planned.problems()

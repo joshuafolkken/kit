@@ -48,7 +48,9 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
-vi.mock('./run-ship-planned', () => ({ run_ship_planned: { problems: planned_mock } }))
+vi.mock('./run-ship-planned', () => ({
+	run_ship_planned: { PRECONDITION: 'unplanned', problems: planned_mock },
+}))
 vi.mock('./run-ship-body-draft', () => ({
 	run_ship_body_draft: { existing: draft_mock, prepare: prepare_mock },
 }))

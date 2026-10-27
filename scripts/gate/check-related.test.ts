@@ -8,13 +8,18 @@ import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-s
 import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { execa } from 'execa'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 
 const execa_mock = vi.hoisted(() => vi.fn())
+const unplanned_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 
 vi.mock('execa', () => ({ execa: execa_mock }))
+// The live branch's lane:plan record never reaches these runs; `check-related-unplanned.test.ts` drives it.
+vi.mock('./check-related-unplanned', () => ({
+	check_related_unplanned: { notice: unplanned_mock },
+}))
 // No green record is read from or written over the live tree; `check-related-run-reuse.test.ts` drives it.
 vi.mock('./check-related-reuse', () => ({
 	check_related_reuse: {
@@ -163,6 +168,41 @@ describe('check_related.report_results', () => {
 			expect(report).toContain(`=== ${command}: passed ===`)
 			expect(report).toContain(`${command} output`)
 		}
+	})
+})
+
+// joshuafolkken/kit#5203: the ship's `unplanned` answer reached a lane only at the ship's preflight.
+describe('check_related.run_all — the unplanned notice', () => {
+	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
+		vi.spyOn(check_related_pinned, 'notice').mockResolvedValue(undefined)
+	})
+
+	afterEach(() => {
+		vi.restoreAllMocks()
+		unplanned_mock.mockReset()
+	})
+
+	it('prints the notice above the verdict line, and still passes', async () => {
+		const notice = 'unplanned: scripts/gate/gate-plan.ts — the lane plan misses it'
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		unplanned_mock.mockResolvedValue(notice)
+
+		await expect(check_related.run_all(undefined, passing_check)).resolves.toBe(0)
+		const report = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(report.indexOf(notice)).toBeGreaterThan(-1)
+		expect(report.indexOf(notice)).toBeLessThan(report.lastIndexOf(`check:related`))
+	})
+
+	it('prints no unplanned line where the notice finds nothing', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		unplanned_mock.mockResolvedValue(undefined)
+		await check_related.run_all(undefined, passing_check)
+
+		expect(write.mock.calls.map(([chunk]) => String(chunk)).join('')).not.toContain('unplanned:')
 	})
 })
 

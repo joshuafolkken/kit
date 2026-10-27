@@ -164,6 +164,20 @@ describe('lane_ledger_write.record_core_wait', () => {
 	})
 })
 
+// joshuafolkken/kit#5203: the `unplanned` answer `check:related` printed reads back as one entry.
+describe('lane_ledger_write.record_unplanned_notice', () => {
+	it('writes the issue and its unplanned files, read back as an unplanned-notice entry', async () => {
+		const target = ledger(lane_ledger_write.KIND.UNPLANNED_NOTICE)
+		const notice = { issue: 5168, files: ['scripts/lane/lane-ledger.ts'] }
+
+		await lane_ledger_write.record_unplanned_notice(notice, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([
+			{ kind: 'unplanned-notice', ...notice },
+		])
+	})
+})
+
 // joshuafolkken/kit#4451: a unit run's slowest files read back as one entry.
 describe('lane_ledger_write.record_unit_files', () => {
 	it('writes each file and its wall time, read back as a unit-files entry', async () => {

@@ -1,0 +1,7 @@
+{
+	"reason": "review:record reads the join a lane skipped through a new due-mark module (run-review-join-read.ts), with a non-waiting read so the restart after it still names its read",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 76
+	}
+}
