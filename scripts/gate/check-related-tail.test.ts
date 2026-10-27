@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { status_icons } from '#scripts/lib/status-icons'
+import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { metrics_totals } from './metrics-totals'
@@ -10,7 +11,7 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'check-related-tail-test-'))
 const LOG_TARGET = path.join(scratch, 'check-related.log')
 const [LINT_COMMAND, TEST_COMMAND] = check_related.CHECKS
 const LINT_OUTPUT = 'lint output'
-const LINT_PASSED = `${status_icons.PASS_ICON} lint:related passed`
+const LINT_PASSED = `${status_icons.PASS_ICON} ${lint_related_scope.COMMAND_LABEL} passed`
 const GROWTH_NOTICE = `${metrics_totals.NOTICE_HEADING}\njosh metrics: 1 total(s) grew`
 const FULL_OUTPUT_LINE = `full output: ${LOG_TARGET}`
 

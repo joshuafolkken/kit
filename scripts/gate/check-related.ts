@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
@@ -20,7 +21,8 @@ const LOG_PATH = stamp_file.stamp_path(
 	gate_log.GATE_LOG_SUFFIX,
 )
 const LINT_RELATED = 'lint:related'
-const LINT_PASSED = verification_tail.format_verdict(LINT_RELATED, [])
+// The verdict `lint:related` itself prints last, under its own label.
+const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, [])
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
 	'test:related',

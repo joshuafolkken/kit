@@ -2,7 +2,7 @@
 	"reason": "New single-source verification tail (scripts/gate/verification-tail.ts) and the check:related log file it names; every josh check now ends with failures, full output path and verdict (#5162)",
 	"date": "2026-10-27",
 	"growth": {
-		"scripts.code_lines": 102,
-		"ai_cost.on_demand_bytes": 137
+		"scripts.code_lines": 103,
+		"ai_cost.on_demand_bytes": 170
 	}
 }
