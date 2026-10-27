@@ -4,6 +4,7 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { related_heavy_tests } from './related-heavy-tests'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
@@ -15,6 +16,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_changed_since: vi.fn(),
 		read_held_at: vi.fn(),
 	},
+}))
+vi.mock('./related-heavy-tests', () => ({
+	related_heavy_tests: { exclude_flags: vi.fn(() => []) },
 }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
@@ -138,6 +142,16 @@ describe('test_related.run_related_tests', () => {
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	// joshuafolkken/kit#5105: the heavy files the scope reaches only indirectly stay out of the run.
+	it('hands vitest the heavy-file exclusions after the narrowed files', async () => {
+		const flags = ['--exclude', 'tools/test/heavy.test.ts']
+
+		vi.mocked(related_heavy_tests.exclude_flags).mockReturnValueOnce(flags)
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run', ...flags])
 	})
 
 	it('reports the narrowing it applied, through the guard that decides there is a run', async () => {
