@@ -149,3 +149,14 @@ describe('issue:lint measurement declaration (joshuafolkken/kit#4621)', () => {
 		expect(await lint_body(declaring('- 計測宣言: `echo 3` <= 5'))).toBe(0)
 	})
 })
+
+const AGGREGATION_BODY = `${VALID_BODY.replace('1 ファイル', '6 ファイル')}- 種別: 非不具合\n${REQUIRED_SECTIONS}\n- [ ] 形を集計し Issue にコメントで記録する\n`
+
+describe('issue:lint aggregation split (joshuafolkken/kit#5190)', () => {
+	it('rejects an aggregation-comment criterion beside an implementation estimate', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await lint_body(AGGREGATION_BODY)).toBe(1)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('--route split'))
+	})
+})
