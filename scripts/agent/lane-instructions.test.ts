@@ -79,6 +79,15 @@ describe('lane instruction composition', () => {
 		expect(composed).toContain('レーン子では `josh ship` が回す')
 		expect(composed).toContain('chain-rule.md` → "A lane child"')
 	})
+
+	it('overrides the harness shell-edit guidance with the file-edits rule in the shipped document', () => {
+		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
+
+		expect(composed).toContain(
+			'make small, mechanical file changes with sed, heredocs, or short scripts」→ ここでは上書き',
+		)
+		expect(composed).toContain('collaboration-workflow/file-edits.md')
+	})
 })
 
 function value_after(flags: ReadonlyArray<string>, flag: string): string {

@@ -1,5 +1,5 @@
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
-import { canonical_command } from '#scripts/josh/josh-command-map'
+import { canonical_command } from '#scripts/josh/josh-aliases'
 import { json_value } from '#scripts/lib/json-value'
 import { time_shell } from './time-shell'
 

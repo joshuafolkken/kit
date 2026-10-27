@@ -8,8 +8,8 @@ import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
 import { command_suggest } from './command-suggest'
+import { ALIASES } from './josh-aliases'
 import {
-	ALIASES,
 	CATEGORY_ORDER,
 	COMMAND_MAP,
 	type CommandCategory,
@@ -310,7 +310,8 @@ const josh_logic = {
 }
 
 export type { CommandEntry } from './josh-command-map'
-export { ALIASES, COMMAND_MAP } from './josh-command-map'
+export { ALIASES } from './josh-aliases'
+export { COMMAND_MAP } from './josh-command-map'
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {

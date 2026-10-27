@@ -1,0 +1,8 @@
+{
+	"reason": "Lane launch prompt declares file-edits.md over the bypass-mode harness shell-edit guidance, the cause of 96% of file-body refusals (#5163)",
+	"date": "2026-10-27",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 292
+	}
+}

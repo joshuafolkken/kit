@@ -1,4 +1,4 @@
-import { ALIASES } from '#scripts/josh/josh-command-map'
+import { ALIASES } from '#scripts/josh/josh-aliases'
 import { describe, expect, it } from 'vitest'
 import { COMMAND_REFERENCE_DOCS, read_unwrapped } from './ai-document-fixture'
 
