@@ -26,6 +26,7 @@ import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 // readily as an issue, so it stays optional and tolerates an explicit null.
 const rest_issue_schema = z.looseObject({
 	number: z.number(),
+	body: z.string().nullish(),
 	issue_dependencies_summary: z.looseObject({ total_blocked_by: z.number().optional() }).nullish(),
 	// Present only on a pull request, which this endpoint serves as readily as an issue.
 	pull_request: z.looseObject({ merged_at: z.string().nullish() }).nullish(),
