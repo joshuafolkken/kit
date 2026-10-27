@@ -241,7 +241,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last',
+			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used",
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],

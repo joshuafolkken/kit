@@ -327,6 +327,28 @@ its last green run and ran no test, so the check carries `is_unmoved` (`related_
 its second stays out of the median and maximum
 ([#4457](https://github.com/joshuafolkken/kit/issues/4457)).
 
+## What a gate check claimed against what it used
+
+Under the check table, `lane:stats` prints one row per check comparing its core-budget claim with the
+cores it kept busy ([#5138](https://github.com/joshuafolkken/kit/issues/5138)). The columns are:
+
+- `claim`: the median of `claim.requested`.
+- `runs`: the measured runs.
+- `cores median`, `cores p90` and `cores max`: a run's cores are its `cpu_ms ÷ elapsed_ms`. The p90 is
+  the nearest-rank one.
+- `wait (s)`: the total `claim.waited_ms`.
+
+Only a measured run is counted. A reused check started no process, and a check with no `cpu_ms` was
+recorded before the field existed, so both stay out of every column.
+
+Read it as: a claim well above `cores p90` asks for cores the check does not use, which other claims
+then wait for. `claim` is the requested weight, and a unit claim narrowed at the wait cap ran at its
+`granted`. `wait (s)` is how long this check's own claims waited to be admitted, not how long it made
+others wait.
+
+**The table does not change the weights.** A weight in `scripts/gate/core-weights.ts` is changed in its
+own Issue, which cites this table as its evidence.
+
 ## What the lane sessions' transcripts show
 
 The last table is read from the lane sessions' transcripts (`~/.claude/projects/<lane-slug>/*.jsonl`),
