@@ -8,6 +8,7 @@ import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
+import { check_related_section, type CheckResult } from './check-related-section'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
@@ -32,12 +33,6 @@ const CHECKS: ReadonlyArray<string> = [
 const REUSED = 'reused'
 const METRICS_STOP =
 	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`)'
-
-interface CheckResult {
-	command: string
-	exit_code: number
-	output: string
-}
 
 type CheckExecutor = (command: string) => Promise<CheckResult>
 type ProcessRunner = (
@@ -108,18 +103,6 @@ async function run_checks(
 	})
 }
 
-function result_status(result: CheckResult): string {
-	return result.exit_code === 0 ? 'passed' : `failed (${String(result.exit_code)})`
-}
-
-function report_result(result: CheckResult): void {
-	process.stdout.write(`\n=== ${result.command}: ${result_status(result)} ===\n`)
-	if (result.output.length === 0) return
-
-	process.stdout.write(result.output)
-	if (!result.output.endsWith('\n')) process.stdout.write('\n')
-}
-
 function failed_commands(results: ReadonlyArray<CheckResult>): ReadonlyArray<string> {
 	return results.filter((result) => result.exit_code !== 0).map((result) => result.command)
 }
@@ -145,7 +128,7 @@ function failure_lines(results: ReadonlyArray<CheckResult>): string {
 // Every check's whole output, kept where the console's size limit cannot reach, as `josh gate` keeps its own.
 function write_log(results: ReadonlyArray<CheckResult>, target: string): string | undefined {
 	const entries = results.map((result) => ({
-		header: `${result.command}: ${result_status(result)}`,
+		header: `${result.command}: ${check_related_section.result_status(result)}`,
 		output: result.output,
 	}))
 
@@ -191,6 +174,7 @@ interface ReportOptions {
 	pinned_notice?: string | undefined
 	reused?: ReadonlySet<string>
 	log_target?: string
+	is_full?: boolean
 }
 
 function report_notices(notices: ReadonlyArray<string | undefined>): void {
@@ -200,10 +184,13 @@ function report_notices(notices: ReadonlyArray<string | undefined>): void {
 }
 
 function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): void {
-	const { log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
+	const { is_full, log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
 
 	report_reused(reused)
-	for (const result of results) report_result(result)
+
+	for (const result of results) {
+		process.stdout.write(check_related_section.format_section(result, is_full))
+	}
 
 	const metrics = metrics_notice(results)
 
@@ -227,7 +214,11 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
 // tree is printed above the verdict line, waited for when this run started it (`check-related-pinned.ts`).
 // A check whose green record still holds is not run (`check-related-reuse.ts`).
-async function run_all(root?: string, execute: CheckExecutor = execute_check): Promise<number> {
+async function run_all(
+	root?: string,
+	execute: CheckExecutor = execute_check,
+	is_full = false,
+): Promise<number> {
 	const is_started = await review_record_pinned.restart_in_lane(root)
 	const tree = await check_related_reuse.read_tree()
 	const reused = await check_related_reuse.reusable(CHECKS, tree)
@@ -238,6 +229,7 @@ async function run_all(root?: string, execute: CheckExecutor = execute_check): P
 
 	await check_related_reuse.record(results, tree)
 	report_results(results, {
+		is_full,
 		pinned_notice: await check_related_pinned.notice(root, is_started),
 		reused,
 	})
@@ -257,8 +249,14 @@ const check_related = {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await check_related.run_all()
+	process.exitCode = await check_related.run_all(
+		undefined,
+		execute_check,
+		check_related_section.is_full_requested(process.argv),
+	)
 }
 
-export type { CheckExecutor, CheckResult }
+export type { CheckExecutor }
 export { check_related }
+
+export { type CheckResult } from './check-related-section'
