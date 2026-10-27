@@ -10,7 +10,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
@@ -216,7 +216,7 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 
 	const issues = await auto_ok_author.with_author_trust(read.issues)
 
-	await issue_sample_gate.prime(issues.map((issue) => issue.body))
+	await issue_sample_prime.prime(issues.map((issue) => issue.body))
 
 	return { ...read, issues }
 }

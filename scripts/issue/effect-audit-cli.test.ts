@@ -3,7 +3,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec, type GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effect_audit_cli } from './effect-audit-cli'
-import { issue_sample_gate } from './issue-sample-gate'
+import { issue_sample_prime } from './issue-sample-prime'
 
 // joshuafolkken/kit#4958: the listing reads two searches — the window's closed time-shortening issues
 // and every follow-up measurement — and `--draft` writes the retirement candidate of a shortfall.
@@ -38,7 +38,7 @@ beforeEach(() => {
 	vi.spyOn(git_gh_exec, 'exec_gh_api').mockImplementation(async (request: GhApiRequest) =>
 		page([request.path.includes('closed%3A') ? ORIGIN : FOLLOW_UP]),
 	)
-	vi.spyOn(issue_sample_gate, 'read_source').mockResolvedValue({
+	vi.spyOn(issue_sample_prime, 'read_source').mockResolvedValue({
 		merged_at: MERGED_AT,
 		closes: ORIGIN.number,
 	})
@@ -75,7 +75,7 @@ describe('effect_audit_cli.run — the listing', () => {
 	)
 
 	it('credits a follow-up to no issue when its cited pull request cannot be read', async () => {
-		vi.spyOn(issue_sample_gate, 'read_source').mockRejectedValue(RATE_LIMITED)
+		vi.spyOn(issue_sample_prime, 'read_source').mockRejectedValue(RATE_LIMITED)
 
 		expect(await effect_audit_cli.run([], NOW_MS)).toBe(0)
 		expect(lines[0]).toMatch(/届かなかった 0 · 未計測 1$/u)
@@ -99,7 +99,7 @@ describe('effect_audit_cli.run — a follow-up citing the issue form', () => {
 
 		expect(await effect_audit_cli.run([], NOW_MS)).toBe(0)
 		expect(lines[0]).toMatch(/届かなかった 1 · 未計測 0$/u)
-		expect(issue_sample_gate.read_source).not.toHaveBeenCalled()
+		expect(issue_sample_prime.read_source).not.toHaveBeenCalled()
 	})
 })
 
