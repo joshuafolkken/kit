@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { FILE_VERDICT, observation_record } from '#scripts/observations/observation-record'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
@@ -32,6 +33,14 @@ const ROUND = [
 	'- rf:comments | low | docs/josh-commands-run.md:458 | 2026-10-14 | #3769',
 ]
 const OWNER = 'OWNER'
+const NOW = new Date('2026-10-28T00:00:00Z')
+const ENTRY = {
+	slug: 'followup-unrelated-test-rerun',
+	depth: 'd1',
+	where: 'a.test.ts',
+	what: 'followup reran Unit Tests (1/6)',
+}
+const SIGHTING = `- k:${ENTRY.slug} | d1 | 2026-10-27 | ${ENTRY.where} | ${ENTRY.what}`
 const QUOTING = `See ${review_comment_round.body_of(['- rf:tests | low | a.ts | 2026-10-14 | #3769'])}`
 
 afterAll(() => {
@@ -126,6 +135,46 @@ describe('review_comment_round.carry', () => {
 	})
 })
 
+// joshuafolkken/kit#5197: a sighting `followup` posts during its CI wait reaches the ledger the same way,
+// where the next sighting of its key counts it.
+describe('review_comment_round.carry — an observation posted on the issue', () => {
+	it('carries the sighting into the ledger, where the next sighting counts it as the first', async () => {
+		const root = root_of('observation')
+
+		comments_mock.mockResolvedValue(
+			JSON.stringify([
+				{ body: review_comment_round.observation_body_of([SIGHTING]), author_association: OWNER },
+			]),
+		)
+
+		expect(await review_comment_round.carry(root)).toBe(1)
+
+		const next = await observation_record.assess({ entry: ENTRY, checkout: root, now: NOW })
+
+		expect(next).toMatchObject({ verdict: FILE_VERDICT, earlier: [SIGHTING] })
+	})
+
+	it('searches the closed issues for either heading, reading an issue both name once', async () => {
+		await review_comment_round.carry(root_of('both'))
+
+		const queries = api_mock.mock.calls.map(([request]: Array<{ path: string }>) =>
+			new URLSearchParams(request?.path.split('?', 2)[1]).get('q'),
+		)
+
+		expect(queries).toHaveLength(2)
+		expect(queries[1]).toContain('Observation recorded while the pull request was open')
+		expect(comments_mock).toHaveBeenCalledTimes(1)
+	})
+
+	it('reads no line of an observation comment that breaks the ledger grammar', async () => {
+		const body = review_comment_round.observation_body_of(['- k:Bad Key | d1 | x'])
+
+		expect(
+			await review_comment_round.lines_of([{ body, author_association: OWNER }]),
+		).toStrictEqual([])
+	})
+})
+
 describe('review_comment_round.carry — what it leaves', () => {
 	it('reads an issue already carried no more', async () => {
 		const root = root_of('again')
@@ -162,6 +211,7 @@ describe('review_comment_round.carry — what it throws on', () => {
 		)
 		api_mock
 			.mockResolvedValueOnce(JSON.stringify({ items: [{ number: ISSUE }] }))
+			.mockResolvedValueOnce(JSON.stringify({ items: [] }))
 			.mockRejectedValue(new Error('HTTP 502'))
 
 		await expect(review_comment_round.carry(root)).rejects.toThrow('unanswered')

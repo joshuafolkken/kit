@@ -9,20 +9,27 @@ import { size_estimate } from './size-estimate'
 
 const CRITERIA_HEADING = '## 受け入れ条件'
 const CRITERION_PREFIX = '- ['
-// Recording on an Issue, not a feature that posts a PR comment: all four words name the lane's own act.
-const AGGREGATION_WORDS: ReadonlyArray<string> = ['集計', 'Issue', 'コメント', '記録']
+// Recording on an Issue, not a feature that posts a PR comment: every one of these words names the
+// lane's own act.
+const RECORDING_WORDS: ReadonlyArray<string> = ['Issue', 'コメント', '記録']
+// What is recorded: an aggregation, or a measurement — #5202's before / after reach count, which carried
+// no aggregation word and passed (joshuafolkken/kit#5238). One of them is enough.
+const SUBJECT_WORDS: ReadonlyArray<string> = ['集計', '計測', 'before', '変更前後']
 // A criterion citing the prior aggregation Issue is the implementation this rule asks for.
 const ISSUE_REFERENCE = /#\d+/u
 // The implementation the estimate declares: a prior aggregation Issue may add a script or two of its own.
 const IMPLEMENTATION_FILES = 3
-const REFUSAL = `an acceptance criterion records an aggregation as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file the aggregation as a prior Issue (\`--route split\`) and cite its comment under ## 背景 in this one; issue-template.md → "\`## 背景\` 直下の宣言と分類ラベル"`
+const REFUSAL = `an acceptance criterion records an aggregation or a measurement as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file it as a prior Issue (\`--route split\`) and cite its comment under ## 背景 in this one; issue-template.md → "\`## 背景\` 直下の宣言と分類ラベル"`
 
 function is_aggregation_criterion(line: string): boolean {
 	const text = line.trim()
 
 	if (!text.startsWith(CRITERION_PREFIX) || ISSUE_REFERENCE.test(text)) return false
 
-	return AGGREGATION_WORDS.every((word) => text.includes(word))
+	return (
+		SUBJECT_WORDS.some((word) => text.includes(word)) &&
+		RECORDING_WORDS.every((word) => text.includes(word))
+	)
 }
 
 function has_aggregation_criterion(body: string): boolean {

@@ -1,6 +1,12 @@
 import path from 'node:path'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { observation_record, type ObservationEntry } from '#scripts/observations/observation-record'
+import {
+	observation_record,
+	REFUSED_VERDICT,
+	type ObservationEntry,
+} from '#scripts/observations/observation-record'
+import { review_comment_round } from '#scripts/review/review-comment-round'
 import { vitest_failure_summary } from '#scripts/test/vitest-failure-summary'
 
 // A CI job that ended `failure` because a unit test went red can still owe nothing to the change: a test
@@ -20,6 +26,8 @@ const SEGMENT_SEPARATOR = '.'
 const OBSERVATION_SLUG = 'followup-unrelated-test-rerun'
 const OBSERVATION_DEPTH = 'd1'
 const NAME_SEPARATOR = '; '
+const UNNAMED_ISSUE =
+	'Did not record the failed tests outside the change: the branch names no issue to post them on.'
 
 const RERUN_VERDICT = 'rerun'
 const KEPT_VERDICT = 'kept'
@@ -93,18 +101,43 @@ function observation_of(failures: ReadonlyArray<UnrelatedFailure>): ObservationE
 	}
 }
 
-// A ledger write that fails is reported and does not stop the rerun it describes.
-async function record(failures: ReadonlyArray<UnrelatedFailure>): Promise<void> {
+// **The line is posted on the issue, never appended to the tree** (joshuafolkken/kit#5197): the rerun
+// happens during the CI wait, after `prepare_merge` committed the ledger, so an appended line would
+// either be lost with the lane or need a push of its own that restarts CI. `review-comment-round.ts`
+// carries it into the ledger once the issue closes; the count is still read off this tree's ledger.
+async function post(failures: ReadonlyArray<UnrelatedFailure>, issue: number): Promise<string> {
+	const assessment = await observation_record.assess({
+		entry: observation_of(failures),
+		checkout: observation_ledger_home.ledger_root(),
+		now: new Date(),
+	})
+
+	if (assessment.verdict === REFUSED_VERDICT) return `${REFUSED_VERDICT}: ${assessment.reason}`
+
+	await git_gh_issue_write.issue_comment(
+		String(issue),
+		review_comment_round.observation_body_of([assessment.line]),
+	)
+
+	return assessment.verdict
+}
+
+// A post that fails is reported and does not stop the rerun it describes; a branch naming no issue has
+// nowhere to post.
+async function record(
+	failures: ReadonlyArray<UnrelatedFailure>,
+	issue: number | undefined,
+): Promise<void> {
 	if (failures.length === 0) return
 
-	try {
-		const result = await observation_record.record({
-			entry: observation_of(failures),
-			checkout: observation_ledger_home.ledger_root(),
-			now: new Date(),
-		})
+	if (issue === undefined) {
+		console.info(`⚠️ ${UNNAMED_ISSUE}`)
 
-		console.info(`📝 Recorded the failed tests outside the change: ${result.verdict}`)
+		return
+	}
+
+	try {
+		console.info(`📝 Recorded the failed tests outside the change: ${await post(failures, issue)}`)
 	} catch (error) {
 		console.info(`⚠️ Could not record the failed tests outside the change: ${String(error)}`)
 	}

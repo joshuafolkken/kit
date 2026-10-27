@@ -105,3 +105,21 @@ describe('observation_record.record — the line', () => {
 		expect(existsSync(ledger_file(checkout, FIRST_DATE))).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#5197: `followup` keeps its line on the issue, so it reads the verdict alone.
+describe('observation_record.assess', () => {
+	it('answers the verdict and the earlier sightings, appending nothing', async () => {
+		const checkout = fresh_checkout('assess')
+
+		await verdict_on(checkout, FIRST_DAY)
+
+		expect(
+			await observation_record.assess({ entry: ENTRY, checkout, now: SECOND_DAY }),
+		).toStrictEqual({
+			verdict: FILE_VERDICT,
+			earlier: [line_on(FIRST_DATE)],
+			line: line_on(SECOND_DATE),
+		})
+		expect(existsSync(ledger_file(checkout, SECOND_DATE))).toBe(false)
+	})
+})
