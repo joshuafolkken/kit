@@ -34,8 +34,8 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	},
 }))
 
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_merge: vi.fn() },
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_merge: vi.fn() },
 }))
 
 vi.mock('./run-merge-steps', () => ({

@@ -2,6 +2,7 @@ import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { split_assess } from './split-assess'
 import { split_resolution } from './split-resolution'
@@ -33,7 +34,7 @@ const SPLIT_CHILD: LedgerEntry = {
 
 const list_comments = vi.spyOn(git_gh_issue_read, 'issue_list_comments')
 const is_trusted = vi.spyOn(gh_author_association, 'is_trusted')
-const record_split_filed = vi.spyOn(lane_ledger, 'record_split_filed')
+const record_split_filed = vi.spyOn(lane_ledger_write, 'record_split_filed')
 
 function comments_json(body: string, association = OWNER): string {
 	return JSON.stringify([{ user: { login: 'someone' }, body, author_association: association }])

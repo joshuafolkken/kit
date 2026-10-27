@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -84,7 +84,7 @@ const REREAD_AFTER: ReadonlySet<Stage> = new Set([STAGE.SYNC, STAGE.REVIEW])
 // recorded, or a gate that reused its tree's green record would otherwise read as a run that took a
 // second and pull the stage's median to zero.
 async function record_timed(step: Step, issue: string, elapsed_ms: number): Promise<void> {
-	await lane_ledger.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
+	await lane_ledger_write.record_stage({ stage: step.stage, elapsed_ms, issue: Number(issue) })
 }
 
 async function run_once(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
@@ -206,7 +206,7 @@ async function open_context(args: ShipArguments): Promise<ShipContext> {
 async function record_stop(args: ShipArguments, stage: Stage, failed?: ShipSection): Promise<void> {
 	const issue = Number(args.number)
 
-	await lane_ledger.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
+	await lane_ledger_write.record_stop(run_ship_stop_cause.record_of(issue, stage, failed))
 	review_stop_log.record({ issue, stage, findings: run_ship_stop_cause.details_of(stage, failed) })
 }
 
@@ -323,7 +323,10 @@ function should_detach(args: ShipArguments): boolean {
 function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
 	if (checks.code === SUCCESS_EXIT_CODE) return stop
 
-	return { ...stop, preconditions: [...(stop.preconditions ?? []), lane_ledger.PRE_DETACH_STAGE] }
+	return {
+		...stop,
+		preconditions: [...(stop.preconditions ?? []), lane_ledger_write.PRE_DETACH_STAGE],
+	}
 }
 
 // The stop is the sync stage's, so it is recorded and resumed as that stage's `conflict` is; the

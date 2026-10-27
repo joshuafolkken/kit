@@ -1,5 +1,5 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
@@ -14,7 +14,7 @@ const SUCCESS_EXIT_CODE = 0
 const { PHASE } = run_ship_stage
 
 async function emit_phase(issue: string, phase: Phase): Promise<void> {
-	const text = run_ship_stage.event_text(issue, lane_ledger.PRE_DETACH_STAGE, phase)
+	const text = run_ship_stage.event_text(issue, lane_ledger_write.PRE_DETACH_STAGE, phase)
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STAGE, text)
 }
@@ -28,8 +28,8 @@ async function checks(
 	const result = await run()
 	const elapsed_ms = performance.now() - started_ms
 
-	await lane_ledger.record_stage({
-		stage: lane_ledger.PRE_DETACH_STAGE,
+	await lane_ledger_write.record_stage({
+		stage: lane_ledger_write.PRE_DETACH_STAGE,
 		elapsed_ms,
 		issue: Number(issue),
 	})

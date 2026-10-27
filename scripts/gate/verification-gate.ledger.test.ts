@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget } from './core-budget'
@@ -112,7 +113,7 @@ describe('run_verification_gate — the lane ledger', () => {
 	})
 
 	it('writes nothing when no ledger was resolved', async () => {
-		const record_gate = vi.spyOn(lane_ledger, 'record_gate')
+		const record_gate = vi.spyOn(lane_ledger_write, 'record_gate')
 
 		await run_into(undefined, PASS)
 

@@ -1,7 +1,7 @@
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_pause } from './lane-pause'
 import { lane_pause_cli } from './lane-pause-cli'
 import { lane_registry } from './lane-registry'
@@ -33,7 +33,7 @@ const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
 const record_change = vi.spyOn(lane_state, 'record_change')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
-const record_lane_state = vi.spyOn(lane_ledger, 'record_lane_state')
+const record_lane_state = vi.spyOn(lane_ledger_write, 'record_lane_state')
 
 beforeEach(() => {
 	vi.clearAllMocks()
