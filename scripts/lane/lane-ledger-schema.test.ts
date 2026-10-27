@@ -27,6 +27,22 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 	})
+
+	// joshuafolkken/kit#5262
+	it('keeps the origin that started it and the discarded mark, and rejects an unknown origin', () => {
+		const run = {
+			kind: KIND.TEST_PINNED,
+			at: AT,
+			held: 0,
+			probes: [],
+			elapsed_ms: 9,
+			origin: 'run-review',
+			discarded: true,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+		expect(entry_schema.safeParse({ ...run, origin: 'ship' }).success).toBe(false)
+	})
 })
 
 describe('lane_ledger_schema.entry_schema', () => {

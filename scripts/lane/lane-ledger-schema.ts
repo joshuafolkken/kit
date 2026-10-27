@@ -218,6 +218,10 @@ const test_related_schema = z.object({
 // answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
 // report) and its wall time. `issue` is the lane it ran in, absent outside a lane. `rewired` counts the
 // hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
+// `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
+// its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
+// older rows.
+const pinned_origin_schema = z.enum(['run-review', 'pre-detach', 'manual'])
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -231,6 +235,8 @@ const test_pinned_schema = z.object({
 	rewired: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
 	elapsed_ms: z.number(),
+	origin: pinned_origin_schema.optional(),
+	discarded: z.boolean().optional(),
 })
 // The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
 // Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
@@ -331,7 +337,7 @@ type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 	waiting?: ReadonlyArray<number> | undefined
 }
 
-const lane_ledger_schema = { KIND, entry_schema }
+const lane_ledger_schema = { KIND, entry_schema, pinned_origin_schema }
 
 export type {
 	CoreWaitEntry,

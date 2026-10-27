@@ -5,6 +5,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { LaunchResult } from '#scripts/run/detached-launch'
+import { test_pinned_ledger } from '#scripts/test/test-pinned-ledger'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_steps } from './run-review-steps'
 
@@ -52,12 +53,14 @@ type Clock = () => number
 // `start` is the launched pid's start time, so a pid the OS has since reissued is told apart from the
 // check (joshuafolkken/kit#4828). `tree` is the digest of the tree it checks (`run-review-pinned-tree.ts`),
 // so `josh review:record` tells a round-1 fix that moved the tree (joshuafolkken/kit#4834).
+// `launched_at` is the launch's epoch milliseconds, the start of a stopped check's wall time.
 interface Launch {
 	pid: number
 	token: string
 	reason?: string | undefined
 	start?: string | undefined
 	tree?: string | undefined
+	launched_at?: number | undefined
 }
 
 function launch_path(root: string = PROJECT_ROOT): string {
@@ -71,7 +74,7 @@ function log_path(root: string = PROJECT_ROOT): string {
 // The token ties the answer to this launch (`test-pinned-record.ts`).
 function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): LaunchResult {
 	const token = randomUUID()
-	const argv = test_pinned_record.launch_argv(token, reason)
+	const argv = test_pinned_record.launch_argv(token, reason, test_pinned_ledger.BACKGROUND_ORIGIN)
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
 
 	if (launched.kind === 'launched') {
@@ -83,6 +86,7 @@ function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): La
 			reason,
 			start: process_identity.read_start(pid),
 			tree,
+			launched_at: Date.now(),
 		})
 	}
 
@@ -94,7 +98,7 @@ function optional_text(value: unknown): string | undefined {
 }
 
 function to_launch(value: unknown): Launch | undefined {
-	const { pid, token, reason, start, tree } = value as Record<string, unknown>
+	const { pid, token, reason, start, tree, launched_at } = value as Record<string, unknown>
 	if (typeof pid !== 'number' || typeof token !== 'string') return undefined
 
 	return {
@@ -103,6 +107,7 @@ function to_launch(value: unknown): Launch | undefined {
 		reason: optional_text(reason),
 		start: optional_text(start),
 		tree: optional_text(tree),
+		launched_at: typeof launched_at === 'number' ? launched_at : undefined,
 	}
 }
 
@@ -142,18 +147,28 @@ function signal_group(pid: number): void {
 	}
 }
 
+// **A check stopped while it runs is a discarded probe** (joshuafolkken/kit#5262): it writes no ledger
+// row of its own, so the stop writes one with the wall time it ran. A launch stamped before
+// `launched_at` has no wall time, and writes none.
+function discard(launched: Launch): void {
+	signal_group(launched.pid)
+	if (launched.launched_at === undefined) return
+
+	void test_pinned_ledger.record_discarded(Date.now() - launched.launched_at)
+}
+
 // A stale stamp can outlive its check by days, so the start signals only a pid whose start time
 // matches the launch's: a reissued pid, or one whose start could not be read, may lead another
 // lane's group.
-function stop_last({ pid, start }: Launch): void {
-	if (process_identity.is_same_process(pid, start) === true) signal_group(pid)
+function stop_last(launched: Launch): void {
+	if (process_identity.is_same_process(launched.pid, launched.start) === true) discard(launched)
 }
 
 // The stamp a waiter just read is this pair's, minutes old, so the lone read and a supervised join
 // signal any pid not proven gone: one whose start could not be read (no `/proc`, no `ps`) is the check
 // they have just been waiting on.
-function stop_current({ pid, start }: Launch): void {
-	if (process_identity.is_same_process(pid, start) !== false) signal_group(pid)
+function stop_current(launched: Launch): void {
+	if (process_identity.is_same_process(launched.pid, launched.start) !== false) discard(launched)
 }
 
 // Every start stops the last pair's check and clears its records first, so a join never reads an

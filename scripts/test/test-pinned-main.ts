@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_pinned } from './test-pinned'
+import { test_pinned_ledger, type PinnedOrigin } from './test-pinned-ledger'
 import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from './test-pinned-record'
 
@@ -14,12 +15,13 @@ const CLEAN_EXIT = 0
 const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh test:pinned [--max <n>] [--record <token>] [--first-unpinned] [--help]',
+	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
 	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
 	'  or whose revert stopped vitest before any test ran, each place listed in the `full output:` log;',
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
+	'  --origin names what started the run on its lane ledger row (default manual);',
 	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
 ].join('\n')
 
@@ -27,6 +29,7 @@ const PARSE_ARGS_OPTIONS = {
 	help: { type: 'boolean', short: 'h', default: false },
 	'first-unpinned': { type: 'boolean', default: false },
 	max: { type: 'string' },
+	origin: { type: 'string' },
 	record: { type: 'string' },
 } as const
 
@@ -39,6 +42,7 @@ interface PinnedOptions {
 	max_hunks: number
 	record_token: string | undefined
 	is_first_unpinned: boolean
+	origin: PinnedOrigin
 }
 
 // A `--max` that is not a whole number above zero is a refusal, not the default.
@@ -48,18 +52,21 @@ function valid_max(raw: string | undefined): number | undefined {
 	return Number.isSafeInteger(max) && max > 0 ? max : undefined
 }
 
-// `undefined` prints the usage: a help request, an unknown flag, or a missing or invalid `--max`.
+// `undefined` prints the usage: a help request, an unknown flag, a missing or invalid `--max`, or an
+// `--origin` not among the three.
 function options_of(argv: ReadonlyArray<string>): PinnedOptions | undefined {
 	try {
 		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
 		const max_hunks = valid_max(values.max)
+		const origin = test_pinned_ledger.origin_of(values.origin)
 
-		if (max_hunks === undefined || values.help) return undefined
+		if (max_hunks === undefined || origin === undefined || values.help) return undefined
 
 		return {
 			max_hunks,
 			record_token: values.record,
 			is_first_unpinned: values['first-unpinned'],
+			origin,
 		}
 	} catch {
 		return undefined
@@ -84,7 +91,11 @@ async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
 		// eslint-disable-next-line no-await-in-loop -- each check runs only once the last one saw the tree move
 		const before = await tree_digest()
 		// eslint-disable-next-line no-await-in-loop -- as above
-		const report = await test_pinned.run(options.max_hunks, options.is_first_unpinned)
+		const report = await test_pinned.run(
+			options.max_hunks,
+			options.is_first_unpinned,
+			options.origin,
+		)
 		// eslint-disable-next-line no-await-in-loop -- as above
 		if ((await tree_digest()) === before) return report
 	}
@@ -115,7 +126,7 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	const summary =
 		options.record_token === undefined
 			? test_pinned_record.summary_of(
-					await test_pinned.run(options.max_hunks, options.is_first_unpinned),
+					await test_pinned.run(options.max_hunks, options.is_first_unpinned, options.origin),
 				)
 			: await recorded_run(options, options.record_token)
 

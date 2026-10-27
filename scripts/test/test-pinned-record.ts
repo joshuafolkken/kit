@@ -3,6 +3,7 @@ import type { KeptLog } from '#scripts/gate/verification-tail'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { test_pinned_cache_logic } from './test-pinned-cache-logic'
+import type { PinnedOrigin } from './test-pinned-ledger'
 import { test_pinned_logic, type PinnedReport, type ReportParts } from './test-pinned-logic'
 
 // The answer `josh test:pinned --record` leaves for `josh run:review --join` (joshuafolkken/kit#4770):
@@ -153,10 +154,15 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 // A recorded launch's `josh test:pinned` arguments, the token last. **With no `--unpinned-ok` reason it
 // stops at the first unpinned hunk** (joshuafolkken/kit#5153): the launcher stops on it whatever the
 // rest say. Under a reason every hunk is probed, since a reason accepts the list as the whole answer.
-function launch_argv(token: string, reason: string | undefined): Array<string> {
+// `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262).
+function launch_argv(
+	token: string,
+	reason: string | undefined,
+	origin: PinnedOrigin,
+): Array<string> {
 	const cut = reason === undefined ? [FIRST_UNPINNED_FLAG] : []
 
-	return ['test:pinned', ...cut, '--record', token]
+	return ['test:pinned', ...cut, '--origin', origin, '--record', token]
 }
 
 const test_pinned_record = {

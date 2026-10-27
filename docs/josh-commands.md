@@ -344,10 +344,11 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in de
 Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on.
 
 ```bash
-pnpm josh test:pinned                    # unpinned <file>:<line> lines; unchecked counted per reason
-pnpm josh test:pinned --max 5            # check at most 5 hunks; the rest count as unchecked
-pnpm josh test:pinned --record <token>   # also leave the answer, under the launch token, for run:review --join
-pnpm josh test:pinned --first-unpinned   # start no probe once one hunk is unpinned; the rest count as unchecked
+pnpm josh test:pinned                       # unpinned <file>:<line> lines; unchecked counted per reason
+pnpm josh test:pinned --max 5               # check at most 5 hunks; the rest count as unchecked
+pnpm josh test:pinned --record <token>      # also leave the answer, under the launch token, for run:review --join
+pnpm josh test:pinned --origin pre-detach   # name what started the run on its lane ledger row (default manual)
+pnpm josh test:pinned --first-unpinned      # start no probe once one hunk is unpinned; the rest count as unchecked
 ```
 
 <!-- /usage -->

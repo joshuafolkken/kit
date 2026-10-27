@@ -199,6 +199,8 @@ describe('run_ship_pre_detach_pinned.pinned_check', () => {
 			'josh',
 			'test:pinned',
 			FIRST_UNPINNED,
+			'--origin',
+			'pre-detach',
 			'--record',
 			token,
 		])

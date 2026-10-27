@@ -1,0 +1,7 @@
+{
+	"reason": "test-pinned ledger rows gain origin and discarded, and lane:breakdown reports discarded run:review probes (#5262)",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 80
+	}
+}

@@ -3,7 +3,9 @@ import type { PinnedReport } from './test-pinned-logic'
 import { test_pinned_main } from './test-pinned-main'
 
 const { run } = vi.hoisted(() => ({
-	run: vi.fn<(max_hunks: number, is_first_unpinned?: boolean) => Promise<PinnedReport>>(),
+	run: vi.fn<
+		(max_hunks: number, is_first_unpinned?: boolean, origin?: string) => Promise<PinnedReport>
+	>(),
 }))
 
 const { write_stamp } = vi.hoisted(() => ({ write_stamp: vi.fn() }))
@@ -24,6 +26,8 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 vi.mock('#scripts/review/review-tree', () => ({ review_tree: { read_changed_tree } }))
 
 const FILE = 'a.ts'
+const MANUAL = 'manual'
+const PRE_DETACH = 'pre-detach'
 const HUNK = { file: FILE, new_start: 4, new_count: 1, old_lines: [], is_green: true }
 const GREEN_LINE = 'unpinned a.ts:4 — reverting it left every related test green\n'
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
@@ -65,7 +69,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue(CLEAN_REPORT)
 
 		expect(await test_pinned_main.main([])).toBe(0)
-		expect(run).toHaveBeenCalledWith(20, false)
+		expect(run).toHaveBeenCalledWith(20, false, MANUAL)
 		expect(output.stdout.join('')).toBe('unpinned 0 · unchecked 0\n')
 	})
 
@@ -73,7 +77,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], unchecked: [HUNK], max_hunks: 1 })
 
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(1)
-		expect(run).toHaveBeenCalledWith(1, false)
+		expect(run).toHaveBeenCalledWith(1, false, MANUAL)
 		expect(output.stdout.join('')).toBe(
 			`${GREEN_LINE}unchecked 1 — over the 1-hunk cap\n` +
 				'full output: josh-test-pinned-list-\n' +
@@ -87,7 +91,7 @@ describe('test_pinned_main.main', () => {
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(0)
 	})
 
-	it.each([[['--max', '0']], [['--max', 'x']], [['--limit']], [['--max']]])(
+	it.each([[['--max', '0']], [['--max', 'x']], [['--limit']], [['--max']], [['--origin', 'ship']]])(
 		'refuses %j with the usage and never runs',
 		async (argv) => {
 			expect(await test_pinned_main.main(argv)).toBe(1)
@@ -194,7 +198,7 @@ describe('test_pinned_main.main --first-unpinned', () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], cut: [CUT_HUNK] })
 
 		expect(await test_pinned_main.main([FIRST_UNPINNED])).toBe(1)
-		expect(run).toHaveBeenCalledWith(20, true)
+		expect(run).toHaveBeenCalledWith(20, true, MANUAL)
 		expect(output.stdout.join('')).toContain(
 			'unchecked 1 — not probed: the run stopped at the first unpinned hunk',
 		)
@@ -206,5 +210,16 @@ describe('test_pinned_main.main --first-unpinned', () => {
 		await test_pinned_main.main([FIRST_UNPINNED, '--record', TOKEN])
 
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ is_cut: true }))
+	})
+})
+
+// joshuafolkken/kit#5262: the run's ledger row names what started it.
+describe('test_pinned_main.main --origin', () => {
+	it('hands the run the origin it was started with', async () => {
+		run.mockResolvedValue(CLEAN_REPORT)
+
+		await test_pinned_main.main(['--origin', PRE_DETACH, '--record', TOKEN])
+
+		expect(run).toHaveBeenCalledWith(20, false, PRE_DETACH)
 	})
 })
