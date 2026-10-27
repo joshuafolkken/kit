@@ -292,7 +292,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 }
 
 // **The tolerant form**, for a caller whose job is something other than the notification.
-// `followup` sends the completion message on its way to the merge, and a gateway timeout at
+// `followup` sends the completion message beside the merge, and a gateway timeout at
 // Telegram is not a reason to leave a reviewed, green pull request unmerged. So the failure is
 // reported and the run carries on.
 //
@@ -307,7 +307,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 //
 // **Not routed through `git_followup_cleanup`**, which is that Issue's mechanism: it guards the
 // steps a merge has already earned and says "failed after the merge" in its own wording, while this
-// send happens *before* the merge. Borrowing it would print a sentence that is not true.
+// send never happens *after* the merge. Borrowing it would print a sentence that is not true.
 function report_send_failure(error: unknown, recovery: string | undefined): void {
 	console.error('')
 	console.error(`❗ ${describe_symptom(error)}`)

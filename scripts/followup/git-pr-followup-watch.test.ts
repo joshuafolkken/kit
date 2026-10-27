@@ -122,14 +122,14 @@ describe('run_checks — a confirmed watch shortens the wait', () => {
 		expect_polled_with(WATCH_CONFIRMED_STABLE_READS)
 	})
 
-	// A timed-out watch gave up with checks still pending, so it never spanned the pending→settled
-	// window and cannot stand in for the second stable read.
-	it('keeps the default stable reads when the watch timed out', async () => {
+	// #5080: a timed-out watch saw a check pending, so the poll's first settled read closes the
+	// pending→settled window and stands in for the second stable read.
+	it('asks for a single stable read when the watch timed out', async () => {
 		watch.mockResolvedValue({ timed_out: true })
 
 		await run_with_watch()
 
-		expect_polled_with(DEFAULT_STABLE_READS)
+		expect_polled_with(WATCH_CONFIRMED_STABLE_READS)
 	})
 
 	// No watch ran, so nothing confirmed completion and the full stable-read window stands.

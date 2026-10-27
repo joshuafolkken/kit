@@ -18,6 +18,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { poll } from '#scripts/lib/poll'
+import { settled_together } from '#scripts/lib/settled-together'
 import {
 	run_carry,
 	type CarryChange,
@@ -251,15 +252,6 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 	if (carry === undefined || ctx.epic === undefined) return
 
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
-}
-
-// Both steps run to their end before either's failure is thrown, so neither is left half-done behind
-// the other's failure.
-async function settled_together(first: Promise<void>, second: Promise<void>): Promise<void> {
-	const [result, other] = await Promise.allSettled([first, second])
-
-	if (result.status === 'rejected') throw result.reason
-	if (other.status === 'rejected') throw other.reason
 }
 
 // Count the merge, which resets the failure streak.

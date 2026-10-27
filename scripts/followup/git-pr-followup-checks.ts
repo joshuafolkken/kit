@@ -76,12 +76,15 @@ async function handle_watch_failure(branch_name: string, error: unknown): Promis
 	console.info(`⚠️ ${WATCH_FAILED_NOTE}: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
 }
 
-// **Returns whether the watch confirmed completion**: `true` only when
-// `pr_checks_watch` saw every check finish, `false` when it timed out with checks still pending or
-// fell through to polling on a swallowed failure. `run_checks` reads it to decide how many stable poll
-// reads the wait still needs. A timed-out watch (`timed_out: true`) never spanned the pending→settled
-// window, so it must keep the full stable-read window rather than claim the confirmation. A rethrown
-// failure — the empty-rollup case — never reaches a caller, so it needs no answer here.
+// **Returns whether the watch observed the checks**: `true` when `pr_checks_watch` returned — every
+// check finished, or the budget ran out with one still pending — and `false` when it fell through to
+// polling on a swallowed failure. `run_checks` reads it to decide how many stable poll reads the wait
+// still needs. **A timed-out watch counts too** (#5080): it read the checks for two minutes without
+// two settled reads in a row, so the checks were registered and not yet settled while it watched, and
+// the poll's first settled read closes that pending→settled window — the window the second stable read
+// exists for. Holding it to two cost ten seconds on every lane whose CI outlasts the two-minute
+// budget. A rethrown failure — the empty-rollup case — never reaches a caller, so it needs no answer
+// here.
 async function watch_before_polling(
 	branch_name: string,
 	observe: SnapshotObserver | undefined,
@@ -90,9 +93,9 @@ async function watch_before_polling(
 	console.info('📊 Watching PR checks...')
 
 	try {
-		const result = await git_gh_command.pr_checks_watch(branch_name, observe)
+		await git_gh_command.pr_checks_watch(branch_name, observe)
 
-		return !result.timed_out
+		return true
 	} catch (error) {
 		await handle_watch_failure(branch_name, error)
 
@@ -100,9 +103,9 @@ async function watch_before_polling(
 	}
 }
 
-// **A confirmed watch lowers the poll's stable-read requirement to one**. The
-// watch is the first confirmation that every check settled, so the poll that follows need only agree
-// once rather than twice — which removes the extra interval `followup` spent re-proving a settled run.
+// **A returned watch lowers the poll's stable-read requirement to one**. The
+// watch saw every check settle or saw them pending, so the poll that follows need only agree once
+// rather than twice — which removes the extra interval `followup` spent re-proving a settled run.
 // A skipped or fallen-through watch keeps `DEFAULT_STABLE_READS`, and a check that turned red is still
 // caught: the poll evaluates the full merge gate and throws on failure before any stable read counts.
 // `observe` is shown each poll's snapshot, the watch's included — the run's `pr-checks` line
@@ -114,9 +117,9 @@ interface RunChecksInput {
 }
 
 async function wait_for_checks(input: RunChecksInput): Promise<PrStateSnapshot> {
-	const is_watch_confirmed =
+	const is_watch_returned =
 		!input.is_skip_watch && (await watch_before_polling(input.branch_name, input.observe))
-	const stable_reads = is_watch_confirmed ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
+	const stable_reads = is_watch_returned ? WATCH_CONFIRMED_STABLE_READS : DEFAULT_STABLE_READS
 
 	return await git_pr_checks.wait_for_pr_success(
 		input.branch_name,

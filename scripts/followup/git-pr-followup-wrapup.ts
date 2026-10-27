@@ -4,6 +4,7 @@ import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks'
 import { git_pr_merge_checked, type WaitForGreen } from '#scripts/gh/git-pr-merge-checked'
 import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
+import { settled_together } from '#scripts/lib/settled-together'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { git_followup_cleanup } from './git-followup-cleanup'
 import { git_followup_issue_close } from './git-followup-issue-close'
@@ -47,6 +48,8 @@ interface WrapupInput {
 	// that head moved before the merge (`git-pr-merge-checked.ts`, #4036).
 	checked?: PrStateSnapshot | undefined
 	wait_for_green: WaitForGreen
+	// The completion Telegram, its body already read, sent beside the merge.
+	send_completion: () => Promise<void>
 }
 
 function build_notify_body(input: {
@@ -232,13 +235,29 @@ async function run_tail_steps(input: WrapupInput): Promise<void> {
 // The last look at the issue before the merge: the CI poll checked it on every iteration, but a
 // person's update can land between that poll and this step, and only the seconds after this read are
 // left unwatched.
-async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
-	if (input.should_merge && input.is_merged !== true) {
-		await issue_watch_gate.assert_read_here()
-		await git_pr_merge_checked.merge_checked(input)
-		lap(log, STAGE.merge)
+async function merge_step(input: WrapupInput): Promise<void> {
+	await issue_watch_gate.assert_read_here()
+	await git_pr_merge_checked.merge_checked(input)
+}
+
+// **The completion Telegram goes out beside the merge** (#5080): neither reads what the other writes,
+// and in sequence the send was about four seconds in front of every merge. The send is tolerant, so
+// its failure still never stops the merge; both settle before a merge failure is thrown, so a refused
+// merge does not cut a send in flight. Answers the stage the interval was.
+async function send_beside_merge(input: WrapupInput): Promise<string> {
+	if (!input.should_merge || input.is_merged === true) {
+		await input.send_completion()
+
+		return STAGE.telegram
 	}
 
+	await settled_together(input.send_completion(), merge_step(input))
+
+	return STAGE.telegram_and_merge
+}
+
+async function run_wrapup(input: WrapupInput, log: StageLog): Promise<void> {
+	lap(log, await send_beside_merge(input))
 	await run_tail_steps(input)
 
 	lap(log, STAGE.completion_and_epic_close)

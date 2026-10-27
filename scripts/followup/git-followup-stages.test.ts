@@ -32,7 +32,7 @@ function two_lap_log(): StageLog {
 	const log = git_followup_stages.new_log()
 
 	git_followup_stages.lap(log, STAGE.checks_wait)
-	git_followup_stages.lap(log, STAGE.merge)
+	git_followup_stages.lap(log, STAGE.telegram_and_merge)
 
 	return log
 }
@@ -45,7 +45,10 @@ describe('git_followup_stages.lap', () => {
 	it('records each stage in the order it was marked', () => {
 		const log = two_lap_log()
 
-		expect(log.stages.map((stage) => stage.name)).toStrictEqual([STAGE.checks_wait, STAGE.merge])
+		expect(log.stages.map((stage) => stage.name)).toStrictEqual([
+			STAGE.checks_wait,
+			STAGE.telegram_and_merge,
+		])
 	})
 
 	it('measures a lap from the previous mark, not from the log opening', () => {

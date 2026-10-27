@@ -48,10 +48,10 @@ function get_configured_max_attempts(): number {
 const CHECK_MAX_ATTEMPTS = get_configured_max_attempts()
 const DEFAULT_STABLE_READS = 2
 
-// One authoritative gate poll is enough once `pr_checks_watch` has already seen every check finish:
-// the watch is the first confirmation, so the poll that follows need only agree once. The two reads
-// exist for the pending→settled window a bare poll opens on, and the watch has itself already spanned
-// that window — so waiting a second interval after it merely re-proves what the watch established.
+// One authoritative gate poll is enough once `pr_checks_watch` has returned — every check finished, or
+// its budget ran out on a pending read. The two reads exist for the pending→settled window a bare poll
+// opens on, and a returned watch has either spanned that window or seen its pending side, which the
+// poll's first settled read then closes — so a second interval merely re-proves it (#5080).
 const WATCH_CONFIRMED_STABLE_READS = 1
 
 // **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
@@ -314,7 +314,7 @@ async function default_fetch_pr_state(
 }
 
 // **`required_stable_reads` is a parameter, not a constant, so the caller can lower it** — `run_checks`
-// passes `WATCH_CONFIRMED_STABLE_READS` when the watch already confirmed completion. It defaults to
+// passes `WATCH_CONFIRMED_STABLE_READS` when the watch returned. It defaults to
 // `DEFAULT_STABLE_READS`, so every caller that names only the branch is exactly where it was.
 // What a caller is shown of each poll it waits on — `followup` reports the checks to the run's event
 // stream from it (joshuafolkken/kit#3770). It decides nothing: the wait reads the same snapshot.

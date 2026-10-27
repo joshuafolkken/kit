@@ -11,8 +11,9 @@ import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-codera
 // epic auto-close. Untimed, every proposal to shorten it is a guess, and a guess made under time
 // pressure falls on whichever stretch is easiest to cut rather than on the one that is long.
 //
-// **Those nine are seven printed rows**: the four reads in front of the wait go out together and so
-// do the two steps after the merge, and a lap measures an interval rather than a call. `STAGE` below is the list; the two names carrying `and` are the batches.
+// **Those nine are six printed rows**: the four reads in front of the wait go out together, so do the
+// Telegram and the merge, and so do the two steps after the merge, and a lap measures an interval
+// rather than a call. `STAGE` below is the list; the three names carrying `and` are the batches.
 //
 // **Laps, not a wrapper per stage.** The alternative was a `measure(name, () => …)` closure around
 // each call, which reads well and rewrites every call site in the file it instruments — nine
@@ -52,20 +53,22 @@ const NO_DURATION = 0
 // The stages, named once. They are the units a proposal to shorten `followup` would be written
 // against, so a rename has to move the printer and whatever reads it together.
 //
-// **Two names say `and` because two stages became one**. Requests that need
+// **Three names say `and` because each is two stages become one**. Requests that need
 // nothing from one another are now issued together, and a lap records an interval rather than a
 // call — so a batch is one interval, and what it holds has to be readable from its name or the
 // shortening becomes invisible to the very measurement that found it. `closes-and-context` is the
 // former `closes-check` and `context`; `completion-and-epic-close` the former `completion-comment`
-// and `epic-close`. **`checks-wait` is untouched, and deliberately so**: it is the merge gate, and
-// this change only ever moved time that was not a wait.
+// and `epic-close`; `telegram-and-merge` the former `telegram` and `merge` (#5080). **`checks-wait` is
+// untouched, and deliberately so**: it is the merge gate, and this change only ever moved time that was
+// not a wait.
 const STAGE = {
 	closes_and_context: 'closes-and-context',
 	checks_wait: 'checks-wait',
 	coderabbit_comments: 'coderabbit-comments',
 	ai_review_comments: 'ai-review-comments',
+	// The interval of a run that merged nothing, where the send has nothing to go beside.
 	telegram: 'telegram',
-	merge: 'merge',
+	telegram_and_merge: 'telegram-and-merge',
 	completion_and_epic_close: 'completion-and-epic-close',
 	// The lap that was still running when a stage threw. `followup` exits non-zero on an AI-review
 	// blocker and on a red check, and those are the runs whose wait is longest — reporting nothing for

@@ -123,6 +123,13 @@ interface RunContext {
 	context: TelegramContext
 }
 
+type CompletionSend = () => Promise<void>
+
+interface PreparedNotify {
+	is_recorded: boolean
+	send: CompletionSend
+}
+
 // **The four reads in front of the check wait are issued together**. Not one
 // of them is a wait on anything: the `closes #N` check reads the pull request body, and the
 // notification needs the repository name, the issue title and the pull request URL — four requests
@@ -165,31 +172,33 @@ async function read_run_context(input: {
 // The pending count replaces the project version line: children no longer
 // bump, so the local `package.json` names the previous release rather than what this run ships.
 // A count that could not be read contributes no line at all, rather than a zero nobody measured.
-async function notify_completion(
+//
+// **The body is read here, the send is returned** (#5080): the send goes out beside the merge, but the
+// pending count is read off `origin`'s default branch, and a fetch that landed after the merge would
+// count this pull request under a line that says it is not counted.
+async function completion_sender(
 	context: TelegramContext,
 	skip_notes: ReadonlyArray<string>,
 	is_merge_pending: boolean,
-): Promise<void> {
+): Promise<CompletionSend> {
 	const pending_line = await git_followup_pending.pending_release_line({ is_merge_pending })
 	const lines = pending_line === undefined ? skip_notes : [pending_line, ...skip_notes]
-	const body = lines.join('\n')
+	const input = build_telegram_input({ task_type: 'completion', context, body: lines.join('\n') })
 
-	// **The tolerant send**: this runs on the way to the merge, so a Telegram
-	// gateway timeout must not leave a reviewed, green pull request unmerged. The failure is reported
-	// under `❗` and the run carries on.
+	// **The tolerant send**: this runs beside the merge, so a Telegram gateway timeout must not leave a
+	// reviewed, green pull request unmerged. The failure is reported under `❗` and the run carries on.
 	//
 	// **No recovery line**, deliberately, in the same sense `git_followup_cleanup`'s epic-close step
 	// has none: a completion notification is never re-sent by hand — `pnpm josh notify --task-type
 	// completion` is prohibited because it populates no PR link — and re-running `followup` after the
 	// merge is not a re-send either. Naming either would send the reader somewhere useless.
-	await telegram_notify.send_or_report(
-		build_telegram_input({
-			task_type: 'completion',
-			context,
-			body,
-		}),
-		undefined,
-	)
+	return async function send_completion(): Promise<void> {
+		await telegram_notify.send_or_report(input, undefined)
+	}
+}
+
+async function send_nothing(): Promise<void> {
+	// A completion already on record is not sent again.
 }
 
 // The two comment scans, marked separately from the check wait because they answer a different
@@ -280,22 +289,23 @@ async function run_review_checks(
 
 // **A tail re-run after a merge does not report twice**: where the issue
 // already carries this pull request's completion report, the Telegram is skipped here and the comment
-// in the wrapup. Answers whether it was recorded, so the wrapup skips on the same read.
-async function notify_unless_recorded(
+// in the wrapup. Answers whether it was recorded, so the wrapup skips on the same read, and the send
+// the wrapup issues beside the merge.
+async function prepare_notify(
 	input: FollowupInput,
 	issue_number: string | undefined,
 	context: TelegramContext,
 	checks: { notes: Array<string> },
-): Promise<boolean> {
+): Promise<PreparedNotify> {
 	const is_recorded = await git_followup_merged.is_completion_recorded({
 		merged_at: input.is_merged === true ? input.merged_at : undefined,
 		issue_number,
 		pr_url: context.pr_url,
 	})
 
-	if (!is_recorded) await notify_completion(context, checks.notes, input.should_merge)
+	if (is_recorded) return { is_recorded, send: send_nothing }
 
-	return is_recorded
+	return { is_recorded, send: await completion_sender(context, checks.notes, input.should_merge) }
 }
 
 // **Answers with the issue number the run actually used**, which is the one
@@ -308,9 +318,8 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 
 	lap(log, STAGE.closes_and_context)
 	const checks = await run_review_checks(input, context, log, issue_number)
-	const is_completion_recorded = await notify_unless_recorded(input, issue_number, context, checks)
+	const notify = await prepare_notify(input, issue_number, context, checks)
 
-	lap(log, STAGE.telegram)
 	await git_pr_followup_wrapup.run_wrapup(
 		{
 			branch_name: input.branch_name,
@@ -321,7 +330,8 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			should_merge: input.should_merge,
 			managed_notes: checks.managed,
 			is_merged: input.is_merged,
-			is_completion_recorded,
+			is_completion_recorded: notify.is_recorded,
+			send_completion: notify.send,
 			checked: checks.snapshot,
 			wait_for_green: wait_for_green_of(input, context, issue_number, log),
 		},

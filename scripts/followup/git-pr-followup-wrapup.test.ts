@@ -59,6 +59,7 @@ const BASE_INPUT: WrapupInput = {
 	managed_notes: [],
 	checked: CHECKED,
 	wait_for_green: vi.fn(),
+	send_completion: vi.fn().mockResolvedValue(undefined),
 }
 
 const mocked_get_body = vi.mocked(git_gh_command.issue_view_json)
