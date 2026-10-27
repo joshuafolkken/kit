@@ -17,6 +17,7 @@ const REPORT: Report = {
 		slept_ms: MINUTE_MS,
 		waits: [],
 		implement: [],
+		pre_detach: [],
 	},
 	detail: {
 		kinds: [
@@ -55,5 +56,16 @@ describe('lane_breakdown_text.line', () => {
 		const report = { ...REPORT, detail: { ...REPORT.detail, background: 0 } }
 
 		expect(lane_breakdown_text.line(report)).not.toContain('backgrounded')
+	})
+
+	// joshuafolkken/kit#5078: the ship pre-detach line says what its test:pinned probe spent.
+	it('writes the test:pinned detail on the ship pre-detach line alone', () => {
+		const pinned = ' (test:pinned 1 hunks, 0 cached, 1 probed, scripts/a.ts 1.0 min)'
+		const stages = [{ name: 'ship pre-detach', ms: MINUTE_MS }, ...REPORT.breakdown.stages]
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, stages }, pinned }
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			`: ship pre-detach 1.0 min${pinned}; implement`,
+		)
 	})
 })

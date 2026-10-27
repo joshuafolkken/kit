@@ -76,3 +76,30 @@ describe('lane_breakdown_cli.run', () => {
 		expect(console.error).toHaveBeenCalledWith(lane_breakdown_cli.USAGE)
 	})
 })
+
+// joshuafolkken/kit#5078: the pre-detach line names what its test:pinned probe spent.
+describe('lane_breakdown_cli.run on a lane whose ship pre-detach probed', () => {
+	it("prints the test:pinned row written inside the stage on that stage's line", async () => {
+		const lane = `#${String(ISSUE)}`
+		const ship_stage = 'ship-stage'
+
+		mocks.all_events.mockResolvedValue([
+			{ pos: 1, at: at(10), kind: 'plan', text: `${lane} plan` },
+			{ pos: 2, at: at(50), kind: ship_stage, text: `${lane} pre-detach start` },
+			{ pos: 3, at: at(55), kind: ship_stage, text: `${lane} pre-detach done` },
+		])
+		mocks.read_entries.mockReturnValue([
+			{ kind: 'dispatch', at: at(0), issue: ISSUE },
+			{ kind: 'test-pinned', at: at(54), issue: ISSUE, held: 1, probes: [], elapsed_ms: 1 },
+			{ kind: 'merge', at: at(61), issue: ISSUE },
+		])
+
+		await lane_breakdown_cli.run([String(ISSUE)])
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringContaining(
+				'- ship pre-detach 5.0 min (test:pinned 1 hunks, 1 cached, 0 probed)',
+			),
+		)
+	})
+})

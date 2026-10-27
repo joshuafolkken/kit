@@ -18,6 +18,7 @@ const KIND = {
 	CORE_WAIT: 'core-wait',
 	UNIT_FILES: 'unit-files',
 	TEST_RELATED: 'test-related',
+	TEST_PINNED: 'test-pinned',
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',
 } as const
@@ -202,6 +203,22 @@ const test_related_schema = z.object({
 	trigger_files: z.array(z.string()).optional(),
 	elapsed_ms: z.number(),
 })
+// One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
+// answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
+// report) and its wall time. `issue` is the lane it ran in, absent outside a lane.
+const test_pinned_probe_schema = z.object({
+	file: z.string(),
+	tests: z.number().optional(),
+	elapsed_ms: z.number(),
+})
+const test_pinned_schema = z.object({
+	kind: z.literal(KIND.TEST_PINNED),
+	at: z.string(),
+	issue: z.number().optional(),
+	held: z.number(),
+	probes: z.array(test_pinned_probe_schema),
+	elapsed_ms: z.number(),
+})
 // The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
 // Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
 // (joshuafolkken/kit#4695).
@@ -235,6 +252,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
 ])
@@ -257,6 +275,8 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type TestPinnedEntry = z.infer<typeof test_pinned_schema>
+type TestPinnedRecord = Omit<TestPinnedEntry, 'kind' | 'at'>
 type SplitNoticeEntry = z.infer<typeof split_notice_schema>
 type SplitNoticeRecord = Omit<SplitNoticeEntry, 'kind' | 'at'>
 type SplitFiledEntry = z.infer<typeof split_filed_schema>
@@ -302,6 +322,8 @@ export type {
 	StageRecord,
 	StopEntry,
 	StopRecord,
+	TestPinnedEntry,
+	TestPinnedRecord,
 	TestRelatedEntry,
 	TestRelatedRecord,
 	UnitFileRecord,

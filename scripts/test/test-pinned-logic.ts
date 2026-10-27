@@ -56,6 +56,9 @@ interface HunkOutcome {
 	// Hunks whose revert stopped vitest before any test ran (joshuafolkken/kit#5043) — a config that
 	// imports the file could not load. No test was asked, so it is neither pinned nor unpinned.
 	stopped: ReadonlyArray<Hunk>
+	// Whether every checked hunk had a verdict — false when a cache-only read found one the cache no
+	// longer holds (joshuafolkken/kit#5078).
+	is_held?: boolean
 }
 
 interface PinnedReport extends HunkOutcome {

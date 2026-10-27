@@ -1,7 +1,7 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
-import type { LedgerEntry } from './lane-ledger'
+import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_stop_stats } from './lane-stop-stats'
 
@@ -20,6 +20,7 @@ const IMPLEMENT_STAGE = 'implement'
 const BETWEEN_STAGE = 'between ship stages'
 const SHIP_LEAD = 'ship '
 const IMPLEMENT_SUFFIX = ' implement'
+const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
 
 // One stage's net milliseconds.
 interface Stage {
@@ -38,6 +39,9 @@ interface Breakdown {
 	waits: ReadonlyArray<LaneSpan>
 	// The implementation's spans, waits left in — the window its tool calls are read in.
 	implement: ReadonlyArray<LaneSpan>
+	// The ship pre-detach stage's spans — the window its `test:pinned` rows are read in
+	// (joshuafolkken/kit#5078).
+	pre_detach: ReadonlyArray<LaneSpan>
 }
 
 interface Segment extends LaneSpan {
@@ -164,6 +168,7 @@ function of(
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
 		waits,
 		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
+		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),
 	}
 }
 
@@ -180,7 +185,15 @@ function longest_of(breakdown: Breakdown): { name: string; minutes: number } | u
 		: { name: longest.name, minutes: Math.round(longest.ms / MS_PER_MINUTE) }
 }
 
-const lane_breakdown = { IMPLEMENT_STAGE, covered_ms, longest_of, minutes_text, of, ranked }
+const lane_breakdown = {
+	IMPLEMENT_STAGE,
+	PRE_DETACH_STAGE,
+	covered_ms,
+	longest_of,
+	minutes_text,
+	of,
+	ranked,
+}
 
 export { lane_breakdown }
 export type { Breakdown, Stage }

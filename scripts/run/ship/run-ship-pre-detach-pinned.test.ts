@@ -1,26 +1,37 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
-import type { PinnedSummary } from '#scripts/test/test-pinned-record'
+import type { PinnedReport } from '#scripts/test/test-pinned-logic'
+import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShipArguments } from './run-ship-steps'
 
-const { run_mock, read_mock, clear_mock, pre_detach_checks, reusable_mock, on_tree_mock } =
-	vi.hoisted(() => ({
-		run_mock: vi.fn<(list: ReadonlyArray<string>) => Promise<Record<string, unknown>>>(),
-		read_mock: vi.fn<(token: string) => PinnedSummary | undefined>(),
-		clear_mock: vi.fn<(token: string) => void>(),
-		pre_detach_checks:
-			vi.fn<
-				(
-					directory?: string,
-					records?: unknown,
-					pinned?: () => Promise<JoshResult>,
-				) => Promise<JoshResult>
-			>(),
-		reusable_mock: vi.fn<(issue: number) => Promise<boolean>>(),
-		on_tree_mock: vi.fn<() => Promise<PinnedSummary | undefined>>(),
-	}))
+const {
+	run_mock,
+	read_mock,
+	clear_mock,
+	pre_detach_checks,
+	reusable_mock,
+	on_tree_mock,
+	held_mock,
+} = vi.hoisted(() => ({
+	run_mock: vi.fn<(list: ReadonlyArray<string>) => Promise<Record<string, unknown>>>(),
+	read_mock: vi.fn<(token: string) => PinnedSummary | undefined>(),
+	clear_mock: vi.fn<(token: string) => void>(),
+	pre_detach_checks:
+		vi.fn<
+			(
+				directory?: string,
+				records?: unknown,
+				pinned?: () => Promise<JoshResult>,
+			) => Promise<JoshResult>
+		>(),
+	reusable_mock: vi.fn<(issue: number) => Promise<boolean>>(),
+	on_tree_mock: vi.fn<() => Promise<PinnedSummary | undefined>>(),
+	held_mock: vi.fn<(max_hunks: number) => Promise<PinnedReport | undefined>>(),
+}))
+
+vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { held_report: held_mock } }))
 
 vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
 	run_review_pinned_join: { answer_on_tree: on_tree_mock },
@@ -31,9 +42,11 @@ vi.mock('#scripts/lib/buffered-process', () => ({
 }))
 // The real `not_run_summary`, so a check that left no answer fails open as it does in production.
 vi.mock(import('#scripts/test/test-pinned-record'), async (import_original) => {
-	const { test_pinned_record } = await import_original()
+	const original = await import_original()
 
-	return { test_pinned_record: { ...test_pinned_record, read: read_mock, clear: clear_mock } }
+	return {
+		test_pinned_record: { ...original.test_pinned_record, read: read_mock, clear: clear_mock },
+	}
 })
 vi.mock('#scripts/review/review-round-reuse', () => ({
 	review_round_reuse: { is_reusable_here: reusable_mock },
@@ -72,6 +85,23 @@ const SHIP_ARGS: ShipArguments = {
 	unpinned_ok: [],
 }
 const PASSED: JoshResult = { code: OK, out: 'pre-detach checks passed' }
+const HELD: PinnedReport = {
+	unpinned: [
+		{
+			file: 'scripts/issue/issue-file-cli.ts',
+			new_start: 49,
+			new_count: 1,
+			old_lines: [],
+			is_green: true,
+		},
+	],
+	stopped: [],
+	is_held: true,
+	unchecked: [],
+	unparsed: [],
+	max_hunks: 1,
+	has_runner: true,
+}
 
 function launched_token(): string | undefined {
 	return run_mock.mock.calls[0]?.[0].at(-1)
@@ -106,6 +136,7 @@ beforeEach(() => {
 	pre_detach_checks.mockReset().mockResolvedValue(PASSED)
 	reusable_mock.mockReset().mockResolvedValue(false)
 	on_tree_mock.mockReset().mockResolvedValue(undefined)
+	held_mock.mockReset().mockResolvedValue(undefined)
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockReset().mockResolvedValue(undefined)
 })
 
@@ -204,6 +235,48 @@ describe('run_ship_pre_detach_pinned.pinned_check under --unpinned-ok', () => {
 		const result = await check([run_review_pinned.UNPINNED_OK_FLAG, ' '])
 
 		expect(result.code).toBe(FAILED)
+		expect(run_mock).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#5078: a re-ship with a new reason judges the cached verdicts and probes nothing.
+describe('run_ship_pre_detach_pinned.pinned_check under --unpinned-ok on a probed tree', () => {
+	beforeEach(() => {
+		reusable_mock.mockResolvedValue(true)
+	})
+
+	it('judges the held verdicts under the reason and launches no josh test:pinned', async () => {
+		held_mock.mockResolvedValue(HELD)
+
+		const result = await check(UNPINNED_OK)
+
+		expect(result).toStrictEqual({
+			code: OK,
+			out: `${test_pinned_record.summary_of(HELD).text}Unpinned accepted by the implementer: ${REASON}\n`,
+		})
+		expect(run_mock).not.toHaveBeenCalled()
+		expect(on_tree_mock).not.toHaveBeenCalled()
+	})
+
+	it('probes when the cache no longer holds a hunk', async () => {
+		await check(UNPINNED_OK)
+
+		expect(held_mock).toHaveBeenCalledOnce()
+		expect(run_mock).toHaveBeenCalledOnce()
+	})
+
+	it('probes when the cache could not be read', async () => {
+		held_mock.mockRejectedValue(new Error('no base'))
+
+		await check(UNPINNED_OK)
+
+		expect(run_mock).toHaveBeenCalledOnce()
+	})
+
+	it('reads no cached verdict without a reason', async () => {
+		await check([])
+
+		expect(held_mock).not.toHaveBeenCalled()
 		expect(run_mock).toHaveBeenCalledOnce()
 	})
 })
