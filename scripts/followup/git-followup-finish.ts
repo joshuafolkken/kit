@@ -7,6 +7,7 @@ import { run_progress_clock } from '#scripts/run/progress/run-progress-clock'
 import { parse_completed_issue_number } from './followup-issue-number'
 import { git_followup_cleanup, type CleanupStep } from './git-followup-cleanup'
 import { git_followup_pending } from './git-followup-pending'
+import { git_followup_stages } from './git-followup-stages'
 
 // **The count of unreleased merges, not the project version**. The local `package.json` version
 // reads as "the version this run just shipped", but children do not bump, so that number names the
@@ -17,33 +18,64 @@ import { git_followup_pending } from './git-followup-pending'
 // Printed after the merge, and the count is read from a freshly fetched default branch — so this
 // run's own merge is already in it and nothing here says otherwise, unlike the Telegram sent one step
 // earlier from a tree the merge had not reached.
-async function print_pending_release(): Promise<void> {
+async function read_pending_release(): Promise<ReadonlyArray<string>> {
 	const line = await git_followup_pending.pending_release_line({ is_merge_pending: false })
 
-	if (line !== undefined) console.info(line)
+	return line === undefined ? [] : [line]
+}
+
+async function print_pending_release(): Promise<void> {
+	const lines = await read_pending_release()
+
+	for (const line of lines) console.info(line)
 }
 
 // #821: surface what to run next right where the completion is read. Printed before the project
 // version line, which stays the final line of the console output by contract.
-async function print_next_issues(completed_issue_number: string | undefined): Promise<void> {
-	const lines = await git_next_issues.fetch_next_issue_lines(
+//
+// Merged runs only, like the epic auto-close: on `--no-merge` the linked issue is still open
+// and still the current task, so a "next" list would hide the one issue that matters.
+async function read_next_issues(
+	completed_issue_number: string | undefined,
+	should_merge: boolean,
+): Promise<ReadonlyArray<string>> {
+	if (!should_merge) return []
+
+	return await git_next_issues.fetch_next_issue_lines(
 		parse_completed_issue_number(completed_issue_number),
 	)
+}
+
+async function print_next_issues(completed_issue_number: string | undefined): Promise<void> {
+	const lines = await read_next_issues(completed_issue_number, true)
+
 	for (const line of lines) console.info(line)
 }
 
-// The tail printed once the workflow itself has finished. `print_pending_release` stays last by
-// contract, so anything added here goes above it.
+// The tail printed once the workflow itself has finished. `print_pending_release`'s line stays last
+// by contract, so anything added here goes above it.
+//
+// **The two reads need nothing from one another, so they go out together** (#5131), and the time
+// they take is printed as a `completion` stage row: the stage block is already out by now, and an
+// untimed tail is the fixed cost `josh ship --log` could not see. The row goes above the completion
+// lines, because the pending-release line is the one that has to stay last.
 async function print_completion(
 	issue_number: string | undefined,
 	should_merge: boolean,
 ): Promise<void> {
+	const started_ms = performance.now()
+	const [next_lines, release_lines] = await Promise.all([
+		read_next_issues(issue_number, should_merge),
+		read_pending_release(),
+	])
+	const duration_ms = performance.now() - started_ms
+
+	console.info(
+		git_followup_stages.format_stage({ name: git_followup_stages.STAGE.completion, duration_ms }),
+	)
 	console.info('')
 	console.info('✅ PR followup completed.')
-	// Merged runs only, like the epic auto-close: on `--no-merge` the linked issue is still open
-	// and still the current task, so a "next" list would hide the one issue that matters.
-	if (should_merge) await print_next_issues(issue_number)
-	await print_pending_release()
+	for (const line of [...next_lines, ...release_lines]) console.info(line)
 }
 
 // A **merged** run ends here, and the round-1 review snapshot's lifetime is one run.
