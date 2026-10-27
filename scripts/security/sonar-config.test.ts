@@ -71,7 +71,12 @@ describe(`${SONAR_PROPERTIES_FILE} taint engine`, () => {
 	const properties = load_sonar_properties()
 
 	it('runs the taint analysis on the legacy engine', () => {
-		expect(properties['sonar.jasmin.internal.disabled']).toBe('true')
+		expect(properties['sonar.jasmin.internal.js.ts.disabled']).toBe('true')
+	})
+
+	// joshuafolkken/kit#5091: this key left JsSecuritySensorV2 running.
+	it('drops the key that did not switch the engine', () => {
+		expect(properties['sonar.jasmin.internal.disabled']).toBeUndefined()
 	})
 
 	it('keeps the taint rules analyzed on every file', () => {
