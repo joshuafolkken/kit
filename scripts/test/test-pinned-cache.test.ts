@@ -2,9 +2,9 @@ import { mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree } from '#scripts/git/base-tree'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
-import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_fixture, type Template } from './test-pinned-fixture'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_red } from './test-red'
 import { test_unit_guard } from './test-unit-guard'
@@ -17,7 +17,15 @@ import { test_unit_guard } from './test-unit-guard'
 
 const RUN_TIMEOUT = 240_000
 const CACHE_NAME = 'josh-test-pinned-verdicts.json'
-const { DRIVER_FILE, CHANGED_DRIVER, build_change_branch, git, write } = test_pinned_fixture
+const {
+	DRIVER_FILE,
+	CHANGED_DRIVER,
+	build_change_branch,
+	copy_template,
+	git,
+	open_template,
+	write,
+} = test_pinned_fixture
 const EXTRA_TEST = 'extra.test.ts'
 // A source file no hunk sits in and no test reaches, standing in for a fixture or a fix elsewhere.
 const OUTSIDE_FILE = 'outside.ts'
@@ -50,7 +58,7 @@ async function build_through_app(): Promise<void> {
 	)
 }
 
-function locations(report: Awaited<ReturnType<typeof test_pinned.run>>): Array<string> {
+function locations(report: Report): Array<string> {
 	return report.unpinned.map((hunk) => test_pinned_logic.location(hunk))
 }
 
@@ -59,7 +67,27 @@ function extra_test(title: string): string {
 	return `import { it } from 'vitest'\n\nit('${title}', () => {})\n`
 }
 
-const fixture: { current?: FixtureWorkspace } = {}
+type Report = Awaited<ReturnType<typeof test_pinned.run>>
+
+const fixture: { current?: FixtureWorkspace; template?: Template<Report> } = {}
+
+async function run_report(): Promise<Report> {
+	return await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+}
+
+beforeAll(async () => {
+	fixture.template = await open_template(
+		'test-pinned-cache-template-',
+		build_change_branch,
+		run_report,
+	)
+}, RUN_TIMEOUT)
+
+afterAll(async () => {
+	if (fixture.template !== undefined) {
+		await git_fixture_workspace.close_workspace(fixture.template.workspace)
+	}
+})
 
 beforeEach(() => {
 	const workspace = git_fixture_workspace.open_workspace('test-pinned-cache-')
@@ -73,8 +101,11 @@ afterEach(async () => {
 	if (fixture.current !== undefined) await git_fixture_workspace.close_workspace(fixture.current)
 })
 
-async function run_report(): ReturnType<typeof test_pinned.run> {
-	return await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+// The change branch after its first run, and that run's report.
+async function after_first_run(): Promise<Report> {
+	if (fixture.template === undefined) throw new Error('the template was not built')
+
+	return await copy_template(fixture.template)
 }
 
 async function drop_cache(): Promise<void> {
@@ -85,8 +116,7 @@ describe('test_pinned.run with a stored verdict', () => {
 	it(
 		'answers the same report on a second run over the same tree without starting vitest',
 		async () => {
-			await build_change_branch()
-			const first = await run_report()
+			const first = await after_first_run()
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			const second = await run_report()
@@ -100,8 +130,7 @@ describe('test_pinned.run with a stored verdict', () => {
 	it(
 		'checks the pinned hunk again but keeps the unpinned one after a file outside the hunks changed',
 		async () => {
-			await build_change_branch()
-			const first = await run_report()
+			const first = await after_first_run()
 
 			await write(OUTSIDE_FILE, 'export const outside = 1\n')
 			const runs = vi.spyOn(test_red, 'probe_in')
@@ -120,8 +149,7 @@ describe('test_pinned.run after only run records changed', () => {
 	it(
 		'keeps every verdict without starting vitest when an approval and an observation are written',
 		async () => {
-			await build_change_branch()
-			const first = await run_report()
+			const first = await after_first_run()
 
 			await mkdir(path.dirname(APPROVAL_FILE), { recursive: true })
 			await mkdir(path.dirname(OBSERVATION_FILE), { recursive: true })
@@ -140,8 +168,7 @@ describe('test_pinned.run after only run records changed', () => {
 	it(
 		'checks the pinned hunk again after a legacy ledger file under docs/ changed, which a test may read',
 		async () => {
-			await build_change_branch()
-			await run_report()
+			await after_first_run()
 
 			await mkdir(path.dirname(LEGACY_LEDGER_FILE), { recursive: true })
 			await write(LEGACY_LEDGER_FILE, OBSERVATION_LINE)
@@ -159,8 +186,7 @@ describe('test_pinned.run after a hunk changed', () => {
 	it(
 		'checks every hunk again, since the pinned one sits in the changed tree',
 		async () => {
-			await build_change_branch()
-			await run_report()
+			await after_first_run()
 			await write(DRIVER_FILE, CHANGED_DRIVER.replace("'--driver'", "'--drive'"))
 			const runs = vi.spyOn(test_red, 'probe_in')
 
@@ -181,8 +207,7 @@ describe('test_pinned.run after lines of the unpinned hunk were removed', () => 
 	it(
 		'keeps the pinned verdict without starting vitest once the unpinned hunk is removed whole',
 		async () => {
-			await build_change_branch()
-			const first = await run_report()
+			const first = await after_first_run()
 			const [unpinned] = first.unpinned
 
 			expect(unpinned).toBeDefined()
@@ -201,8 +226,7 @@ describe('test_pinned.run after lines of the unpinned hunk were removed', () => 
 	it(
 		'probes only what is left of the unpinned hunk once one of its lines is removed',
 		async () => {
-			await build_change_branch()
-			await run_report()
+			await after_first_run()
 			await write(DRIVER_FILE, CHANGED_DRIVER.replace(/^\treturn argv.*\n/mu, ''))
 			const runs = vi.spyOn(test_red, 'probe_in')
 
@@ -241,8 +265,7 @@ describe('test_pinned.run after a test file is added', () => {
 	it(
 		'checks the unpinned hunk again but keeps the pinned one, whose failed test is unchanged',
 		async () => {
-			await build_change_branch()
-			const first = await run_report()
+			const first = await after_first_run()
 
 			await write(EXTRA_TEST, extra_test('runs'))
 			const runs = vi.spyOn(test_red, 'probe_in')
@@ -261,8 +284,7 @@ describe('test_pinned.run after the test a pinned hunk failed in changed', () =>
 	it(
 		'checks every hunk again',
 		async () => {
-			await build_change_branch()
-			await run_report()
+			await after_first_run()
 			await write(
 				test_pinned_fixture.TEST_FILE,
 				`${test_pinned_fixture.DEFAULT_PATH_TEST}\nit('runs', () => {})\n`,

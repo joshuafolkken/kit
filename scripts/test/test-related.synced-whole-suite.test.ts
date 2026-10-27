@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
@@ -137,11 +139,58 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 		])
 	})
 
-	it('still runs the whole suite when the change base cannot be read', async () => {
+	// joshuafolkken/kit#5122: the list is a file every test imports, so it reaches the test files
+	// importing it directly — never the whole suite, which the gate and CI run.
+	it('runs the test files importing the list when the change base cannot be read', async () => {
 		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
+		const importers = await direct_importers.every_test_importers(REPOSITORY_ROOT, [PURE_FILES])
 
 		await test_related.run_related_tests([])
 
+		expect(vitest_arguments()).toEqual([
+			'related',
+			...(importers.get(PURE_FILES) ?? []).map((file) => path.join(REPOSITORY_ROOT, file)),
+			'--run',
+		])
+	})
+})
+
+// joshuafolkken/kit#5122: the gate's unit leg keeps the whole suite for a file every test imports,
+// and the flag never reaches vitest.
+describe('test_related.run_related_tests — the gate’s whole-suite flag', () => {
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([pure_files_entries.PURE_FILES_PATH, FIXED_SOURCE])
+		vi.mocked(git_command.show_file).mockRejectedValue(NOT_A_REPOSITORY)
+	})
+
+	it('runs the whole suite for a file every test imports', async () => {
+		mocked_moved.mockResolvedValue({ changed: [pure_files_entries.PURE_FILES_PATH], synced: [] })
+
+		await test_related.run_related_tests([gate_plan.KEEP_WHOLE_SUITE_FLAG])
+
 		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
+	})
+
+	// A bare run's green vouches only for that file's direct importers.
+	it('never narrows by a green past a file every test imports the branch changed', async () => {
+		await test_related.run_related_tests([gate_plan.KEEP_WHOLE_SUITE_FLAG])
+
+		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
+	})
+
+	it('never reports a file every test imports as ignored when it names one', async () => {
+		await test_related.run_related_tests([pure_files_entries.PURE_FILES_PATH])
+
+		expect(vi.mocked(process.stdout.write).mock.calls.join('\n')).not.toContain('ignored')
+	})
+
+	it('narrows by that green without the flag', async () => {
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			path.join(REPOSITORY_ROOT, FIXED_SOURCE),
+			'--run',
+		])
 	})
 })

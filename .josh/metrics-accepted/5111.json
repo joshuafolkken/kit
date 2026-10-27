@@ -1,0 +1,7 @@
+{
+	"reason": "test-pinned-fixture gains the shared template helpers that let the pinned-verdict test files build and probe their branch once per file, closing the template when its build fails",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

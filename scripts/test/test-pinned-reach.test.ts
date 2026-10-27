@@ -1,7 +1,7 @@
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned } from './test-pinned'
-import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_fixture, type Template } from './test-pinned-fixture'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_reach, type ReachInputs } from './test-pinned-reach'
 import { test_red } from './test-red'
@@ -11,7 +11,8 @@ import { test_red } from './test-red'
 // import closure and the changed non-code files for a pinned one.
 
 const RUN_TIMEOUT = 240_000
-const { DRIVER_FILE, TEST_FILE, build_change_branch, write } = test_pinned_fixture
+const { DRIVER_FILE, TEST_FILE, build_change_branch, copy_template, open_template, write } =
+	test_pinned_fixture
 const TSCONFIG = 'tsconfig.json'
 const TSCONFIG_CONTENT =
 	'{ "compilerOptions": { "allowJs": true, "moduleResolution": "bundler", "module": "esnext" } }\n'
@@ -29,7 +30,9 @@ const UNPINNED_HUNK = `${DRIVER_FILE}:6`
 const APP_FILE = 'app.js'
 const APP_THROUGH_DRIVER = `export { label, token_of } from './${DRIVER_FILE}'\n`
 
-const fixture: { current?: FixtureWorkspace } = {}
+type Report = Awaited<ReturnType<typeof test_pinned.run>>
+
+const fixture: { current?: FixtureWorkspace; template?: Template<Report> } = {}
 
 beforeEach(() => {
 	const workspace = git_fixture_workspace.open_workspace('test-pinned-reach-')
@@ -74,11 +77,32 @@ function extra_test(title: string): string {
 	return `import { it } from 'vitest'\n\nit('${title}', () => {})\n`
 }
 
-async function run_report(): ReturnType<typeof test_pinned.run> {
+async function run_report(): Promise<Report> {
 	return await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
 }
 
-function locations(report: Awaited<ReturnType<typeof test_pinned.run>>): Array<string> {
+beforeAll(async () => {
+	fixture.template = await open_template(
+		'test-pinned-reach-template-',
+		build_with_graph,
+		run_report,
+	)
+}, RUN_TIMEOUT)
+
+afterAll(async () => {
+	if (fixture.template !== undefined) {
+		await git_fixture_workspace.close_workspace(fixture.template.workspace)
+	}
+})
+
+// The graph branch after its first run, and that run's report.
+async function after_first_run(): Promise<Report> {
+	if (fixture.template === undefined) throw new Error('the template was not built')
+
+	return await copy_template(fixture.template)
+}
+
+function locations(report: Report): Array<string> {
 	return report.unpinned.map((hunk) => test_pinned_logic.location(hunk))
 }
 
@@ -94,8 +118,7 @@ describe('test_pinned.run over an import graph after an edit no hunk rests on', 
 	it(
 		'keeps every verdict without starting vitest after a test reaching no hunk is added',
 		async () => {
-			await build_with_graph()
-			const first = await run_report()
+			const first = await after_first_run()
 
 			await write(EXTRA_TEST, extra_test('runs'))
 			const runs = vi.spyOn(test_red, 'probe_in')
@@ -145,8 +168,7 @@ describe('test_pinned.run over an import graph after an edit a hunk rests on', (
 	it(
 		'checks every hunk again after the test reaching them changed',
 		async () => {
-			await build_with_graph()
-			await run_report()
+			await after_first_run()
 			await write(TEST_FILE, `${test_pinned_fixture.DEFAULT_PATH_TEST}\nit('runs', () => {})\n`)
 			const runs = vi.spyOn(test_red, 'probe_in')
 
@@ -160,8 +182,7 @@ describe('test_pinned.run over an import graph after an edit a hunk rests on', (
 	it(
 		'checks the pinned hunk again after a non-code file changed, which a test may read',
 		async () => {
-			await build_with_graph()
-			await run_report()
+			await after_first_run()
 			await write(FIXTURE_FILE, '{}\n')
 			const runs = vi.spyOn(test_red, 'probe_in')
 
@@ -192,8 +213,7 @@ describe('test_pinned.run over an import graph after an edit the failed test res
 	it(
 		'checks the pinned hunk again after a code file nothing imports changed',
 		async () => {
-			await build_with_graph()
-			await run_report()
+			await after_first_run()
 			await write(ROOT_FILE, 'export const cli = 1\n')
 			const runs = vi.spyOn(test_red, 'probe_in')
 
