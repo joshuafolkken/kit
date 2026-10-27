@@ -1,3 +1,5 @@
+import { realpathSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { core_budget } from '#scripts/gate/core-budget'
 import { core_weights } from '#scripts/gate/core-weights'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
@@ -107,6 +109,7 @@ describe('reserved_run.reservation_options', () => {
 describe('reserved_run.run_reserved', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
+		vi.unstubAllEnvs()
 	})
 
 	// The whole path: a guarded command runs while a place is held, and its exit code is what the caller
@@ -115,6 +118,18 @@ describe('reserved_run.run_reserved', () => {
 	it('runs the guarded command and returns its exit code', async () => {
 		expect(
 			await reserved_run.run_reserved([String(AUDIT_WEIGHT), '--', process.execPath, '--version']),
+		).toBe(0)
+	})
+
+	// joshuafolkken/kit#5147: `pnpm josh` starts at the package root, so the command runs where it was typed.
+	it('runs the command in the directory pnpm was called from', async () => {
+		const typed_in = realpathSync(tmpdir())
+		const check = `process.exit(process.cwd() === ${JSON.stringify(typed_in)} ? 0 : 3)`
+
+		vi.stubEnv('INIT_CWD', typed_in)
+
+		expect(
+			await reserved_run.run_reserved([String(AUDIT_WEIGHT), '--', process.execPath, '-e', check]),
 		).toBe(0)
 	})
 
