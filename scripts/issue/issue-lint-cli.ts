@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { aggregation_split } from './aggregation-split'
 import { behavior_change_lint } from './behavior-change-lint'
 import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
@@ -33,6 +34,7 @@ function problems(body: string): ReadonlyArray<string> {
 		...issue_not_before.problems(body),
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),
+		...aggregation_split.problems(body),
 	]
 }
 

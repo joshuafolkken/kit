@@ -63,6 +63,15 @@ describe('lane_ledger_schema.entry_schema', () => {
 	})
 })
 
+// joshuafolkken/kit#5168
+describe('lane_ledger_schema.entry_schema — lane state', () => {
+	it("parses a lane's pause or resume", () => {
+		const line = { kind: KIND.LANE_STATE, at: AT, issue: 5168, state: 'paused' }
+
+		expect(entry_schema.safeParse(line).success).toBe(true)
+	})
+})
+
 // joshuafolkken/kit#4620: how a ship's round 1 ended, for `josh lane:stats`.
 describe('lane_ledger_schema.entry_schema — round one', () => {
 	it('parses the round 1 a ship acted on', () => {
