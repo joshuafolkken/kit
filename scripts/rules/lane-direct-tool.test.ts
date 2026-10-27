@@ -19,6 +19,8 @@ const PNPM_EXEC_ESLINT = 'pnpm exec eslint .'
 const LINT_RELATED = 'pnpm josh lint:related'
 const JOSH_RESERVED = 'pnpm josh reserved-run 1 -- vitest run'
 const RESERVED_ESLINT = `pnpm josh reserved-run 4 -- ${PNPM_EXEC_ESLINT}`
+const JOSH_RENAME =
+	"pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' scripts/gate/core-wait-record.ts"
 const ESLINT_FOUR = `${PNPM_EXEC_ESLINT} --concurrency 4`
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
@@ -173,6 +175,11 @@ describe('delivered_rules.delivery — inside a lane checkout', () => {
 		expect(
 			delivered_rules.delivery(payload_of('lane-reserved', JOSH_RESERVED), NOW_MS),
 		).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#5236: the rename formats through the edit hook's own eslint route.
+	it('lets josh rename through', () => {
+		expect(delivered_rules.delivery(payload_of('lane-rename', JOSH_RENAME), NOW_MS)).toBeUndefined()
 	})
 
 	it('is claimed by exactly one rule in the enumeration', () => {

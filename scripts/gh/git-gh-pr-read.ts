@@ -421,7 +421,9 @@ export type { PullMergeState }
 export {
 	git_gh_pr_read,
 	forget_pr_numbers,
+	read_listed_pull,
 	read_pull,
+	read_pull_or_listed,
 	require_pr_number,
 	resolve_pr_number,
 	NO_PULL_REQUEST_MESSAGE,

@@ -8,9 +8,12 @@ import {
 	gh_failure,
 	PR_BRANCH,
 	pr_detail_path,
+	pr_lookup_path,
 	PR_NUMBER,
 	pr_routes,
 	rest_pull,
+	rest_pull_page,
+	too_many_files_failure,
 	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import { forget_pr_numbers } from './git-gh-pr-read'
@@ -178,5 +181,29 @@ describe('pr_merge — a merge request that failed after the merge landed', () =
 			'cause.message',
 			gh_failure().message,
 		)
+	})
+})
+
+// joshuafolkken/kit#5229: the listing row stands in for a detail refused as too many files changed.
+describe('pr_merge — a read-back whose detail is too large', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		forget_pr_numbers()
+	})
+
+	it('reads the merge back from the listing row', async () => {
+		const merged_row = rest_pull_page([{ state: 'closed', merged_at: MERGED_AT }])
+		const routes = pr_routes(
+			{},
+			{
+				[pr_lookup_path()]: merged_row,
+				[pr_detail_path()]: fails_with(too_many_files_failure()),
+				[PR_MERGE_PATH]: fails_with(gh_failure()),
+			},
+		)
+
+		mocked_api.mockImplementation(gh_api_routes(routes))
+
+		await expect(git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)).resolves.toBeUndefined()
 	})
 })
