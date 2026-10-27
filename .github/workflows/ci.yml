@@ -477,19 +477,19 @@ jobs:
   # which for a matrix is `success` only when every shard succeeded — no change there is needed.
   # The shards split by the recorded per-file durations in `tools/test/unit-durations.json`, not by
   # file count, so they finish together (`tools/test/duration-shard.ts`, joshuafolkken/kit#4467).
-  # Three shards (joshuafolkken/kit#4610): joshuafolkken/kit#4573 went to four while a lone run was
-  # held to one worker; with vitest's default workers back every shard ends well inside Static
-  # Checks, which sets the CI wait, so the fourth runner only added a job.
+  # Six shards (joshuafolkken/kit#5090): at three (joshuafolkken/kit#4610) the slowest shard had
+  # become the last check `Checks` waited on, past Static Checks. Six bring a shard's recorded load
+  # to about two minutes; past that the longest single file, not the shard count, sets the floor.
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
-    name: Unit Tests (${{ matrix.shard }}/3)
+    name: Unit Tests (${{ matrix.shard }}/6)
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -521,7 +521,7 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit --shard=${{ matrix.shard }}/3
+        run: pnpm josh test:unit --shard=${{ matrix.shard }}/6
 
       # One shard is enough: the check does not depend on which test files ran beside it.
       - name: Verify optional ESLint consumer install
