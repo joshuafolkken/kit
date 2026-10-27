@@ -6,9 +6,10 @@ import { vitest_cli_excludes } from './vitest-cli-excludes'
 
 // **A scoped run leaves out the heavy test files a change reaches only indirectly**
 // (joshuafolkken/kit#5105). A hub module's change reaches the integration tests importing it through
-// the shared harnesses, and a scoped run's wall clock is bounded below by its longest file — 18 to 49
-// seconds each — whatever else it narrows. A heavy file still runs when this change moved it or a file
-// it imports directly, so the test written for a module is never left out with it.
+// the shared harnesses, and a scoped run's wall clock is bounded below by its longest file — over
+// `HEAVY_TEST_MS` each — whatever else it narrows. A heavy file still runs when this change moved it,
+// the module it is named for, or a file it imports directly, so the test written for a module is never
+// left out with it, even when it reaches that module through a harness.
 //
 // "Heavy" is read off the CI shards' duration record (`unit-durations.json`), never a named list, so
 // a file that slows down or speeds up moves in or out on the record's next refresh. The whole-suite
@@ -20,6 +21,8 @@ const { EXCLUDE_FLAG } = vitest_cli_excludes
 const PACKAGE_FILE = 'package.json'
 const WILDCARD = '*'
 const CURRENT_DIRECTORY_PREFIX = './'
+// The suffix a test file's module key carries past the module it is named for.
+const TEST_SUFFIX_PATTERN = /(?:\.integration)?\.test$/u
 
 // The module specifiers a source names in a static or dynamic import, an export-from or a `vi.mock`.
 const SPECIFIER_PATTERN = /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+|\bmock\(\s*)["']([^"']+)["']/gu
@@ -93,13 +96,19 @@ function imports_directly(file: string, scoped: ReadonlySet<string>, reader: Hea
 	})
 }
 
-// The heavy files to leave out of a scoped run: every one this scope neither holds nor imports from.
+function is_kept(file: string, scoped: ReadonlySet<string>, reader: HeavyReader): boolean {
+	const key = module_key(file)
+
+	if (scoped.has(key) || scoped.has(key.replace(TEST_SUFFIX_PATTERN, ''))) return true
+
+	return imports_directly(file, scoped, reader)
+}
+
+// The heavy files to leave out of a scoped run: every one this scope neither holds, names nor imports from.
 function excluded_tests(scoped_files: ReadonlyArray<string>, reader: HeavyReader): Array<string> {
 	const scoped = new Set(scoped_files.map((file) => module_key(file)))
 
-	return heavy_tests(reader.durations).filter(
-		(file) => !scoped.has(module_key(file)) && !imports_directly(file, scoped, reader),
-	)
+	return heavy_tests(reader.durations).filter((file) => !is_kept(file, scoped, reader))
 }
 
 function read_imports(root: string): ImportMap {
@@ -107,9 +116,14 @@ function read_imports(root: string): ImportMap {
 		const parsed: unknown = JSON.parse(readFileSync(path.join(root, PACKAGE_FILE), 'utf8'))
 		const imports: unknown = Reflect.get(new Object(parsed), 'imports')
 
-		return typeof imports === 'object' && imports !== null
-			? Object.fromEntries(Object.entries(imports))
-			: {}
+		if (typeof imports !== 'object' || imports === null) return {}
+
+		// A conditional entry (`{ "node": … }`) names no single file, so it resolves nothing.
+		return Object.fromEntries(
+			Object.entries(imports).filter(
+				(entry): entry is [string, string] => typeof entry[1] === 'string',
+			),
+		)
 	} catch {
 		return {}
 	}
