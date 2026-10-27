@@ -86,6 +86,12 @@ read as commands. The Codex adapter cannot apply a
 rewritten input, so it keeps refusing. Every other guard judges the rewritten call, so another rule's
 refusal still wins and the piped-verification row spends no delivery on a call it rewrote.
 
+A resident trigger clause was added after all (joshuafolkken/kit#5252). Without the hook, an agent
+asked for only the gate's tail piped it in 3 of 3 `piped-verification` eval runs.
+
+One clause on `CLAUDE.md`'s gate step — never piped, its last lines carry the verdict — held in 3 of 3.
+It is a trigger beside the step that runs the gate; the body stays here.
+
 **The detector stays**. `scripts/time-runtime/time-reported-failure.ts` reads the gate's
 own `✗ verification gate failed:` line on top of `is_error`. A hook reaches Claude Code alone — not a
 session with the stop switch set, not another harness — so the detector covers the outside and is **the

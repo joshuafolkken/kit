@@ -14,7 +14,8 @@ import { rule_list } from './rule-list'
 // answered success on a gate that had printed `✗ verification gate failed`. The failure was real, and
 // what caught it was a child reading the output rather than anything the shell reported.
 //
-// **The rule is delivered, not written down, and this suite is what pins that choice.** Two
+// **The rule is delivered, with only a trigger clause resident (joshuafolkken/kit#5252), and this
+// suite is what pins that choice.** Two
 // alternatives were measured and rejected — rewriting the procedure documents' examples, when a
 // survey of every document, prompt and skill found exactly one piped verification example and it was
 // the repository's own explanation of this bug; and stating a calling convention, which
@@ -59,7 +60,7 @@ describe('the delivered text — what the refusal states', () => {
 		expect(delivered).toContain('Reissue this call with no pipe')
 	})
 
-	// The pointer is where the reasoning is, and `CLAUDE.md` never carried this rule to point back at.
+	// The pointer is where the reasoning is; `CLAUDE.md` carries only the trigger clause.
 	it('names the topic file rather than the resident document', () => {
 		expect(delivered).toContain(CANONICAL)
 		expect(delivered).not.toContain('CLAUDE.md')
@@ -100,6 +101,17 @@ describe(`${CANONICAL} — the single source for the rule and its rejected alter
 		'**The detector stays**',
 	])('records the rejected alternative %j', (marker) => {
 		expect(read_unwrapped(RATIONALE)).toContain(marker)
+	})
+})
+
+// joshuafolkken/kit#5252: with no hook to deliver the refusal, an agent asked for the gate's tail piped
+// it in 3 of 3 eval runs; this clause on the gate step held in 3 of 3.
+describe('CLAUDE.md — keeps the trigger on the gate step', () => {
+	it('states the pipe ban with a pointer to the topic file', () => {
+		const content = read_unwrapped('CLAUDE.md')
+
+		expect(content).toContain('`pnpm josh gate`, never piped: `| tail` reports a red gate as green')
+		expect(content).toContain(`the verdict (\`${CANONICAL}\`)`)
 	})
 })
 
