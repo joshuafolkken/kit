@@ -91,7 +91,7 @@
 | `- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）` | なし                                   | epic 以外は必須。目安の判定は `issue:file`（`scripts/issue/size-estimate.ts`）        |
 | `- 分割しない理由: <理由>`                               | なし                                   | 目安を超える見積もりを 1 件のまま起票する（`split-assessment.md` → "The question"）   |
 
-集計を Issue コメントに記録する受け入れ条件と実装の見積もりを併せ持つ本文 → 集計を `--route split` の先行 Issue に分ける（`issue:lint` が拒否する。`scripts/issue/aggregation-split.ts`）。
+集計を Issue コメントに記録する受け入れ条件と実装の見積もりを併せ持つ本文 → 集計を `--route split` の先行 Issue に分け、そのコメントを `## 背景` に引く（`issue:lint` が拒否する。`scripts/issue/aggregation-split.ts`）。
 
 優先度の基準（`scripts/issue/issue-priority.ts`）。`kickoff new critical` / `high` と打った優先度があれば本文は判定しない:
 

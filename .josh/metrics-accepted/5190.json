@@ -2,8 +2,8 @@
 	"reason": "#5190 adds the aggregation-split lint to issue:lint and its one-line pointer in issue-template.md",
 	"date": "2026-10-27",
 	"growth": {
-		"scripts.code_lines": 25,
+		"scripts.code_lines": 27,
 		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 243
+		"ai_cost.on_demand_bytes": 286
 	}
 }

@@ -9,15 +9,20 @@ import { size_estimate } from './size-estimate'
 
 const CRITERIA_HEADING = '## 受け入れ条件'
 const CRITERION_PREFIX = '- ['
-const AGGREGATION_WORDS: ReadonlyArray<string> = ['集計', 'コメント']
+// Recording on an Issue, not a feature that posts a PR comment: all four words name the lane's own act.
+const AGGREGATION_WORDS: ReadonlyArray<string> = ['集計', 'Issue', 'コメント', '記録']
+// A criterion citing the prior aggregation Issue is the implementation this rule asks for.
+const ISSUE_REFERENCE = /#\d+/u
 // The implementation the estimate declares: a prior aggregation Issue may add a script or two of its own.
 const IMPLEMENTATION_FILES = 3
-const REFUSAL = `an acceptance criterion records an aggregation as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file the aggregation as a prior Issue (\`--route split\`) and cite its comment in this one; issue-template.md → "\`## 背景\` 直下の宣言と分類ラベル"`
+const REFUSAL = `an acceptance criterion records an aggregation as an Issue comment beside an implementation of ${String(IMPLEMENTATION_FILES)}+ files — file the aggregation as a prior Issue (\`--route split\`) and cite its comment under ## 背景 in this one; issue-template.md → "\`## 背景\` 直下の宣言と分類ラベル"`
 
 function is_aggregation_criterion(line: string): boolean {
 	const text = line.trim()
 
-	return text.startsWith(CRITERION_PREFIX) && AGGREGATION_WORDS.every((word) => text.includes(word))
+	if (!text.startsWith(CRITERION_PREFIX) || ISSUE_REFERENCE.test(text)) return false
+
+	return AGGREGATION_WORDS.every((word) => text.includes(word))
 }
 
 function has_aggregation_criterion(body: string): boolean {

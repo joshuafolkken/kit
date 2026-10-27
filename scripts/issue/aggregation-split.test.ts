@@ -30,6 +30,16 @@ describe('aggregation_split.problems', () => {
 	it.each([
 		{ name: 'an aggregation alone', files: 1, criterion: AGGREGATION },
 		{ name: 'an implementation alone', files: 6, criterion: IMPLEMENTATION },
+		{
+			name: 'an implementation citing the prior aggregation',
+			files: 6,
+			criterion: '- [ ] #5200 のコメントに記録した Issue の集計に沿って実装する',
+		},
+		{
+			name: 'a feature posting an aggregate as a PR comment',
+			files: 6,
+			criterion: '- [ ] `josh metrics` が失敗を集計し PR コメントに投稿する',
+		},
 	])('passes $name', ({ files, criterion }) => {
 		expect(aggregation_split.problems(body(files, criterion))).toStrictEqual([])
 	})
