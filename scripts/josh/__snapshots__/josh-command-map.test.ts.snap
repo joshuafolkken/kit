@@ -1001,6 +1001,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "rename": [
+      "<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>",
+      "automation",
+      [
+        "files",
+        "processes",
+      ],
+    ],
     "repo:party": [
       "[<owner/repo>]",
       "automation",

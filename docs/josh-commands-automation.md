@@ -24,6 +24,22 @@ The candidates are those of `prompts/refactoring.md` §4.1–§4.3, as `verdict:
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refactor:scan` in detail".
 
+### `josh rename`
+
+<!-- usage: rename -->
+
+Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree.
+
+```bash
+pnpm josh rename old_name new_name scripts/a.ts scripts/b.ts
+pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' scripts/gate/core-wait-record.ts   # the identifier and its module together
+```
+
+<!-- /usage -->
+
+Only bindings and module specifiers change; strings, comments, `obj.old` and property keys stay. Each file's count is printed, then the files are formatted as the edit hook would.
+A file with no replacement, missing, or not TypeScript or JavaScript is named, nothing is written, exit 1.
+
 ### `josh format:edited`
 
 <!-- usage: format:edited -->
