@@ -9,8 +9,9 @@ import { test_declared_logic } from './test-declared-logic'
 // test:pinned` red rests on besides the test's own closure; an edit to code nothing named reaches
 // leaves the red held. A comment starts nothing, so its file names are not read.
 //
-// A name is a file's base name, so a file named by another with the same base name counts too: the
-// match errs toward re-probing, never toward holding a red its test no longer pins.
+// A name is a file's whole base name in one string or template span, so a file named by another with
+// the same base name counts too, erring toward re-probing. A name built across template spans or
+// written without its extension is not read, so a fix to that CLI leaves its red held.
 
 const TOKEN = /[\w.-]+/gu
 
@@ -36,31 +37,33 @@ function names_in(text: string, index: ReadonlyMap<string, ReadonlyArray<string>
 	return (text.match(TOKEN) ?? []).flatMap((token) => index.get(token) ?? [])
 }
 
+// `read` answered once per file for the graph's lifetime, however many reds ask it.
+function memoized(read: (file: string) => Array<string>): (file: string) => Array<string> {
+	const known = new Map<string, Array<string>>()
+
+	return function answer(file: string): Array<string> {
+		const found = known.get(file) ?? read(file)
+
+		known.set(file, found)
+
+		return found
+	}
+}
+
 function create(graph: ImportGraph, universe: ReadonlyArray<string>): TestSpawn {
 	const index = index_of(universe)
-	const named_by = new Map<string, ReadonlyArray<string>>()
-
-	function names_of(file: string): ReadonlyArray<string> {
-		const known = named_by.get(file)
-		if (known !== undefined) return known
-		const names = names_in(graph.strings(file).join(' '), index)
-
-		named_by.set(file, names)
-
-		return names
-	}
-
-	// What `file` runs names: its own text and that of every module its imports reach.
-	function named_from(file: string): Array<string> {
-		return [file, ...graph.closure(file)].flatMap((read) => names_of(read))
-	}
+	const names_of = memoized((file) => names_in(graph.strings(file).join(' '), index))
+	// What `file` runs names: its own strings and those of every module its imports reach.
+	const named_from = memoized((file) => [
+		...new Set([file, ...graph.closure(file)].flatMap((read) => names_of(read))),
+	])
 
 	function started(tests: ReadonlyArray<string>): ReadonlySet<string> {
 		const found = new Set<string>()
 		const pending = [...tests]
 
 		for (let current = pending.pop(); current !== undefined; current = pending.pop()) {
-			const next = [...new Set(named_from(current))].filter((file) => !found.has(file))
+			const next = named_from(current).filter((file) => !found.has(file))
 
 			for (const file of next) found.add(file)
 			pending.push(...next)
