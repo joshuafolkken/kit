@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { lane_implement_stats } from './lane-implement-stats'
+import type { PausedSpans } from './lane-paused-spans'
 import type { ToolCall } from './lane-transcript-calls'
 
 // joshuafolkken/kit#4887: the implement stage is broken down by what each call's span went on, from the
@@ -11,6 +12,8 @@ const SESSION = 'session-1'
 const WINDOW = { since_ms: 0, until_ms: 1000 * MINUTE_MS }
 const CHECK_RELATED = 'pnpm josh check:related'
 const SHIP = 'pnpm josh ship'
+const LANE_ISSUE = 4887
+const NO_PAUSE: PausedSpans = new Map()
 
 // A call that starts at `start` minutes and runs for one minute.
 function call(start: number, fields: Partial<ToolCall>): ToolCall {
@@ -27,8 +30,11 @@ function call(start: number, fields: Partial<ToolCall>): ToolCall {
 	}
 }
 
-function minutes_of(calls: ReadonlyArray<ToolCall>): Record<string, number> {
-	const [totals] = lane_implement_stats.lane_totals_in(calls, WINDOW)
+function minutes_of(
+	calls: ReadonlyArray<ToolCall>,
+	paused: PausedSpans = NO_PAUSE,
+): Record<string, number> {
+	const [totals] = lane_implement_stats.lane_totals_in(calls, WINDOW, paused)
 
 	return Object.fromEntries(
 		[...(totals ?? new Map<string, number>())].map(([stage, ms]) => [stage, ms / MINUTE_MS]),
@@ -59,7 +65,9 @@ describe('lane_implement_stats.lane_totals_in — the sub-stages', () => {
 	})
 
 	it('counts no implement for a lane that never shipped', () => {
-		expect(lane_implement_stats.lane_totals_in(LANE_CALLS.slice(0, -2), WINDOW)).toStrictEqual([])
+		expect(
+			lane_implement_stats.lane_totals_in(LANE_CALLS.slice(0, -2), WINDOW, NO_PAUSE),
+		).toStrictEqual([])
 	})
 
 	it("spans a later session's first call by its own duration, not the gap since the last session", () => {
@@ -70,6 +78,30 @@ describe('lane_implement_stats.lane_totals_in — the sub-stages', () => {
 		]
 
 		expect(minutes_of(resumed)['edit']).toBe(2)
+	})
+})
+
+// joshuafolkken/kit#5168: a `lane:pause` left seven hours on the clock of the one call in flight.
+describe('lane_implement_stats.lane_totals_in — a paused lane', () => {
+	it('takes the time the lane stood paused out of the call in flight across it', () => {
+		const stopped = [
+			call(0, { tool: 'Read' }),
+			call(2, { command: CHECK_RELATED, duration_ms: 400 * MINUTE_MS }),
+			call(403, { command: SHIP }),
+		]
+		const paused = new Map([[LANE_ISSUE, [{ from_ms: 3 * MINUTE_MS, to_ms: 399 * MINUTE_MS }]]])
+
+		expect(minutes_of(stopped, paused)['check']).toBe(5)
+	})
+
+	it("leaves another lane's paused time in this lane's calls", () => {
+		const stopped = [
+			call(0, { command: CHECK_RELATED, duration_ms: 10 * MINUTE_MS }),
+			call(11, { command: SHIP }),
+		]
+		const paused = new Map([[LANE_ISSUE + 1, [{ from_ms: 0, to_ms: 10 * MINUTE_MS }]]])
+
+		expect(minutes_of(stopped, paused)['check']).toBe(10)
 	})
 })
 
@@ -95,7 +127,7 @@ describe('lane_implement_stats.lane_totals_in — calls made side by side', () =
 describe('lane_implement_stats.table', () => {
 	it('prints a row per sub-stage with its median over the lanes', () => {
 		const other_lane = LANE_CALLS.map((entry) => ({ ...entry, lane: `${LANE}-other` }))
-		const table = lane_implement_stats.table([...LANE_CALLS, ...other_lane], WINDOW)
+		const table = lane_implement_stats.table([...LANE_CALLS, ...other_lane], WINDOW, NO_PAUSE)
 
 		expect(table).toContain('| implement sub-stage | lanes | median (min) | max (min) |')
 		expect(table.split('\n')).toHaveLength(lane_implement_stats.SUB_STAGES.length + 2)

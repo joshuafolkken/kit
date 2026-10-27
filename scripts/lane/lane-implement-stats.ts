@@ -1,3 +1,4 @@
+import { lane_paused_spans, type PausedSpan, type PausedSpans } from './lane-paused-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import type { ToolCall } from './lane-transcript-calls'
@@ -13,7 +14,9 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 // has no implement here. **`review-fix` runs from `run:review` on** — the round's fixes and their scoped
 // checks; before it, an edit is `edit`, a scoped check or gate is `check`, and any other call is `plan`
 // before the first edit, `read` after it. **A session's first call spans its own duration**, so the gap
-// between two sessions of one lane is nobody's.
+// between two sessions of one lane is nobody's. **Nor is the time the lane stood paused**: a
+// `lane:pause` leaves the call in flight on the clock, so its overlap with the lane's paused spans is
+// taken out (joshuafolkken/kit#5168).
 
 const SUB_STAGES = ['plan', 'read', 'edit', 'check', 'review-fix'] as const
 type SubStage = (typeof SUB_STAGES)[number]
@@ -87,8 +90,16 @@ function next_reach(call: ToolCall, reach: Reach): Reach {
 	return { session_id: call.session_id, end_ms: Math.max(latest, end_ms(call)) }
 }
 
+// The call's span less the time its lane stood paused inside it.
+function active_ms(call: ToolCall, reach: Reach, paused: ReadonlyArray<PausedSpan>): number {
+	const span = span_ms(call, reach)
+	const end = end_ms(call)
+
+	return span - lane_paused_spans.overlap_ms(paused, end - span, end)
+}
+
 // Each sub-stage's summed span over one lane's implement calls, oldest first.
-function lane_totals(calls: ReadonlyArray<ToolCall>): Totals {
+function lane_totals(calls: ReadonlyArray<ToolCall>, paused: ReadonlyArray<PausedSpan>): Totals {
 	const totals = new Map<SubStage, number>(SUB_STAGES.map((stage) => [stage, 0]))
 	let phase: Phase = { edited: false, reviewing: false }
 	let reach = NO_REACH
@@ -97,7 +108,7 @@ function lane_totals(calls: ReadonlyArray<ToolCall>): Totals {
 		phase = next_phase(call, phase)
 		const stage = sub_stage_of(call, phase)
 
-		totals.set(stage, (totals.get(stage) ?? 0) + span_ms(call, reach))
+		totals.set(stage, (totals.get(stage) ?? 0) + active_ms(call, reach, paused))
 		reach = next_reach(call, reach)
 	}
 
@@ -122,11 +133,16 @@ function lanes_of(calls: ReadonlyArray<ToolCall>): Array<ReadonlyArray<ToolCall>
 }
 
 // The sub-stage totals of each lane that shipped in `window`.
-function lane_totals_in(calls: ReadonlyArray<ToolCall>, window: StatsWindow): Array<Totals> {
+function lane_totals_in(
+	calls: ReadonlyArray<ToolCall>,
+	window: StatsWindow,
+	paused: PausedSpans,
+): Array<Totals> {
 	return lanes_of(lane_transcript_stats.in_period(calls, window)).flatMap((lane) => {
 		const implement = implement_calls(lane)
+		const spans = lane_paused_spans.of_lane(paused, lane[0]?.lane ?? '')
 
-		return implement === undefined ? [] : [lane_totals(implement)]
+		return implement === undefined ? [] : [lane_totals(implement, spans)]
 	})
 }
 
@@ -141,9 +157,10 @@ function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string
 	]
 }
 
-// The period's table: `calls` is every lane session's calls, filtered here to `window`.
-function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow): string {
-	const totals = lane_totals_in(calls, window)
+// The period's table: `calls` is every lane session's calls, filtered here to `window`; `paused` is
+// each lane's paused spans (`lane-paused-spans.ts`).
+function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: PausedSpans): string {
+	const totals = lane_totals_in(calls, window, paused)
 
 	return [
 		lane_stats.to_row(COLUMNS),
