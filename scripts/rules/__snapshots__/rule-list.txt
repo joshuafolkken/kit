@@ -76,6 +76,10 @@
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
   - silent: another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
   - not automated: which reads go beside the dispatch is the author’s call
+- **Lane child reviewer dispatched in the foreground** (`reviewer-foreground`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child’s `Agent` / `Task` call of the `reviewer` or `reviewer-verification` type without `run_in_background: false` — rewritten with it, every occurrence
+  - silent: not a lane child, another agent type, or `run_in_background: false` set
+  - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
   - silent: not a lane child — the parent owns the run budget

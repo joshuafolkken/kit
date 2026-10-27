@@ -29,6 +29,7 @@ import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
+import { reviewer_foreground } from './reviewer-foreground'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
@@ -225,6 +226,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_interactive_ask.ROW,
 	agent_model.ROW,
 	investigator_foreground.ROW,
+	reviewer_foreground.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
