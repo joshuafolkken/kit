@@ -93,16 +93,21 @@ function observation_of(failures: ReadonlyArray<UnrelatedFailure>): ObservationE
 	}
 }
 
+// A ledger write that fails is reported and does not stop the rerun it describes.
 async function record(failures: ReadonlyArray<UnrelatedFailure>): Promise<void> {
 	if (failures.length === 0) return
 
-	const result = await observation_record.record({
-		entry: observation_of(failures),
-		checkout: observation_ledger_home.ledger_root(),
-		now: new Date(),
-	})
+	try {
+		const result = await observation_record.record({
+			entry: observation_of(failures),
+			checkout: observation_ledger_home.ledger_root(),
+			now: new Date(),
+		})
 
-	console.info(`📝 Recorded the failed tests outside the change: ${result.verdict}`)
+		console.info(`📝 Recorded the failed tests outside the change: ${result.verdict}`)
+	} catch (error) {
+		console.info(`⚠️ Could not record the failed tests outside the change: ${String(error)}`)
+	}
 }
 
 const followup_failed_tests = {

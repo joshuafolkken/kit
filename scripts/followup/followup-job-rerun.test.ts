@@ -306,6 +306,17 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 	})
 })
 
+describe('rerun_failed_jobs — an observation that cannot be written', () => {
+	it('still reruns the run', async () => {
+		record.mockRejectedValue(new Error('EACCES'))
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log: UNIT_LOG })
+
+		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
+		expect(rerun_paths()).toHaveLength(1)
+	})
+})
+
 // PR #5158: the aggregator `Checks` failed beside the shard, its log naming no test.
 describe('rerun_failed_jobs — a job red only for waiting on a job red outside the change', () => {
 	const checks = job({ id: 104, name: CHECKS_NAME, conclusion: FAILURE, steps: FAILED_STEPS })
