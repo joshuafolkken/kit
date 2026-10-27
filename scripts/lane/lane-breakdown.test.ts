@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#4995: #4970 ran 79.5 minutes of net time, 51 of them its implementation, and the
 // overrun investigation saw only the total. Its stages add up to the net time, waits taken out.
@@ -15,11 +16,12 @@ const LANE = `#${String(ISSUE)}`
 const MERGE_MINUTE = 79.5
 const IMPLEMENT = 'implement'
 const REVIEW_START = 'review start'
+const START_TO_PLAN = 'start to plan'
 
 // #4970's stages, longest first.
 const STAGES_4970: ReadonlyArray<readonly [string, number]> = [
 	[IMPLEMENT, 51],
-	['start to plan', 10],
+	[START_TO_PLAN, 10],
 	['ship review', 8],
 	['ship commit', 3.5],
 	['ship followup', 3.5],
@@ -100,6 +102,26 @@ describe('lane_breakdown.of — #4970', () => {
 		const breakdown_of_lane = lane_breakdown.of(lane(), events, ISSUE)
 
 		expect(minutes_of(breakdown_of_lane)).toStrictEqual(STAGES_4970)
+	})
+})
+
+// joshuafolkken/kit#5216: #5171 yielded before its plan, so its start to plan ran from its first
+// dispatch through the wait for its redispatch.
+describe('lane_breakdown.of — a yield', () => {
+	it('takes the yield wait out of start to plan and counts it apart', () => {
+		const entries: ReadonlyArray<LedgerEntry> = [
+			{ kind: 'dispatch', at: at(-50), issue: ISSUE },
+			{ kind: 'dispatch', at: at(0), issue: ISSUE },
+			{ kind: 'merge', at: at(MERGE_MINUTE), issue: ISSUE },
+		]
+		const text = `${LANE} withdrawn by ${lane_yield.YIELD_TEXT.name}: overlaps`
+		const events = [event(-43, 'withdraw', text), ...events_4970()]
+		const breakdown = lane_breakdown.of(entries, events, ISSUE)
+
+		expect(stage_minutes(breakdown, START_TO_PLAN)).toBe(17)
+		expect(breakdown?.yield_ms).toBe(43 * MINUTE_MS)
+		expect(breakdown?.excluded_ms).toBe(43 * MINUTE_MS)
+		expect(total_ms(breakdown)).toBe(lane_net_time.net_ms(entries, events, ISSUE))
 	})
 })
 

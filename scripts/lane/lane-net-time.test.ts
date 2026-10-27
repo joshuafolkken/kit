@@ -2,6 +2,7 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { describe, expect, it } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#4749: a lane's net time is its dispatch-to-merge time less the waits it stood
 // on a person or an outage, each until the lane resumed; a ship stop's wait is the fix, so it stays in.
@@ -74,6 +75,33 @@ describe('lane_net_time.net_ms', () => {
 
 	it('keeps a ship stop, whose wait the relaunched child spends on the fix', () => {
 		expect(net_minutes([dispatch(0), stop(10), stage(18), merge(30)])).toBe(30)
+	})
+})
+
+function yielded(minute: number, by: string = lane_yield.YIELD_TEXT.name): RunEvent {
+	return event(
+		minute,
+		'withdraw',
+		`#${String(ISSUE)} withdrawn by ${by}: overlaps #${String(OTHER)}`,
+	)
+}
+
+// joshuafolkken/kit#5216: #5171 yielded its seat at 7 minutes and waited 43 for its redispatch.
+describe('lane_net_time.net_ms -- a yield', () => {
+	it('is the two seats together, the wait for the redispatch taken out', () => {
+		const entries = [dispatch(0), dispatch(50), merge(104)]
+
+		expect(net_minutes(entries, [yielded(7)])).toBe(61)
+	})
+
+	it('keeps the time after a withdrawal that is not a yield', () => {
+		const entries = [dispatch(0), dispatch(50), merge(104)]
+
+		expect(net_minutes(entries, [yielded(7, 'a person')])).toBe(104)
+	})
+
+	it('cuts a yield no redispatch ended at the merge', () => {
+		expect(net_minutes([dispatch(0), merge(30)], [yielded(20)])).toBe(20)
 	})
 })
 
