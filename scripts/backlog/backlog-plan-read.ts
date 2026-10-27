@@ -5,7 +5,8 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
-import { backlog_next, type OptedIn } from './backlog-next'
+import { backlog_gate_scope, type OptedIn } from './backlog-gate-scope'
+import { backlog_next } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
 import type { GateScope } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
@@ -61,7 +62,7 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		scope: await backlog_next.gate_scope(context),
+		scope: await backlog_gate_scope.gate_scope(context),
 	}
 }
 

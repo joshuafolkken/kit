@@ -17,7 +17,10 @@ import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 const CODE_SPAN = /`([^`\s]+)`/gu
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const FILE_EXTENSION = /\.[a-z]\w*$/iu
-const ROOT_FILE_EXTENSION = /\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt)$/u
+// `properties`: `sonar-project.properties`, which joshuafolkken/kit#5083 and its holder both named
+// and neither declared (joshuafolkken/kit#5107).
+const ROOT_FILE_EXTENSION =
+	/\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt|properties)$/u
 const GLOB = '*'
 const ISSUE_MARK = '#'
 const SEPARATOR = '/'
