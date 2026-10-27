@@ -27,6 +27,9 @@ function spy_steps(order: Array<string>, is_handed_over: boolean): void {
 	vi.spyOn(review_record_interaction, 'report_due').mockImplementation(async () => {
 		order.push('interaction')
 	})
+	vi.spyOn(review_record_pinned, 'read_skipped_join').mockImplementation(async () => {
+		order.push('join')
+	})
 	vi.spyOn(review_record_pinned, 'restart_if_moved').mockImplementation(async () => {
 		order.push('pinned')
 
@@ -44,7 +47,7 @@ afterEach(() => {
 })
 
 describe('review_record_code_round.follow', () => {
-	it('records the tree with the High-cited files unsettled, then the handover, the due pass and the restart', async () => {
+	it('records the tree with the High-cited files unsettled, then the handover, the due pass, the skipped join and the restart', async () => {
 		const order: Array<string> = []
 
 		spy_steps(order, true)
@@ -60,9 +63,22 @@ describe('review_record_code_round.follow', () => {
 		expect(console.info).toHaveBeenCalledWith(review_lane_handover.NEXT_STEP_LINE)
 		expect(review_record_interaction.report_due).toHaveBeenCalledWith(ISSUE, ROOT)
 		expect(review_record_pinned.restart_if_moved).toHaveBeenCalledWith(ROOT)
-		expect(order).toStrictEqual(['tree', 'handover', 'interaction', 'pinned'])
+		expect(order).toStrictEqual(['tree', 'handover', 'interaction', 'join', 'pinned'])
 	})
+})
 
+// joshuafolkken/kit#5212: a lane that skipped `run:review --join` met its unpinned places at the ship.
+describe('review_record_code_round.follow on a skipped join', () => {
+	it('reads the skipped join over the same checkout', async () => {
+		spy_steps([], true)
+
+		await review_record_code_round.follow(ISSUE, ROOT, [])
+
+		expect(review_record_pinned.read_skipped_join).toHaveBeenCalledWith(ROOT)
+	})
+})
+
+describe('review_record_code_round.follow outside a reused lane round', () => {
 	it('starts no check for a round the ship does not reuse from a lane child', async () => {
 		const order: Array<string> = []
 

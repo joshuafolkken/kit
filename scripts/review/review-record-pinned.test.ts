@@ -1,8 +1,11 @@
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { run_review_join_read, type JoinVerdict } from '#scripts/run/review/run-review-join-read'
+import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
 import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_record_pinned } from './review-record-pinned'
 
@@ -116,5 +119,70 @@ describe('review_record_pinned.restart_in_lane answers whether it started a chec
 		vi.spyOn(observation_ledger_home, 'read').mockRejectedValue(new Error('unreadable'))
 
 		await expect(review_record_pinned.restart_in_lane(ROOT)).resolves.toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5212: a lane that skipped `run:review --join` met its unpinned places only as the
+// ship's pre-detach failure.
+const UNPINNED_LINE = 'unpinned a.ts:3 — no test turns red'
+const STOPPED: JoinVerdict = {
+	summary: { text: '', unpinned: ['a.ts f'] },
+	is_stop: true,
+	text: UNPINNED_LINE,
+}
+
+function spy_join(is_due: boolean, joined: JoinVerdict | undefined): void {
+	vi.spyOn(run_review_join_read, 'is_due').mockReturnValue(is_due)
+	vi.spyOn(run_review_join_read, 'read_finished').mockResolvedValue(joined)
+	vi.spyOn(test_pinned_logic, 'report_text').mockImplementation(
+		(_summary, note = '') => `${UNPINNED_LINE}\n${note}`,
+	)
+}
+
+describe('review_record_pinned.read_skipped_join', () => {
+	it('prints the unpinned lines and the two ways out when the join is still due', async () => {
+		spy_join(true, STOPPED)
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(run_review_join_read.read_finished).toHaveBeenCalledWith(ROOT)
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(
+			`${UNPINNED_LINE}\n${review_record_pinned.CHOICE_LINE.trimEnd()}`,
+		)
+		expect(review_record_pinned.CHOICE_LINE).toContain('--unpinned-ok "<reason>"')
+	})
+
+	it('reads nothing and prints nothing once the join was read', async () => {
+		spy_join(false, STOPPED)
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(run_review_join_read.read_finished).not.toHaveBeenCalled()
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('prints nothing for a join that stops nothing', async () => {
+		spy_join(true, { ...STOPPED, is_stop: false })
+
+		await review_record_pinned.read_skipped_join(ROOT)
+
+		expect(console.info).not.toHaveBeenCalled()
+	})
+})
+
+// Round-1 findings of joshuafolkken/kit#5212: the skipped-join read waited in the foreground, and on a
+// moved tree restarted the check itself, so the restart after it printed no started line.
+describe('review_record_pinned.read_skipped_join, then restart_if_moved on a moved tree', () => {
+	it('neither waits nor restarts, so the restart still names its read', async () => {
+		vi.spyOn(run_review_join_read, 'is_due').mockReturnValue(true)
+		vi.spyOn(run_review_pinned_join, 'finished_on_tree').mockResolvedValue(undefined)
+		const wait = vi.spyOn(run_review_pinned_join, 'wait_for_join')
+
+		await review_record_pinned.read_skipped_join(ROOT)
+		await review_record_pinned.restart_if_moved(ROOT)
+
+		expect(wait).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.launch).toHaveBeenCalledOnce()
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(review_record_pinned.started_line())
 	})
 })

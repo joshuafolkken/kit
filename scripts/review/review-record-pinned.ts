@@ -2,8 +2,10 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
+import { run_review_join_read, type JoinVerdict } from '#scripts/run/review/run-review-join-read'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { review_finding_ledger } from './review-finding-ledger'
 
 // What `josh review:record` does about the background `josh test:pinned` (joshuafolkken/kit#4834).
@@ -44,6 +46,26 @@ async function restart_if_moved(root: string = PROJECT_ROOT): Promise<boolean> {
 	}
 }
 
+// **A join the lane skipped is read here** (joshuafolkken/kit#5212): `josh run:review --join` was never
+// run, so the unpinned places would surface only as the ship's pre-detach failure. It reads only an
+// answer already left on this tree, so nothing waits on it either. A read that stops nothing prints
+// nothing, and a join already read changes nothing.
+const CHOICE_LINE =
+	'Unpinned before the ship: pin each place above with a test that turns red without it, or ship with `--unpinned-ok "<reason>"`.\n'
+
+function show_stop(joined: JoinVerdict | undefined): void {
+	if (joined?.is_stop !== true) return
+	console.info(test_pinned_logic.report_text(joined.summary, CHOICE_LINE).trimEnd())
+}
+
+async function read_skipped_join(root: string = PROJECT_ROOT): Promise<void> {
+	try {
+		if (run_review_join_read.is_due(root)) show_stop(await run_review_join_read.read_finished(root))
+	} catch (error) {
+		error_text.trace_swallowed('review_record_pinned.read_skipped_join', error)
+	}
+}
+
 // Whether the lane's code round is on the ledger: from then on `review:record` owns the restart, behind
 // its own handover guard.
 async function is_round_recorded(root: string): Promise<boolean> {
@@ -75,6 +97,12 @@ async function restart_in_lane(root: string = PROJECT_ROOT): Promise<boolean> {
 	}
 }
 
-const review_record_pinned = { restart_if_moved, restart_in_lane, started_line }
+const review_record_pinned = {
+	CHOICE_LINE,
+	read_skipped_join,
+	restart_if_moved,
+	restart_in_lane,
+	started_line,
+}
 
 export { review_record_pinned }
