@@ -23,17 +23,17 @@
 		"**/.git/josh/**": true,
 		"**/.josh/observations/**": true,
 		"**/.svelte-kit/**": true,
-		"**/coverage/**": true,
-		"**/build/**": true,
-		"**/dist/**": true
+		"coverage/**": true,
+		"build/**": true,
+		"dist/**": true
 	},
 	"search.exclude": {
 		"**/node_modules": true,
 		"**/.git/josh": true,
 		"**/.svelte-kit": true,
-		"**/coverage": true,
-		"**/build": true,
-		"**/dist": true
+		"coverage": true,
+		"build": true,
+		"dist": true
 	},
 	"[markdown]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
