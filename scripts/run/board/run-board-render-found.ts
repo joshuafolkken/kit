@@ -13,8 +13,8 @@ import type { ItemState } from './run-board-status'
 // (`🔍 implement 51′ · 4983`), `↪N` for each open
 // Issue it appended causes to (joshuafolkken/kit#4858), `∅` and why it did not, `∅ ↻N` for a
 // recurrence commented on, or 💥 for an investigation that failed. While the investigation runs, the spinner stands for 🔍.
-// A row its merge left no note on was never asked. A done row that did not merge says only what was
-// filed during it.
+// A row its merge left no note on was never asked. A done row that did not merge, and a merged row
+// while the investigation switch is off, says only what was filed during it.
 
 const { OVERRUN_MARK } = run_board_labels
 const DONE_STATES: ReadonlySet<ItemState> = new Set(['merged', 'done'])
@@ -126,22 +126,13 @@ function investigation_text(found: Found | undefined, header: BoardHeader): stri
 	return joined([outcome, joined([longest_text(found), filed], LONGEST_SEPARATOR)], ' ')
 }
 
-// A lane its merge skipped because the switch was off, while the switch stays off: its skip is by
-// design, so the row says neither it nor the minutes the note never carried (joshuafolkken/kit#5132).
-function is_switched_off(found: Found | undefined, header: BoardHeader): boolean {
-	const note = found?.overrun
-
-	if (header.is_investigation_on || note?.kind !== 'skipped') return false
-
-	return note.reason === run_event_overrun.DISABLED_REASON
-}
-
-// The minutes, the child's own filings, then the investigation, each group apart by two spaces; a lane
-// skipped for the switch says only what was filed.
+// The minutes, the child's own filings, then the investigation, each group apart by two spaces. While
+// the investigation switch is off, every merged row says only what was filed, whatever its note
+// (joshuafolkken/kit#5132, joshuafolkken/kit#5194).
 function merged_text(row: BoardRow, header: BoardHeader): string {
 	const found = found_of(row, header)
 
-	if (is_switched_off(found, header)) return numbers_of(found, header)
+	if (!header.is_investigation_on) return numbers_of(found, header)
 
 	const own = links_of(found?.filed ?? [], header)
 
