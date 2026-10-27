@@ -22,6 +22,9 @@ const AFTER_CITED_CHANGE: ReadonlyArray<RegExp> = [
 const RECORD_READERS: ReadonlyArray<string> = ['lane:stats', 'actions/runs', 'ship --log']
 const CITATION_PATTERN = /#[1-9]\d*/u
 const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
+// joshuafolkken/kit#5144: one waiting K merges reads one value against a bound, which `backlog:drive`
+// does without a lane once it is declared; the declaration is the default, a stated reason the exception.
+const UNDECLARED = `measurement follow-up without a measure declaration: declare \`${measure_declaration.DECLARATION}\` (any \`lane:stats\` cell: \`pnpm josh lane:value cell\`), or \`${measure_declaration.ABSENT}\` when no one command prints the value, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"\n${measure_declaration.EXAMPLE}`
 
 function measures_a_change(criterion: string): boolean {
 	if (AFTER_CITED_CHANGE.some((pattern) => pattern.test(criterion))) return true
@@ -39,11 +42,14 @@ function is_measurement(body: string): boolean {
 }
 
 // The refusal for a measurement follow-up whose start condition does not parse — missing, or
-// malformed beside `issue_sample_gate.problems`' format refusal; `undefined` for any other filing.
+// malformed beside `issue_sample_gate.problems`' format refusal — or whose condition parses with no
+// measure declaration nor a reason for none; `undefined` for any other filing.
 function problem(body: string): string | undefined {
-	if (!is_measurement(body)) return undefined
+	if (issue_sample_gate.cited_number(body) !== undefined) {
+		return measure_declaration.is_stated(body) ? undefined : UNDECLARED
+	}
 
-	return issue_sample_gate.cited_number(body) === undefined ? MISSING : undefined
+	return is_measurement(body) ? MISSING : undefined
 }
 
 const issue_sample_required = { problem }

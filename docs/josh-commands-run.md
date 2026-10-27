@@ -996,15 +996,18 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 
 <!-- usage: lane:value -->
 
-Print one lane measurement since an instant as a single number: lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
 
 ```bash
-pnpm josh lane:value edit --since 2026-10-23T03:29Z   # the median Edit time since an instant
+pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant
+pnpm josh lane:value cell --table "test:related scope" --row related --column "median (s)" --since 2026-10-23T03:29Z   # one lane:stats table cell since an instant
 ```
 
 <!-- /usage -->
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
+
+`cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
 
 #### `josh lane:net`
 
