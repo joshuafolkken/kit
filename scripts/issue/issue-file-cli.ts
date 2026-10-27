@@ -24,6 +24,7 @@ import { issue_file_cap } from './issue-file-cap'
 import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_file_interrupt } from './issue-file-interrupt'
+import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
@@ -287,11 +288,13 @@ async function record(url: string, filing: Filing, labels: ReadonlyArray<string>
 	})
 }
 
-function is_admitted(filing: Filing): boolean {
+async function is_admitted(filing: Filing): Promise<boolean> {
 	const refusals = refusals_of(filing)
 
 	if (refusals.length === 0) return true
-	console.error(refusals.join('\n'))
+	const hint = await issue_file_lane_hint.lines_of(filing.args.found_during, filing.body)
+
+	console.error([...refusals, ...hint].join('\n'))
 
 	return false
 }
@@ -337,7 +340,7 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 // printed at once and fixed in one reissue: the body's own refusals, the start condition's citation,
 // the run label, the WIP count and the duplicate candidates. The labels, or `undefined` when any refused.
 async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
-	const is_body_clear = is_admitted(filing)
+	const is_body_clear = await is_admitted(filing)
 	const is_cited = await is_source_clear(filing)
 	const labels = labels_of(filing)
 	const verdicts = [

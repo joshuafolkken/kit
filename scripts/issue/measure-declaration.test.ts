@@ -43,8 +43,19 @@ describe('measure_declaration.problems', () => {
 		const found = measure_declaration.problems(`${BACKGROUND}- 計測宣言: \`echo 1\` = 5\n`)
 
 		expect(found).toStrictEqual([
-			`\`${measure_declaration.PREFIX}\` must be written ${measure_declaration.DECLARATION}`,
+			expect.stringContaining(
+				`\`${measure_declaration.PREFIX}\` must be written ${measure_declaration.DECLARATION}\n`,
+			),
 		])
+	})
+
+	// joshuafolkken/kit#5225: the refusal's last line is an example the declaration reads as pasted.
+	it('ends the refusal in a one-line example that parses', () => {
+		const [found = ''] = measure_declaration.problems(`${BACKGROUND}- 計測宣言: soon\n`)
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(example).toMatch(/^- 計測宣言: `/u)
+		expect(measure_declaration.parse(`${BACKGROUND}${example}\n`)).toBeDefined()
 	})
 
 	it.each([DECLARED, `${BACKGROUND}- 種別: 非不具合\n`])('finds no problem in %j', (body) => {

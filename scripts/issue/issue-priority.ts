@@ -245,6 +245,7 @@ function with_label(labels: ReadonlyArray<string>, body: string): ReadonlyArray<
 
 const issue_priority = {
 	CAUSE_PREFIX,
+	LANE_PREFIX,
 	LOSS_HIGH_MINUTES,
 	declared_level,
 	floor_of,

@@ -16,6 +16,7 @@ const BREAKDOWN: Breakdown = {
 	stages: [{ name: 'implement', ms: IMPLEMENT_TO - IMPLEMENT_FROM }],
 	excluded_ms: 0,
 	slept_ms: 0,
+	yield_ms: 0,
 	waits: [],
 	implement: [{ from_ms: IMPLEMENT_FROM, to_ms: IMPLEMENT_TO }],
 	pre_detach: [],

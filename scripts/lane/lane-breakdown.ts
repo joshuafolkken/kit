@@ -35,6 +35,8 @@ interface Breakdown {
 	excluded_ms: number
 	// The host's sleeps among them (joshuafolkken/kit#5032).
 	slept_ms: number
+	// The yields' waits for a redispatch among them (joshuafolkken/kit#5216).
+	yield_ms: number
 	// The waits taken out, each — the implementation's split leaves them out of its remainder too.
 	waits: ReadonlyArray<LaneSpan>
 	// The implementation's spans, waits left in — the window its tool calls are read in.
@@ -166,6 +168,7 @@ function of(
 		stages: ranked(parts),
 		excluded_ms: spans_ms(waits),
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
+		yield_ms: spans_ms(lane_net_time.yielded(entries, events, issue, span)),
 		waits,
 		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
 		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),

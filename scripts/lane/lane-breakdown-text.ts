@@ -8,8 +8,9 @@ import type { LedgerEntry } from './lane-ledger'
 // investigation comments it on the lane's Issue and leads its prompt with it (`lane-overrun.ts`).
 
 const HEADING = 'Net time by stage, longest first'
-const EXCLUDED = 'waits taken out (park, outage, usage limit, host sleep)'
+const EXCLUDED = 'waits taken out (park, outage, usage limit, yield, host sleep)'
 const SLEPT = 'of which host sleep'
+const YIELDED = 'of which yield wait'
 
 interface Report {
 	breakdown: Breakdown
@@ -43,8 +44,9 @@ function stage_text(stage: Stage, report: Report): string {
 
 function entries_of(report: Report): Array<string> {
 	const { breakdown } = report
+	const yielded = `${YIELDED} ${lane_breakdown.minutes_text(breakdown.yield_ms)}`
 	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
-	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${slept}`
+	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${yielded}, ${slept}`
 
 	return [...breakdown.stages.map((stage) => stage_text(stage, report)), excluded]
 }
