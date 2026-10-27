@@ -57,7 +57,7 @@ describe('the static-checks job runs the verification gate', () => {
 
 	// Whole-script equality, and both flags matter. `--verbose` prints every check body, so a check
 	// that passed with warnings is in the log rather than hidden behind a one-line green summary.
-	// `--no-unit` is what says this job runs three of the four — asserted from the constants the gate
+	// `--no-unit` is what leaves the unit suite out of this job — asserted from the constants the gate
 	// itself defines, so a flag renamed in `verification-gate.ts` fails here rather than leaving the
 	// workflow passing an argument the gate would refuse.
 	// joshuafolkken/kit#5215: each matrix leg names its group through the step's env, so the matrix value

@@ -130,6 +130,19 @@ describe('josh gate --static-group', () => {
 		expect(spawned_checks()).toEqual([])
 		stderr.mockRestore()
 	})
+
+	// The accepted-here line is built from `STATIC_GROUPS`, so a group added there is offered here too.
+	it('names every group it accepts in the refusal', async () => {
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
+
+		await run_gate(['--nope'])
+
+		expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+			`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`,
+		)
+		stderr.mockRestore()
+	})
 })
 
 // The record's meaning to `gate_skip` is "every check this repository gates on passed on exactly this

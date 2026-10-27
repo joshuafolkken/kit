@@ -40,7 +40,7 @@ Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsun
 - `--static-group=<lint|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`).
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
-- Exit `1` if any check failed. Refuses any argument other than the three flags.
+- Exit `1` if any check failed. Refuses any argument other than the three flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
