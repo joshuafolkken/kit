@@ -8,24 +8,20 @@ import { size_estimate } from './size-estimate'
 // lane finds no sample (#4897). It is refused until it declares the condition (`measurement.md`).
 //
 // A measurement follow-up is a body carrying a measure declaration, or one changing no file whose criterion
-// reads the records about a cited change. A record read that cites nothing (a CI investigation) waits
-// on no merge, so it files as before.
+// reads the period after a cited change — whichever record it reads it with (`lane:stats`,
+// `actions/runs`, `ship --log`, …), so the reading is matched, never the reader (#5103). A record read
+// that cites nothing (a CI investigation) waits on no merge, so it files as before.
 
-const RECORD_READERS: ReadonlyArray<string> = ['lane:stats', 'actions/runs']
-const CITATION_PATTERN = /#[1-9]\d*/u
+const AFTER_CITED_CHANGE = /#[1-9]\d*\s*(?:を閉じる PR\s*)?(?:の\s*)?(?:マージ)?(?:後|以降)/u
 const MISSING = `measurement follow-up without its start condition: declare \`${issue_sample_gate.DECLARATION}\`, or \`${issue_sample_gate.CLOSING_FORMAT}\` before that pull request exists, under ## 背景 — prompts/collaboration-workflow/measurement.md → "効果を測る後続 Issue"`
-
-function measures_a_change(criterion: string): boolean {
-	return (
-		CITATION_PATTERN.test(criterion) && RECORD_READERS.some((reader) => criterion.includes(reader))
-	)
-}
 
 function is_measurement(body: string): boolean {
 	if (measure_declaration.parse(body) !== undefined) return true
 	if (size_estimate.declared_files(body) !== 0) return false
 
-	return acceptance_map.criteria_of(body).some((criterion) => measures_a_change(criterion.text))
+	return acceptance_map
+		.criteria_of(body)
+		.some((criterion) => AFTER_CITED_CHANGE.test(criterion.text))
 }
 
 // The refusal for a measurement follow-up whose start condition does not parse — missing, or
