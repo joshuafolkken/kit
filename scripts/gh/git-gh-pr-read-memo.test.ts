@@ -33,6 +33,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const PR_BODY = 'closes #3263'
 const MERGED_AT = '2026-10-06T00:00:00Z'
 const OTHER_STATUS = 400
+const NEWER_PR_NUMBER = 973
 
 function stub(routes: Record<string, GhApiAnswer>): void {
 	mocked_api.mockImplementation(gh_api_routes(routes))
@@ -139,12 +140,15 @@ describe('a failed detail read the listing does not stand in for', () => {
 		expect(lookup_calls()).toBe(1)
 	})
 
-	it('stays unreadable when the listing no longer names the number', async () => {
+	it.each([
+		['is empty', EMPTY_LISTING],
+		['names a newer pull request', rest_pull_page([{ number: NEWER_PR_NUMBER }])],
+	])('stays unreadable when the listing %s', async (_label, listing) => {
 		const failure = too_many_files_failure()
 
 		stub_failed_detail(failure)
 		await git_gh_pr_read.pr_get_number(PR_BRANCH)
-		stub_failed_detail(failure, EMPTY_LISTING)
+		stub_failed_detail(failure, listing)
 
 		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(
 			expect.objectContaining({ cause: failure }) as Error,

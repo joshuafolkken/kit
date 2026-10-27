@@ -1,0 +1,2 @@
+- rf:comments | low | scripts/lane/lane-yield.ts:28 | 2026-10-27 | #5211
+- rf:comments | low | .claude/skills/workflow-commands/entry-sequence.md:7 | 2026-10-27 | #5211
