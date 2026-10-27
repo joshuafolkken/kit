@@ -68,6 +68,6 @@ function capped_print(text: string, label: string, root: string = process.cwd())
 	console.info(listing(text, budget, write_parts(label, text, budget)))
 }
 
-const capped_output = { HEADROOM_CHARS, capped_print }
+const capped_output = { HEADROOM_CHARS, capped_print, output_budget }
 
 export { capped_output }

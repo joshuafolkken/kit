@@ -12,7 +12,7 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
 import { run_next } from '#scripts/run/run-next'
-import { run_prep } from '#scripts/run/run-prep'
+import type { PrepParts } from '#scripts/run/run-prep'
 import { run_prep_cli } from '#scripts/run/run-prep-cli'
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
 import {
@@ -25,6 +25,7 @@ import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop } from './run-entry-stop'
 import { run_entry_trust, type TrustStop } from './run-entry-trust'
 
@@ -127,7 +128,7 @@ async function check_cost(): Promise<string> {
 }
 
 interface Reads {
-	report: string
+	prep: PrepParts
 	verdict: string
 	trust_stop: TrustStop | undefined
 }
@@ -137,17 +138,28 @@ interface Reads {
 // formatter, the verdict is `run:step`'s `pre_verdict` over the same parts.
 async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
-	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const verdict = run_step.pre_verdict(run_next.to_input(parts))
+	const prep = run_prep_cli.to_parts(issue_number, reads)
+	const verdict = run_step.pre_verdict(run_next.to_input(prep))
 	const trust_stop = run_entry_trust.stop_of(reads.content, reads.state, issue_number)
 
-	return { report: run_prep.format_report(parts), verdict, trust_stop }
+	return { prep, verdict, trust_stop }
+}
+
+function entry_text(parts: EntryParts): string {
+	return session_cite.text(run_entry.format_report(parts))
 }
 
 function emit(parts: EntryParts): number {
-	console.info(session_cite.text(run_entry.format_report(parts)))
+	console.info(entry_text(parts))
 
 	return run_entry.exit_code(parts)
+}
+
+// The bundle emitted as it fits the Bash result, measured on the composite `emit` prints.
+function emit_fitted(entry: Omit<EntryParts, 'report'>, prep: PrepParts): number {
+	const report = run_entry_spill.fit(prep, (text) => entry_text({ ...entry, report: text }))
+
+	return emit({ ...entry, report })
 }
 
 // The summary of a run that stopped without a report — before it read the issue, or after reading an
@@ -321,7 +333,7 @@ async function proceed(
 	// update is measured against (`issue-watch.ts`).
 	await issue_watch.record_baseline_here(issue_number)
 
-	const code = emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+	const code = emit_fitted({ issue_number, hold, cost, verdict: reads.verdict }, reads.prep)
 
 	// The entry's own read — the split assessment every run answers before its work — printed here so
 	// the reader does not spend a turn fetching it.

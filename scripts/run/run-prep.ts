@@ -109,6 +109,7 @@ const run_prep = {
 	SUMMARY_PREFIX,
 	format_report,
 	ship_body,
+	summary,
 }
 
 export type { PrepParts }
