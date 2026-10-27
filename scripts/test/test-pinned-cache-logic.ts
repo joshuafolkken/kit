@@ -27,6 +27,7 @@ import type { RedProbe, RedVerdict } from './test-red-logic'
 // failed file recorded — only the tree-wide digests hold it, as before.
 // **A `red` verdict also holds while `pruned` reads the same** (joshuafolkken/kit#5004): the code
 // change since differs only by lines removed from `green` hunks (`test-pinned-prune-logic.ts`).
+// **Past all of those, a verdict is rechecked rather than probed whole** (`recheck_of`).
 
 const DIGEST_ALGORITHM = 'sha256'
 const LINE_BREAK = '\n'
@@ -237,23 +238,45 @@ function recheck_tests(entry: StoredVerdict, basis: Basis | undefined): Array<st
 	return changed_tests(entry.related, basis.related)
 }
 
-// A `green` or `no-test` verdict whose code change is the same, rechecked against only the tests added
-// or edited since; a source change, a removed test or no recorded tests reruns every reaching test.
+// A `red` verdict rechecked against the test files it failed in, while each is still there
+// (joshuafolkken/kit#5129); none where no failed file was recorded.
+function failed_recheck(
+	entry: StoredVerdict,
+	digests: ReadonlyMap<string, string>,
+): Recheck | undefined {
+	const failed = Object.keys(entry.tests)
+	if (failed.length === 0 || failed.some((file) => !digests.has(file))) return undefined
+
+	return { verdict: entry.verdict, recheck: failed }
+}
+
+// A `red` verdict past its basis is rechecked against its failed tests: one still failing pins the hunk
+// on the tree now, whatever moved (`rechecked`), so an edit to a doc no import names re-runs a few tests,
+// not every test reaching a hub file. A `green` or `no-test` one whose code change is the same is
+// rechecked against only the tests added or edited since; a source change, a removed test or no recorded
+// tests reruns every reaching test. `digests` holds each test file's content digest now.
 function recheck_of(
 	entry: StoredVerdict,
 	freshness: Freshness,
 	basis: Basis | undefined,
+	digests: ReadonlyMap<string, string>,
 ): Recheck | undefined {
-	if (entry.verdict === 'red' || !freshness.is_same_change) return undefined
+	if (entry.verdict === 'red') return failed_recheck(entry, digests)
+	if (!freshness.is_same_change) return undefined
 	const recheck = recheck_tests(entry, basis) ?? []
 
 	return recheck.length === 0 ? undefined : { verdict: entry.verdict, recheck }
 }
 
 // The verdict a recheck answers: a red test pins the hunk; otherwise the stored verdict stands, raised
-// to `green` when a stored `no-test` now has a test that ran.
-function rechecked(known: Recheck, probe: RedProbe): RedProbe {
-	return probe.verdict === 'no-test' ? { verdict: known.verdict, failed: [] } : probe
+// to `green` when a stored `no-test` now has a test that ran. A `red` one whose tests no longer fail
+// answers nothing — only a run over every reaching test can — and a stopped run answers as it stopped.
+function rechecked(known: Recheck, probe: RedProbe): RedProbe | undefined {
+	if (known.verdict !== 'red') {
+		return probe.verdict === 'no-test' ? { verdict: known.verdict, failed: [] } : probe
+	}
+
+	return probe.verdict === 'green' || probe.verdict === 'no-test' ? undefined : probe
 }
 
 function is_recheck(known: Known): known is Recheck {

@@ -192,8 +192,7 @@ async function basis_of(
 }
 
 // The tree-wide digests first; only an entry they drop has its basis read, so an unchanged tree builds
-// no import graph. Past the basis, a `green` or `no-test` one may still be rechecked against the tests
-// added or edited since (`recheck_of`).
+// no import graph. Past the basis, it may still be rechecked against a few tests (`recheck_of`).
 async function known_by_basis(
 	cache: LoadedCache,
 	entry: StoredVerdict,
@@ -204,13 +203,20 @@ async function known_by_basis(
 	const basis = await basis_of(cache, stored, file)
 	const held = test_pinned_cache_logic.fresh_verdict(entry, freshness, test_digests, basis?.digest)
 
-	return held ?? test_pinned_cache_logic.recheck_of(entry, freshness, basis)
+	return held ?? test_pinned_cache_logic.recheck_of(entry, freshness, basis, test_digests)
 }
 
+// An entry stored with no basis is not held past the tree-wide digests, but a `red` one is still
+// rechecked against its failed tests.
 async function known_one(cache: LoadedCache, key: string, file: string): Promise<Known> {
+	const { freshness, test_digests } = cache
 	const entry = cache.entries[key]
-	const kept = test_pinned_cache_logic.fresh_verdict(entry, cache.freshness, cache.test_digests)
-	if (kept !== undefined || entry?.basis === undefined) return kept
+	const kept = test_pinned_cache_logic.fresh_verdict(entry, freshness, test_digests)
+	if (kept !== undefined || entry === undefined) return kept
+
+	if (entry.basis === undefined) {
+		return test_pinned_cache_logic.recheck_of(entry, freshness, undefined, test_digests)
+	}
 
 	return await known_by_basis(cache, entry, file)
 }
