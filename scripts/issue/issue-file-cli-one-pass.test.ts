@@ -5,6 +5,7 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { repository_labels } from '#scripts/repo/repository-labels'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
@@ -26,9 +27,12 @@ const body_path = path.join(work, 'refused-thrice.md')
 writeFileSync(body_path, '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n')
 const ARGV = ['A title', '--body-file', body_path]
 
+// Stubbed so a regression that lets the filing through never reaches a real create.
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 
 beforeEach(() => {
+	exec_gh_api.mockResolvedValue('https://github.com/joshuafolkken/kit/issues/1')
+	vi.spyOn(repository_labels, 'ensure_labels').mockReturnValue([])
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(git_gh_command, 'repo_get_name_with_owner').mockResolvedValue(HERE)
