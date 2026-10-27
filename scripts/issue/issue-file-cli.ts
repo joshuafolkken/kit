@@ -35,13 +35,13 @@ import { size_estimate } from './size-estimate'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
-// [--release] [--blocks-finder]` — file an Issue with every filing step run in order: the third-party refusal, the body
-// lint, the size estimate against the split guide, the start condition a measurement follow-up owes,
-// the `## Origin` check for another repository, the `auto-ok` decision
-// with the run label it owes, the start condition read as a pull request, the filing cap per origin,
-// the fold question against the run's earlier
-// filings, the WIP cap count, the
-// duplicate scout, the missing workflow labels created, the create call
+// [--release] [--blocks-finder]` — file an Issue with every filing step run: the third-party refusal,
+// the filing cap per origin and the fold question against the run's earlier filings, each ending the
+// filing on its own; then, in one pass that prints every refusal before any is acted on, the body lint,
+// the size estimate against the split guide, the start condition a measurement follow-up owes, the
+// `## Origin` check for another repository, the start condition read as a pull request, the `auto-ok`
+// decision with the run label it owes, the WIP cap count and the duplicate scout; then the missing
+// workflow labels created, the create call
 // carrying every label, a blocking interrupt's finder recorded as blocked by it, the release link on
 // `--release`, and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
@@ -89,12 +89,8 @@ function party_refusal(target: string): string | undefined {
 	return party === repo_party.THIRD_PARTY ? THIRD_PARTY_MESSAGE : UNKNOWN_PARTY_MESSAGE
 }
 
-// Every refusal the filing can meet before a request is sent, in the order the steps run — `[]` when
-// the filing may go on to the scout.
+// Every refusal the body and the arguments carry, read locally — `[]` when the body is admitted.
 function refusals_of(filing: Filing): ReadonlyArray<string> {
-	const party_problem = party_refusal(filing.target)
-
-	if (party_problem !== undefined) return [party_problem]
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
 		size_estimate.guide_problem(filing.body, filing.args.route),
@@ -171,8 +167,8 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 }
 
 // Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
-// Decided before the WIP count and the scout, so a refusal costs no listing. The decision reads the
-// labels the body's declarations add, so a declared breaking change is excluded like its label.
+// The decision reads the labels the body's declarations add, so a declared breaking change is excluded
+// like its label.
 function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
 	const auto_ok = issue_auto_ok.decide({
 		is_opted_out: filing.args.is_auto_ok_opted_out,
@@ -300,7 +296,7 @@ function is_admitted(filing: Filing): boolean {
 	return false
 }
 
-// The start condition's citation read against GitHub — after the local refusals, before any listing.
+// The start condition's citation read against GitHub.
 async function is_source_clear(filing: Filing): Promise<boolean> {
 	const is_here = issue_file.is_same_repository(filing.target, filing.current)
 	const problem = await issue_sample_source.problem(
@@ -326,28 +322,48 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 	return SUCCESS_EXIT_CODE
 }
 
-// The holds that read the run and the backlog, in the order they cost: the filing cap reads the local
-// event stream, the fold the stream and diff, the WIP count one listing, the scout a search.
-async function is_clear(filing: Filing): Promise<boolean> {
+// The holds that end the filing whatever the body says, read first: the filing cap reads the local
+// event stream, the fold the stream and diff.
+async function is_run_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 
-	if (
-		!(await issue_file_cap.is_cap_clear(filing.args.found_during)) ||
-		!(await issue_file_fold.is_fold_clear(prefix, filing.args))
-	) {
-		return false
-	}
+	return (
+		(await issue_file_cap.is_cap_clear(filing.args.found_during)) &&
+		(await issue_file_fold.is_fold_clear(prefix, filing.args))
+	)
+}
 
-	return (await is_wip_clear(filing)) && (await is_scout_clear(filing))
+// Every step the caller answers from the body and the arguments, run in one pass so each refusal is
+// printed at once and fixed in one reissue: the body's own refusals, the start condition's citation,
+// the run label, the WIP count and the duplicate candidates. The labels, or `undefined` when any refused.
+async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
+	const is_body_clear = is_admitted(filing)
+	const is_cited = await is_source_clear(filing)
+	const labels = labels_of(filing)
+	const verdicts = [
+		is_body_clear,
+		is_cited,
+		labels !== undefined,
+		await is_wip_clear(filing),
+		await is_scout_clear(filing),
+	]
+
+	return verdicts.every(Boolean) ? labels : undefined
 }
 
 async function file(filing: Filing): Promise<number> {
-	if (!is_admitted(filing) || !(await is_source_clear(filing))) return FAILURE_EXIT_CODE
-	const labels = labels_of(filing)
+	const party_problem = party_refusal(filing.target)
 
-	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE
+	if (party_problem !== undefined) {
+		console.error(party_problem)
 
-	return await send(filing, labels)
+		return FAILURE_EXIT_CODE
+	}
+
+	if (!(await is_run_clear(filing))) return FAILURE_EXIT_CODE
+	const labels = await labels_in_one_pass(filing)
+
+	return labels === undefined ? FAILURE_EXIT_CODE : await send(filing, labels)
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {
