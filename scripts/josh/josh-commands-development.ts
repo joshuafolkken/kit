@@ -227,6 +227,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '' },
 				NARROWED,
+				{ arguments: '--touched', note: "only the diff's tests and its modules' same-named ones" },
 				{ arguments: '--silent', note: 'flags are forwarded to vitest' },
 			],
 		},

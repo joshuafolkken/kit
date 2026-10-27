@@ -79,6 +79,14 @@ describe('test_related_record.record_of', () => {
 
 		expect(record).toMatchObject({ changed: 1, synced: 1, since_map: 1 })
 	})
+
+	// joshuafolkken/kit#5237: a `--touched` run narrows like any other, yet is recorded as its own kind.
+	it('records the run under the kind it was given over its scope mode', () => {
+		const input = { ...related_input(), kind: 'touched' }
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record.scope).toBe('touched')
+	})
 })
 
 // joshuafolkken/kit#5041: a shared test and a synced file the split cannot vouch for are in the change
