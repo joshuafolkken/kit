@@ -102,12 +102,12 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT'],
 					description:
-						'role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.',
+						'role effort overrides for either provider; defaults are `medium`, `medium`, and `medium`.',
 				},
 				{
 					names: ['JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}'],
 					description:
-						'review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.',
+						'review round 2 and later (the verification pass); defaults are `claude-sonnet-5-5` / `high` on Anthropic and `high` on OpenAI, falling back to `JOSH_REVIEWER_*`.',
 				},
 			],
 		},

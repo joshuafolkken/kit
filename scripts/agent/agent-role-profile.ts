@@ -57,27 +57,25 @@ const OPENAI_MODEL = 'gpt-6.1-sol'
 const ANTHROPIC_MODEL = 'claude-opus-5-5'
 const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
-const DEFAULT_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: {
-		provider: ANTHROPIC_PROVIDER,
-		role: SCHEDULER,
-		model: ANTHROPIC_MODEL,
-		effort: 'medium',
-	},
-	worker: { provider: ANTHROPIC_PROVIDER, role: WORKER, model: ANTHROPIC_MODEL, effort: 'medium' },
-	reviewer: {
-		provider: ANTHROPIC_PROVIDER,
-		role: REVIEWER,
-		model: ANTHROPIC_MODEL,
-		effort: 'high',
-	},
+// **Round 1 reviews at `medium`** (joshuafolkken/kit#5106): it ended clean on 88% of diffs while its
+// `high` run sat on the lane's critical path; the verification pass below keeps `high`.
+const REVIEW_EFFORT: AgentEffort = 'medium'
+const VERIFICATION_EFFORT: AgentEffort = 'high'
+
+// Every provider runs each role at the same effort; only the model differs.
+function role_profiles(
+	provider: AgentProvider,
+	model: string,
+): Readonly<Record<AgentRole, AgentProfile>> {
+	return {
+		scheduler: { provider, role: SCHEDULER, model, effort: 'medium' },
+		worker: { provider, role: WORKER, model, effort: 'medium' },
+		reviewer: { provider, role: REVIEWER, model, effort: REVIEW_EFFORT },
+	}
 }
 
-const OPENAI_PROFILES: Readonly<Record<AgentRole, AgentProfile>> = {
-	scheduler: { provider: OPENAI_PROVIDER, role: SCHEDULER, model: OPENAI_MODEL, effort: 'medium' },
-	worker: { provider: OPENAI_PROVIDER, role: WORKER, model: OPENAI_MODEL, effort: 'medium' },
-	reviewer: { provider: OPENAI_PROVIDER, role: REVIEWER, model: OPENAI_MODEL, effort: 'high' },
-}
+const DEFAULT_PROFILES = role_profiles(ANTHROPIC_PROVIDER, ANTHROPIC_MODEL)
+const OPENAI_PROFILES = role_profiles(OPENAI_PROVIDER, OPENAI_MODEL)
 
 const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES }
 
@@ -89,8 +87,12 @@ const FIRST_REVIEW_ROUND = 1
 // pass/fail equals Opus's (100% agreement), and Opus passes all 4.
 const VERIFICATION_MODEL = 'claude-sonnet-5-5'
 const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
-	anthropic: { ...DEFAULT_PROFILES.reviewer, model: VERIFICATION_MODEL },
-	openai: OPENAI_PROFILES.reviewer,
+	anthropic: {
+		...DEFAULT_PROFILES.reviewer,
+		model: VERIFICATION_MODEL,
+		effort: VERIFICATION_EFFORT,
+	},
+	openai: { ...OPENAI_PROFILES.reviewer, effort: VERIFICATION_EFFORT },
 }
 const VERIFICATION_KEYS = {
 	model: 'JOSH_REVIEWER_VERIFICATION_MODEL',
@@ -101,7 +103,7 @@ const VERIFICATION_KEYS = {
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
 // commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
 // of judgement. The design-judgment implementation phases keep the role default, as does any role/phase
-// with no entry, and the review's own judgement is the reviewer role's (`high`), untouched by lowering
+// with no entry, and the review's own judgement is the reviewer role's, untouched by lowering
 // the worker here. The investigation phase — highest output density — is left for a later merge, once
 // the delegation half of this Issue has moved its reading out.
 const SHIP_EFFORT: AgentEffort = 'low'

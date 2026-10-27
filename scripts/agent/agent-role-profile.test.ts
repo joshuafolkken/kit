@@ -34,7 +34,7 @@ describe('the role policy defaults', () => {
 		expect(profile(REVIEWER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
 			model: ANTHROPIC_MODEL,
-			effort: 'high',
+			effort: 'medium',
 		})
 	})
 
@@ -46,7 +46,7 @@ describe('the role policy defaults', () => {
 			effort: 'medium',
 		})
 		expect(profile(WORKER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
-		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
+		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
 	})
 
 	// joshuafolkken/kit#2415: a floating alias cannot say which model a logged run used.

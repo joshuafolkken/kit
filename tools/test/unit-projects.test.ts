@@ -22,6 +22,7 @@ const {
 	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
 	unit_environment,
+	unit_projects_for,
 } = unit_projects
 
 function project(name: string): UnitProject['test'] {
@@ -65,6 +66,18 @@ describe('the two projects partition the suite without gaps or overlap', () => {
 	it('excludes every pure file from the isolated project so nothing runs twice', () => {
 		for (const file of PURE_FILES) {
 			expect(project(ISOLATED_PROJECT).exclude, `${file} runs in both projects`).toContain(file)
+		}
+	})
+
+	// joshuafolkken/kit#5105: vitest applies a command line's `--exclude` to the root config alone.
+	it('adds a command line --exclude to both projects, and nothing without one', () => {
+		const excluded = 'tools/test/heavy.test.ts'
+		const narrowed = unit_projects_for(['vitest', 'related', '--exclude', excluded, '--run'])
+
+		for (const entry of narrowed) expect(entry.test.exclude).toContain(excluded)
+
+		for (const entry of unit_projects_for(['vitest', 'run'])) {
+			expect(entry.test.exclude).not.toContain(excluded)
 		}
 	})
 
