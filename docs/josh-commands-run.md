@@ -194,14 +194,14 @@ start, or does not claim the run within two minutes, is a `failed` stop; an uncl
 
 **Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
 
-| Provider  | scheduler                    | worker                       | reviewer                   |
-| --------- | ---------------------------- | ---------------------------- | -------------------------- |
-| Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `high` |
-| OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `high`     |
+| Provider  | scheduler                    | worker                       | reviewer                     |
+| --------- | ---------------------------- | ---------------------------- | ---------------------------- |
+| Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |
+| OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     |
 
 Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
 either provider, and legacy `JOSH_LANE_*` values to the worker only. Review round 2 and later (the
-verification pass) runs Anthropic on `claude-sonnet-5-5` / `high`, overridable by
+verification pass) runs Anthropic on `claude-sonnet-5-5` / `high` and OpenAI on `gpt-6.1-sol` / `high`, overridable by
 `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}`, then `JOSH_REVIEWER_*`. With no session marker and no
 `JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
 launch from a plain terminal. Invalid configuration, conflicting session markers, or a missing,
@@ -886,8 +886,8 @@ pnpm josh lane:dispatch 1749   # prints the child's pid; a refusal is an empty c
 **Options:**
 
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
-- `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}` — review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `medium`.
+- `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}` — review round 2 and later (the verification pass); defaults are `claude-sonnet-5-5` / `high` on Anthropic and `high` on OpenAI, falling back to `JOSH_REVIEWER_*`.
 
 <!-- /usage -->
 
