@@ -189,7 +189,13 @@ pnpm josh check:related
 
 <!-- /usage -->
 
-Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for all four, ends with one verdict line naming every check that failed, and exits non-zero if any fails. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, so the end of the output still shows it.
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+
+A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict line lists it as `(reused: …)`. A check that failed last time left no record and runs again.
+
+`lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
+
+A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, so the end of the output still shows it.
 
 With that notice, the verdict line also says the ship's pre-detach stops on it and names `josh metrics --accept`.
 
@@ -336,6 +342,7 @@ Revert each changed hunk outside tests and fixtures only they reach, and replace
 pnpm josh test:pinned                    # unpinned / unchecked <file>:<line> lines
 pnpm josh test:pinned --max 5            # check at most 5 hunks; the rest print as unchecked
 pnpm josh test:pinned --record <token>   # also leave the answer, under the launch token, for run:review --join
+pnpm josh test:pinned --first-unpinned   # start no probe once one hunk is unpinned; the rest print as unchecked
 ```
 
 <!-- /usage -->

@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned --first-unpinned early stop: probe ordering, cut answer record, launcher argv, and run:review relaunching the whole check under a reason for a cut answer",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 108
+	}
+}

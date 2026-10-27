@@ -98,11 +98,23 @@ async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promis
 	return answer ?? (await reverted_run(tree, { ...probe, recheck: undefined }, workers))
 }
 
-// What every lane of one run shares: its workers per tree, the caller's hand-off and the probes' times.
+// Set once a probe is unpinned in a `--first-unpinned` run (joshuafolkken/kit#5153): no lane starts
+// another probe, and the ones already running finish and hand their verdicts on.
+interface Halt {
+	is_set: boolean
+}
+
+// What every lane of one run shares: its workers per tree, the caller's hand-off, the probes' times,
+// and the halt a `--first-unpinned` run carries.
 interface Lane {
 	workers: number
 	on_verdict: OnVerdict
 	times: Array<ProbeTime>
+	halt?: Halt | undefined
+}
+
+function halt_on(lane: Lane, verdict: RedProbe): void {
+	if (lane.halt !== undefined && test_pinned_logic.is_unpinned(verdict)) lane.halt.is_set = true
 }
 
 async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
@@ -114,7 +126,8 @@ async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<
 	return verdict
 }
 
-// One hunk at a time within a lane: its hunks share the lane's tree (`test-pinned-pool.ts`).
+// One hunk at a time within a lane: its hunks share the lane's tree (`test-pinned-pool.ts`). A set
+// halt starts no further hunk, so the lane answers fewer than it was dealt.
 async function verdicts_in(
 	tree: BaseTree,
 	probes: ReadonlyArray<Probe>,
@@ -123,9 +136,11 @@ async function verdicts_in(
 	const verdicts: Array<RedProbe> = []
 
 	for (const probe of probes) {
+		if (lane.halt?.is_set === true) break
 		// eslint-disable-next-line no-await-in-loop -- the hunks share one tree, so each revert waits for the last restore
 		const verdict = await timed_verdict(tree, probe, lane)
 
+		halt_on(lane, verdict)
 		// eslint-disable-next-line no-await-in-loop -- stored before the next hunk runs, so a stopped run keeps it
 		await lane.on_verdict(probe.index, verdict)
 		verdicts.push(verdict)
@@ -154,19 +169,27 @@ async function pooled(
 	)
 }
 
+// `held` counts the hunks the cache answered; `is_first_unpinned` starts no probe once one is unpinned.
+interface CheckOptions {
+	held?: number
+	is_first_unpinned?: boolean
+}
+
 // The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
-// The run's ledger row counts the `held` hunks the cache answered beside the probed ones' times.
+// The run's ledger row counts the `held` hunks beside the probed ones' times. The verdicts reached, in
+// the probes' order — under `is_first_unpinned`, the ones started before the first unpinned verdict.
 async function checked_on(
 	paths: ReadonlyArray<string>,
 	probes: ReadonlyArray<Probe>,
 	on_verdict: OnVerdict,
-	held = 0,
+	options: CheckOptions = {},
 ): Promise<Array<RedProbe>> {
 	const started = Date.now()
 	const times: Array<ProbeTime> = []
-	const verdicts = await pooled(paths, probes, { on_verdict, times })
+	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
+	const verdicts = await pooled(paths, probes, { on_verdict, times, halt })
 
-	await test_pinned_ledger.record(held, times, Date.now() - started)
+	await test_pinned_ledger.record(options.held ?? 0, times, Date.now() - started)
 
 	return verdicts
 }

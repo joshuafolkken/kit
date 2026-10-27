@@ -71,6 +71,7 @@ const UNPINNED: PinnedSummary = {
 	unpinned: ['scripts/issue/issue-file-cli.ts 0123456789abcdef'],
 }
 const CLEAR: PinnedSummary = { text: 'unpinned 0 · unchecked 0\n', unpinned: [] }
+const FIRST_UNPINNED = '--first-unpinned'
 const SKIPPED_NOTE_PREFIX =
 	'test:pinned not run before the detach; round 1 lists the unpinned places under --unpinned-ok: '
 const SHIP_ARGS: ShipArguments = {
@@ -158,6 +159,25 @@ describe('run_ship_pre_detach_pinned.pinned_check on the tree run:review checked
 		expect(result.code).toBe(FAILED)
 		expect(run_mock).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#5153: a cut answer lists only the first unpinned place, so a reason checks all.
+	it('probes every hunk under a reason when the background check stopped at its first', async () => {
+		reusable_mock.mockResolvedValue(true)
+		on_tree_mock.mockResolvedValue({ ...UNPINNED, is_cut: true })
+
+		await check(UNPINNED_OK)
+
+		expect(run_mock.mock.calls[0]?.[0]).not.toContain(FIRST_UNPINNED)
+	})
+
+	it('stops on a cut answer without a reason, running nothing more', async () => {
+		on_tree_mock.mockResolvedValue({ ...UNPINNED, is_cut: true })
+
+		const result = await check([])
+
+		expect(result.code).toBe(FAILED)
+		expect(run_mock).not.toHaveBeenCalled()
+	})
 })
 
 describe('run_ship_pre_detach_pinned.pinned_check', () => {
@@ -175,7 +195,13 @@ describe('run_ship_pre_detach_pinned.pinned_check', () => {
 		const token = launched_token()
 
 		expect(result).toStrictEqual({ code: OK, out: CLEAR.text })
-		expect(run_mock.mock.calls[0]?.[0]).toStrictEqual(['josh', 'test:pinned', '--record', token])
+		expect(run_mock.mock.calls[0]?.[0]).toStrictEqual([
+			'josh',
+			'test:pinned',
+			FIRST_UNPINNED,
+			'--record',
+			token,
+		])
 		expect(read_mock).toHaveBeenCalledWith(token)
 		expect(clear_mock).toHaveBeenCalledWith(token)
 	})

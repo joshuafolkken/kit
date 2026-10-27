@@ -5,6 +5,7 @@ import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { check_related_pinned } from './check-related-pinned'
+import { check_related_reuse } from './check-related-reuse'
 import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
 
@@ -15,6 +16,7 @@ const CHECKS: ReadonlyArray<string> = [
 	gate_plan.TYPE_CHECK_TARGET,
 	'cspell:dot',
 ]
+const REUSED = 'reused'
 const METRICS_STOP =
 	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`)'
 
@@ -76,8 +78,11 @@ async function start_check(
 	}
 }
 
-async function run_checks(execute: CheckExecutor = execute_check): Promise<Array<CheckResult>> {
-	const tasks = CHECKS.map((command): run_parallel.Task<CheckResult> => {
+async function run_checks(
+	execute: CheckExecutor = execute_check,
+	commands: ReadonlyArray<string> = CHECKS,
+): Promise<Array<CheckResult>> {
+	const tasks = commands.map((command): run_parallel.Task<CheckResult> => {
 		return (complete): void => {
 			void start_check(command, execute, complete)
 		}
@@ -110,10 +115,18 @@ function checks_line(results: ReadonlyArray<CheckResult>): string {
 	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
 }
 
+function reused_suffix(reused: ReadonlySet<string>): string {
+	return reused.size === 0 ? '' : ` (reused: ${[...reused].join(', ')})`
+}
+
 // A notice is never a failure, so a passing verdict line alone hid it from a reader of the last lines,
 // and the ship's pre-detach stopped on it (joshuafolkken/kit#4987).
-function verdict_line(results: ReadonlyArray<CheckResult>, has_metrics_notice: boolean): string {
-	const line = checks_line(results)
+function verdict_line(
+	results: ReadonlyArray<CheckResult>,
+	has_metrics_notice: boolean,
+	reused: ReadonlySet<string>,
+): string {
+	const line = `${checks_line(results)}${reused_suffix(reused)}`
 
 	return has_metrics_notice ? `${line} — ${METRICS_STOP}` : line
 }
@@ -130,7 +143,19 @@ function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined
 	return output.slice(start).trimEnd()
 }
 
-function report_results(results: ReadonlyArray<CheckResult>, pinned_notice?: string): void {
+function report_reused(reused: ReadonlySet<string>): void {
+	for (const command of reused) {
+		process.stdout.write(`\n=== ${command}: ${REUSED} ===\n`)
+	}
+}
+
+function report_results(
+	results: ReadonlyArray<CheckResult>,
+	pinned_notice?: string,
+	reused: ReadonlySet<string> = new Set(),
+): void {
+	report_reused(reused)
+
 	for (const result of results) {
 		report_result(result)
 	}
@@ -141,7 +166,7 @@ function report_results(results: ReadonlyArray<CheckResult>, pinned_notice?: str
 		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 	}
 
-	process.stdout.write(`\n${verdict_line(results, metrics !== undefined)}\n`)
+	process.stdout.write(`\n${verdict_line(results, metrics !== undefined, reused)}\n`)
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -153,17 +178,26 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // its pre-detach waited out a whole run. Started here, the check runs beside these four; a tree that did
 // not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
 // tree is printed above the verdict line, waited for when this run started it (`check-related-pinned.ts`).
+// A check whose green record still holds is not run (`check-related-reuse.ts`).
 async function run_all(root?: string, execute: CheckExecutor = execute_check): Promise<number> {
 	const is_started = await review_record_pinned.restart_in_lane(root)
-	const results = await run_checks(execute)
+	const tree = await check_related_reuse.read_tree()
+	const reused = await check_related_reuse.reusable(CHECKS, tree)
+	const results = await run_checks(
+		execute,
+		CHECKS.filter((command) => !reused.has(command)),
+	)
 
-	report_results(results, await check_related_pinned.notice(root, is_started))
+	await check_related_reuse.record(results, tree)
+	report_results(results, await check_related_pinned.notice(root, is_started), reused)
 
 	return exit_code(results)
 }
 
 const check_related = {
+	CHECKS,
 	METRICS_STOP,
+	REUSED,
 	execute_check,
 	exit_code,
 	report_results,

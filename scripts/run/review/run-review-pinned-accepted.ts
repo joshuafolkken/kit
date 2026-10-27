@@ -99,7 +99,9 @@ async function recorded_reason(): Promise<string | undefined> {
 }
 
 // `run_review_pinned.verdict_of`, with this run's reason recorded and, without one, the recorded reason
-// standing in for it.
+// standing in for it. **The recorded reason never judges a check cut at its first unpinned hunk**
+// (joshuafolkken/kit#5153): its list is not every place, so a place outside the record could be
+// among those it left, and the run stops.
 async function judge(summary: PinnedSummary, reason: string | undefined): Promise<PinnedVerdict> {
 	if (summary.unpinned.length === 0) return run_review_pinned.verdict_of(summary, reason)
 
@@ -109,7 +111,7 @@ async function judge(summary: PinnedSummary, reason: string | undefined): Promis
 		return run_review_pinned.verdict_of(summary, reason)
 	}
 
-	const earlier = await earlier_reason(summary.unpinned)
+	const earlier = summary.is_cut === true ? undefined : await earlier_reason(summary.unpinned)
 
 	if (earlier === undefined) return run_review_pinned.verdict_of(summary, undefined)
 

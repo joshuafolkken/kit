@@ -16,6 +16,14 @@ import { metrics_totals } from './metrics-totals'
 const execa_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('execa', () => ({ execa: execa_mock }))
+// No green record is read from or written over the live tree; `check-related-run-reuse.test.ts` drives it.
+vi.mock('./check-related-reuse', () => ({
+	check_related_reuse: {
+		read_tree: async () => ({ files: {}, base: undefined }),
+		record: async () => undefined,
+		reusable: async () => new Set(),
+	},
+}))
 
 const CHECK_COMMANDS = ['lint:related', 'test:related', 'check', 'cspell:dot'] as const
 const [LINT_COMMAND] = CHECK_COMMANDS

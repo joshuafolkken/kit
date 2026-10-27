@@ -22,6 +22,7 @@ const STUB_NO_TEST_REASON = 'no related test ran with its body replaced by a thr
 const UNPARSED_REASON = 'an added file, and typescript is not installed to read its functions'
 const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
 const STOPPED_REASON = 'vitest stopped before any test ran with it reverted'
+const CUT_REASON = 'not probed: the run stopped at the first unpinned hunk'
 const STOPPED_VERDICT: RedVerdict = 'stopped'
 const SETTLED_VERDICTS: ReadonlySet<RedVerdict> = new Set<RedVerdict>(['red', STOPPED_VERDICT])
 
@@ -56,6 +57,9 @@ interface HunkOutcome {
 	// Hunks whose revert stopped vitest before any test ran (joshuafolkken/kit#5043) — a config that
 	// imports the file could not load. No test was asked, so it is neither pinned nor unpinned.
 	stopped: ReadonlyArray<Hunk>
+	// Hunks a `--first-unpinned` run did not probe once one was unpinned (joshuafolkken/kit#5153): the
+	// run fails already, so the rest wait for the next run.
+	cut?: ReadonlyArray<Hunk>
 	// Whether every checked hunk had a verdict — false when a cache-only read found one the cache no
 	// longer holds (joshuafolkken/kit#5078).
 	is_held?: boolean
@@ -158,10 +162,28 @@ function split(hunks: ReadonlyArray<Hunk>, max_hunks: number): HunkSplit {
 	return { checked: hunks.slice(0, max_hunks), unchecked: hunks.slice(max_hunks) }
 }
 
-// `green` and `no-test` leave a hunk unpinned: either way nothing went red when it was reverted. A hunk
-// with no verdict yet is neither.
+// The probes, the ones whose file reaches the fewest tests first (joshuafolkken/kit#5153), so a run
+// that stops at its first unpinned hunk reaches it soonest; a file `reach` lacks counts as 0, and
+// equal counts keep their order.
+function by_reach<T extends { hunk: Hunk }>(
+	probes: ReadonlyArray<T>,
+	reach: ReadonlyMap<string, number>,
+): Array<T> {
+	function count(probe: T): number {
+		return reach.get(probe.hunk.file) ?? 0
+	}
+
+	return probes.toSorted((first, second) => count(first) - count(second))
+}
+
+// `green` and `no-test` leave a hunk unpinned: either way nothing went red when it was reverted.
+function is_unpinned(probe: RedProbe): boolean {
+	return !SETTLED_VERDICTS.has(probe.verdict)
+}
+
+// A hunk with no verdict yet is neither pinned nor unpinned.
 function unpinned_of(hunk: Hunk, probe: RedProbe | undefined): Array<UnpinnedHunk> {
-	if (probe === undefined || SETTLED_VERDICTS.has(probe.verdict)) return []
+	if (probe === undefined || !is_unpinned(probe)) return []
 
 	return [{ ...hunk, is_green: probe.verdict === 'green' }]
 }
@@ -204,16 +226,18 @@ function format(report: PinnedReport): string {
 		(hunk) => `unchecked ${location(hunk)} — ${unchecked_reason(report)}`,
 	)
 	const stopped = report.stopped.map((hunk) => `unchecked ${location(hunk)} — ${STOPPED_REASON}`)
+	const cut = (report.cut ?? []).map((hunk) => `unchecked ${location(hunk)} — ${CUT_REASON}`)
 	const unparsed = report.unparsed.map((file) => `unchecked ${file} — ${UNPARSED_REASON}`)
 
-	return [...unpinned, ...unchecked, ...stopped, ...unparsed].join(LINE_BREAK)
+	return [...unpinned, ...unchecked, ...stopped, ...cut, ...unparsed].join(LINE_BREAK)
 }
 
 // The counts line, then one line per unpinned or unchecked place — what `josh test:pinned` prints and
 // what `josh run:review` prints before round 1.
 function report_text(report: PinnedReport): string {
 	const unpinned = String(report.unpinned.length)
-	const unchecked = String(report.unchecked.length + report.stopped.length + report.unparsed.length)
+	const skipped = report.stopped.length + (report.cut?.length ?? 0) + report.unparsed.length
+	const unchecked = String(report.unchecked.length + skipped)
 	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, format(report)]
 
 	return `${lines.filter((line) => line !== '').join(LINE_BREAK)}${LINE_BREAK}`
@@ -221,8 +245,10 @@ function report_text(report: PinnedReport): string {
 
 const test_pinned_logic = {
 	DEFAULT_MAX_HUNKS,
+	by_reach,
 	format,
 	is_target,
+	is_unpinned,
 	location,
 	outcome,
 	parse_hunks,

@@ -1,0 +1,7 @@
+{
+	"reason": "check:related reuses green records: new check-related-reuse module, green_scripts in scoped-green, cspell input declaration, and the round-1 fix that keeps a moved .josh/ record from being reused",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 106
+	}
+}

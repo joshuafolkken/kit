@@ -16,6 +16,7 @@ const RECORD_PREFIX = 'josh-test-pinned-record-'
 const TOKEN_KEY_LENGTH = 16
 const SITE_KEY_LENGTH = 16
 const NOT_RUN_NOTE = '`josh test:pinned` could not run, so nothing was checked: '
+const FIRST_UNPINNED_FLAG = '--first-unpinned'
 
 type UnpinnedHunk = PinnedReport['unpinned'][number]
 
@@ -26,6 +27,9 @@ interface PinnedSummary {
 	unpinned: ReadonlyArray<string>
 	// What a check still running reached so far; it is shown, never judged or remembered as the answer.
 	is_partial?: boolean
+	// A `--first-unpinned` check that stopped before some hunks (joshuafolkken/kit#5153): its unpinned
+	// places are not every one, so no reason accepts it as the whole answer.
+	is_cut?: boolean
 }
 
 // A place's key leaves out its line, so merging the default branch in, which moves the line, keeps the
@@ -40,10 +44,12 @@ function site_of(hunk: UnpinnedHunk): string {
 }
 
 function summary_of(report: PinnedReport): PinnedSummary {
-	return {
+	const summary = {
 		text: test_pinned_logic.report_text(report),
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
+
+	return report.cut === undefined ? summary : { ...summary, is_cut: true }
 }
 
 // What a check still running has reached so far (joshuafolkken/kit#4936): `note` says the rest is to come.
@@ -75,11 +81,11 @@ function is_text_list(value: unknown): value is Array<string> {
 }
 
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
-	const { text, unpinned } = record
+	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
 
-	return { text, unpinned }
+	return is_cut === true ? { text, unpinned, is_cut } : { text, unpinned }
 }
 
 function parsed(raw: string): Record<string, unknown> | undefined {
@@ -107,8 +113,18 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 	stamp_file.remove_stamp(record_path(token, root))
 }
 
+// A recorded launch's `josh test:pinned` arguments, the token last. **With no `--unpinned-ok` reason it
+// stops at the first unpinned hunk** (joshuafolkken/kit#5153): the launcher stops on it whatever the
+// rest say. Under a reason every hunk is probed, since a reason accepts the list as the whole answer.
+function launch_argv(token: string, reason: string | undefined): Array<string> {
+	const cut = reason === undefined ? [FIRST_UNPINNED_FLAG] : []
+
+	return ['test:pinned', ...cut, '--record', token]
+}
+
 const test_pinned_record = {
 	clear,
+	launch_argv,
 	is_text_list,
 	not_run_summary,
 	parsed,
