@@ -1,5 +1,5 @@
 import { ports } from '#ports'
-import { core_budget } from '#scripts/gate/core-budget'
+import { core_weights } from '#scripts/gate/core-weights'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 import { AGENT_HOOK_COMMANDS } from './josh-commands-agent-hooks'
@@ -44,8 +44,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
 		reference: ['[--changed]', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		core_weight: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: {
 			examples: [
 				{ arguments: '' },
@@ -59,8 +59,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		core_weight: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: { examples: [{ arguments: '' }, NARROWED] },
 	},
 	lines: {
@@ -68,8 +68,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.eslint_scan,
 		usage: {
 			examples: [{ arguments: 'scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts' }],
 		},
@@ -84,8 +84,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'developer',
 			['files'],
 		],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.metrics,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 		usage: {
 			examples: [
@@ -100,8 +100,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'List refactoring candidates in the changed scope by category and answer clear/candidates',
 		category: 'Development',
 		reference: ['', 'automation', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.eslint_scan,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	bytes: {
@@ -154,8 +154,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.spell_check,
-		memory_mb: core_budget.MEMORY_MB.spell_check,
+		core_weight: core_weights.CORE_WEIGHTS.spell_check,
+		memory_mb: core_weights.MEMORY_MB.spell_check,
 		usage: { examples: [{ arguments: '', note: 'includes dotfiles' }] },
 	},
 	'check:related': {
@@ -239,8 +239,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Type-check with tsc (skips a basic project with no TypeScript to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.type_check,
-		memory_mb: core_budget.MEMORY_MB.type_check,
+		core_weight: core_weights.CORE_WEIGHTS.type_check,
+		memory_mb: core_weights.MEMORY_MB.type_check,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	port: {
