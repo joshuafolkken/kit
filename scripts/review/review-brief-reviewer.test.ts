@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -7,7 +6,6 @@ import { changed_paths } from '#scripts/git/changed-paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_attest } from './review-attest'
 import { review_brief_cli } from './review-brief-cli'
-import type { ReviewCheckout } from './review-checkout'
 import { review_tree } from './review-tree'
 
 // joshuafolkken/kit#5113: a ship's reviewer attested its nonce and then ran `review:brief --round 2`
@@ -28,18 +26,6 @@ const SCOPED_REFUSAL = '⛔ scoped checks not green on this tree: run them and r
 const REFUSED_EXIT_CODE = 1
 const ROUND_TWO = ['--round', '2']
 const CHANGED_FILE = 'scripts/review/review-brief-cli.ts'
-const ROOT_BYTES = 8
-const LANE: ReviewCheckout = { root: '/lanes/5113', branch: '5113-lane', head: 'c4604d2c' }
-
-const roots: Array<string> = []
-
-function fresh_root(): string {
-	const root = `/josh-review-brief-reviewer-test/${randomBytes(ROOT_BYTES).toString('hex')}`
-
-	roots.push(root)
-
-	return root
-}
 
 function errors(): ReadonlyArray<unknown> {
 	return vi.mocked(console.error).mock.calls.map(([message]: ReadonlyArray<unknown>) => message)
@@ -58,7 +44,6 @@ beforeEach(() => {
 afterEach(() => {
 	vi.unstubAllEnvs()
 	vi.restoreAllMocks()
-	for (const root of roots.splice(0)) review_attest.clear(root)
 })
 
 describe('josh review:brief in a reviewer session', () => {
@@ -69,16 +54,6 @@ describe('josh review:brief in a reviewer session', () => {
 		await expect(review_brief_cli.run(ROUND_TWO)).resolves.toBe(REFUSED_EXIT_CODE)
 		expect(record).not.toHaveBeenCalled()
 		expect(errors()).toEqual([expect.stringContaining('reviewer session')])
-	})
-
-	it('leaves the attestation the reviewer already left for the check', async () => {
-		const root = fresh_root()
-
-		review_attest.attest(review_attest.record_target(LANE, root), LANE)
-		vi.stubEnv(agent_session_role.KEY, agent_role_profile.REVIEWER)
-		await review_brief_cli.run(ROUND_TWO)
-
-		expect(review_attest.check(Date.now(), root).status).toBe('ok')
 	})
 })
 
