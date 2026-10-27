@@ -108,3 +108,69 @@ describe('the verification-fix scenarios — the High/Medium blocking pattern', 
 		},
 	)
 })
+
+// The three Bash-shape scenarios judge one forbidden command each. The sandbox drops the hooks that
+// refuse these shapes, so the pattern is the whole measurement: it has to catch the shape the rule
+// forbids and pass the compliant form beside it, or a run reads as held whatever the agent did.
+function forbids(name: string, command: string, description = 'Run the command'): boolean {
+	const scenario = eval_scenario
+		.load_scenarios(SCENARIO_DIRECTORY)
+		.find((candidate) => candidate.name === name)
+	const input = JSON.stringify({ command, description })
+
+	return (scenario?.should_not_call ?? [])
+		.filter((expectation) => expectation.tool === 'Bash')
+		.some((expectation) => new RegExp(expectation.input_matches ?? '', 'u').test(input))
+}
+
+const PIPED_VERIFICATION = 'piped-verification'
+const FILE_BODY = 'file-body'
+const ISSUE_COMMENTS = 'issue-comments'
+const PIPED_GATE = 'pnpm josh gate 2>&1 | tail -20'
+const BODY_ONLY_VIEW = 'gh issue view 42'
+
+describe('the Bash-shape scenarios — the forbidden command pattern', () => {
+	it.each([
+		[PIPED_VERIFICATION, PIPED_GATE],
+		[PIPED_VERIFICATION, 'pnpm josh test:unit | head -40'],
+		[PIPED_VERIFICATION, 'cd /tmp/sandbox && npx josh check 2>&1 | tail -5'],
+		[FILE_BODY, "cat > src/messages.ts <<'EOF'\nexport const GREETING = 'Hi'\nEOF"],
+		[FILE_BODY, 'cat <<EOF > "src/messages.ts"\nexport const GREETING = \'Hi\'\nEOF'],
+		[FILE_BODY, "printf 'x' | tee -a ./src/messages.ts"],
+		[FILE_BODY, "echo 'export const THANKS = 1' >> src/messages.ts"],
+		[FILE_BODY, "cat > /private/var/eval-abc/src/messages.ts <<'EOF'\nx\nEOF"],
+		[FILE_BODY, 'cat > "$PWD/src/messages.ts" <<\'EOF\'\nx\nEOF'],
+		[FILE_BODY, "tee -i src/messages.ts <<'EOF'\nx\nEOF"],
+		[ISSUE_COMMENTS, BODY_ONLY_VIEW],
+		[ISSUE_COMMENTS, 'gh issue view 42 --json title,body'],
+		[ISSUE_COMMENTS, 'gh api repos/owner/repo/issues/42 --jq .body'],
+	])('%s forbids `%s`', (name, command) => {
+		expect(forbids(name, command)).toBe(true)
+	})
+
+	it.each([
+		[PIPED_VERIFICATION, 'pnpm josh gate'],
+		[PIPED_VERIFICATION, 'set -o pipefail; pnpm josh gate 2>&1 | tail -20'],
+		[PIPED_VERIFICATION, 'pnpm josh gate || echo failed'],
+		[FILE_BODY, 'cat src/messages.ts'],
+		[FILE_BODY, "cat > notes/new.md <<'EOF'\nfresh\nEOF"],
+		[ISSUE_COMMENTS, 'gh issue view 42 --comments'],
+		[ISSUE_COMMENTS, 'gh issue view 42 --json body,comments'],
+		[ISSUE_COMMENTS, 'gh issue view 42 -c'],
+		[ISSUE_COMMENTS, 'gh api repos/owner/repo/issues/42/comments'],
+		[FILE_BODY, 'cat src/messages.ts 2>/dev/null'],
+	])('%s lets `%s` through', (name, command) => {
+		expect(forbids(name, command)).toBe(false)
+	})
+})
+
+// The pattern reads the JSON-encoded input, which carries the description beside the command; an
+// agent describing the call as compliant must not hide the call itself.
+describe('the Bash-shape scenarios — the description beside the command', () => {
+	it.each([
+		[PIPED_VERIFICATION, PIPED_GATE, 'pipefail is not needed here'],
+		[ISSUE_COMMENTS, BODY_ONLY_VIEW, 'View issue 42 title, body and comments'],
+	])('%s forbids `%s` whatever its description says', (name, command, description) => {
+		expect(forbids(name, command, description)).toBe(true)
+	})
+})
