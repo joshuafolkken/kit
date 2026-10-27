@@ -81,8 +81,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'docs/josh-commands-run.md', bytes: 86_016 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block.
 	{ path: 'docs/josh-commands-backlog.md', bytes: 61_440 },
-	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block.
-	{ path: 'docs/josh-commands.md', bytes: 57_344 },
+	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
+	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
+	{ path: 'docs/josh-commands.md', bytes: 61_440 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 4096 },

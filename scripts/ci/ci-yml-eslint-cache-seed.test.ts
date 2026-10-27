@@ -25,7 +25,8 @@ const REUSE_JOB = 'reuse-pr-checks'
 const RESTORE_STEP = 'eslint-cache'
 const SHA_SUFFIX = '${{ github.sha }}'
 const CACHE_PATH = '.eslintcache'
-const PULL_REQUEST_ONLY = "github.event_name == 'pull_request'"
+// joshuafolkken/kit#5215: `static-checks` is a matrix, and only its lint leg restores and writes the cache.
+const PULL_REQUEST_ONLY = "github.event_name == 'pull_request' && matrix.group == 'lint'"
 const PREFIX_FILE = 'eslint-cache-prefix'
 const UPLOAD_ARTIFACT = 'eslint-cache-${{ github.event.pull_request.number }}'
 const ON_REUSE = "needs.reuse-pr-checks.outputs.reuse == 'true'"

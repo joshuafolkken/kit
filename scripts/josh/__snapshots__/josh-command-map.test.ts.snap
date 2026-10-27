@@ -426,7 +426,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "gate": [
-      "[--verbose|--force|--no-unit]",
+      "[--verbose|--force|--no-unit|--static-group=<group>]",
       "developer",
       [
         "files",
