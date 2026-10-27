@@ -124,7 +124,7 @@ function is_direct_pr_create(command: string): boolean {
 const DIRECT_PR_CREATE_REASON =
 	'⛔ direct PR creation: `gh pr create` (or a `gh api` POST to `repos/<o>/<r>/pulls`) bypasses ' +
 	'`build_body`, which writes the `closes #N` line — the Issue would stay open after the merge ' +
-	'(`CLAUDE.md` → Git Rules). Open the PR with `pnpm josh pr` instead; after a failed push, fix, push, ' +
+	'(`operating-rules.md` → "git-rules"). Open the PR with `pnpm josh pr` instead; after a failed push, fix, push, ' +
 	'then run `pnpm josh pr`. **This rule fires on every occurrence, not once per run.**'
 
 const ROW = {
@@ -134,7 +134,7 @@ const ROW = {
 	decide: (): boolean => true,
 	about: {
 		title: 'Direct PR creation',
-		topic: '`CLAUDE.md` → Git Rules',
+		topic: '`operating-rules.md` → "git-rules"',
 		fires:
 			'`gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence',
 		quiet: '`pnpm josh pr`, or reading a PR — the path that writes `closes #N`',

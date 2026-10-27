@@ -20,7 +20,7 @@
 		{
 			"tool": "Bash",
 			"input_matches": "josh (bump|bp|git|g|pr|gp|followup|fu)\\b",
-			"because": "Committing, versioning or opening a pull request through the project's own commands is the execution half of a workflow that was never invoked. The aliases are listed because `josh-command-map.ts` makes `gp` and `g` the same call as `pr` and `git`."
+			"because": "Committing, versioning or opening a pull request through the project's own commands is the execution half of a workflow that was never invoked. The aliases are listed because `josh-aliases.ts` makes `gp` and `g` the same call as `pr` and `git`."
 		}
 	]
 }

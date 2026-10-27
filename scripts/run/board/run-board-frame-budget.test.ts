@@ -1,6 +1,7 @@
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import string_width from 'string-width'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { run_board_fixture } from './run-board-fixture'
 import { run_board_gather, type Gatherer, type GatherState } from './run-board-gather'
@@ -15,6 +16,12 @@ import type { BoardPorts, BoardState } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
 import type { UsageMark } from './run-board-usage'
 import { run_board_usage_board } from './run-board-usage-board'
+
+vi.mock('string-width', async (original) => {
+	const actual = await original<{ default: typeof string_width }>()
+
+	return { default: vi.fn(actual.default) }
+})
 
 // joshuafolkken/kit#4267: one redraw — the layout, the frame and its fit — runs on the board's own
 // thread between spinner turns, so it is held to a budget over a run the size of a busy day's: eight
@@ -37,6 +44,8 @@ const ROUNDS = 3
 // events it folds. A redraw that keeps the stream's folds read one, and one that folds the stream
 // again read 18,294 (three folds of six thousand), so a redraw is held under one fold of the stream.
 const READ_BUDGET = EVENTS
+// The pane the live board was profiled in (joshuafolkken/kit#5185).
+const PANE = { rows: 50, columns: 160 }
 const ISSUES = EVENTS / EVENTS_PER_ISSUE
 const LIVE = Array.from({ length: LANES }, (_, index) => FIRST_ISSUE + ISSUES - LANES + index)
 
@@ -144,7 +153,7 @@ function rereading(is_afresh: boolean): Rereading {
 
 // The board over the busy run, drawn once — its first frame waits for the worker's first round.
 async function first_frame(reread: () => void, gather: Gatherer): Promise<Board> {
-	const { ports, read_plan } = harness(BUSY, [])
+	const { ports, read_plan, frames } = harness(BUSY, [])
 	const live = { ...ports, gather }
 
 	read_plan.mockResolvedValue(PLAN)
@@ -152,19 +161,22 @@ async function first_frame(reread: () => void, gather: Gatherer): Promise<Board>
 
 	reread()
 
-	return { live, state: await first }
+	return { live, state: await first, frames }
 }
 
 interface Board {
 	live: BoardPorts
 	state: BoardState
+	// The frames the board wrote, fitted to its pane once it has one.
+	frames: Array<string>
 }
 
 interface Redrawing {
 	live: BoardPorts
 	reread: () => void
-	// Each event's issue read, counted from the read before the redraw.
-	reads: MockInstance<typeof run_event_scope.issue_named>
+	// What the redraw is counted by — each event's issue read, or each width measured — from the read
+	// before it.
+	reads: MockInstance<typeof run_event_scope.issue_named> | MockInstance<typeof string_width>
 }
 
 // One redraw right after a read — the one that would fold the stream again.
@@ -208,6 +220,28 @@ function most_read({ spent }: Redraws): number {
 	return Math.max(...spent.map(({ reads }) => reads))
 }
 
+interface Measured {
+	// The lines `string-width` measured over one redraw fitted to the pane.
+	measured: number
+	// The lines of the frame that redraw wrote.
+	lines: number
+}
+
+// joshuafolkken/kit#5185: a redraw fitted to a pane the size of a live one, right after another in the
+// same pane as a live board's once a second, its widths counted.
+async function fitted_redraw(): Promise<Measured> {
+	const { gather, reread } = rereading(false)
+	const { live, state, frames } = await first_frame(reread, gather)
+	const sized = { ...live, size: () => PANE }
+	const before = await redraw(state, { live: sized, reread, reads: vi.mocked(string_width) })
+
+	await redraw(before, { live: sized, reread, reads: vi.mocked(string_width) })
+
+	const measured = vi.mocked(string_width).mock.calls.length
+
+	return { measured, lines: frames.at(-1)?.split('\n').length ?? 0 }
+}
+
 afterEach(() => vi.restoreAllMocks())
 
 describe('run_board_tick.tick frame budget', () => {
@@ -226,5 +260,12 @@ describe('run_board_tick.tick frame budget', () => {
 		const { spent } = await redraws_read(true)
 
 		for (const { reads } of spent) expect(reads).toBeGreaterThanOrEqual(READ_BUDGET)
+	})
+
+	it('measures no more widths in a redraw fitted to the pane than its frame has lines', async () => {
+		const { measured, lines } = await fitted_redraw()
+
+		expect(lines).toBeGreaterThanOrEqual(PANE.rows)
+		expect(measured).toBeLessThanOrEqual(lines)
 	})
 })

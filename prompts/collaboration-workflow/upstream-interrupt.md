@@ -25,7 +25,7 @@
 1. **現在の作業を退避する**: `pnpm josh stash:push "upstream-interrupt: paused #<N>"`（WIP コミットでも可）
 2. **進行中の Issue に状況を書く**: `pnpm josh issue:comment <N> --body-file <path>` で、stash したこと、中断理由（どの別パッケージのどんな問題か）、新 Issue へのリンク（`## Upstream issues` 見出しの下に `owner/repo#N` 形式、→「起票元へのバックリンク」）
 3. **対象パッケージのリポジトリに Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --route tier-a --repo <owner>/<repo>`（joshuafolkken/kit#1083）。検査・分類ラベル・重複探し・`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
-4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `CLAUDE.md` → "Mid-workflow stop notification (`confirmation`)"）
+4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `rule-delivery.md` → "stop-notify"）
 5. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
 
 ### first-party の Issue・PR への書き込みは確認不要

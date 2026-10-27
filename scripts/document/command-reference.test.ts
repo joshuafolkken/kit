@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { ALIASES } from '#scripts/josh/josh-aliases'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import {
 	CATALOG_FILE,
 	format_command_entry,

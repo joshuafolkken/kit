@@ -1,7 +1,7 @@
 import { availableParallelism } from 'node:os'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { core_budget } from './core-budget'
+import { core_weights } from './core-weights'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four.
@@ -36,7 +36,7 @@ interface GateCheck {
 	// The unit suite reserves nothing: it sizes its own pool from the machine, so it is capped
 	// instead of reserved, and counting it here would reserve cores against itself.
 	reserved_cores: number
-	// The memory this check holds while it runs, `core_budget.MEMORY_MB`'s measured peak; none declared is
+	// The memory this check holds while it runs, `core_weights.MEMORY_MB`'s measured peak; none declared is
 	// none waited for. The unit suite's is per worker, so it is derived instead.
 	memory_mb?: number
 	// A check whose `josh` command is kit-only, so a consumer's gate leaves it out rather than running
@@ -81,7 +81,7 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
 //
-// **The three reserving weights are `core_budget.CORE_WEIGHTS`**, the same
+// **The three reserving weights are `core_weights.CORE_WEIGHTS`**, the same
 // numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
 //
 // **The two zero weights are measured, and they stay zero.** These are warm runs on the 11-core
@@ -98,20 +98,20 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		label: LINT_LABEL,
 		target: 'lint',
 		args: ['--changed'],
-		reserved_cores: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		reserved_cores: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 	},
 	{
 		label: TYPE_CHECK_LABEL,
 		target: TYPE_CHECK_TARGET,
-		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
-		memory_mb: core_budget.MEMORY_MB.type_check,
+		reserved_cores: core_weights.CORE_WEIGHTS.type_check,
+		memory_mb: core_weights.MEMORY_MB.type_check,
 	},
 	{
 		label: SPELL_CHECK_LABEL,
 		target: SPELL_CHECK_TARGET,
-		reserved_cores: core_budget.CORE_WEIGHTS.spell_check,
-		memory_mb: core_budget.MEMORY_MB.spell_check,
+		reserved_cores: core_weights.CORE_WEIGHTS.spell_check,
+		memory_mb: core_weights.MEMORY_MB.spell_check,
 	},
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 	// **The unused-member check reserves no core**: it builds one TypeScript
@@ -128,7 +128,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		target: METRICS_LABEL,
 		args: ['--no-startup'],
 		reserved_cores: 0,
-		memory_mb: core_budget.MEMORY_MB.metrics,
+		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 	},
 	// The lockfile policy check is network-bound and usually instant: it verifies only when the
@@ -359,7 +359,7 @@ function check_weight(check: GateCheck, plan: GatePlan, available_cores: number)
 }
 
 function unit_memory(workers: number): number {
-	return workers * core_budget.MEMORY_MB.unit_worker
+	return workers * core_weights.MEMORY_MB.unit_worker
 }
 
 // The memory a check holds: its declared figure, or for the unit suite one

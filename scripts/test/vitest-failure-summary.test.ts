@@ -3,8 +3,11 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { gate_log } from '#scripts/gate/gate-log'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
+import { status_icons } from '#scripts/lib/status-icons'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { vitest_failure_summary } from './vitest-failure-summary'
+
+const { FAIL_ICON, PASS_ICON } = status_icons
 
 // joshuafolkken/kit#4869: a failed `josh test:related` piped through `tail` kept the last stack and
 // no names, and the names cost a second run of the suite.
@@ -59,6 +62,7 @@ describe('vitest_failure_summary.format_failure_summary', () => {
 			`  ${SECOND}`,
 			`${vitest_failure_summary.RERUN_PREFIX}scripts/a.test.ts scripts/b.test.ts`,
 			`${gate_log.LOG_NOTICE_PREFIX}${LOG_PATH}`,
+			`${FAIL_ICON} vitest failed: scripts/a.test.ts, scripts/b.test.ts`,
 			'',
 		])
 	})
@@ -68,7 +72,9 @@ describe('vitest_failure_summary.format_failure_summary', () => {
 
 		expect(summary).toContain('none named in the output')
 		expect(summary).not.toContain(vitest_failure_summary.RERUN_PREFIX)
-		expect(summary.endsWith(`${gate_log.LOG_FAILED_NOTICE}\n`)).toBe(true)
+		expect(
+			summary.endsWith(`${gate_log.LOG_FAILED_NOTICE}\n${FAIL_ICON} vitest failed: none named\n`),
+		).toBe(true)
 	})
 })
 
@@ -98,18 +104,21 @@ describe('vitest_failure_summary.report', () => {
 		expect(readFileSync(target, 'utf8')).toContain(`=== vitest ${RELATED.join(' ')} ===`)
 		expect(readFileSync(target, 'utf8')).toContain(FAILED_OUTPUT)
 		expect(captured.text()).toBe(
-			vitest_failure_summary.format_failure_summary(FAILED_OUTPUT, target),
+			vitest_failure_summary.format_failure_summary(FAILED_OUTPUT, target, 'vitest related'),
 		)
 	})
 
-	it('writes the log but prints nothing on a pass', () => {
+	// joshuafolkken/kit#5162: a green run's last line was vitest's counts, so a run piped it into `tail`.
+	it('writes the log and ends a pass with the log path and its verdict', () => {
 		const target = path.join(ctx.directory, 'unit.log')
 		const captured = capture_stdout()
 
 		vitest_failure_summary.report(RELATED, 'all green', 0, target)
 
 		expect(readFileSync(target, 'utf8')).toContain('all green')
-		expect(captured.text()).toBe('')
+		expect(captured.text()).toBe(
+			`${gate_log.LOG_NOTICE_PREFIX}${target}\n${PASS_ICON} vitest related passed\n`,
+		)
 	})
 
 	it('keeps the log beside the gate log in the temp directory', () => {

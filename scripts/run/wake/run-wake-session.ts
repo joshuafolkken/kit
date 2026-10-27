@@ -9,6 +9,7 @@ import { claude_agent_argv } from '#scripts/agent/claude-agent-argv'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_invocation } from '#scripts/run/run-invocation'
+import { run_wake_caffeinate } from './run-wake-caffeinate'
 
 // How the supervisor starts things: the next agent session, and — at `--start` — its own detached
 // self. Both go through one `launch`, because the two differ only in what is being run.
@@ -164,6 +165,7 @@ const run_wake_session = {
 	WAKE_FLAGS,
 	ensure_log: detached_launch.ensure_log,
 	is_safe_argv: detached_launch.is_safe_argv,
+	keep_awake: run_wake_caffeinate.keep_awake,
 	launch: detached_launch.launch,
 	chosen_profile,
 	scheduler_profile,

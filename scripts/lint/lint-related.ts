@@ -10,6 +10,7 @@ import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { structural_checks } from '#scripts/gate/structural-checks'
+import { verification_tail } from '#scripts/gate/verification-tail'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { split_early_notice } from '#scripts/split/split-early-notice'
@@ -59,6 +60,17 @@ function document_check_exit_code(scope: ChangedFileScope, root: string): number
 	return document_checks.check_files(root, scope.files)
 }
 
+interface LintOutcome {
+	stage: string
+	exit_code: number
+}
+
+const UNMOVED: LintOutcome = { stage: 'unmoved', exit_code: 0 }
+
+function is_failed(outcome: LintOutcome): boolean {
+	return outcome.exit_code !== 0
+}
+
 // The lint result folded together with the fast document checks: the
 // same checks the gate's `document-byte-budget.test.ts`, `command-reference.test.ts` and
 // `issue-citation-budget.test.ts` run, brought forward to this between-edits path so a mandated
@@ -73,22 +85,27 @@ function document_check_exit_code(scope: ChangedFileScope, root: string): number
 // reported here for the namespaces the changed files declare or import directly
 // (joshuafolkken/kit#4645, joshuafolkken/kit#4649), rather than at ship's pre-detach gate. The
 // fallback scans the whole program, a superset as the lint's is.
-async function scoped_exit_code(scope: ChangedFileScope, root: string): Promise<number> {
+//
+// The outcome names the stage that failed first, which the verdict line names (joshuafolkken/kit#5162).
+async function scoped_outcome(scope: ChangedFileScope, root: string): Promise<LintOutcome> {
 	const structural = structural_checks.run_structural(scope, root)
-	const lint_exit = await lint_exit_code(scope)
-	const structural_exit = await structural
+	const lint = { stage: 'lint', exit_code: await lint_exit_code(scope) }
+	const failed = [lint, { stage: 'structural', exit_code: await structural }].find((outcome) =>
+		is_failed(outcome),
+	)
 
-	if (lint_exit !== 0) return lint_exit
-	if (structural_exit !== 0) return structural_exit
+	if (failed !== undefined) return failed
 	// The linters' buffered output ends without a newline; keep the checks' own lines apart from it.
 	process.stdout.write('\n')
-	const document_exit = document_check_exit_code(scope, root)
-	if (document_exit !== 0) return document_exit
+	const documents = { stage: 'documents', exit_code: document_check_exit_code(scope, root) }
+	if (is_failed(documents)) return documents
 
-	return await unused_members_check.run_unused_members(
-		root,
-		scope.mode === 'all' ? undefined : scope.files,
-	)
+	const files = scope.mode === 'all' ? undefined : scope.files
+
+	return {
+		stage: 'unused members',
+		exit_code: await unused_members_check.run_unused_members(root, files),
+	}
 }
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
@@ -143,20 +160,20 @@ async function resolve_lint_scope(
 // In kit, a metrics total grown past the merge-base is reported after the lint and changes no exit
 // code (`metrics-totals.ts`). The totals are a whole-repository pass, so only a green bare run pays
 // for it: a red lint is edited again anyway, and a run narrowed by file arguments is a spot check.
-async function exit_code_with_notice(
+async function outcome_with_notice(
 	command_arguments: ReadonlyArray<string>,
 	scope: ChangedFileScope,
 	root: string,
-): Promise<number> {
-	const exit_code = await scoped_exit_code(scope, root)
-	if (exit_code !== 0 || command_arguments.length > 0) return exit_code
+): Promise<LintOutcome> {
+	const outcome = await scoped_outcome(scope, root)
+	if (is_failed(outcome) || command_arguments.length > 0) return outcome
 
 	const notice = await metrics_totals.growth_notice(root)
 
 	// On a line of its own: a linter's buffered output need not end with a newline.
 	if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 
-	return exit_code
+	return outcome
 }
 
 // The narrowing line is printed before either child starts, so a scoped run is never read as a
@@ -178,26 +195,35 @@ function report_scope(
 
 // **Nothing moved since the last green run lints nothing** (joshuafolkken/kit#4593), as
 // `josh test:related` runs no test.
-function report_unmoved(): number {
+function report_unmoved(): LintOutcome {
 	process.stdout.write(
 		`${lint_related_scope.COMMAND_LABEL}: ${since_green.UNMOVED_REASON} — linting nothing.\n`,
 	)
 
-	return 0
+	return UNMOVED
 }
 
-async function checked_exit_code(
+async function checked_outcome(
 	command_arguments: ReadonlyArray<string>,
 	root: string,
 	moved: ReadonlyArray<string> | undefined,
-): Promise<number> {
+): Promise<LintOutcome> {
 	if (moved?.length === 0) return report_unmoved()
 
 	const scope = await resolve_lint_scope(command_arguments, root, moved)
 
 	report_scope(command_arguments, scope, root)
 
-	return await exit_code_with_notice(command_arguments, scope, root)
+	return await outcome_with_notice(command_arguments, scope, root)
+}
+
+// The run's last line names the stage that failed, or says it passed; the console is the only copy of
+// the output, so there is no log notice (`verification-tail.ts`).
+function report_verdict(outcome: LintOutcome): void {
+	const failed = is_failed(outcome) ? [outcome.stage] : []
+	const verdict = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, failed)
+
+	process.stdout.write(`\n${verification_tail.format_tail({ failures: '', verdict })}`)
 }
 
 // **A green run leaves a record of the tree it was green on**, so
@@ -209,11 +235,15 @@ async function run_related_lint(command_arguments: ReadonlyArray<string>): Promi
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const before = await scoped_green.read_before(command_arguments)
 	const moved = await read_since_green(before)
-	const exit_code = await checked_exit_code(command_arguments, root, moved)
+	const outcome = await checked_outcome(command_arguments, root, moved)
 
-	await scoped_green.record_if_green(review_stamps.lint_related_stamp, { before, exit_code })
+	report_verdict(outcome)
+	await scoped_green.record_if_green(review_stamps.lint_related_stamp, {
+		before,
+		exit_code: outcome.exit_code,
+	})
 
-	return exit_code
+	return outcome.exit_code
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

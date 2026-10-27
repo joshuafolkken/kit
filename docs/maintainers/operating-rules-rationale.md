@@ -34,8 +34,8 @@ Where each one lives now:
 - **Explicit invocation** — `CLAUDE.md` → "Explicit invocation required (MANDATORY)" (resident) and
   `.claude/skills/workflow-commands/SKILL.md` → "0. The rule that fires before any of them — explicit
   invocation" (the skill-side single source)
-- **The `confirmation` stop notification** — `CLAUDE.md` → "Mid-workflow stop notification
-  (`confirmation`)"
+- **The `confirmation` stop notification** — `prompts/collaboration-workflow/rule-delivery.md` →
+  "stop-notify"
 - **The working-tree hold (`josh run:hold`)** — `.claude/skills/workflow-commands/working-tree-hold.md`
   → "The working-tree hold — one run per tree"
 - **The overrides protection** — `.claude/skills/dependency-update/SKILL.md` → "1. Effective overrides
