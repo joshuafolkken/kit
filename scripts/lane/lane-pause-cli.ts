@@ -4,7 +4,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_pause, type LaneSignalled } from './lane-pause'
 import type { LaneProcesses } from './lane-reap'
 import { lane_registry } from './lane-registry'
@@ -75,7 +75,7 @@ async function record(verb: Verb, issue: string): Promise<void> {
 	const command = `lane:${verb}`
 
 	await lane_state.record_change({ issue, state: VERBS[verb].state, command })
-	await lane_ledger.record_lane_state({ issue: Number(issue), state: VERBS[verb].state })
+	await lane_ledger_write.record_lane_state({ issue: Number(issue), state: VERBS[verb].state })
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.LANE_STATE,
 		`${issue_cite.plain(issue)} ${VERBS[verb].done} by ${command}`,

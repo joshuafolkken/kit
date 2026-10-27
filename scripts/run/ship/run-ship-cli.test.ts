@@ -69,7 +69,7 @@ vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
 vi.spyOn(run_ship_body_draft, 'with_draft').mockImplementation(async (args) => args)
 run_ship_recorded_fixture.isolate()
 
-const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
 
@@ -382,8 +382,8 @@ describe('run_ship_cli.run — --review carries round 2 between the commit and t
 // joshuafolkken/kit#3789: the stop goes to the ledger too, so `lane:stats` can time the wait it began;
 // joshuafolkken/kit#3998: with its cause — a red gate is a check whatever it prints, never retried.
 it('records each stage a ship ran, never a skipped one, and the stop with its cause', async () => {
-	const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
-	const record_stop = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+	const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
+	const record_stop = vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
 	const stop = { issue: Number(NUMBER), reason: 'gate', cause: 'check' }
 
 	review_mock.mockResolvedValue({ code: OK, out: 'round 1 already recorded', is_skipped: true })

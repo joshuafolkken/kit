@@ -49,6 +49,7 @@ describe('whole_suite_files — every file vitest widens the whole suite on', ()
 
 		expect(graph).not.toContain(path.normalize('tools/test/unit-file-reporter.ts'))
 		expect(graph).not.toContain(path.normalize('scripts/lane/lane-ledger.ts'))
+		expect(graph).not.toContain(path.normalize('scripts/lane/lane-ledger-write.ts'))
 	})
 
 	// joshuafolkken/kit#4572: the config reads the run markers alone, so the often-changed bounds of the

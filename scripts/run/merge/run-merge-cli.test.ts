@@ -29,7 +29,7 @@ vi.mock('#scripts/issue/issue-closing-pr')
 vi.mock('#scripts/issue/issue-merged', () => ({
 	issue_merged: { read_merge_state: vi.fn().mockResolvedValue(true) },
 }))
-vi.mock('#scripts/lane/lane-ledger')
+vi.mock('#scripts/lane/lane-ledger-write')
 vi.mock('./run-merge-ship')
 
 vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))

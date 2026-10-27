@@ -1,5 +1,5 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { time_format } from '#scripts/time-runtime/time-format'
 import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
 
@@ -157,8 +157,8 @@ async function record_ci_wait(log: StageLog): Promise<void> {
 
 	if (wait === undefined) return
 
-	await lane_ledger.record_stage({
-		stage: lane_ledger.CI_WAIT_STAGE,
+	await lane_ledger_write.record_stage({
+		stage: lane_ledger_write.CI_WAIT_STAGE,
 		elapsed_ms: wait.duration_ms,
 	})
 }

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LedgerEntry } from './lane-ledger'
 
 // joshuafolkken/kit#3355: `lane:sample` appends one load sample and `lane:stats` prints the period's
 // table row; a malformed verb or flag is refused rather than measured as a zero period.
@@ -12,6 +13,7 @@ const sample_mock = vi.hoisted(() => vi.fn())
 vi.mock('./lane-load', () => ({ lane_load: { sample: sample_mock } }))
 
 const { lane_ledger } = await import('./lane-ledger')
+const { lane_ledger_write } = await import('./lane-ledger-write')
 const { lane_measure_cli } = await import('./lane-measure-cli')
 const { lane_stats } = await import('./lane-stats')
 const { run_event_stream } = await import('#scripts/run/event/run-event-stream')
@@ -22,6 +24,7 @@ const AT = new Date(NOW).toISOString()
 const FAILURE = 1
 const SINCE = '2026-10-06T00:00Z'
 const SESSION_FILE = 'session.jsonl'
+const GATE_STOP: LedgerEntry = { kind: 'stop', at: AT, issue: 1, reason: 'gate' }
 
 afterAll(() => {
 	rmSync(scratch, { force: true, recursive: true })
@@ -98,7 +101,7 @@ describe('lane_measure_cli.run — stats', () => {
 	it('prints the header and the row of the ledger period under the given limit', async () => {
 		const context = fresh_context()
 
-		lane_ledger.append(context.ledger_path, { kind: 'merge', at: AT, issue: 1 })
+		lane_ledger_write.append(context.ledger_path, { kind: 'merge', at: AT, issue: 1 })
 
 		await expect(
 			lane_measure_cli.run(['stats', '--period', '2', '--limit', '6'], context),
@@ -115,7 +118,7 @@ describe('lane_measure_cli.run — stats', () => {
 		const context = fresh_context()
 		const minute = 60_000
 
-		lane_ledger.append(context.ledger_path, {
+		lane_ledger_write.append(context.ledger_path, {
 			kind: 'stage',
 			at: AT,
 			stage: 'review',
@@ -134,7 +137,7 @@ describe('lane_measure_cli.run — stats', () => {
 	it('prints the per-stop-reason table last', async () => {
 		const context = fresh_context()
 
-		lane_ledger.append(context.ledger_path, { kind: 'stop', at: AT, issue: 1, reason: 'gate' })
+		lane_ledger_write.append(context.ledger_path, GATE_STOP)
 
 		await lane_measure_cli.run(['stats', '--period', '2'], context)
 
@@ -151,7 +154,7 @@ describe('lane_measure_cli.run — stats reads the event stream', () => {
 		const context = fresh_context()
 		const parked_at = new Date(Date.parse(AT) + 60_000).toISOString()
 
-		lane_ledger.append(context.ledger_path, { kind: 'stop', at: AT, issue: 1, reason: 'gate' })
+		lane_ledger_write.append(context.ledger_path, GATE_STOP)
 		run_event_stream.append(context.events_path, 'park', '#1 parked', parked_at)
 
 		await lane_measure_cli.run(['stats', '--period', '2'], context)
@@ -183,7 +186,7 @@ describe('lane_measure_cli.run — stats holds', () => {
 	it('prints the per-hold-reason table', async () => {
 		const context = fresh_context()
 
-		lane_ledger.append(context.ledger_path, { kind: 'held', at: AT, reason: 'offer:wait' })
+		lane_ledger_write.append(context.ledger_path, { kind: 'held', at: AT, reason: 'offer:wait' })
 
 		await lane_measure_cli.run(['stats', '--period', '2'], context)
 
@@ -206,7 +209,7 @@ describe('lane_measure_cli.run — stats core waits', () => {
 			issue: 7,
 		} as const
 
-		lane_ledger.append(context.ledger_path, wait)
+		lane_ledger_write.append(context.ledger_path, wait)
 
 		await lane_measure_cli.run(['stats', '--period', '2'], context)
 
@@ -224,7 +227,7 @@ describe('lane_measure_cli.run — stats core claims', () => {
 		const claim = { requested: 2, granted: 2, waited_ms: 3000 }
 		const check = { label: 'lint', elapsed_ms: 10_000, is_passed: true, cpu_ms: 15_000, claim }
 
-		lane_ledger.append(context.ledger_path, {
+		lane_ledger_write.append(context.ledger_path, {
 			kind: 'gate',
 			at: AT,
 			elapsed_ms: 10_000,
@@ -252,7 +255,7 @@ describe('lane_measure_cli.run — stats round 2', () => {
 			code: 'inert',
 		} as const
 
-		lane_ledger.append(context.ledger_path, decision)
+		lane_ledger_write.append(context.ledger_path, decision)
 
 		await lane_measure_cli.run(['stats', '--period', '2'], context)
 

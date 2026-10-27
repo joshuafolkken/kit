@@ -16,7 +16,7 @@ import { run_label } from '#scripts/run/run-label'
 import { lane_child_invocation } from './lane-child-invocation'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch_log } from './lane-dispatch-log'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
@@ -345,7 +345,7 @@ async function record_started(issue: string, start: DispatchStart): Promise<void
 		`${issue_cite.plain(issue)} dispatched`,
 		now,
 	)
-	await lane_ledger.record_dispatch(Number(issue))
+	await lane_ledger_write.record_dispatch(Number(issue))
 	await lane_state.record_change(
 		{
 			issue,

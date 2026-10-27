@@ -4,6 +4,7 @@ import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import type { ProcessOwner } from '#scripts/josh/process-owner'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
@@ -197,7 +198,7 @@ describe('gate_ledger — the reuses and the fallbacks', () => {
 	})
 
 	it('writes no reused line when no ledger was resolved', async () => {
-		const record_gate = vi.spyOn(lane_ledger, 'record_gate')
+		const record_gate = vi.spyOn(lane_ledger_write, 'record_gate')
 
 		await gate_ledger.record_reused(undefined, OUTCOME.elapsed_ms)
 
