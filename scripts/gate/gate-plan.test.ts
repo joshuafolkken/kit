@@ -415,8 +415,9 @@ describe('gate_plan without the unit suite', () => {
 		expect(gate_plan.GATE_CHECKS.slice(0, -1)).toEqual(gate_plan.STATIC_CHECKS)
 	})
 
-	// joshuafolkken/kit#4609: on CI's four cores the spell check does not fit beside lint and the type
-	// check, and counted in declaration order it ended the count there — behavior, exports, metrics
+	// joshuafolkken/kit#4609: on CI's four cores the three reserving checks do not all fit — today the
+	// type check is the one over the share — and counted in declaration order the one that did not
+	// fit ended the count there — behavior, exports, metrics
 	// and lockfile queued behind it. Every check but the one over the share is admitted.
 	it('leaves only the check over the share out on the four-core runner CI gives it', () => {
 		const plan = gate_plan.resolve_gate_plan(CI_CORES, 1, false)

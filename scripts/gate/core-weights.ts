@@ -14,10 +14,11 @@ interface Measurement {
 // 2026-10-21 under a load average of 14. `prettier --check` over 40 staged files, `josh retrospective`
 // and a fresh lane's `pnpm install --frozen-lockfile` with `/usr/bin/time -l` on 2026-10-17 under a
 // load average of 16. The gate ledger records each check's CPU beside its duration (`check-cpu.ts`),
-// so these can be re-measured from it. The spell check is (joshuafolkken/kit#5140): its median CPU and
-// median wall over the lane ledger's 413 gate `cspell` runs that were not reused from 2026-10-24 to 2026-10-27,
-// whose per-run cores had a median of 0.91 and a p90 of 1.31 — one core rounded up, where the single
-// 2026-10-21 run of 6.0s over 5.6s had rounded up to two.
+// so these can be re-measured from it. The spell check was re-measured from it
+// (joshuafolkken/kit#5140): its median CPU and median wall over the lane ledger's 413 gate `cspell`
+// runs that were not reused, from 2026-10-24 to 2026-10-27, whose per-run cores had a median of 0.91
+// and a p90 of 1.31 — one core rounded up, where the single 2026-10-21 run of 6.0s over 5.6s had
+// rounded up to two.
 const MEASURED = {
 	lint: { cpu_s: 16.9, wall_s: 14 },
 	type_check: { cpu_s: 31.2, wall_s: 27.3 },
