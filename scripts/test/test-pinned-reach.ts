@@ -110,6 +110,16 @@ function related_of(view: GraphView, file: string): Array<string> {
 		.filter((reader) => test_declared_logic.is_test_file(reader))
 }
 
+// How many test files the imports of `files` reach, a listed test counting itself — what
+// `josh test:related` sizes its core claim by before vitest walks the same graph
+// (joshuafolkken/kit#5135). Undefined where no graph can be built.
+async function reached_test_count(files: ReadonlyArray<string>): Promise<number | undefined> {
+	const view = await view_of()
+	if (view === undefined) return undefined
+
+	return new Set(files.flatMap((file) => related_of(view, file))).size
+}
+
 // None where no failed test is named or one is gone: what such a red rests on, no graph names.
 function failed_of(
 	view: GraphView,
@@ -144,7 +154,13 @@ function create(inputs: ReachInputs): Reach {
 	return { related, failed }
 }
 
-const test_pinned_reach = { code_universe, create, probed_files, work_tree_files }
+const test_pinned_reach = {
+	code_universe,
+	create,
+	probed_files,
+	reached_test_count,
+	work_tree_files,
+}
 
 export type { Reach, ReachInputs }
 export { test_pinned_reach }

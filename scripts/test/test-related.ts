@@ -14,6 +14,7 @@ import { pure_files_entries } from './pure-files-entries'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
+import { test_related_claim } from './test-related-claim'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -283,14 +284,20 @@ async function run_scope(
 		return 0
 	}
 
-	return await test_unit_guard.run_guarded_vitest(
-		process.cwd(),
-		related_scope.vitest_arguments(scope, [
-			...changed_file_scope.flags_of(command_arguments),
-			...related_heavy_tests.exclude_flags(scope, root),
-		]),
-		related_scope.COMMAND_NAME,
-		description,
+	const vitest_arguments = related_scope.vitest_arguments(scope, [
+		...changed_file_scope.flags_of(command_arguments),
+		...related_heavy_tests.exclude_flags(scope, root),
+	])
+
+	return await test_related_claim.with_unit_claim(
+		scope.mode === 'related' ? scope.files : undefined,
+		async () =>
+			await test_unit_guard.run_guarded_vitest(
+				process.cwd(),
+				vitest_arguments,
+				related_scope.COMMAND_NAME,
+				description,
+			),
 	)
 }
 

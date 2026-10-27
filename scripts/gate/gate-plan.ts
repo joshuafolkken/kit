@@ -399,14 +399,35 @@ function direct_unit_weight(
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
 }
 
+// The related files one vitest worker clears in about 30 seconds: `tools/test/unit-durations.json`'s
+// median file takes 105 ms (2077 files), and 30 000 ÷ 105 ≈ 285 (joshuafolkken/kit#5135).
+const FILES_PER_WORKER = 285
+
+// The cores a narrowed `josh test:related` reserves once its scope is known: one worker for each
+// `FILES_PER_WORKER` related files, at least `MIN_WORKERS` and at most the share `direct_unit_weight`
+// gives the whole suite, plus vitest's own process. **A small scope no longer claims the whole width**,
+// so the other lanes' unit claims stop waiting behind a twenty-second run (joshuafolkken/kit#5135).
+function scoped_unit_weight(
+	files: number,
+	available_cores: number = availableParallelism(),
+	live_runs: number = unit_worker_share.live_run_count(),
+): number {
+	const { MAIN_PROCESS_CORES, MIN_WORKERS } = unit_worker_share
+	const share = direct_unit_weight(available_cores, live_runs) - MAIN_PROCESS_CORES
+	const wanted = Math.max(MIN_WORKERS, Math.ceil(files / FILES_PER_WORKER))
+
+	return Math.min(wanted, share) + MAIN_PROCESS_CORES
+}
+
 // What a unit run started directly holds: one worker's peak for each core `direct_unit_weight` gives
 // it, vitest's own process counted as one more.
 function direct_unit_memory(): number {
 	return unit_memory(direct_unit_weight())
 }
 
-// The claim every unit run started directly declares — `josh test:unit`, `josh test:related` and the
-// pre-push hook — declared once so the three cannot drift apart.
+// The claim every unit run started directly declares — `josh test:unit` and the pre-push hook —
+// declared once so the two cannot drift apart. `josh test:related` claims in its body instead, once
+// its scope is known (`scoped_unit_weight`).
 const DIRECT_UNIT_CLAIM = {
 	core_weight: direct_unit_weight,
 	memory_mb: direct_unit_memory,
@@ -501,6 +522,7 @@ function format_gate_plan(
 const gate_plan = {
 	DIRECT_UNIT_CLAIM,
 	EXPORTS_LABEL,
+	FILES_PER_WORKER,
 	GATE_CHECKS,
 	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
@@ -524,7 +546,9 @@ const gate_plan = {
 	resolve_concurrency,
 	resolve_gate_plan,
 	resolve_unit_worker_cap,
+	scoped_unit_weight,
 	select_gate_checks,
+	unit_memory,
 }
 
 export type { GateCheck, GatePlan }
