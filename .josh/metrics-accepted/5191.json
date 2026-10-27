@@ -1,0 +1,8 @@
+{
+	"reason": "issue:file one-pass refusals (#5191): a dedicated one-pass test file and the pass function",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 12,
+		"prose.excess_bold": 1
+	}
+}

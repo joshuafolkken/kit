@@ -5,15 +5,19 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_closing_pr } from './issue-closing-pr'
+import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
+import { issue_file_fold } from './issue-file-fold'
 import { issue_sample_gate } from './issue-sample-gate'
 import { issue_scout_cli } from './issue-scout-cli'
 
 // joshuafolkken/kit#4460: `josh issue:file` refuses a start condition citing an issue rather than a
-// pull request before any listing or create, and names the pull request that closed the issue.
-// What passes is `issue-sample-source.test.ts`'s; here only the filing's refusal is asserted.
+// pull request before any create, and names the pull request that closed the issue. What passes is
+// `issue-sample-source.test.ts`'s; here only the filing's refusal is asserted. The run's holds clear
+// and the scout answers nothing, so no filing reaches a create.
 
 const HERE = 'joshuafolkken/kit'
 const THERE = 'joshuafolkken/app-kit'
@@ -77,6 +81,10 @@ beforeEach(() => {
 	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
 	vi.spyOn(issue_closing_pr, 'read_closing_number').mockResolvedValue(CLOSING)
 	exec_gh_api.mockResolvedValue(JSON.stringify({ number: CITED }))
+	vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
+	vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
+	vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: undefined, is_capped: false })
+	scout.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -93,7 +101,6 @@ describe('issue_file_cli.run — a measurement follow-up with no start condition
 		expect(await issue_file_cli.run(argv_of(measurement_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(issue_sample_gate.DECLARATION)
 		expect(exec_gh_api).not.toHaveBeenCalled()
-		expect(scout).not.toHaveBeenCalled()
 	})
 })
 
@@ -102,7 +109,6 @@ describe('issue_file_cli.run — a start condition citing an issue', () => {
 		expect(await issue_file_cli.run(argv_of(body_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(`#${String(CLOSING)}`)
 		expect(exec_gh_api).toHaveBeenCalledTimes(1)
-		expect(scout).not.toHaveBeenCalled()
 	})
 
 	it('reads the number in the target repository', async () => {
@@ -117,8 +123,6 @@ describe('issue_file_cli.run — a start condition citing an issue', () => {
 // issue exists — `josh ship` wants the deferral row first — by citing the issue's closing pull request.
 describe('issue_file_cli.run — a measurement follow-up citing the closing pull request of an issue', () => {
 	it('passes the start condition checks unread and reaches the scout', async () => {
-		scout.mockResolvedValueOnce(undefined)
-
 		await issue_file_cli.run(argv_of(closing_path, '--label', 'run:lane'))
 
 		expect(vi.mocked(console.error).mock.calls.join('\n')).not.toContain('実施可能条件')
