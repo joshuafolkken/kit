@@ -1,3 +1,5 @@
+import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_static_group } from '#scripts/gate/gate-static-group'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
 
@@ -11,6 +13,8 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 const SHA_SUFFIX = '-${{ github.sha }}'
 const TS_BUILD_CACHE_STEP = 'tsbuildinfo-cache'
 const PRETTIER_CACHE_STEP = 'prettier-cache'
+const ESLINT_CACHE_STEP = 'eslint-cache'
+const CSPELL_CACHE_STEP = 'cspell-cache'
 const TS_CHECK_COMMAND = 'pnpm josh check'
 
 interface WorkflowCase {
@@ -32,23 +36,22 @@ const TEMPLATE_WORKFLOW_CASE: WorkflowCase = {
 	excluded_step_ids: [TS_BUILD_CACHE_STEP, PRETTIER_CACHE_STEP],
 }
 
-const WORKFLOW_CASES: ReadonlyArray<WorkflowCase> = [
-	{
-		relative_path: ci_yml_fixture.RUNTIME_CI_YML,
-		job_name: 'static-checks',
-		gate_command: 'pnpm josh gate',
-	},
-	TEMPLATE_WORKFLOW_CASE,
-]
+const RUNTIME_WORKFLOW_CASE: WorkflowCase = {
+	relative_path: ci_yml_fixture.RUNTIME_CI_YML,
+	job_name: 'static-checks',
+	gate_command: 'pnpm josh gate',
+}
+
+const WORKFLOW_CASES: ReadonlyArray<WorkflowCase> = [RUNTIME_WORKFLOW_CASE, TEMPLATE_WORKFLOW_CASE]
 
 const CACHE_CASES: ReadonlyArray<CacheCase> = [
 	{
-		step_id: 'eslint-cache',
+		step_id: ESLINT_CACHE_STEP,
 		path: '.eslintcache',
 		command_fragment: 'pnpm exec eslint . --cache --cache-strategy content',
 	},
 	{ step_id: TS_BUILD_CACHE_STEP, path: '.tsbuildinfo', command_fragment: TS_CHECK_COMMAND },
-	{ step_id: 'cspell-cache', path: '.cspellcache', command_fragment: 'pnpm josh cspell:dot' },
+	{ step_id: CSPELL_CACHE_STEP, path: '.cspellcache', command_fragment: 'pnpm josh cspell:dot' },
 	{ step_id: PRETTIER_CACHE_STEP, path: '.prettiercache', command_fragment: 'pnpm josh lint' },
 ]
 
@@ -101,6 +104,31 @@ describe.each(WORKFLOW_CASES)('static-check caches in $relative_path', (workflow
 				true,
 			)
 		})
+	})
+})
+
+// joshuafolkken/kit#5215: the runtime job is a matrix of static groups, and a leg that restored a cache
+// its checks never write would save it back unchanged under the same sha key, racing the leg that
+// writes it. So each cache restores only on the leg whose group holds the check that writes the file.
+const RUNTIME_CACHE_WRITERS: ReadonlyArray<readonly [string, string]> = [
+	[ESLINT_CACHE_STEP, gate_plan.LINT_LABEL],
+	[PRETTIER_CACHE_STEP, gate_plan.LINT_LABEL],
+	[TS_BUILD_CACHE_STEP, gate_plan.TYPE_CHECK_LABEL],
+	[CSPELL_CACHE_STEP, gate_plan.SPELL_CHECK_LABEL],
+]
+
+function group_holding(label: string): string | undefined {
+	return Object.entries(gate_static_group.STATIC_GROUPS).find(([, labels]) =>
+		labels.includes(label),
+	)?.[0]
+}
+
+describe.each(RUNTIME_CACHE_WRITERS)('the runtime %s', (step_id, writer_label) => {
+	it('restores only on the matrix leg that writes it', () => {
+		const group = group_holding(writer_label) ?? ''
+
+		expect(group).not.toBe('')
+		expect(cache_step(RUNTIME_WORKFLOW_CASE, step_id)?.if).toBe(`matrix.group == '${group}'`)
 	})
 })
 
