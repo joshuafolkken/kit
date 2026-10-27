@@ -169,9 +169,11 @@ async function pooled(
 	)
 }
 
-// `held` counts the hunks the cache answered; `is_first_unpinned` starts no probe once one is unpinned.
+// `held` counts the hunks the cache answered, `rewired` the ones left out as a rewire
+// (`test-pinned-rewire.ts`); `is_first_unpinned` starts no probe once one is unpinned.
 interface CheckOptions {
 	held?: number
+	rewired?: number
 	is_first_unpinned?: boolean
 }
 
@@ -189,7 +191,9 @@ async function checked_on(
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
 	const verdicts = await pooled(paths, probes, { on_verdict, times, halt })
 
-	await test_pinned_ledger.record(options.held ?? 0, times, Date.now() - started)
+	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0 }
+
+	await test_pinned_ledger.record(skipped, times, Date.now() - started)
 
 	return verdicts
 }

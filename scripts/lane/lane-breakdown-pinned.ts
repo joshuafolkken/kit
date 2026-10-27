@@ -44,9 +44,12 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 		.flatMap((row) => row.probes)
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
 	const held = rows.reduce((sum, row) => sum + row.held, 0)
-	const head = `test:pinned ${String(held + probes.length)} hunks, ${String(held)} cached, ${String(probes.length)} probed`
+	const rewired = rows.reduce((sum, row) => sum + (row.rewired ?? 0), 0)
+	const total = held + rewired + probes.length
+	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached, ${String(probes.length)} probed`
+	const counts = rewired === 0 ? [head] : [head, `${String(rewired)} rewired`]
 
-	return ` (${[head, ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
+	return ` (${[...counts, ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
 }
 
 const lane_breakdown_pinned = { detail_text, rows_of }

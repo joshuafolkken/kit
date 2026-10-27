@@ -24,14 +24,21 @@ function issue_here(): number | undefined {
 	return lane === undefined ? undefined : Number(lane)
 }
 
+// The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire.
+interface Skipped {
+	held: number
+	rewired: number
+}
+
 async function record(
-	held: number,
+	skipped: Skipped,
 	probes: ReadonlyArray<ProbeTime>,
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
 		issue: issue_here(),
-		held,
+		held: skipped.held,
+		rewired: skipped.rewired,
 		probes: [...probes],
 		elapsed_ms,
 	})

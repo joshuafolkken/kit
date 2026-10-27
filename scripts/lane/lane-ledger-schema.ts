@@ -215,7 +215,8 @@ const test_related_schema = z.object({
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
 // answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
-// report) and its wall time. `issue` is the lane it ran in, absent outside a lane.
+// report) and its wall time. `issue` is the lane it ran in, absent outside a lane. `rewired` counts the
+// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -226,6 +227,7 @@ const test_pinned_schema = z.object({
 	at: z.string(),
 	issue: z.number().optional(),
 	held: z.number(),
+	rewired: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
 	elapsed_ms: z.number(),
 })
