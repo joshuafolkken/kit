@@ -21,7 +21,9 @@ const DECLARATION = `${PREFIX} 約 <N> ファイル / <M> 行（テスト除く�
 const VALUE_PATTERN =
 	/^約\s*(?<files>\d+)\s*ファイル\s*\/\s*(?<lines>\d+)\s*行\s*[（(]テスト除く[）)]$/u
 const MISSING = `missing size estimate: declare \`${DECLARATION}\` under ${BACKGROUND_HEADING}`
-const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}`
+// The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
+const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
+const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
 
 function declared(body: string, prefix: string): string | undefined {

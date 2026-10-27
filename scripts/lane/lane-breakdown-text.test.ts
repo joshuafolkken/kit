@@ -13,8 +13,9 @@ const REPORT: Report = {
 			{ name: 'implement', ms: 51 * MINUTE_MS },
 			{ name: 'start to plan', ms: 10 * MINUTE_MS },
 		],
-		excluded_ms: 2 * MINUTE_MS,
+		excluded_ms: 3 * MINUTE_MS,
 		slept_ms: MINUTE_MS,
+		yield_ms: MINUTE_MS,
 		waits: [],
 		implement: [],
 		pre_detach: [],
@@ -31,7 +32,7 @@ const REPORT: Report = {
 const IMPLEMENT_TEXT =
 	'implement 51.0 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
 const EXCLUDED_TEXT =
-	'waits taken out (park, outage, usage limit, host sleep) 2.0 min, of which host sleep 1.0 min'
+	'waits taken out (park, outage, usage limit, yield, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
 
 describe('lane_breakdown_text.comment', () => {
 	it('heads the stages with the net minutes and the command that prints them', () => {

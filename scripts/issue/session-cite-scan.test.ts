@@ -47,6 +47,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['propagate/propagate-steps.ts', 1],
 	['review/review-finding-ledger.ts', 1],
 	['run/merge/run-merge-steps.ts', 1],
+	// The causing-lane line a refused filing prints to be pasted into the Issue body, whose shape
+	// `issue-priority.ts` reads with the bare `#N`.
+	['issue/issue-file-lane-hint.ts', 1],
 	// A person reads it on Telegram.
 	['notify/git-notify.ts', 1],
 	['backlog/backlog-drive-idle.ts', 1],

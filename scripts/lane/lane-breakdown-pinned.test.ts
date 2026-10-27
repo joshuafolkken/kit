@@ -14,6 +14,7 @@ const BREAKDOWN: Breakdown = {
 	stages: [],
 	excluded_ms: 0,
 	slept_ms: 0,
+	yield_ms: 0,
 	waits: [],
 	implement: [],
 	pre_detach: [{ from_ms: Date.parse(FROM), to_ms: Date.parse(TO) }],
@@ -52,6 +53,12 @@ describe('lane_breakdown_pinned.detail_text', () => {
 	it('counts the cached and probed hunks and names the probes longest first', () => {
 		expect(lane_breakdown_pinned.detail_text([row(INSIDE)])).toBe(
 			' (test:pinned 4 hunks, 2 cached, 2 probed, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
+		)
+	})
+
+	it('counts the rewired hunks the run did not probe', () => {
+		expect(lane_breakdown_pinned.detail_text([{ ...row(INSIDE), rewired: 6 }])).toBe(
+			' (test:pinned 10 hunks, 2 cached, 2 probed, 6 rewired, scripts/b.ts 2.0 min, scripts/a.ts 3 test files 1.0 min)',
 		)
 	})
 

@@ -239,4 +239,13 @@ describe('the sample declaration in issue:lint', () => {
 			expect(found).toEqual([expect.stringContaining(issue_sample_gate.CLOSING_FORMAT)])
 		},
 	)
+
+	// joshuafolkken/kit#5225: the refusal's last line is an example the lint admits as pasted.
+	it('ends the refusal in a one-line example the lint admits', () => {
+		const [found = ''] = issue_lint_cli.problems(body_with('- 実施可能条件: soon'))
+		const example = found.split('\n').at(-1) ?? ''
+
+		expect(example).toBe('- 実施可能条件: #5198 のマージ後 30 マージ')
+		expect(issue_lint_cli.problems(body_with(example))).toEqual([])
+	})
 })

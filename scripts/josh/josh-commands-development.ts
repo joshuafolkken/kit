@@ -153,6 +153,27 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['files', 'processes']],
 		usage: { examples: [{ arguments: '' }] },
 	},
+	rename: {
+		script: 'scripts/lint/rename-cli.ts',
+		description:
+			'Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree',
+		category: 'Development',
+		reference: [
+			'<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>',
+			'automation',
+			['files', 'processes'],
+		],
+		usage: {
+			examples: [
+				{ arguments: 'old_name new_name scripts/a.ts scripts/b.ts' },
+				{
+					arguments:
+						"lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' scripts/gate/core-wait-record.ts",
+					note: 'the identifier and its module together',
+				},
+			],
+		},
+	},
 	...AGENT_HOOK_COMMANDS,
 	'cspell:dot': {
 		script: 'scripts/lint/cspell-cached.ts',
