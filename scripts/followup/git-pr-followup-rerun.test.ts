@@ -21,7 +21,7 @@ vi.mock('#scripts/issue/issue-watch-gate', () => ({
 }))
 
 vi.mock('./followup-job-rerun', () => ({
-	followup_job_rerun: { rerun_stalled_jobs: vi.fn() },
+	followup_job_rerun: { rerun_failed_jobs: vi.fn() },
 }))
 
 const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
@@ -33,7 +33,7 @@ const RERUN_NAMES = ['Detect E2E']
 const SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: undefined }
 
 const wait = vi.mocked(git_pr_checks.wait_for_pr_success)
-const rerun = vi.mocked(followup_job_rerun.rerun_stalled_jobs)
+const rerun = vi.mocked(followup_job_rerun.rerun_failed_jobs)
 
 async function run(): Promise<unknown> {
 	return await run_checks({ branch_name: BRANCH_NAME, is_skip_watch: true })
