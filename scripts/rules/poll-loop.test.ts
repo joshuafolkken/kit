@@ -87,11 +87,38 @@ describe('poll_loop.is_poll_loop — a counted for loop that sleeps', () => {
 	})
 })
 
+// joshuafolkken/kit#5115: a sleep chain before a read of a task's output or a process is the poll
+// unrolled; a short settle wait and a read with no sleep are ordinary work.
+const TAIL_CHAIN = 'sleep 20; sleep 20; sleep 20; tail -c 1500 /tmp/tasks/x.output'
+const PS_CHAIN = 'sleep 20; ps -p 123 -o etime='
+
+describe('poll_loop.is_poll_loop — a sleep chain before a read', () => {
+	it.each([
+		TAIL_CHAIN,
+		PS_CHAIN,
+		'sleep 20; ps -p 123 >/dev/null && echo running || cat /tmp/tasks/x.output',
+		'sleep 30 && tail -5 /tmp/tasks/x.output 2>&1 | grep -c done',
+		'sleep 1m; stat -f %z /tmp/tasks/x.output',
+	])('refuses the unrolled poll %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(true)
+	})
+
+	it.each([
+		'sleep 3; tail -5 /tmp/x.log',
+		'tail -c 1500 /tmp/tasks/x.output',
+		'sleep 20; pnpm josh ship:wait 5115',
+		'sleep 20; tail -5 /tmp/x.log; pnpm build',
+		'gh issue comment 1 --body "sleep 20; tail -c 1500 x.output"',
+	])('passes the settle wait or plain read %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(false)
+	})
+})
+
 // **Disjoint from `early-heartbeat` by construction, asserted rather than assumed.** That rule stands
 // down on any loop keyword, and this one fires only on a loop — so neither reproduce shape is a wait
 // timer, and a bare `sleep` this rule leaves alone is exactly what that rule takes.
 describe('poll_loop and early_heartbeat claim disjoint commands', () => {
-	it.each([GREP_POLL, WC_POLL, SEQ_SLEEP])(
+	it.each([GREP_POLL, WC_POLL, SEQ_SLEEP, TAIL_CHAIN, PS_CHAIN])(
 		'a poll loop is not an early-heartbeat wait timer: %j',
 		(command) => {
 			expect(early_heartbeat.is_wait_timer(command)).toBe(false)
@@ -110,9 +137,11 @@ describe('poll_loop.POLL_LOOP_REASON', () => {
 		'run_in_background',
 		'its exit re-invokes you',
 		'counted `for`',
+		'a `sleep` chain before a read',
+		'pnpm josh run:liveness',
 		'a background `Agent` is waited on by its completion notification',
 		'background-commands.md',
-		'fires on every occurrence',
+		'Fires on every occurrence',
 	])('carries %j', (marker) => {
 		expect(poll_loop.POLL_LOOP_REASON).toContain(marker)
 	})

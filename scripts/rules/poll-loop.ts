@@ -1,5 +1,7 @@
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
+import { early_heartbeat } from './early-heartbeat'
+import { shell_segments } from './shell-segments'
 
 // The trigger and the delivered text behind the `poll-loop` row of `delivered-rules.ts`.
 // The hand-written wait loop a lane child improvises over a backgrounded
@@ -65,6 +67,36 @@ const COUNTED_FOR = new RegExp(
 )
 const THROUGH_FIRST_DONE = /^[\s\S]*?\bdone\b/u
 
+// **A sleep chain in front of a read is the same poll, unrolled** (joshuafolkken/kit#5115). A lane
+// child watched a backgrounded task with `sleep 20; sleep 20; sleep 20; tail -c 1500 …/x.output` and
+// `sleep 20; ps -p 123`: no loop keyword, so the rows above miss it, and a read segment makes it
+// work rather than a bare timer, so `early-heartbeat` stands down. Its sleep is only there for the
+// read after it, which the completion notification makes unnecessary. The call is cut where the shell
+// starts a program (`shell_segments.commands_of`), and every cut is a sleep, an inert marker
+// (`early-heartbeat`'s own reading of both), or a read of a file or a process — at least one read,
+// which is what keeps it disjoint from `early-heartbeat`'s bare timer. A short settle (`sleep 3; tail`)
+// is below the threshold and passes.
+const SETTLE_SECONDS = 10
+const NO_SECONDS = 0
+const READ_COMMAND = /^(?:tail|cat|head|ps|stat|grep|wc|ls|pgrep|test|kill\s+-0|\[\[?)(?=\s|$)/u
+
+function slept_seconds(segments: ReadonlyArray<string>): number {
+	return segments.reduce(
+		(total, segment) => total + (early_heartbeat.sleep_seconds(segment) ?? NO_SECONDS),
+		NO_SECONDS,
+	)
+}
+
+function is_sleep_then_read(plain: string): boolean {
+	const segments = shell_segments.commands_of(plain).filter((segment) => segment !== '')
+
+	if (slept_seconds(segments) < SETTLE_SECONDS) return false
+
+	const work = segments.filter((segment) => !early_heartbeat.is_wait_or_inert(segment))
+
+	return work.length > 0 && work.every((segment) => READ_COMMAND.test(segment))
+}
+
 function is_state_wait(plain: string): boolean {
 	return UNTIL_HEADER.test(plain) || PROBE_HEADERS.some((header) => header.test(plain))
 }
@@ -107,17 +139,18 @@ function is_poll_loop(command: string): boolean {
 	if (is_stream_reader(plain)) return false
 	if (is_state_wait(plain)) return true
 
-	return is_sleeping_loop(plain)
+	return is_sleeping_loop(plain) || is_sleep_then_read(plain)
 }
 
 // The instruction in the shape a refusal can carry: why the command's exit is the thing to wait on,
 // and the one route that delivers that exit. The measurement behind it is in
 // `docs/maintainers/rule-delivery-rationale.md`.
 const POLL_LOOP_REASON =
-	'⛔ output poll loop: a `while`/`until` or counted `for` wait loop does not know when the command ' +
-	'finished. Use `run_in_background` and end the turn — its exit re-invokes you; a background ' +
-	'`Agent` is waited on by its completion notification (a lane child: single `sleep 20` calls); CI ' +
-	'by `pnpm josh followup` (`background-commands.md`). It fires on every occurrence.'
+	'⛔ output poll loop: a `while`/`until` or counted `for` loop, or a `sleep` chain before a read, ' +
+	'does not know when the task finished. `run_in_background` and end the turn — its exit ' +
+	're-invokes you; a background `Agent` is waited on by its completion notification (lane child: ' +
+	'bare `sleep 20`, `pnpm josh run:liveness`); CI by `pnpm josh followup` ' +
+	'(`background-commands.md`). Fires on every occurrence.'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` returns true so it refuses every
 // occurrence; it declares no `keeps` — waiting on the task exit is the *absence* of a loop, not a
@@ -132,7 +165,7 @@ const ROW = {
 		title: 'Output poll loop',
 		topic: '`.claude/skills/workflow-commands/background-commands.md`',
 		fires:
-			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, or a counted `for` that sleeps. Every occurrence",
+			"a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence",
 		quiet: 'the command started with `run_in_background` — its exit ends the wait',
 	},
 }

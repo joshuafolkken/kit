@@ -137,7 +137,7 @@
   - silent: `gh secret list`, `gh variable get`, a `gh api` read — a `DELETE` is `destructive-command`
   - not automated: the call must not run at all, or only on a person's word — refusing is the remedy
 - **Output poll loop** (`poll-loop`, `.claude/skills/workflow-commands/background-commands.md`)
-  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, or a counted `for` that sleeps. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a hand-written `while` / `until` wait loop over a command's output, a marker file or a process, a counted `for` that sleeps, or a `sleep` chain of 10 s or more before a read of a file or process. Every occurrence
   - silent: the command started with `run_in_background` — its exit ends the wait
   - not automated: the right act is another command, whose arguments the call does not carry
 - **The implementation-phase cut** (`implementation-cut`, `.claude/skills/workflow-commands/pre-gate-cut.md` → "It is a guard, fired at the edit that crosses the threshold")
