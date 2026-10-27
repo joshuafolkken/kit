@@ -87,6 +87,20 @@ describe('run_review_pinned_accepted.judge — the reason an earlier run accepte
 	})
 })
 
+// joshuafolkken/kit#5153: a cut answer lists only its first unpinned place, so the rest may be new.
+describe('run_review_pinned_accepted.judge — a check cut at its first unpinned hunk', () => {
+	it('stops a later run with no reason, though the record holds the place it listed', async () => {
+		await accept([SITE])
+
+		const verdict = await run_review_pinned_accepted.judge(
+			{ text: 'L\n', unpinned: [SITE], is_cut: true },
+			undefined,
+		)
+
+		expect(verdict.kind).toBe('stop')
+	})
+})
+
 // joshuafolkken/kit#4974: the pre-detach check skips its probe under the reason this branch recorded.
 describe('run_review_pinned_accepted.recorded_reason', () => {
 	it("returns this branch's recorded reason", async () => {

@@ -336,6 +336,7 @@ Revert each changed hunk outside tests and fixtures only they reach, and replace
 pnpm josh test:pinned                    # unpinned / unchecked <file>:<line> lines
 pnpm josh test:pinned --max 5            # check at most 5 hunks; the rest print as unchecked
 pnpm josh test:pinned --record <token>   # also leave the answer, under the launch token, for run:review --join
+pnpm josh test:pinned --first-unpinned   # start no probe once one hunk is unpinned; the rest print as unchecked
 ```
 
 <!-- /usage -->

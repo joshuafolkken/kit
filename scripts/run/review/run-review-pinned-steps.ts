@@ -19,7 +19,6 @@ import { run_review_steps } from './run-review-steps'
 // a check that could not run does.
 
 const PINNED_COMMAND = 'test:pinned'
-const RECORD_FLAG = '--record'
 const LAUNCH_PREFIX = 'josh-run-review-pinned-launch-'
 const LOG_PREFIX = 'josh-run-review-pinned-log-'
 const MS_PER_SECOND = 1000
@@ -72,7 +71,7 @@ function log_path(root: string = PROJECT_ROOT): string {
 // The token ties the answer to this launch (`test-pinned-record.ts`).
 function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): LaunchResult {
 	const token = randomUUID()
-	const argv = [PINNED_COMMAND, RECORD_FLAG, token]
+	const argv = test_pinned_record.launch_argv(token, reason)
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
 
 	if (launched.kind === 'launched') {
