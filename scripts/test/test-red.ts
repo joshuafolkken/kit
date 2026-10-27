@@ -75,6 +75,7 @@ async function probe_in(
 	return {
 		verdict: test_red_logic.verdict_for(ran, result.exitCode !== 0),
 		failed: test_red_logic.failed_files(text, [tree, await realpath(tree)]),
+		ran,
 	}
 }
 

@@ -142,6 +142,17 @@ describe('lane_breakdown.of — waits and resumes', () => {
 	})
 })
 
+// joshuafolkken/kit#5078: the window the pre-detach's test:pinned rows are read in.
+describe('lane_breakdown.of — ship pre-detach', () => {
+	it('keeps the ship pre-detach span', () => {
+		const pre_detach = [ship(62, 'pre-detach start'), ship(62.5, 'pre-detach done')]
+		const breakdown = lane_breakdown.of(lane(), [...events_4970(), ...pre_detach], ISSUE)
+		const spans = breakdown?.pre_detach.map(({ from_ms, to_ms }) => [from_ms, to_ms])
+
+		expect(spans).toStrictEqual([[Date.parse(at(62)), Date.parse(at(62.5))]])
+	})
+})
+
 describe('lane_breakdown.minutes_text', () => {
 	it('writes minutes to one decimal', () => {
 		expect(lane_breakdown.minutes_text(3.5 * MINUTE_MS)).toBe('3.5 min')

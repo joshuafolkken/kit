@@ -94,12 +94,19 @@ async function verdicts_on(
 	writer: CacheWriter,
 ): Promise<Array<RedProbe | undefined>> {
 	const verdicts = known.map((entry) => held_of(entry))
+	const reached = reached_of(verdicts)
+	const probes = probes_of(hunks, known)
 
-	await writer.record(reached_of(verdicts))
-	await test_pinned_probe.checked_on(paths, probes_of(hunks, known), async (index, verdict) => {
-		verdicts[index] = verdict
-		await writer.record([[index, verdict]])
-	})
+	await writer.record(reached)
+	await test_pinned_probe.checked_on(
+		paths,
+		probes,
+		async (index, verdict) => {
+			verdicts[index] = verdict
+			await writer.record([[index, verdict]])
+		},
+		reached.length,
+	)
 
 	return verdicts
 }
@@ -121,8 +128,9 @@ async function outcome_on(
 	const verdicts = is_cached_only
 		? known.map((entry) => held_of(entry))
 		: await verdicts_on(paths, hunks, known, test_pinned_cache.writer(cache, keys))
+	const is_held = verdicts.every((verdict) => verdict !== undefined)
 
-	return test_pinned_logic.outcome(hunks, verdicts)
+	return { ...test_pinned_logic.outcome(hunks, verdicts), is_held }
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.
@@ -212,6 +220,14 @@ async function cached(max_hunks: number): Promise<PinnedReport> {
 	return await report({ max_hunks, is_cached_only: true })
 }
 
-const test_pinned = { cached, run }
+// The cached report when the cache holds every checked hunk's verdict for this tree, probing nothing
+// (joshuafolkken/kit#5078); `undefined` when a hunk moved or was never probed, so the caller probes.
+async function held_report(max_hunks: number): Promise<PinnedReport | undefined> {
+	const read = await cached(max_hunks)
+
+	return read.is_held === true ? read : undefined
+}
+
+const test_pinned = { cached, held_report, run }
 
 export { test_pinned }

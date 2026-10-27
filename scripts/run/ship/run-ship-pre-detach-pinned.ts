@@ -7,6 +7,8 @@ import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
+import { test_pinned } from '#scripts/test/test-pinned'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_ship_pre_detach } from './run-ship-pre-detach'
 import type { ShipArguments } from './run-ship-steps'
@@ -56,6 +58,29 @@ async function summary(): Promise<PinnedSummary> {
 	return (await run_review_pinned_join.answer_on_tree()) ?? (await own_summary())
 }
 
+// The verdicts an earlier probe left for this very tree, read from the cache without a probe
+// (joshuafolkken/kit#5078); `undefined` when a hunk moved since, or the tree could not be read.
+async function held_summary(): Promise<PinnedSummary | undefined> {
+	try {
+		const report = await test_pinned.held_report(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+		return report === undefined ? undefined : test_pinned_record.summary_of(report)
+	} catch (error) {
+		error_text.trace_swallowed('run_ship_pre_detach_pinned.held_summary', error)
+
+		return undefined
+	}
+}
+
+// **A re-ship with a new reason probes nothing the cache already answers** (joshuafolkken/kit#5078):
+// the earlier probe's verdicts are judged under the reason, with no wait on a check elsewhere. A moved
+// hunk falls to `summary`, whose run probes only the hunks the cache no longer holds.
+async function summary_for(reason: string | undefined): Promise<PinnedSummary> {
+	const held = reason === undefined ? undefined : await held_summary()
+
+	return held ?? (await summary())
+}
+
 // Whether the supervisor runs a fresh round 1, whose `run:review --join` lists and records the unpinned
 // places under the reason. A reused round 1 — its delta left to round 2, or after the ship's own
 // round 1 stopped, the lane's fix included — runs no `test:pinned` (`review-round-reuse.ts`). A question git could not answer probes.
@@ -78,7 +103,7 @@ async function pinned_check(options: CheckOptions): Promise<JoshResult> {
 		return { code: SUCCESS_EXIT_CODE, out: `${SKIPPED_NOTE}${reason}\n` }
 	}
 
-	const verdict = await run_review_pinned_accepted.judge(await summary(), reason)
+	const verdict = await run_review_pinned_accepted.judge(await summary_for(reason), reason)
 
 	return {
 		code: verdict.kind === 'stop' ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE,

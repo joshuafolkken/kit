@@ -127,6 +127,30 @@ describe('lane_overrun.investigate — the breakdown of an overrun', () => {
 	})
 })
 
+// joshuafolkken/kit#5078: the overrun comment and prompt say what the ship pre-detach probed, as
+// `josh lane:breakdown` does.
+describe('lane_overrun.investigate — a ship pre-detach that probed', () => {
+	it('carries the test:pinned detail on the comment and the prompt', async () => {
+		const ship_stage = 'ship-stage'
+		const detail = 'ship pre-detach 5.0 min (test:pinned 1 hunks, 1 cached, 0 probed)'
+
+		mocks.all_events.mockResolvedValue([
+			plan(),
+			{ pos: 2, at: at(50), kind: ship_stage, text: `${LANE} pre-detach start` },
+			{ pos: 3, at: at(55), kind: ship_stage, text: `${LANE} pre-detach done` },
+		])
+		mocks.read_entries.mockReturnValue([
+			...lane(61),
+			{ kind: 'test-pinned', at: at(54), issue: ISSUE, held: 1, probes: [], elapsed_ms: 1 },
+		])
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(mocks.comment).toHaveBeenCalledWith(String(ISSUE), expect.stringContaining(detail))
+		expect(launched_prompt()).toContain(detail)
+	})
+})
+
 // The breakdown reads the same directories, so they moved to `lane-breakdown-implement.ts`.
 describe('lane_overrun.investigate — the transcripts the session reads', () => {
 	it("points the session at the lane's own transcript directories alone", async () => {

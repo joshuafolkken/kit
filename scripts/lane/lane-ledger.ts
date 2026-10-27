@@ -17,6 +17,7 @@ import {
 	type SplitNoticeRecord,
 	type StageRecord,
 	type StopRecord,
+	type TestPinnedRecord,
 	type TestRelatedRecord,
 	type UnitFileRecord,
 } from './lane-ledger-schema'
@@ -173,6 +174,10 @@ async function record_test_related(run: TestRelatedRecord, path?: string): Promi
 	await record({ kind: KIND.TEST_RELATED, at: now_iso(), ...run }, path)
 }
 
+async function record_test_pinned(run: TestPinnedRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.TEST_PINNED, at: now_iso(), ...run }, path)
+}
+
 async function record_split_notice(notice: SplitNoticeRecord, path?: string): Promise<void> {
 	await record({ kind: KIND.SPLIT_NOTICE, at: now_iso(), ...notice }, path)
 }
@@ -232,6 +237,7 @@ const lane_ledger = {
 	record_split_notice,
 	record_stage,
 	record_stop,
+	record_test_pinned,
 	record_test_related,
 	record_unit_files,
 	target,
@@ -258,6 +264,8 @@ export type {
 	StageEntry,
 	StopEntry,
 	StopRecord,
+	TestPinnedEntry,
+	TestPinnedRecord,
 	TestRelatedEntry,
 	TestRelatedRecord,
 	UnitFileRecord,

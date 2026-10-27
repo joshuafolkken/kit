@@ -14,7 +14,7 @@ import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import { lane_child_marker } from './lane-child-marker'
 import { lane_investigation_switch } from './lane-investigation-switch'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_overrun_prompt } from './lane-overrun-prompt'
 import { lane_tail_stats } from './lane-tail-stats'
@@ -38,9 +38,16 @@ const NO_LEDGER = 'no ledger'
 const DISABLED = 'disabled (JOSH_LANE_INVESTIGATION is not on)'
 
 // A lane's net minutes and their breakdown by stage, or why there are none (joshuafolkken/kit#4818).
-// `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already.
+// `is_commented` says an earlier pass of the lane commented the breakdown on its Issue already;
+// `entries` are the ledger rows the breakdown's details are read off (joshuafolkken/kit#5078).
 type LaneNet =
-	| { kind: 'minutes'; minutes: number; breakdown: Breakdown; is_commented: boolean }
+	| {
+			kind: 'minutes'
+			minutes: number
+			breakdown: Breakdown
+			entries: ReadonlyArray<LedgerEntry>
+			is_commented: boolean
+	  }
 	| { kind: 'missing'; reason: string }
 
 // A launch that failed is retried once, at the next `run:merge` (joshuafolkken/kit#4930).
@@ -103,7 +110,7 @@ function net_in(path: string, events: ReadonlyArray<RunEvent>, issue: number): L
 		return { kind: 'missing', reason: lane_net_time.missing_reason(entries, issue) }
 	}
 
-	return { kind: 'minutes', minutes, breakdown, is_commented: is_commented(events, issue) }
+	return { kind: 'minutes', minutes, breakdown, entries, is_commented: is_commented(events, issue) }
 }
 
 // The net time of a lane not yet noted, or `undefined` when its note is on the stream already.
@@ -195,7 +202,7 @@ type OverranNet = Extract<LaneNet, { kind: 'minutes' }>
 // The breakdown goes on the lane's Issue before the session starts, once across the lane's passes; a
 // refused comment costs the comment, not the investigation.
 async function overran_text(issue: number, net: OverranNet): Promise<string> {
-	const report = lane_breakdown_text.report_of(issue, net.breakdown)
+	const report = lane_breakdown_text.report_of(issue, net.breakdown, net.entries)
 	const comment = lane_breakdown_text.comment(issue, net.minutes, report)
 
 	if (!net.is_commented) await git_gh_issue_write.issue_try_comment(String(issue), comment)
