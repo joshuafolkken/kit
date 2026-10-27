@@ -50,7 +50,7 @@ function done_lines(columns: number): Array<string> {
 	])
 	const lines = run_board_render
 		.render({
-			header: header({ layout: { ...EMPTY_LAYOUT, active }, found }),
+			header: header({ layout: { ...EMPTY_LAYOUT, active }, found, is_investigation_on: true }),
 			notes: [],
 			size: { columns, rows: 60 },
 		})

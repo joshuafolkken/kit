@@ -77,6 +77,7 @@ function board(
 	return header({
 		layout: { ...EMPTY_LAYOUT, active: [row_of(status)] },
 		found: new Map(found === undefined ? [] : [[DONE, found]]),
+		is_investigation_on: true,
 		...extra,
 	})
 }
@@ -110,33 +111,47 @@ describe('run_board_render — a merged row’s net minutes', () => {
 })
 
 // joshuafolkken/kit#5132: #5106's row drew `?′  5109, 5113  ⏭ disabled (…)` with the switch off.
-describe('run_board_render — a merged row skipped for the investigation switch', () => {
+// joshuafolkken/kit#5194: #5167's row still drew `12′58″   13′` and #4801's `?′  ⏭ no record`.
+describe('run_board_render — a merged row while the investigation switch is off', () => {
+	const OFF = { is_investigation_on: false }
 	const DISABLED = found_of(
 		{ kind: 'skipped', issue: DONE, reason: run_event_overrun.DISABLED_REASON },
 		{ filed: ['5109', '5113'] },
 	)
 
-	it('ends on the filings alone while the switch is off', () => {
-		const line = done_line(DISABLED, { is_investigation_on: false })
+	it('ends on its time alone at or under the threshold', () => {
+		expect(done_line(found_of(WITHIN), OFF)).toMatch(/″$/u)
+	})
 
-		expect(line).toMatch(/\S \s*5109, 5113$/u)
-		expect(line).not.toMatch(/\?′|⏭/u)
+	it('ends on its time alone where its merge left no note', () => {
+		expect(done_line(undefined, OFF)).toMatch(/″$/u)
+	})
+
+	it('ends on the filings alone for a lane skipped for the switch', () => {
+		expect(done_line(DISABLED, OFF)).toMatch(/″ +5109, 5113$/u)
+	})
+
+	it('ends on the filings alone for any other skip', () => {
+		const skipped = found_of(
+			{ kind: 'skipped', issue: DONE, reason: 'no ledger' },
+			{ filed: FILED },
+		)
+
+		expect(done_line(skipped, OFF)).toMatch(/″ +4768, 4769, 4770$/u)
+	})
+
+	it('ends on every filing and no 🔍 for a started investigation', () => {
+		const started = found_of(STARTED_NOTE, { filed: ['4768'], overrun_filed: ['4769'] })
+		const lines = lines_of(board(started, OFF))
+
+		expect(lines.find((line) => line.includes(String(DONE)))).toMatch(/″ +4768, 4769$/u)
+		expect(lines.join('\n')).not.toContain(STILL)
 	})
 
 	it('still says `?′` and the skip while the switch is on', () => {
-		const line = done_line(DISABLED, { is_investigation_on: true })
+		const line = done_line(DISABLED)
 
 		expect(line).toMatch(/\?′ {2}5109, 5113 {2}⏭ disabled \(JOSH_LANE_INVESTIGATION is not on\)$/u)
-	})
-
-	it('still says any other skip while the switch is off', () => {
-		const skipped = found_of({ kind: 'skipped', issue: DONE, reason: 'no ledger' })
-
-		expect(done_line(skipped, { is_investigation_on: false })).toMatch(/\?′ {2}⏭ no ledger$/u)
-	})
-
-	it('still says `⏭ no record` while the switch is off', () => {
-		expect(done_line(undefined, { is_investigation_on: false })).toMatch(/\?′ {2}⏭ no record$/u)
 	})
 })
 

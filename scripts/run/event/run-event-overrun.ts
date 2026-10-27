@@ -40,8 +40,9 @@ const INVESTIGATING_PATTERN = /^investigating in pid (?<pid>\d+)(?: started (?<s
 const ENDED_PATTERN = /^#(?<issue>\d+) overrun: (?<result>.*)$/u
 const FAILED_PATTERN = /^#(?<issue>\d+) overrun investigation failed: /u
 
-// Why an overrun was skipped with the switch off (joshuafolkken/kit#5044); the board hides such a row's
-// minutes and skip while the switch stays off (joshuafolkken/kit#5132).
+// Why an overrun was skipped with the switch off (joshuafolkken/kit#5044); the board draws it only
+// once the switch is on, hiding every merged row's minutes and skip while it stays off
+// (joshuafolkken/kit#5132, joshuafolkken/kit#5194).
 const DISABLED_REASON = 'disabled (JOSH_LANE_INVESTIGATION is not on)'
 // The result an investigation that filed records; the board shows the filings themselves.
 const FILED_RESULT = 'filed'
