@@ -87,14 +87,18 @@ function slept_seconds(segments: ReadonlyArray<string>): number {
 	)
 }
 
+// Only the sleep in front of the first read counts: `tail x; sleep 20` reads first and waits after,
+// which is not a wait *for* the read.
 function is_sleep_then_read(plain: string): boolean {
 	const segments = shell_segments.commands_of(plain).filter((segment) => segment !== '')
+	const first_work = segments.findIndex((segment) => !early_heartbeat.is_wait_or_inert(segment))
+	const waited = first_work === -1 ? NO_SECONDS : slept_seconds(segments.slice(0, first_work))
 
-	if (slept_seconds(segments) < SETTLE_SECONDS) return false
+	if (waited < SETTLE_SECONDS) return false
 
-	const work = segments.filter((segment) => !early_heartbeat.is_wait_or_inert(segment))
-
-	return work.length > 0 && work.every((segment) => READ_COMMAND.test(segment))
+	return segments
+		.slice(first_work)
+		.every((segment) => early_heartbeat.is_wait_or_inert(segment) || READ_COMMAND.test(segment))
 }
 
 function is_state_wait(plain: string): boolean {

@@ -108,6 +108,8 @@ describe('poll_loop.is_poll_loop — a sleep chain before a read', () => {
 		'tail -c 1500 /tmp/tasks/x.output',
 		'sleep 20; pnpm josh ship:wait 5115',
 		'sleep 20; tail -5 /tmp/x.log; pnpm build',
+		// The sleep after the read is not a wait for it (review round 1).
+		'tail -5 /tmp/x.log; sleep 20',
 		'gh issue comment 1 --body "sleep 20; tail -c 1500 x.output"',
 	])('passes the settle wait or plain read %j', (command) => {
 		expect(poll_loop.is_poll_loop(command)).toBe(false)
@@ -115,7 +117,8 @@ describe('poll_loop.is_poll_loop — a sleep chain before a read', () => {
 })
 
 // **Disjoint from `early-heartbeat` by construction, asserted rather than assumed.** That rule stands
-// down on any loop keyword, and this one fires only on a loop — so neither reproduce shape is a wait
+// down on any loop keyword and refuses only an all-sleep call, and this one fires only on a loop or
+// on a sleep chain with a read after it — so no refused shape here is a wait
 // timer, and a bare `sleep` this rule leaves alone is exactly what that rule takes.
 describe('poll_loop and early_heartbeat claim disjoint commands', () => {
 	it.each([GREP_POLL, WC_POLL, SEQ_SLEEP, TAIL_CHAIN, PS_CHAIN])(
