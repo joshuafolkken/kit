@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
+import { observation_record } from '#scripts/observations/observation-record'
+import { review_comment_round } from '#scripts/review/review-comment-round'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
 	followup_failed_tests,
 	KEPT_VERDICT,
@@ -13,6 +16,26 @@ const CLAIM_TEST = 'scripts/test/test-related.claim.test.ts'
 const CLAIM_SUBJECT = 'scripts/test/test-related.ts'
 const BUDGET_NAME = `${BUDGET_TEST} > frame budget > reads the budget`
 const CLAIM_NAME = `|isolated| ${CLAIM_TEST} > claim > holds`
+const ISSUE = 5197
+const SIGHTING = `- k:${OBSERVATION_SLUG} | d1 | 2026-10-28 | ${BUDGET_TEST} | followup reran`
+const FIFTH_SHARD = 'Unit Tests (5/6)'
+const FAILURES = [{ job: FIFTH_SHARD, tests: { files: [BUDGET_TEST], names: [BUDGET_NAME] } }]
+
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { issue_comment: vi.fn() },
+}))
+vi.mock('#scripts/observations/observation-record', () => ({
+	observation_record: { assess: vi.fn(), record: vi.fn() },
+	REFUSED_VERDICT: 'refused',
+}))
+
+beforeEach(() => {
+	vi.mocked(git_gh_issue_write.issue_comment).mockReset().mockResolvedValue('https://comment')
+	vi.mocked(observation_record.assess)
+		.mockReset()
+		.mockResolvedValue({ verdict: 'ledger', earlier: [], line: SIGHTING })
+	vi.mocked(observation_record.record).mockReset()
+})
 
 function tests_of(...files: Array<string>): { files: Array<string>; names: Array<string> } {
 	return { files, names: files.map((file) => `${file} > suite > test`) }
@@ -81,7 +104,7 @@ describe('followup_failed_tests.verdict_of', () => {
 describe('followup_failed_tests.observation_of', () => {
 	it('names the reran jobs, the failed files and each test once, with no field separator inside', () => {
 		const entry = followup_failed_tests.observation_of([
-			{ job: 'Unit Tests (5/6)', tests: { files: [CLAIM_TEST], names: [CLAIM_NAME] } },
+			{ job: FIFTH_SHARD, tests: { files: [CLAIM_TEST], names: [CLAIM_NAME] } },
 			{ job: 'Unit Tests (2/6)', tests: { files: [CLAIM_TEST], names: [CLAIM_NAME] } },
 		])
 
@@ -91,5 +114,43 @@ describe('followup_failed_tests.observation_of', () => {
 			where: CLAIM_TEST,
 			what: `followup reran Unit Tests (5/6), Unit Tests (2/6); failed outside the change: /isolated/ ${CLAIM_TEST} > claim > holds`,
 		})
+	})
+})
+
+// joshuafolkken/kit#5197: the rerun happens after the ledger's last commit, so the sighting goes to the
+// issue, from which `review_comment_round.carry` brings it into the ledger once the issue closes.
+describe('followup_failed_tests.record', () => {
+	it('posts the sighting on the issue under the observation heading, appending nothing to the tree', async () => {
+		await followup_failed_tests.record(FAILURES, ISSUE)
+
+		expect(git_gh_issue_write.issue_comment).toHaveBeenCalledWith(
+			String(ISSUE),
+			review_comment_round.observation_body_of([SIGHTING]),
+		)
+		expect(observation_record.record).not.toHaveBeenCalled()
+	})
+
+	it.each([
+		['a branch naming no issue', FAILURES, undefined],
+		['no failure outside the change', [], ISSUE],
+	])('posts nothing for %s', async (_label, failures, issue) => {
+		await followup_failed_tests.record(failures, issue)
+
+		expect(observation_record.assess).not.toHaveBeenCalled()
+		expect(git_gh_issue_write.issue_comment).not.toHaveBeenCalled()
+	})
+
+	it('posts nothing for a sighting the ledger grammar refuses', async () => {
+		vi.mocked(observation_record.assess).mockResolvedValue({ verdict: 'refused', reason: 'bad' })
+
+		await followup_failed_tests.record(FAILURES, ISSUE)
+
+		expect(git_gh_issue_write.issue_comment).not.toHaveBeenCalled()
+	})
+
+	it('reports a post that failed without stopping the rerun', async () => {
+		vi.mocked(git_gh_issue_write.issue_comment).mockRejectedValue(new Error('HTTP 502'))
+
+		await expect(followup_failed_tests.record(FAILURES, ISSUE)).resolves.toBeUndefined()
 	})
 })
