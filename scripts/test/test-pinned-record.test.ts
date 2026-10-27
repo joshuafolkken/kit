@@ -78,6 +78,15 @@ describe('test_pinned_record — the record', () => {
 		expect(test_pinned_record.read(TOKEN, `${ROOT}-other`)).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#5153: a check cut at its first unpinned hunk is read back as one.
+	it('reads back a cut answer as cut', () => {
+		const summary = test_pinned_record.summary_of({ ...REPORT, cut: [HUNK] })
+
+		test_pinned_record.write(TOKEN, summary, ROOT)
+
+		expect(test_pinned_record.read(TOKEN, ROOT)?.is_cut).toBe(true)
+	})
+
 	it("reads nothing of another launch's answer", () => {
 		test_pinned_record.write(EARLIER_TOKEN, test_pinned_record.summary_of(REPORT), ROOT)
 

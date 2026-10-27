@@ -69,6 +69,20 @@ describe('run with --unpinned-ok after the join stopped on this tree', () => {
 		expect(started.filter((spy) => spy.mock.calls.length > 0)).toStrictEqual([])
 	})
 
+	// joshuafolkken/kit#5153: a check cut at its first unpinned hunk listed only that one.
+	it('launches only the whole check under the reason over an answer cut at its first unpinned hunk', async () => {
+		vi.spyOn(run_review_pinned_join, 'finished_on_tree').mockResolvedValue({
+			...UNPINNED,
+			is_cut: true,
+		})
+		spy_starts()
+
+		expect(await run_review_cli.run(OK_ARGV)).toBe(0)
+		expect(run_review_pinned_steps.launch).toHaveBeenCalledWith(PROJECT_ROOT, REASON, TREE)
+		expect(run_review_steps.launch_gate).not.toHaveBeenCalled()
+		expect(run_review_pinned_steps.carry_reason).not.toHaveBeenCalled()
+	})
+
 	it.each(RECHECKS)('checks again when %s', async (_label, answer, gate) => {
 		vi.spyOn(run_review_pinned_join, 'finished_on_tree').mockResolvedValue(answer)
 		vi.mocked(run_review_steps.read_gate_state).mockResolvedValue(gate)

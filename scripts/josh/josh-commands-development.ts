@@ -3,6 +3,7 @@ import { core_weights } from '#scripts/gate/core-weights'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 import { AGENT_HOOK_COMMANDS } from './josh-commands-agent-hooks'
+import { TEST_CHECK_COMMANDS } from './josh-commands-test-check'
 
 const NARROWED = { arguments: 'scripts/thing.ts', note: 'narrow by the given files instead' }
 // The unseeded ports are read from `ports/index.js`, their one definition (#818).
@@ -11,7 +12,6 @@ const UNSEEDED: Readonly<Record<string, string | undefined>> = {}
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
-const MATCH_ARGUMENTS = '[--match]'
 const PATH_ARGUMENTS = '<path...>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -203,46 +203,7 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	'test:declared': {
-		script: 'scripts/test/test-declared.ts',
-		description:
-			'Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin',
-		category: 'Development',
-		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
-		usage: {
-			examples: [
-				{ arguments: '' },
-				{ arguments: '--match', note: 'check Step 0 declarations on stdin' },
-				{ arguments: '--help', note: 'print usage, including the --match stdin form' },
-			],
-		},
-	},
-	'test:red': {
-		script: 'scripts/test/test-red-main.ts',
-		description:
-			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/stopped/test-only',
-		category: 'Development',
-		reference: ['', 'developer', ['git', 'processes']],
-		usage: { examples: [{ arguments: '', note: 'red, green, no-test, stopped or test-only' }] },
-	},
-	'test:pinned': {
-		script: 'scripts/test/test-pinned-main.ts',
-		description:
-			"Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
-		category: 'Development',
-		reference: ['[--max <n>] [--record <token>]', 'developer', ['git', 'processes']],
-		...gate_plan.DIRECT_UNIT_CLAIM,
-		usage: {
-			examples: [
-				{ arguments: '', note: 'unpinned / unchecked <file>:<line> lines' },
-				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest print as unchecked' },
-				{
-					arguments: '--record <token>',
-					note: 'also leave the answer, under the launch token, for run:review --join',
-				},
-			],
-		},
-	},
+	...TEST_CHECK_COMMANDS,
 	disposition: {
 		script: 'scripts/review/disposition-cli.ts',
 		description:

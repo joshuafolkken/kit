@@ -68,6 +68,17 @@ describe('run_review_pinned_steps.launch', () => {
 		run_review_pinned_steps.launch(ROOT)
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
+			[PINNED_COMMAND, '--first-unpinned', '--record', expect.any(String)],
+			run_review_pinned_steps.log_path(ROOT),
+			ROOT,
+		)
+	})
+
+	// joshuafolkken/kit#5153: a reason accepts the list as the whole answer, so every hunk is probed.
+	it('probes every hunk under a reason', () => {
+		run_review_pinned_steps.launch(ROOT, REASON)
+
+		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
 			[PINNED_COMMAND, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,

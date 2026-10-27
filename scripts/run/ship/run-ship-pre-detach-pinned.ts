@@ -32,7 +32,6 @@ import type { ShipArguments } from './run-ship-steps'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const PINNED_COMMAND = ['josh', 'test:pinned', '--record']
 const SKIPPED_NOTE =
 	'test:pinned not run before the detach; round 1 lists the unpinned places under --unpinned-ok: '
 const CARRIED_NOTE = 'josh ship: --unpinned-ok carried from an earlier run on this branch: '
@@ -41,9 +40,11 @@ type CheckOptions = Pick<ShipArguments, 'number' | 'unpinned_ok'>
 type PinnedOptions = CheckOptions & Pick<ShipArguments, 'is_review'>
 
 // A check that left no answer could not run, and fails open as the one `run:review` launches does.
-async function own_summary(): Promise<PinnedSummary> {
+// Its arguments follow the reason (`test_pinned_record.launch_argv`).
+async function own_summary(reason: string | undefined): Promise<PinnedSummary> {
 	const token = randomUUID()
-	const result = await buffered_process.run_buffered_process([...PINNED_COMMAND, token])
+	const argv = ['josh', ...test_pinned_record.launch_argv(token, reason)]
+	const result = await buffered_process.run_buffered_process(argv)
 	const answer = test_pinned_record.read(token)
 
 	test_pinned_record.clear(token)
@@ -53,9 +54,13 @@ async function own_summary(): Promise<PinnedSummary> {
 
 // **The tree `run:review` checked is not checked twice** (joshuafolkken/kit#4888): its background
 // check's answer is read, waited for while it still runs; only another tree, or a check that left no
-// answer, runs one here.
-async function summary(): Promise<PinnedSummary> {
-	return (await run_review_pinned_join.answer_on_tree()) ?? (await own_summary())
+// answer, runs one here. **A reason never judges a check that stopped at its first unpinned hunk**
+// (joshuafolkken/kit#5153): the hunks it left are probed here before the reason accepts the list.
+async function summary(reason: string | undefined): Promise<PinnedSummary> {
+	const answer = await run_review_pinned_join.answer_on_tree()
+	const is_whole = answer?.is_cut !== true || reason === undefined
+
+	return answer !== undefined && is_whole ? answer : await own_summary(reason)
 }
 
 // The verdicts an earlier probe left for this very tree, read from the cache without a probe
@@ -78,7 +83,7 @@ async function held_summary(): Promise<PinnedSummary | undefined> {
 async function summary_for(reason: string | undefined): Promise<PinnedSummary> {
 	const held = reason === undefined ? undefined : await held_summary()
 
-	return held ?? (await summary())
+	return held ?? (await summary(reason))
 }
 
 // Whether the supervisor runs a fresh round 1, whose `run:review --join` lists and records the unpinned
