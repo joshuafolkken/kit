@@ -89,7 +89,7 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // machine. `behavior` took 0.6s of wall for 0.7s of CPU, which
 // is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Rounded
 // up, that would be two cores, but a reservation lasts the whole gate's plan, not the check's five
-// seconds. It would raise `RESERVED_CORES` from 6 to 8 and cut the solo unit cap from 5 workers to 3
+// seconds. It would raise `RESERVED_CORES` from 5 to 7 and cut the solo unit cap from 6 workers to 4
 // for the full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
 // that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
@@ -174,7 +174,7 @@ function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
 	return checks.some((check) => check.label === UNIT_LABEL)
 }
 
-// What the non-elastic checks hold between them: 2 + 2 + 2. Reduced over `STATIC_CHECKS`
+// What the non-elastic checks hold between them: 2 + 2 + 1. Reduced over `STATIC_CHECKS`
 // rather than over every check, because that is the set the sentence above names: `resolve_unit_worker_cap`
 // spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
 // it would have the suite subtract its own reservation from its own budget the day that reservation
@@ -250,7 +250,7 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 
 // Admit checks, lightest first, while the running set's reserved cores still fit **this run's
 // share** of the machine. On a machine running one gate that share is the machine, so this bites
-// only below six cores — the three reserving checks want six between them — and there it is the
+// only below five cores — the three reserving checks want five between them — and there it is the
 // difference between two checks sharing a core and four fighting over it.
 //
 // **Under concurrency it is the only lever there is, and that is a measurement rather than a
@@ -307,8 +307,8 @@ function resolve_concurrency(
 //
 // **The shared branch drops `RESERVED_CORES`, knowingly, and it is not a strict improvement.** Each
 // concurrent gate still runs lint, the type check and the spell check beside its unit step, and the
-// share below does not subtract them: on 12 cores a solo gate takes 8 unit workers plus 3 siblings —
-// 11 processes for 12 cores — while two concurrent gates take 6 each plus 3 siblings each, which is 18.
+// share below does not subtract them: on 12 cores a solo gate takes 7 unit workers plus 3 siblings —
+// 10 processes for 12 cores — while two concurrent gates take 6 each plus 3 siblings each, which is 18.
 // The obvious correction, `⌊(cores − RESERVED_CORES × runs) ÷ runs⌋`, is **not** applied because
 // nothing has measured it: it hands two gates on an 11-core machine one worker apiece, against the
 // 11.7s-at-8-workers / 16.7s-at-4 curve the table above was built from, and trading a measured
@@ -347,8 +347,8 @@ function solo_unit_weight(available_cores: number): number {
 // once**: no second set of weights is introduced, so a change to the measured reservation moves the
 // admission with it.
 //
-// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 2) +
-// unit_cap(cores - 6)` is `cores` — which is what lets every check of a lone gate on a machine with room
+// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 1) +
+// unit_cap(cores - 5)` is `cores` — which is what lets every check of a lone gate on a machine with room
 // (its busy cores within what the ledger holds, `core-budget.ts`) be admitted at once,
 // its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
 // its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core

@@ -55,7 +55,8 @@ describe('run_gate_steps — the start order', () => {
 		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))
 
 		expect(started[0]).toContain('behavior')
-		expect(started.at(-1)).toContain('cspell')
+		// The type check is the last of the two-core checks; the one-core spell check starts before both.
+		expect(started.at(-1)).toContain('"check"')
 		expect(results.map((result) => result.label)).toEqual(plan.checks.map((check) => check.label))
 	})
 })

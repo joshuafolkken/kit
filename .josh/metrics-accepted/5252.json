@@ -1,0 +1,7 @@
+{
+	"reason": "#5252: one resident clause on the gate step; unaided, the piped-verification eval went from 3/3 violated to 3/3 held",
+	"date": "2026-10-27",
+	"growth": {
+		"ai_cost.resident_bytes": 141
+	}
+}
