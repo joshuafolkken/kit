@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/issue/aggregation-split.test.ts:27 | 2026-10-27 | #5190
+- rf:bug-risks | low | scripts/issue/aggregation-split.ts:22 | 2026-10-27 | #5190

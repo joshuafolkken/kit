@@ -18,12 +18,14 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 		digest: (content: string) => content,
 		stamp_path: (prefix: string) => prefix,
 		write_stamp,
+		write_text_stamp: (target: string) => target,
 	},
 }))
 vi.mock('#scripts/review/review-tree', () => ({ review_tree: { read_changed_tree } }))
 
 const FILE = 'a.ts'
 const HUNK = { file: FILE, new_start: 4, new_count: 1, old_lines: [], is_green: true }
+const GREEN_LINE = 'unpinned a.ts:4 — reverting it left every related test green\n'
 const output: { stdout: Array<string>; stderr: Array<string> } = { stdout: [], stderr: [] }
 
 function capture(sink: Array<string>): (chunk: string | Uint8Array) => boolean {
@@ -73,9 +75,9 @@ describe('test_pinned_main.main', () => {
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(1)
 		expect(run).toHaveBeenCalledWith(1, false)
 		expect(output.stdout.join('')).toBe(
-			'unpinned 1 · unchecked 1\n' +
-				'unpinned a.ts:4 — reverting it left every related test green\n' +
-				'unchecked a.ts:4 — over the 1-hunk cap\n',
+			`${GREEN_LINE}unchecked 1 — over the 1-hunk cap\n` +
+				'full output: josh-test-pinned-list-\n' +
+				'unpinned 1 · unchecked 1\n',
 		)
 	})
 
@@ -112,7 +114,9 @@ describe('test_pinned_main.main --record', () => {
 		expect(await test_pinned_main.main(['--record', TOKEN])).toBe(1)
 		expect(write_stamp).toHaveBeenCalledWith(RECORD, {
 			token: TOKEN,
-			text: output.stdout.join(''),
+			text: GREEN_LINE,
+			counts: 'unpinned 1 · unchecked 0',
+			log: undefined,
 			unpinned: [expect.stringMatching(/^a\.ts /u)],
 		})
 	})
@@ -192,7 +196,7 @@ describe('test_pinned_main.main --first-unpinned', () => {
 		expect(await test_pinned_main.main([FIRST_UNPINNED])).toBe(1)
 		expect(run).toHaveBeenCalledWith(20, true)
 		expect(output.stdout.join('')).toContain(
-			'unchecked a.ts:9 — not probed: the run stopped at the first unpinned hunk',
+			'unchecked 1 — not probed: the run stopped at the first unpinned hunk',
 		)
 	})
 
