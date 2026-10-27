@@ -92,6 +92,14 @@ describe('vitest_failure_summary.failed_files', () => {
 
 		expect(vitest_failure_summary.failed_files([labelled])).toStrictEqual(['scripts/c.test.ts'])
 	})
+
+	// joshuafolkken/kit#5171: a colored run prints the label as a badge, which stripping leaves bare.
+	it('drops the project badge a colored run prints', () => {
+		const output = ' FAIL  \u{1B}[46m isolated \u{1B}[49m tools/d.test.ts > suite > lists'
+		const names = vitest_failure_summary.failed_tests(output)
+
+		expect(vitest_failure_summary.failed_files(names)).toStrictEqual(['tools/d.test.ts'])
+	})
 })
 
 describe('vitest_failure_summary.report', () => {

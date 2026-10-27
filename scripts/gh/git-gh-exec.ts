@@ -260,6 +260,7 @@ const INPUT_FLAG = '--input'
 const PAGINATE_FLAG = '--paginate'
 const SLURP_FLAG = '--slurp'
 const JQ_FLAG = '--jq'
+const ALLOW_ESCAPES_FLAG = '--allow-escape-sequences'
 
 // One REST request through `gh api`. `path` is the only required field: a read names nothing else,
 // because `gh api` sends GET when neither `--method` nor a request body is given. **A `body` alone
@@ -297,6 +298,9 @@ interface GhApiRequest {
 	// `false` for a write that must not be sent twice: a transient failure may follow a write that
 	// already landed, and nothing reads it back (`git-gh-retry.ts`). Absent means retried.
 	should_retry?: boolean
+	// `true` for a plain-text body that carries terminal colors, such as an Actions job log: gh refuses
+	// to print one off a terminal without `--allow-escape-sequences`.
+	should_allow_escapes?: boolean
 }
 
 function optional_flag(flag: string, value?: string): Array<string> {
@@ -316,6 +320,7 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 	const body_args = request.body === undefined ? [] : [INPUT_FLAG, BODY_FROM_STDIN]
 	const paginate_args = request.should_paginate === true ? [PAGINATE_FLAG] : []
 	const slurp_args = request.should_slurp === true ? [SLURP_FLAG] : []
+	const escape_args = request.should_allow_escapes === true ? [ALLOW_ESCAPES_FLAG] : []
 
 	return [
 		'api',
@@ -324,6 +329,7 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 		...body_args,
 		...paginate_args,
 		...slurp_args,
+		...escape_args,
 		...optional_flag(JQ_FLAG, request.jq_filter),
 	]
 }

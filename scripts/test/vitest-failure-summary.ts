@@ -18,8 +18,9 @@ const FAILED_LINE = /^FAIL\s+(?<name>\S.*)$/u
 const FAILED_HEADING = 'failed tests:'
 const NONE_NAMED = '  (none named in the output — read the full output)'
 const NONE_NAMED_VERDICT = 'none named'
-// A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace.
-const FAILED_FILE = /^(?:\|[^|]*\|\s+)?(?<file>\S+)/u
+// A name is `<file> > <suite> > <test>` or `<file> [ <file> ]`, prefixed `|<project>| ` in a workspace —
+// or, with color on, ` <project>  ` once its badge's escapes are stripped (joshuafolkken/kit#5171).
+const FAILED_FILE = /^(?:\|[^|]*\|\s+|\S+\s{2,})?(?<file>\S+)/u
 // The guarded unit run, filtered to those files: it reserves its cores and ends a failure with this
 // same summary (joshuafolkken/kit#5023).
 const RERUN_PREFIX = 'rerun failed: pnpm josh test:unit '
