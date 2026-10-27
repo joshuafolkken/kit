@@ -1,4 +1,5 @@
 import { agent_safe_text } from '#scripts/agent/agent-safe-text'
+import { run_event_overrun } from '#scripts/run/event/run-event-overrun'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
@@ -166,6 +167,20 @@ describe('lane_overrun.investigate — the switch off', () => {
 		expect(notes()).toStrictEqual([
 			`#${String(ISSUE)} overrun skipped: disabled (JOSH_LANE_INVESTIGATION is not on)`,
 		])
+	})
+
+	// joshuafolkken/kit#5132: the board hides a row by this reason, so writer and reader share it.
+	it('notes the skip with the reason the board reads', async () => {
+		vi.stubEnv('JOSH_LANE_INVESTIGATION', undefined)
+		mocks.all_events.mockResolvedValue([failed_launch(1)])
+
+		await lane_overrun.investigate(ISSUE)
+
+		expect(run_event_overrun.parse(notes()[0] ?? '')).toStrictEqual({
+			kind: 'skipped',
+			issue: ISSUE,
+			reason: run_event_overrun.DISABLED_REASON,
+		})
 	})
 
 	it('still notes the net minutes of a lane within 40 minutes, which the board draws', async () => {

@@ -112,6 +112,12 @@ async function drop_cache(): Promise<void> {
 	await rm(await git(['rev-parse', '--git-path', CACHE_NAME]), { force: true })
 }
 
+// A non-code file under `docs/`, which a test may read.
+async function write_ledger(): Promise<void> {
+	await mkdir(path.dirname(LEGACY_LEDGER_FILE), { recursive: true })
+	await write(LEGACY_LEDGER_FILE, OBSERVATION_LINE)
+}
+
 describe('test_pinned.run with a stored verdict', () => {
 	it(
 		'answers the same report on a second run over the same tree without starting vitest',
@@ -170,13 +176,51 @@ describe('test_pinned.run after only run records changed', () => {
 		async () => {
 			await after_first_run()
 
-			await mkdir(path.dirname(LEGACY_LEDGER_FILE), { recursive: true })
-			await write(LEGACY_LEDGER_FILE, OBSERVATION_LINE)
+			await write_ledger()
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			await run_report()
 
 			expect(runs).toHaveBeenCalledTimes(1)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5129: a pinned hunk past its basis reruns only the test it failed in — not every
+// test reaching its file — and every reaching test once that one no longer fails.
+describe('test_pinned.run after a non-code file changed', () => {
+	it(
+		'reruns only the test the pinned hunk failed in, and keeps the hunk pinned',
+		async () => {
+			const first = await after_first_run()
+
+			await write_ledger()
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			const report = await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(1)
+			expect(runs.mock.calls[0]?.[1].slice(0, 2)).toEqual(['run', test_pinned_fixture.TEST_FILE])
+			expect(report).toEqual(first)
+		},
+		RUN_TIMEOUT,
+	)
+
+	it(
+		'runs every test reaching the hunk once the test it failed in passes',
+		async () => {
+			await after_first_run()
+			await write_ledger()
+			const runs = vi
+				.spyOn(test_red, 'probe_in')
+				.mockResolvedValueOnce({ verdict: 'green', failed: [], ran: 1 })
+
+			const report = await run_report()
+
+			expect(runs).toHaveBeenCalledTimes(2)
+			expect(runs.mock.calls[1]?.[1][0]).toBe('related')
+			expect(locations(report)).toEqual([UNPINNED_HUNK])
 		},
 		RUN_TIMEOUT,
 	)
