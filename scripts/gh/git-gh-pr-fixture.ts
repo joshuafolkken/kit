@@ -2,6 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { FULL_PAGE_QUERY } from './git-gh-api-path'
 import type { ConditionalRead } from './git-gh-conditional'
 import type { GhApiRequest } from './git-gh-exec'
+import { gh_failure as gh_failure_module } from './git-gh-failure'
 
 // One pull request as `repos/{owner}/{repo}/pulls/{N}` answers it, the paths the reads ask for, and
 // the router that answers them. The mapping tests, the read tests and the write tests all start from
@@ -26,6 +27,16 @@ const GH_FAILURE = 'gh exploded'
 
 function gh_failure(): Error {
 	return new Error(GH_FAILURE)
+}
+
+const UNPROCESSABLE_STATUS = 422
+const TOO_MANY_FILES_FAILURE =
+	'gh: The request could not be processed because too many files changed (HTTP 422)'
+
+// What GitHub answers some pull requests' single-pull JSON with (joshuafolkken/kit#5226), with the
+// status `gh_failure.attach` puts on a real `gh api` failure.
+function too_many_files_failure(status = UNPROCESSABLE_STATUS): Error {
+	return gh_failure_module.attach(new Error(TOO_MANY_FILES_FAILURE), { status })
 }
 
 // Newest first, spelled out rather than left to the endpoint's default — the lookup's fallback to
@@ -195,6 +206,7 @@ export {
 	commit_status_path,
 	gh_api_routes,
 	gh_failure,
+	GH_FAILURE,
 	pr_conversation_comments_path,
 	pr_detail_path,
 	pr_lookup_path,
@@ -204,6 +216,7 @@ export {
 	status_pages,
 	rest_pull,
 	rest_pull_page,
+	too_many_files_failure,
 	EMPTY_LISTING,
 	PR_API_URL,
 	PR_BRANCH,
