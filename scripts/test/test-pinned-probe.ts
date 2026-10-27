@@ -18,7 +18,8 @@ import { unit_worker_share } from './unit-worker-share'
 // it is reached** (joshuafolkken/kit#4936), so the caller stores it before the next hunk runs.
 //
 // A hunk with a `recheck` runs only those tests — the ones added or edited since its stored `green` or
-// `no-test` verdict (`test-pinned-cache-logic.ts`).
+// `no-test` verdict, or the ones its stored `red` failed in (`test-pinned-cache-logic.ts`); a `red`
+// recheck they no longer fail falls back to every reaching test.
 
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
@@ -68,9 +69,9 @@ async function selection_of(
 	return [...tests, ...unit_worker_share.worker_arguments([], workers)]
 }
 
-// The verdict with this one hunk reverted. The file is put back before the next hunk runs, or that
-// hunk's tests would also see this revert.
-async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
+// The run with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
+// tests would also see this revert.
+async function reverted_run(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
 	const selection = await selection_of(tree.tree, probe, workers)
 
 	if (selection === undefined) return NO_TEST
@@ -81,14 +82,20 @@ async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promis
 	await writeFile(target, test_pinned_logic.revert(content, probe.hunk))
 
 	try {
-		const verdict = await test_red.probe_in(tree, selection)
-
-		return probe.recheck === undefined
-			? verdict
-			: test_pinned_cache_logic.rechecked(probe.recheck, verdict)
+		return await test_red.probe_in(tree, selection)
 	} finally {
 		await writeFile(target, content)
 	}
+}
+
+// The hunk's verdict: its recheck's answer, or a run over every reaching test where it answers none.
+async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
+	const run = await reverted_run(tree, probe, workers)
+	if (probe.recheck === undefined) return run
+
+	const answer = test_pinned_cache_logic.rechecked(probe.recheck, run)
+
+	return answer ?? (await reverted_run(tree, { ...probe, recheck: undefined }, workers))
 }
 
 // What every lane of one run shares: its workers per tree, the caller's hand-off and the probes' times.
