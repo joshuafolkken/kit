@@ -121,7 +121,7 @@ describe('git_gh_pr_auto_merge.pr_is_merged', () => {
 		await expect(git_gh_pr_auto_merge.pr_is_merged(PR_BRANCH)).resolves.toBe(false)
 		expect(stderr_spy).toHaveBeenCalledWith(
 			expect.stringMatching(
-				/^josh debug: git_gh_pr_auto_merge\.pr_is_merged: .*branch: feature-branch\n$/u,
+				/^josh debug: git_gh_pr_auto_merge\.pr_is_merged: .*branch: feature-branch \(.+\)\n$/u,
 			),
 		)
 		stderr_spy.mockRestore()
