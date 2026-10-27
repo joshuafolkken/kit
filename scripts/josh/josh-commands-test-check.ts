@@ -50,7 +50,7 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 			"Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on",
 		category: 'Development',
 		reference: [
-			'[--max <n>] [--record <token>] [--first-unpinned]',
+			'[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned]',
 			'developer',
 			['git', 'processes'],
 		],
@@ -62,6 +62,10 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--record <token>',
 					note: 'also leave the answer, under the launch token, for run:review --join',
+				},
+				{
+					arguments: '--origin pre-detach',
+					note: 'name what started the run on its lane ledger row (default manual)',
 				},
 				{
 					arguments: '--first-unpinned',

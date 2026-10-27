@@ -4,7 +4,7 @@ import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { direct_importers } from './direct-importers'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
-import { test_pinned_ledger, type ProbeTime } from './test-pinned-ledger'
+import { test_pinned_ledger, type PinnedOrigin, type ProbeTime } from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_red } from './test-red'
@@ -175,6 +175,7 @@ interface CheckOptions {
 	held?: number
 	rewired?: number
 	is_first_unpinned?: boolean
+	origin?: PinnedOrigin | undefined
 }
 
 // The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
@@ -191,7 +192,7 @@ async function checked_on(
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
 	const verdicts = await pooled(paths, probes, { on_verdict, times, halt })
 
-	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0 }
+	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0, origin: options.origin }
 
 	await test_pinned_ledger.record(skipped, times, Date.now() - started)
 
@@ -200,5 +201,5 @@ async function checked_on(
 
 const test_pinned_probe = { checked_on, selection_of }
 
-export type { Probe }
+export type { CheckOptions, Probe }
 export { test_pinned_probe }

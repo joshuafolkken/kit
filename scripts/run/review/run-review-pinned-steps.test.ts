@@ -13,6 +13,7 @@ const ROOT = `/nonexistent/run-review-pinned-${randomUUID()}`
 const PID = 4770
 const REASON = 'the branch only logs'
 const PINNED_COMMAND = 'test:pinned'
+const ORIGIN_ARGS = ['--origin', 'run-review']
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
 const STILL_RUNNING_NOTE =
 	'it is still running on this tree; wait for its answer with `pnpm josh run:review --pinned`'
@@ -68,7 +69,7 @@ describe('run_review_pinned_steps.launch', () => {
 		run_review_pinned_steps.launch(ROOT)
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			[PINNED_COMMAND, '--first-unpinned', '--record', expect.any(String)],
+			[PINNED_COMMAND, '--first-unpinned', ...ORIGIN_ARGS, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,
 		)
@@ -79,7 +80,7 @@ describe('run_review_pinned_steps.launch', () => {
 		run_review_pinned_steps.launch(ROOT, REASON)
 
 		expect(run_review_steps.launch_josh).toHaveBeenCalledWith(
-			[PINNED_COMMAND, '--record', expect.any(String)],
+			[PINNED_COMMAND, ...ORIGIN_ARGS, '--record', expect.any(String)],
 			run_review_pinned_steps.log_path(ROOT),
 			ROOT,
 		)

@@ -8,13 +8,14 @@ import { test_pinned_cache, type LoadedCache, type Reached } from './test-pinned
 import { test_pinned_cache_logic, type Known, type Recheck } from './test-pinned-cache-logic'
 import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_functions } from './test-pinned-functions'
+import type { PinnedOrigin } from './test-pinned-ledger'
 import {
 	test_pinned_logic,
 	type Hunk,
 	type HunkOutcome,
 	type PinnedReport,
 } from './test-pinned-logic'
-import { test_pinned_probe, type Probe } from './test-pinned-probe'
+import { test_pinned_probe, type CheckOptions, type Probe } from './test-pinned-probe'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
@@ -44,6 +45,7 @@ interface RunOptions {
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
 	rewired?: number
+	origin?: PinnedOrigin | undefined
 }
 
 // One run's probing: the checked hunks, what the cache knows of each, and the cache they are written to.
@@ -111,6 +113,16 @@ function reached_of(verdicts: ReadonlyArray<RedProbe | undefined>): Array<Reache
 	return verdicts.flatMap((verdict, index) => (verdict === undefined ? [] : [[index, verdict]]))
 }
 
+// The fresh run's options: the hunks the cache held, then the run's own.
+function check_options(held: number, options: RunOptions): CheckOptions {
+	return {
+		held,
+		rewired: options.rewired ?? 0,
+		is_first_unpinned: options.is_first_unpinned === true,
+		origin: options.origin,
+	}
+}
+
 // Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
 // The held ones are written first and each fresh one as it is reached (`test_pinned_cache.writer`).
 // Under `is_first_unpinned` a hunk the run stopped before keeps no verdict.
@@ -122,11 +134,7 @@ async function verdicts_on(
 	const reached = reached_of(verdicts)
 	const probes = await by_reach(probes_of(probing.hunks, probing.known), probing.cache.reach)
 	const writer = test_pinned_cache.writer(probing.cache, probing.keys)
-	const options = {
-		held: reached.length,
-		rewired: probing.options.rewired ?? 0,
-		is_first_unpinned: probing.options.is_first_unpinned === true,
-	}
+	const options = check_options(reached.length, probing.options)
 
 	await writer.record(reached)
 	await test_pinned_probe.checked_on(
@@ -268,9 +276,14 @@ async function report(options: RunOptions): Promise<PinnedReport> {
 // No merge-base (not a repository, no default branch) checks nothing, as `josh test:red` does. The cap
 // is shared: changed hunks first, then the added files' functions. Without Vitest (a consumer that has
 // none) no probe runs, so every one is unchecked rather than unpinned. `is_first_unpinned` starts no
-// probe once one is unpinned (joshuafolkken/kit#5153): the hunks left are reported `cut`.
-async function run(max_hunks: number, is_first_unpinned = false): Promise<PinnedReport> {
-	return await report({ max_hunks, is_cached_only: false, is_first_unpinned })
+// probe once one is unpinned (joshuafolkken/kit#5153): the hunks left are reported `cut`. `origin` is
+// what started the run, for its ledger row.
+async function run(
+	max_hunks: number,
+	is_first_unpinned = false,
+	origin?: PinnedOrigin,
+): Promise<PinnedReport> {
+	return await report({ max_hunks, is_cached_only: false, is_first_unpinned, origin })
 }
 
 // The unpinned hunks the cache already answers for this tree, probing nothing (joshuafolkken/kit#4936):

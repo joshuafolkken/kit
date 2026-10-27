@@ -43,7 +43,7 @@ type PinnedOptions = CheckOptions & Pick<ShipArguments, 'is_review'>
 // Its arguments follow the reason (`test_pinned_record.launch_argv`).
 async function own_summary(reason: string | undefined): Promise<PinnedSummary> {
 	const token = randomUUID()
-	const argv = ['josh', ...test_pinned_record.launch_argv(token, reason)]
+	const argv = ['josh', ...test_pinned_record.launch_argv(token, reason, 'pre-detach')]
 	const result = await buffered_process.run_buffered_process(argv)
 	const answer = test_pinned_record.read(token)
 

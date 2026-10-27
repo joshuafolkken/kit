@@ -17,6 +17,8 @@ interface Report {
 	detail: ImplementDetail
 	// The ship pre-detach line's `test:pinned` detail, `''` when none (joshuafolkken/kit#5078).
 	pinned?: string
+	// The discarded `run:review` background probes' line, `''` when none (joshuafolkken/kit#5262).
+	discarded?: string
 }
 
 function part_text(part: Stage): string {
@@ -48,7 +50,10 @@ function entries_of(report: Report): Array<string> {
 	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
 	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${yielded}, ${slept}`
 
-	return [...breakdown.stages.map((stage) => stage_text(stage, report)), excluded]
+	const discarded =
+		report.discarded === undefined || report.discarded === '' ? [] : [report.discarded]
+
+	return [...breakdown.stages.map((stage) => stage_text(stage, report)), ...discarded, excluded]
 }
 
 // `issue`'s breakdown with its implementation's tool calls read off its transcripts, and its ship
@@ -65,6 +70,7 @@ function report_of(
 		breakdown,
 		detail: lane_breakdown_implement.of(calls, breakdown),
 		pinned: lane_breakdown_pinned.detail_text(rows),
+		discarded: lane_breakdown_pinned.discarded_text(entries, issue),
 	}
 }
 

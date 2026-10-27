@@ -1418,7 +1418,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "test:pinned": [
-      "[--max <n>] [--record <token>] [--first-unpinned]",
+      "[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned]",
       "developer",
       [
         "git",

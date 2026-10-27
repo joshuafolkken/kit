@@ -10,8 +10,14 @@ type PinnedProbe = TestPinnedEntry['probes'][number]
 // The longest probes named; the rest are counted in the head alone.
 const MAX_SHOWN = 5
 
+const DISCARDED_LABEL = 'run:review background test:pinned probes discarded'
+
 function is_lane_row(entry: LedgerEntry, issue: number): entry is TestPinnedEntry {
 	return entry.kind === lane_ledger.KIND.TEST_PINNED && entry.issue === issue
+}
+
+function is_discarded(entry: TestPinnedEntry): boolean {
+	return entry.discarded === true
 }
 
 function is_in_pre_detach(entry: TestPinnedEntry, breakdown: Breakdown): boolean {
@@ -28,7 +34,19 @@ function rows_of(
 ): Array<TestPinnedEntry> {
 	return entries
 		.filter((entry) => is_lane_row(entry, issue))
-		.filter((entry) => is_in_pre_detach(entry, breakdown))
+		.filter((entry) => !is_discarded(entry) && is_in_pre_detach(entry, breakdown))
+}
+
+// `issue`'s `run:review` background probes stopped before their answer (joshuafolkken/kit#5262), as a
+// count and their wall time; `''` when none was.
+function discarded_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
+	const rows = entries
+		.filter((entry) => is_lane_row(entry, issue))
+		.filter((entry) => is_discarded(entry))
+	if (rows.length === 0) return ''
+	const elapsed_ms = rows.reduce((sum, row) => sum + row.elapsed_ms, 0)
+
+	return `${DISCARDED_LABEL} ${String(rows.length)}, ${lane_breakdown.minutes_text(elapsed_ms)}`
 }
 
 function probe_text(probe: PinnedProbe): string {
@@ -52,6 +70,6 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 	return ` (${[...counts, ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
 }
 
-const lane_breakdown_pinned = { detail_text, rows_of }
+const lane_breakdown_pinned = { detail_text, discarded_text, rows_of }
 
 export { lane_breakdown_pinned }
