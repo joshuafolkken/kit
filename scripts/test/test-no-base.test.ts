@@ -3,6 +3,7 @@ import { project_checks } from '#scripts/gate/project-checks'
 import { no_base_checkout } from '#scripts/git/no-base-checkout'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_no_base } from './test-no-base'
+import { test_related_claim } from './test-related-claim'
 import { test_unit_guard } from './test-unit-guard'
 
 vi.mock('#scripts/git/no-base-checkout', () => ({
@@ -53,6 +54,22 @@ describe('test_no_base.run_if_touched', () => {
 		expect(mocked_create).toHaveBeenCalledWith(ROOT)
 		expect(mocked_run).toHaveBeenCalledWith(CHECKOUT, ['related', BASE_FILE, '--run', '--silent'])
 		expect(mocked_remove).toHaveBeenCalledWith(CHECKOUT)
+	})
+
+	// joshuafolkken/kit#5135: the first pass's claim is released before this one starts.
+	it('runs the checkout pass inside its own claim, sized by the touching files', async () => {
+		const claim = vi
+			.spyOn(test_related_claim, 'with_unit_claim')
+			.mockImplementation(async (_files, run) => {
+				expect(mocked_create).not.toHaveBeenCalled()
+
+				return await run()
+			})
+
+		await test_no_base.run_if_touched(ROOT, [BASE_FILE, OTHER_FILE], [])
+
+		expect(claim).toHaveBeenCalledWith([BASE_FILE], expect.any(Function))
+		expect(mocked_run).toHaveBeenCalledOnce()
 	})
 
 	it('answers the checkout run’s failure and still removes the checkout', async () => {

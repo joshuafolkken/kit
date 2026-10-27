@@ -392,6 +392,12 @@ async function with_core_reservation<T>(
 	}
 }
 
+// Whether a parent's claim already covers this process — a held parent command, or a unit suite this
+// runs inside — so a command claims nothing, and one that sizes its claim need not size it.
+function is_covered(): boolean {
+	return held_mark.is_held() || unit_worker_share.is_nested_run()
+}
+
 // **A command's reservation: the gate's claim, unless a parent already holds the cores**
 // `josh-logic.ts` calls this around every command that declares a weight.
 // Each command then only declares its weight, and no command carries a copy of the claim, run and
@@ -403,7 +409,7 @@ async function with_command_reservation<T>(
 	run: () => Promise<T>,
 	options: ReserveOptions = {},
 ): Promise<T> {
-	if (held_mark.is_held() || unit_worker_share.is_nested_run()) return await run()
+	if (is_covered()) return await run()
 
 	return await with_core_reservation(
 		weight,
@@ -435,6 +441,7 @@ const core_budget = {
 	budget_waits,
 	describe_overflow: core_admission.describe_overflow,
 	held_unit_claim,
+	is_covered,
 	is_held: held_mark.is_held,
 	live_reservations,
 	release,

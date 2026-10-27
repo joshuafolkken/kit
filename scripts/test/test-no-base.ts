@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { project_checks } from '#scripts/gate/project-checks'
 import { no_base_checkout } from '#scripts/git/no-base-checkout'
+import { test_related_claim } from './test-related-claim'
 import { related_scope } from './test-related-scope'
 import { test_unit_guard } from './test-unit-guard'
 
@@ -75,7 +76,11 @@ async function run_if_touched(
 		`josh test:related: ${String(files.length)} changed file(s) touch the base branch's resolution — their related tests run again in a checkout with no local main, as CI's has none\n`,
 	)
 
-	return await run_in_checkout(root, files, flags)
+	// Its own claim, since the first pass released its own before this one starts.
+	return await test_related_claim.with_unit_claim(
+		files,
+		async () => await run_in_checkout(root, files, flags),
+	)
 }
 
 const test_no_base = { names_any, run_if_touched, text_of, touching }
