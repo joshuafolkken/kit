@@ -15,6 +15,10 @@ You have several Issues, or an epic, that an agent may implement and merge witho
 
 The run's budgets — the 8-hour idle watch and the child limit — are described in [the two budgets](../maintainers/backlogrun-driver.md#the-two-budgets).
 
+On macOS the supervisor keeps the machine awake with `caffeinate -i -s` until it exits or `backlogrun --stop` ends it. It blocks idle sleep, and lid-close sleep only on AC power.
+
+On battery a closed lid still sleeps the machine, and the run waits until it wakes. A host without `caffeinate` (Linux, CI) runs as before.
+
 ## Check it worked
 
 - `josh backlog:next` answers `none` once nothing opted in is left.
