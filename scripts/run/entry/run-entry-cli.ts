@@ -5,6 +5,7 @@ import { issue_watch } from '#scripts/issue/issue-watch'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_plan_check } from '#scripts/lane/lane-plan-check'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_event_plan } from '#scripts/run/event/run-event-plan'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
@@ -51,6 +52,8 @@ const NEWLINE = '\n'
 const HOLD_STOP_NOTE =
 	'(tree not held — see the reason above; clean up and retry, or release with `pnpm josh run:release`)'
 const COST_STOP_NOTE = '(session budget spent — see the figure above; resume in a fresh session)'
+const YIELD_NOTE =
+	'(lane given back at the entry — see the overlap above; end the session now, with no edit)'
 const { BUDGET_REASON, HOLD_REASON } = run_entry_stop
 const HALFRUN_RESUME_TOKEN = 'halfrun'
 
@@ -275,6 +278,27 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 	if (state === run_stage.PLANNED) await run_event_plan.emit_plan(issue_number)
 }
 
+// **A lane child probes its declared paths before the investigation** (joshuafolkken/kit#5211): a running
+// lane that planned one of them since dispatch takes the lane back here, at the cost of the entry
+// alone, rather than after the investigation `lane:plan` would otherwise yield on. `lane:plan` has
+// already released the hold and noted the yield, so this only reports it — no stop notice, as for
+// any yield.
+async function yields_at_entry(issue_number: string): Promise<boolean> {
+	if (!lane_child_marker.is_child_of(process.cwd())) return false
+
+	return await lane_plan_check.yield_at_entry(Number(issue_number))
+}
+
+// The report of a lane given back at the entry, exiting as `lane:plan` does on a yield.
+function yield_report(
+	issue_number: string,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+): number {
+	stop_report(issue_number, hold, cost, YIELD_NOTE)
+
+	return lane_plan_check.YIELD_EXIT_CODE
+}
+
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // — the label then shows in the `labels:` line the report below carries.
 // The plan event is written only once the run passed the trust gate.
@@ -289,6 +313,7 @@ async function proceed(
 	const reads = await gather_reads(issue_number)
 
 	if (reads.trust_stop) return await stop_untrusted(request, { hold, cost }, reads.trust_stop)
+	if (await yields_at_entry(issue_number)) return yield_report(issue_number, { hold, cost })
 
 	await mark_planned(issue_number, state)
 

@@ -16,7 +16,8 @@ const { lane_yield } = await import('./lane-yield')
 const ISSUE = '4926'
 const YIELD_EVENT_TEXT = `#${ISSUE} withdrawn by its own lane:plan: overlaps #4925`
 const PERSON_EVENT_TEXT = `#${ISSUE} withdrawn by a person: superseded`
-const YIELD_NOTE_TEXT = `#${ISSUE} yielded its lane: overlaps #4925`
+const OVERLAP = 'overlaps #4925'
+const YIELD_NOTE_TEXT = `#${ISSUE} yielded its lane: ${OVERLAP}`
 
 function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-10-26T00:00:00.000Z' }
@@ -31,9 +32,19 @@ beforeEach(() => {
 
 describe('lane_yield.record_yield', () => {
 	it('notes the yield and the overlap, rather than writing a withdrawal', async () => {
-		await lane_yield.record_yield(Number(ISSUE), 'overlaps #4925')
+		await lane_yield.record_yield(Number(ISSUE), OVERLAP, 'summary')
 
-		expect(emit_mock).toHaveBeenCalledWith('note', YIELD_NOTE_TEXT)
+		expect(emit_mock).toHaveBeenCalledWith('note', `${YIELD_NOTE_TEXT} · at: summary`)
+	})
+
+	// joshuafolkken/kit#5211: one word says whether the entry probe caught it before any reading.
+	it('names a yield the entry probe caught as at the entry, still read as a yield', async () => {
+		await lane_yield.record_yield(Number(ISSUE), OVERLAP, 'entry')
+
+		const text = `${YIELD_NOTE_TEXT} · at: entry`
+
+		expect(emit_mock).toHaveBeenCalledWith('note', text)
+		expect(lane_yield.is_yielded([LAUNCH, event(2, 'note', text)], ISSUE)).toBe(true)
 	})
 })
 
