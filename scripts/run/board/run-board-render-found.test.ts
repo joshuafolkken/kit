@@ -109,6 +109,37 @@ describe('run_board_render — a merged row’s net minutes', () => {
 	})
 })
 
+// joshuafolkken/kit#5132: #5106's row drew `?′  5109, 5113  ⏭ disabled (…)` with the switch off.
+describe('run_board_render — a merged row skipped for the investigation switch', () => {
+	const DISABLED = found_of(
+		{ kind: 'skipped', issue: DONE, reason: run_event_overrun.DISABLED_REASON },
+		{ filed: ['5109', '5113'] },
+	)
+
+	it('ends on the filings alone while the switch is off', () => {
+		const line = done_line(DISABLED, { is_investigation_on: false })
+
+		expect(line).toMatch(/\S \s*5109, 5113$/u)
+		expect(line).not.toMatch(/\?′|⏭/u)
+	})
+
+	it('still says `?′` and the skip while the switch is on', () => {
+		const line = done_line(DISABLED, { is_investigation_on: true })
+
+		expect(line).toMatch(/\?′ {2}5109, 5113 {2}⏭ disabled \(JOSH_LANE_INVESTIGATION is not on\)$/u)
+	})
+
+	it('still says any other skip while the switch is off', () => {
+		const skipped = found_of({ kind: 'skipped', issue: DONE, reason: 'no ledger' })
+
+		expect(done_line(skipped, { is_investigation_on: false })).toMatch(/\?′ {2}⏭ no ledger$/u)
+	})
+
+	it('still says `⏭ no record` while the switch is off', () => {
+		expect(done_line(undefined, { is_investigation_on: false })).toMatch(/\?′ {2}⏭ no record$/u)
+	})
+})
+
 // joshuafolkken/kit#4880: the case #4834's row drew as `47′ 🔍 4847, 4856`.
 describe('run_board_render — a merged row’s filings by origin', () => {
 	const MIXED = { ...ended(run_event_overrun.FILED_RESULT), minutes: 47 }

@@ -126,9 +126,23 @@ function investigation_text(found: Found | undefined, header: BoardHeader): stri
 	return joined([outcome, joined([longest_text(found), filed], LONGEST_SEPARATOR)], ' ')
 }
 
-// The minutes, the child's own filings, then the investigation, each group apart by two spaces.
+// A lane its merge skipped because the switch was off, while the switch stays off: its skip is by
+// design, so the row says neither it nor the minutes the note never carried (joshuafolkken/kit#5132).
+function is_switched_off(found: Found | undefined, header: BoardHeader): boolean {
+	const note = found?.overrun
+
+	if (header.is_investigation_on || note?.kind !== 'skipped') return false
+
+	return note.reason === run_event_overrun.DISABLED_REASON
+}
+
+// The minutes, the child's own filings, then the investigation, each group apart by two spaces; a lane
+// skipped for the switch says only what was filed.
 function merged_text(row: BoardRow, header: BoardHeader): string {
 	const found = found_of(row, header)
+
+	if (is_switched_off(found, header)) return numbers_of(found, header)
+
 	const own = links_of(found?.filed ?? [], header)
 
 	return joined([minutes_text(found), own, investigation_text(found, header)], GROUP_SEPARATOR)
