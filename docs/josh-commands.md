@@ -280,6 +280,7 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 `josh gate` runs it as its unit leg.
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
+- A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
 - An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.

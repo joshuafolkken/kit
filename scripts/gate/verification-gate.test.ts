@@ -400,7 +400,7 @@ describe('run_verification_gate — how long each check took', () => {
 
 // joshuafolkken/kit#1258: the plan decides how many checks run at once and how wide the unit suite
 // fans out. `gate-plan.test.ts` owns the numbers; what is asserted here is that the gate obeys them.
-const JOSH = 'josh'
+const UNIT_COMMAND = ['josh', gate_plan.UNIT_TARGET, gate_plan.KEEP_WHOLE_SUITE_FLAG]
 const UNIT_CAP = 7
 const NARROWEST_CONCURRENCY = 1
 const CAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length, UNIT_CAP)
@@ -417,8 +417,7 @@ describe('the gate follows the plan', () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, CAPPED_PLAN)
 
 		expect(unit_step_args(steps)).toEqual([
-			JOSH,
-			gate_plan.UNIT_TARGET,
+			...UNIT_COMMAND,
 			`${verification_gate.UNIT_WORKER_FLAG}=${String(UNIT_CAP)}`,
 		])
 	})
@@ -434,10 +433,10 @@ describe('the gate follows the plan', () => {
 		}
 	})
 
-	it('leaves the unit command bare when the plan caps nothing', async () => {
+	it('hands the unit command only the whole-suite flag when the plan caps nothing', async () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, UNCAPPED_PLAN)
 
-		expect(unit_step_args(steps)).toEqual([JOSH, gate_plan.UNIT_TARGET])
+		expect(unit_step_args(steps)).toEqual(UNIT_COMMAND)
 	})
 
 	// The whole point of the gate is that one failure never hides the other three. Narrowing the

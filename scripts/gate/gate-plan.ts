@@ -52,6 +52,9 @@ const TYPE_CHECK_LABEL = 'check'
 const TYPE_CHECK_TARGET = 'check'
 const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
+// **The gate's unit leg runs the whole suite for a changed file every test imports**
+// (joshuafolkken/kit#5122), which every other `josh test:related` narrows to its direct importers.
+const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
 const EXPORTS_LABEL = 'exports'
@@ -142,7 +145,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 // sharded suite regardless.
 const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 	...STATIC_CHECKS,
-	{ label: UNIT_LABEL, target: UNIT_TARGET, reserved_cores: 0 },
+	{ label: UNIT_LABEL, target: UNIT_TARGET, args: [KEEP_WHOLE_SUITE_FLAG], reserved_cores: 0 },
 ]
 
 // **Selecting is not skipping, and the difference is where the unit suite runs rather than whether
@@ -499,6 +502,7 @@ const gate_plan = {
 	DIRECT_UNIT_CLAIM,
 	EXPORTS_LABEL,
 	GATE_CHECKS,
+	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
 	MEASURED_CORES,
 	METRICS_LABEL,

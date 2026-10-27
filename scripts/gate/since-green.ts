@@ -11,7 +11,9 @@ import { verification_inputs } from './verification-inputs'
 // **The check is no weaker.** The green record (`scoped-green.ts`) vouches that the check passed over
 // the branch diff of the tree it names; what moved since is every path whose content can differ from
 // that tree (`moved-paths.ts`), a main sync's own changes included. A record written by a narrowed run
-// vouches for the same thing, by the same argument one run earlier.
+// vouches for the same thing, by the same argument one run earlier — except a bare `josh test:related`
+// over a file every test imports, which ran only its direct importers, so the gate's unit leg never
+// narrows by it while the branch changes one (`is_green_narrowable` in `test-related.ts`, #5122).
 //
 // **Whatever cannot be narrowed answers `undefined`**, and the caller reads the whole branch change as
 // before: no record, one that cannot be compared, one written under other tools or environment, or a

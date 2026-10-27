@@ -109,6 +109,9 @@ interface ScopeRequest {
 	// The entries a change of `tools/test/pure-files.ts` moved, when it moved nothing else there — the
 	// list then reaches those test files rather than every test (`pure-files-entries.ts`).
 	pure_entries?: ReadonlyArray<string> | undefined
+	// The changed files every test imports, each with the test files importing it directly
+	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
+	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -225,16 +228,40 @@ function without_pure_entries(
 	return { files: pure_files_entries.tests_of(entries), unread: rest }
 }
 
+function is_narrowed(request: ScopeRequest, file: string): boolean {
+	return request.every_test_importers?.has(file) === true
+}
+
+// **A moved file every test imports reaches only the test files importing it directly**
+// (joshuafolkken/kit#5122): handed to vitest it would run the whole suite, which the gate's `test:unit`
+// and CI run once regardless. One no test imports directly reaches no test here.
+function direct_selection(request: ScopeRequest, changed: ReadonlyArray<string>): Selection {
+	const moved = changed.filter((file) => is_narrowed(request, file) && is_moved(request, file))
+	const tests = moved.map((file) => request.every_test_importers?.get(file) ?? [])
+
+	return { files: tests.flat(), unread: moved.filter((_file, index) => tests[index]?.length === 0) }
+}
+
+function whole_suite_triggers(
+	request: ScopeRequest,
+	changed: ReadonlyArray<string>,
+): Array<string> {
+	return changed.filter(
+		(file) => WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file),
+	)
+}
+
 function resolve_read(
 	request: ScopeRequest & { changed: ReadonlyArray<string> },
 	entry_tests: ReadonlyArray<string>,
 ): RelatedScope {
 	const { changed, root } = request
-	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file) && is_moved(request, file))
+	const whole = whole_suite_triggers(request, changed)
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
-	const code = changed.filter((file) => is_code_input(request, file))
+	const direct = direct_selection(request, changed)
+	const code = changed.filter((file) => !is_narrowed(request, file) && is_code_input(request, file))
 	const resolution = resolve_through_map(
 		changed.filter((file) => !is_relatable(file) && is_moved(request, file)),
 		request,
@@ -242,8 +269,14 @@ function resolve_read(
 
 	if ('reason' in resolution) return all_scope(resolution.reason, resolution.triggers, root)
 
-	const files = [...code, ...code_readers(code, request.map), ...resolution.files, ...entry_tests]
-	const unread = [...resolution.unread, ...left_out(request, code)]
+	const files = [
+		...code,
+		...code_readers(code, request.map),
+		...resolution.files,
+		...entry_tests,
+		...direct.files,
+	]
+	const unread = [...resolution.unread, ...left_out(request, code), ...direct.unread]
 
 	return narrowed_scope({ files, unread }, request)
 }
