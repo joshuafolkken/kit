@@ -75,6 +75,18 @@ describe('test_unit_guard.vitest_share — the claim the run was admitted on', (
 
 		expect(await worker_arguments_for()).toStrictEqual([`--maxWorkers=${String(CI_DEFAULT)}`])
 	})
+
+	// joshuafolkken/kit#5135: a narrowed `josh test:related` opens as many workers as it claimed.
+	it('starts a narrowed related run at its scoped claim less vitest itself', async () => {
+		const weight = gate_plan.scoped_unit_weight(gate_plan.FILES_PER_WORKER * 2, PINNED_CORES, 0)
+
+		stub_share(undefined)
+		stub_claim({ weight })
+
+		expect(await worker_arguments_for()).toStrictEqual([
+			`--maxWorkers=${String(weight - unit_worker_share.MAIN_PROCESS_CORES)}`,
+		])
+	})
 })
 
 // joshuafolkken/kit#4528: the free memory the guard reads narrows a solo run's workers too.

@@ -195,7 +195,6 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: {
 			examples: [
 				{ arguments: '' },

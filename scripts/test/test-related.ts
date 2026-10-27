@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
@@ -13,6 +14,7 @@ import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_no_base } from './test-no-base'
+import { test_pinned_reach } from './test-pinned-reach'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record, type RunInput } from './test-related-record'
@@ -269,6 +271,31 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 	return scope.mode !== 'none'
 }
 
+// The cores a run claims once its scope is known (joshuafolkken/kit#5135): a narrowed scope by the
+// test files its imports reach — not by its own files, one of which may reach hundreds — and the whole
+// suite, or a scope no graph can be built for, by the full width a direct unit run holds.
+async function claim_weight(scope: RelatedScope): Promise<number> {
+	const tests =
+		scope.mode === 'related' ? await test_pinned_reach.reached_test_count(scope.files) : undefined
+
+	return tests === undefined ? gate_plan.direct_unit_weight() : gate_plan.scoped_unit_weight(tests)
+}
+
+// **The claim is taken here, not declared on the command entry**: the entry is reserved before the
+// scope resolves, so it could only ever claim the whole width. `vitest_share` reads this claim back
+// as the `--maxWorkers` bound. Under `josh gate` the gate's claim covers the run, so none is sized.
+async function run_claimed(scope: RelatedScope, run: () => Promise<number>): Promise<number> {
+	if (core_budget.is_covered()) return await run()
+
+	const weight = await claim_weight(scope)
+
+	return await core_budget.with_command_reservation(weight, run, {
+		memory_mb: gate_plan.unit_memory(weight),
+		command: related_scope.COMMAND_NAME,
+		is_unit: true,
+	})
+}
+
 // A change known to reach no test succeeds without starting vitest, and says why.
 async function run_scope(
 	scope: RelatedScope,
@@ -283,14 +310,20 @@ async function run_scope(
 		return 0
 	}
 
-	return await test_unit_guard.run_guarded_vitest(
-		process.cwd(),
-		related_scope.vitest_arguments(scope, [
-			...changed_file_scope.flags_of(command_arguments),
-			...related_heavy_tests.exclude_flags(scope, root),
-		]),
-		related_scope.COMMAND_NAME,
-		description,
+	const vitest_arguments = related_scope.vitest_arguments(scope, [
+		...changed_file_scope.flags_of(command_arguments),
+		...related_heavy_tests.exclude_flags(scope, root),
+	])
+
+	return await run_claimed(
+		scope,
+		async () =>
+			await test_unit_guard.run_guarded_vitest(
+				process.cwd(),
+				vitest_arguments,
+				related_scope.COMMAND_NAME,
+				description,
+			),
 	)
 }
 
