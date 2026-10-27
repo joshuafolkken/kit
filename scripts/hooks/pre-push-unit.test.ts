@@ -79,6 +79,7 @@ const { pre_push_unit } = await import('./pre-push-unit')
 const { capture_stdout } = gate_test_fixture
 
 const SCRIPT_PATH = 'scripts/hooks/pre-push-unit.ts'
+const OTHER_PATH = 'scripts/gate/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [SCRIPT_PATH]: 'digest-one' }
 const MOVED_TREE: Record<string, string> = { [SCRIPT_PATH]: 'digest-two' }
 const EMPTY_TREE: Record<string, string> = {}
@@ -315,6 +316,31 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).not.toContain(MISS_LEAD)
+	})
+})
+
+// joshuafolkken/kit#5214: `josh ship`'s catch-up merge moves the merge base to the default branch it
+// brought in; the gate after it keys its record on that base and the tree the push then carries.
+describe('a catch-up merge gated green before its push', () => {
+	it('runs no unit suite, reusing the record taken on the new base', async () => {
+		repository.base = ADVANCED_BASE
+		record_green(CHANGED_TREE, ADVANCED_BASE)
+
+		const [code] = await run_hook()
+
+		expect(code).toBe(0)
+		expect(suite_run_count()).toBe(NOTHING_RAN)
+	})
+
+	// A record over other files is told apart from none, by how far it is off.
+	it('counts the files a record over another tree is off by', async () => {
+		record_green({ ...MOVED_TREE, [OTHER_PATH]: 'digest-three' }, BASE)
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(
+			'no green gate record matches the changed files (1 changed, record covers 2, 2 differ).',
+		)
 	})
 })
 

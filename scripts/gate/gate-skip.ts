@@ -1,4 +1,4 @@
-import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_brief } from '#scripts/review/review-brief'
 import { review_stamps } from '#scripts/review/review-stamps'
 
@@ -77,6 +77,20 @@ function stamp_miss(stamp: FileMapStamp, base: string): string | undefined {
 	return review_stamps.gate_stamp.describes_inputs(stamp) ? undefined : INPUTS_MOVED
 }
 
+const NO_MATCHING_RECORD = 'no green gate record matches the changed files'
+
+// joshuafolkken/kit#5214: a record that exists but covers other files is told apart from no record
+// at all, with the sizes of the two maps, so a log shows how far the tree had moved past it.
+function record_miss(recorded: FileMapStamp | undefined, tree: Record<string, string>): string {
+	if (recorded === undefined) return NO_MATCHING_RECORD
+
+	const changed = String(Object.keys(tree).length)
+	const covered = String(Object.keys(recorded.files).length)
+	const differing = String(file_map_stamp.changed_since(recorded, tree).length)
+
+	return `${NO_MATCHING_RECORD} (${changed} changed, record covers ${covered}, ${differing} differ)`
+}
+
 function gate_reuse(
 	tree: Record<string, string>,
 	base: string | undefined,
@@ -85,9 +99,10 @@ function gate_reuse(
 	if (base === undefined) return { miss: 'the merge base could not be read' }
 	if (Object.keys(tree).length === 0) return { miss: 'no file differs from the merge base' }
 
-	const stamp = review_brief.matching_stamp(review_stamps.gate_stamp.read(source), tree)
+	const recorded = review_stamps.gate_stamp.read(source)
+	const stamp = review_brief.matching_stamp(recorded, tree)
 
-	if (stamp === undefined) return { miss: 'no green gate record matches the changed files' }
+	if (stamp === undefined) return { miss: record_miss(recorded, tree) }
 
 	const miss = stamp_miss(stamp, base)
 
