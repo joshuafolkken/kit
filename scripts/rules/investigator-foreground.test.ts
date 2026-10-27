@@ -7,6 +7,7 @@ import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
 
 // joshuafolkken/kit#4721: a background `investigator` leaves its result queued until a later turn, so
@@ -19,6 +20,8 @@ const OTHER_PROMPT = 'Other work'
 const INVESTIGATOR = 'investigator'
 const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
+const ROW_REASON = investigator_foreground.ROW.reason
+const { REISSUE_WINDOW_MS } = implementation_cut
 
 function agent_call(
 	input: Record<string, unknown>,
@@ -68,9 +71,12 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
-// A transcript of its own per call, so one test's remembered build never reaches another's.
-function fresh_run(): GuardRun {
-	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms: 1 }
+const TIMESTAMP_MS = Date.parse(TIMESTAMP)
+
+// A transcript of its own per call, so one test's remembered build never reaches another's. Past the
+// reissue window of the tail's results unless a test says otherwise.
+function fresh_run(now_ms = TIMESTAMP_MS + REISSUE_WINDOW_MS): GuardRun {
+	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms }
 }
 
 function lacks(tail: string, call: GuardedCall, run: GuardRun = fresh_run()): boolean {
@@ -266,6 +272,74 @@ describe('investigator_foreground.lacks_background_field — remembered for the 
 		expect(delivered_rules.delivery(payload)).toBe(investigator_foreground.ROW.reason)
 		expect(lacks(string_tail, agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
 		expect(delivered_rules.delivery(payload)).toBeUndefined()
+	})
+})
+
+function payload_of(run: GuardRun, input: Record<string, unknown>): string {
+	return JSON.stringify({ transcript_path: run.transcript, tool_name: 'Agent', tool_input: input })
+}
+
+function sibling_use(id: string, prompt: string): Record<string, unknown> {
+	return { type: 'tool_use', id, name: 'Agent', input: { subagent_type: INVESTIGATOR, prompt } }
+}
+
+// Two dispatches launched in one message, the first refused by this row.
+function sibling_tail(): string {
+	const content = [sibling_use('toolu_2', PROMPT), sibling_use('toolu_3', OTHER_PROMPT)]
+	const message = { id: 'msg_1', role: 'assistant', content }
+	const use = JSON.stringify({ type: 'assistant', timestamp: TIMESTAMP, message })
+
+	return [use, result_line('toolu_2')].join('\n')
+}
+
+// joshuafolkken/kit#5148: the harness drops the undeclared field before the hook and the transcript see
+// it, so a reissue rewritten after the refusal leaves no tell. The row's own answered refusal is the
+// tell, read off the tail so a sibling or a later dispatch in a build that declares the field is not.
+const REWRITTEN_INPUT = { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT }
+
+function within_window(): GuardRun {
+	return fresh_run(TIMESTAMP_MS + REISSUE_WINDOW_MS - 1)
+}
+
+describe('investigator_foreground.lacks_background_field — the row’s own refusal as the tell', () => {
+	const rewritten = agent_call(REWRITTEN_INPUT)
+	const refused_tail = refused_dispatch({ prompt: PROMPT }, 'toolu_2')
+
+	it('stands down on a rewritten reissue with no field anywhere, and remembers the build', () => {
+		const run = within_window()
+
+		expect(lacks(refused_tail, rewritten, run)).toBe(true)
+		expect(lacks('', agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
+	})
+
+	it('keeps refusing a dispatch that names the background after a refusal', () => {
+		const background = agent_call({ subagent_type: INVESTIGATOR, run_in_background: true })
+
+		expect(lacks(refused_tail, background, within_window())).toBe(false)
+	})
+
+	it.each([
+		['past the reissue window', refused_tail, fresh_run],
+		['beside the refused call in its message', sibling_tail(), within_window],
+		[
+			'after a foreground reissue that ran',
+			[refused_tail, refused_dispatch({ prompt: PROMPT }, 'toolu_3', false)].join('\n'),
+			within_window,
+		],
+	])('refuses a bare dispatch %s, and remembers nothing', (_case, tail, run_of) => {
+		const run = run_of()
+
+		expect(lacks(tail, rewritten, run)).toBe(false)
+		expect(lacks('', rewritten, run)).toBe(false)
+	})
+
+	it('refuses the rewritten reissue on the delivered guard once the refusal is past the window', () => {
+		const run = fresh_run()
+
+		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
+		writeFileSync(run.transcript, refused_tail)
+
+		expect(delivered_rules.delivery(payload_of(run, REWRITTEN_INPUT))).toBe(ROW_REASON)
 	})
 })
 

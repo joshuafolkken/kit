@@ -43,6 +43,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'piped-verification': rewrite(), // wrapped in `(set -o pipefail; …)`
 	'issue-comments': rewrite(), // the same Issue's comments read on the same line
 	'lane-background': rewrite(), // a lane child's `ship` run in the foreground (`pretool-guard.ts`)
+	'reviewer-foreground': rewrite(), // a lane child's `reviewer` given `run_in_background: false`
 	'file-body': judgment(ANOTHER_TOOL), // Edit or Write
 	'shell-body': judgment(
 		"which part of the body the shell was meant to expand is the author's, not the hook's",
