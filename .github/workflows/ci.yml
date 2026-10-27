@@ -486,7 +486,7 @@ jobs:
   # exact hit means the seed already wrote this release's lineage for this push, and nothing runs.
   # A miss — a new release, or a seed that saved nothing — lints here, and `actions/cache` saves the
   # result in its post step, so the cold lint is paid on main instead of on a pull request. The lint
-  # only saves time, so a red one does not turn the push red.
+  # only saves time, so its step continues on error: a red lint still saves, and leaves the job green.
   warm-eslint-lineage:
     name: Warm ESLint Lineage
     needs: [reuse-pr-checks, seed-eslint-cache]
