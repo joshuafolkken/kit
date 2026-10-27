@@ -44,9 +44,11 @@ interface ProjectConfig {
 }
 
 interface ImportGraph {
+	closure: (file: string) => ReadonlyArray<string>
 	closure_hash: (file: string) => string
 	imports: (file: string, content?: string) => ReadonlyArray<string>
 	importers: (files: ReadonlyArray<string>, universe: ReadonlyArray<string>) => ReadonlySet<string>
+	strings: (file: string) => ReadonlyArray<string>
 }
 
 // `typescript` is an optional peer: a project without it has no type-aware rule to go stale.
@@ -257,6 +259,33 @@ function closure_hash(context: GraphContext, file: string): string {
 	return input_fingerprint.of_entries(tokens)
 }
 
+// The project's own files `closure_hash` reads for `file`, a package's left out.
+function closure(context: GraphContext, file: string): Array<string> {
+	return [...reachable(context, file).values()]
+		.filter((dependency) => !dependency.external)
+		.map((dependency) => dependency.file)
+}
+
+// The text of each string literal `file` holds, a template's spans included: where a file names one it
+// starts rather than imports — the CLI a test spawns.
+function strings(typescript: TypeScript, file: string): Array<string> {
+	const content = file_reader.read_if_readable(file) ?? ''
+	const source = typescript.createSourceFile(file, content, typescript.ScriptTarget.Latest)
+	const found: Array<string> = []
+
+	function visit(node: ts.Node): void {
+		if (typescript.isStringLiteralLike(node) || typescript.isTemplateLiteralToken(node)) {
+			found.push(node.text)
+		}
+
+		typescript.forEachChild(node, visit)
+	}
+
+	visit(source)
+
+	return found
+}
+
 // The project's own files `file` imports directly; a package's are left out. `content` reads another
 // text of the file in its place — its version at another revision — resolved from where it sits now.
 function imports(context: GraphContext, file: string, content?: string): Array<string> {
@@ -331,9 +360,11 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 	}
 
 	return {
+		closure: (file) => closure(context, file),
 		closure_hash: (file) => closure_hash(context, file),
 		imports: (file, content) => imports(context, file, content),
 		importers: (files, universe) => importers(context, files, universe),
+		strings: (file) => strings(typescript, file),
 	}
 }
 

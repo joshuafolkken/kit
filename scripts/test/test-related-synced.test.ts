@@ -41,9 +41,11 @@ function importers_of(files: ReadonlyArray<string>): ReadonlySet<string> {
 }
 
 const FAKE_GRAPH: ImportGraph = {
+	closure: () => [],
 	closure_hash: () => '',
 	imports: () => [],
 	importers: (files) => importers_of(files),
+	strings: () => [],
 }
 
 const MAP: ReadMap = {

@@ -4,6 +4,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_cache_logic } from './test-pinned-cache-logic'
+import { test_pinned_spawn, type TestSpawn } from './test-pinned-spawn'
 import { related_scope } from './test-related-scope'
 import { whole_suite_files } from './whole-suite-files'
 
@@ -42,6 +43,7 @@ interface ReachedCount {
 interface GraphView {
 	graph: ImportGraph
 	universe: ReadonlyArray<string>
+	spawn: TestSpawn
 }
 
 // Every file in the work tree, tracked or untracked but not ignored. `-z` lists a path as it is,
@@ -64,7 +66,9 @@ async function view_of(): Promise<GraphView | undefined> {
 	const graph = await import_graph.create(process.cwd())
 	if (graph === undefined) return undefined
 
-	return { graph, universe: await code_universe() }
+	const universe = await code_universe()
+
+	return { graph, universe, spawn: test_pinned_spawn.create(graph, universe) }
 }
 
 // A code file nothing imports that is not a test: a config, a setup file or a CLI a test spawns.
@@ -75,17 +79,19 @@ function is_root(view: GraphView, file: string): boolean {
 	return view.graph.importers([file], view.universe).size <= 1
 }
 
-// A changed path no import names a test's dependency on: a non-code file a test reads, one every test
-// depends on without importing it (the vitest config, the setup files, the lock), or a code file a root
-// reaches — the root itself or a module it imports, which a test spawning it runs past any closure.
-function is_asset(view: GraphView, file: string): boolean {
-	if (
+// A changed path no graph ties to the tests that read it: a non-code file a test reads, or one every
+// test depends on without importing it (the vitest config, the setup files, the lock).
+function is_shared(file: string): boolean {
+	return (
 		!related_scope.is_relatable(file) ||
 		whole_suite_files.WHOLE_SUITE_FILES.has(path.normalize(file))
-	) {
-		return true
-	}
+	)
+}
 
+// A shared path, or a code file a root reaches — the root itself or a module it imports, which a test
+// spawning it runs past any closure.
+function is_asset(view: GraphView, file: string): boolean {
+	if (is_shared(file)) return true
 	const reached = view.graph.importers([path.resolve(file)], view.universe)
 
 	return [...reached].some((reader) => is_root(view, reader))
@@ -137,15 +143,19 @@ async function reached_test_counts(
 	return files.map((file) => ({ file, count: related_of(view, file).length }))
 }
 
-// None where no failed test is named or one is gone: what such a red rests on, no graph names.
+// None where no failed test is named or one is gone: what such a red rests on, no graph names. Past
+// the failed tests' closures it rests on the shared paths and on each file they can start, with its
+// closure (joshuafolkken/kit#5261) — a root no failed test names moves no verdict of theirs.
 function failed_of(
 	view: GraphView,
 	tests: ReadonlyArray<string>,
 	inputs: ReachInputs,
 ): string | undefined {
 	if (tests.length === 0 || tests.some((test) => !inputs.test_digests.has(test))) return undefined
-	const closures = tests.map((test) => [test, view.graph.closure_hash(path.resolve(test))] as const)
-	const assets = inputs.code.filter((file) => is_asset(view, file))
+	const started = view.spawn.started(tests.map((test) => path.resolve(test)))
+	const run = [...tests, ...[...started].map((file) => path.relative(process.cwd(), file))]
+	const closures = run.map((file) => [file, view.graph.closure_hash(path.resolve(file))] as const)
+	const assets = inputs.code.filter((file) => is_shared(file) || started.has(path.resolve(file)))
 	const change = test_pinned_cache_logic.change_of(inputs.commit, assets, inputs.digests)
 
 	return test_pinned_cache_logic.red_basis(change, closures)
