@@ -13,13 +13,13 @@ const MERGED_AT = '2026-10-27T09:00:00Z'
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({ read_pull: vi.fn() }))
 
 const { read_pull } = await import('#scripts/gh/git-gh-pr-read')
-const { issue_sample_gate } = await import('./issue-sample-gate')
+const { issue_sample_prime } = await import('./issue-sample-prime')
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('issue_sample_gate.read_source on a pull request too large to read', () => {
+describe('issue_sample_prime.read_source on a pull request too large to read', () => {
 	it('reads the body and the merge time from the issue endpoint', async () => {
 		const served = rest_issue({
 			number: PR,
@@ -30,7 +30,7 @@ describe('issue_sample_gate.read_source on a pull request too large to read', ()
 		vi.mocked(read_pull).mockRejectedValue(too_many_files_failure())
 		const exec = vi.spyOn(git_gh_exec, 'exec_gh_api').mockResolvedValue(served)
 
-		expect(await issue_sample_gate.read_source(PR)).toStrictEqual({
+		expect(await issue_sample_prime.read_source(PR)).toStrictEqual({
 			merged_at: MERGED_AT,
 			closes: ISSUE,
 		})
@@ -43,7 +43,7 @@ describe('issue_sample_gate.read_source on a pull request too large to read', ()
 		vi.mocked(read_pull).mockRejectedValue(failure)
 		const exec = vi.spyOn(git_gh_exec, 'exec_gh_api')
 
-		await expect(issue_sample_gate.read_source(PR)).rejects.toBe(failure)
+		await expect(issue_sample_prime.read_source(PR)).rejects.toBe(failure)
 		expect(exec).not.toHaveBeenCalled()
 	})
 })

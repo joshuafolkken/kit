@@ -4,7 +4,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_not_before } from './issue-not-before'
-import { issue_sample_gate, type PrimePorts } from './issue-sample-gate'
+import { issue_sample_gate } from './issue-sample-gate'
+import { issue_sample_prime, type PrimePorts } from './issue-sample-prime'
 
 // joshuafolkken/kit#4414: a follow-up measurement waits on the merges the lane ledger records after the
 // pull request it measures merged, not on a calendar time.
@@ -66,7 +67,7 @@ describe('issue_sample_gate.wait_of', () => {
 	})
 
 	it('waits while the pull request has not merged', async () => {
-		await issue_sample_gate.prime([GATED_BODY], ports_of(undefined, undefined))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(undefined, undefined))
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({ kind: 'unmerged', ...CITED_PULL })
 	})
@@ -74,7 +75,7 @@ describe('issue_sample_gate.wait_of', () => {
 	it('counts only the merges recorded after the pull request merged', async () => {
 		const ledger = ledger_with([BEFORE, AFTER])
 
-		await issue_sample_gate.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({
 			kind: 'short',
@@ -88,7 +89,7 @@ describe('issue_sample_gate.wait_of', () => {
 	it('releases the body once the declared merges are recorded', async () => {
 		const ledger = ledger_with([AFTER, AFTER])
 
-		await issue_sample_gate.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toBeUndefined()
 	})
@@ -107,7 +108,7 @@ describe("issue_sample_gate.wait_of on the pull request's own merge", () => {
 			{ at: AFTER, issue: 1 },
 		])
 
-		await issue_sample_gate.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger))
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)).toStrictEqual({
 			kind: 'short',
@@ -119,11 +120,11 @@ describe("issue_sample_gate.wait_of on the pull request's own merge", () => {
 	})
 })
 
-describe('issue_sample_gate.prime', () => {
+describe('issue_sample_prime.prime', () => {
 	it('reads nothing for bodies that declare no condition', async () => {
 		const ports = ports_of(MERGED_AT, undefined)
 
-		await issue_sample_gate.prime([body_with(''), undefined], ports)
+		await issue_sample_prime.prime([body_with(''), undefined], ports)
 
 		expect(ports.pull).not.toHaveBeenCalled()
 	})
@@ -132,11 +133,11 @@ describe('issue_sample_gate.prime', () => {
 		const merged = ports_of(MERGED_AT, undefined)
 		const unmerged = ports_of(undefined, undefined)
 
-		await issue_sample_gate.prime([GATED_BODY, GATED_BODY], merged)
-		await issue_sample_gate.prime([GATED_BODY], merged)
+		await issue_sample_prime.prime([GATED_BODY, GATED_BODY], merged)
+		await issue_sample_prime.prime([GATED_BODY], merged)
 		issue_sample_gate.reset()
-		await issue_sample_gate.prime([GATED_BODY], unmerged)
-		await issue_sample_gate.prime([GATED_BODY], unmerged)
+		await issue_sample_prime.prime([GATED_BODY], unmerged)
+		await issue_sample_prime.prime([GATED_BODY], unmerged)
 
 		expect(merged.pull).toHaveBeenCalledTimes(1)
 		expect(unmerged.pull).toHaveBeenCalledTimes(2)
@@ -146,7 +147,7 @@ describe('issue_sample_gate.prime', () => {
 		const ports = ports_of(MERGED_AT, undefined)
 
 		vi.mocked(ports.pull).mockRejectedValue(new Error('rate limited'))
-		await issue_sample_gate.prime([GATED_BODY], ports)
+		await issue_sample_prime.prime([GATED_BODY], ports)
 
 		expect(issue_sample_gate.wait_of(GATED_BODY)?.kind).toBe('unread')
 	})
@@ -154,7 +155,7 @@ describe('issue_sample_gate.prime', () => {
 
 describe('issue_not_before with a sample condition', () => {
 	it('holds the issue back and names the merges it still waits on', async () => {
-		await issue_sample_gate.prime([GATED_BODY], ports_of(MERGED_AT, ledger_with([AFTER])))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger_with([AFTER])))
 
 		expect(issue_not_before.is_due(GATED_BODY)).toBe(false)
 		expect(issue_not_before.waiting_reason(GATED_BODY)).toBe(`1/2 merges after #${String(PR)}`)
@@ -164,12 +165,12 @@ describe('issue_not_before with a sample condition', () => {
 		expect(issue_not_before.waiting_reason(GATED_BODY)).toBe(
 			`until the merge of #${String(PR)} is read`,
 		)
-		await issue_sample_gate.prime([GATED_BODY], ports_of(undefined, undefined))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(undefined, undefined))
 		expect(issue_not_before.waiting_reason(GATED_BODY)).toBe(`until #${String(PR)} merges`)
 	})
 
 	it('is due once the samples are recorded', async () => {
-		await issue_sample_gate.prime([GATED_BODY], ports_of(MERGED_AT, ledger_with([AFTER, AFTER])))
+		await issue_sample_prime.prime([GATED_BODY], ports_of(MERGED_AT, ledger_with([AFTER, AFTER])))
 
 		expect(issue_not_before.is_due(GATED_BODY)).toBe(true)
 	})
@@ -181,7 +182,7 @@ describe('issue_sample_gate with the issue form', () => {
 	it('waits on the closing pull request until it merges', async () => {
 		const ports = ports_of(undefined, undefined)
 
-		await issue_sample_gate.prime([CLOSING_BODY], ports)
+		await issue_sample_prime.prime([CLOSING_BODY], ports)
 
 		expect(ports.closing).toHaveBeenCalledWith(SOURCE_ISSUE)
 		expect(ports.pull).not.toHaveBeenCalled()
@@ -196,7 +197,7 @@ describe('issue_sample_gate with the issue form', () => {
 			{ at: AFTER, issue: 1 },
 		])
 
-		await issue_sample_gate.prime([CLOSING_BODY], ports_of(MERGED_AT, ledger))
+		await issue_sample_prime.prime([CLOSING_BODY], ports_of(MERGED_AT, ledger))
 
 		expect(issue_sample_gate.wait_of(CLOSING_BODY)).toStrictEqual({
 			kind: 'short',
@@ -211,7 +212,7 @@ describe('issue_sample_gate with the issue form', () => {
 		const pull_body = body_with(`- 実施可能条件: #${String(SOURCE_ISSUE)} のマージ後 1 マージ`)
 		const ports = ports_of(MERGED_AT, undefined)
 
-		await issue_sample_gate.prime([CLOSING_BODY, pull_body], ports)
+		await issue_sample_prime.prime([CLOSING_BODY, pull_body], ports)
 
 		expect(ports.closing).toHaveBeenCalledTimes(1)
 		expect(ports.pull).toHaveBeenCalledTimes(1)

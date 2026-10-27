@@ -8,6 +8,7 @@ import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { PRIORITY_CRITICAL_LABEL } from '#scripts/issue/issue-labels'
 import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -115,7 +116,7 @@ describe('backlog:next with a declared sample condition', () => {
 
 	beforeEach(() => {
 		backlog_fixture.stub_backlog({ opted_in: [sampled] })
-		vi.spyOn(issue_sample_gate, 'prime').mockResolvedValue()
+		vi.spyOn(issue_sample_prime, 'prime').mockResolvedValue()
 	})
 
 	it('waits and links the pull request it waits on', async () => {

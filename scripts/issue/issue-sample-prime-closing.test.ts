@@ -13,17 +13,17 @@ vi.mock('#scripts/gh/git-gh-pr-read', () => ({
 }))
 
 const { read_pull } = await import('#scripts/gh/git-gh-pr-read')
-const { issue_sample_gate } = await import('./issue-sample-gate')
+const { issue_sample_prime } = await import('./issue-sample-prime')
 
 afterEach(() => {
 	vi.restoreAllMocks()
 })
 
-describe('issue_sample_gate.read_closing', () => {
+describe('issue_sample_prime.read_closing', () => {
 	it('reads the merge of the closing pull request, closing the cited issue', async () => {
 		vi.spyOn(issue_closing_pr, 'read_closing_number').mockResolvedValue(CLOSING_PR)
 
-		expect(await issue_sample_gate.read_closing(ISSUE)).toStrictEqual({
+		expect(await issue_sample_prime.read_closing(ISSUE)).toStrictEqual({
 			merged_at: MERGED_AT,
 			closes: ISSUE,
 		})
@@ -33,7 +33,7 @@ describe('issue_sample_gate.read_closing', () => {
 	it('reads as unmerged when no pull request closes the issue yet', async () => {
 		vi.spyOn(issue_closing_pr, 'read_closing_number').mockResolvedValue(undefined)
 
-		expect(await issue_sample_gate.read_closing(ISSUE)).toStrictEqual({
+		expect(await issue_sample_prime.read_closing(ISSUE)).toStrictEqual({
 			merged_at: undefined,
 			closes: ISSUE,
 		})
