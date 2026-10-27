@@ -73,6 +73,15 @@ function selection_lines(scope: string): ReadonlyArray<string> {
 	]
 }
 
+// A reach count measured by a hand-written probe, and a before / after criterion beside the fix, cost
+// #5202's lane its implement time (joshuafolkken/kit#5238).
+const MEASUREMENT_LINES = [
+	'Measure a reach test count — the test files `pnpm josh test:related` runs for a changed file — with',
+	'`pnpm josh test:reach <file…>`.',
+	'Put a measurement criterion (a before / after recorded as an Issue comment) in a prior `--route split`',
+	'issue, never in the issue that carries the fix.',
+]
+
 // The result's vocabulary, recorded as the note `template` names with `<result>` in it.
 function result_lines(template: string): ReadonlyArray<string> {
 	return [
@@ -99,6 +108,7 @@ function cause_handling(rules: CauseHandling): string {
 	return [
 		...selection_lines(rules.scope),
 		grouping(rules.origin, rules.loss_lines),
+		...MEASUREMENT_LINES,
 		...duplicate_lines(rules.loss_lines),
 		...result_lines(rules.template),
 	].join(' ')

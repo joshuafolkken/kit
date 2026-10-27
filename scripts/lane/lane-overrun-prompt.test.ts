@@ -98,6 +98,22 @@ describe('lane_overrun_prompt.handling — a recurrence', () => {
 	})
 })
 
+// joshuafolkken/kit#5238: #5202's lane hand-wrote a reach probe and measured before / after in the
+// implementing lane.
+describe('lane_overrun_prompt.handling — a measurement', () => {
+	it('measures a reach test count with test:reach', () => {
+		expect(handling()).toContain(
+			'Measure a reach test count — the test files `pnpm josh test:related` runs for a changed file — with `pnpm josh test:reach <file…>`.',
+		)
+	})
+
+	it('puts a measurement criterion in a prior split issue, not beside the fix', () => {
+		expect(handling()).toContain(
+			'Put a measurement criterion (a before / after recorded as an Issue comment) in a prior `--route split` issue, never in the issue that carries the fix.',
+		)
+	})
+})
+
 describe("lane_overrun_prompt.handling — the lane's minutes", () => {
 	it('carries them on the ranked lines of a 65-minute lane, with no priority label', () => {
 		expect(handling()).toContain(`- 原因のレーン: ${String(MINUTES)} 分（#${String(ISSUE)}）`)

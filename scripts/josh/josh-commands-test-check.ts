@@ -29,6 +29,21 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['git', 'processes']],
 		usage: { examples: [{ arguments: '', note: 'red, green, no-test, stopped or test-only' }] },
 	},
+	'test:reach': {
+		script: 'scripts/test/test-reach-cli.ts',
+		description:
+			"Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file",
+		category: 'Development',
+		reference: ['<files...>', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: 'scripts/lane/lane-ledger.ts',
+					note: 'a reach count to measure before and after a change',
+				},
+			],
+		},
+	},
 	'test:pinned': {
 		script: 'scripts/test/test-pinned-main.ts',
 		description:

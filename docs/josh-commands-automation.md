@@ -263,6 +263,22 @@ Run by the distributed `ci.yml` between its E2E attempts.
 
 - Reads the preview server debug log (`WRANGLER_LOG_PATH`, default `e2e-web-server-logs`); matches only when `Error in ProxyController` **and** `Network connection lost.` are in the same file. Verdict goes to `$GITHUB_OUTPUT` as `crashed`; a missing/unreadable log means "no crash".
 
+### `josh test:reach`
+
+<!-- usage: test:reach -->
+
+Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file.
+
+```bash
+pnpm josh test:reach scripts/lane/lane-ledger.ts   # a reach count to measure before and after a change
+```
+
+<!-- /usage -->
+
+Run by a lane filing an overrun investigation, for the reach count its `## ベースライン` measures before and after a change.
+
+- A path is read from the repository root (where `pnpm josh` runs) or as an absolute path; one that names no file is refused rather than printed as `0`.
+
 ## Project
 
 Commands for setting up and maintaining a project.
