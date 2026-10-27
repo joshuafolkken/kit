@@ -123,6 +123,21 @@ describe('run --join --fixing', () => {
 		expect(errored()).toBe(LIST)
 		expect(judge).not.toHaveBeenCalled()
 	})
+
+	// joshuafolkken/kit#5188: a partial answer ends on its counts line too, the full list path above it.
+	it('ends a partial answer on its counts line', async () => {
+		const partial = { text: LIST, counts: 'COUNTS', log: { path: 'LOG' }, unpinned: [SITE] }
+
+		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		vi.spyOn(run_review_pinned_join, 'wait_for_join').mockResolvedValue({
+			...partial,
+			is_partial: true,
+		})
+
+		await run_review_cli.run(['--join', '--fixing'])
+
+		expect(errored()).toBe(`${LIST}full output: LOG\nCOUNTS\n`)
+	})
 })
 
 describe('run --join on the background test:pinned', () => {

@@ -42,15 +42,15 @@ const TEST_CHECK_COMMANDS: Record<string, CommandEntry> = {
 		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: {
 			examples: [
-				{ arguments: '', note: 'unpinned / unchecked <file>:<line> lines' },
-				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest print as unchecked' },
+				{ arguments: '', note: 'unpinned <file>:<line> lines; unchecked counted per reason' },
+				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest count as unchecked' },
 				{
 					arguments: '--record <token>',
 					note: 'also leave the answer, under the launch token, for run:review --join',
 				},
 				{
 					arguments: '--first-unpinned',
-					note: 'start no probe once one hunk is unpinned; the rest print as unchecked',
+					note: 'start no probe once one hunk is unpinned; the rest count as unchecked',
 				},
 			],
 		},

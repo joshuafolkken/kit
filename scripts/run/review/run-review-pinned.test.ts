@@ -151,6 +151,15 @@ describe('run_review_pinned.verdict_of — the answer the join reads', () => {
 		})
 	})
 
+	// joshuafolkken/kit#5188: a `tail` of the run:review or pre-detach answer keeps what to do.
+	it('ends a stop on the counts line, the stop note and the full list path above it', () => {
+		const summary = { text: 'LIST\n', counts: 'COUNTS', log: { path: 'LOG' }, unpinned: [SITE] }
+
+		expect(run_review_pinned.verdict_of(summary, undefined).text).toBe(
+			`LIST\n${run_review_pinned.STOP_NOTE}\nfull output: LOG\nCOUNTS\n`,
+		)
+	})
+
 	it('stays clear when nothing is unpinned', () => {
 		expect(run_review_pinned.verdict_of({ text: 'L\n', unpinned: [] }, undefined).kind).toBe(
 			'clear',

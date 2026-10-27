@@ -1,3 +1,4 @@
+import { verification_tail, type KeptLog } from '#scripts/gate/verification-tail'
 import { test_declared_logic } from './test-declared-logic'
 import type { RedProbe, RedVerdict } from './test-red-logic'
 import { related_scope } from './test-related-scope'
@@ -73,6 +74,19 @@ interface PinnedReport extends HunkOutcome {
 	// False when no Vitest is installed to run a probe, so every hunk is `unchecked` rather than run and
 	// read as a `no-test` unpinned one.
 	has_runner: boolean
+}
+
+interface UncheckedPlace {
+	place: string
+	why: string
+}
+
+// A report as printed (joshuafolkken/kit#5188): `text` is its lines above the counts line, each ending in
+// a newline; `counts` is absent for a check that could not run, and `log` where no full list was kept.
+interface ReportParts {
+	text: string
+	counts?: string | undefined
+	log?: KeptLog | undefined
 }
 
 interface DiffWalk {
@@ -220,42 +234,85 @@ function unchecked_reason(report: PinnedReport): string {
 	return report.has_runner ? `over the ${String(report.max_hunks)}-hunk cap` : NO_RUNNER_REASON
 }
 
-function format(report: PinnedReport): string {
-	const unpinned = report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
-	const unchecked = report.unchecked.map(
-		(hunk) => `unchecked ${location(hunk)} — ${unchecked_reason(report)}`,
-	)
-	const stopped = report.stopped.map((hunk) => `unchecked ${location(hunk)} — ${STOPPED_REASON}`)
-	const cut = (report.cut ?? []).map((hunk) => `unchecked ${location(hunk)} — ${CUT_REASON}`)
-	const unparsed = report.unparsed.map((file) => `unchecked ${file} — ${UNPARSED_REASON}`)
-
-	return [...unpinned, ...unchecked, ...stopped, ...cut, ...unparsed].join(LINE_BREAK)
+function unpinned_lines(report: PinnedReport): Array<string> {
+	return report.unpinned.map((hunk) => `unpinned ${location(hunk)} — ${reason(hunk)}`)
 }
 
-// The counts line, then one line per unpinned or unchecked place — what `josh test:pinned` prints and
-// what `josh run:review` prints before round 1.
-function report_text(report: PinnedReport): string {
-	const unpinned = String(report.unpinned.length)
-	const skipped = report.stopped.length + (report.cut?.length ?? 0) + report.unparsed.length
-	const unchecked = String(report.unchecked.length + skipped)
-	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, format(report)]
+function place_of(hunk: Hunk, why: string): UncheckedPlace {
+	return { place: location(hunk), why }
+}
 
-	return `${lines.filter((line) => line !== '').join(LINE_BREAK)}${LINE_BREAK}`
+// Every unchecked place with its reason, in the full list's order.
+function unchecked_places(report: PinnedReport): Array<UncheckedPlace> {
+	return [
+		...report.unchecked.map((hunk) => place_of(hunk, unchecked_reason(report))),
+		...report.stopped.map((hunk) => place_of(hunk, STOPPED_REASON)),
+		...(report.cut ?? []).map((hunk) => place_of(hunk, CUT_REASON)),
+		...report.unparsed.map((file) => ({ place: file, why: UNPARSED_REASON })),
+	]
+}
+
+// Whether the printed report folds any place, so the full list is worth keeping.
+function has_unchecked(report: PinnedReport): boolean {
+	return unchecked_places(report).length > 0
+}
+
+// One line per unpinned or unchecked place — the full list `josh test:pinned` keeps in its log.
+function format(report: PinnedReport): string {
+	const unchecked = unchecked_places(report).map((item) => `unchecked ${item.place} — ${item.why}`)
+
+	return [...unpinned_lines(report), ...unchecked].join(LINE_BREAK)
+}
+
+// The unchecked places folded to one line per reason (joshuafolkken/kit#5188): a cap's overflow listed
+// one line each pushed the unpinned places, and what to do about them, out of a `tail` window.
+function folded_unchecked(report: PinnedReport): Array<string> {
+	const counts = new Map<string, number>()
+
+	for (const { why } of unchecked_places(report)) counts.set(why, (counts.get(why) ?? 0) + 1)
+
+	return [...counts].map(([why, count]) => `unchecked ${String(count)} — ${why}`)
+}
+
+function counts_line(report: PinnedReport): string {
+	const unchecked = String(unchecked_places(report).length)
+
+	return `unpinned ${String(report.unpinned.length)} · unchecked ${unchecked}`
+}
+
+// The report's parts: each unpinned place and the folded unchecked lines, and the counts line.
+function report_parts(report: PinnedReport): ReportParts {
+	const lines = [...unpinned_lines(report), ...folded_unchecked(report)]
+
+	return { text: lines.map((line) => `${line}${LINE_BREAK}`).join(''), counts: counts_line(report) }
+}
+
+// What `josh test:pinned`, `josh run:review` and the ship's pre-detach print, in the verification-tail
+// shape (`verification-tail.ts`): the places, then `note` (what to do about them, each line ending in a
+// newline), then where the full list went, and the counts line last. Without a counts line — a check
+// that could not run — the text and the note alone.
+function report_text(parts: ReportParts, note = ''): string {
+	const failures = `${parts.text}${note}`
+	if (parts.counts === undefined) return failures
+
+	return verification_tail.format_tail({ failures, log: parts.log, verdict: parts.counts })
 }
 
 const test_pinned_logic = {
 	DEFAULT_MAX_HUNKS,
 	by_reach,
 	format,
+	has_unchecked,
 	is_target,
 	is_unpinned,
 	location,
 	outcome,
 	parse_hunks,
+	report_parts,
 	report_text,
 	revert,
 	split,
 }
 
-export type { Hunk, HunkOutcome, PinnedReport, UnpinnedHunk }
+export type { Hunk, HunkOutcome, PinnedReport, ReportParts, UnpinnedHunk }
 export { test_pinned_logic }

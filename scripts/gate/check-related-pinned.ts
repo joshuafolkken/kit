@@ -1,6 +1,7 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 
 // **`check:related` prints the `josh test:pinned` verdict it finds already reached on this tree**
@@ -32,7 +33,9 @@ async function notice(
 	if (summary === undefined) return undefined
 	const verdict = await run_review_pinned_accepted.judge(summary, undefined)
 
-	return verdict.kind === 'stop' ? `${summary.text.trimEnd()}\n${SHIP_HINT}` : undefined
+	if (verdict.kind !== 'stop') return undefined
+
+	return test_pinned_logic.report_text(summary, `${SHIP_HINT}\n`).trimEnd()
 }
 
 const check_related_pinned = { SHIP_HINT, WAIT_MS, notice }

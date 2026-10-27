@@ -11,6 +11,7 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
+import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_early_push } from './run-review-early-push'
@@ -219,7 +220,7 @@ type PinnedWait = () => Promise<PinnedSummary | undefined>
 // A partial answer (joshuafolkken/kit#4936) is printed, but neither stops the round nor replaces the
 // accepted `--unpinned-ok` record (`run_review_pinned_accepted.remember`).
 function show_partial(summary: PinnedSummary): boolean {
-	process.stderr.write(summary.text)
+	process.stderr.write(test_pinned_logic.report_text(summary))
 
 	return false
 }

@@ -11,6 +11,12 @@ const EMPTY_REPORT: PinnedReport = {
 	has_runner: true,
 }
 
+const GREEN_LINE = 'unpinned a.ts:3 — reverting it left every related test green\n'
+
+function printed(report: PinnedReport): string {
+	return test_pinned_logic.report_text(test_pinned_logic.report_parts(report))
+}
+
 const MODIFIED_DIFF = [
 	`diff --git a/${DRIVER} b/${DRIVER}`,
 	`--- a/${DRIVER}`,
@@ -133,8 +139,7 @@ describe('test_pinned_logic.split and format', () => {
 		}
 
 		expect(test_pinned_logic.format(report)).toBe(
-			'unpinned a.ts:3 — reverting it left every related test green\n' +
-				'unchecked b.ts:1 — over the 1-hunk cap',
+			`${GREEN_LINE}unchecked b.ts:1 — over the 1-hunk cap`,
 		)
 	})
 
@@ -173,8 +178,8 @@ describe('test_pinned_logic.outcome and a stopped hunk', () => {
 	it('prints a hunk whose revert stopped vitest as unchecked, never as unpinned', () => {
 		const report = { ...EMPTY_REPORT, stopped: [hunk({ file: 'a.ts', new_start: 3 })] }
 
-		expect(test_pinned_logic.report_text(report)).toBe(
-			'unpinned 0 · unchecked 1\nunchecked a.ts:3 — vitest stopped before any test ran with it reverted\n',
+		expect(printed(report)).toBe(
+			'unchecked 1 — vitest stopped before any test ran with it reverted\nunpinned 0 · unchecked 1\n',
 		)
 	})
 })
@@ -206,13 +211,11 @@ describe('test_pinned_logic.format with nothing left, and on an added file funct
 describe('test_pinned_logic.report_text', () => {
 	const one_unchecked = 'unpinned 0 · unchecked 1\n'
 
-	it('counts an added file it could not read as unchecked and lists it', () => {
+	it('counts an added file it could not read as unchecked', () => {
 		const report = { ...EMPTY_REPORT, unparsed: ['added.ts'] }
 
-		expect(test_pinned_logic.report_text(report)).toBe(
-			`${
-				one_unchecked
-			}unchecked added.ts — an added file, and typescript is not installed to read its functions\n`,
+		expect(printed(report)).toBe(
+			`unchecked 1 — an added file, and typescript is not installed to read its functions\n${one_unchecked}`,
 		)
 	})
 
@@ -224,21 +227,60 @@ describe('test_pinned_logic.report_text', () => {
 			has_runner: false,
 		}
 
-		expect(test_pinned_logic.report_text(report)).toBe(
-			`${one_unchecked}unchecked a.ts:3 — vitest is not installed to run its related tests\n`,
+		expect(printed(report)).toBe(
+			`unchecked 1 — vitest is not installed to run its related tests\n${one_unchecked}`,
 		)
 	})
 
 	it('prints only the counts when nothing is unpinned or unchecked', () => {
-		expect(test_pinned_logic.report_text(EMPTY_REPORT)).toBe('unpinned 0 · unchecked 0\n')
+		expect(printed(EMPTY_REPORT)).toBe('unpinned 0 · unchecked 0\n')
 	})
 
-	it('counts and lists a hunk a --first-unpinned run stopped before as unchecked', () => {
+	it('counts a hunk a --first-unpinned run stopped before as unchecked', () => {
 		const report = { ...EMPTY_REPORT, cut: [hunk({ file: 'a.ts', new_start: 3 })] }
 
-		expect(test_pinned_logic.report_text(report)).toBe(
-			`${one_unchecked}unchecked a.ts:3 — not probed: the run stopped at the first unpinned hunk\n`,
+		expect(printed(report)).toBe(
+			`unchecked 1 — not probed: the run stopped at the first unpinned hunk\n${one_unchecked}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#5188: a cap's overflow pushed the unpinned places and the note out of a `tail`.
+describe('test_pinned_logic.report_text in the verification-tail shape', () => {
+	const unpinned = { ...hunk({ file: 'a.ts', new_start: 3 }), is_green: true }
+	const over_cap = ['b.ts', 'c.ts', 'd.ts'].map((file) => hunk({ file, new_start: 1 }))
+	const report = { ...EMPTY_REPORT, unpinned: [unpinned], unchecked: over_cap }
+	const log = { path: 'josh-test-pinned-list.log' }
+
+	it('folds the unchecked places to one line per reason, below the unpinned places', () => {
+		expect(printed(report)).toBe(
+			`${GREEN_LINE}unchecked 3 — over the 1-hunk cap\nunpinned 1 · unchecked 3\n`,
+		)
+	})
+
+	it('puts the note and the full list path above the counts line, which ends it', () => {
+		const text = test_pinned_logic.report_text(
+			{ ...test_pinned_logic.report_parts(report), log },
+			'Pin each.\n',
+		)
+
+		expect(text.split('\n').slice(-4)).toEqual([
+			'Pin each.',
+			`full output: ${log.path}`,
+			'unpinned 1 · unchecked 3',
+			'',
+		])
+	})
+
+	it('prints the text and the note alone where no counts line was reached', () => {
+		expect(test_pinned_logic.report_text({ text: 'not run\n' }, 'Pin each.\n')).toBe(
+			'not run\nPin each.\n',
+		)
+	})
+
+	it('says whether any place was folded, so a full list is worth keeping', () => {
+		expect(test_pinned_logic.has_unchecked(report)).toBe(true)
+		expect(test_pinned_logic.has_unchecked({ ...report, unchecked: [] })).toBe(false)
 	})
 })
 
