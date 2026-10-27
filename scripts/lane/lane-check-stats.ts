@@ -4,7 +4,7 @@ import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // Which check a gate waited on: one period's per-check rows reduced to one row per check — median,
-// maximum, runs, reuses, no-ops and whole-suite fallbacks — printed last by `josh lane:stats`.
+// maximum, runs, reuses, no-ops and whole-suite fallbacks — printed by `josh lane:stats`.
 //
 // The whole gate is the first row, since its reuse started no check (joshuafolkken/kit#4397); the
 // checks follow in the order they first appear.
