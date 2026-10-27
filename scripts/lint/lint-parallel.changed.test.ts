@@ -32,10 +32,12 @@ const ABSOLUTE_CHANGED = path.join(ROOT, CHANGED)
 const WHOLE_TREE = '.'
 const FAILED = 1
 const CHANGED_ARGUMENTS = ['--changed']
+const PRETTIER_PASS = 'All matched files use Prettier code style!'
+const TIMING_LINE = /^lint timing — prettier \d+\.\d s · eslint \d+\.\d s\n$/u
 
 // The lint check reads only `all` and `exitCode` of execa's large result interface.
-function fake_result(exit_code: number): ExecaResult {
-	const result = { all: '', exitCode: exit_code }
+function fake_result(exit_code: number, all = ''): ExecaResult {
+	const result = { all, exitCode: exit_code }
 
 	return result as unknown as ExecaResult
 }
@@ -110,5 +112,51 @@ describe('lint_parallel.run_lint_command --changed', () => {
 		await lint_parallel.run_lint_command([])
 
 		for (const argv of linter_arguments()) expect(argv).toContain(WHOLE_TREE)
+	})
+})
+
+// joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line says which of the two
+// side-by-side tools is the long pole.
+describe('lint_parallel.run_lint_command timing', () => {
+	it('prints prettier and eslint seconds separately for a narrowed run', async () => {
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command(CHANGED_ARGUMENTS)
+
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
+	})
+
+	it('prints them for a whole-tree run in CI', async () => {
+		vi.stubEnv('CI', 'true')
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command(CHANGED_ARGUMENTS)
+
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
+	})
+
+	it('prints them on a failed run too', async () => {
+		mock_exit_codes(FAILED, 0)
+
+		await expect(lint_parallel.run_lint_command(CHANGED_ARGUMENTS)).resolves.toBe(FAILED)
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
+	})
+
+	it('starts the line on its own after an output with no final newline', async () => {
+		mocked_execa
+			.mockResolvedValueOnce(fake_result(0, PRETTIER_PASS))
+			.mockResolvedValueOnce(fake_result(0))
+
+		await lint_parallel.run_lint_command(CHANGED_ARGUMENTS)
+
+		expect(process.stdout.write).toHaveBeenCalledWith(`${PRETTIER_PASS}\n`)
+	})
+
+	it('prints nothing of the kind without the flag', async () => {
+		mock_exit_codes(0, 0)
+
+		await lint_parallel.run_lint_command([])
+
+		expect(process.stdout.write).not.toHaveBeenCalledWith(expect.stringMatching(TIMING_LINE))
 	})
 })
