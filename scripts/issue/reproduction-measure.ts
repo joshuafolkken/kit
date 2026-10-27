@@ -10,6 +10,8 @@ const REPRODUCTION_HEADING = '## 再現'
 // A backticked command span on a line that is not inside a fenced block. `- `grep …`` and a bare
 // `` `grep …` `` both match; prose with no backticked command does not.
 const COMMAND_SPAN = /`[^`]+`/u
+// A template placeholder span (a backticked `<...>`) the filer never replaced — not a command.
+const PLACEHOLDER_SPAN = /`<[^`]*>`/gu
 // A fenced code block boundary — a backtick or tilde fence. The actual output goes between an opening
 // and a closing fence, so a valid reproduction carries at least two of these lines. Tilde is accepted
 // so the template can show the block without nesting a backtick fence inside its own ```md example.
@@ -28,7 +30,7 @@ function has_command_line(lines: ReadonlyArray<string>): boolean {
 	const first_fence = lines.findIndex((line) => FENCE_LINE.test(line))
 	const open_lines = first_fence === -1 ? lines : lines.slice(0, first_fence)
 
-	return open_lines.some((line) => COMMAND_SPAN.test(line))
+	return open_lines.some((line) => COMMAND_SPAN.test(line.replaceAll(PLACEHOLDER_SPAN, '')))
 }
 
 // An opened-and-closed output block is two fence lines, so counting them is enough — a section with a
