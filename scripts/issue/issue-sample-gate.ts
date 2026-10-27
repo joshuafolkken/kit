@@ -1,4 +1,8 @@
+import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
 import { read_pull } from '#scripts/gh/git-gh-pr-read'
+import { git_gh_pr_too_large } from '#scripts/gh/git-gh-pr-too-large'
 import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
 import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { issue_cite } from './issue-cite'
@@ -51,6 +55,12 @@ type SampleWait =
 interface PullRead {
 	merged_at: string | undefined
 	closes: number | undefined
+}
+
+// The two fields `read_source` takes from a pull request, whichever endpoint served them.
+interface PullFields {
+	body?: string | null | undefined
+	merged_at?: string | null | undefined
 }
 
 // `closing` reads the pull request that closes an issue; one not merged yet reads as unmerged.
@@ -115,8 +125,28 @@ function problems(body: string): ReadonlyArray<string> {
 	return value === undefined || CONDITION_PATTERN.test(value) ? [] : [MALFORMED]
 }
 
+// joshuafolkken/kit#5241: GitHub refuses the single pull request read of a large one with 422 `too many
+// files changed`, and a closing number carries no branch to read the listing row by. The issue
+// endpoint serves the same pull request's body and merge time.
+async function read_as_issue(pr: number): Promise<PullFields> {
+	const json = await git_gh_exec.exec_gh_api({ path: git_gh_api_path.issue_api_path(String(pr)) })
+	const issue = git_gh_issue_rest.parse_rest_issue(json)
+
+	return { body: issue.body, merged_at: issue.pull_request?.merged_at }
+}
+
+async function read_fields(pr: number): Promise<PullFields> {
+	try {
+		return await read_pull(pr)
+	} catch (error) {
+		if (!git_gh_pr_too_large.is_too_many_files(error)) throw error
+
+		return await read_as_issue(pr)
+	}
+}
+
 async function read_source(pr: number): Promise<PullRead> {
-	const pull = await read_pull(pr)
+	const pull = await read_fields(pr)
 	const closes = git_closes_keyword.parse_closes_issue_number(pull.body ?? undefined)
 
 	return {
