@@ -266,20 +266,13 @@ describe('run_ship_cli.run — the preflight refusal beside red pre-detach check
 		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
 	})
 
+	// What the stop records beside the refusal: `run-ship-cli-pre-detach-stop.test.ts`.
 	it('prints the refusal after the pre-detach failures', async () => {
 		await run_ship_cli.run([TITLE, '--detach'])
 		const report = info_lines.join('\n')
 
 		expect(report.indexOf(PREFLIGHT_REFUSAL)).toBeGreaterThan(report.indexOf(TYPE_ERROR))
 		expect(report.endsWith('stopped at: === preflight ===')).toBe(true)
-	})
-
-	it('records the red pre-detach checks beside the unmet preconditions', async () => {
-		const record = vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
-
-		await run_ship_cli.run([TITLE, '--detach'])
-
-		expect(record.mock.calls[0]?.[0].preconditions).toStrictEqual([LIVE_EVIDENCE, 'pre-detach'])
 	})
 })
 

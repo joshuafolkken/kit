@@ -1,8 +1,7 @@
-import type { JoshResult } from '#scripts/josh/josh-run'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
-import { run_ship_pre_detach } from './run-ship-pre-detach'
+import { run_ship_pre_detach, type PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_stage, type Phase } from './run-ship-stage'
 
 // The pre-detach checks, timed into the lane ledger and marked on the event stream as a ship stage
@@ -21,8 +20,8 @@ async function emit_phase(issue: string, phase: Phase): Promise<void> {
 
 async function checks(
 	issue: string,
-	run: () => Promise<JoshResult> = run_ship_pre_detach.checks,
-): Promise<JoshResult> {
+	run: () => Promise<PreDetachResult> = run_ship_pre_detach.checks,
+): Promise<PreDetachResult> {
 	await emit_phase(issue, PHASE.START)
 	const started_ms = performance.now()
 	const result = await run()
