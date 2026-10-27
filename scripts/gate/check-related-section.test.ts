@@ -7,6 +7,10 @@ import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_section } from './check-related-section'
 
+// The live branch's lane:plan record never reaches these runs.
+vi.mock('./check-related-unplanned', () => ({
+	check_related_unplanned: { notice: async () => undefined },
+}))
 // No green record is read from or written over the live tree.
 vi.mock('./check-related-reuse', () => ({
 	check_related_reuse: {

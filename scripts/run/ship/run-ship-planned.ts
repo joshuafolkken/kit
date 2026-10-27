@@ -11,6 +11,8 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // files (a `cspell.config.yaml` term, a lock file) never count, and a branch with no plan record, or a
 // yielded one — a `fullrun` a person drove — passes as before.
 
+// The precondition's name in the preflight's answer and in a `stop` record's `preconditions`.
+const PRECONDITION = 'unplanned'
 const SEPARATOR = '/'
 const NON_CODE_PREFIXES = ['docs/', '.josh/']
 const CODE_EXTENSIONS = new Set(['.cjs', '.js', '.mjs', '.sh', '.svelte', '.ts'])
@@ -56,18 +58,35 @@ function held_claims(plan: LanePlan | undefined): ReadonlyArray<string> | undefi
 	return plan?.yielded === true ? undefined : plan?.paths
 }
 
-async function problems(): Promise<Array<string>> {
-	const issue = git_issue.branch_number(await git_branch.current())
-
-	if (issue === undefined) return []
-	const claims = held_claims(lane_plan.read(Number(issue), process.cwd()))
-
-	if (claims === undefined) return []
-	const files = unplanned_of(claims, await changed_paths.read_changed_paths(false))
-
-	return files.length === 0 ? [] : [problem_text(issue, claims, files)]
+// The branch's unplanned code files and the text naming the two ways out, `undefined` where none is —
+// read by the ship's preflight and, ahead of it, by `josh check:related` (joshuafolkken/kit#5203).
+interface Unplanned {
+	issue: number
+	files: ReadonlyArray<string>
+	text: string
 }
 
-const run_ship_planned = { problems, unplanned_of }
+async function unplanned(): Promise<Unplanned | undefined> {
+	const issue = git_issue.branch_number(await git_branch.current())
+
+	if (issue === undefined) return undefined
+	const claims = held_claims(lane_plan.read(Number(issue), process.cwd()))
+
+	if (claims === undefined) return undefined
+	const files = unplanned_of(claims, await changed_paths.read_changed_paths(false))
+
+	if (files.length === 0) return undefined
+
+	return { issue: Number(issue), files, text: problem_text(issue, claims, files) }
+}
+
+async function problems(): Promise<Array<string>> {
+	const found = await unplanned()
+
+	return found === undefined ? [] : [found.text]
+}
+
+const run_ship_planned = { PRECONDITION, problems, unplanned, unplanned_of }
 
 export { run_ship_planned }
+export type { Unplanned }

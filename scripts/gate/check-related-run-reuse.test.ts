@@ -5,6 +5,11 @@ import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import type { GateTree } from './gate-tree'
 
+// The live branch's lane:plan record never reaches these runs.
+vi.mock('./check-related-unplanned', () => ({
+	check_related_unplanned: { notice: async () => undefined },
+}))
+
 // joshuafolkken/kit#5156: a re-run after fixing one check ran the three that had passed over again.
 
 const ROOT = '/repo'
