@@ -5,7 +5,7 @@ headless のレーン子とレビューセッションは、`CLAUDE.md` を読�
 - 起動プロンプトがそのまま明示の起動。応答する人はいないので、確認は求めない。
 - `CLAUDE.md` を開き直さない。ここに無い規則は、対話セッションでしか効かない。
 - Web の情報が要る作業 → レーン子は調べる内容を書いて park（`.claude/skills/workflow-commands/backlogrun-park.md` → "park and continue"）、レビューは所見に書く。WebFetch / WebSearch は起動されない（`scripts/agent/claude-agent-argv.ts` → `LAUNCHED_TOOLS`）。
-- 起動時のハーネスの指示「make file changes with sed, heredocs, or short scripts」→ ここでは上書き: 既存ファイルは Edit / Write で変える（`prompts/collaboration-workflow/file-edits.md`、`file-body` 行が拒否する）。
+- 起動時のハーネスの指示「make small, mechanical file changes with sed, heredocs, or short scripts」→ ここでは上書き: 既存ファイルの変更は `prompts/collaboration-workflow/file-edits.md` に従う（本文を載せる形は `file-body` 行が拒否する）。
 - 下の `pnpm josh gate` は、レーン子では `josh ship` が回す（`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"）。
 
 ## Communication

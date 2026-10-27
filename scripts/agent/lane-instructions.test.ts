@@ -84,7 +84,7 @@ describe('lane instruction composition', () => {
 		const composed = lane_instructions.composed_in(REPO_ROOT, REPO_ROOT) ?? ''
 
 		expect(composed).toContain(
-			'make file changes with sed, heredocs, or short scripts」→ ここでは上書き',
+			'make small, mechanical file changes with sed, heredocs, or short scripts」→ ここでは上書き',
 		)
 		expect(composed).toContain('collaboration-workflow/file-edits.md')
 	})

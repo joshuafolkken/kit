@@ -1,0 +1,1 @@
+- rf:project-conventions | low | scripts/rules/reviewer-foreground.test.ts:66 | 2026-10-27 | #5154

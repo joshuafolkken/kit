@@ -3,6 +3,6 @@
 	"date": "2026-10-27",
 	"growth": {
 		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 258
+		"ai_cost.on_demand_bytes": 292
 	}
 }
