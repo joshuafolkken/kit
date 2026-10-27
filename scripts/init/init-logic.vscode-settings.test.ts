@@ -9,6 +9,12 @@ const SONARLINT_KEY = 'sonarlint.connectedMode.project'
 const ESLINT_VALIDATE_KEY = 'eslint.validate'
 const TERMINAL_LINE_HEIGHT_KEY = 'terminal.integrated.lineHeight'
 const KIT_VSCODE_SETTINGS_PATH = '.vscode/settings.json'
+const WATCHER_EXCLUDE_KEY = 'files.watcherExclude'
+const SEARCH_EXCLUDE_KEY = 'search.exclude'
+const JOSH_RUN_STATE_GLOB = '**/.git/josh/**'
+const JOSH_RUN_STATE_SEARCH_GLOB = '**/.git/josh'
+const ANY_DEPTH_BUILD_PREFIX = '**/build'
+const ROOT_BUILD_GLOB = 'build/**'
 
 describe('strip_kit_only_vscode_settings', () => {
 	it('removes kit-only keys while preserving other settings', () => {
@@ -34,6 +40,35 @@ describe('strip_kit_only_vscode_settings', () => {
 		const result = init_logic.strip_kit_only_vscode_settings_content(raw)
 
 		expect(result).not.toContain(TERMINAL_LINE_HEIGHT_KEY)
+	})
+})
+
+describe('kit .vscode/settings.json excludes', () => {
+	// joshuafolkken/kit#5141: josh's run records and build outputs churn during a backlogrun, so the
+	// watcher and search excludes reach consumers, who get the same directories.
+	it('distributes the watcher and search excludes for josh run records', () => {
+		const raw = readFileSync(KIT_VSCODE_SETTINGS_PATH, 'utf8')
+		const result = JSON.parse(init_logic.strip_kit_only_vscode_settings_content(raw)) as Record<
+			string,
+			Record<string, boolean>
+		>
+
+		expect(result[WATCHER_EXCLUDE_KEY]).toHaveProperty([JOSH_RUN_STATE_GLOB], true)
+		expect(result[SEARCH_EXCLUDE_KEY]).toHaveProperty([JOSH_RUN_STATE_SEARCH_GLOB], true)
+	})
+
+	// kit keeps source under `scripts/build/`, and a consumer may own `src/lib/build/`, so the build
+	// outputs are excluded at the root only, never at any depth.
+	it('anchors the build output excludes to the root', () => {
+		const raw = readFileSync(KIT_VSCODE_SETTINGS_PATH, 'utf8')
+		const result = JSON.parse(raw) as Record<string, Record<string, boolean>>
+		const globs = [
+			...Object.keys(result[WATCHER_EXCLUDE_KEY] ?? {}),
+			...Object.keys(result[SEARCH_EXCLUDE_KEY] ?? {}),
+		]
+
+		expect(globs.filter((glob) => glob.startsWith(ANY_DEPTH_BUILD_PREFIX))).toStrictEqual([])
+		expect(globs).toContain(ROOT_BUILD_GLOB)
 	})
 })
 
