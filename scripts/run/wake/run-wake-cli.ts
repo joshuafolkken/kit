@@ -405,6 +405,8 @@ async function loop(context: WakeContext, interval_ms: number): Promise<number> 
 	if (claimed.kind === 'running') return report(RUNNING_VERDICT)
 	if (claimed.kind === 'refused') return refuse_without_carry(claimed.carry_kind)
 
+	run_wake_session.keep_awake(process.pid)
+
 	const stop = await supervised(context, interval_ms, claimed.wake.profile ?? profile)
 
 	return await finish(stop, context, claimed.carry.started_at)
