@@ -40,6 +40,7 @@ interface FileRename {
 	file: string
 	text: string
 	count: number
+	is_taken: boolean
 }
 
 type Formatter = (files: ReadonlyArray<string>) => Promise<void>
@@ -101,28 +102,52 @@ async function write_all(
 	return 0
 }
 
+function file_refusal(files: ReadonlyArray<string>): number | undefined {
+	const missing = files.filter((file) => !existsSync(file))
+	if (missing.length > 0) return refuse('no such file', missing)
+	const unparsed = files.filter((file) => !SCRIPT_EXTENSIONS.has(path.extname(file)))
+
+	return unparsed.length > 0 ? refuse('not a TypeScript or JavaScript file', unparsed) : undefined
+}
+
+function files_where(
+	renames: ReadonlyArray<FileRename>,
+	is_match: (rename: FileRename) => boolean,
+): ReadonlyArray<string> {
+	return renames.filter((rename) => is_match(rename)).map((rename) => rename.file)
+}
+
+// The rename matches by spelling, so a file that already binds the new name could end up with one
+// binding shadowing or merging with another; it is refused rather than guessed at.
+function rename_refusal(renames: ReadonlyArray<FileRename>, new_name: string): number | undefined {
+	const untouched = files_where(renames, (rename) => rename.count === 0)
+	if (untouched.length > 0) return refuse('no replacement', untouched)
+	const taken = files_where(renames, (rename) => rename.is_taken)
+
+	return taken.length > 0 ? refuse(`\`${new_name}\` is already bound`, taken) : undefined
+}
+
 async function apply(
 	api: TypeScriptApi,
 	parsed: RenameArguments,
 	formatter: Formatter,
 ): Promise<number> {
-	const missing = parsed.files.filter((file) => !existsSync(file))
-	if (missing.length > 0) return refuse('no such file', missing)
-	const unparsed = parsed.files.filter((file) => !SCRIPT_EXTENSIONS.has(path.extname(file)))
-	if (unparsed.length > 0) return refuse('not a TypeScript or JavaScript file', unparsed)
+	const file_stop = file_refusal(parsed.files)
+	if (file_stop !== undefined) return file_stop
 	const renames = rename_all(api, parsed)
-	const untouched = renames.filter((rename) => rename.count === 0).map((rename) => rename.file)
-	if (untouched.length > 0) return refuse('no replacement', untouched)
 
-	return await write_all(renames, formatter)
+	return rename_refusal(renames, parsed.request.new_name) ?? (await write_all(renames, formatter))
 }
 
 // The edit hook's own formatter, one file at a time: each run rewrites the file the next may import.
-async function format_files(files: ReadonlyArray<string>): Promise<void> {
+async function format_files(
+	files: ReadonlyArray<string>,
+	format_one: typeof format_edited_payload = format_edited_payload,
+): Promise<void> {
 	for (const file of files) {
 		const payload = JSON.stringify({ tool_input: { file_path: path.resolve(file) } })
 		// eslint-disable-next-line no-await-in-loop -- formatters rewrite files the next run reads
-		const diagnostics = await format_edited_payload(payload, process.cwd())
+		const diagnostics = await format_one(payload, process.cwd())
 
 		if (diagnostics !== undefined) console.info(diagnostics)
 	}
@@ -147,7 +172,7 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv, typescript.default)
 }
 
-const rename_cli = { USAGE, run }
+const rename_cli = { USAGE, format_files, main, run }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/gate/gate-static-group.ts:43 | 2026-10-27 | #5215
+- rf:bug-risks | low | scripts/gate/gate-static-group.ts:43 | 2026-10-27 | #5215

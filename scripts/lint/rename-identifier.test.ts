@@ -52,6 +52,7 @@ describe('rename_identifier.rewrite — the PR #5221 rename', () => {
 		expect(rename_identifier.rewrite(ts, FILE, BEFORE, LEDGER_RENAME)).toStrictEqual({
 			text: AFTER,
 			count: 5,
+			is_taken: false,
 		})
 	})
 
@@ -69,6 +70,14 @@ describe('rename_identifier.rewrite — the PR #5221 rename', () => {
 		expect(renamed(text)).toBe(
 			'type Entry = typeof renamed.read\nconst line = `old ${renamed}`\nexport { renamed }\n',
 		)
+	})
+
+	it('reports a file that already binds the new name, but not one holding it as a key', () => {
+		const taken = 'const renamed = 1\nfunction read(old) { return old + renamed }\n'
+		const keyed = 'const old = 1\nconst value = { renamed: other.renamed }\n'
+
+		expect(rename_identifier.rewrite(ts, FILE, taken, BARE_RENAME).is_taken).toBe(true)
+		expect(rename_identifier.rewrite(ts, FILE, keyed, BARE_RENAME).is_taken).toBe(false)
 	})
 
 	it('counts nothing in a file without the identifier or the specifier', () => {
@@ -98,6 +107,12 @@ describe('rename_identifier.rewrite — leaves what is not a binding', () => {
 	it('keeps the key of a shorthand property and a shorthand destructuring', () => {
 		expect(renamed('const { old } = source\nconst value = { old }\n')).toBe(
 			'const { old: renamed } = source\nconst value = { old: renamed }\n',
+		)
+	})
+
+	it('renames an object rest element without a key', () => {
+		expect(renamed('const { a, ...old } = source\nuse(old)\n')).toBe(
+			'const { a, ...renamed } = source\nuse(renamed)\n',
 		)
 	})
 

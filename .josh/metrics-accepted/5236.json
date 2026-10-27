@@ -1,10 +1,9 @@
 {
-	"reason": "josh rename: new AST rename command and its tests (#5236)",
+	"reason": "josh rename: new rename-identifier/rename-cli scripts plus review round 1 fixes (rest element, new-name collision refusal) and their tests",
 	"date": "2026-10-27",
 	"growth": {
-		"scripts.code_lines": 266,
+		"scripts.code_lines": 292,
 		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 211,
-		"prose.long_paragraphs": 1
+		"ai_cost.on_demand_bytes": 211
 	}
 }

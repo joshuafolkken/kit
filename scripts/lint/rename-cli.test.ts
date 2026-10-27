@@ -54,6 +54,25 @@ describe('rename_cli.run — writes', () => {
 
 		expect(formatter).toHaveBeenCalledWith([file])
 	})
+
+	it('formats each file through the edit hook payload and prints what it could not fix', async () => {
+		const format_one = vi.fn(async () => 'unfixed')
+
+		await rename_cli.format_files(['a.ts'], format_one)
+
+		expect(format_one).toHaveBeenCalledWith(
+			JSON.stringify({ tool_input: { file_path: path.resolve('a.ts') } }),
+			process.cwd(),
+		)
+		expect(console.info).toHaveBeenCalledWith('unfixed')
+	})
+
+	it('sets the exit code from the run when called as the command', async () => {
+		await rename_cli.main(['old'])
+
+		expect(process.exitCode).toBe(FAILURE_EXIT_CODE)
+		process.exitCode = 0
+	})
 })
 
 describe('rename_cli.run — refuses', () => {
@@ -73,6 +92,16 @@ describe('rename_cli.run — refuses', () => {
 
 		expect(await rename_cli.run(['old', 'renamed', missing], ts, no_format)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(missing))
+	})
+})
+
+describe('rename_cli.run — refuses a file', () => {
+	it('names a file that already binds the new name, exits 1 and writes nothing', async () => {
+		const taken = file_with('taken.ts', `${TOUCHED}const renamed = 1\n`)
+
+		expect(await rename_cli.run(['old', 'renamed', taken], ts, no_format)).toBe(FAILURE_EXIT_CODE)
+		expect(readFileSync(taken, 'utf8')).toBe(`${TOUCHED}const renamed = 1\n`)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(taken))
 	})
 
 	it('names a file the TypeScript parser does not read whole and exits 1', async () => {

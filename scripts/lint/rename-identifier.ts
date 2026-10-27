@@ -22,9 +22,12 @@ interface Replacement {
 	text: string
 }
 
+// `is_taken`: the new name is already a binding here, so the rename could shadow or merge with it —
+// the rename matches by spelling, not by scope.
 interface RenameResult {
 	text: string
 	count: number
+	is_taken: boolean
 }
 
 // Calls whose first argument is a module specifier the test runner resolves like an import.
@@ -72,6 +75,7 @@ function keeps_key(api: TypeScriptApi, node: ts.Identifier): boolean {
 	return (
 		api.isBindingElement(parent) &&
 		parent.propertyName === undefined &&
+		parent.dotDotDotToken === undefined &&
 		api.isObjectBindingPattern(parent.parent)
 	)
 }
@@ -170,10 +174,16 @@ function rewrite(
 ): RenameResult {
 	const source = api.createSourceFile(file_name, text, api.ScriptTarget.Latest, true)
 	const replacements: Array<Replacement> = []
+	const existing: Array<Replacement> = []
 
 	collect(api, source, request, replacements)
+	collect(api, source, { old_name: request.new_name, new_name: request.new_name }, existing)
 
-	return { text: apply(text, replacements), count: replacements.length }
+	return {
+		text: apply(text, replacements),
+		count: replacements.length,
+		is_taken: existing.length > 0,
+	}
 }
 
 const rename_identifier = { rewrite }
