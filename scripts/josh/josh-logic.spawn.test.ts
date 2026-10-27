@@ -153,7 +153,6 @@ const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'check',
 	'cspell:dot',
 	'test:unit',
-	'test:related',
 	// joshuafolkken/kit#4516
 	'test:pinned',
 	// joshuafolkken/kit#3944
@@ -195,6 +194,13 @@ describe('josh_logic.run_command — the core budget a command reserves', () => 
 
 		await expect(josh_logic.run_command(TEST_CMD, [])).resolves.toBe(SPAWN_SUCCESS.exitCode)
 		expect(reservation).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#5135: the dispatch reserves before the related scope resolves, so it could
+	// only claim the whole width — `josh test:related` claims in its body instead.
+	it('declares no weight for test:related, which claims once its scope is known', () => {
+		expect(COMMAND_MAP['test:related']?.core_weight).toBeUndefined()
+		expect(COMMAND_MAP['test:related']?.is_unit_claim).toBeUndefined()
 	})
 
 	// One table of weights: a direct `josh lint` claims exactly what the gate's lint check claims.
