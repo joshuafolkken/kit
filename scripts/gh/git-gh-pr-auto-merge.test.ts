@@ -6,10 +6,14 @@ import {
 	FORK_REPO,
 	gh_api_routes,
 	PR_BRANCH,
+	pr_detail_path,
+	pr_lookup_path,
 	pr_routes,
 	REPO_NAME_PATH,
 	request_body,
 	rest_pull_page,
+	too_many_files_failure,
+	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import { forget_pr_numbers } from './git-gh-pr-read'
 
@@ -126,6 +130,44 @@ describe('git_gh_pr_auto_merge.pr_is_merged', () => {
 		)
 		stderr_spy.mockRestore()
 		vi.unstubAllEnvs()
+	})
+})
+
+// joshuafolkken/kit#5229: the listing row stands in for a detail refused as too many files changed.
+function too_large_routes(row: Record<string, unknown>): Record<string, GhApiAnswer> {
+	return pr_routes(
+		{},
+		{
+			[pr_lookup_path()]: rest_pull_page([row]),
+			[pr_detail_path()]: async () => {
+				throw too_many_files_failure()
+			},
+			[GRAPHQL_PATH]: '{}',
+		},
+	)
+}
+
+describe('git_gh_pr_auto_merge — a detail refused as too many files changed', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		forget_pr_numbers()
+	})
+
+	it('enables auto-merge on the listing row node', async () => {
+		mocked_api.mockImplementation(gh_api_routes(too_large_routes({ node_id: NODE_ID })))
+
+		await git_gh_pr_auto_merge.pr_enable_auto_merge(PR_BRANCH, PUSHED_SHA)
+		const requests = mocked_api.mock.calls.map(([request]) => request)
+
+		expect(request_body(find_request(requests, GRAPHQL_PATH))).toMatchObject({
+			variables: { id: NODE_ID },
+		})
+	})
+
+	it('reads a merged listing row as merged', async () => {
+		mocked_api.mockImplementation(gh_api_routes(too_large_routes({ merged_at: MERGED_AT })))
+
+		await expect(git_gh_pr_auto_merge.pr_is_merged(PR_BRANCH)).resolves.toBe(true)
 	})
 })
 

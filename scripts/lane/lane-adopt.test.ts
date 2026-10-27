@@ -1,3 +1,14 @@
+import { git_gh_exec } from '#scripts/gh/git-gh-exec'
+import {
+	gh_api_routes,
+	PR_BRANCH,
+	pr_detail_path,
+	pr_lookup_path,
+	PR_NUMBER,
+	rest_pull_page,
+	too_many_files_failure,
+} from '#scripts/gh/git-gh-pr-fixture'
+import { forget_pr_numbers } from '#scripts/gh/git-gh-pr-read'
 import type { IssueState } from '#scripts/issue/issue-state'
 import {
 	PROCESS_ALIVE,
@@ -20,6 +31,11 @@ const DIRTY_STATUS = ' M scripts/lane/lane-adopt.ts\n'
 const RECORD_EXISTS = 'a record exists'
 const OPEN_ISSUE: IssueState = { state: 'OPEN', labels: ['in-progress'], is_human_review: false }
 const NO_RECORDS: LaneRecords = new Map()
+const MERGED_AT = '2026-10-27T01:23:45Z'
+
+vi.mock('#scripts/gh/git-gh-exec', () => ({
+	git_gh_exec: { exec_gh_api: vi.fn() },
+}))
 
 const LANE: LaneInfo = {
 	issue: ISSUE,
@@ -171,5 +187,24 @@ describe('lane_adopt.adopt — a lane already recorded', () => {
 
 		expect(adoption).toStrictEqual({ kind: 'kept', state: 'running' })
 		expect(ports.record).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5229: the listing row stands in for a detail refused as too many files changed.
+describe('lane_adopt.read_pull_request — a detail too large to read', () => {
+	it('reads the state from the listing row', async () => {
+		forget_pr_numbers()
+		const routes = {
+			[pr_lookup_path()]: rest_pull_page([{ state: 'closed', merged_at: MERGED_AT }]),
+			[pr_detail_path()]: async (): Promise<string> => {
+				throw too_many_files_failure()
+			},
+		}
+
+		vi.mocked(git_gh_exec.exec_gh_api).mockImplementation(gh_api_routes(routes))
+
+		await expect(lane_adopt.read_pull_request(PR_BRANCH)).resolves.toStrictEqual({
+			pull: { number: PR_NUMBER, state: 'MERGED' },
+		})
 	})
 })
