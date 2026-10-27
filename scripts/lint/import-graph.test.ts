@@ -149,6 +149,31 @@ describe('import_graph.closure_hash', () => {
 	})
 })
 
+describe('import_graph.closure', () => {
+	it("names the project's files the imports reach, without the file itself or a package's", async () => {
+		const root = write_package_user()
+
+		for (const [name, content] of CHAIN) writeFileSync(path.join(root, name), content)
+		writeFileSync(path.join(root, TOP), `${TOP_SOURCE}import './${PACKAGE_USER}'\n`)
+		const graph = await graph_of(root)
+		const reached = graph.closure(path.join(root, TOP))
+
+		expect(reached.toSorted((left, right) => left.localeCompare(right))).toEqual(
+			['bottom.ts', 'middle.ts', TSCONFIG_NAME, PACKAGE_USER].map((file) => path.join(root, file)),
+		)
+	})
+})
+
+describe('import_graph.strings', () => {
+	it("reads each string literal and template span, a comment's text left out", async () => {
+		const source = "// runs comment.ts\nimport './a'\nspawn('cli.ts', [`${dir}/main.ts`, `x.ts`])\n"
+		const root = write_project([[TOP, source], TSCONFIG_FILE])
+		const graph = await graph_of(root)
+
+		expect(graph.strings(path.join(root, TOP))).toEqual(['./a', 'cli.ts', '', '/main.ts', 'x.ts'])
+	})
+})
+
 describe('import_graph.closure_hash — a package import', () => {
 	// The resolved path carries the installed version, so the package's content is never read.
 	it('names a package import by where it resolves rather than by its content', async () => {

@@ -7,7 +7,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_park } from '#scripts/issue/issue-park'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
@@ -339,7 +339,7 @@ async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>
 
 	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
 
-	await issue_sample_gate.prime([body])
+	await issue_sample_prime.prime([body])
 	const reason = issue_not_before.waiting_reason(body)
 
 	return reason === undefined ? NO_WAITS : [reason]

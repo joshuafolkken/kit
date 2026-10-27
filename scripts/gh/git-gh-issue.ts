@@ -68,7 +68,7 @@ const { issue_list } = git_gh_issue_list
 // rides along because the caller re-sorts explicitly rather than inheriting the listing's order, and
 // `body` because the ranking reads its causing-lane minutes — without it the display would order a
 // priority differently from the pickup (joshuafolkken/kit#4859). It adds no listing request, as
-// above; `backlog:plan`'s read now also hands the bodies to `issue_sample_gate.prime`, which reads
+// above; `backlog:plan`'s read now also hands the bodies to `issue_sample_prime.prime`, which reads
 // the pull requests they cite.
 async function issue_list_recent(limit: number): Promise<IssueListOutcome> {
 	return await issue_list({ json_fields: `${SUMMARY_FIELDS},body`, limit })

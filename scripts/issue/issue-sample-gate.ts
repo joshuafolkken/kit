@@ -1,12 +1,4 @@
-import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
-import { git_gh_exec } from '#scripts/gh/git-gh-exec'
-import { git_gh_issue_rest } from '#scripts/gh/git-gh-issue-rest'
-import { read_pull } from '#scripts/gh/git-gh-pr-read'
-import { git_gh_pr_too_large } from '#scripts/gh/git-gh-pr-too-large'
-import { git_closes_keyword } from '#scripts/git/git-closes-keyword'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
 import { issue_cite } from './issue-cite'
-import { issue_closing_pr } from './issue-closing-pr'
 import { markdown_section } from './markdown-section'
 
 // joshuafolkken/kit#4414: a follow-up measurement waits on samples, not on the calendar — a busy day
@@ -19,6 +11,10 @@ import { markdown_section } from './markdown-section'
 // the wait needs — when the pull request merged — is read ahead by `prime`, once per pull request per
 // process, wherever bodies first arrive. A body nobody primed reads as waiting: offering it early is
 // the defect this guards, and the next primed read releases it.
+//
+// joshuafolkken/kit#5220: the reads `prime` makes — the pull request and the lane ledger — live in
+// `issue-sample-prime.ts`, which hands this module the ledger's merges. The readers that only judge a
+// body import this module alone, so a change to the ledger's reading never reaches their suites.
 //
 // joshuafolkken/kit#5051: a lane files its measurement follow-up before its own pull request exists —
 // `josh ship` wants the deferral row first. So the condition may cite the issue instead (`CLOSING_FORMAT`),
@@ -57,27 +53,26 @@ interface PullRead {
 	closes: number | undefined
 }
 
-// The two fields `read_source` takes from a pull request, whichever endpoint served them.
-interface PullFields {
-	body?: string | null | undefined
-	merged_at?: string | null | undefined
+// One merge the lane ledger recorded, keyed by the issue its pull request closed.
+interface MergeSample {
+	at: string
+	issue: number
 }
 
-// `closing` reads the pull request that closes an issue; one not merged yet reads as unmerged.
-interface PrimePorts {
-	pull: (pr: number) => Promise<PullRead>
-	closing: (issue: number) => Promise<PullRead>
-	ledger_path: () => Promise<string | undefined>
-}
-
+// The ledger's merges as they read now; none until a prime has handed them over.
 interface LedgerState {
-	path: string | undefined
+	merges: () => ReadonlyArray<MergeSample>
 }
 
 // A cited number with no entry was never read. Keyed by `key_of`, as one number may be cited both ways.
 
 const pull_by_key = new Map<string, PullRead>()
-const ledger: LedgerState = { path: undefined }
+
+function no_merges(): ReadonlyArray<MergeSample> {
+	return []
+}
+
+const ledger: LedgerState = { merges: no_merges }
 
 function declared_value(body: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
@@ -125,69 +120,23 @@ function problems(body: string): ReadonlyArray<string> {
 	return value === undefined || CONDITION_PATTERN.test(value) ? [] : [MALFORMED]
 }
 
-// joshuafolkken/kit#5241: GitHub refuses the single pull request read of a large one with 422 `too many
-// files changed`, and a closing number carries no branch to read the listing row by. The issue
-// endpoint serves the same pull request's body and merge time.
-async function read_as_issue(pr: number): Promise<PullFields> {
-	const json = await git_gh_exec.exec_gh_api({ path: git_gh_api_path.issue_api_path(String(pr)) })
-	const issue = git_gh_issue_rest.parse_rest_issue(json)
-
-	return { body: issue.body, merged_at: issue.pull_request?.merged_at }
-}
-
-async function read_fields(pr: number): Promise<PullFields> {
-	try {
-		return await read_pull(pr)
-	} catch (error) {
-		if (!git_gh_pr_too_large.is_too_many_files(error)) throw error
-
-		return await read_as_issue(pr)
-	}
-}
-
-async function read_source(pr: number): Promise<PullRead> {
-	const pull = await read_fields(pr)
-	const closes = git_closes_keyword.parse_closes_issue_number(pull.body ?? undefined)
-
-	return {
-		merged_at: pull.merged_at ?? undefined,
-		closes: closes === undefined ? undefined : Number(closes),
-	}
-}
-
-// The merged pull request closing the issue; `closes` is the issue itself, whichever pull request it is.
-async function read_closing_source(issue: number): Promise<PullRead> {
-	const pr = await issue_closing_pr.read_closing_number(issue)
-
-	if (pr === undefined) return { merged_at: undefined, closes: issue }
-
-	const { merged_at } = await read_source(pr)
-
-	return { merged_at, closes: issue }
-}
-
-const DEFAULT_PORTS: PrimePorts = {
-	pull: read_source,
-	closing: read_closing_source,
-	ledger_path: lane_ledger.target,
-}
-
-// A failed read stays unread, so the next prime asks again.
-async function remember(condition: Condition, ports: PrimePorts): Promise<void> {
+// Keeps what a prime read for the condition; `undefined` — a failed read — leaves it unread.
+function record(condition: Condition, pull: PullRead | undefined): void {
 	const key = key_of(condition)
-	const read = condition.via === 'pull' ? ports.pull : ports.closing
 
-	try {
-		pull_by_key.set(key, await read(condition.cited))
-	} catch {
-		pull_by_key.delete(key)
-	}
+	if (pull === undefined) pull_by_key.delete(key)
+	else pull_by_key.set(key, pull)
+}
+
+function use_merges(merges: () => ReadonlyArray<MergeSample>): void {
+	ledger.merges = merges
 }
 
 function is_merge_known(condition: Condition): boolean {
 	return pull_by_key.get(key_of(condition))?.merged_at !== undefined
 }
 
+// The conditions the bodies declare whose pull request has not been read merged, one per key.
 function unread_of(bodies: ReadonlyArray<string | undefined>): Array<Condition> {
 	const unread = bodies
 		.map((body) => condition_of(body))
@@ -198,36 +147,11 @@ function unread_of(bodies: ReadonlyArray<string | undefined>): Array<Condition> 
 	return [...new Map(unread.map((condition) => [key_of(condition), condition])).values()]
 }
 
-// Reads ahead what the bodies' conditions need. Nothing is read for bodies that declare none.
-async function prime(
-	bodies: ReadonlyArray<string | undefined>,
-	ports: PrimePorts = DEFAULT_PORTS,
-): Promise<void> {
-	const unread = unread_of(bodies)
-
-	if (unread.length === 0) return
-
-	ledger.path = await ports.ledger_path()
-	await Promise.all(
-		unread.map(async (condition) => {
-			await remember(condition, ports)
-		}),
-	)
-}
-
 function merges_after({ merged_at, closes }: PullRead & { merged_at: string }): number {
-	if (ledger.path === undefined) return 0
-
 	const since = Date.parse(merged_at)
 
-	return lane_ledger
-		.read_entries(ledger.path)
-		.filter(
-			(entry) =>
-				entry.kind === lane_ledger.KIND.MERGE &&
-				entry.issue !== closes &&
-				Date.parse(entry.at) > since,
-		).length
+	return ledger.merges().filter((merge) => merge.issue !== closes && Date.parse(merge.at) > since)
+		.length
 }
 
 // What the body still waits on, or `undefined` when it declares nothing or has its samples.
@@ -268,7 +192,7 @@ function reason_of(wait: SampleWait): string {
 
 function reset(): void {
 	pull_by_key.clear()
-	ledger.path = undefined
+	ledger.merges = no_merges
 }
 
 const issue_sample_gate = {
@@ -276,14 +200,14 @@ const issue_sample_gate = {
 	CLOSING_FORMAT,
 	cited_number,
 	cited_via,
-	prime,
 	problems,
-	read_closing: read_closing_source,
-	read_source,
 	reason_of,
+	record,
 	reset,
+	unread_of,
+	use_merges,
 	wait_of,
 }
 
-export type { PrimePorts, SampleWait }
+export type { Condition, MergeSample, PullRead, SampleWait }
 export { issue_sample_gate }
