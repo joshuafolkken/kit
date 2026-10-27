@@ -3,6 +3,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_helpers } from '#scripts/gh/git-gh-helpers'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { git_branch } from '#scripts/git/git-branch'
 import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
 import {
@@ -256,6 +257,7 @@ async function rerun(branch_name: string, entries: ReadonlyArray<Judged>): Promi
 	)
 	await followup_failed_tests.record(
 		entries.flatMap(({ job, tests }) => (tests === undefined ? [] : { job: job.name, tests })),
+		git_branch.issue_from_branch(branch_name),
 	)
 	await rerun_runs([...new Set(jobs.map((job) => job.run_id))])
 	await await_rerun_registered(branch_name, jobs)

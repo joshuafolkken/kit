@@ -17,7 +17,12 @@ vi.mock('#scripts/git/changed-paths', () => ({
 }))
 
 vi.mock('#scripts/observations/observation-record', () => ({
-	observation_record: { record: vi.fn() },
+	observation_record: { assess: vi.fn() },
+	REFUSED_VERDICT: 'refused',
+}))
+
+vi.mock('#scripts/gh/git-gh-issue-write', () => ({
+	git_gh_issue_write: { issue_comment: vi.fn() },
 }))
 
 vi.mock(import('./followup-job-needs'), async (import_original) => {
@@ -30,15 +35,18 @@ const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_gh_exec } = await import('#scripts/gh/git-gh-exec')
 const { changed_paths } = await import('#scripts/git/changed-paths')
 const { observation_record } = await import('#scripts/observations/observation-record')
+const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
 const { followup_job_needs } = await import('./followup-job-needs')
 
 const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
 const api = vi.mocked(git_gh_exec.exec_gh_api)
 const read_changed = vi.mocked(changed_paths.read_changed_paths)
-const record = vi.mocked(observation_record.record)
+const assess = vi.mocked(observation_record.assess)
+const comment = vi.mocked(git_gh_issue_write.issue_comment)
 const read_graph = vi.mocked(followup_job_needs.read_graph)
 
 const BRANCH_NAME = '4813-lane'
+const SIGHTING = '- k:followup-unrelated-test-rerun | d1 | 2026-10-28 | a.test.ts | followup reran'
 const PR_NUMBER = 4811
 const RUN_ID = 40_117_183_013
 const OTHER_RUN_ID = 40_117_183_014
@@ -173,7 +181,8 @@ async function expect_no_rerun(): Promise<void> {
 beforeEach(() => {
 	fetch_checks.mockReset()
 	api.mockReset()
-	record.mockReset().mockResolvedValue({ verdict: 'refused', reason: 'not written in a test' })
+	assess.mockReset().mockResolvedValue({ verdict: 'ledger', earlier: [], line: SIGHTING })
+	comment.mockReset().mockResolvedValue('https://comment')
 	read_changed.mockReset().mockResolvedValue(['scripts/followup/followup-job-rerun.ts'])
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
@@ -190,7 +199,7 @@ describe('rerun_failed_jobs — a run whose only failures stopped after every st
 		expect(console.info).toHaveBeenCalledWith(
 			`🔁 Rerunning CI jobs that stopped after every step passed or failed only outside the change: ${DETECT_E2E_NAME}, ${PLAYWRIGHT_NAME}`,
 		)
-		expect(record).not.toHaveBeenCalled()
+		expect(assess).not.toHaveBeenCalled()
 	})
 
 	// GitHub refuses a rerun while the run is still going, and the gate fails on the first red check.
@@ -274,7 +283,7 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 		answer_actions({ jobs: [failed_unit(), DETECT_E2E], log: UNIT_LOG })
 
 		const names = await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)
-		const entry = record.mock.calls[0]?.[0].entry
+		const entry = assess.mock.calls[0]?.[0].entry
 
 		expect(names).toStrictEqual([UNIT_NAME, DETECT_E2E_NAME])
 		expect(rerun_paths()).toStrictEqual([`${ACTIONS}runs/${String(RUN_ID)}/rerun-failed-jobs`])
@@ -284,6 +293,7 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 		})
 		expect(entry?.where).toBe(OUTSIDE_TEST)
 		expect(entry?.what).toContain(FAILED_TEST)
+		expect(comment).toHaveBeenCalledWith('4813', expect.stringContaining(SIGHTING))
 	})
 
 	it.each([
@@ -302,13 +312,13 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 		answer_actions({ jobs: [failed_unit(run_attempt)], log })
 
 		await expect_no_rerun()
-		expect(record).not.toHaveBeenCalled()
+		expect(assess).not.toHaveBeenCalled()
 	})
 })
 
-describe('rerun_failed_jobs — an observation that cannot be written', () => {
+describe('rerun_failed_jobs — an observation that cannot be posted', () => {
 	it('still reruns the run', async () => {
-		record.mockRejectedValue(new Error('EACCES'))
+		comment.mockRejectedValue(new Error('HTTP 502'))
 		answer_checks([as_check(failed_unit())])
 		answer_actions({ jobs: [failed_unit()], log: UNIT_LOG })
 
@@ -337,7 +347,7 @@ describe('rerun_failed_jobs — a job red only for waiting on a job red outside 
 			CHECKS_NAME,
 		])
 		expect(read_graph).toHaveBeenCalledWith(WORKFLOW_PATH)
-		expect(record.mock.calls[0]?.[0].entry.what).toContain(`followup reran ${UNIT_NAME};`)
+		expect(assess.mock.calls[0]?.[0].entry.what).toContain(`followup reran ${UNIT_NAME};`)
 	})
 
 	it('does not rerun when it waits on no such job', async () => {
