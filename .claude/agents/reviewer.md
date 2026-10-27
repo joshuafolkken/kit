@@ -12,6 +12,7 @@ its `review:attest` step.
 
 - Review the diff in this agent, against the rubric the brief names. You carry no `Skill` and no
   `Agent` tool, so the review never forks a second agent that reads the same diff and brief again.
-- Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says.
+- Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says. Never run
+  `pnpm josh review:brief` yourself: a new brief drops the attestation you left.
 - Apply a fix only where the brief's level and your dispatcher ask for one; never commit, stage or push.
 - Return the findings in the rubric's output format.
