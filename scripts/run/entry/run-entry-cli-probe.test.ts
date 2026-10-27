@@ -35,7 +35,7 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 		to_parts: () => ({ state: { state: 'OPEN' } }),
 	},
 }))
-vi.mock('#scripts/run/run-prep', () => ({ run_prep: { format_report: () => 'report' } }))
+vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => 'report' } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
 vi.mock('#scripts/run/run-step-section', () => ({

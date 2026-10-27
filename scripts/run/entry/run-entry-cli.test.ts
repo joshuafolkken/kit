@@ -5,7 +5,9 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const gather_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
-const format_report_mock = vi.hoisted(() => vi.fn())
+const fit_mock = vi.hoisted(() =>
+	vi.fn<(parts: unknown, compose: (r: string) => string) => string>(),
+)
 const adopt_mock = vi.hoisted(() => vi.fn())
 const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_adopt_mock = vi.hoisted(() => vi.fn())
@@ -37,7 +39,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 vi.mock('#scripts/run/run-prep-cli', () => ({
 	run_prep_cli: { gather: gather_mock, to_parts: to_parts_mock },
 }))
-vi.mock('#scripts/run/run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
+vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: mark_mock } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({
 	run_event_plan: { emit_plan: emit_plan_mock },
@@ -104,7 +106,7 @@ beforeEach(() => {
 	is_child_mock.mockReset().mockReturnValue(false)
 	gather_mock.mockReset().mockResolvedValue(TRUSTED_READS)
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
-	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
+	fit_mock.mockReset().mockReturnValue(PREP_BODY)
 	reset_resume_mocks()
 	confirm_mock.mockReset().mockResolvedValue(true)
 	info_lines.length = 0
@@ -138,6 +140,10 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		])
 		// joshuafolkken/kit#3921: the entry's own read follows the report, saving its turn.
 		expect(print_section_mock).toHaveBeenCalledExactlyOnceWith(ENTRY_KEY)
+		// joshuafolkken/kit#5213: the parts are fitted to the Bash cap on the composite they print in.
+		expect(
+			fit_mock.mock.calls.map(([parts, compose]) => [parts, compose(PREP_BODY)]),
+		).toStrictEqual([[state_parts('OPEN'), info_lines[1]]])
 	})
 })
 
