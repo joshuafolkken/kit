@@ -29,7 +29,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
-		reference: ['[--verbose|--force|--no-unit]', 'developer', ['files', 'processes']],
+		reference: [
+			'[--verbose|--force|--no-unit|--static-group=<group>]',
+			'developer',
+			['files', 'processes'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '' },

@@ -17,7 +17,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh exports:unused` · `josh eu` | — | developer | none | Report exported namespace members nothing reads (kit only; a consumer project skips it) |
 | `josh format` · `josh f` | — | developer | files, processes | Format code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh format:edited` | — | automation | files, processes | Claude Code hook: format the file just edited (reads the tool call on stdin) |
-| `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
+| `josh gate` · `josh ga` | `[--verbose\|--force\|--no-unit\|--static-group=<group>]` | developer | files, processes | Run lint, type check, spell check and unit tests concurrently |
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
 | `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |

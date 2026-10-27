@@ -60,6 +60,7 @@ const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
 const BEHAVIOR_LABEL = 'behavior'
 const METRICS_LABEL = 'metrics'
 const EXPORTS_LABEL = 'exports'
+const LOCKFILE_LABEL = 'lockfile'
 
 // The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
 // (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
@@ -134,7 +135,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 	// The lockfile policy check is network-bound and usually instant: it verifies only when the
 	// lockfile or `pnpm-workspace.yaml` moved from the merge-base (joshuafolkken/kit#4090), so it
 	// reserves no core. Kit's own until a consumer's private-registry entries are known to verify.
-	{ label: 'lockfile', target: 'lockfile:policy', reserved_cores: 0, is_kit_only: true },
+	{ label: LOCKFILE_LABEL, target: 'lockfile:policy', reserved_cores: 0, is_kit_only: true },
 ]
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the
@@ -522,12 +523,14 @@ function format_gate_plan(
 }
 
 const gate_plan = {
+	BEHAVIOR_LABEL,
 	DIRECT_UNIT_CLAIM,
 	EXPORTS_LABEL,
 	FILES_PER_WORKER,
 	GATE_CHECKS,
 	KEEP_WHOLE_SUITE_FLAG,
 	LINT_LABEL,
+	LOCKFILE_LABEL,
 	MEASURED_CORES,
 	METRICS_LABEL,
 	RESERVED_CORES,
