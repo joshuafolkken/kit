@@ -1,5 +1,9 @@
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { git_gh_pr_read, read_pull as read_rest_pull } from '#scripts/gh/git-gh-pr-read'
+import {
+	git_gh_pr_read,
+	read_pull_or_listed,
+	read_pull as read_rest_pull,
+} from '#scripts/gh/git-gh-pr-read'
 import { git_gh_pr_rest } from '#scripts/gh/git-gh-pr-rest'
 import { git_command } from '#scripts/git/git-command'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
@@ -80,7 +84,10 @@ async function read_pull(branch: string): Promise<Pull | undefined> {
 
 	if (number === undefined) return undefined
 
-	const state = git_gh_pr_rest.to_pr_state(await read_rest_pull(number))
+	// The listing row carries `state` and `merged_at` too, so it stands in for a detail GitHub refuses
+	// as too many files changed.
+	const pull = await read_pull_or_listed(branch, number, read_rest_pull)
+	const state = git_gh_pr_rest.to_pr_state(pull)
 
 	return state === undefined ? undefined : { number, state }
 }
@@ -195,7 +202,7 @@ function facts_text(facts: LaneFacts): string {
 	].join(SEPARATOR)
 }
 
-const lane_adopt = { ADOPT_COMMAND, adopt, facts_text }
+const lane_adopt = { ADOPT_COMMAND, adopt, facts_text, read_pull_request }
 
 export { lane_adopt }
 export type { AdoptPorts, Adoption, LaneFacts }
