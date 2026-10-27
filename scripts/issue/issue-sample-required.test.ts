@@ -64,6 +64,17 @@ describe('issue_sample_required.problem — a measurement follow-up with no star
 	})
 })
 
+describe('issue_sample_required.problem — the wordings of the period after a cited change', () => {
+	it.each([
+		'- [ ] #4896 以後の中央値を記録する',
+		'- [ ] #4896 をマージした後の中央値を記録する',
+		'- [ ] #4896 を閉じるPRのマージ後の中央値を記録する',
+		'- [ ] `pnpm josh lane:stats` で #4896 の効果を測る',
+	])('refuses "%s" with no start condition', (criterion) => {
+		expect(issue_sample_required.problem(body_of(NO_FILES, [criterion]))).toBeDefined()
+	})
+})
+
 describe('issue_sample_required.problem — filings that pass as before', () => {
 	it.each([
 		['measures with its start condition', body_of(NO_FILES, [MEASURING], CONDITION)],
@@ -75,8 +86,11 @@ describe('issue_sample_required.problem — filings that pass as before', () => 
 		['investigates CI records citing no change', body_of(NO_FILES, [INVESTIGATING])],
 		[
 			'cites a change without reading the period after it',
-			body_of(NO_FILES, ['- [ ] #4896 の `actions/runs` で失敗した step を特定する']),
+			body_of(NO_FILES, ['- [ ] #4896 で失敗した step を特定する']),
 		],
+		...['- [ ] #4896 の後始末として残ったラベルを削除する', '- [ ] #4896 の後述の手順を直す'].map(
+			(criterion) => [`opens a word with "after": ${criterion}`, body_of(NO_FILES, [criterion])],
+		),
 		['measures #5101 with its start condition', body_of(NO_FILES, [SHARD_MEDIANS], CONDITION)],
 		['changes no file and reads no record', body_of(NO_FILES, [FOLLOW_UP])],
 		['changes files and reads no record', body_of(SOME_FILES, [CHANGING])],

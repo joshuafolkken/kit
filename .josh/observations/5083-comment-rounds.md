@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/security/sonar-config.test.ts:57 | 2026-10-27 | #5083
+- rf:comments | low | sonar-project.properties:15 | 2026-10-27 | #5083
