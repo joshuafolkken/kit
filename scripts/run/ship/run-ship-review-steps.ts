@@ -1,7 +1,6 @@
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
-import { lane_round_one_stats } from '#scripts/lane/lane-round-one-stats'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
@@ -221,7 +220,7 @@ function skipped(out: string): StepResult {
 async function record_outcome(issue: string, verdict: string, cause?: string): Promise<void> {
 	if (verdict === run_ship_review.VERDICT.INVALID || cause === CAUSE.CHECK) return
 
-	await lane_ledger.record_round_one({ issue: Number(issue), verdict })
+	await lane_ledger_write.record_round_one({ issue: Number(issue), verdict })
 }
 
 // Over every slot: either slot's fix moved the tree round 1 is gated on, so the round is `fixed`, and
@@ -274,7 +273,7 @@ async function round_one_stage(
 ): Promise<StepResult> {
 	// The reuse question `review:record --check` answers too (`review-round-reuse.ts`).
 	if (await review_round_reuse.is_reusable(Number(issue), is_stale)) {
-		await record_outcome(issue, lane_round_one_stats.REUSED)
+		await record_outcome(issue, lane_ledger_write.ROUND_ONE_REUSED)
 
 		return skipped(ROUND_ONE_RECORDED_NOTE)
 	}
@@ -363,7 +362,7 @@ async function round_two_stage(issue: string): Promise<StepResult> {
 	}
 
 	note(answer.reason)
-	await lane_ledger.record_round_two({
+	await lane_ledger_write.record_round_two({
 		issue: Number(issue),
 		verdict: answer.verdict,
 		code: answer.code,

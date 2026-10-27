@@ -35,8 +35,8 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 
 	return { review_interaction: { ...review_interaction, status: async () => undefined } }
 })
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_round_one: vi.fn(), record_round_two: record_round_two_mock },
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_round_one: vi.fn(), record_round_two: record_round_two_mock },
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')

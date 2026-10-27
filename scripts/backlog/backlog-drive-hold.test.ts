@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const record_held = vi.hoisted(() => vi.fn(async () => undefined))
 const record_released = vi.hoisted(() => vi.fn(async () => undefined))
 
-vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_held, record_released } }))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_held, record_released },
+}))
 
 const { backlog_drive } = await import('./backlog-drive')
 const { backlog_drive_fixture } = await import('./backlog-drive-fixture')

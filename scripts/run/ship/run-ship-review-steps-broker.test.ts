@@ -36,7 +36,9 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 vi.mock('#scripts/review/review-record', () => ({
 	review_record: { check: vi.fn(async () => ({ status: 'missing' })) },
 }))
-vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one: vi.fn() } }))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_round_one: vi.fn() },
+}))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 const { lane_session_broker } = await import('#scripts/lane/lane-session-broker')

@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { unit_count_file } from '#scripts/test/unit-count-file'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -81,17 +81,17 @@ describe('unit_file_reporter.report — the run end', () => {
 describe('unit_file_reporter.record_to_ledger — the ledger it writes', () => {
 	it('appends to the ledger of the repository the run is in', async () => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(REPOSITORY)
-		const record = vi.spyOn(lane_ledger, 'record_unit_files').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_unit_files').mockResolvedValue()
 		const files = [{ file: STALLED, elapsed_ms: SLOW_MS }]
 
 		await unit_file_reporter.record_to_ledger(files)
 
-		expect(record).toHaveBeenCalledWith(files, lane_ledger.target_of(REPOSITORY))
+		expect(record).toHaveBeenCalledWith(files, lane_ledger_write.target_of(REPOSITORY))
 	})
 
 	it('writes nothing, and does not throw, outside a repository', async () => {
 		vi.spyOn(run_carry, 'repository_directory').mockRejectedValue(new Error('not a git repository'))
-		const record = vi.spyOn(lane_ledger, 'record_unit_files').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_unit_files').mockResolvedValue()
 
 		await expect(unit_file_reporter.record_to_ledger([])).resolves.toBeUndefined()
 		expect(record).not.toHaveBeenCalled()

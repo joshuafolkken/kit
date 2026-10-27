@@ -5,7 +5,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { lane_baseline } from '#scripts/lane/lane-baseline'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_overrun } from '#scripts/lane/lane-overrun'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -225,7 +225,7 @@ async function put_merge_on_record(child: string, at: Date): Promise<void> {
 	if (await is_on_record(text)) return
 
 	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, text, at)
-	await lane_ledger.record_merge(Number(child), at)
+	await lane_ledger_write.record_merge(Number(child), at)
 }
 
 // A merged child counted and its lane closed, the merge put on the stream and in the ledger ahead of the

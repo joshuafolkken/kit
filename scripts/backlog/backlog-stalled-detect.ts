@@ -1,4 +1,5 @@
 import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { backlog_ready, type ReadyPorts } from './backlog-ready'
@@ -78,7 +79,7 @@ async function read_real_ledger(): Promise<ReadonlyArray<LedgerEntry>> {
 }
 
 async function real_mark_offerable(is_offerable: boolean): Promise<void> {
-	await lane_ledger.record_offerable(is_offerable)
+	await lane_ledger_write.record_offerable(is_offerable)
 }
 
 function ports_over(ready: ReadyPorts): DetectPorts {

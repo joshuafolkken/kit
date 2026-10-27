@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { Hunk } from './test-pinned-logic'
 import type { RedProbe } from './test-red-logic'
@@ -29,7 +29,7 @@ async function record(
 	probes: ReadonlyArray<ProbeTime>,
 	elapsed_ms: number,
 ): Promise<void> {
-	await lane_ledger.record_test_pinned({
+	await lane_ledger_write.record_test_pinned({
 		issue: issue_here(),
 		held,
 		probes: [...probes],
