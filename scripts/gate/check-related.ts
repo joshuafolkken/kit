@@ -1,15 +1,26 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { status_icons } from '#scripts/lib/status-icons'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
+import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
+import { verification_tail } from './verification-tail'
 
+const COMMAND = 'check:related'
+// One file per checkout beside the gate's own log, overwritten by each run.
+const LOG_PATH = stamp_file.stamp_path(
+	'josh-check-related-log-',
+	PROJECT_ROOT,
+	gate_log.GATE_LOG_SUFFIX,
+)
 const LINT_RELATED = 'lint:related'
+const LINT_PASSED = verification_tail.format_verdict(LINT_RELATED, [])
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
 	'test:related',
@@ -95,24 +106,48 @@ async function run_checks(
 	})
 }
 
-function report_result(result: CheckResult): void {
-	const status = result.exit_code === 0 ? 'passed' : `failed (${String(result.exit_code)})`
+function result_status(result: CheckResult): string {
+	return result.exit_code === 0 ? 'passed' : `failed (${String(result.exit_code)})`
+}
 
-	process.stdout.write(`\n=== ${result.command}: ${status} ===\n`)
+function report_result(result: CheckResult): void {
+	process.stdout.write(`\n=== ${result.command}: ${result_status(result)} ===\n`)
 	if (result.output.length === 0) return
 
 	process.stdout.write(result.output)
 	if (!result.output.endsWith('\n')) process.stdout.write('\n')
 }
 
+function failed_commands(results: ReadonlyArray<CheckResult>): ReadonlyArray<string> {
+	return results.filter((result) => result.exit_code !== 0).map((result) => result.command)
+}
+
 // The verdict is the last line, as every josh check prints it, so a reader of the tail sees every
 // check that failed rather than only the section that finished last (joshuafolkken/kit#4940).
 function checks_line(results: ReadonlyArray<CheckResult>): string {
-	const failed = results.filter((result) => result.exit_code !== 0).map((result) => result.command)
+	return verification_tail.format_verdict(COMMAND, failed_commands(results))
+}
 
-	if (failed.length === 0) return `${status_icons.PASS_ICON} check:related passed`
+// Each failed check and the command that reproduces it alone, above the log notice (joshuafolkken/kit#5162).
+function failure_lines(results: ReadonlyArray<CheckResult>): string {
+	const failed = failed_commands(results)
+	if (failed.length === 0) return ''
 
-	return `${status_icons.FAIL_ICON} check:related failed: ${failed.join(', ')}`
+	const lines = failed.map((command) =>
+		verification_tail.format_rerun(command, `pnpm josh ${command}`),
+	)
+
+	return `${COMMAND} — next:\n${lines.join('\n')}\n`
+}
+
+// Every check's whole output, kept where the console's size limit cannot reach, as `josh gate` keeps its own.
+function write_log(results: ReadonlyArray<CheckResult>, target: string): string | undefined {
+	const entries = results.map((result) => ({
+		header: `${result.command}: ${result_status(result)}`,
+		output: result.output,
+	}))
+
+	return gate_log.write_gate_log(entries, target)
 }
 
 function reused_suffix(reused: ReadonlySet<string>): string {
@@ -140,7 +175,8 @@ function metrics_notice(results: ReadonlyArray<CheckResult>): string | undefined
 
 	if (start === -1) return undefined
 
-	return output.slice(start).trimEnd()
+	// The lint's own verdict closes its section; it is not part of the notice.
+	return output.slice(start).replace(LINT_PASSED, '').trimEnd()
 }
 
 function report_reused(reused: ReadonlySet<string>): void {
@@ -149,24 +185,34 @@ function report_reused(reused: ReadonlySet<string>): void {
 	}
 }
 
-function report_results(
-	results: ReadonlyArray<CheckResult>,
-	pinned_notice?: string,
-	reused: ReadonlySet<string> = new Set(),
-): void {
-	report_reused(reused)
+interface ReportOptions {
+	pinned_notice?: string | undefined
+	reused?: ReadonlySet<string>
+	log_target?: string
+}
 
-	for (const result of results) {
-		report_result(result)
+function report_notices(notices: ReadonlyArray<string | undefined>): void {
+	for (const notice of notices) {
+		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
 	}
+}
+
+function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): void {
+	const { log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
+
+	report_reused(reused)
+	for (const result of results) report_result(result)
 
 	const metrics = metrics_notice(results)
 
-	for (const notice of [metrics, pinned_notice]) {
-		if (notice !== undefined) process.stdout.write(`\n${notice}\n`)
-	}
+	report_notices([metrics, pinned_notice])
 
-	process.stdout.write(`\n${verdict_line(results, metrics !== undefined, reused)}\n`)
+	const log = { path: write_log(results, log_target) }
+	const verdict = verdict_line(results, metrics !== undefined, reused)
+
+	process.stdout.write(
+		`\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`,
+	)
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -189,7 +235,10 @@ async function run_all(root?: string, execute: CheckExecutor = execute_check): P
 	)
 
 	await check_related_reuse.record(results, tree)
-	report_results(results, await check_related_pinned.notice(root, is_started), reused)
+	report_results(results, {
+		pinned_notice: await check_related_pinned.notice(root, is_started),
+		reused,
+	})
 
 	return exit_code(results)
 }

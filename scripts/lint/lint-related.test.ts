@@ -9,6 +9,7 @@ import { structural_checks } from '#scripts/gate/structural-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import { status_icons } from '#scripts/lib/status-icons'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
@@ -84,6 +85,18 @@ function written_output(): string {
 		.join('')
 }
 
+function expect_recorded(exit_code: number): void {
+	expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+		before: BEFORE_TREE,
+		exit_code,
+	})
+}
+
+// joshuafolkken/kit#5162: the verdict closes the run, naming the stage that failed.
+function last_line(): string | undefined {
+	return written_output().trimEnd().split('\n').at(-1)
+}
+
 function eslint_arguments(): ReadonlyArray<string> {
 	return mocked_scoped.mock.calls[0]?.[1] ?? []
 }
@@ -140,10 +153,7 @@ describe('lint_related.run_related_lint — the metrics growth notice', () => {
 		mocked_notice.mockResolvedValue(notice)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 })
 
@@ -159,10 +169,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 	it('hands the recorder that reading and this run’s verdict', async () => {
 		await lint_related.run_related_lint([])
 
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 
 	it('hands the recorder a failing verdict rather than deciding for it', async () => {
@@ -170,10 +177,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 
 		await lint_related.run_related_lint([])
 
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: FAILED,
-		})
+		expect_recorded(FAILED)
 	})
 
 	it('records the whole-tree fallback too, since it is a superset of the changed files', async () => {
@@ -182,10 +186,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 		await lint_related.run_related_lint([])
 
 		expect(mocked_whole_tree).toHaveBeenCalled()
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 })
 
@@ -210,6 +211,7 @@ describe('lint_related.run_related_lint', () => {
 		await lint_related.run_related_lint([])
 
 		expect(written_output()).toContain(CHANGED_SOURCE)
+		expect(last_line()).toBe(`${status_icons.PASS_ICON} josh lint:related passed`)
 	})
 
 	it('checks the whole tree when the changed files could not be read', async () => {
@@ -234,6 +236,7 @@ describe('lint_related.run_related_lint', () => {
 		mocked_scoped.mockResolvedValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: lint`)
 	})
 })
 
@@ -270,10 +273,7 @@ describe('lint_related.run_related_lint — the document checks', () => {
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
 		expect(mocked_unused).not.toHaveBeenCalled()
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: FAILED,
-		})
+		expect_recorded(FAILED)
 	})
 })
 
@@ -291,6 +291,7 @@ describe('lint_related.run_related_lint — the unused namespace member check', 
 		mocked_unused.mockResolvedValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: unused members`)
 	})
 })
 
@@ -311,10 +312,7 @@ describe('lint_related.run_related_lint — the structural checks', () => {
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
 		expect(mocked_byte_files).not.toHaveBeenCalled()
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: FAILED,
-		})
+		expect_recorded(FAILED)
 	})
 })
 
@@ -403,10 +401,7 @@ describe('lint_related.run_related_lint — nothing moved since the last green r
 
 		await lint_related.run_related_lint([])
 
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 
 	// No record (a red run writes none, `scoped-green.test.ts`), other inputs, or a moved configuration
