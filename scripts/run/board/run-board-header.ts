@@ -95,6 +95,9 @@ interface BoardHeader {
 	lane_limit?: number | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
 	found?: FoundOf | undefined
+	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a row its merge skipped for the switch hides the skip
+	// (joshuafolkken/kit#5132).
+	is_investigation_on: boolean
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined

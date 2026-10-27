@@ -40,6 +40,9 @@ const INVESTIGATING_PATTERN = /^investigating in pid (?<pid>\d+)(?: started (?<s
 const ENDED_PATTERN = /^#(?<issue>\d+) overrun: (?<result>.*)$/u
 const FAILED_PATTERN = /^#(?<issue>\d+) overrun investigation failed: /u
 
+// Why an overrun was skipped with the switch off (joshuafolkken/kit#5044); the board hides such a row's
+// minutes and skip while the switch stays off (joshuafolkken/kit#5132).
+const DISABLED_REASON = 'disabled (JOSH_LANE_INVESTIGATION is not on)'
 // The result an investigation that filed records; the board shows the filings themselves.
 const FILED_RESULT = 'filed'
 const NONE_LEAD = 'none: '
@@ -171,6 +174,7 @@ function parse(text: string): OverrunNote | undefined {
 }
 
 const run_event_overrun = {
+	DISABLED_REASON,
 	ended_text,
 	failed_text,
 	FILED_RESULT,

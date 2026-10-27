@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/test/test-related.ts:125 | 2026-10-27 | #5122
+- rf:performance | low | scripts/test/direct-importers.ts:140 | 2026-10-27 | #5122
+- rf:comments | low | docs/josh-commands.md:282 | 2026-10-27 | #5122
