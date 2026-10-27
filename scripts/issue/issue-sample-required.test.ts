@@ -67,6 +67,9 @@ describe('issue_sample_required.problem — a measurement follow-up with no star
 describe('issue_sample_required.problem — the wordings of the period after a cited change', () => {
 	it.each([
 		'- [ ] #4896 以後の中央値を記録する',
+		'- [ ] #4896後の中央値を記録する',
+		'- [ ] #4896 の後の中央値を記録する',
+		'- [ ] #4896 のマージ直後 5 マージの中央値を記録する',
 		'- [ ] #4896 をマージした後の中央値を記録する',
 		'- [ ] #4896 を閉じるPRのマージ後の中央値を記録する',
 		'- [ ] `pnpm josh lane:stats` で #4896 の効果を測る',
@@ -91,6 +94,13 @@ describe('issue_sample_required.problem — filings that pass as before', () => 
 		...['- [ ] #4896 の後始末として残ったラベルを削除する', '- [ ] #4896 の後述の手順を直す'].map(
 			(criterion) => [`opens a word with "after": ${criterion}`, body_of(NO_FILES, [criterion])],
 		),
+		...[
+			'- [ ] #4896 の調査の最後に結果を書く',
+			'- [ ] #4896 の前後の差分を説明する',
+			'- [ ] #4896 の手順を今後の手引きに書く',
+			'- [ ] #4896 の失敗の直後に出たログを貼る',
+			'- [ ] #4896 の後続 Issue を閉じる',
+		].map((criterion) => [`uses "after" in a word: ${criterion}`, body_of(NO_FILES, [criterion])]),
 		['measures #5101 with its start condition', body_of(NO_FILES, [SHARD_MEDIANS], CONDITION)],
 		['changes no file and reads no record', body_of(NO_FILES, [FOLLOW_UP])],
 		['changes files and reads no record', body_of(SOME_FILES, [CHANGING])],
