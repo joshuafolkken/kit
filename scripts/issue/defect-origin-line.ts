@@ -1,5 +1,6 @@
 import { issue_bug_label } from './issue-bug-label'
 import { markdown_section } from './markdown-section'
+import { reproduction_measure } from './reproduction-measure'
 
 // The origin line a bug body declares under its background heading: the merged pull request that
 // introduced the defect, or "unknown" with the reason it could not be traced. `defect:report` groups
@@ -12,6 +13,8 @@ const MISSING_ORIGIN =
 	'missing origin line: a `- 種別: 不具合` body declares `- 原因: #<PR>` or `- 原因: 不明（<reason>）` under ## 背景 (`pnpm josh defect:origin <N>` lists candidates)'
 const MALFORMED_ORIGIN =
 	'malformed origin line: write `- 原因: #<PR>` or `- 原因: 不明（<reason>）` with a non-empty reason'
+const MISSING_REPRODUCTION =
+	'missing reproduction: a `- 原因: 不明（<reason>）` bug carries ## 再現 with a backticked command and its actual output in a fenced block'
 
 type DefectOrigin = { kind: 'pr'; pr: number } | { kind: 'unknown'; reason: string }
 
@@ -54,7 +57,22 @@ function problem(body: string): string | undefined {
 	return lines.every((line) => parse_line(line) !== undefined) ? undefined : MALFORMED_ORIGIN
 }
 
-const defect_origin_line = { MALFORMED_ORIGIN, MISSING_ORIGIN, parse, problem }
+// An untraced bug owes the lane a way to see it: without a reproduction the run starts by
+// investigating. A traced one (a pull request origin) already names where to look, so it owes none.
+function reproduction_problem(body: string): string | undefined {
+	if (!issue_bug_label.is_bug_fix(body) || parse(body)?.kind !== 'unknown') return undefined
+
+	return reproduction_measure.has_command_output(body) ? undefined : MISSING_REPRODUCTION
+}
+
+const defect_origin_line = {
+	MALFORMED_ORIGIN,
+	MISSING_ORIGIN,
+	MISSING_REPRODUCTION,
+	parse,
+	problem,
+	reproduction_problem,
+}
 
 export type { DefectOrigin }
 export { defect_origin_line }

@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/hooks/pre-push-unit.ts:172 | 2026-10-27 | #5135
+- rf:bug-risks | low | scripts/test/test-pinned-reach.ts:58 | 2026-10-27 | #5135

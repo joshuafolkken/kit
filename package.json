@@ -1,14 +1,17 @@
 {
 	"version": "1.1784.0",
 	"name": "@joshuafolkken/kit",
-	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
+	"description": "Hand-off kit for Claude Code and Codex: backlogrun takes your GitHub Issues to tested, reviewed, merged PRs — in parallel and unattended — with the rules, hooks and checks that keep the agent on track",
 	"keywords": [
 		"ai",
+		"automation",
+		"backlogrun",
 		"claude-code",
 		"cli",
 		"codex",
 		"developer-tools",
 		"eslint",
+		"github-issues",
 		"prettier",
 		"toolkit",
 		"workflow"
