@@ -103,14 +103,17 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 // malformed or foreign file and answers `undefined`, so the two cases are indistinguishable here —
 // and the consequence of treating one as the other is a single 14-second scoped run, against the
 // alternative of briefing a review on a tree nothing has checked.
-function describes_tree(check: ScopedCheck, tree: Record<string, string>, base: string): boolean {
+function describes_tree(
+	check: ScopedCheck,
+	tree: Record<string, string>,
+	base: string,
+	is_overlooked: (relative: string) => boolean = run_record_path.is_run_record,
+): boolean {
 	const stamp = check.stamp.read(check.source)
 
 	return (
 		stamp !== undefined &&
-		file_map_stamp
-			.changed_since(stamp, tree)
-			.every((relative) => run_record_path.is_run_record(relative)) &&
+		file_map_stamp.changed_since(stamp, tree).every((relative) => is_overlooked(relative)) &&
 		file_map_stamp.describes_base(stamp, base) &&
 		check.stamp.describes_inputs(stamp)
 	)
@@ -166,7 +169,12 @@ function missing_scripts(
 }
 
 // The scripts whose green record still describes this tree, which `check:related` need not run again
-// (joshuafolkken/kit#5156). A tree with no answer reuses nothing, never reading silence as green.
+// (joshuafolkken/kit#5156). A tree with no answer reuses nothing, never reading silence as green. A
+// moved `.josh/` record counts here: the gate is not behind `check:related` to lint and test it.
+function overlooks_nothing(): boolean {
+	return false
+}
+
 function green_scripts(
 	tree: Record<string, string>,
 	base: string | undefined,
@@ -175,7 +183,7 @@ function green_scripts(
 	if (!is_answerable(tree, base)) return []
 
 	return checks_of(sources)
-		.filter((check) => describes_tree(check, tree, base))
+		.filter((check) => describes_tree(check, tree, base, overlooks_nothing))
 		.map((check) => check.script)
 }
 

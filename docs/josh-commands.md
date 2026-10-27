@@ -195,7 +195,7 @@ A check whose green record still describes the tree is not run: its section read
 
 `lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
 
-A record holds only for the same changed files, merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, so the end of the output still shows it.
+A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, so the end of the output still shows it.
 
 With that notice, the verdict line also says the ship's pre-detach stops on it and names `josh metrics --accept`.
 
