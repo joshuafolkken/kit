@@ -178,6 +178,18 @@ describe('lane_ledger_write.record_unplanned_notice', () => {
 	})
 })
 
+// joshuafolkken/kit#5234: a pre-push hook's miss reads back with its scope and reason kind.
+describe('lane_ledger_write.record_push_miss', () => {
+	it('writes the scope and the reason kind, read back as a push-miss entry', async () => {
+		const target = ledger(lane_ledger_write.KIND.PUSH_MISS)
+		const miss = { scope: 'related', reason: 'base-moved' } as const
+
+		await lane_ledger_write.record_push_miss(miss, target)
+
+		expect(lane_ledger.read_entries(target)).toMatchObject([{ kind: 'push-miss', ...miss }])
+	})
+})
+
 // joshuafolkken/kit#4451: a unit run's slowest files read back as one entry.
 describe('lane_ledger_write.record_unit_files', () => {
 	it('writes each file and its wall time, read back as a unit-files entry', async () => {

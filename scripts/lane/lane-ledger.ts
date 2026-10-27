@@ -77,6 +77,7 @@ export type {
 	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	PushMissEntry,
 	RoundOneEntry,
 	RoundTwoEntry,
 	SplitFiledEntry,
