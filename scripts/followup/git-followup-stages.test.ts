@@ -1,5 +1,6 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { time_followup_stage } from '#scripts/time-runtime/time-followup-stage'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 
@@ -105,6 +106,20 @@ describe('git_followup_stages.format_stages', () => {
 		drive_clock()
 
 		expect(git_followup_stages.format_stages(git_followup_stages.new_log())).toStrictEqual([])
+	})
+})
+
+// #5131: the completion row is printed outside the block, so the one row has to read back on its own.
+describe('git_followup_stages.format_stage', () => {
+	it('prints a lone row the stage reader reads back', () => {
+		const row = git_followup_stages.format_stage({
+			name: STAGE.completion,
+			duration_ms: FIRST_LAP_MS,
+		})
+
+		expect(time_followup_stage.read_stages(row)).toStrictEqual([
+			{ name: STAGE.completion, duration_ms: FIRST_LAP_MS },
+		])
 	})
 })
 

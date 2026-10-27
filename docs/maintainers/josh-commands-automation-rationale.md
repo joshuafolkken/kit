@@ -109,6 +109,9 @@ Fail when a pull request adds any new SonarCloud issue — of any type or severi
   row appears only on a run that merged, and a run that merged nothing prints `telegram` instead.
 - A row named `<a>-and-<b>` is a batch of requests sent together; `checks-wait` is never overlapped.
 - The total is the sum of the stages, not the wall clock — the post-merge tail sits outside it.
+- The completion tail's two reads (the next-issue list and the unreleased-merge count) go out
+  together and print one `completion` row after the total, above the completion lines; it is not in
+  the total.
 
 **AI-reviewer scan:** top-level PR comments from AI reviewers are scanned independently of CI status.
 
