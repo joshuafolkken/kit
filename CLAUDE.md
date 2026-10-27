@@ -73,4 +73,4 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 
 #### Mid-workflow stop notification (`confirmation`)
 
-The `Stop` hook sends it; send it yourself only when the hook refuses the stop: `prompts/collaboration-workflow/rule-delivery.md` → "stop-notify".
+The `Stop` hook sends it; send it yourself only when the hook refuses the stop: `prompts/collaboration-workflow/rule-delivery.md` → "stop-notify". A lane child stopping for a person → `pnpm josh run:park`, no notify: `backlogrun-park.md` → "park and continue".

@@ -23,6 +23,7 @@ const KIND = {
 	SPLIT_FILED: 'split-filed',
 	UNPLANNED_NOTICE: 'unplanned-notice',
 	LANE_STATE: 'lane-state',
+	PUSH_MISS: 'push-miss',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -256,6 +257,14 @@ const unplanned_notice_schema = z.object({
 	issue: z.number(),
 	files: z.array(z.string()),
 })
+// A pre-push hook that could not reuse the green gate record and ran the `whole` or the `related`
+// suite: `reason` is the miss's kind (`hook_gate_reuse.miss_kind`), never its sentence (joshuafolkken/kit#5234).
+const push_miss_schema = z.object({
+	kind: z.literal(KIND.PUSH_MISS),
+	at: z.string(),
+	scope: z.enum(['whole', 'related']),
+	reason: z.string(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -277,6 +286,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	split_filed_schema,
 	unplanned_notice_schema,
 	lane_state_schema,
+	push_miss_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -307,6 +317,8 @@ type UnplannedNoticeEntry = z.infer<typeof unplanned_notice_schema>
 type UnplannedNoticeRecord = Omit<UnplannedNoticeEntry, 'kind' | 'at'>
 type LaneStateChangeEntry = z.infer<typeof lane_state_schema>
 type LaneStateChangeRecord = Omit<LaneStateChangeEntry, 'kind' | 'at'>
+type PushMissEntry = z.infer<typeof push_miss_schema>
+type PushMissRecord = Omit<PushMissEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -338,6 +350,8 @@ export type {
 	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	PushMissEntry,
+	PushMissRecord,
 	RoundOneEntry,
 	RoundOneRecord,
 	RoundTwoEntry,

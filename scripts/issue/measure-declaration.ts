@@ -11,6 +11,10 @@ import { markdown_section } from './markdown-section'
 
 const BACKGROUND_HEADING = '## 背景'
 const PREFIX = '- 計測宣言:'
+// joshuafolkken/kit#5144: a follow-up whose value no one command prints (an Actions record, an external
+// service) says why under the same heading instead, so it files without a declaration.
+const ABSENT_PREFIX = '- 計測宣言なし:'
+const ABSENT = `${ABSENT_PREFIX} <理由>`
 const DECLARATION = `${PREFIX} \`<command>\` <=|<|>=|> <number>`
 const VALUE_PATTERN =
 	/^`(?<command>[^`\s][^`]*)`\s*(?<operator><=|>=|<|>)\s*(?<threshold>-?\d+(?:\.\d+)?)$/u
@@ -35,15 +39,27 @@ const COMPARE: Readonly<Record<Operator, (value: number, threshold: number) => b
 	'>': (value, threshold) => value > threshold,
 }
 
-// The value after the declaration under the background heading, or `undefined` when the body declares none.
-function declared_value(body: string): string | undefined {
+// The value after `prefix` under the background heading, or `undefined` when the body has no such line.
+function background_value(body: string, prefix: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')
 	const line = markdown_section
 		.unfenced_lines(background)
 		.map((text) => text.trim())
-		.find((text) => text.startsWith(PREFIX))
+		.find((text) => text.startsWith(prefix))
 
-	return line?.slice(PREFIX.length).trim()
+	return line?.slice(prefix.length).trim()
+}
+
+function declared_value(body: string): string | undefined {
+	return background_value(body, PREFIX)
+}
+
+// Whether the body writes a declaration line — a malformed one is `problems`' refusal — or says why it
+// has none; an empty reason says nothing.
+function is_stated(body: string): boolean {
+	if (declared_value(body) !== undefined) return true
+
+	return (background_value(body, ABSENT_PREFIX) ?? '').length > 0
 }
 
 function parsed(value: string): MeasureDeclaration | undefined {
@@ -89,7 +105,17 @@ function format(declaration: MeasureDeclaration): string {
 	return `\`${declaration.command}\` ${declaration.operator} ${String(declaration.threshold)}`
 }
 
-const measure_declaration = { DECLARATION, PREFIX, format, judge, parse, problems }
+const measure_declaration = {
+	ABSENT,
+	DECLARATION,
+	EXAMPLE,
+	PREFIX,
+	format,
+	is_stated,
+	judge,
+	parse,
+	problems,
+}
 
 export type { MeasureDeclaration, MeasureVerdict }
 export { measure_declaration }

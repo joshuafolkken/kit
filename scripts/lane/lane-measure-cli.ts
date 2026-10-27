@@ -6,29 +6,14 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_capacity } from './lane-capacity'
-import { lane_check_stats } from './lane-check-stats'
-import { lane_claim_stats } from './lane-claim-stats'
-import { lane_core_wait_stats } from './lane-core-wait-stats'
-import { lane_gap_stats } from './lane-gap-stats'
-import { lane_held_stats } from './lane-held-stats'
-import { lane_implement_stats } from './lane-implement-stats'
-import type { lane_ledger } from './lane-ledger'
 import { lane_net_read } from './lane-net-read'
-import { lane_paused_spans } from './lane-paused-spans'
-import { lane_process_stats } from './lane-process-stats'
-import { lane_round_one_stats } from './lane-round-one-stats'
-import { lane_round_two_stats } from './lane-round-two-stats'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
-import { lane_split_stats } from './lane-split-stats'
-import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
-import { lane_stop_stats } from './lane-stop-stats'
-import { lane_test_related_stats } from './lane-test-related-stats'
-import type { ToolCall } from './lane-transcript-calls'
+import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
 import { lane_value } from './lane-value'
+import { lane_value_cell, type CellAddress } from './lane-value-cell'
 
 // `josh lane:sample` / `josh lane:stats` — the lane-limit measurement; `josh lane:value` and
 // `josh lane:net` print one measurement each.
@@ -47,18 +32,26 @@ const SAMPLE_VERB = 'sample'
 const STATS_VERB = 'stats'
 const VALUE_VERB = 'value'
 const NET_VERB = 'net'
+// `lane:value cell` reads one `lane:stats` table cell rather than a named metric (joshuafolkken/kit#5144).
+const CELL_METRIC = 'cell'
 // A value keeps two decimals: seconds, minutes and per-lane counts read at that grain.
 const VALUE_DIGITS = 2
 const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
+	`       josh lane:value ${CELL_METRIC} --table <title> --row <label> --column <header> --since <instant>`,
 	'       josh lane:net <issue>',
 ].join('\n')
 
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
 const STATS_OPTIONS = { period: { type: 'string' }, limit: { type: 'string' } } as const
-const VALUE_OPTIONS = { since: { type: 'string' } } as const
+const VALUE_OPTIONS = {
+	since: { type: 'string' },
+	table: { type: 'string' },
+	row: { type: 'string' },
+	column: { type: 'string' },
+} as const
 
 function refuse(): number {
 	console.error(USAGE)
@@ -129,31 +122,16 @@ function transcript_directories(context: MeasureContext): ReadonlyArray<string> 
 	return cost_transcript.lane_transcript_directories(main_cwd, cost_transcript.home_directory())
 }
 
-interface PeriodRecords {
-	entries: ReturnType<typeof lane_ledger.read_entries>
-	events: ReadonlyArray<RunEvent>
-	calls: ReadonlyArray<ToolCall>
-}
-
-// The tables under the period's row, in the order `lane:stats` prints them.
-function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
-	return [
-		lane_stage_stats.table(entries, window),
-		lane_implement_stats.table(calls, window, lane_paused_spans.by_lane(entries)),
-		lane_stop_stats.table(entries, window, events),
-		lane_gap_stats.table(entries, window, events),
-		lane_round_one_stats.table(entries, window),
-		lane_round_two_stats.table(entries, window),
-		lane_split_stats.table(entries, window),
-		lane_held_stats.table(entries, window),
-		lane_core_wait_stats.table(entries, window),
-		lane_process_stats.table(entries, window),
-		lane_check_stats.table(entries, window),
-		lane_claim_stats.table(entries, window),
-		lane_test_related_stats.table(entries, window),
-		lane_test_related_stats.trigger_table(entries, window),
-		lane_transcript_stats.table(calls, window),
-	]
+// The whole ledger, every run event and the window's lane calls — what the `lane:stats` tables read.
+async function period_records(
+	context: MeasureContext,
+	window: StatsWindow,
+): Promise<PeriodRecords> {
+	return {
+		entries: await lane_net_read.read_ledger(context),
+		events: await lane_net_read.read_events(context),
+		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
+	}
 }
 
 async function stats_command(
@@ -167,15 +145,11 @@ async function stats_command(
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
 	const label = { limit: await limit_label(values.limit), period_days }
-	const entries = await lane_net_read.read_ledger(context)
-	const row = lane_stats.row(entries, window, label)
-	const records = {
-		entries,
-		events: await lane_net_read.read_events(context),
-		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
-	}
+	const records = await period_records(context, window)
+	const row = lane_stats.row(records.entries, window, label)
+	const tables = lane_stats_tables.tables_of(records, window)
 
-	console.info([`${lane_stats.header()}\n${row}`, ...tables_of(records, window)].join('\n\n'))
+	console.info([`${lane_stats.header()}\n${row}`, ...tables].join('\n\n'))
 
 	return 0
 }
@@ -183,6 +157,13 @@ async function stats_command(
 interface ValueRequest {
 	metric: string
 	since_ms: number
+	address?: CellAddress
+}
+
+interface AddressFlags {
+	table?: string | undefined
+	row?: string | undefined
+	column?: string | undefined
 }
 
 function since_of(text = ''): number | undefined {
@@ -191,12 +172,20 @@ function since_of(text = ''): number | undefined {
 	return Number.isNaN(since_ms) ? undefined : since_ms
 }
 
+function is_known(name: string): boolean {
+	return name === CELL_METRIC || lane_value.is_metric(name)
+}
+
 function metric_of(positionals: ReadonlyArray<string>): string | undefined {
 	const [name] = positionals
 
-	return name !== undefined && positionals.length === 1 && lane_value.is_metric(name)
-		? name
-		: undefined
+	return name !== undefined && positionals.length === 1 && is_known(name) ? name : undefined
+}
+
+function address_of({ table, row, column }: AddressFlags): CellAddress | undefined {
+	return table === undefined || row === undefined || column === undefined
+		? undefined
+		: { table, row, column }
 }
 
 function request_of(
@@ -206,13 +195,20 @@ function request_of(
 	return metric === undefined || since_ms === undefined ? undefined : { metric, since_ms }
 }
 
-// One known metric and a readable `--since` instant, or `undefined` for a refusal.
+// One known metric and a readable `--since` instant — `cell` with its whole address — or `undefined`
+// for a refusal.
 function value_request(rest: ReadonlyArray<string>): ValueRequest | undefined {
 	const parsed = cli_flags.arguments_of(rest, VALUE_OPTIONS)
 
 	if (parsed === undefined) return undefined
 
-	return request_of(metric_of(parsed.positionals), since_of(parsed.values.since))
+	const request = request_of(metric_of(parsed.positionals), since_of(parsed.values.since))
+
+	if (request?.metric !== CELL_METRIC) return request
+
+	const address = address_of(parsed.values)
+
+	return address === undefined ? undefined : { ...request, address }
 }
 
 // The value alone on its line, so a measurement declaration reads it as the output's last line; a
@@ -221,7 +217,9 @@ function print_value(request: ValueRequest, measured: number | undefined): numbe
 	if (measured === undefined) {
 		const since = new Date(request.since_ms).toISOString()
 
-		console.error(`josh lane:value ${request.metric}: no sample since ${since}`)
+		const missing = request.address === undefined ? 'no sample' : 'no single numeric cell'
+
+		console.error(`josh lane:value ${request.metric}: ${missing} since ${since}`)
 
 		return FAILURE_EXIT_CODE
 	}
@@ -229,6 +227,17 @@ function print_value(request: ValueRequest, measured: number | undefined): numbe
 	console.info(measured.toFixed(VALUE_DIGITS))
 
 	return 0
+}
+
+// The addressed cell of the tables `lane:stats` would print for `window`.
+async function cell_value(
+	address: CellAddress,
+	window: StatsWindow,
+	context: MeasureContext,
+): Promise<number | undefined> {
+	const tables = lane_stats_tables.tables_of(await period_records(context, window), window)
+
+	return lane_value_cell.value(tables, address)
 }
 
 async function value_command(
@@ -240,6 +249,11 @@ async function value_command(
 	if (request === undefined) return refuse()
 
 	const window = { since_ms: request.since_ms, until_ms: context.now_ms ?? Date.now() }
+
+	if (request.address !== undefined) {
+		return print_value(request, await cell_value(request.address, window, context))
+	}
+
 	const records = {
 		entries: await lane_net_read.read_ledger(context),
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),

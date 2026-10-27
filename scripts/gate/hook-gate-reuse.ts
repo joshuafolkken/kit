@@ -103,6 +103,12 @@ interface HookReuse {
 	source?: string | undefined
 }
 
+const ARGUMENTS_MISS = 'arguments were passed to the hook'
+
+function force_miss(force_environment: string): string {
+	return `${force_environment} is set`
+}
+
 // The stamp rather than a boolean, for the same reason `gate_skip.gate_reuse` hands one back: the
 // caller prints `taken_at`, and a record that does not describe this tree has no timestamp worth
 // printing. A refusal carries its reason instead.
@@ -111,11 +117,21 @@ interface HookReuse {
 // asked for that run rather than for a recorded result about a whole tree, and a hook's own line passes
 // none, so this costs it nothing.
 function hook_reuse(input: HookReuse): GateReuse {
-	if (input.extra_arguments.length > 0) return { miss: 'arguments were passed to the hook' }
-	if (is_force_requested(input.force_env)) return { miss: `${input.force_env} is set` }
+	if (input.extra_arguments.length > 0) return { miss: ARGUMENTS_MISS }
+	if (is_force_requested(input.force_env)) return { miss: force_miss(input.force_env) }
 	if (!input.is_tree_carried) return { miss: input.carry_miss }
 
 	return gate_skip.gate_reuse(input.tree.files, input.tree.base, input.source)
+}
+
+// joshuafolkken/kit#5234: the kind of a refusal `hook_reuse` answered, the hook's own three refusals
+// told apart before the gate's, so a ledger counts each without a second wording of the sentences.
+function miss_kind(miss: string, input: Pick<HookReuse, 'carry_miss' | 'force_env'>): string {
+	if (miss === ARGUMENTS_MISS) return 'arguments'
+	if (miss === force_miss(input.force_env)) return 'forced'
+	if (miss === input.carry_miss) return 'tree-not-carried'
+
+	return gate_skip.miss_kind(miss)
 }
 
 const hook_gate_reuse = {
@@ -124,6 +140,7 @@ const hook_gate_reuse = {
 	is_force_requested,
 	is_index_matching_worktree,
 	is_worktree_clean,
+	miss_kind,
 	read_status_lines,
 }
 

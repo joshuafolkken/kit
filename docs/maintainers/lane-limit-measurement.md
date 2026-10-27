@@ -320,6 +320,11 @@ gate median ([#4397](https://github.com/joshuafolkken/kit/issues/4397)).
 A unit leg that ran the whole suite carries `fallback`, the reason's stable kind read off the line
 `test:related` printed (`related_scope.fallback_kind`). A table under it counts the fallbacks by kind.
 
+A pre-push hook that could not reuse the green record writes a `push-miss` entry
+(`scripts/hooks/pre-push-unit.ts`, the kind from `hook_gate_reuse.miss_kind`); the same table counts it
+as `pre-push <scope>: <kind>`, so its rows outnumber the checks table's `fallback` column
+([#5234](https://github.com/joshuafolkken/kit/issues/5234)).
+
 **A reused check is counted, never timed** — it started no process, so its zero would pull the median
 toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
 before the field existed contributes no check row.
