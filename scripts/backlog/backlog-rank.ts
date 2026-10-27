@@ -85,12 +85,28 @@ interface OfferInput {
 	declared?: Declared
 	// The issues' lane state records; a clash with a paused holder says so. Absent, none is named.
 	lanes?: LaneRecords
+	// The keys of the issues that gave their lane back (`lane-yield.ts`). Absent, none did.
+	yielded?: ReadonlySet<string>
+}
+
+// A yielded issue ahead of the rank: its lane was taken from it, so it takes the first free one
+// once its holder ends rather than queueing behind the pool (joshuafolkken/kit#5107). While the
+// holder runs, its kept plan still withholds it in the separation. It goes ahead of a `run:solo`
+// issue too: the solo gate sees it first.
+function yielded_first(
+	ranked: ReadonlyArray<EpicChild>,
+	yielded: ReadonlySet<string>,
+): Array<EpicChild> {
+	return [
+		...ranked.filter((child) => is_in(child, yielded)),
+		...ranked.filter((child) => !is_in(child, yielded)),
+	]
 }
 
 // The overlap separation runs before the cap, for the reason the gate does: the cap only ever
 // removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
-	const ranked = rank(input.candidates, input.pool)
+	const ranked = yielded_first(rank(input.candidates, input.pool), input.yielded ?? new Set())
 	const { read, repo, lanes } = input
 	const gated = epic_solo.select(ranked, read, repo)
 	const separated = backlog_overlap.separate(gated, input.declared ?? new Map(), {
@@ -106,6 +122,7 @@ interface GateScope {
 	standalone: ReadonlySet<string>
 	declared: Declared
 	lanes?: LaneRecords
+	yielded?: ReadonlySet<string>
 }
 
 // `backlog:next`'s gate: `epic_solo.gate` with this selection in place of its bare one.
