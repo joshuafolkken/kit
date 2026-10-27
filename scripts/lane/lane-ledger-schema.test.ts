@@ -6,6 +6,22 @@ import { lane_ledger_schema } from './lane-ledger-schema'
 const { KIND, entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
 
+// joshuafolkken/kit#5078
+describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
+	it('parses a probe whose test file count is left out', () => {
+		const run = {
+			kind: KIND.TEST_PINNED,
+			at: AT,
+			issue: 5078,
+			held: 2,
+			probes: [{ file: 'scripts/a.ts', elapsed_ms: 5 }],
+			elapsed_ms: 9,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 describe('lane_ledger_schema.entry_schema', () => {
 	it('parses a test-related run with its test file count left out', () => {
 		const run = {

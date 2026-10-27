@@ -18,6 +18,7 @@ const BREAKDOWN: Breakdown = {
 	slept_ms: 0,
 	waits: [],
 	implement: [{ from_ms: IMPLEMENT_FROM, to_ms: IMPLEMENT_TO }],
+	pre_detach: [],
 }
 
 interface CallShape {

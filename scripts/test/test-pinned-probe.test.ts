@@ -3,6 +3,7 @@ import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-f
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { test_pinned } from './test-pinned'
 import { test_pinned_fixture } from './test-pinned-fixture'
+import { test_pinned_ledger } from './test-pinned-ledger'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_red } from './test-red'
@@ -59,6 +60,13 @@ async function run_locations(): Promise<Array<string>> {
 	return report.unpinned.map((hunk) => test_pinned_logic.location(hunk))
 }
 
+// The unpinned places the cache alone answers, `undefined` when a hunk has no verdict there.
+async function held_locations(): Promise<Array<string> | undefined> {
+	const report = await test_pinned.held_report(test_pinned_logic.DEFAULT_MAX_HUNKS)
+
+	return report?.unpinned.map((hunk) => test_pinned_logic.location(hunk))
+}
+
 // The selection each probe ran with: `related <file>` over every reaching test, or `run <tests>`.
 function selections_of(runs: MockInstance<typeof test_red.probe_in>): Array<Array<string>> {
 	return runs.mock.calls.map(([, selection]) => selection.slice(0, 2))
@@ -81,6 +89,29 @@ describe('test_pinned.run stopped after its first verdict', () => {
 
 			expect(await run_locations()).toEqual([UNPINNED_HUNK])
 			expect(runs).toHaveBeenCalledTimes(1)
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5078: a run's probes are timed into one ledger row, and a later read of the same
+// tree answers from the cache alone.
+describe('test_pinned.run timed into the ledger', () => {
+	it(
+		'records one row with a time per probe, after which held_report answers without a probe',
+		async () => {
+			await build_with_graph()
+			const row = vi.spyOn(test_pinned_ledger, 'record')
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			expect(await held_locations()).toBeUndefined()
+			await run_locations()
+			const [held, times] = row.mock.calls[0] ?? []
+
+			expect([held, times?.length]).toEqual([0, runs.mock.calls.length])
+			runs.mockClear()
+			expect(await held_locations()).toEqual([UNPINNED_HUNK])
+			expect(runs).not.toHaveBeenCalled()
 		},
 		RUN_TIMEOUT,
 	)

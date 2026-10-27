@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
+import { test_pinned_ledger, type ProbeTime } from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_red } from './test-red'
@@ -56,32 +57,46 @@ async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promis
 	}
 }
 
+// What every lane of one run shares: its workers per tree, the caller's hand-off and the probes' times.
+interface Lane {
+	workers: number
+	on_verdict: OnVerdict
+	times: Array<ProbeTime>
+}
+
+async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
+	const started = Date.now()
+	const verdict = await verdict_of(tree, probe, lane.workers)
+
+	lane.times.push(test_pinned_ledger.time_of(probe.hunk, verdict, Date.now() - started))
+
+	return verdict
+}
+
 // One hunk at a time within a lane: its hunks share the lane's tree (`test-pinned-pool.ts`).
 async function verdicts_in(
 	tree: BaseTree,
 	probes: ReadonlyArray<Probe>,
-	workers: number,
-	on_verdict: OnVerdict,
+	lane: Lane,
 ): Promise<Array<RedProbe>> {
 	const verdicts: Array<RedProbe> = []
 
 	for (const probe of probes) {
 		// eslint-disable-next-line no-await-in-loop -- the hunks share one tree, so each revert waits for the last restore
-		const verdict = await verdict_of(tree, probe, workers)
+		const verdict = await timed_verdict(tree, probe, lane)
 
 		// eslint-disable-next-line no-await-in-loop -- stored before the next hunk runs, so a stopped run keeps it
-		await on_verdict(probe.index, verdict)
+		await lane.on_verdict(probe.index, verdict)
 		verdicts.push(verdict)
 	}
 
 	return verdicts
 }
 
-// The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
-async function checked_on(
+async function pooled(
 	paths: ReadonlyArray<string>,
 	probes: ReadonlyArray<Probe>,
-	on_verdict: OnVerdict,
+	lane: Omit<Lane, 'workers'>,
 ): Promise<Array<RedProbe>> {
 	if (probes.length === 0) return []
 	const plan = test_pinned_pool.lane_plan(probes.length, await test_unit_guard.vitest_share([]))
@@ -93,9 +108,26 @@ async function checked_on(
 			await base_tree.with_tree(TREE_PREFIX, HEAD, async (tree) => {
 				await base_tree.copy_in(tree.tree, paths)
 
-				return await verdicts_in(tree, group, plan.workers, on_verdict)
+				return await verdicts_in(tree, group, { ...lane, workers: plan.workers })
 			}),
 	)
+}
+
+// The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
+// The run's ledger row counts the `held` hunks the cache answered beside the probed ones' times.
+async function checked_on(
+	paths: ReadonlyArray<string>,
+	probes: ReadonlyArray<Probe>,
+	on_verdict: OnVerdict,
+	held = 0,
+): Promise<Array<RedProbe>> {
+	const started = Date.now()
+	const times: Array<ProbeTime> = []
+	const verdicts = await pooled(paths, probes, { on_verdict, times })
+
+	await test_pinned_ledger.record(held, times, Date.now() - started)
+
+	return verdicts
 }
 
 const test_pinned_probe = { checked_on }

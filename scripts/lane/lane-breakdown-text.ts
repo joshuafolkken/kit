@@ -1,5 +1,7 @@
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown-implement'
+import { lane_breakdown_pinned } from './lane-breakdown-pinned'
+import type { LedgerEntry } from './lane-ledger'
 
 // A lane's breakdown in words (joshuafolkken/kit#4995): the stages longest first, the implementation's
 // tool-call kinds beside it, and the waits taken out last. `josh lane:breakdown` prints it, the overrun
@@ -12,6 +14,8 @@ const SLEPT = 'of which host sleep'
 interface Report {
 	breakdown: Breakdown
 	detail: ImplementDetail
+	// The ship pre-detach line's `test:pinned` detail, `''` when none (joshuafolkken/kit#5078).
+	pinned?: string
 }
 
 function part_text(part: Stage): string {
@@ -27,25 +31,39 @@ function detail_text(detail: ImplementDetail): string {
 	return ` (${[...kinds, ...background].join(', ')})`
 }
 
-function stage_text(stage: Stage, detail: ImplementDetail): string {
-	const is_implement = stage.name === lane_breakdown.IMPLEMENT_STAGE
+function stage_text(stage: Stage, report: Report): string {
+	if (stage.name === lane_breakdown.IMPLEMENT_STAGE) {
+		return `${part_text(stage)}${detail_text(report.detail)}`
+	}
 
-	return is_implement ? `${part_text(stage)}${detail_text(detail)}` : part_text(stage)
+	const is_pre_detach = stage.name === lane_breakdown.PRE_DETACH_STAGE
+
+	return is_pre_detach ? `${part_text(stage)}${report.pinned ?? ''}` : part_text(stage)
 }
 
 function entries_of(report: Report): Array<string> {
-	const { breakdown, detail } = report
+	const { breakdown } = report
 	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
 	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${slept}`
 
-	return [...breakdown.stages.map((stage) => stage_text(stage, detail)), excluded]
+	return [...breakdown.stages.map((stage) => stage_text(stage, report)), excluded]
 }
 
-// `issue`'s breakdown with its implementation's tool calls read off its transcripts.
-function report_of(issue: number, breakdown: Breakdown): Report {
+// `issue`'s breakdown with its implementation's tool calls read off its transcripts, and its ship
+// pre-detach's `test:pinned` rows read off `entries`.
+function report_of(
+	issue: number,
+	breakdown: Breakdown,
+	entries: ReadonlyArray<LedgerEntry>,
+): Report {
 	const calls = lane_breakdown_implement.read(issue, breakdown)
+	const rows = lane_breakdown_pinned.rows_of(entries, issue, breakdown)
 
-	return { breakdown, detail: lane_breakdown_implement.of(calls, breakdown) }
+	return {
+		breakdown,
+		detail: lane_breakdown_implement.of(calls, breakdown),
+		pinned: lane_breakdown_pinned.detail_text(rows),
+	}
 }
 
 // The Issue comment and the printout: a heading, then one bullet per stage.

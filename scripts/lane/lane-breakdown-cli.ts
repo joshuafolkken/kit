@@ -36,7 +36,7 @@ async function print(issue: string): Promise<number> {
 
 	if (minutes === undefined || breakdown === undefined) return missing(issue)
 
-	const report = lane_breakdown_text.report_of(Number(issue), breakdown)
+	const report = lane_breakdown_text.report_of(Number(issue), breakdown, entries)
 
 	console.info(lane_breakdown_text.comment(Number(issue), minutes, report))
 
