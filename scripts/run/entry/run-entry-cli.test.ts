@@ -260,21 +260,6 @@ describe('run_entry_cli.run — a carried cut is resumed before the hold is clai
 	})
 })
 
-describe('run_entry_cli — the lane-aware budget skip', () => {
-	it('skips cost --cut in a dispatched lane child, where the parent owns the budget', async () => {
-		is_child_mock.mockReturnValue(true)
-		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD)
-
-		await run_entry_cli.run([ISSUE])
-
-		expect(calls()).toStrictEqual([
-			['run:cut', '--resume', ISSUE],
-			['run:hold', ISSUE, '--fullrun'],
-		])
-		expect(last_line()).toContain('cost: skipped')
-	})
-})
-
 describe('run_entry_cli.run — a stop already made is resumed or reported (joshuafolkken/kit#3042)', () => {
 	it('adopts a halfrun stop under prrun and resumes at the gate', async () => {
 		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(UNDER)

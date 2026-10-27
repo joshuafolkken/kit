@@ -176,7 +176,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue',
 		category: 'AI tools',
-		reference: ['<issue> <path>...', 'automation', ['files', 'network']],
+		reference: ['<issue> <path>... [--probe]', 'automation', ['files', 'network']],
 		usage: {
 			examples: [{ arguments: '4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts' }],
 		},

@@ -650,7 +650,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "lane:plan": [
-      "<issue> <path>...",
+      "<issue> <path>... [--probe]",
       "automation",
       [
         "files",

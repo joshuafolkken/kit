@@ -99,7 +99,7 @@ describe('lane:plan — a plan that edits a file an earlier plan holds', () => {
 
 		await lane_plan_cli.run([String(LATER), OVERRUN], DIRECTORY)
 
-		expect(record_yield).toHaveBeenCalledWith(LATER, expect.stringContaining(OVERRUN))
+		expect(record_yield).toHaveBeenCalledWith(LATER, expect.stringContaining(OVERRUN), 'summary')
 		expect(lane_plan.read(LATER, DIRECTORY)).toMatchObject({ paths: [OVERRUN], yielded: true })
 		expect(lane_plan.is_uncleared(LATER, DIRECTORY)).toBe(true)
 	})
@@ -200,6 +200,12 @@ describe('lane:plan — what it refuses', () => {
 	])('prints the usage for a call with %s', async (_case, paths) => {
 		expect(await lane_plan_cli.run([String(LATER), ...paths], DIRECTORY)).toBe(FAILURE)
 		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
+	})
+
+	it('prints the usage naming `--probe` for a probe with no path, never holding the flag as a path', async () => {
+		expect(await lane_plan_cli.run([String(LATER), '--probe'], DIRECTORY)).toBe(FAILURE)
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('[--probe]'))
+		expect(fetch_opted_in).not.toHaveBeenCalled()
 	})
 
 	it('waits rather than starting on a listing it could not read', async () => {
