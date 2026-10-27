@@ -6,8 +6,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
-import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_capacity } from './lane-capacity'
 import { lane_check_stats } from './lane-check-stats'
 import { lane_claim_stats } from './lane-claim-stats'
@@ -15,8 +14,8 @@ import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_implement_stats } from './lane-implement-stats'
-import { lane_ledger } from './lane-ledger'
-import { lane_net_time } from './lane-net-time'
+import type { lane_ledger } from './lane-ledger'
+import { lane_net_read } from './lane-net-read'
 import { lane_paused_spans } from './lane-paused-spans'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_round_one_stats } from './lane-round-one-stats'
@@ -121,21 +120,6 @@ async function limit_label(given: string | undefined): Promise<string> {
 	return choice.kind === 'limit' ? String(choice.limit) : lane_stats.MISSING
 }
 
-async function read_ledger(
-	context: MeasureContext,
-): Promise<ReturnType<typeof lane_ledger.read_entries>> {
-	const path = context.ledger_path ?? (await lane_ledger.target())
-
-	return path === undefined ? [] : lane_ledger.read_entries(path)
-}
-
-// The run's event stream, read for the parks that end a stop's wait.
-async function read_events(context: MeasureContext): Promise<ReadonlyArray<RunEvent>> {
-	if (context.events_path !== undefined) return run_event_stream.read_events(context.events_path)
-
-	return await run_event_stream_emit.all_events()
-}
-
 // Every lane's transcript directory under this checkout's lane root, read from a lane or the main checkout.
 function transcript_directories(context: MeasureContext): ReadonlyArray<string> {
 	if (context.transcript_directories !== undefined) return context.transcript_directories
@@ -183,11 +167,11 @@ async function stats_command(
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
 	const label = { limit: await limit_label(values.limit), period_days }
-	const entries = await read_ledger(context)
+	const entries = await lane_net_read.read_ledger(context)
 	const row = lane_stats.row(entries, window, label)
 	const records = {
 		entries,
-		events: await read_events(context),
+		events: await lane_net_read.read_events(context),
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
 
@@ -257,7 +241,7 @@ async function value_command(
 
 	const window = { since_ms: request.since_ms, until_ms: context.now_ms ?? Date.now() }
 	const records = {
-		entries: await read_ledger(context),
+		entries: await lane_net_read.read_ledger(context),
 		calls: lane_transcript_stats.read_calls(transcript_directories(context), window),
 	}
 
@@ -271,8 +255,7 @@ async function net_command(rest: ReadonlyArray<string>, context: MeasureContext)
 
 	if (rest.length !== 1 || !issue_number_shape.is_issue_number(issue)) return refuse()
 
-	const events = await read_events(context)
-	const net = lane_net_time.net_minutes(await read_ledger(context), events, Number(issue))
+	const net = await lane_net_read.net_minutes_of(Number(issue), context)
 
 	if (net === undefined) {
 		console.error(

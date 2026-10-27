@@ -28,7 +28,9 @@ const CONDITION_PATTERN =
 const VALUE_FORMAT = '#<PR> のマージ後 <K> マージ'
 const CLOSING_FORMAT = '#<issue> を閉じる PR のマージ後 <K> マージ'
 const DECLARATION = `${PREFIX} ${VALUE_FORMAT}`
-const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` or \`${CLOSING_FORMAT}\` with K at least 1`
+// The refusal ends in a line ready to paste (joshuafolkken/kit#5225).
+const EXAMPLE = `${PREFIX} #5198 のマージ後 30 マージ`
+const MALFORMED = `\`${PREFIX}\` must read \`${VALUE_FORMAT}\` or \`${CLOSING_FORMAT}\` with K at least 1\n${EXAMPLE}`
 
 // `pull` cites the pull request itself, `issue` the issue whose closing pull request it waits on.
 type Via = 'pull' | 'issue'

@@ -5,6 +5,7 @@ import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +23,7 @@ import { issue_scout_cli } from './issue-scout-cli'
 const HERE = 'joshuafolkken/kit'
 const FAILURE_EXIT_CODE = 1
 const FOUND_DURING_FLAG = '--found-during'
+const BODY_FILE_FLAG = '--body-file'
 const ORIGIN = 4717
 const HELD_MESSAGE = 'duplicate candidate'
 
@@ -42,7 +44,7 @@ writeFileSync(
 )
 
 function argv_of(...extra: ReadonlyArray<string>): Array<string> {
-	return ['A title', '--body-file', body_path, ...extra]
+	return ['A title', BODY_FILE_FLAG, body_path, ...extra]
 }
 
 // The scout answers nothing, so a filing the cap lets through stops there, before any create.
@@ -120,5 +122,26 @@ describe('issue_file_cli.run — the --found-during origin as a scout candidate'
 		expect(await issue_file_cli.run(argv_of())).toBe(FAILURE_EXIT_CODE)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(HELD_MESSAGE)
+	})
+})
+
+// joshuafolkken/kit#5225: a body refusal under `--found-during <N>` ends in the causing-lane line
+// filled from `josh lane:net <N>`.
+describe('issue_file_cli.run — the causing-lane line on a refused body', () => {
+	const refused_path = path.join(work, 'refused.md')
+	const LANE_MINUTES = 35
+
+	beforeEach(() => {
+		writeFileSync(refused_path, '## 背景\n\n- 規模見積もり: 多い\n')
+		vi.spyOn(lane_net_read, 'net_minutes_of').mockResolvedValue(LANE_MINUTES)
+	})
+
+	it('prints the line after the refusals', async () => {
+		const argv = ['A title', BODY_FILE_FLAG, refused_path, FOUND_DURING_FLAG, String(ORIGIN)]
+
+		expect(await issue_file_cli.run(argv)).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(
+			`- 原因のレーン: ${String(LANE_MINUTES)} 分（#${String(ORIGIN)}）`,
+		)
 	})
 })

@@ -34,10 +34,16 @@ interface StubRead {
 	unparsed: ReadonlyArray<string>
 }
 
+// `rewired` counts the changed hunks left out as a rewire (`test-pinned-rewire.ts`).
+interface ProbeRead extends StubRead {
+	rewired: number
+}
+
 interface RunOptions {
 	max_hunks: number
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
+	rewired?: number
 }
 
 // One run's probing: the checked hunks, what the cache knows of each, and the cache they are written to.
@@ -46,7 +52,7 @@ interface ProbeRun {
 	known: ReadonlyArray<Known>
 	cache: LoadedCache
 	keys: ReadonlyArray<string>
-	is_first_unpinned: boolean
+	options: RunOptions
 }
 
 const NO_OUTCOME: HunkOutcome = { unpinned: [], stopped: [] }
@@ -116,7 +122,11 @@ async function verdicts_on(
 	const reached = reached_of(verdicts)
 	const probes = await by_reach(probes_of(probing.hunks, probing.known), probing.cache.reach)
 	const writer = test_pinned_cache.writer(probing.cache, probing.keys)
-	const options = { held: reached.length, is_first_unpinned: probing.is_first_unpinned }
+	const options = {
+		held: reached.length,
+		rewired: probing.options.rewired ?? 0,
+		is_first_unpinned: probing.options.is_first_unpinned === true,
+	}
 
 	await writer.record(reached)
 	await test_pinned_probe.checked_on(
@@ -176,8 +186,7 @@ async function outcome_on(
 		)
 	}
 
-	const is_first_unpinned = options.is_first_unpinned === true
-	const verdicts = await verdicts_on(paths, { hunks, known, cache, keys, is_first_unpinned })
+	const verdicts = await verdicts_on(paths, { hunks, known, cache, keys, options })
 
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts) }
 }
@@ -202,23 +211,23 @@ async function stub_hunks_of(added: ReadonlyArray<string>): Promise<StubRead> {
 	return { hunks, unparsed: [] }
 }
 
-// A changed hunk whose revert emits the same JavaScript is dropped before the cap (`test-pinned-emit.ts`);
-// without `typescript` every hunk is kept, so the run checks more rather than less.
-async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<Array<Hunk>> {
+// A changed hunk whose revert emits the same JavaScript, or a rewire, is dropped before the cap
+// (`test-pinned-emit.ts`), so neither is `unchecked`; without `typescript` every hunk is kept, so the
+// run checks more rather than less.
+async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<ProbeRead> {
 	const api = review_code_tree.load_typescript(process.cwd())
-	if (api === undefined) return [...hunks]
+	if (api === undefined) return { hunks: [...hunks], unparsed: [], rewired: 0 }
 	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
 
-	return hunks.filter((hunk, index) =>
-		test_pinned_emit.changes_runtime(api, contents[index] ?? '', hunk),
-	)
+	return { ...test_pinned_emit.probed_of(api, hunks, contents), unparsed: [] }
 }
 
-async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<StubRead> {
+async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<ProbeRead> {
 	const stubs = await stub_hunks_of(await added_scripts(base, targets))
 	const changed = await runtime_hunks(await read_hunks(base, targets))
+	const hunks = [...changed.hunks, ...stubs.hunks]
 
-	return { hunks: [...changed, ...stubs.hunks], unparsed: stubs.unparsed }
+	return { hunks, unparsed: stubs.unparsed, rewired: changed.rewired }
 }
 
 // The work tree's files that differ from `commit`, deleted ones dropped. Read since `HEAD` they are
@@ -243,7 +252,7 @@ async function report_on(
 	)
 	const probes = await read_probes(base, targets)
 	const { checked, unchecked } = test_pinned_logic.split(probes.hunks, has_runner ? max_hunks : 0)
-	const outcome = await outcome_on(base, paths, checked, options)
+	const outcome = await outcome_on(base, paths, checked, { ...options, rewired: probes.rewired })
 
 	return { ...outcome, unchecked, unparsed: probes.unparsed, max_hunks, has_runner }
 }

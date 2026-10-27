@@ -20,6 +20,13 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 	})
+
+	// joshuafolkken/kit#5235
+	it('keeps the count of hunks it did not probe as a rewire', () => {
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 0, rewired: 2, probes: [], elapsed_ms: 9 }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
 })
 
 describe('lane_ledger_schema.entry_schema', () => {

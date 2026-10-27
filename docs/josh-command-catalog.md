@@ -26,6 +26,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh pr:classification` | — | automation | none | Require one release classification on a pull request |
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |
 | `josh refactor:scan` | — | automation | processes | List refactoring candidates in the changed scope by category and answer clear/candidates |
+| `josh rename` | `<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>` | automation | files, processes | Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree |
 | `josh session:lang` | — | automation | none | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing) |
 | `josh stop:guard` | — | automation | none | Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin) |
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
