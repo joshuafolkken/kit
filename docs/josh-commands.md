@@ -185,19 +185,20 @@ Run related lint, unit, type and dotfile spelling checks in parallel.
 
 ```bash
 pnpm josh check:related
+pnpm josh check:related --full   # whole outputs
 ```
 
 <!-- /usage -->
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
 
+A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
+
 A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict line lists it as `(reused: …)`. A check that failed last time left no record and runs again.
 
 `lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
 
-A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, so the end of the output still shows it.
-
-With that notice, the verdict line also says the ship's pre-detach stops on it and names `josh metrics --accept`.
+A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
 
 When a `josh test:pinned` launched on the current tree has already answered with unpinned places the ship's pre-detach would stop on, they are printed there too, with the `josh ship --review … --unpinned-ok "<reason>"` form, so the first ship can carry the reason; a check this run did not start, if still running, prints nothing and is not waited on.
 
