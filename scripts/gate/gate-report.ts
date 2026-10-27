@@ -7,6 +7,7 @@ import { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-mar
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_log } from './gate-log'
 import { gate_plan } from './gate-plan'
+import { verification_tail } from './verification-tail'
 
 // The gate's console reporting, split out of `verification-gate.ts` so that file stays under its line
 // ceiling while it grows the scoped pre-check and the failure summary. Nothing
@@ -201,8 +202,8 @@ function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 function format_failure_actions(failed: ReadonlyArray<GateStepResult>): string {
 	if (failed.length === 0) return ''
 
-	const lines = failed.map(
-		(result) => `  ${FAIL_ICON} ${result.label} — re-run: pnpm ${result.command}`,
+	const lines = failed.map((result) =>
+		verification_tail.format_rerun(result.label, `pnpm ${result.command}`),
 	)
 
 	return `${GATE_COMMAND} — next:\n${lines.join('\n')}\n`
@@ -256,10 +257,10 @@ function print_gate_summary(
 		failed.length === 0
 			? format_green_verdict(results, total)
 			: josh_verdict.format_gate_failed(failed.map((result) => result.label).join(', '), total)
-	const notes = format_budget_notes(results)
+	const failures = `${format_budget_notes(results)}${format_failure_actions(failed)}`
 
 	process.stdout.write(
-		`\n${notes}${format_failure_actions(failed)}${gate_log.format_log_notice(log_path)}${verdict}\n`,
+		`\n${verification_tail.format_tail({ failures, log: { path: log_path }, verdict })}`,
 	)
 }
 
