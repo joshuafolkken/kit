@@ -17,8 +17,9 @@ import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
-// joshuafolkken/kit#2808: `josh issue:file` runs every filing step in order, and each refusal stops
-// the filing before anything is sent. The network reads are stubbed at the namespaces the command
+// joshuafolkken/kit#2808: `josh issue:file` runs every filing step, and any refusal stops the filing
+// before anything is sent; joshuafolkken/kit#5191: the refusals the caller answers from the body and
+// the arguments are printed in one pass. The network reads are stubbed at the namespaces the command
 // calls, so what is asserted is the order and the request — never a real filing.
 
 const HERE = 'joshuafolkken/kit'
@@ -201,22 +202,20 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 		)
 	})
 
-	it('refuses a body with no judgement declaration, before the count, the scout or the create', async () => {
+	it('refuses a body with no judgement declaration, still scouting it, before the create', async () => {
 		expect(await issue_file_cli.run(argv_of(undeclared_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('`- 人の判断: 不要`')
-		expect(issue_list).not.toHaveBeenCalled()
-		expect(scout).not.toHaveBeenCalled()
+		expect(scout).toHaveBeenCalledTimes(1)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
 
 // joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
 describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
-	it('refuses an auto-ok filing with no run label, before the count, the scout or the create', async () => {
+	it('refuses an auto-ok filing with no run label, still counting and scouting it, before the create', async () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
-		expect(issue_list).not.toHaveBeenCalled()
-		expect(scout).not.toHaveBeenCalled()
+		for (const step of [issue_list, scout]) expect(step).toHaveBeenCalledTimes(1)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
@@ -282,12 +281,13 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 		expect(issue_list).toHaveBeenCalledWith(expect.objectContaining({ repo: THERE }))
 	})
 
-	it('holds a filing past the cap with no exemption, before the scout or the create', async () => {
+	it('holds a filing past the cap with no exemption, still scouting it, before the create', async () => {
 		issue_list.mockResolvedValue(OVER_CAP_LISTING)
 
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(OVER_CAP_FLAG)
-		for (const step of [scout, exec_gh_api]) expect(step).not.toHaveBeenCalled()
+		expect(scout).toHaveBeenCalledTimes(1)
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
 	it.each([
@@ -311,7 +311,6 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a body the lint rejects', async () => {
 		expect(await issue_file_cli.run(argv_of(invalid_path))).toBe(FAILURE_EXIT_CODE)
-		expect(scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 

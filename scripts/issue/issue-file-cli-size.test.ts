@@ -10,7 +10,7 @@ import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
 
 // joshuafolkken/kit#4675: `josh issue:file` refuses a size estimate over the split guide before any
-// listing, unless the filing is a split or declares why it stays one Issue. The guide itself is
+// create, unless the filing is a split or declares why it stays one Issue. The guide itself is
 // `size-estimate.test.ts`'s; here only the filing's wiring of the route is asserted.
 
 const HERE = 'joshuafolkken/kit'
@@ -70,11 +70,10 @@ function refusals(): string {
 }
 
 describe('issue_file_cli.run — a size estimate over the split guide', () => {
-	it('refuses the filing before the scout, naming the guide and the question', async () => {
+	it('refuses the filing, naming the guide and the question', async () => {
 		expect(await issue_file_cli.run(argv_of(over_path))).toBe(FAILURE_EXIT_CODE)
 		expect(refusals()).toContain('exceeds the guide (10 files / 400 lines)')
 		expect(refusals()).toContain('split-assessment.md → "The question"')
-		expect(scout).not.toHaveBeenCalled()
 	})
 
 	it.each([
