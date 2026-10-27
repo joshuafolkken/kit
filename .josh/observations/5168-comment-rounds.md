@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/lane/lane-paused-spans.ts:72 | 2026-10-27 | #5168
