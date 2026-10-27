@@ -57,6 +57,7 @@ const BASE_INPUT: WrapupInput = {
 		head_sha: 'c0ffee1',
 	},
 	wait_for_green: vi.fn(),
+	send_completion: vi.fn().mockResolvedValue(undefined),
 }
 
 const mocked_merge = vi.mocked(git_gh_command.pr_merge)

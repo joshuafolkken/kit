@@ -313,7 +313,7 @@ describe('telegram_notify.send — JOSH_NOTIFY=off opts out explicitly', () => {
 	})
 })
 
-// The other half of the same Issue: inside `followup` the send happens on the way to the merge, so a
+// The other half of the same Issue: inside `followup` the send happens beside the merge, so a
 // gateway timeout must not leave a reviewed, green pull request unmerged.
 describe('telegram_notify.send_or_report — reports and carries on', () => {
 	it("answers false and reports the caller's recovery instead of throwing", async () => {

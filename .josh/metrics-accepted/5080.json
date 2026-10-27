@@ -1,0 +1,7 @@
+{
+	"reason": "#5080: the Telegram send runs beside the merge, which splits the notify into a read and a send and moves settled_together into scripts/lib for both callers",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}

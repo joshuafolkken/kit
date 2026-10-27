@@ -114,7 +114,7 @@ describe('git_followup_pending.pending_release_line', () => {
 		expect(line).not.toContain(CURRENT_VERSION)
 	})
 
-	// The Telegram goes out before the merge, so a bare number is understated by exactly one every
+	// The Telegram's body is read before the merge, so a bare number is understated by exactly one every
 	// time. The note is what keeps the reader from taking it for the count afterwards.
 	it('says the pending merge is not in the count when one is coming', async () => {
 		const line = await git_followup_pending.pending_release_line({

@@ -105,8 +105,8 @@ Fail when a pull request adds any new SonarCloud issue — of any type or severi
 
 **Stage timing:** one `followup stage: <name> <seconds>` row per stage, then `followup stages total:`.
 
-- A failed run prints it up to the stage that threw, named `interrupted`; the `merge` row appears only
-  on a run that merged.
+- A failed run prints it up to the stage that threw, named `interrupted`; the `telegram-and-merge`
+  row appears only on a run that merged, and a run that merged nothing prints `telegram` instead.
 - A row named `<a>-and-<b>` is a batch of requests sent together; `checks-wait` is never overlapped.
 - The total is the sum of the stages, not the wall clock — the post-merge tail sits outside it.
 
