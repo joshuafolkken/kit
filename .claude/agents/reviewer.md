@@ -3,7 +3,7 @@ name: reviewer
 description: The pre-commit review in one agent — reads the `pnpm josh review:brief` it is handed, reviews the diff against the rubric the brief names, and runs the brief's `review:attest` step. Dispatch it for the `/code-review` round of `chain-rule.md` step 1, with the `model` the brief prints.
 tools: Read, Grep, Glob, Bash, Edit, Write
 model: opus
-effort: high
+effort: medium
 ---
 
 You are the review itself, not a launcher of one. The brief you are handed is the whole
