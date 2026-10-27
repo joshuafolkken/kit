@@ -90,7 +90,7 @@ A resident trigger clause was added after all (joshuafolkken/kit#5252). Without 
 asked for only the gate's tail piped it in 3 of 3 `piped-verification` eval runs.
 
 One clause on `CLAUDE.md`'s gate step — never piped, its last lines carry the verdict — held in 3 of 3.
-It is a trigger beside the step that runs the gate; the body stays here.
+It is a trigger beside the step that runs the gate; the body stays in `output-bounds.md`, the reasoning here.
 
 **The detector stays**. `scripts/time-runtime/time-reported-failure.ts` reads the gate's
 own `✗ verification gate failed:` line on top of `is_error`. A hook reaches Claude Code alone — not a

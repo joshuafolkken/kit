@@ -14,9 +14,9 @@ import { rule_list } from './rule-list'
 // answered success on a gate that had printed `✗ verification gate failed`. The failure was real, and
 // what caught it was a child reading the output rather than anything the shell reported.
 //
-// **The rule is delivered, with only a trigger clause resident (joshuafolkken/kit#5252), and this
-// suite is what pins that choice.** Two
-// alternatives were measured and rejected — rewriting the procedure documents' examples, when a
+// **The rule is delivered, and this suite is what pins that choice** — `CLAUDE.md` keeps only a
+// trigger clause on the gate step (joshuafolkken/kit#5252). Two alternatives were measured and
+// rejected as the rule's carrier — rewriting the procedure documents' examples, when a
 // survey of every document, prompt and skill found exactly one piped verification example and it was
 // the repository's own explanation of this bug; and stating a calling convention, which
 // `tools/time/time-reported-failure.ts` had already rejected in writing. So what is asserted here is
