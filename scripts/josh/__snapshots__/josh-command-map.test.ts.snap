@@ -1425,6 +1425,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "processes",
       ],
     ],
+    "test:reach": [
+      "<files...>",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "test:red": [
       "",
       "developer",
