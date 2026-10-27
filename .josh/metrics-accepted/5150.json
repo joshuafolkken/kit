@@ -1,0 +1,8 @@
+{
+	"reason": "#5150 adds the untraced-bug reproduction check and its one-clause rule in issue-template.md",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 16,
+		"ai_cost.on_demand_bytes": 57
+	}
+}
