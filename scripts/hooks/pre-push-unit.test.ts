@@ -4,6 +4,7 @@ import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
+import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -88,6 +89,8 @@ const UNCOMMITTED = ` M ${SCRIPT_PATH}`
 const NOTHING_RAN = 0
 const SUITE_RAN = 1
 const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
+const RELATED_ENV = pre_push_related_switch.SWITCH_ENV_KEY
+const RELATED_ON = pre_push_related_switch.SWITCH_ON
 const SPEC_FILTER = '--project=unit'
 const COMMAND_NAME = 'pre-push-unit'
 
@@ -123,6 +126,9 @@ beforeEach(() => {
 	repository.status = CLEAN
 	repository.unreadable = READS_FINE
 	vi.stubEnv(FORCE_ENV, '')
+	// joshuafolkken/kit#5187: `josh ship`'s push ahead of the gate runs this file under the switch it
+	// tests, so every test pins it off and only the ones about it switch it on.
+	vi.stubEnv(RELATED_ENV, '')
 })
 
 afterEach(() => {
@@ -315,10 +321,8 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 // joshuafolkken/kit#5067: `josh ship` pushes its sync merge ahead of the gate, whose whole suite runs
 // over the same tree next, so that push asks for the related tests instead.
 describe('a push ahead of its gate runs the related tests', () => {
-	const RELATED_ENV = 'JOSH_PRE_PUSH_RELATED'
-
 	beforeEach(() => {
-		vi.stubEnv(RELATED_ENV, '1')
+		vi.stubEnv(RELATED_ENV, RELATED_ON)
 	})
 
 	it('runs the related tests, not the whole suite, when no record covers the push', async () => {
@@ -394,7 +398,7 @@ describe('the whole suite holds a place in the core budget', () => {
 			.spyOn(core_budget, 'with_command_reservation')
 			.mockImplementation(async (_weight, run) => await run())
 
-		vi.stubEnv('JOSH_PRE_PUSH_RELATED', '1')
+		vi.stubEnv(RELATED_ENV, RELATED_ON)
 		await run_hook()
 
 		expect(reservation).toHaveBeenCalledTimes(1)
