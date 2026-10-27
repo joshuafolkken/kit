@@ -72,7 +72,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'investigator-foreground': judgment('which reads go beside the dispatch is the author’s call'),
 	'lane-carry-conflict': judgment(ANOTHER_COMMAND),
 	'lane-switch-main': judgment(ANOTHER_COMMAND),
-	'lane-direct-tool': judgment(ANOTHER_COMMAND),
+	'lane-direct-tool': rewrite(), // a one-command line behind `pnpm josh reserved-run <weight> --`
 	'lane-spilled-read': judgment(ANOTHER_COMMAND),
 	'timed-rerun': judgment(ANOTHER_COMMAND),
 	'oracle-consulted': judgment(ANOTHER_COMMAND),

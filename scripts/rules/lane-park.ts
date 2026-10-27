@@ -122,14 +122,16 @@ function records_the_park(command: string): boolean {
 }
 
 // The instruction in the shape a refusal can carry: what the stop must leave behind, how to record it,
-// and the reissue sentence every delivery needs. **The park procedure is named, not restated** — the
+// and that the park is the stop itself — no notify follows it, since the `Stop` hook sends one still owed
+// on the hold (`stop-rules.ts` → `needs_notify`). **The park procedure is named, not restated** — the
 // single source is `backlogrun-park.md` → "park and continue", and a second copy here would be the
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
 	'⛔ lane child park: this session is a dispatched lane child, so a stop for a person parks first: ' +
 	'`pnpm josh run:park <N> --body-file <path>` (question, options, stash — it applies ' +
 	'`needs-decision`); a ' +
-	'`needs-human-review` / `already-done` stop already is. Reissue this notify, once per run ' +
+	'`needs-human-review` / `already-done` stop already is. The park is the stop: no notify ' +
+	'after it. Refused once per run ' +
 	'(`.claude/skills/workflow-commands/pre-gate-cut.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. **Once per run rather than `decide`.** The

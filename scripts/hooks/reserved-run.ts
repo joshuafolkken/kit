@@ -106,12 +106,25 @@ function reservation_options(parsed: ReservedCommand): {
 	return { command, memory_mb: parsed.memory_mb ?? command_memory.estimated_memory_mb(command) }
 }
 
+// The directory the caller typed the command in. **`pnpm josh` runs from the package root**, so without
+// this a wrapped `eslint rules/a.ts` typed in `scripts/` would lint from the root and match nothing;
+// pnpm records the caller's directory in `INIT_CWD` (joshuafolkken/kit#5147).
+function command_directory(): string {
+	const initial = process.env['INIT_CWD']
+
+	return initial === undefined || initial === '' ? process.cwd() : initial
+}
+
 // `stdio: 'inherit'` so the command's own progress reaches the push, and `reject: false` so a failing
 // command becomes an exit code the caller returns rather than a throw — the reservation is released by
 // `with_core_reservation`'s `finally` on either path.
 async function run_command(command: ReadonlyArray<string>): Promise<number> {
 	const [file = '', ...args] = command
-	const result = await execa(file, args, { stdio: 'inherit', reject: false })
+	const result = await execa(file, args, {
+		cwd: command_directory(),
+		stdio: 'inherit',
+		reject: false,
+	})
 
 	return result.exitCode ?? FAIL_EXIT_CODE
 }
