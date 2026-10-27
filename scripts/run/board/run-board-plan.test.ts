@@ -1,4 +1,4 @@
-import type { OptedIn } from '#scripts/backlog/backlog-next'
+import type { OptedIn } from '#scripts/backlog/backlog-gate-scope'
 import type { Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'
 import type { EpicChild } from '#scripts/epic/epic-graph'

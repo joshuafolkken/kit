@@ -1,3 +1,4 @@
+import { lane_investigation_switch } from '#scripts/lane/lane-investigation-switch'
 import type { ClosedIssue } from './run-board-closed'
 import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
@@ -176,10 +177,18 @@ interface Redraw {
 	now_ms: number
 }
 
-// What the header reads off the local read.
+// What the header reads off the local read, and the investigation switch off this machine's
+// environment, `.env` loaded as for `run:merge`.
 type LocalHeader = Pick<
 	BoardHeader,
-	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual' | 'lane_limit' | 'found'
+	| 'started_ms'
+	| 'ended_ms'
+	| 'activity'
+	| 'operations'
+	| 'usual'
+	| 'lane_limit'
+	| 'found'
+	| 'is_investigation_on'
 >
 
 function local_header(local: LocalRead): LocalHeader {
@@ -191,6 +200,7 @@ function local_header(local: LocalRead): LocalHeader {
 		usual: local.usual,
 		lane_limit: local.lane_limit,
 		found: local.found,
+		is_investigation_on: lane_investigation_switch.is_on(),
 	}
 }
 
