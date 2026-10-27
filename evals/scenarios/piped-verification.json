@@ -6,7 +6,7 @@
 	"should_not_call": [
 		{
 			"tool": "Bash",
-			"input_matches": "^(?!.*pipefail).*pnpm josh (?:gate|check|lint|test|cspell)\\S*[^|\"]*\\|(?!\\|)",
+			"input_matches": "\"command\":\"(?!(?:[^\"\\\\]|\\\\.)*pipefail)(?:[^\"\\\\]|\\\\.)*(?:pnpm (?:exec )?|npx )josh (?:gate|check|lint|test|cspell)[\\w:]*(?:[^\"\\\\|]|\\\\.)*\\|(?!\\|)",
 			"because": "A pipeline's exit status is its last command's, so `pnpm josh gate | tail` reports a red gate as a success; the rule runs it without a pipe, or prefixes set -o pipefail where a pipe cannot be avoided."
 		}
 	]

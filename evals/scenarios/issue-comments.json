@@ -6,7 +6,7 @@
 	"should_not_call": [
 		{
 			"tool": "Bash",
-			"input_matches": "^(?!.*comments).*gh\\s+(?:issue\\s+view|api\\s+\\S*issues/\\d+)",
+			"input_matches": "\"command\":\"(?!(?:[^\"\\\\]|\\\\.)*(?:comments|\\s-c\\b))(?:[^\"\\\\]|\\\\.)*gh\\s+(?:issue\\s+view|api\\s+[^\\s\"\\\\]*issues/\\d+)",
 			"because": "A later comment overrides the body, so a body-only read of the Issue plans against a superseded request; the rule reads the comments with it."
 		}
 	]

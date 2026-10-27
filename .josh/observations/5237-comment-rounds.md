@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/test/test-related.ts:394 | 2026-10-27 | #5237
+- rf:bug-risks | low | scripts/test/test-related-record.ts:123 | 2026-10-27 | #5237
+- rf:project-conventions | low | scripts/test/test-related.ts:177 | 2026-10-27 | #5237
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:85 | 2026-10-27 | #5237
