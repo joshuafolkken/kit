@@ -220,7 +220,9 @@ const early_heartbeat = {
 	EARLY_HEARTBEAT_REASON,
 	decide,
 	is_progress_watch,
+	is_wait_or_inert,
 	is_wait_timer,
+	sleep_seconds,
 	wait_duration_ms,
 	waits_for_progress,
 }

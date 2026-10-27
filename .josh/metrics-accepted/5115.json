@@ -1,0 +1,8 @@
+{
+	"reason": "#5115 adds the sleep-chain-before-read trigger to poll-loop and one pointer line to background-commands.md",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 23,
+		"ai_cost.on_demand_bytes": 185
+	}
+}
