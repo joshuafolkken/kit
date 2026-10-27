@@ -1,6 +1,4 @@
-import { stripVTControlCharacters } from 'node:util'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
-import string_width from 'string-width'
 import { run_board_fit, type TerminalSize } from './run-board-fit'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPorts } from './run-board-state'
@@ -38,7 +36,7 @@ type SpinPorts = Pick<BoardPorts, 'now' | 'sleep' | 'write'>
 // The spot of the placeholder at `index` in a line that starts `row` rows down the screen.
 function spot_at(line: string, index: number, row: number, columns: number): Spot {
 	const before = line.slice(0, index)
-	const width = string_width(stripVTControlCharacters(before))
+	const width = run_board_fit.width_of(before)
 	const style = (before.match(SGR) ?? []).join('')
 
 	return { row: row + Math.floor(width / columns), column: (width % columns) + 1, style }
