@@ -19,6 +19,7 @@ import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record, type RunInput } from './test-related-record'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
+import { test_related_touched } from './test-related-touched'
 import { test_unit_guard } from './test-unit-guard'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
@@ -173,15 +174,19 @@ async function whole_change(
 	return map === undefined ? { changed: await branch_change(), map } : await map_change(root, map)
 }
 
+function explicit_files(root: string, command_arguments: ReadonlyArray<string>): Array<string> {
+	return command_arguments
+		.filter((argument) => !changed_file_scope.is_flag(argument))
+		.map((file) => path.relative(root, path.resolve(file)))
+}
+
 async function read_change(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	is_whole: boolean,
 ): Promise<ChangeReading> {
 	const map = test_read_map.read_map(root)
-	const explicit = command_arguments
-		.filter((argument) => !changed_file_scope.is_flag(argument))
-		.map((file) => path.relative(root, path.resolve(file)))
+	const explicit = explicit_files(root, command_arguments)
 
 	return explicit.length > 0
 		? await explicit_change(root, explicit, map)
@@ -381,7 +386,24 @@ function report_unhanded(
 	)
 }
 
+// **A `--touched` run is the implementation loop's** (`test-related-touched.ts`): it reads its scope off
+// the change alone and leaves no green record, so `josh review:brief` and the gate's reuse count only
+// a full-reach run.
+async function run_touched(given: ReadonlyArray<string>): Promise<number> {
+	const { TOUCHED_FLAG, TOUCHED_KIND } = test_related_touched
+	const command_arguments = given.filter((argument) => argument !== TOUCHED_FLAG)
+	const root = await changed_file_scope.repository_root_or_cwd()
+	const explicit = explicit_files(root, command_arguments)
+	const changed = explicit.length > 0 ? explicit : await branch_change()
+	const scope = test_related_touched.touched_scope(root, changed)
+	const input = { scope, root, changed, synced: [], since_map: [], kind: TOUCHED_KIND }
+
+	return await run_and_record(input, command_arguments)
+}
+
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
+	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
+
 	const { KEEP_WHOLE_SUITE_FLAG } = gate_plan
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()

@@ -27,6 +27,8 @@ interface RunInput {
 	since_map: ReadonlyArray<string>
 	// This branch's own change from its merge base, where it was read.
 	branch?: ReadonlyArray<string> | undefined
+	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
+	kind?: string
 }
 
 interface RunResult {
@@ -114,7 +116,7 @@ function parts_of(input: RunInput): Record<'own' | 'synced' | 'since_map', Reado
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
-		scope: related_scope.scope_kind(input.scope),
+		scope: input.kind ?? related_scope.scope_kind(input.scope),
 		changed: own.length,
 		synced: synced.length,
 		since_map: since_map.length,
