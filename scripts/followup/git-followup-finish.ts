@@ -80,7 +80,7 @@ async function print_completion(
 
 // A **merged** run ends here, and the round-1 review snapshot's lifetime is one run.
 // `--no-merge` is not the end of one — the pull request is still open and
-// the issue is still the current task, the same line `print_next_issues` and the epic auto-close
+// the issue is still the current task, the same line `read_next_issues` and the epic auto-close
 // already draw — and clearing there would be the unsafe direction: the next round-1 brief would find
 // no record and write a fresh one against the already-fixed tree, which is the arm-A skip over
 // unreviewed fix code the record exists to prevent.
