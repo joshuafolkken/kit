@@ -68,3 +68,19 @@ describe('missing_scripts — josh records under .josh/', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#5156: `check:related` has no gate behind it to lint and test a moved `.josh/`
+// record, so the exemption the ship preflight takes does not carry over to reuse.
+describe('green_scripts — josh records under .josh/', () => {
+	it('reuses neither record when a josh record under .josh/ was written since them', () => {
+		const tree = { [SOURCE]: DIGEST, [METRICS_RECORD]: DIGEST }
+
+		expect(scoped_green.green_scripts(tree, BASE, plant_both())).toStrictEqual([])
+	})
+
+	it('reuses both records when the tree is the one they describe', () => {
+		const tree = { [SOURCE]: DIGEST }
+
+		expect(scoped_green.green_scripts(tree, BASE, plant_both())).toStrictEqual(BOTH_SCRIPTS)
+	})
+})

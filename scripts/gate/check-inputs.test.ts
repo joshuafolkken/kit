@@ -54,7 +54,7 @@ describe('check_inputs.touches_inputs', () => {
 	})
 
 	it('answers true for an undeclared check whatever moved', async () => {
-		await expect(check_inputs.touches_inputs('cspell', [], never_ignored)).resolves.toBe(true)
+		await expect(check_inputs.touches_inputs('behavior', [], never_ignored)).resolves.toBe(true)
 	})
 })
 
