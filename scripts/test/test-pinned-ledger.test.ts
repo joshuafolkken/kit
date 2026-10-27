@@ -11,22 +11,34 @@ afterEach(() => {
 })
 
 describe('test_pinned_ledger.record', () => {
-	it('writes one test-pinned row with the lane, the held count and each probe', async () => {
+	it('writes one test-pinned row with the lane, the held and rewired counts and each probe', async () => {
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue('5078')
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
-		await test_pinned_ledger.record(3, [PROBE], 2000)
+		await test_pinned_ledger.record({ held: 3, rewired: 2 }, [PROBE], 2000)
 
-		expect(write).toHaveBeenCalledWith({ issue: 5078, held: 3, probes: [PROBE], elapsed_ms: 2000 })
+		expect(write).toHaveBeenCalledWith({
+			issue: 5078,
+			held: 3,
+			rewired: 2,
+			probes: [PROBE],
+			elapsed_ms: 2000,
+		})
 	})
 
 	it('leaves the lane out of a run outside a lane', async () => {
 		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue(undefined)
 		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
 
-		await test_pinned_ledger.record(0, [], 10)
+		await test_pinned_ledger.record({ held: 0, rewired: 0 }, [], 10)
 
-		expect(write).toHaveBeenCalledWith({ issue: undefined, held: 0, probes: [], elapsed_ms: 10 })
+		expect(write).toHaveBeenCalledWith({
+			issue: undefined,
+			held: 0,
+			rewired: 0,
+			probes: [],
+			elapsed_ms: 10,
+		})
 	})
 })
 

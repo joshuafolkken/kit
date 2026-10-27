@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { test_pinned } from './test-pinned'
+import { test_pinned_emit } from './test-pinned-emit'
 import { test_pinned_fixture } from './test-pinned-fixture'
 import { test_pinned_ledger } from './test-pinned-ledger'
 import { test_pinned_logic } from './test-pinned-logic'
@@ -18,6 +19,7 @@ const TSCONFIG_CONTENT =
 const UNPINNED_HUNK = `${DRIVER_FILE}:6`
 const NEW_TEST = 'new.test.ts'
 const OTHER_SOURCE = 'other.js'
+const REWIRES = 2
 // A test that pins the unpinned hunk: reverting it reads `result.token` on the driver path.
 const PINNING_TEST = `import { expect, it } from 'vitest'
 import { token_of } from './driver.js'
@@ -67,6 +69,17 @@ async function held_locations(): Promise<Array<string> | undefined> {
 	return report?.unpinned.map((hunk) => test_pinned_logic.location(hunk))
 }
 
+// Each run reads `count` more rewired hunks than the fixture's change holds (joshuafolkken/kit#5235).
+function with_rewires(count: number): void {
+	const probed_of = test_pinned_emit.probed_of.bind(test_pinned_emit)
+
+	vi.spyOn(test_pinned_emit, 'probed_of').mockImplementation((api, hunks, contents) => {
+		const read = probed_of(api, hunks, contents)
+
+		return { ...read, rewired: read.rewired + count }
+	})
+}
+
 // The selection each probe ran with: `related <file>` over every reaching test, or `run <tests>`.
 function selections_of(runs: MockInstance<typeof test_red.probe_in>): Array<Array<string>> {
 	return runs.mock.calls.map(([, selection]) => selection.slice(0, 2))
@@ -105,10 +118,11 @@ describe('test_pinned.run timed into the ledger', () => {
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			expect(await held_locations()).toBeUndefined()
+			with_rewires(REWIRES)
 			await run_locations()
-			const [held, times] = row.mock.calls[0] ?? []
-
-			expect([held, times?.length]).toEqual([0, runs.mock.calls.length])
+			expect(row.mock.calls.map(([skipped, times]) => [skipped, times.length])).toEqual([
+				[{ held: 0, rewired: REWIRES }, runs.mock.calls.length],
+			])
 			runs.mockClear()
 			expect(await held_locations()).toEqual([UNPINNED_HUNK])
 			expect(runs).not.toHaveBeenCalled()
