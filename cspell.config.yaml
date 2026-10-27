@@ -2,6 +2,8 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # SonarJasmin, the SonarQube JS/TS taint engine `sonar.jasmin.internal.disabled` turns off (#5084).
+  - jasmin
   # `nohup pnpm josh gate`, a wrapper the shell command walk skips (#4525).
   - nohup
   # `ps -o pgid=`, the process group `lane:close` spares when it ends a lane's leftovers (#4304).

@@ -65,6 +65,26 @@ describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
 	})
 })
 
+// joshuafolkken/kit#5084: the new taint engine re-analyzes every file on any change; the legacy one
+// keeps a per-file cache, and the taint rules stay on.
+describe(`${SONAR_PROPERTIES_FILE} taint engine`, () => {
+	const properties = load_sonar_properties()
+
+	it('runs the taint analysis on the legacy engine', () => {
+		expect(properties['sonar.jasmin.internal.disabled']).toBe('true')
+	})
+
+	it('keeps the taint rules analyzed on every file', () => {
+		const prefix = 'sonar.issue.ignore.multicriteria'
+		const muted_everywhere = (properties[prefix] ?? '')
+			.split(',')
+			.filter((id) => properties[`${prefix}.${id}.resourceKey`] === '**/*')
+			.map((id) => properties[`${prefix}.${id}.ruleKey`] ?? '')
+
+		expect(muted_everywhere.filter((rule) => /^(?:ts|js)security:/u.test(rule))).toEqual([])
+	})
+})
+
 // joshuafolkken/kit#3047: ESLint's `no-await-in-loop` is the gate for S9382, and SonarJS does not read
 // the `eslint-disable-next-line` comments that record each intentional sequential await.
 describe.each([SONAR_PROPERTIES_FILE, SONAR_TEMPLATE_FILE])('%s S9382 suppression', (file) => {
