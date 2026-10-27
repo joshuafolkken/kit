@@ -3,8 +3,10 @@ import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { related_heavy_tests } from './related-heavy-tests'
+import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_probe, type Probe } from './test-pinned-probe'
 import { unit_durations } from './unit-durations'
+import { whole_suite_files } from './whole-suite-files'
 
 // joshuafolkken/kit#5122: a probe narrows by `josh test:related`'s rule — a file every test imports
 // reaches the test files importing it directly, never the whole suite — and leaves out the heavy files
@@ -76,5 +78,19 @@ describe('test_pinned_probe.selection_of', () => {
 
 		expect(argv?.slice(0, 2)).toEqual(['related', HUB_MODULE])
 		expect(argv).toEqual(expect.arrayContaining([EXCLUDE_FLAG, HEAVY_TEST]))
+	})
+})
+
+// joshuafolkken/kit#5260: before #5122 a probe handed `vitest related` the hunk's file itself, and a
+// config dependency such as `unit-projects.ts` widened it to the whole suite (2081 test files in #5105).
+// In this repository's own tree, the files it hands vitest are test files, none a whole-suite trigger.
+describe('test_pinned_probe.selection_of — in this repository', () => {
+	it('hands vitest only test files, none a file the whole suite widens on', async () => {
+		const argv = await test_pinned_probe.selection_of(process.cwd(), probe_of(EVERY_TEST_MODULE), 1)
+		const related = argv?.slice(1, argv.indexOf('--run')) ?? []
+
+		expect(related.length).toBeGreaterThan(0)
+		expect(related.filter((file) => !test_declared_logic.is_test_file(file))).toEqual([])
+		expect(related.filter((file) => whole_suite_files.WHOLE_SUITE_FILES.has(file))).toEqual([])
 	})
 })
