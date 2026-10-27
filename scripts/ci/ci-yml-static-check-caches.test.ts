@@ -6,15 +6,18 @@ import { ci_yml_fixture } from './ci-yml-fixture'
 // distributed workflow writes only eslint and cspell caches because its strict Svelte check has no
 // safe persistent mode. Assert the writer beside the action so a cache of a file no command produces
 // cannot pass from its key shape alone.
+// joshuafolkken/kit#5116: the runtime gate's `josh lint --changed` writes `.prettiercache` too; the
+// distributed workflow runs `prettier --check .` with no cache flag, so it writes none to restore.
 const SHA_SUFFIX = '-${{ github.sha }}'
 const TS_BUILD_CACHE_STEP = 'tsbuildinfo-cache'
+const PRETTIER_CACHE_STEP = 'prettier-cache'
 const TS_CHECK_COMMAND = 'pnpm josh check'
 
 interface WorkflowCase {
 	relative_path: string
 	job_name: string
 	gate_command?: string
-	excluded_step_id?: string
+	excluded_step_ids?: ReadonlyArray<string>
 }
 
 interface CacheCase {
@@ -26,7 +29,7 @@ interface CacheCase {
 const TEMPLATE_WORKFLOW_CASE: WorkflowCase = {
 	relative_path: ci_yml_fixture.TEMPLATE_CI_YML,
 	job_name: 'checks',
-	excluded_step_id: TS_BUILD_CACHE_STEP,
+	excluded_step_ids: [TS_BUILD_CACHE_STEP, PRETTIER_CACHE_STEP],
 }
 
 const WORKFLOW_CASES: ReadonlyArray<WorkflowCase> = [
@@ -46,6 +49,7 @@ const CACHE_CASES: ReadonlyArray<CacheCase> = [
 	},
 	{ step_id: TS_BUILD_CACHE_STEP, path: '.tsbuildinfo', command_fragment: TS_CHECK_COMMAND },
 	{ step_id: 'cspell-cache', path: '.cspellcache', command_fragment: 'pnpm josh cspell:dot' },
+	{ step_id: PRETTIER_CACHE_STEP, path: '.prettiercache', command_fragment: 'pnpm josh lint' },
 ]
 
 function cache_step(
@@ -70,35 +74,34 @@ function job_scripts(workflow_case: WorkflowCase): ReadonlyArray<string> {
 }
 
 describe.each(WORKFLOW_CASES)('static-check caches in $relative_path', (workflow_case) => {
-	describe.each(CACHE_CASES.filter(({ step_id }) => step_id !== workflow_case.excluded_step_id))(
-		'cache saves fresh every run ($step_id)',
-		({ step_id, path, command_fragment }) => {
-			// The lookups above return the empty string for a step that is not there, which would let the two
-			// assertions below pass on a job that had lost the cache entirely.
-			it('caches the file its check writes at the repo root', () => {
-				expect(cache_input(workflow_case, step_id, 'path')).toContain(path)
-			})
+	describe.each(
+		CACHE_CASES.filter(({ step_id }) => !workflow_case.excluded_step_ids?.includes(step_id)),
+	)('cache saves fresh every run ($step_id)', ({ step_id, path, command_fragment }) => {
+		// The lookups above return the empty string for a step that is not there, which would let the two
+		// assertions below pass on a job that had lost the cache entirely.
+		it('caches the file its check writes at the repo root', () => {
+			expect(cache_input(workflow_case, step_id, 'path')).toContain(path)
+		})
 
-			it('keys the cache on the commit sha so a fresh entry is saved every run', () => {
-				expect(cache_input(workflow_case, step_id, 'key').endsWith(SHA_SUFFIX)).toBe(true)
-			})
+		it('keys the cache on the commit sha so a fresh entry is saved every run', () => {
+			expect(cache_input(workflow_case, step_id, 'key').endsWith(SHA_SUFFIX)).toBe(true)
+		})
 
-			it('restores the newest previous entry via the sha-less prefix', () => {
-				const prefix = cache_input(workflow_case, step_id, 'key').slice(0, -SHA_SUFFIX.length)
+		it('restores the newest previous entry via the sha-less prefix', () => {
+			const prefix = cache_input(workflow_case, step_id, 'key').slice(0, -SHA_SUFFIX.length)
 
-				expect(prefix).not.toBe('')
-				expect(cache_input(workflow_case, step_id, 'restore-keys')).toContain(prefix)
-			})
+			expect(prefix).not.toBe('')
+			expect(cache_input(workflow_case, step_id, 'restore-keys')).toContain(prefix)
+		})
 
-			it('runs a command that writes the cached file', () => {
-				const writer_command = workflow_case.gate_command ?? command_fragment
+		it('runs a command that writes the cached file', () => {
+			const writer_command = workflow_case.gate_command ?? command_fragment
 
-				expect(job_scripts(workflow_case).some((script) => script.includes(writer_command))).toBe(
-					true,
-				)
-			})
-		},
-	)
+			expect(job_scripts(workflow_case).some((script) => script.includes(writer_command))).toBe(
+				true,
+			)
+		})
+	})
 })
 
 describe('the distributed template caches only files its checks write', () => {
@@ -110,5 +113,9 @@ describe('the distributed template caches only files its checks write', () => {
 
 	it('does not configure an unwritten TypeScript build cache', () => {
 		expect(cache_step(TEMPLATE_WORKFLOW_CASE, TS_BUILD_CACHE_STEP)).toBeUndefined()
+	})
+
+	it('does not configure an unwritten prettier cache', () => {
+		expect(cache_step(TEMPLATE_WORKFLOW_CASE, PRETTIER_CACHE_STEP)).toBeUndefined()
 	})
 })

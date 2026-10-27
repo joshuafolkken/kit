@@ -1,9 +1,9 @@
-import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from 'node:fs'
 import path from 'node:path'
 import { josh_cli_fixture } from '#scripts/josh/josh-cli-fixture'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { BUNDLED_COMMAND_DIRECTORY } from '#scripts/josh/josh-in-process'
+import { execa } from 'execa'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { build_bin } from './build-bin'
 import { build_commands } from './build-commands'
@@ -34,7 +34,7 @@ const INVOCATIONS: ReadonlyArray<ReadonlyArray<string>> = [
 ]
 
 interface Answer {
-	status: number | null
+	status: number | undefined
 	stdout: string
 	stderr: string
 }
@@ -61,16 +61,20 @@ afterAll(() => {
 	rmSync(package_root, { recursive: true, force: true })
 })
 
-function answer(command: string, arguments_: ReadonlyArray<string>): Answer {
-	const result = spawnSync(command, arguments_, { cwd: PACKAGE_DIR, encoding: 'utf8' })
+async function answer(command: string, arguments_: ReadonlyArray<string>): Promise<Answer> {
+	const result = await execa(command, [...arguments_], {
+		cwd: PACKAGE_DIR,
+		reject: false,
+		stripFinalNewline: false,
+	})
 
-	return { status: result.status, stdout: result.stdout, stderr: result.stderr }
+	return { status: result.exitCode, stdout: result.stdout, stderr: result.stderr }
 }
 
-function source_answer(arguments_: ReadonlyArray<string>): Answer {
+async function source_answer(arguments_: ReadonlyArray<string>): Promise<Answer> {
 	const { executable, leading_arguments } = josh_cli_fixture.SOURCE_JOSH
 
-	return answer(executable, [...leading_arguments, ...arguments_])
+	return await answer(executable, [...leading_arguments, ...arguments_])
 }
 
 const BUNDLED_COMMANDS = Object.keys(COMMAND_MAP).filter(
@@ -84,10 +88,16 @@ describe('bundled commands through dist/josh.js', () => {
 		expect(named).toStrictEqual(new Set(BUNDLED_COMMANDS))
 	})
 
+	// The two sides share no state, so they start together: one start-up each test, not two.
 	it.each(INVOCATIONS)(
 		'%s answers the same as the source dispatcher',
-		(...invocation) => {
-			expect(answer('node', [built_josh, ...invocation])).toStrictEqual(source_answer(invocation))
+		async (...invocation) => {
+			const [built, source] = await Promise.all([
+				answer('node', [built_josh, ...invocation]),
+				source_answer(invocation),
+			])
+
+			expect(built).toStrictEqual(source)
 		},
 		RUN_TIMEOUT,
 	)

@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
@@ -437,10 +438,13 @@ async function scoped_refusal(): Promise<string | undefined> {
 	return scoped_green.refusal_for(tree, commit)
 }
 
-// `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
-// the Bash output cap (joshuafolkken/kit#4863). `run` prints it.
-async function run_to(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
-	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+// **A reviewer never mints a brief** (joshuafolkken/kit#5113): every brief takes a fresh nonce and drops
+// the previous one's records, so a reviewer that re-briefs after attesting erases the attestation its
+// supervisor is about to check, and a finished review reads as none. `--level-only` mints nothing.
+const REVIEWER_REFUSAL =
+	'review:brief refused: this is a reviewer session (JOSH_AGENT_ROLE=reviewer). A new brief would drop the attestation this review already left — review the brief you were handed and report.'
+
+async function run_brief(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
 	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction(emit)
 
 	const round = parse_round(argv)
@@ -448,6 +452,15 @@ async function run_to(argv: ReadonlyArray<string>, emit: Emit): Promise<number> 
 	if (round === undefined) return report_error(USAGE)
 
 	return await run_review(round, await read_change(), emit)
+}
+
+// `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
+// the Bash output cap (joshuafolkken/kit#4863). `run` prints it.
+async function run_to(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
+	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+	if (agent_session_role.is_reviewer()) return report_error(REVIEWER_REFUSAL)
+
+	return await run_brief(argv, emit)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

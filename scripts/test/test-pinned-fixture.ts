@@ -1,6 +1,6 @@
-import { symlink, writeFile } from 'node:fs/promises'
+import { cp, symlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { git_fixture_workspace } from '#scripts/git/git-fixture-workspace'
+import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 
 // The git repository `josh test:pinned`'s run tests drive, modelled on joshuafolkken/kit#4102's round 1:
 // `run()` gained a driver-flag output beside `result.token`, and the tests only covered the default
@@ -79,6 +79,40 @@ async function build_change_branch(): Promise<void> {
 	await link_node_modules()
 }
 
+interface Template<T> {
+	workspace: FixtureWorkspace
+	first: T
+}
+
+// joshuafolkken/kit#5111: a branch built and run once per file, which each test copies — `.git` and
+// the verdict cache in it included — instead of building it and probing it cold again. The cache keys
+// on relative paths and contents, so a copy reads the template's verdicts as its own.
+async function open_template<T>(
+	prefix: string,
+	build: () => Promise<void>,
+	first_run: () => Promise<T>,
+): Promise<Template<T>> {
+	const workspace = git_fixture_workspace.open_workspace(prefix)
+
+	process.chdir(workspace.workspace)
+
+	try {
+		await build()
+
+		return { workspace, first: await first_run() }
+	} catch (error) {
+		await git_fixture_workspace.close_workspace(workspace)
+		throw error
+	}
+}
+
+// Into the current directory, the workspace a test opened; answers the template's first report.
+async function copy_template<T>(template: Template<T>): Promise<T> {
+	await cp(template.workspace.workspace, process.cwd(), { recursive: true, verbatimSymlinks: true })
+
+	return template.first
+}
+
 async function snapshot(): Promise<string> {
 	const status = await git(['status', PORCELAIN])
 	const trees = await git(['worktree', 'list', PORCELAIN])
@@ -93,10 +127,12 @@ const test_pinned_fixture = {
 	TEST_FILE,
 	build_base,
 	build_change_branch,
+	copy_template,
 	git,
 	link_node_modules,
+	open_template,
 	snapshot,
 	write,
 }
 
-export { test_pinned_fixture }
+export { test_pinned_fixture, type Template }

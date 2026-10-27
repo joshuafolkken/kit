@@ -330,6 +330,24 @@ jobs:
             ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-cspell-cache-
 
+      # joshuafolkken/kit#5116: `josh lint --changed` runs `prettier --check . --cache --cache-strategy
+      # content --cache-location .prettiercache` beside eslint, and with no restored cache it walked
+      # the whole tree cold on every run. Prettier hashes each file's absolute path into its entry
+      # (`scripts/josh/josh-command-types.ts` → `GATE_CACHE_SPECS`), which is why no lane shares it,
+      # but the runner checks out to the same path on every run, so an earlier run's entries hit. The
+      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha.
+      - name: Setup prettier cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: prettier-cache
+        with:
+          path: |
+            .prettiercache
+          key: ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('prettier.config.js', 'prettier/**/*.js') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('prettier.config.js', 'prettier/**/*.js') }}-
+            ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-prettier-cache-
+
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
         with:
