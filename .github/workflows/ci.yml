@@ -242,12 +242,23 @@ jobs:
   # needed a ruleset edit to stay as strict as it was, and left every merge between the two
   # unguarded. So the two halves run under new names and `Checks` stays exactly what the ruleset
   # already requires: a job that is green only when both halves are.
+  #
+  # **The static half is a matrix of three legs** (joshuafolkken/kit#5215). On one runner its seven
+  # checks took 4.1 minutes while every unit shard was done in about two, so it was the critical path
+  # to `Checks`. Each leg is still `josh gate`, narrowed by `--static-group` to the partition
+  # `scripts/gate/gate-static-group.ts` defines, and restores only the caches its checks write — a leg
+  # that restored a cache it never writes would save it back unchanged under the same sha-keyed name,
+  # racing the leg that does write it. `needs.static-checks.result` is `success` only when every leg is.
   static-checks:
-    name: Static Checks
+    name: Static Checks (${{ matrix.group }})
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [lint, types, rest]
     permissions:
       contents: read
       packages: read
@@ -269,6 +280,7 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
+        if: matrix.group == 'lint'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
         with:
@@ -309,6 +321,7 @@ jobs:
       # `josh check` runs `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` and `josh
       # cspell:dot` runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`.
       - name: Setup TypeScript build cache
+        if: matrix.group == 'types'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: tsbuildinfo-cache
         with:
@@ -320,6 +333,7 @@ jobs:
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Setup cspell cache
+        if: matrix.group == 'rest'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cspell-cache
         with:
@@ -337,6 +351,7 @@ jobs:
       # but the runner checks out to the same path on every run, so an earlier run's entries hit. The
       # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha.
       - name: Setup prettier cache
+        if: matrix.group == 'lint'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: prettier-cache
         with:
@@ -394,9 +409,10 @@ jobs:
       # default branch itself. A name that does not resolve fails the step rather than comparing
       # with nothing.
       - name: Run verification gate
-        run: pnpm josh gate --verbose --no-unit
+        run: pnpm josh gate --verbose --no-unit "--static-group=${STATIC_GROUP}"
         env:
           JOSH_METRICS_BASE: HEAD^1
+          STATIC_GROUP: ${{ matrix.group }}
 
       # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no
       # ESLint cache, and a later pull request restored an entry several merges old. Since
@@ -408,13 +424,13 @@ jobs:
       # transient artifact-service error must not turn this required job red; it continues on error.
       - name: Write ESLint cache prefix
         id: eslint-cache-prefix
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.group == 'lint'
         env:
           ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
         run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
 
       - name: Upload ESLint cache
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.group == 'lint'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

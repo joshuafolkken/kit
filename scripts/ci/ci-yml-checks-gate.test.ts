@@ -1,3 +1,4 @@
+import { gate_static_group } from '#scripts/gate/gate-static-group'
 import { GATE_TARGETS, verification_gate } from '#scripts/gate/verification-gate'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
@@ -56,12 +57,14 @@ describe('the static-checks job runs the verification gate', () => {
 
 	// Whole-script equality, and both flags matter. `--verbose` prints every check body, so a check
 	// that passed with warnings is in the log rather than hidden behind a one-line green summary.
-	// `--no-unit` is what says this job runs three of the four — asserted from the constants the gate
+	// `--no-unit` is what leaves the unit suite out of this job — asserted from the constants the gate
 	// itself defines, so a flag renamed in `verification-gate.ts` fails here rather than leaving the
 	// workflow passing an argument the gate would refuse.
-	it('runs the three static checks verbosely, the unit suite having its own job', () => {
+	// joshuafolkken/kit#5215: each matrix leg names its group through the step's env, so the matrix value
+	// reaches the gate as data rather than as an expression spliced into the script.
+	it('runs the static checks verbosely, one group per leg, the unit suite having its own job', () => {
 		expect(checks_scripts()).toContain(
-			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG}`,
+			`${GATE_STEP} ${verification_gate.VERBOSE_FLAG} ${verification_gate.NO_UNIT_FLAG} "${gate_static_group.STATIC_GROUP_FLAG_PREFIX}\${STATIC_GROUP}"`,
 		)
 	})
 })
