@@ -20,6 +20,8 @@ Review results and successful pushes are never turn boundaries.
    the stage printed nothing), on a review stop the sweep of each finding's other sites the stop note
    directs, and (Anthropic lane) the re-detach to run after the fix — `pnpm josh ship --detach`, `--review` only if the stopped ship carried it and stopped before
    round 2, which is final, or the review went stale (`scripts/run/ship/run-ship-next.ts`).
+   A preflight stop `unplanned: <files>` → take one of the two ways out it prints, then re-detach
+   — unless its `lane:plan` answers `yield` (`docs/josh-commands-run.md` → "`josh ship`").
    `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
