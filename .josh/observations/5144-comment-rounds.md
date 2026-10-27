@@ -1,0 +1,1 @@
+- rf:assumptions | low | scripts/issue/issue-sample-required.ts:45 | 2026-10-27 | #5144
