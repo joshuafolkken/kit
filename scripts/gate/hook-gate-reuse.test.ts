@@ -187,6 +187,36 @@ describe(REUSE_CALL, () => {
 	})
 })
 
+// joshuafolkken/kit#5234: each refusal `hook_reuse` answers is classified off its own sentence.
+function kind_of(reuse: ReturnType<typeof hook_gate_reuse.hook_reuse>): string | undefined {
+	if (!('miss' in reuse)) return undefined
+
+	return hook_gate_reuse.miss_kind(reuse.miss, { carry_miss: CARRY_MISS, force_env: FORCE_ENV })
+}
+
+describe('hook_gate_reuse.miss_kind', () => {
+	beforeEach(() => {
+		review_stamps.gate_stamp.write(TREE.files, stamp_path, BASE)
+	})
+
+	it('classifies the hook refusals by their own kinds', () => {
+		expect(kind_of(reusable(AN_ARGUMENT))).toBe('arguments')
+		expect(kind_of(reusable(NO_ARGUMENTS, false))).toBe('tree-not-carried')
+	})
+
+	it('classifies the escape hatch as forced', () => {
+		vi.stubEnv(FORCE_ENV, '1')
+
+		expect(kind_of(reusable())).toBe('forced')
+	})
+
+	it('hands a gate refusal on to the gate classification', () => {
+		review_stamps.gate_stamp.write(TREE.files, stamp_path, 'e5f6a7b8')
+
+		expect(kind_of(reusable())).toBe('base-moved')
+	})
+})
+
 // joshuafolkken/kit#1786: `josh layers` reports which of its rows a green gate lets a hook skip, and
 // it reads the list from here rather than keeping its own. A list kept by hand goes stale silently —
 // the report would go on printing a retired name, or stop printing a new one — so it is compared

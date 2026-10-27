@@ -10,6 +10,7 @@ import {
 	type LaneStateChangeRecord,
 	type LedgerEntry,
 	type OverlapRecord,
+	type PushMissRecord,
 	type RoundOneRecord,
 	type RoundTwoRecord,
 	type SplitFiledRecord,
@@ -198,6 +199,10 @@ async function record_split_filed(filed: SplitFiledRecord, path?: string): Promi
 	await record({ kind: KIND.SPLIT_FILED, at: now_iso(), ...filed }, path)
 }
 
+async function record_push_miss(miss: PushMissRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.PUSH_MISS, at: now_iso(), ...miss }, path)
+}
+
 async function record_unplanned_notice(
 	notice: UnplannedNoticeRecord,
 	path?: string,
@@ -224,6 +229,7 @@ const lane_ledger_write = {
 	record_merge,
 	record_overlap,
 	record_offerable,
+	record_push_miss,
 	record_round_one,
 	record_round_two,
 	record_split_filed,

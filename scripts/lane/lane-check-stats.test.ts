@@ -116,6 +116,32 @@ describe('lane_check_stats.table — the whole gate and the fallbacks', () => {
 	})
 })
 
+// joshuafolkken/kit#5234: a pre-push hook's miss joins the fallback reasons, told apart by its scope.
+const BASE_MOVED = 'base-moved'
+
+function push_miss(scope: 'whole' | 'related', reason: string): LedgerEntry {
+	return { kind: 'push-miss', at: AT, scope, reason }
+}
+
+describe('lane_check_stats.table — the pre-push misses', () => {
+	it('counts each pre-push miss by its scope and reason kind beside the gate fallbacks', () => {
+		const entries = [
+			gate([{ ...check(UNIT, CHECK_MS), fallback: NO_MAP }]),
+			push_miss('related', BASE_MOVED),
+			push_miss('related', BASE_MOVED),
+			push_miss('whole', 'record-differs'),
+		]
+
+		expect(row_of(entries, NO_MAP)).toStrictEqual(['1'])
+		expect(row_of(entries, 'pre-push related: base-moved')).toStrictEqual(['2'])
+		expect(row_of(entries, 'pre-push whole: record-differs')).toStrictEqual(['1'])
+	})
+
+	it('adds no check row for a pre-push miss', () => {
+		expect(row_of([push_miss('whole', 'no-record')], WHOLE_GATE_LABEL)).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#4457: the unit leg's since-green no-op ran no test, so it is counted, never timed.
 describe('lane_check_stats.table — the unit leg no-ops', () => {
 	it('counts the no-ops without letting their seconds reach the timings', () => {

@@ -6,6 +6,7 @@ import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
 import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -114,6 +115,8 @@ async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[n
 		stdout.restore()
 	}
 }
+
+const record_push_miss = vi.spyOn(lane_ledger_write, 'record_push_miss')
 
 function suite_run_count(): number {
 	return run_guarded_unit.mock.calls.length
@@ -284,6 +287,8 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		expect(text).toContain(
 			`${MISS_LEAD}the merge base moved since the green gate (${ADVANCED_BASE} → ${BASE}).`,
 		)
+		// joshuafolkken/kit#5234: the miss's kind reaches the lane ledger, for `lane:stats` to count.
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'base-moved' })
 	})
 
 	it('names the paths that leave the working tree dirty', async () => {
@@ -293,6 +298,7 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).toContain(`${MISS_LEAD}the working tree differs from HEAD ( M pnpm-lock.yaml).`)
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'tree-not-carried' })
 	})
 
 	it('names a missing record', async () => {
@@ -316,6 +322,7 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).not.toContain(MISS_LEAD)
+		expect(record_push_miss).not.toHaveBeenCalled()
 	})
 })
 
@@ -358,6 +365,7 @@ describe('a push ahead of its gate runs the related tests', () => {
 		expect(run_related_tests).toHaveBeenCalledWith([])
 		expect(suite_run_count()).toBe(NOTHING_RAN)
 		expect(text).toContain('running the related unit tests')
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'related', reason: 'no-record' })
 	})
 
 	it('still reuses a record that covers the push', async () => {
