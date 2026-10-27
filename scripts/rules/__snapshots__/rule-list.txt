@@ -74,7 +74,7 @@
   - not automated: which model fits the unit is the author's call
 - **Investigator dispatched in the foreground** (`investigator-foreground`, `.claude/skills/workflow-commands/delegation.md` → "The pre-implementation reading — what goes to a unit, and from which file")
   - fires: `pnpm josh pretool:guard` — an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence
-  - silent: another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused) — remembered for the session
+  - silent: another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session
   - not automated: which reads go beside the dispatch is the author’s call
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence

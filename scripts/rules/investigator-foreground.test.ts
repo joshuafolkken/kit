@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
-import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
+import type { GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -21,7 +21,6 @@ const INVESTIGATOR = 'investigator'
 const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
 const ROW_REASON = investigator_foreground.ROW.reason
-const { NEVER_MS } = hook_decision
 const { REISSUE_WINDOW_MS } = implementation_cut
 
 function agent_call(
@@ -72,9 +71,12 @@ afterAll(() => {
 	rmSync(WORK_DIRECTORY, { recursive: true, force: true })
 })
 
-// A transcript of its own per call, so one test's remembered build never reaches another's.
-function fresh_run(): GuardRun {
-	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms: 1 }
+const TIMESTAMP_MS = Date.parse(TIMESTAMP)
+
+// A transcript of its own per call, so one test's remembered build never reaches another's. Past the
+// reissue window of the tail's results unless a test says otherwise.
+function fresh_run(now_ms = TIMESTAMP_MS + REISSUE_WINDOW_MS): GuardRun {
+	return { transcript: path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`), now_ms }
 }
 
 function lacks(tail: string, call: GuardedCall, run: GuardRun = fresh_run()): boolean {
@@ -277,63 +279,73 @@ function payload_of(run: GuardRun, input: Record<string, unknown>): string {
 	return JSON.stringify({ transcript_path: run.transcript, tool_name: 'Agent', tool_input: input })
 }
 
-// A session the delivered guard reads: the switch on and an empty transcript.
-function delivered_run(): GuardRun {
-	const run = fresh_run()
+function sibling_use(id: string, prompt: string): Record<string, unknown> {
+	return { type: 'tool_use', id, name: 'Agent', input: { subagent_type: INVESTIGATOR, prompt } }
+}
 
-	vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
-	writeFileSync(run.transcript, '')
+// Two dispatches launched in one message, the first refused by this row.
+function sibling_tail(): string {
+	const content = [sibling_use('toolu_2', PROMPT), sibling_use('toolu_3', OTHER_PROMPT)]
+	const message = { id: 'msg_1', role: 'assistant', content }
+	const use = JSON.stringify({ type: 'assistant', timestamp: TIMESTAMP, message })
 
-	return run
+	return [use, result_line('toolu_2')].join('\n')
 }
 
 // joshuafolkken/kit#5148: the harness drops the undeclared field before the hook and the transcript see
-// it, so a reissue rewritten after the refusal leaves no tell. The row's own refusal is the tell.
-describe('investigator_foreground.ROW.decide — the row’s own refusal as the tell', () => {
-	it('passes a rewritten reissue with no field anywhere, and remembers the build', () => {
-		const run = delivered_run()
-		const first = payload_of(run, { subagent_type: INVESTIGATOR, prompt: PROMPT })
-		const rewritten = payload_of(run, { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT })
+// it, so a reissue rewritten after the refusal leaves no tell. The row's own answered refusal is the
+// tell, read off the tail so a sibling or a later dispatch in a build that declares the field is not.
+const REWRITTEN_INPUT = { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT }
 
-		expect(delivered_rules.delivery(first)).toBe(investigator_foreground.ROW.reason)
-		expect(delivered_rules.delivery(rewritten)).toBeUndefined()
+function within_window(): GuardRun {
+	return fresh_run(TIMESTAMP_MS + REISSUE_WINDOW_MS - 1)
+}
+
+describe('investigator_foreground.lacks_background_field — the row’s own refusal as the tell', () => {
+	const rewritten = agent_call(REWRITTEN_INPUT)
+	const refused_tail = refused_dispatch({ prompt: PROMPT }, 'toolu_2')
+
+	it('stands down on a rewritten reissue with no field anywhere, and remembers the build', () => {
+		const run = within_window()
+
+		expect(lacks(refused_tail, rewritten, run)).toBe(true)
 		expect(lacks('', agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
 	})
 
 	it('keeps refusing a dispatch that names the background after a refusal', () => {
-		const run = delivered_run()
-		const background = { subagent_type: INVESTIGATOR, run_in_background: true }
+		const background = agent_call({ subagent_type: INVESTIGATOR, run_in_background: true })
 
-		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
-		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
+		expect(lacks(refused_tail, background, within_window())).toBe(false)
 	})
 
-	// A build that declares the field: a refusal, its foreground reissue, then a new bare dispatch.
-	it('refuses a bare dispatch past the reissue window, and remembers nothing', () => {
-		const run = delivered_run()
-		const first = payload_of(run, { subagent_type: INVESTIGATOR, prompt: PROMPT })
-		const later = payload_of(run, { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT })
-		const refused_at_ms = Date.now()
+	it.each([
+		['past the reissue window', refused_tail, fresh_run],
+		['beside the refused call in its message', sibling_tail(), within_window],
+		[
+			'after a foreground reissue that ran',
+			[refused_tail, refused_dispatch({ prompt: PROMPT }, 'toolu_3', false)].join('\n'),
+			within_window,
+		],
+	])('refuses a bare dispatch %s, and remembers nothing', (_case, tail, run_of) => {
+		const run = run_of()
 
-		expect(delivered_rules.delivery(first, refused_at_ms)).toBe(ROW_REASON)
-		expect(delivered_rules.delivery(later, refused_at_ms + REISSUE_WINDOW_MS)).toBe(ROW_REASON)
-		expect(lacks('', agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(false)
+		expect(lacks(tail, rewritten, run)).toBe(false)
+		expect(lacks('', rewritten, run)).toBe(false)
 	})
 
-	it('remembers nothing when the batching guard refuses the call instead', () => {
+	it('refuses the rewritten reissue on the delivered guard once the refusal is past the window', () => {
 		const run = fresh_run()
-		const call = agent_call({ subagent_type: INVESTIGATOR })
 
-		expect(investigator_foreground.ROW.decide(call, run, false, 1)).toBe(false)
-		expect(lacks('', call, run)).toBe(false)
+		vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
+		writeFileSync(run.transcript, refused_tail)
+
+		expect(delivered_rules.delivery(payload_of(run, REWRITTEN_INPUT))).toBe(ROW_REASON)
 	})
 })
 
 describe('investigator_foreground.ROW — delivered by the rule guard', () => {
-	it('refuses every occurrence until this row has refused once', () => {
-		const call = agent_call({ subagent_type: INVESTIGATOR })
-
-		expect(investigator_foreground.ROW.decide(call, fresh_run(), true, NEVER_MS)).toBe(true)
+	it('refuses every occurrence', () => {
+		expect(investigator_foreground.ROW.decide()).toBe(true)
 	})
 
 	it('scores a foreground dispatch as kept and reaches every investigator dispatch', () => {

@@ -2,7 +2,11 @@ import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
+import {
+	time_transcript_line,
+	type Block,
+	type TranscriptLine,
+} from '#scripts/time-runtime/time-transcript-line'
 import { agent_model } from './agent-model'
 import { implementation_cut } from './implementation-cut'
 
@@ -33,9 +37,11 @@ import { implementation_cut } from './implementation-cut'
 //
 // **This row's own refusal is the last tell** (joshuafolkken/kit#5148). The harness drops an undeclared
 // argument before both the hook and the transcript see it, so a reissue rewritten after the refusal
-// leaves no tell on the tail. A reissue inside the refusal-then-reissue window that still carries no
-// field passes, and is remembered for the session; one that names the background is refused every
-// time, and a dispatch past the window is a new one.
+// leaves no tell on the tail. A reissue that still carries no field passes, and is remembered for the
+// session, when the last answered investigator dispatch on the tail is this row's refusal, alone in its
+// message and inside the refusal-then-reissue window. A sibling of the refused call shares its message,
+// a dispatch after an answered reissue follows a call that ran, and one past the window is a new one —
+// each still refused where the build declares the field.
 
 const INVESTIGATOR_FOREGROUND_REASON =
 	'⛔ investigator foreground: a background `investigator` leaves its result queued until a later turn. ' +
@@ -79,19 +85,33 @@ function is_untyped_field(name: string, input: unknown): boolean {
 	return typeof input[BACKGROUND_FIELD] === 'string'
 }
 
-// The ids of the tail's calls that have a result, and of those this row refused.
+// The ids of the tail's calls that have a result, and of those this row refused with the refusal's
+// instant.
 interface TailResults {
 	answered: ReadonlySet<string>
-	refused: ReadonlySet<string>
+	refused: ReadonlyMap<string, number>
 }
 
-function results_of(blocks: ReadonlyArray<Block>): TailResults {
-	const results = blocks.filter((block) => block.result_id !== '')
-	const refused = results.filter((block) => block.refusal_guard === GUARD_LABEL)
+// A block with the message it was written in, or the instant its line was written.
+interface Placed {
+	block: Block
+	message_id: string
+	at_ms: number
+}
+
+function placed_of(lines: ReadonlyArray<TranscriptLine>): Array<Placed> {
+	return lines.flatMap((line) =>
+		line.blocks.map((block) => ({ block, message_id: line.message_id, at_ms: line.timestamp_ms })),
+	)
+}
+
+function results_of(placed: ReadonlyArray<Placed>): TailResults {
+	const results = placed.filter(({ block }) => block.result_id !== '')
+	const refused = results.filter(({ block }) => block.refusal_guard === GUARD_LABEL)
 
 	return {
-		answered: new Set(results.map((block) => block.result_id)),
-		refused: new Set(refused.map((block) => block.result_id)),
+		answered: new Set(results.map(({ block }) => block.result_id)),
+		refused: new Map(refused.map(({ block, at_ms }) => [block.result_id, at_ms])),
 	}
 }
 
@@ -123,16 +143,38 @@ function is_dropped_foreground(block: Block, results: TailResults): boolean {
 	return results.refused.has(block.id) && is_investigator(block) && writes_foreground(block)
 }
 
-function tail_shows_no_field(tail: string, call: GuardedCall): boolean {
-	const blocks = time_transcript_line.parse_text(tail).flatMap((line) => line.blocks)
-	const results = results_of(blocks)
+function refused_at_ms(dispatch: Placed | undefined, results: TailResults): number {
+	return results.refused.get(dispatch?.block.id ?? '') ?? hook_decision.NEVER_MS
+}
 
-	return blocks.some(
-		(block) =>
+function is_alone(dispatch: Placed, dispatches: ReadonlyArray<Placed>): boolean {
+	return dispatches.filter(({ message_id }) => message_id === dispatch.message_id).length === 1
+}
+
+// The call in hand reissues this row's refusal: the last investigator dispatch with a result is one
+// this row refused, alone in its message, within the reissue window. A sibling launched beside the
+// refused call shares its message, and a dispatch after an answered reissue follows a call that ran.
+function is_reissue(placed: ReadonlyArray<Placed>, results: TailResults, now_ms: number): boolean {
+	const dispatches = placed.filter(({ block }) => is_investigator(block))
+	const last = dispatches.findLast(({ block }) => results.answered.has(block.id))
+	const at_ms = refused_at_ms(last, results)
+
+	if (last === undefined || at_ms === hook_decision.NEVER_MS) return false
+
+	return is_alone(last, dispatches) && now_ms - at_ms < implementation_cut.REISSUE_WINDOW_MS
+}
+
+function tail_shows_no_field(tail: string, call: GuardedCall, now_ms: number): boolean {
+	const placed = placed_of(time_transcript_line.parse_text(tail))
+	const results = results_of(placed)
+	const has_block_tell = placed.some(
+		({ block }) =>
 			is_untyped_field(block.name, block.input) ||
 			is_same_dispatch(block, call, results) ||
 			is_dropped_foreground(block, results),
 	)
+
+	return has_block_tell || is_reissue(placed, results, now_ms)
 }
 
 function remember_no_field(run: GuardRun): boolean {
@@ -154,26 +196,10 @@ function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun):
 	if (field_of(call.input, BACKGROUND_FIELD) === true) return false
 	if (is_remembered(run)) return true
 
-	const has_tell = is_untyped_field(call.name, call.input) || tail_shows_no_field(tail, call)
+	const has_tell =
+		is_untyped_field(call.name, call.input) || tail_shows_no_field(tail, call, run.now_ms)
 
 	return has_tell && remember_no_field(run)
-}
-
-// The call in hand answers this row's own refusal (`at_ms`): a later dispatch is a new one, which a
-// build that declares the field still refuses.
-function is_reissue(run: GuardRun, at_ms: number): boolean {
-	if (at_ms === hook_decision.NEVER_MS) return false
-
-	return run.now_ms - at_ms < implementation_cut.REISSUE_WINDOW_MS
-}
-
-// Refuses unless the call in hand reissues this row's refusal and still carries no field. The
-// stand-down is remembered only when the call is not refused by the batching guard instead.
-function refuses(call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number): boolean {
-	if (!is_reissue(run, at_ms) || field_of(call.input, BACKGROUND_FIELD) !== undefined) return true
-	if (can_record) remember_no_field(run)
-
-	return false
 }
 
 const ROW = {
@@ -181,7 +207,7 @@ const ROW = {
 	is_trigger: is_background_investigator,
 	reason: INVESTIGATOR_FOREGROUND_REASON,
 	already_satisfied: lacks_background_field,
-	decide: refuses,
+	decide: (): boolean => true,
 	keeps: keeps_foreground,
 	reaches: is_investigator,
 	about: {
@@ -191,7 +217,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused) — remembered for the session',
+			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused a lone dispatch) — remembered for the session',
 	},
 }
 
