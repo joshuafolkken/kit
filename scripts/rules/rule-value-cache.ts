@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { statSync } from 'node:fs'
 import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { file_reader } from '#scripts/lib/read-file'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -14,7 +15,12 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 // **It reports and never fails**, as `rule:value` itself does: a missing cache, an unwritable directory
 // or a refresh that could not start prints at most nothing, and never changes the offer's answer.
 
-const CACHE_DIRECTORY = ['node_modules', '.cache', 'josh']
+// Outside a repository only: inside one the cache lives in the common git directory, so a lane's work
+// tree reads the reading its parent's loop head stored rather than measuring again
+// (joshuafolkken/kit#5186). The reading is the main checkout's — its transcripts and every lane's —
+// because only the main checkout writes it (`is_linked_work_tree`); a lane's own measurement reaches
+// only its own transcripts (`cost_transcript.transcript_directories`).
+const FALLBACK_DIRECTORY = ['node_modules', '.cache', 'josh']
 const CACHE_FILE = 'rule-value.txt'
 // Touched when a refresh starts, so the loop head starts at most one per interval however often it runs.
 const STAMP_FILE = 'rule-value.stamp'
@@ -28,12 +34,46 @@ interface CachePorts {
 	start_refresh: (cwd: string) => void
 }
 
+interface FreshReading {
+	text: string
+	taken_at: Date
+}
+
 function cache_path(cwd: string, file: string): string {
-	return path.join(cwd, ...CACHE_DIRECTORY, file)
+	const common = git_common_directory.repository(cwd)
+
+	if (common === undefined) return path.join(cwd, ...FALLBACK_DIRECTORY, file)
+
+	return path.join(common, git_common_directory.STATE_DIRECTORY, file)
 }
 
 function read_cached(cwd: string): string | undefined {
 	return file_reader.read_if_readable(cache_path(cwd, CACHE_FILE))
+}
+
+function taken_at_if_fresh(cwd: string, now_ms: number): Date | undefined {
+	try {
+		const { mtime } = statSync(cache_path(cwd, CACHE_FILE))
+
+		return now_ms - mtime.getTime() < REFRESH_MS ? mtime : undefined
+	} catch {
+		return undefined
+	}
+}
+
+// The stored reading when it was taken inside the refresh interval — what `josh rule:value` prints
+// instead of measuring. `undefined` is a miss: no reading, or one older than the interval.
+function read_fresh(
+	cwd: string = process.cwd(),
+	now_ms: number = Date.now(),
+): FreshReading | undefined {
+	const taken_at = taken_at_if_fresh(cwd, now_ms)
+
+	if (taken_at === undefined) return undefined
+
+	const text = read_cached(cwd)
+
+	return text === undefined ? undefined : { text, taken_at }
 }
 
 function is_refresh_due(cwd: string, now_ms: number): boolean {
@@ -63,8 +103,14 @@ function start_refresh_default(cwd: string): void {
 
 const DEFAULT_PORTS: CachePorts = { now: Date.now, start_refresh: start_refresh_default }
 
+// A linked work tree — a lane — measures its own transcripts alone, so it never writes the main
+// checkout's reading or its stamp: either would stand in for the whole repository's for an interval.
+function is_linked_work_tree(cwd: string): boolean {
+	return git_common_directory.resolve(cwd) !== undefined
+}
+
 function refresh_if_due(cwd: string, ports: CachePorts): void {
-	if (!is_refresh_due(cwd, ports.now())) return
+	if (is_linked_work_tree(cwd) || !is_refresh_due(cwd, ports.now())) return
 
 	write_cache_file(cwd, STAMP_FILE, new Date(ports.now()).toISOString())
 	ports.start_refresh(cwd)
@@ -85,10 +131,12 @@ function emit(cwd: string = process.cwd(), ports: CachePorts = DEFAULT_PORTS): v
 
 // The detached refresh's body: the reading written whole, so a reader never sees half of one.
 function store(text: string, cwd: string = process.cwd()): void {
+	if (is_linked_work_tree(cwd)) return
+
 	write_cache_file(cwd, CACHE_FILE, `${text}\n`)
 }
 
-const rule_value_cache = { CACHE_FILE, REFRESH_MS, STAMP_FILE, cache_path, emit, store }
+const rule_value_cache = { CACHE_FILE, REFRESH_MS, STAMP_FILE, cache_path, emit, read_fresh, store }
 
-export type { CachePorts }
+export type { CachePorts, FreshReading }
 export { rule_value_cache }

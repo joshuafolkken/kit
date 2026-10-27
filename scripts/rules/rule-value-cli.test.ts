@@ -1,7 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
 import { rule_value_cache } from './rule-value-cache'
@@ -228,6 +229,72 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 			vi.restoreAllMocks()
 			rmSync(cwd, { recursive: true, force: true })
 		}
+	})
+})
+
+const CACHED_TABLE = 'issue-comments  reached 3  100% unaided  refused 0'
+
+interface CachedRun {
+	is_measured: boolean
+	out: string
+}
+
+// A fresh directory holding a reading whose cache file was written `age_ms` ago.
+function directory_with_cache(age_ms: number): string {
+	const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+	const seconds = (Date.now() - age_ms) / MS_PER_SECOND
+
+	rule_value_cache.store(CACHED_TABLE, cwd)
+	utimesSync(rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE), seconds, seconds)
+
+	return cwd
+}
+
+// Run against that cache with the transcript listing spied, so a test reads whether it measured.
+function run_with_cache(argv: ReadonlyArray<string>, age_ms: number): CachedRun {
+	const cwd = directory_with_cache(age_ms)
+	const out = new Array<string>()
+	const listing = vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([])
+
+	vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+		out.push(String(chunk))
+
+		return true
+	})
+
+	try {
+		rule_value_cli.run_rule_value(argv, cwd)
+
+		return { is_measured: listing.mock.calls.length > 0, out: out.join('') }
+	} finally {
+		vi.restoreAllMocks()
+		rmSync(cwd, { recursive: true, force: true })
+	}
+}
+
+describe('rule_value_cli.run_rule_value — a fresh cached reading is printed without measuring', () => {
+	it('prints the cached table and when it was taken, without listing a transcript', () => {
+		const { is_measured, out } = run_with_cache([], 0)
+
+		expect(is_measured).toBe(false)
+		expect(out).toContain(CACHED_TABLE)
+		expect(out).toMatch(
+			new RegExp(String.raw`${rule_value_cli.CACHED_NOTE} \d{4}-\d{2}-\d{2}T`, 'u'),
+		)
+	})
+
+	it('measures when the cached reading is older than the refresh interval', () => {
+		const { is_measured, out } = run_with_cache([], rule_value_cache.REFRESH_MS)
+
+		expect(is_measured).toBe(true)
+		expect(out).toBe(`${rule_value_cli.NO_TARGETS}\n`)
+	})
+
+	it('measures regardless of a fresh cache under --fresh', () => {
+		const { is_measured, out } = run_with_cache(['--fresh'], 0)
+
+		expect(is_measured).toBe(true)
+		expect(out).not.toContain(rule_value_cli.CACHED_NOTE)
 	})
 })
 
