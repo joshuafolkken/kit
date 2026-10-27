@@ -92,6 +92,15 @@ describe('check_related.report_results metrics growth notice', () => {
 	})
 })
 
+// joshuafolkken/kit#5157: a lane read the notice as a failure and ran check:related again after the accept.
+describe('check_related.report_results metrics accept', () => {
+	it('tells the reader the accept needs no check:related re-run', () => {
+		const verdict = report_with_lint_output(GROWTH_NOTICE).at(-1) ?? ''
+
+		expect(verdict).toContain('the accept needs no `check:related` re-run')
+	})
+})
+
 // joshuafolkken/kit#5162: failures, then where the whole output went, then the verdict.
 describe('check_related.report_results tail', () => {
 	const results = check_related.CHECKS.map((command): CheckResult => ({
