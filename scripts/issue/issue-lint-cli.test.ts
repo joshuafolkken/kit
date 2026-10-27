@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { issue_lint_cli } from './issue-lint-cli'
+import { issue_template_section } from './issue-template-section'
 
 const TEMP_PATHS: Array<string> = []
 const VALID_BODY = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）\n'
@@ -60,7 +61,7 @@ describe('issue:lint fenced headings', () => {
 		expect(await issue_lint_cli.run(body_path)).toBe(1)
 		expect(report).toHaveBeenCalledWith(
 			expect.stringMatching(
-				/^✖ missing heading: ## 背景\n✖ missing bug classification\n✖ missing size estimate/u,
+				/^✖ missing heading: ## 背景\n## 背景\n[^✖]+\n✖ missing bug classification\n✖ missing size estimate/u,
 			),
 		)
 	})
@@ -120,7 +121,18 @@ describe('issue:lint expected effect (joshuafolkken/kit#3909)', () => {
 		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		expect(await lint_body(SHORTENING_BODY)).toBe(1)
-		expect(report).toHaveBeenCalledWith('✖ missing heading: ## 期待効果')
+		expect(report).toHaveBeenCalledWith(expect.stringMatching(/^✖ missing heading: ## 期待効果\n/u))
+	})
+
+	it('follows the missing heading with its template section (joshuafolkken/kit#5206)', async () => {
+		const report = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		await lint_body(SHORTENING_BODY)
+
+		expect(report).toHaveBeenCalledWith(
+			`✖ missing heading: ## 期待効果\n${String(issue_template_section.section('## 期待効果'))}`,
+		)
+		expect(report).toHaveBeenCalledWith(expect.stringContaining('\n- 効く率: <値>\n'))
 	})
 
 	it('accepts it with the section and labels it an enhancement', async () => {

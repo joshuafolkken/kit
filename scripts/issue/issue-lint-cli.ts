@@ -5,6 +5,7 @@ import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 import { issue_not_before } from './issue-not-before'
+import { issue_template_section } from './issue-template-section'
 import { measure_declaration } from './measure-declaration'
 import { size_estimate } from './size-estimate'
 
@@ -21,10 +22,23 @@ const OK_MESSAGE = 'ok'
 const NO_LABELS = 'none'
 const USAGE = 'Usage: josh issue:lint <path-to-issue-body>'
 
+const MISSING_HEADING_PREFIX = 'missing heading: '
+
+// A missing-heading problem followed by that section of the template, so the filer pastes it in rather
+// than reopening `issue-template.md`; any other problem, or a heading the template lacks, is unchanged.
+function with_template(problem: string): string {
+	if (!problem.startsWith(MISSING_HEADING_PREFIX)) return problem
+	const template = issue_template_section.section(problem.slice(MISSING_HEADING_PREFIX.length))
+
+	return template === undefined ? problem : `${problem}\n${template}`
+}
+
 // Every problem a body has: the four base template headings it lacks, then the behavior-change and
 // expected-effect problems (each empty for an Issue that does not declare itself one).
 function problems(body: string): ReadonlyArray<string> {
-	const missing = issue_lint.missing_headings(body).map((heading) => `missing heading: ${heading}`)
+	const missing = issue_lint
+		.missing_headings(body)
+		.map((heading) => `${MISSING_HEADING_PREFIX}${heading}`)
 
 	return [
 		...missing,
@@ -35,7 +49,7 @@ function problems(body: string): ReadonlyArray<string> {
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),
 		...aggregation_split.problems(body),
-	]
+	].map((problem) => with_template(problem))
 }
 
 function report(found: ReadonlyArray<string>, body: string): number {
