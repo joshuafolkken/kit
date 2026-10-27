@@ -210,12 +210,9 @@ describe('test_pinned.run where a recheck cannot answer', () => {
 			const runs = vi.spyOn(test_red, 'probe_in')
 
 			expect(await run_locations()).toEqual([UNPINNED_HUNK])
-			// A file nothing imports drops the pinned hunk's basis as well (joshuafolkken/kit#4873), so it
-			// reruns the test it failed in (joshuafolkken/kit#5129).
-			expect(selections_of(runs)).toEqual([
-				['run', test_pinned_fixture.TEST_FILE],
-				['related', DRIVER_FILE],
-			])
+			// A file nothing imports that the failed test does not start leaves the pinned hunk's red
+			// answered from the cache (joshuafolkken/kit#5261).
+			expect(selections_of(runs)).toEqual([['related', DRIVER_FILE]])
 		},
 		RUN_TIMEOUT,
 	)
