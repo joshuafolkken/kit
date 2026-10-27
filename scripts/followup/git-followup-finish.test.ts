@@ -181,7 +181,9 @@ describe('print_completion - the completion stage row', () => {
 		next_issues.answer([NEXT_ISSUES_HEADER])
 		await completion
 
-		expect(vi.mocked(console.info).mock.calls.at(-1)?.[0]).toBe(PENDING_SENTINEL)
+		const printed = vi.mocked(console.info).mock.calls.map((call) => String(call[0]))
+
+		expect(printed.slice(-2)).toStrictEqual([NEXT_ISSUES_HEADER, PENDING_SENTINEL])
 	})
 })
 
