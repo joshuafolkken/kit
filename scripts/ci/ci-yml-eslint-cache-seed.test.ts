@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { ci_yml_fixture, type WorkflowJob } from './ci-yml-fixture'
+import { ci_yml_fixture, type WorkflowJob, type WorkflowStep } from './ci-yml-fixture'
 
 // joshuafolkken/kit#4449: a main push that reuses a pull request's Checks skips `static-checks`, so
 // nothing saved an ESLint cache for it and the next pull request restored one several merges old. The
@@ -28,6 +28,8 @@ const CACHE_PATH = '.eslintcache'
 const PULL_REQUEST_ONLY = "github.event_name == 'pull_request'"
 const PREFIX_FILE = 'eslint-cache-prefix'
 const UPLOAD_ARTIFACT = 'eslint-cache-${{ github.event.pull_request.number }}'
+const ON_REUSE = "needs.reuse-pr-checks.outputs.reuse == 'true'"
+const CACHE_ACTION = 'actions/cache@'
 
 function job(job_name: string): WorkflowJob | undefined {
 	return ci_yml_fixture.find_job(RUNTIME, job_name)
@@ -82,7 +84,7 @@ describe('the pull request run hands its ESLint cache over', () => {
 describe('a reused main push saves that cache', () => {
 	it('runs only when the reuse proof answered true', () => {
 		expect(ci_yml_fixture.job_needs(job(SEED_JOB))).toContain(REUSE_JOB)
-		expect(job(SEED_JOB)?.if).toContain("needs.reuse-pr-checks.outputs.reuse == 'true'")
+		expect(job(SEED_JOB)?.if).toContain(ON_REUSE)
 	})
 
 	it('reads the artifact from the run the proof selected', () => {
@@ -108,7 +110,7 @@ describe('a reused main push saves that cache', () => {
 	it('saves the downloaded file under the push sha, and only with a checked prefix', () => {
 		const save = ci_yml_fixture.find_step_by_id(job(SEED_JOB), 'save')
 
-		expect(save?.uses).toContain('actions/cache@')
+		expect(save?.uses).toContain(CACHE_ACTION)
 		expect(save?.if).toBe("steps.download.outputs.prefix != ''")
 		expect(step_with(SEED_JOB, 'save', 'path')).toContain(CACHE_PATH)
 		// actions/cache versions an entry by its path list, so a seed saved under a different list is
@@ -117,6 +119,42 @@ describe('a reused main push saves that cache', () => {
 		expect(step_with(SEED_JOB, 'save', 'key')).toBe(
 			`\${{ steps.download.outputs.prefix }}${SHA_SUFFIX}`,
 		)
+	})
+})
+
+// joshuafolkken/kit#5189: a new runner Node.js patch release has no lineage on main, so the first pull
+// request on it linted cold. The warm job restores with the pull request's own key on a reused push
+// and lints only on a miss, letting `actions/cache` save the result under main's scope.
+const WARM_JOB = 'warm-eslint-lineage'
+const ON_MISS = "steps.eslint-cache.outputs.cache-hit != 'true'"
+
+function warm_step(step_id: string): WorkflowStep | undefined {
+	return ci_yml_fixture.find_step_by_id(job(WARM_JOB), step_id)
+}
+
+describe("a reused main push warms the runner's Node.js lineage", () => {
+	it('runs after the seed has saved, on a proven reuse, even when the seed failed', () => {
+		expect(ci_yml_fixture.job_needs(job(WARM_JOB))).toEqual([REUSE_JOB, SEED_JOB])
+		expect(job(WARM_JOB)?.if).toContain('!cancelled()')
+		expect(job(WARM_JOB)?.if).toContain(ON_REUSE)
+	})
+
+	it('restores and saves under exactly the key and path a pull request restores with', () => {
+		for (const input of ['path', 'key', 'restore-keys']) {
+			expect(step_with(WARM_JOB, RESTORE_STEP, input)).toBe(
+				step_with(STATIC_JOB, RESTORE_STEP, input),
+			)
+		}
+
+		expect(warm_step(RESTORE_STEP)?.uses).toContain(CACHE_ACTION)
+	})
+
+	it('lints the whole tree only when the exact key missed, and never turns the push red', () => {
+		const lint = warm_step('lint')
+
+		expect(lint?.if).toBe(ON_MISS)
+		expect(ci_yml_fixture.step_run(lint)).toBe('pnpm josh lint')
+		expect(ci_yml_fixture.step_continue_on_error(lint)).toBe(true)
 	})
 })
 
