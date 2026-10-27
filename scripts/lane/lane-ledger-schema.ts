@@ -103,12 +103,12 @@ const stage_schema = z.object({
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
 // retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
 // before it had one. `preconditions` names the kinds a preflight stop found unmet (`run-ship-preflight.ts`),
-// with `pre-detach` where a lane child's fast checks went red beside them (joshuafolkken/kit#4478),
-// absent on any other stop and on one recorded before it had them. `findings` names the
-// `<category>:<severity>` of each finding that decided a review or round-2 stop — the blocking ones, else
-// the fixed ones (joshuafolkken/kit#4426),
-// absent where none decided the stop. How long it stayed stopped is derived from the next ship stage, not recorded, so a
-// resumed ship never has to know the stop it ends.
+// with `pre-detach` where a lane child's fast checks went red (joshuafolkken/kit#4478) and `unpinned`
+// where its `test:pinned` did (joshuafolkken/kit#5228), beside them or alone, absent on any other
+// stop and on one recorded before it had them. `findings` names the `<category>:<severity>` of each
+// finding that decided a review or round-2 stop — the blocking ones, else the fixed ones
+// (joshuafolkken/kit#4426), absent where none decided the stop. How long it stayed stopped is derived
+// from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
 const stop_schema = z.object({
 	kind: z.literal(KIND.STOP),
 	at: z.string(),
