@@ -4,6 +4,7 @@ import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_line, type Block } from '#scripts/time-runtime/time-transcript-line'
 import { agent_model } from './agent-model'
+import { implementation_cut } from './implementation-cut'
 
 // An `investigator` dispatched without `run_in_background: false` is refused until it names it
 // (joshuafolkken/kit#4721).
@@ -32,8 +33,9 @@ import { agent_model } from './agent-model'
 //
 // **This row's own refusal is the last tell** (joshuafolkken/kit#5148). The harness drops an undeclared
 // argument before both the hook and the transcript see it, so a reissue rewritten after the refusal
-// leaves no tell on the tail. A dispatch that still carries no field after this row refused once passes,
-// and is remembered for the session; one that names the background is refused every time.
+// leaves no tell on the tail. A reissue inside the refusal-then-reissue window that still carries no
+// field passes, and is remembered for the session; one that names the background is refused every
+// time, and a dispatch past the window is a new one.
 
 const INVESTIGATOR_FOREGROUND_REASON =
 	'⛔ investigator foreground: a background `investigator` leaves its result queued until a later turn. ' +
@@ -108,7 +110,8 @@ function is_pending_foreground(block: Block, results: TailResults): boolean {
 }
 
 // The call in hand on the tail, or a dispatch this row refused that it repeats. A same-body dispatch
-// that ran is not a tell: a build that declares the field still refuses a bare repeat of it.
+// that ran is not a tell: a build that declares the field still refuses a bare repeat of it past the
+// reissue window `refuses` reads.
 function is_same_dispatch(block: Block, call: GuardedCall, results: TailResults): boolean {
 	if (!is_investigator(block) || !has_same_body(block, call)) return false
 
@@ -156,13 +159,18 @@ function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun):
 	return has_tell && remember_no_field(run)
 }
 
-// Refuses unless this row refused before (`at_ms`) and the call in hand still carries no field. The
+// The call in hand answers this row's own refusal (`at_ms`): a later dispatch is a new one, which a
+// build that declares the field still refuses.
+function is_reissue(run: GuardRun, at_ms: number): boolean {
+	if (at_ms === hook_decision.NEVER_MS) return false
+
+	return run.now_ms - at_ms < implementation_cut.REISSUE_WINDOW_MS
+}
+
+// Refuses unless the call in hand reissues this row's refusal and still carries no field. The
 // stand-down is remembered only when the call is not refused by the batching guard instead.
 function refuses(call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number): boolean {
-	if (at_ms === hook_decision.NEVER_MS || field_of(call.input, BACKGROUND_FIELD) !== undefined) {
-		return true
-	}
-
+	if (!is_reissue(run, at_ms) || field_of(call.input, BACKGROUND_FIELD) !== undefined) return true
 	if (can_record) remember_no_field(run)
 
 	return false
@@ -183,7 +191,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a dispatch still without the field after this row refused once) — remembered for the session',
+			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a reissue still without the field just after this row refused) — remembered for the session',
 	},
 }
 

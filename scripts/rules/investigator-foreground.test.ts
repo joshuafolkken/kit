@@ -7,6 +7,7 @@ import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
 
 // joshuafolkken/kit#4721: a background `investigator` leaves its result queued until a later turn, so
@@ -21,6 +22,7 @@ const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
 const ROW_REASON = investigator_foreground.ROW.reason
 const { NEVER_MS } = hook_decision
+const { REISSUE_WINDOW_MS } = implementation_cut
 
 function agent_call(
 	input: Record<string, unknown>,
@@ -304,6 +306,18 @@ describe('investigator_foreground.ROW.decide — the row’s own refusal as the 
 
 		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
 		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
+	})
+
+	// A build that declares the field: a refusal, its foreground reissue, then a new bare dispatch.
+	it('refuses a bare dispatch past the reissue window, and remembers nothing', () => {
+		const run = delivered_run()
+		const first = payload_of(run, { subagent_type: INVESTIGATOR, prompt: PROMPT })
+		const later = payload_of(run, { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT })
+		const refused_at_ms = Date.now()
+
+		expect(delivered_rules.delivery(first, refused_at_ms)).toBe(ROW_REASON)
+		expect(delivered_rules.delivery(later, refused_at_ms + REISSUE_WINDOW_MS)).toBe(ROW_REASON)
+		expect(lacks('', agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(false)
 	})
 
 	it('remembers nothing when the batching guard refuses the call instead', () => {
