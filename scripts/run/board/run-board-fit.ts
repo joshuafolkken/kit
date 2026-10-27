@@ -107,9 +107,32 @@ const NO_CUT: Cut = {
 	rows: new Set(),
 }
 
+// A line of printable ASCII alone takes a column a character, so `string-width` is spared it.
+const PRINTABLE_ASCII = /^[ -~]*$/u
+
+// The widths measured so far. A fit weighs a frame for every cut of its order, each repeating most of
+// the last one's lines, and the next redraw draws nearly the same lines and cells again, so each is
+// measured once (joshuafolkken/kit#5185). Let go whole once it holds `WIDTHS_KEPT`, so a long-running
+// board does not keep every line it stopped drawing.
+const WIDTHS_KEPT = 10_000
+const widths = new Map<string, number>()
+
+function measured(plain: string): number {
+	return PRINTABLE_ASCII.test(plain) ? plain.length : string_width(plain)
+}
+
 // The columns a line takes on screen: its color escapes take none, an emoji two.
 function width_of(line: string): number {
-	return string_width(stripVTControlCharacters(line))
+	const known = widths.get(line)
+
+	if (known !== undefined) return known
+	if (widths.size >= WIDTHS_KEPT) widths.clear()
+
+	const width = measured(stripVTControlCharacters(line))
+
+	widths.set(line, width)
+
+	return width
 }
 
 function height_of(line: string, columns: number): number {

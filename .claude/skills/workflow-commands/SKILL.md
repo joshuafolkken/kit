@@ -98,7 +98,7 @@ from — read at that trigger, never restated here.
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
 | `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |
 | Any artifact prose (Issue bodies, comments, Telegram) | Session language (`JOSH_SESSION_LANG`, default `ja`); Issue/PR titles stay English | `prompts/collaboration-workflow/overview.md` |
-| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `CLAUDE.md` → "Mid-workflow stop notification" |
+| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `rule-delivery.md` → "stop-notify" |
 
 ## 3. What stays resident, and what is read from here
 

@@ -137,10 +137,10 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 
 	// Every shipped file being reachable from the entry is pinned in `workflow-skill-reach.test.ts`.
 
-	// The stop rule itself is resident (asserted below); what the entry file owes the reader is the
-	// pointer, since `kickoff` and `halfrun` are routed away from `followup.md`.
-	it('points at the resident mid-workflow stop rule', () => {
-		expect(entry).toContain('Mid-workflow stop notification')
+	// What the entry file owes the reader is the pointer, since `kickoff` and `halfrun` are routed away
+	// from `followup.md`; joshuafolkken/kit#5165 moved the rule's body to `rule-delivery.md`.
+	it('points at the mid-workflow stop rule', () => {
+		expect(entry).toContain('`rule-delivery.md` → "stop-notify"')
 	})
 
 	// joshuafolkken/kit#2296: `chain-rule.md` is how the gate itself starts, overlapped with the review,
@@ -382,7 +382,6 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		ROUTING_END_HEADING,
 		PACKAGE_FIRST_HEADING,
 		'Please run \\`<command>\\` to start this task.',
-		'pnpm josh notify --task-type confirmation',
 		// joshuafolkken/kit#3395: both prohibitions of the retired overrides section, as one Tier C
 		// entry. The sanctioned `josh latest` bump is named by the `dependency-update` skill, and the
 		// `epic:*` rules by the `epic-commands` skill, whose description carries their trigger.
@@ -398,18 +397,40 @@ describe.each(AI_DOCS)('%s — keeps what cannot move', (document_path) => {
 		expect(content).not.toContain(OVERRIDES_HEADING)
 	})
 
-	// joshuafolkken/kit#3077: the merge exception named `fullrun` alone, though a `backlogrun` merges
-	// too and a `prrun` stops before the merge. The exception is resident because it binds the merge
-	// itself, which a turn can reach without the skill loaded.
-	it.each(['invoking `fullrun` or `backlogrun` authorizes the merge', '`prrun` does not'])(
-		'states the merge exception with %j',
-		(marker) => {
-			expect(content).toContain(marker)
-		},
-	)
+	// joshuafolkken/kit#5165: the Git Rules body and the stop-notify command moved to the sources their
+	// hook rows cite; the resident text keeps the trigger and the pointer to each.
+	it.each([
+		'`prompts/collaboration-workflow/operating-rules.md` → "git-rules"',
+		'`prompts/collaboration-workflow/rule-delivery.md` → "stop-notify"',
+	])('points at the moved body with %j', (marker) => {
+		expect(content).toContain(marker)
+	})
 
 	// The residency criterion itself is not restated here: it lives in `residency.md` (question 2) and
 	// is read only when a rule is placed (joshuafolkken/kit#3256). The markers above pin its outcome.
+})
+
+// joshuafolkken/kit#3077: the merge exception names `fullrun` and `backlogrun`, and a `prrun` stops
+// before the merge. joshuafolkken/kit#5165 moved it, with the stop-notify command, out of the resident
+// document into the sources the `pr-merge` and `stop-notify` rows cite.
+describe.each([
+	[
+		'prompts/collaboration-workflow/operating-rules.md',
+		[
+			'`fullrun` / `backlogrun` の起動で、`pnpm josh followup` 経由のマージを認める',
+			'`prrun` は認めない',
+		],
+	],
+	[
+		'prompts/collaboration-workflow/rule-delivery.md',
+		['pnpm josh notify --task-type confirmation'],
+	],
+])('%s — carries the moved body', (document_path, markers) => {
+	const content = read_repo_file(document_path)
+
+	it.each(markers)('states %j', (marker) => {
+		expect(content).toContain(marker)
+	})
 })
 
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard

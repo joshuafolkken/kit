@@ -44,7 +44,7 @@ const ROW = {
 	reason: REASON,
 	about: {
 		title: 'Test declaration',
-		topic: '`CLAUDE.md` → Code Change Rules',
+		topic: '`testing-guide.md` → "0. Per-Requirement Test Coverage (MANDATORY)"',
 		fires: '`pnpm josh git -y` (`josh g`) while `pnpm josh test:declared` answers `required`',
 		quiet: '`exempt` (non-runtime only) or `satisfied` (tests included)',
 	},
