@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { describe, expect, it } from 'vitest'
 
 // The review's agent type (joshuafolkken/kit#4715). A `general-purpose` review agent loaded the
@@ -27,5 +28,13 @@ describe('reviewer agent definition', () => {
 
 	it('can edit, so a --fix review applies its findings', () => {
 		expect(frontmatter()).toMatch(/^tools:.*\bEdit\b.*\bWrite\b/mu)
+	})
+
+	// joshuafolkken/kit#5106: the in-session round 1 takes its effort from here, not from the brief.
+	it('reviews at the round-1 effort the reviewer profile names', () => {
+		expect(frontmatter()).toMatch(
+			new RegExp(`^effort: ${agent_role_profile.DEFAULT_PROFILES.reviewer.effort}$`, 'mu'),
+		)
+		expect(frontmatter()).toMatch(/^effort: medium$/mu)
 	})
 })
