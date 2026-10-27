@@ -1094,7 +1094,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "rule:value": [
-      "[--refresh]",
+      "[--fresh | --refresh]",
       "developer",
       [
         "files",

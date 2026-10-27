@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { delivered_rules } from './delivered-rules'
 import { rule_value, type RuleReading } from './rule-value'
-import { rule_value_cache } from './rule-value-cache'
+import { rule_value_cache, type FreshReading } from './rule-value-cache'
 import { rule_value_candidates } from './rule-value-candidates'
 
 // `josh rule:value` — what each delivered rule earns on the channel that carries it, one row per rule.
@@ -18,6 +18,8 @@ import { rule_value_candidates } from './rule-value-candidates'
 
 const ARGV_OFFSET = 2
 const REFRESH_FLAG = '--refresh'
+const FRESH_FLAG = '--fresh'
+const CACHED_NOTE = 'cached reading taken at'
 const PERCENT_SIGN = '%'
 const COLUMN_GAP = '  '
 const NO_TARGETS = 'no measurement targets'
@@ -137,15 +139,36 @@ function render(runs: Iterable<ReadonlyArray<string>>): string {
 	return render_parts(runs).table
 }
 
+// The cached table and when it was taken. The cache holds the table alone, so the line names the flag
+// that measures now for the `candidates:` section too.
+function cached_text(fresh: FreshReading): string {
+	const taken_at = fresh.taken_at.toISOString()
+
+	return `${fresh.text.trimEnd()}\n\n${CACHED_NOTE} ${taken_at} — ${FRESH_FLAG} to measure now, with candidates`
+}
+
+function print_measured(cwd: string): void {
+	const { table, candidates } = render_parts(gather_runs(cwd))
+
+	process.stdout.write(`${[table, candidates].filter(Boolean).join('\n\n')}\n`)
+}
+
+function print_reading(argv: ReadonlyArray<string>, cwd: string): void {
+	const fresh = argv.includes(FRESH_FLAG) ? undefined : rule_value_cache.read_fresh(cwd)
+
+	if (fresh === undefined) print_measured(cwd)
+	else process.stdout.write(`${cached_text(fresh)}\n`)
+}
+
 // `--refresh` is the detached measurement the `backlogrun` loop head starts: the table goes to the
 // cache `backlog:offer` prints from, never to stdout (`rule-value-cache.ts`). The candidates are read
 // when a rule is retired, not at the loop head, so they print to stdout only and the cache keeps its
-// shape.
+// shape. Bare, a reading cached inside the refresh interval is printed instead of measuring again —
+// the measurement re-reads every transcript and takes minutes (joshuafolkken/kit#5186); `--fresh`
+// measures regardless.
 function run_rule_value(argv: ReadonlyArray<string> = [], cwd: string = process.cwd()): number {
-	const { table, candidates } = render_parts(gather_runs(cwd))
-
-	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(table, cwd)
-	else process.stdout.write(`${[table, candidates].filter(Boolean).join('\n\n')}\n`)
+	if (argv.includes(REFRESH_FLAG)) rule_value_cache.store(render_parts(gather_runs(cwd)).table, cwd)
+	else print_reading(argv, cwd)
 
 	return 0
 }
@@ -161,6 +184,7 @@ const rule_value_cli = {
 	row,
 	run_rule_value,
 	runs_of,
+	CACHED_NOTE,
 	NO_TARGETS,
 	UNMEASURED,
 	UNREACHED,

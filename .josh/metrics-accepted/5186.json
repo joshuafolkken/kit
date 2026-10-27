@@ -1,0 +1,7 @@
+{
+	"reason": "rule:value prints a fresh cached reading instead of rescanning, and resolves the cache in the common git directory (#5186)",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}
