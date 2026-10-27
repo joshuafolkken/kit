@@ -21,6 +21,7 @@ const BUILD_TIMEOUT_MS = 60_000
 const REPO_ROOT = process.cwd()
 const TSX_BIN = path.join(REPO_ROOT, 'node_modules', '.bin', 'tsx')
 const UNFORMATTED_JSON = '{"value":1}'
+const TRANSCRIPT_LINE = '{"type":"assistant","message":{"content":[]}}\n'
 const CODEX_ADAPTER_SOURCE = 'scripts/hooks/codex-hook-adapter.ts'
 const CODEX_ADAPTER_BUNDLE = 'dist/hooks/codex-hook-adapter.js'
 const PRETOOL_BUNDLE = 'dist/hooks/pretool-guard.js'
@@ -66,9 +67,6 @@ async function run(
 	input: string,
 	cwd: string = REPO_ROOT,
 ): Promise<RunResult> {
-	// The Step 0 notice speaks once per transcript (joshuafolkken/kit#2994), so the first of a
-	// source-then-bundle pair would spend it and the second run silently. Each run starts unstamped.
-	rmSync(step_zero_notice.stamp_path(TRANSCRIPT_PATH), { force: true })
 	const { stdout, exitCode: exit_code } = await execa(command, [...args], {
 		cwd,
 		input,
@@ -84,24 +82,41 @@ async function run(
 	return { stdout, exit_code }
 }
 
+type PayloadOf = (transcript_path: string) => string
+
+// The Step 0 notice speaks once per transcript (joshuafolkken/kit#2994), so a source-then-bundle pair
+// on one transcript would have the first spend it and the second run silently. Each side reads a
+// transcript of its own, so neither reads the other's stamp and the two start together.
+function new_transcript(): string {
+	const transcript_path = path.join(mkdtempSync(path.join(directory, 'transcript-')), 't.jsonl')
+
+	writeFileSync(transcript_path, TRANSCRIPT_LINE)
+	onTestFinished(() => {
+		rmSync(step_zero_notice.stamp_path(transcript_path), { force: true })
+	})
+
+	return transcript_path
+}
+
 // Compare the built bundle against the live source for one hook: same stdin, same stdout, same exit.
 // The bundle regressing to a different verdict — or the self-invoke collision that empties the second
 // stdin read — shows up here as a mismatch (joshuafolkken/kit#2023).
-async function expect_parity(source: string, bundle: string, input: string): Promise<void> {
-	const from_source = await run(TSX_BIN, [source], input)
-	const from_bundle = await run('node', [bundle], input)
+async function expect_parity(
+	source: ReadonlyArray<string>,
+	bundle: ReadonlyArray<string>,
+	payload_of: PayloadOf,
+): Promise<void> {
+	const source_input = payload_of(new_transcript())
+	const bundle_input = payload_of(new_transcript())
+	const [from_source, from_bundle] = await Promise.all([
+		run(TSX_BIN, source, source_input),
+		run('node', bundle, bundle_input),
+	])
 
 	expect(from_bundle).toEqual(from_source)
 }
 
-async function expect_adapter_parity(mode: string, input: string): Promise<void> {
-	const source = await run(TSX_BIN, [CODEX_ADAPTER_SOURCE, mode], input)
-	const bundle = await run('node', [CODEX_ADAPTER_BUNDLE, mode], input)
-
-	expect(bundle).toEqual(source)
-}
-
-writeFileSync(TRANSCRIPT_PATH, '{"type":"assistant","message":{"content":[]}}\n')
+writeFileSync(TRANSCRIPT_PATH, TRANSCRIPT_LINE)
 
 beforeAll(async () => {
 	await build_hooks()
@@ -112,14 +127,18 @@ afterAll(() => {
 	rmSync(format_directory, { recursive: true, force: true })
 })
 
-function payload(tool_name: string, tool_input: Record<string, unknown>): string {
-	return JSON.stringify({ transcript_path: TRANSCRIPT_PATH, tool_name, tool_input })
+function payload(
+	tool_name: string,
+	tool_input: Record<string, unknown>,
+	transcript_path: string = TRANSCRIPT_PATH,
+): string {
+	return JSON.stringify({ transcript_path, tool_name, tool_input })
 }
 
-function patch_payload(file_path: string): string {
+function patch_payload(file_path: string, transcript_path: string = TRANSCRIPT_PATH): string {
 	const command = `*** Begin Patch\n*** Update File: ${file_path}\n*** End Patch`
 
-	return payload('apply_patch', { command })
+	return payload('apply_patch', { command }, transcript_path)
 }
 
 async function format_with_entrypoint(
@@ -144,19 +163,25 @@ describe('build_hooks', () => {
 	})
 
 	it('emits the session language identically to the source', async () => {
-		await expect_parity('scripts/josh/session-language-main.ts', 'dist/hooks/session-lang.js', '')
+		await expect_parity(
+			['scripts/josh/session-language-main.ts'],
+			['dist/hooks/session-lang.js'],
+			() => '',
+		)
 	})
 
 	it('reaches the same guard decision as the source', async () => {
-		const input = payload('Bash', { command: 'git commit -m x' })
-
-		await expect_parity('scripts/hooks/pretool-guard-cli.ts', PRETOOL_BUNDLE, input)
+		await expect_parity(['scripts/hooks/pretool-guard-cli.ts'], [PRETOOL_BUNDLE], (transcript) =>
+			payload('Bash', { command: 'git commit -m x' }, transcript),
+		)
 	})
 
 	it('runs the format-edited hook identically to the source', async () => {
-		const input = payload('Edit', { file_path: path.join(directory, 'absent.ts') })
+		const file_path = path.join(directory, 'absent.ts')
 
-		await expect_parity('scripts/hooks/format-edited-cli.ts', FORMAT_BUNDLE, input)
+		await expect_parity(['scripts/hooks/format-edited-cli.ts'], [FORMAT_BUNDLE], (transcript) =>
+			payload('Edit', { file_path }, transcript),
+		)
 	})
 })
 
@@ -261,7 +286,11 @@ describe('build_hooks output directory', () => {
 
 describe('Codex adapter bundle', () => {
 	it('runs the Codex pretool adapter identically to the source', async () => {
-		await expect_adapter_parity('pretool', patch_payload('absent.ts'))
+		await expect_parity(
+			[CODEX_ADAPTER_SOURCE, 'pretool'],
+			[CODEX_ADAPTER_BUNDLE, 'pretool'],
+			(transcript) => patch_payload('absent.ts', transcript),
+		)
 	})
 
 	it(
@@ -270,7 +299,7 @@ describe('Codex adapter bundle', () => {
 			const source_file = path.join(format_directory, 'source.json')
 			const bundle_file = path.join(format_directory, 'bundle.json')
 			// Concurrent: each side formats its own file, and the posttool path never reads the Step 0
-			// stamp the sequential pretool parity runs have to clear between them.
+			// stamp.
 			const [source, bundle] = await Promise.all([
 				format_with_entrypoint(source_file, TSX_BIN, CODEX_ADAPTER_SOURCE),
 				format_with_entrypoint(bundle_file, 'node', CODEX_ADAPTER_BUNDLE),
