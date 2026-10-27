@@ -145,6 +145,8 @@ The following table describes the `full` profile. The profile table above lists 
 | `.vscode/settings.json`   | Created from package template                                                                                                                               | Missing keys merged in; a key the project already owns gains kit's missing entries when both values are objects (project entries win)       |
 | `.vscode/tasks.json`      | Created from package template                                                                                                                               | Merged per task `label`: a task with a kit label is replaced in place, a missing kit task is appended, every other task is kept as authored |
 
+> `.vscode/settings.json` distributes `files.watcherExclude` and `search.exclude` for josh's run records (`.git/josh`, `.josh/observations`) and build outputs (`.svelte-kit`, `coverage`, `build`, `dist`); a project's own exclude entries are kept and kit's missing ones are added.
+
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`) are never written into consumer projects.
 
 ### Claude Code permission mode

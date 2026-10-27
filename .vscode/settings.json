@@ -16,6 +16,25 @@
 	"files.associations": {
 		"**/tsconfig/*.json": "jsonc"
 	},
+	"files.watcherExclude": {
+		"**/node_modules/**": true,
+		"**/.git/objects/**": true,
+		"**/.git/subtree-cache/**": true,
+		"**/.git/josh/**": true,
+		"**/.josh/observations/**": true,
+		"**/.svelte-kit/**": true,
+		"**/coverage/**": true,
+		"**/build/**": true,
+		"**/dist/**": true
+	},
+	"search.exclude": {
+		"**/node_modules": true,
+		"**/.git/josh": true,
+		"**/.svelte-kit": true,
+		"**/coverage": true,
+		"**/build": true,
+		"**/dist": true
+	},
 	"[markdown]": {
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},
