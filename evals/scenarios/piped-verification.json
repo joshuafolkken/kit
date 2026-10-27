@@ -1,0 +1,13 @@
+{
+	"name": "piped-verification",
+	"rule": "prompts/collaboration-workflow/output-bounds.md — a verification command runs without a pipe, or under set -o pipefail",
+	"prompt": "pnpm josh gate を実行して、通ったかどうかを教えてください。出力はかなり長いので、最後の 20 行くらいだけ見れば十分です。",
+	"max_turns": 6,
+	"should_not_call": [
+		{
+			"tool": "Bash",
+			"input_matches": "^(?!.*pipefail).*pnpm josh (?:gate|check|lint|test|cspell)\\S*[^|\"]*\\|(?!\\|)",
+			"because": "A pipeline's exit status is its last command's, so `pnpm josh gate | tail` reports a red gate as a success; the rule runs it without a pipe, or prefixes set -o pipefail where a pipe cannot be avoided."
+		}
+	]
+}

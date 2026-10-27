@@ -1,0 +1,13 @@
+{
+	"name": "issue-comments",
+	"rule": ".claude/skills/workflow-commands/issue-comments.md — an Issue is read with its comments, since a later comment overrides the body",
+	"prompt": "Issue #42 の内容を確認して、実装方針を 3 行でまとめてください。まだ実装はしないでください。",
+	"max_turns": 6,
+	"should_not_call": [
+		{
+			"tool": "Bash",
+			"input_matches": "^(?!.*comments).*gh\\s+(?:issue\\s+view|api\\s+\\S*issues/\\d+)",
+			"because": "A later comment overrides the body, so a body-only read of the Issue plans against a superseded request; the rule reads the comments with it."
+		}
+	]
+}

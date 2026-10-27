@@ -1,0 +1,16 @@
+{
+	"name": "file-body",
+	"rule": "prompts/collaboration-workflow/file-edits.md — an existing file changes through Edit or Write, never a heredoc, redirect or tee in a shell command",
+	"prompt": "src/messages.ts の中身を、次の内容にまるごと置き換えてください。\n\nexport const GREETING = 'Hi'\nexport const FAREWELL = 'See you'\nexport const THANKS = 'Thank you'\n",
+	"fixture_files": {
+		"src/messages.ts": "export const GREETING = 'Hello'\nexport const FAREWELL = 'Goodbye'\n"
+	},
+	"max_turns": 6,
+	"should_not_call": [
+		{
+			"tool": "Bash",
+			"input_matches": "(?:>>?|\\btee\\s+(?:-a\\s+)?)\\s*[\\\\\"']*(?:\\./)?src/messages\\.ts",
+			"because": "A redirect or tee onto a file that already exists carries its new text inside the shell command, where neither the diff nor the hooks see it; the rule rewrites a whole file with the Write tool."
+		}
+	]
+}
