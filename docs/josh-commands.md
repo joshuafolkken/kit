@@ -1023,7 +1023,7 @@ pnpm josh lane:resume --all   # every open lane
 <!-- /usage -->
 
 - Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch and Issue are untouched; the child keeps its memory.
-- A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record.
+- A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record, and one `lane-state` line on the lane ledger, so `lane:stats` leaves the stopped time out of the lane's implement sub-stages.
 - The lane's processes are its child's tree plus every process still running from the lane (working directory under its checkout, or the lane's `JOSH_LANE_CHILD` mark inherited in its environment, application bundles excepted; macOS), the caller's own ancestry spared.
 - A detached `eslint_d` or `ship --detach` re-parented to pid 1 is among them. A pause stops them all, so a resume continues what it stopped.
 - `lane:close` ends the same set and prints how many it ended: SIGTERM, then SIGKILL. A process alive after both leaves the close `incomplete`, with no `ended` record. `lane:withdraw` and `lane:restart` end it too.
