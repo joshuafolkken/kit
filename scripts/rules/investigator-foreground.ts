@@ -29,6 +29,11 @@ import { agent_model } from './agent-model'
 // recorded once against the transcript, so a stand-down outlives the 256 KiB window the tells are read
 // from. A boolean `false` the parsed input dropped is a tell too: the transcript keeps what the model
 // wrote, so a dispatch this row refused that wrote it there is one the field never reached.
+//
+// **This row's own refusal is the last tell** (joshuafolkken/kit#5148). The harness drops an undeclared
+// argument before both the hook and the transcript see it, so a reissue rewritten after the refusal
+// leaves no tell on the tail. A dispatch that still carries no field after this row refused once passes,
+// and is remembered for the session; one that names the background is refused every time.
 
 const INVESTIGATOR_FOREGROUND_REASON =
 	'⛔ investigator foreground: a background `investigator` leaves its result queued until a later turn. ' +
@@ -151,12 +156,24 @@ function lacks_background_field(tail: string, call: GuardedCall, run: GuardRun):
 	return has_tell && remember_no_field(run)
 }
 
+// Refuses unless this row refused before (`at_ms`) and the call in hand still carries no field. The
+// stand-down is remembered only when the call is not refused by the batching guard instead.
+function refuses(call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number): boolean {
+	if (at_ms === hook_decision.NEVER_MS || field_of(call.input, BACKGROUND_FIELD) !== undefined) {
+		return true
+	}
+
+	if (can_record) remember_no_field(run)
+
+	return false
+}
+
 const ROW = {
 	id: 'investigator-foreground',
 	is_trigger: is_background_investigator,
 	reason: INVESTIGATOR_FOREGROUND_REASON,
 	already_satisfied: lacks_background_field,
-	decide: (): boolean => true,
+	decide: refuses,
 	keeps: keeps_foreground,
 	reaches: is_investigator,
 	about: {
@@ -166,7 +183,7 @@ const ROW = {
 		fires:
 			'an `Agent` / `Task` call of the `investigator` type without `run_in_background: false`. Every occurrence',
 		quiet:
-			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, or a refused dispatch that wrote it `false`) — remembered for the session',
+			'another agent type, `run_in_background: false` set, or a session whose subagent tool declares no `run_in_background` (the field written as a string, the tail holding the same description and prompt, a refused dispatch that wrote it `false`, or a dispatch still without the field after this row refused once) — remembered for the session',
 	},
 }
 

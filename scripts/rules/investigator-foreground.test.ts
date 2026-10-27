@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
-import type { GuardRun } from '#scripts/josh/hook-decision'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
@@ -19,6 +19,8 @@ const OTHER_PROMPT = 'Other work'
 const INVESTIGATOR = 'investigator'
 const GENERAL_PURPOSE = 'general-purpose'
 const FOREGROUND_FIELD = '`run_in_background: false`'
+const ROW_REASON = investigator_foreground.ROW.reason
+const { NEVER_MS } = hook_decision
 
 function agent_call(
 	input: Record<string, unknown>,
@@ -269,9 +271,55 @@ describe('investigator_foreground.lacks_background_field — remembered for the 
 	})
 })
 
+function payload_of(run: GuardRun, input: Record<string, unknown>): string {
+	return JSON.stringify({ transcript_path: run.transcript, tool_name: 'Agent', tool_input: input })
+}
+
+// A session the delivered guard reads: the switch on and an empty transcript.
+function delivered_run(): GuardRun {
+	const run = fresh_run()
+
+	vi.stubEnv(delivered_rules.SWITCH_ENV_KEY, '')
+	writeFileSync(run.transcript, '')
+
+	return run
+}
+
+// joshuafolkken/kit#5148: the harness drops the undeclared field before the hook and the transcript see
+// it, so a reissue rewritten after the refusal leaves no tell. The row's own refusal is the tell.
+describe('investigator_foreground.ROW.decide — the row’s own refusal as the tell', () => {
+	it('passes a rewritten reissue with no field anywhere, and remembers the build', () => {
+		const run = delivered_run()
+		const first = payload_of(run, { subagent_type: INVESTIGATOR, prompt: PROMPT })
+		const rewritten = payload_of(run, { subagent_type: INVESTIGATOR, prompt: OTHER_PROMPT })
+
+		expect(delivered_rules.delivery(first)).toBe(investigator_foreground.ROW.reason)
+		expect(delivered_rules.delivery(rewritten)).toBeUndefined()
+		expect(lacks('', agent_call({ subagent_type: INVESTIGATOR }), run)).toBe(true)
+	})
+
+	it('keeps refusing a dispatch that names the background after a refusal', () => {
+		const run = delivered_run()
+		const background = { subagent_type: INVESTIGATOR, run_in_background: true }
+
+		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
+		expect(delivered_rules.delivery(payload_of(run, background))).toBe(ROW_REASON)
+	})
+
+	it('remembers nothing when the batching guard refuses the call instead', () => {
+		const run = fresh_run()
+		const call = agent_call({ subagent_type: INVESTIGATOR })
+
+		expect(investigator_foreground.ROW.decide(call, run, false, 1)).toBe(false)
+		expect(lacks('', call, run)).toBe(false)
+	})
+})
+
 describe('investigator_foreground.ROW — delivered by the rule guard', () => {
-	it('refuses every occurrence', () => {
-		expect(investigator_foreground.ROW.decide()).toBe(true)
+	it('refuses every occurrence until this row has refused once', () => {
+		const call = agent_call({ subagent_type: INVESTIGATOR })
+
+		expect(investigator_foreground.ROW.decide(call, fresh_run(), true, NEVER_MS)).toBe(true)
 	})
 
 	it('scores a foreground dispatch as kept and reaches every investigator dispatch', () => {

@@ -1,0 +1,7 @@
+{
+	"reason": "investigator-foreground stands down on its own refusal record (#5148): a 7-line decide that replaces the constant",
+	"date": "2026-10-27",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}
