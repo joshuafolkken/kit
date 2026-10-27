@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 interface PackageJson {
 	description?: string
+	keywords?: Array<string>
 	files?: Array<string>
 	bin?: Record<string, string>
 	exports?: Record<string, unknown>
@@ -89,13 +90,31 @@ const AI_COPY_ROOT_FILES = [
 	'tsconfig.sonar.json',
 ] as const
 
+const README_PRODUCT = 'Claude Code and Codex'
+const ADDED_KEYWORDS = ['automation', 'backlogrun', 'github-issues'] as const
+
+// joshuafolkken/kit#5146: npm shows the description first, so it names the product the README
+// opens with, rather than the formatting and lint configuration that comes with it.
 describe('package.json description', () => {
 	const { description } = load_manifest()
+	const readme = readFileSync(package_path('README.md'), 'utf8')
 
-	it('describes the package for both project profiles, not TypeScript alone', () => {
-		expect(description).toMatch(/any repository/u)
-		expect(description).toMatch(/Node projects/u)
-		expect(description).not.toMatch(/TypeScript projects/u)
+	it('names the product the README opens with', () => {
+		expect(readme).toContain(`The hand-off kit for ${README_PRODUCT}.`)
+		expect(description).toContain(`Hand-off kit for ${README_PRODUCT}`)
+		expect(description).toContain('backlogrun')
+	})
+})
+
+describe('package.json keywords', () => {
+	const keywords = load_manifest().keywords ?? []
+
+	it('includes the backlogrun keywords', () => {
+		expect(keywords).toEqual(expect.arrayContaining([...ADDED_KEYWORDS]))
+	})
+
+	it('keeps the keywords in alphabetical order', () => {
+		expect(keywords).toEqual(keywords.toSorted((left, right) => left.localeCompare(right)))
 	})
 })
 
