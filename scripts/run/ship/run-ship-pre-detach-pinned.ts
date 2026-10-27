@@ -10,7 +10,7 @@ import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-jo
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
-import { run_ship_pre_detach } from './run-ship-pre-detach'
+import { run_ship_pre_detach, type PreDetachResult } from './run-ship-pre-detach'
 import type { ShipArguments } from './run-ship-steps'
 
 // `josh test:pinned` among the pre-detach checks of a `josh ship --review` (joshuafolkken/kit#4785). The
@@ -117,7 +117,7 @@ async function pinned_check(options: CheckOptions): Promise<JoshResult> {
 }
 
 // The pre-detach checks this ship runs, `test:pinned` among them under `--review`.
-function checks_for(options: PinnedOptions): () => Promise<JoshResult> {
+function checks_for(options: PinnedOptions): () => Promise<PreDetachResult> {
 	if (!options.is_review) return async () => await run_ship_pre_detach.checks()
 
 	return async () =>

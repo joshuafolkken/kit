@@ -48,6 +48,7 @@ const GUARD_TESTS = `${GUARD_TEST_COMMAND} ${GUARD_TARGET}`
 const TYPE_ERROR = 'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature'
 const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const GUARD_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
+const STATIC_RED = ['pre-detach']
 
 interface Answer {
 	exit_code: number | undefined
@@ -137,6 +138,7 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
+			preconditions: STATIC_RED,
 		})
 	})
 
@@ -147,9 +149,12 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
+			preconditions: STATIC_RED,
 		})
 	})
+})
 
+describe('run_ship_pre_detach.checks — every failure', () => {
 	it('reports every failure at once', async () => {
 		create(GUARD_TARGET)
 		answer(
@@ -165,11 +170,13 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 				`${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
 				`${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
 			].join('\n\n'),
+			preconditions: STATIC_RED,
 		})
 	})
 })
 
 // joshuafolkken/kit#4785: a `--review` ship's `test:pinned` stop joins the other checks' report.
+// joshuafolkken/kit#5228: its kind, `unpinned`, rides beside the static checks' `pre-detach`.
 describe('run_ship_pre_detach.checks — the pinned check', () => {
 	const PINNED_STOP = 'unpinned scripts/a.ts:3\n'
 
@@ -177,19 +184,21 @@ describe('run_ship_pre_detach.checks — the pinned check', () => {
 		return { code: FAILED, out: PINNED_STOP }
 	}
 
-	it('stops on the pinned check alone when every other check passed', async () => {
+	it('stops on the pinned check alone, as unpinned, when every other check passed', async () => {
 		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
 			code: FAILED,
 			out: PINNED_STOP,
+			preconditions: [run_ship_pre_detach.UNPINNED],
 		})
 	})
 
-	it('reports the pinned stop after the other failures', async () => {
+	it('reports the pinned stop after the other failures, with both kinds', async () => {
 		answer(new Map([[TYPE_CHECK, { exit_code: FAILED, output: TYPE_ERROR }]]))
 
 		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
 			code: FAILED,
 			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}\n\n${PINNED_STOP}`,
+			preconditions: [...STATIC_RED, run_ship_pre_detach.UNPINNED],
 		})
 	})
 })
@@ -204,6 +213,7 @@ describe('run_ship_pre_detach.checks — the failed check is named', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: heading(EXPORTS, NO_OUTPUT_EXIT),
+			preconditions: STATIC_RED,
 		})
 	})
 
@@ -213,6 +223,7 @@ describe('run_ship_pre_detach.checks — the failed check is named', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `✗ ${TYPE_CHECK} — no exit code (timed out or ended by a signal)`,
+			preconditions: STATIC_RED,
 		})
 	})
 })
@@ -233,6 +244,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `${heading(EXPORTS)}\n${unread}`,
+			preconditions: STATIC_RED,
 		})
 	})
 
@@ -291,6 +303,7 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
 			out: `${heading(metrics)}\n${grown}`,
+			preconditions: STATIC_RED,
 		})
 	})
 })
