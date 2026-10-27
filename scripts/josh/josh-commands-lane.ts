@@ -270,7 +270,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:net': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages and usage-limit stops stood and the host's sleeps",
+			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood and the host's sleeps",
 		category: 'AI tools',
 		reference: ['<issue>', 'maintainer', ['none']],
 		default_script_arguments: ['net'],
