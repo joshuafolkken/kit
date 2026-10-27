@@ -5,7 +5,7 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { error_text } from '#scripts/lib/error-message'
 import { has_label_name, NOT_BEFORE_LABEL, REPOSITORY_LABELS } from './issue-labels'
 import { issue_not_before } from './issue-not-before'
-import { issue_sample_gate } from './issue-sample-gate'
+import { issue_sample_prime } from './issue-sample-prime'
 import { session_cite } from './session-cite'
 
 // joshuafolkken/kit#4079: the body's start-time declaration held an issue back from `backlog:next`,
@@ -126,7 +126,7 @@ async function sweep(
 	const seen = new Set(scanned.map((issue) => issue.number))
 	const labelled = await read_labelled()
 
-	await issue_sample_gate.prime(labelled.map((issue) => issue.body))
+	await issue_sample_prime.prime(labelled.map((issue) => issue.body))
 	await sync([...scanned, ...labelled.filter((issue) => !seen.has(issue.number))], now)
 }
 

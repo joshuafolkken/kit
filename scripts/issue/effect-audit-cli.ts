@@ -8,7 +8,7 @@ import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { defect_rate } from './defect-rate'
 import { effect_audit, type AuditRow, type FollowUp } from './effect-audit'
-import { issue_sample_gate } from './issue-sample-gate'
+import { issue_sample_prime } from './issue-sample-prime'
 import { issue_search, type SearchIssue } from './issue-search'
 import { session_cite } from './session-cite'
 
@@ -66,7 +66,7 @@ function parse_request(argv: ReadonlyArray<string>): AuditRequest | undefined {
 // and the listing counts it.
 async function measured_issue(pr: number): Promise<number | undefined> {
 	try {
-		const pull = await issue_sample_gate.read_source(pr)
+		const pull = await issue_sample_prime.read_source(pr)
 
 		return pull.closes
 	} catch {

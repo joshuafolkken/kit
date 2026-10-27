@@ -4,7 +4,7 @@ import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { backlog_gate_scope, type OptedIn } from './backlog-gate-scope'
 import { backlog_next } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
@@ -77,7 +77,7 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 	const read = read_json_listing(json, open_issue_schema)
 
 	if (read.kind !== 'read') return undefined
-	await issue_sample_gate.prime(read.rows.map((row) => row.body))
+	await issue_sample_prime.prime(read.rows.map((row) => row.body))
 
 	return { rows: read.rows, is_capped }
 }
