@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | scripts/issue/issue-sample-required.ts:15 | 2026-10-27 | #5103
