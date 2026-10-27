@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -35,6 +36,10 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
 vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+// The claim walks no import graph here; what it claims is `test-related.claim.test.ts`.
+vi.mock('./test-pinned-reach', () => ({
+	test_pinned_reach: { reached_test_count: vi.fn() },
+}))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
@@ -88,6 +93,16 @@ function announcement(): string {
 	return mocked_run.mock.calls[0]?.[3] ?? ''
 }
 
+// No recorded read map, and the claim runs its body without touching the machine-wide ledger; what
+// it claims is `test-related.claim.test.ts`.
+function stub_machine_state(): void {
+	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	vi.spyOn(core_budget, 'is_covered').mockReturnValue(false)
+	vi.spyOn(core_budget, 'with_command_reservation').mockImplementation(
+		async (_weight, run) => await run(),
+	)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -98,7 +113,7 @@ beforeEach(() => {
 	mocked_running.mockReturnValue(true)
 	mocked_since.mockResolvedValue([])
 	mocked_held.mockResolvedValue([])
-	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	stub_machine_state()
 })
 
 describe('test_related.run_related_tests — the green record', () => {
@@ -329,6 +344,7 @@ describe('test_related.run_related_tests — a change no test reads', () => {
 		await expect(test_related.run_related_tests([])).resolves.toBe(0)
 
 		expect(mocked_run).not.toHaveBeenCalled()
+		expect(core_budget.with_command_reservation).not.toHaveBeenCalled()
 		expect(written_output()).toContain('running no tests')
 		expect(written_output()).toContain(UNREAD_DOCUMENT)
 	})

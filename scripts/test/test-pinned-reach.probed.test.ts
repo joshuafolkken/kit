@@ -77,6 +77,28 @@ describe('test_pinned_reach.probed_files', () => {
 	})
 })
 
+// joshuafolkken/kit#5135: `josh test:related` sizes its claim by the tests its scope reaches.
+describe('test_pinned_reach.reached_test_count', () => {
+	it('counts the test a module reaches and a listed test once', async () => {
+		await build_with_fixture()
+		await write(ROOT_FILE, ROOT_CONTENT)
+
+		expect(await test_pinned_reach.reached_test_count([FIXTURE_FILE, FIXTURE_TEST])).toBe(1)
+	})
+
+	it('counts nothing for an empty scope', async () => {
+		await build_with_fixture()
+
+		expect(await test_pinned_reach.reached_test_count([])).toBe(0)
+	})
+
+	it('answers nothing where no tsconfig.json is there to build a graph from', async () => {
+		await build_with_fixture(false)
+
+		expect(await test_pinned_reach.reached_test_count([FIXTURE_FILE])).toBeUndefined()
+	})
+})
+
 describe('test_pinned.run on a changed fixture', () => {
 	it(
 		'reports no hunk of a fixture only tests import',
