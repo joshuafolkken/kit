@@ -50,7 +50,8 @@ interface Basis {
 }
 
 // A `green` or `no-test` verdict that holds once `recheck` — the tests added or edited since, among
-// those reaching its hunk — stays green with the hunk reverted (joshuafolkken/kit#4936).
+// those reaching its hunk — stays green with the hunk reverted (joshuafolkken/kit#4936), or a `red`
+// one once the tests it failed in still fail (joshuafolkken/kit#5129).
 interface Recheck {
 	verdict: RedVerdict
 	recheck: ReadonlyArray<string>

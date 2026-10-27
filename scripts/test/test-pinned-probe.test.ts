@@ -167,6 +167,24 @@ describe('test_pinned.run after a test reaching an unpinned hunk is added', () =
 	)
 })
 
+describe('test_pinned.run after a test reaching an unpinned hunk is edited', () => {
+	it(
+		'rechecks the unpinned hunk against the edited test only',
+		async () => {
+			await build_with_graph()
+			await write(NEW_TEST, REACHING_TEST)
+			await run_locations()
+			await write(NEW_TEST, PINNING_TEST)
+			const runs = vi.spyOn(test_red, 'probe_in')
+
+			expect(await run_locations()).toEqual([])
+			expect(selections_of(runs)).toContainEqual(['run', NEW_TEST])
+			expect(selections_of(runs)).not.toContainEqual(['related', DRIVER_FILE])
+		},
+		RUN_TIMEOUT,
+	)
+})
+
 describe('test_pinned.run where a recheck cannot answer', () => {
 	it(
 		'runs every reaching test once a source changed beside the added test',
