@@ -21,6 +21,7 @@ const KIND = {
 	TEST_PINNED: 'test-pinned',
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',
+	UNPLANNED_NOTICE: 'unplanned-notice',
 	LANE_STATE: 'lane-state',
 } as const
 
@@ -245,6 +246,14 @@ const split_filed_schema = z.object({
 	issue: z.number(),
 	child: z.string(),
 })
+// The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
+// so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
+const unplanned_notice_schema = z.object({
+	kind: z.literal(KIND.UNPLANNED_NOTICE),
+	at: z.string(),
+	issue: z.number(),
+	files: z.array(z.string()),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -264,6 +273,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
+	unplanned_notice_schema,
 	lane_state_schema,
 ])
 
@@ -291,6 +301,8 @@ type SplitNoticeEntry = z.infer<typeof split_notice_schema>
 type SplitNoticeRecord = Omit<SplitNoticeEntry, 'kind' | 'at'>
 type SplitFiledEntry = z.infer<typeof split_filed_schema>
 type SplitFiledRecord = Omit<SplitFiledEntry, 'kind' | 'at'>
+type UnplannedNoticeEntry = z.infer<typeof unplanned_notice_schema>
+type UnplannedNoticeRecord = Omit<UnplannedNoticeEntry, 'kind' | 'at'>
 type LaneStateChangeEntry = z.infer<typeof lane_state_schema>
 type LaneStateChangeRecord = Omit<LaneStateChangeEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
@@ -342,5 +354,7 @@ export type {
 	TestRelatedRecord,
 	UnitFileRecord,
 	UnitFilesEntry,
+	UnplannedNoticeEntry,
+	UnplannedNoticeRecord,
 }
 export { lane_ledger_schema }

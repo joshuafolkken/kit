@@ -6,7 +6,7 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), `pnpm josh check:related`, `pnpm josh run:review` — its `--join`'s `test:pinned` lines
+   the implementer's self-check"), `pnpm josh check:related` (a metrics notice → its verdict line), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
    answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
    本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then `run:review --join`, `review:attest --check`, the
    round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
