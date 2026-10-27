@@ -1,14 +1,27 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
+import { check_related_pinned } from './check-related-pinned'
 import { check_related_section } from './check-related-section'
+
+// No green record is read from or written over the live tree.
+vi.mock('./check-related-reuse', () => ({
+	check_related_reuse: {
+		read_tree: async () => ({ files: {}, base: undefined }),
+		record: async () => undefined,
+		reusable: async () => new Set(),
+	},
+}))
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'check-related-section-test-'))
 const LOG_TARGET = path.join(scratch, 'check-related.log')
 const TEST_COMMAND = 'test:related'
 const LINE_COUNT = 60
+const PASSED_DROPPED_LINE = '… 55 earlier line(s) in the log'
+const FIRST_LINE = '\nline 1\n'
 // The size past which Claude Code saves a tool result instead of showing it (`BASH_MAX_OUTPUT_LENGTH`).
 const TOOL_RESULT_BYTES = 8000
 // joshuafolkken/kit#5168: the `test:related` that printed 142.8 KB ran 877 files.
@@ -46,6 +59,20 @@ function report_size(results: ReadonlyArray<CheckResult>): number {
 	return Buffer.byteLength(write.mock.calls.map(([chunk]) => String(chunk)).join(''))
 }
 
+async function long_check(command: string): Promise<CheckResult> {
+	return { command, exit_code: 0, output: numbered_output(LINE_COUNT) }
+}
+
+async function run_all_report(is_full: boolean): Promise<string> {
+	const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+	vi.spyOn(review_record_pinned, 'restart_in_lane').mockResolvedValue(false)
+	vi.spyOn(check_related_pinned, 'notice').mockResolvedValue(undefined)
+	await check_related.run_all(scratch, long_check, is_full)
+
+	return write.mock.calls.map(([chunk]) => String(chunk)).join('')
+}
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
@@ -60,7 +87,7 @@ describe('check_related_section.format_section', () => {
 		const section = check_related_section.format_section(result_of(0))
 
 		expect(body_lines(section)).toStrictEqual([
-			'… 55 earlier line(s) in the log',
+			PASSED_DROPPED_LINE,
 			'line 56',
 			'line 57',
 			'line 58',
@@ -113,5 +140,21 @@ describe('check_related.report_results size', () => {
 		}))
 
 		expect(report_size(results)).toBeLessThan(TOOL_RESULT_BYTES)
+	})
+})
+
+describe('check_related.run_all --full', () => {
+	it('prints each whole output when --full is asked', async () => {
+		const report = await run_all_report(true)
+
+		expect(report).toContain(FIRST_LINE)
+		expect(report).not.toContain('earlier line(s)')
+	})
+
+	it('prints each tail otherwise', async () => {
+		const report = await run_all_report(false)
+
+		expect(report).not.toContain(FIRST_LINE)
+		expect(report).toContain(PASSED_DROPPED_LINE)
 	})
 })
