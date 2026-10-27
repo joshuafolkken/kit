@@ -33,6 +33,7 @@ vi.mock('#scripts/review/review-lane-handover', () => ({
 		refusal: (issue: number) => `REFUSED #${String(issue)} pnpm josh ship --detach --review`,
 	},
 }))
+vi.mock('./run-review-join-read', () => ({ run_review_join_read: { mark_due: vi.fn() } }))
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn() },
 }))

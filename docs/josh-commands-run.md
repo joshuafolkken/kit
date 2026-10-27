@@ -522,7 +522,8 @@ The default waits only for the gate to _start_ and writes the brief to a file an
 and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
 the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
 never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
-it is left running for the ship's pre-detach, as under `--fixing`. The reason and places `--unpinned-ok` accepted stay for the
+it is left running for the ship's pre-detach, as under `--fixing`. `review:record` reads a skipped
+`--join`. The reason and places `--unpinned-ok` accepted stay for the
 branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
 while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
 `josh ship --review` given no reason carries it as its `--unpinned-ok`. A scoped refusal launches
@@ -580,7 +581,7 @@ A `preflight` stage first asks every pull-request precondition together, so a st
 
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
-In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and the `lane:stats` stop table count it as `unplanned`.
+In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once `check:related` printed it.
 
 A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 

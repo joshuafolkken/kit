@@ -1,4 +1,5 @@
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
+import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
 import { lane_ledger, type LedgerEntry, type StopEntry } from './lane-ledger'
 import type { IssueAt } from './lane-spans'
@@ -44,6 +45,7 @@ const EVENT_ISSUE = /#([1-9]\d*)\b/u
 // A stop recorded before it carried a cause (joshuafolkken/kit#3998) is counted under this one.
 const UNRECORDED_CAUSE = 'unrecorded'
 const NO_CAUSES = '-'
+const NOTICED = ' (noticed)'
 
 // `causes` is a preflight stop's unmet preconditions or a review stop's blocking finding kinds, every
 // one of them, else the stop's one cause.
@@ -102,22 +104,43 @@ function instant_of(stop: StopEntry): IssueAt {
 	return { issue: stop.issue, at_ms: Date.parse(stop.at) }
 }
 
+// The `josh check:related` notices of the ship's `unplanned` answer (joshuafolkken/kit#5203).
+function notices_of(entries: ReadonlyArray<LedgerEntry>): Array<IssueAt> {
+	return entries
+		.filter((entry) => entry.kind === lane_ledger.KIND.UNPLANNED_NOTICE)
+		.map((entry) => ({ issue: entry.issue, at_ms: Date.parse(entry.at) }))
+}
+
+// An `unplanned` stop the same issue's `check:related` already printed counts as `unplanned (noticed)`,
+// so the stops the earlier notice did not prevent are a number of their own.
+function noticed(cause: string, stop: IssueAt, notices: ReadonlyArray<IssueAt>): string {
+	if (cause !== run_ship_planned.PRECONDITION) return cause
+	const is_noticed = notices.some(
+		(notice) => notice.issue === stop.issue && notice.at_ms <= stop.at_ms,
+	)
+
+	return is_noticed ? `${cause}${NOTICED}` : cause
+}
+
 // A stop recorded before it named its preconditions (joshuafolkken/kit#4166) or its finding kinds
 // (joshuafolkken/kit#4426) counts under its cause.
-function causes_of(stop: StopEntry): ReadonlyArray<string> {
+function causes_of(stop: StopEntry, notices: ReadonlyArray<IssueAt>): ReadonlyArray<string> {
 	const { preconditions = [], findings = [] } = stop
 	const kinds = [...preconditions, ...findings]
 
-	return kinds.length > 0 ? kinds : [stop.cause ?? UNRECORDED_CAUSE]
+	if (kinds.length === 0) return [stop.cause ?? UNRECORDED_CAUSE]
+
+	return kinds.map((kind) => noticed(kind, instant_of(stop), notices))
 }
 
 function waits_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	ends: ReadonlyArray<IssueAt>,
+	notices: ReadonlyArray<IssueAt>,
 ): Array<StopWait> {
 	return entries.filter(is_stop).map((stop) => ({
 		reason: stop.reason,
-		causes: causes_of(stop),
+		causes: causes_of(stop, notices),
 		wait_ms: wait_ms(instant_of(stop), ends),
 	}))
 }
@@ -164,7 +187,7 @@ function table(
 	events: ReadonlyArray<RunEvent> = [],
 ): string {
 	const ends = ends_of(entries, parks_of(events))
-	const waits = waits_of(lane_stats.in_window(entries, window), ends)
+	const waits = waits_of(lane_stats.in_window(entries, window), ends, notices_of(entries))
 
 	return [
 		lane_stats.to_row(COLUMNS),

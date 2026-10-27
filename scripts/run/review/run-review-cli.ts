@@ -11,10 +11,10 @@ import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
-import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
 import { run_review_early_push } from './run-review-early-push'
+import { run_review_join_read, type JoinVerdict } from './run-review-join-read'
 import { run_review_pinned } from './run-review-pinned'
 import { run_review_pinned_accepted } from './run-review-pinned-accepted'
 import { run_review_pinned_join } from './run-review-pinned-join'
@@ -211,36 +211,20 @@ async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 	const is_early_push = await run_review_early_push.prepare(plan)
 
 	await launch_pinned(reason)
+	run_review_join_read.mark_due()
 
 	return await start_pair(plan, is_early_push)
 }
 
-type PinnedWait = () => Promise<PinnedSummary | undefined>
-
-// A partial answer (joshuafolkken/kit#4936) is printed, but neither stops the round nor replaces the
-// accepted `--unpinned-ok` record (`run_review_pinned_accepted.remember`).
-function show_partial(summary: PinnedSummary): boolean {
-	process.stderr.write(test_pinned_logic.report_text(summary))
-
-	return false
-}
-
 // The background check's answer, on stderr beside the other run notes. The join waits as the end of
 // the pair; `--pinned` waits for a check started moments before (`run_review_pinned_steps.wait_alone`).
-async function join_pinned(wait: PinnedWait): Promise<boolean> {
-	const summary = await wait()
+async function show_pinned(read: Promise<JoinVerdict | undefined>): Promise<boolean> {
+	const joined = await read
 
-	if (summary === undefined) return false
-	if (summary.is_partial === true) return show_partial(summary)
+	if (joined === undefined) return false
+	process.stderr.write(joined.text)
 
-	const verdict = await run_review_pinned_accepted.judge(
-		summary,
-		run_review_pinned_steps.launched_reason(),
-	)
-
-	process.stderr.write(verdict.text)
-
-	return verdict.kind === 'stop'
+	return joined.is_stop
 }
 
 // The gate's own green stamp carries the moment it finished; a red gate leaves none, so the join's own
@@ -297,9 +281,7 @@ async function run_join(is_fixing = false): Promise<number> {
 	report_timing(timing)
 
 	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
-	const is_unpinned = await join_pinned(
-		async () => await run_review_pinned_join.wait_for_join(undefined, undefined, is_fixing),
-	)
+	const is_unpinned = await show_pinned(run_review_join_read.read(PROJECT_ROOT, is_fixing))
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }
@@ -381,7 +363,9 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 }
 
 async function run_pinned(): Promise<number> {
-	const is_unpinned = await join_pinned(run_review_pinned_steps.wait_alone)
+	const is_unpinned = await show_pinned(
+		run_review_join_read.read_with(run_review_pinned_steps.wait_alone),
+	)
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : SUCCESS_EXIT_CODE
 }

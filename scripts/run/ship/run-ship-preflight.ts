@@ -41,7 +41,7 @@ const PRECONDITION = {
 	REMOVED_TESTS: 'removed-tests',
 	LOCK: 'lock',
 	SCOPED: 'scoped',
-	UNPLANNED: 'unplanned',
+	UNPLANNED: run_ship_planned.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`

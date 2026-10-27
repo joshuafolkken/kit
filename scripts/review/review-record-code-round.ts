@@ -8,8 +8,8 @@ import { review_reviewed_tree } from './review-reviewed-tree'
 // What `josh review:record` does once a code round is on the ledger: it records the tree the verdict
 // stands for, which `josh ship` reuses while the tree holds still (`review-reviewed-tree.ts`), names
 // the ship next for a lane child (`review-lane-handover.ts`), names an interaction review its fixes
-// made due (`review-record-interaction.ts`), and starts `josh test:pinned` again on a tree its fixes
-// moved (`review-record-pinned.ts`).
+// made due (`review-record-interaction.ts`), reads a `josh run:review --join` the lane skipped, and
+// starts `josh test:pinned` again on a tree its fixes moved (`review-record-pinned.ts`).
 
 const HIGH_SEVERITY = 'high'
 
@@ -45,7 +45,9 @@ async function follow(
 	const is_handed_over = await report_handover(issue)
 
 	await review_record_interaction.report_due(issue, root)
-	if (is_restarted_here(is_handed_over)) await review_record_pinned.restart_if_moved(root)
+	if (!is_restarted_here(is_handed_over)) return
+	await review_record_pinned.read_skipped_join(root)
+	await review_record_pinned.restart_if_moved(root)
 }
 
 const review_record_code_round = { follow }
