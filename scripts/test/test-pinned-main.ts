@@ -4,10 +4,10 @@ import { parseArgs } from 'node:util'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_pinned } from './test-pinned'
 import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
-import { test_pinned_record } from './test-pinned-record'
+import { test_pinned_record, type PinnedSummary } from './test-pinned-record'
 
-// The `josh test:pinned` entry: read `--max`, run, print one line per unpinned or unchecked hunk, and
-// exit non-zero when any checked hunk is unpinned. An unchecked hunk alone does not fail the run — it
+// The `josh test:pinned` entry: read `--max`, run, print one line per unpinned hunk and per unchecked
+// reason (each unchecked place in the `full output:` log), and exit non-zero when any checked hunk is unpinned. An unchecked hunk alone does not fail the run — it
 // was not asked about.
 
 const CLEAN_EXIT = 0
@@ -17,8 +17,8 @@ const USAGE = [
 	'Usage: josh test:pinned [--max <n>] [--record <token>] [--first-unpinned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
-	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
-	'  or where its revert stopped vitest before any test ran;',
+	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
+	'  or whose revert stopped vitest before any test ran, each place listed in the `full output:` log;',
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
 	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
 ].join('\n')
@@ -94,13 +94,13 @@ async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
 
 // `--record` leaves an answer however the run ends — a check that could not run included — so the
 // join waiting on it never waits on a check that died.
-async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedReport> {
+async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedSummary> {
 	try {
-		const report = await settled_run(options)
+		const summary = test_pinned_record.summary_of(await settled_run(options))
 
-		test_pinned_record.write(token, test_pinned_record.summary_of(report))
+		test_pinned_record.write(token, summary)
 
-		return report
+		return summary
 	} catch (error: unknown) {
 		test_pinned_record.write(token, test_pinned_record.not_run_summary(error))
 
@@ -112,14 +112,16 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 	const options = options_of(argv)
 	if (options === undefined) return print_usage(argv)
 
-	const report =
+	const summary =
 		options.record_token === undefined
-			? await test_pinned.run(options.max_hunks, options.is_first_unpinned)
+			? test_pinned_record.summary_of(
+					await test_pinned.run(options.max_hunks, options.is_first_unpinned),
+				)
 			: await recorded_run(options, options.record_token)
 
-	process.stdout.write(test_pinned_logic.report_text(report))
+	process.stdout.write(test_pinned_logic.report_text(summary))
 
-	return report.unpinned.length === 0 ? CLEAN_EXIT : FAILED_EXIT
+	return summary.unpinned.length === 0 ? CLEAN_EXIT : FAILED_EXIT
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

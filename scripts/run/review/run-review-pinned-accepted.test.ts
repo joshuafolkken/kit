@@ -87,6 +87,20 @@ describe('run_review_pinned_accepted.judge — the reason an earlier run accepte
 	})
 })
 
+// joshuafolkken/kit#5188: the note and the full list path sit above the counts line, which ends it.
+describe('run_review_pinned_accepted.judge — the verification-tail shape', () => {
+	it('ends the accepted report on its counts line, with the note and the full list path above it', async () => {
+		await accept([SITE])
+
+		const summary = { text: 'L\n', counts: 'COUNTS', log: { path: 'LOG' }, unpinned: [SITE] }
+		const verdict = await run_review_pinned_accepted.judge(summary, undefined)
+
+		expect(verdict.text).toBe(
+			`L\nUnpinned accepted by an earlier run on this branch: ${REASON}\nfull output: LOG\nCOUNTS\n`,
+		)
+	})
+})
+
 // joshuafolkken/kit#5153: a cut answer lists only its first unpinned place, so the rest may be new.
 describe('run_review_pinned_accepted.judge — a check cut at its first unpinned hunk', () => {
 	it('stops a later run with no reason, though the record holds the place it listed', async () => {

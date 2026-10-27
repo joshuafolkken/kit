@@ -48,5 +48,5 @@ function format_tail(tail: VerificationTail): string {
 
 const verification_tail = { format_rerun, format_tail, format_verdict }
 
-export type { VerificationTail }
+export type { KeptLog, VerificationTail }
 export { verification_tail }
