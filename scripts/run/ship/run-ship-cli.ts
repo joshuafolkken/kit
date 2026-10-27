@@ -12,6 +12,7 @@ import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
+import type { PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_probe } from './run-ship-probe'
@@ -319,13 +320,14 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
-// The preflight stop's unmet kinds, with `pre-detach` added when those checks went red beside it.
-function with_checks(stop: ShipSection, checks: ShipSection): ShipSection {
+// The preflight stop's unmet kinds, with the red pre-detach checks' own kinds added beside them
+// (`run-ship-pre-detach.ts`).
+function with_checks(stop: ShipSection, checks: PreDetachResult): ShipSection {
 	if (checks.code === SUCCESS_EXIT_CODE) return stop
 
 	return {
 		...stop,
-		preconditions: [...(stop.preconditions ?? []), lane_ledger_write.PRE_DETACH_STAGE],
+		preconditions: [...(stop.preconditions ?? []), ...(checks.preconditions ?? [])],
 	}
 }
 
@@ -355,7 +357,9 @@ async function conflict_sections(
 // **The refusal is printed last**: a lane child reading the report through `tail` saw only the red
 // metrics or type check after it, fixed those, and shipped into the same refusal again — every repeated
 // preflight stop of joshuafolkken/kit#4478. The stop records the pre-detach checks' red beside the
-// unmet kinds, so the ledger shows which refusals came with one.
+// unmet kinds, so the ledger shows which refusals came with one. **Red checks behind a passed preflight
+// are a stop too** (joshuafolkken/kit#5228): recorded under the preflight with their kinds, an
+// `unpinned` place among them.
 //
 // **A conflict with origin/main stops before the checks** (joshuafolkken/kit#5018): the supervisor's
 // sync would stop on it after them, so they would only be run again once it is resolved.
@@ -371,8 +375,8 @@ async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<S
 	)
 	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
-	if (preflight.code !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, checks))
+	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
+		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, result))
 	}
 
 	return [checks, preflight]

@@ -9,6 +9,7 @@ import { project_checks } from '#scripts/gate/project-checks'
 import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight (whatever it
@@ -59,6 +60,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const SECTION_SEPARATOR = '\n\n'
 const PASSED = 'pre-detach checks passed'
+const UNPINNED = 'unpinned'
 const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
 	{ list: ['josh', 'exports:unused'], label: gate_plan.EXPORTS_LABEL },
@@ -142,12 +144,33 @@ async function not_asked(): Promise<JoshResult> {
 	return { code: SUCCESS_EXIT_CODE, out: PASSED }
 }
 
-// The pinned check's stop joins the others' rather than hiding them.
-function with_pinned(result: JoshResult, pinned: JoshResult): JoshResult {
+// The checks' answer, with the kinds a `stop` record names its red by: `pre-detach` for the static
+// checks, `unpinned` for `test:pinned`, so `lane:stats` tells an unpinned stop apart
+// (joshuafolkken/kit#5228).
+interface PreDetachResult extends JoshResult {
+	preconditions?: ReadonlyArray<string>
+}
+
+function joined(result: JoshResult, pinned: JoshResult): JoshResult {
 	if (pinned.code === SUCCESS_EXIT_CODE) return result
 	if (result.code === SUCCESS_EXIT_CODE) return pinned
 
 	return { code: FAILURE_EXIT_CODE, out: [result.out, pinned.out].join(SECTION_SEPARATOR) }
+}
+
+function red_kinds(result: JoshResult, pinned: JoshResult): ReadonlyArray<string> {
+	return [
+		...(result.code === SUCCESS_EXIT_CODE ? [] : [lane_ledger_write.PRE_DETACH_STAGE]),
+		...(pinned.code === SUCCESS_EXIT_CODE ? [] : [UNPINNED]),
+	]
+}
+
+// The pinned check's stop joins the others' rather than hiding them.
+function with_pinned(result: JoshResult, pinned: JoshResult): PreDetachResult {
+	const preconditions = red_kinds(result, pinned)
+	const answer = joined(result, pinned)
+
+	return preconditions.length === 0 ? answer : { ...answer, preconditions }
 }
 
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
@@ -159,7 +182,7 @@ async function checks(
 	directory: string = process.cwd(),
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
 	pinned: PinnedCheck = not_asked,
-): Promise<JoshResult> {
+): Promise<PreDetachResult> {
 	const metrics = await Promise.all(
 		kit_only(directory).map(async (check) => await run_in(directory, check)),
 	)
@@ -179,9 +202,10 @@ const run_ship_pre_detach = {
 	METRICS_RERECORD_COMMAND,
 	PASSED,
 	STATIC_CHECKS,
+	UNPINNED,
 	checks,
 	failure_prefix,
 }
 
-export type { PinnedCheck, PreDetachCheck }
+export type { PinnedCheck, PreDetachCheck, PreDetachResult }
 export { run_ship_pre_detach }

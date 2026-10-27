@@ -230,6 +230,16 @@ describe('lane_stop_stats.table — the unmet preconditions', () => {
 
 		expect(causes_of(entries, PREFLIGHT)).toBe('lock 1, check 1, unrecorded 1')
 	})
+
+	// joshuafolkken/kit#5228: a ship whose pre-detach `test:pinned` stopped names it `unpinned`.
+	it('counts a stop the pre-detach test:pinned check made under unpinned', () => {
+		const entries = [
+			{ ...stop(PREFLIGHT, 30), cause: 'check', preconditions: ['unpinned'] },
+			{ ...stop(PREFLIGHT, 20), cause: 'check', preconditions: ['pre-detach', 'unpinned'] },
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('unpinned 2, pre-detach 1')
+	})
 })
 
 // joshuafolkken/kit#5203: an `unplanned` stop after the same issue's `check:related` printed the answer

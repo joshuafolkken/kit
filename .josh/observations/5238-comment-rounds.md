@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/issue/aggregation-split.ts:17 | 2026-10-27 | #5238
+- rf:comments | low | scripts/issue/aggregation-split.ts:23 | 2026-10-27 | #5238
