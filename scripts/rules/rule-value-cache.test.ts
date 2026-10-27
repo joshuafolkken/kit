@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -118,6 +118,31 @@ describe('rule_value_cache.read_fresh — the reading only inside the refresh in
 
 	it('misses when no reading is stored', () => {
 		expect(rule_value_cache.read_fresh(context.cwd, NOW_MS)).toBeUndefined()
+	})
+})
+
+describe('rule_value_cache — a lane never writes the main checkout reading', () => {
+	beforeEach(() => {
+		vi.spyOn(git_common_directory, 'resolve').mockReturnValue(path.join(context.cwd, '.git'))
+	})
+
+	it('stores nothing from a linked work tree', () => {
+		rule_value_cache.store(READING, context.cwd)
+
+		expect(existsSync(rule_value_cache.cache_path(context.cwd, rule_value_cache.CACHE_FILE))).toBe(
+			false,
+		)
+	})
+
+	it('starts no refresh and writes no stamp from a linked work tree', () => {
+		const start_refresh = vi.fn()
+
+		rule_value_cache.emit(context.cwd, ports(start_refresh))
+
+		expect(start_refresh).not.toHaveBeenCalled()
+		expect(existsSync(rule_value_cache.cache_path(context.cwd, rule_value_cache.STAMP_FILE))).toBe(
+			false,
+		)
 	})
 })
 

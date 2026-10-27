@@ -18,8 +18,8 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 // Outside a repository only: inside one the cache lives in the common git directory, so a lane's work
 // tree reads the reading its parent's loop head stored rather than measuring again
 // (joshuafolkken/kit#5186). The reading is the main checkout's — its transcripts and every lane's —
-// because the loop head's `backlog:offer` is the one writer; a lane's own measurement reaches only its
-// own transcripts (`cost_transcript.transcript_directories`).
+// because only the main checkout writes it (`is_linked_work_tree`); a lane's own measurement reaches
+// only its own transcripts (`cost_transcript.transcript_directories`).
 const FALLBACK_DIRECTORY = ['node_modules', '.cache', 'josh']
 const CACHE_FILE = 'rule-value.txt'
 // Touched when a refresh starts, so the loop head starts at most one per interval however often it runs.
@@ -103,8 +103,14 @@ function start_refresh_default(cwd: string): void {
 
 const DEFAULT_PORTS: CachePorts = { now: Date.now, start_refresh: start_refresh_default }
 
+// A linked work tree — a lane — measures its own transcripts alone, so it never writes the main
+// checkout's reading or its stamp: either would stand in for the whole repository's for an interval.
+function is_linked_work_tree(cwd: string): boolean {
+	return git_common_directory.resolve(cwd) !== undefined
+}
+
 function refresh_if_due(cwd: string, ports: CachePorts): void {
-	if (!is_refresh_due(cwd, ports.now())) return
+	if (is_linked_work_tree(cwd) || !is_refresh_due(cwd, ports.now())) return
 
 	write_cache_file(cwd, STAMP_FILE, new Date(ports.now()).toISOString())
 	ports.start_refresh(cwd)
@@ -125,6 +131,8 @@ function emit(cwd: string = process.cwd(), ports: CachePorts = DEFAULT_PORTS): v
 
 // The detached refresh's body: the reading written whole, so a reader never sees half of one.
 function store(text: string, cwd: string = process.cwd()): void {
+	if (is_linked_work_tree(cwd)) return
+
 	write_cache_file(cwd, CACHE_FILE, `${text}\n`)
 }
 
