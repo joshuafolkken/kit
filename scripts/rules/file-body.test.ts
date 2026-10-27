@@ -123,6 +123,14 @@ describe('file_body.carries_a_file_body — is silent', () => {
 	it('allows a redirect extract with no heredoc', () => {
 		expect(file_body.carries_a_file_body('grep foo CLAUDE.md > out.txt', is_present)).toBe(false)
 	})
+
+	// joshuafolkken/kit#5236: the multi-file rename the table points at instead of a script.
+	it('allows josh rename across files', () => {
+		const command =
+			"pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' a.ts b.ts"
+
+		expect(file_body.carries_a_file_body(command, is_present)).toBe(false)
+	})
 })
 
 describe('file_body.FILE_BODY_REASON', () => {
