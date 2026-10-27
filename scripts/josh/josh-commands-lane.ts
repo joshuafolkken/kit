@@ -254,7 +254,7 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:value': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one lane measurement since an instant as a single number: lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit)',
+			'Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit)',
 		category: 'AI tools',
 		reference: ['<metric> --since <instant>', 'maintainer', ['none']],
 		default_script_arguments: ['value'],
@@ -263,6 +263,11 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: 'edit --since 2026-10-23T03:29Z',
 					note: 'the median Edit time since an instant',
+				},
+				{
+					arguments:
+						'cell --table "test:related scope" --row related --column "median (s)" --since 2026-10-23T03:29Z',
+					note: 'one lane:stats table cell since an instant',
 				},
 			],
 		},
