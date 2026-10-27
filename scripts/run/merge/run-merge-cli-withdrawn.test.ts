@@ -30,7 +30,9 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 		invocation_or_all_events: vi.fn().mockResolvedValue([]),
 	},
 }))
-vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_merge: record_merge_mock } }))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_merge: record_merge_mock },
+}))
 vi.mock('#scripts/lane/lane-overrun', () => ({ lane_overrun: { investigate: investigate_mock } }))
 vi.mock('#scripts/lane/lane-baseline', () => ({ lane_baseline: { investigate: baseline_mock } }))
 vi.mock('#scripts/lane/lane-withdraw-closed', () => ({

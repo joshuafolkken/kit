@@ -4,7 +4,7 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
@@ -444,7 +444,7 @@ async function run_gate_command(
 // process end on its own, which it can, since every child has already exited by here.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
-		ledger_path: await lane_ledger.target(),
+		ledger_path: await lane_ledger_write.target(),
 		check_records: check_reuse.DEFAULT_RECORDS,
 	})
 }

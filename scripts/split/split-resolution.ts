@@ -8,6 +8,7 @@ import {
 	type SplitFiledEntry,
 	type SplitNoticeEntry,
 } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { split_assess } from './split-assess'
 
 // **What answers a split notice** (joshuafolkken/kit#4695). Of the lanes the notice reached, none split
@@ -98,7 +99,7 @@ interface Filing {
 // other route, and a filing found in no lane, record nothing.
 async function record_child({ route, found_during, child }: Filing): Promise<void> {
 	if (route !== SPLIT_ROUTE_LABEL || found_during === undefined) return
-	await lane_ledger.record_split_filed({ issue: Number(found_during), child })
+	await lane_ledger_write.record_split_filed({ issue: Number(found_during), child })
 }
 
 const split_resolution = { ledger_refusal, notices, record_child, refusal, split_issues }

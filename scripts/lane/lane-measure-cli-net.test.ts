@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_measure_cli } from './lane-measure-cli'
 
 // joshuafolkken/kit#4749: `josh lane:net <issue>` prints a lane's net minutes, the waits its parks and
@@ -34,7 +34,7 @@ describe('lane_measure_cli.run — net', () => {
 	it('prints the whole net minutes of a lane whose park waited on a person', async () => {
 		const context = fresh_context()
 
-		lane_ledger.append(context.ledger_path, {
+		lane_ledger_write.append(context.ledger_path, {
 			kind: 'dispatch',
 			at: '2026-10-24T03:00:00.000Z',
 			issue: ISSUE,
@@ -45,12 +45,12 @@ describe('lane_measure_cli.run — net', () => {
 			`#${String(ISSUE)} parked`,
 			'2026-10-24T03:20:00.000Z',
 		)
-		lane_ledger.append(context.ledger_path, {
+		lane_ledger_write.append(context.ledger_path, {
 			kind: 'dispatch',
 			at: '2026-10-24T03:50:00.000Z',
 			issue: ISSUE,
 		})
-		lane_ledger.append(context.ledger_path, {
+		lane_ledger_write.append(context.ledger_path, {
 			kind: 'merge',
 			at: '2026-10-24T04:04:20.000Z',
 			issue: ISSUE,

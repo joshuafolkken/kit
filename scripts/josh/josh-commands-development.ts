@@ -164,7 +164,9 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run related lint, unit, type and dotfile spelling checks in parallel',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
-		usage: { examples: [{ arguments: '' }] },
+		usage: {
+			examples: [{ arguments: '' }, { arguments: '--full', note: 'whole outputs' }],
+		},
 	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',

@@ -252,6 +252,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	// be gone by the time its transcript is scored.
 	'credential-body',
 	'raw-field-body',
+	'round-one-check-related',
 	'test-declared',
 	'lane-background',
 	'lane-split-park',

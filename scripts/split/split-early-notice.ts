@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { split_assess, type SizeMeasurement } from './split-assess'
 import { split_measure } from './split-measure'
 
@@ -58,7 +58,7 @@ async function claim_notice(
 	measurement: SizeMeasurement,
 ): Promise<boolean> {
 	if (!(await claim(target))) return false
-	await lane_ledger.record_split_notice({
+	await lane_ledger_write.record_split_notice({
 		issue,
 		files: measurement.files,
 		lines: measurement.lines,

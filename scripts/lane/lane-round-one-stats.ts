@@ -9,7 +9,7 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 
 const COLUMNS = ['round 1', 'rounds', 'share'] as const
 const VERDICTS = ['clean', 'fixed', 'blocking'] as const
-const REUSED = 'reused'
+const { ROUND_ONE_REUSED: REUSED } = lane_ledger
 const NO_SHARE = '-'
 const PERCENT = 100
 
@@ -46,6 +46,6 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_round_one_stats = { REUSED, table }
+const lane_round_one_stats = { table }
 
 export { lane_round_one_stats }

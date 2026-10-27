@@ -1,4 +1,4 @@
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_body_draft } from './run-ship-body-draft'
@@ -46,8 +46,8 @@ function stub_stages(): void {
 
 beforeEach(() => {
 	stub_stages()
-	vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
-	vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+	vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
+	vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 	vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 	vi.spyOn(console, 'info').mockReturnValue()
 	vi.spyOn(console, 'error').mockReturnValue()
@@ -73,7 +73,7 @@ describe('josh ship --detach — a conflict with origin/main', () => {
 
 		await run_ship_cli.run([TITLE, '--detach'])
 
-		expect(vi.mocked(lane_ledger.record_stop).mock.calls[0]?.[0].reason).toBe('conflict')
+		expect(vi.mocked(lane_ledger_write.record_stop).mock.calls[0]?.[0].reason).toBe('conflict')
 	})
 })
 
@@ -82,6 +82,6 @@ describe('josh ship --detach — no conflict with origin/main', () => {
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
 		expect(run_ship_pre_detach_timed.checks).toHaveBeenCalledOnce()
 		expect(run_ship_detach.detach).toHaveBeenCalledOnce()
-		expect(lane_ledger.record_stop).not.toHaveBeenCalled()
+		expect(lane_ledger_write.record_stop).not.toHaveBeenCalled()
 	})
 })

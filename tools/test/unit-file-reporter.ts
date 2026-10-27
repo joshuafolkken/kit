@@ -7,14 +7,14 @@ import type { Reporter, TestModule } from 'vitest/node'
 // (joshuafolkken/kit#4451). A unit leg whose wall time far outran its CPU — 1032 s against 658 s on
 // 2026-10-21 — left no record of the file it stalled on; this one names it afterwards.
 //
-// **Its own ledger path, not `lane_ledger.target`'s**, which answers none under `VITEST` so a suite
+// **Its own ledger path, not `lane_ledger_write.target`'s**, which answers none under `VITEST` so a suite
 // cannot append fixture durations. This reporter runs in vitest's own process, where that is always
 // set, and what it records is the run itself.
 
 // Enough to name a stalled file beside the few that are always slow, few enough for a short line.
 const SLOWEST_COUNT = 5
 
-// `lane_ledger`'s `UnitFileRecord` by shape, so this module loads nothing of the ledger until the run
+// `lane-ledger-schema.ts`'s `UnitFileRecord` by shape, so this module loads nothing of the ledger until the run
 // ends; `record_unit_files` still checks this against its own schema type.
 interface UnitFileRecord {
 	file: string
@@ -42,15 +42,15 @@ function slowest_files(
 // and never imports it, so none of this enters the config's import graph (joshuafolkken/kit#4465).
 async function record_to_ledger(files: ReadonlyArray<UnitFileRecord>): Promise<void> {
 	try {
-		const [{ lane_ledger }, { run_carry }] = await Promise.all([
-			import('#scripts/lane/lane-ledger'),
+		const [{ lane_ledger_write }, { run_carry }] = await Promise.all([
+			import('#scripts/lane/lane-ledger-write'),
 			import('#scripts/run/carry/run-carry'),
 		])
 		const repository = await run_carry.repository_directory()
 
 		if (repository === undefined) return
 
-		await lane_ledger.record_unit_files(files, lane_ledger.target_of(repository))
+		await lane_ledger_write.record_unit_files(files, lane_ledger_write.target_of(repository))
 	} catch {
 		// Reporting is best-effort: no repository, or no git, records nothing.
 	}

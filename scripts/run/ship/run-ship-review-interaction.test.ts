@@ -57,7 +57,7 @@ vi.mock('#scripts/review/review-reviewed-tree', () => ({
 		standing_here: async () => ({ movement: 'held' }),
 	},
 }))
-vi.mock('#scripts/lane/lane-ledger', () => ({ lane_ledger: { record_round_one } }))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({ lane_ledger_write: { record_round_one } }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
 

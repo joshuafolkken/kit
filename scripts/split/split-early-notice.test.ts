@@ -21,12 +21,12 @@ vi.mock('#scripts/git/change-base', () => ({
 }))
 
 const { git_command } = await import('#scripts/git/git-command')
-const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { split_assess } = await import('./split-assess')
 const { split_early_notice } = await import('./split-early-notice')
 const { split_measure } = await import('./split-measure')
 
-const record_split_notice = vi.spyOn(lane_ledger, 'record_split_notice')
+const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
 
 const ISSUE_NUMBER = 4642
 const ISSUE_BRANCH = `${String(ISSUE_NUMBER)}-lane`
