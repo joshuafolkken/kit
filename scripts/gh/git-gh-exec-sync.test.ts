@@ -79,6 +79,18 @@ describe('exec_gh_api_sync — the body never becomes an argument', () => {
 			{ timeout: GH_REQUEST_TIMEOUT_MS },
 		)
 	})
+
+	it('lets a body carrying terminal colors through with --allow-escape-sequences', () => {
+		mocked_execa_sync.mockReturnValueOnce(fake_sync_result(ISSUE_URL))
+
+		git_gh_exec.exec_gh_api_sync({ path: API_PATH, should_allow_escapes: true })
+
+		expect(mocked_execa_sync).toHaveBeenCalledWith(
+			'gh',
+			['api', API_PATH, '--allow-escape-sequences'],
+			{ timeout: GH_REQUEST_TIMEOUT_MS },
+		)
+	})
 })
 
 describe('exec_gh_api_sync — one argument builder, two spawns', () => {

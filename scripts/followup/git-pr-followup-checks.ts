@@ -136,15 +136,15 @@ function is_checks_failure(error: unknown): boolean {
 	return error instanceof Error && error.message.startsWith(FAILURE_MESSAGE_PREFIX)
 }
 
-// **A job the runner stopped after every step passed is rerun once and the wait judged again**
-// (`followup-job-rerun.ts`). The second wait has no rerun of its own, so a job that stops the same way
+// **A job the runner stopped after every step passed, or one red only on tests outside the change, is
+// rerun once and the wait judged again** (`followup-job-rerun.ts`). The second wait has no rerun of its own, so a job that stops the same way
 // twice — or any other failure — ends the run as before.
 async function rejudge_after_rerun(
 	input: RunChecksInput,
 	error: unknown,
 ): Promise<PrStateSnapshot> {
 	if (!is_checks_failure(error)) throw error
-	const rerun = await followup_job_rerun.rerun_stalled_jobs(input.branch_name)
+	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
 	if (rerun.length === 0) throw error
 
 	return await wait_for_checks(input)
