@@ -1065,7 +1065,8 @@ pnpm josh lane:adopt --all   # every open lane with no record
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals.
 
 ```bash
-pnpm josh rule:value
+pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
+pnpm josh rule:value --fresh     # measure now, whatever the cache holds
 pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
 ```
 
@@ -1076,6 +1077,7 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - A lane's transcript counts with the parent run that dispatched it.
 - It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
-- On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone.
+- Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
+- On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".

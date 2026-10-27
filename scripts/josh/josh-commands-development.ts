@@ -122,10 +122,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
-		reference: ['[--refresh]', 'developer', ['files']],
+		reference: ['[--fresh | --refresh]', 'developer', ['files']],
 		usage: {
 			examples: [
-				{ arguments: '' },
+				{ arguments: '', note: 'a reading cached under 15 minutes ago, else measure' },
+				{ arguments: '--fresh', note: 'measure now, whatever the cache holds' },
 				{
 					arguments: '--refresh',
 					note: 'write the reading to the loop-head cache instead of stdout',
