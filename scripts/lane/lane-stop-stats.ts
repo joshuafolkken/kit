@@ -75,6 +75,12 @@ function parks_of(events: ReadonlyArray<RunEvent>): Array<IssueAt> {
 	return events_of(events, run_event_stream.EVENT_KIND.PARK)
 }
 
+function dispatches_of(entries: ReadonlyArray<LedgerEntry>): Array<IssueAt> {
+	return entries
+		.filter((entry) => is_dispatch(entry))
+		.map((entry) => ({ issue: entry.issue, at_ms: Date.parse(entry.at) }))
+}
+
 function ends_of(
 	entries: ReadonlyArray<LedgerEntry>,
 	parks: ReadonlyArray<IssueAt>,
@@ -82,11 +88,8 @@ function ends_of(
 	const resumes = entries
 		.filter((entry) => is_stage(entry))
 		.map((stage) => ({ issue: stage.issue, at_ms: lane_stage_stats.started_ms(stage) }))
-	const dispatches = entries
-		.filter((entry) => is_dispatch(entry))
-		.map((entry) => ({ issue: entry.issue, at_ms: Date.parse(entry.at) }))
 
-	return [...resumes, ...dispatches, ...parks]
+	return [...resumes, ...dispatches_of(entries), ...parks]
 }
 
 // A stage's start counts from the stop's own instant, so a ship relaunched within the same
@@ -196,6 +199,6 @@ function table(
 	].join('\n')
 }
 
-const lane_stop_stats = { REASONS, ends_of, events_of, issue_of, table, wait_ms }
+const lane_stop_stats = { REASONS, dispatches_of, ends_of, events_of, issue_of, table, wait_ms }
 
 export { lane_stop_stats }

@@ -14,6 +14,7 @@ const BREAKDOWN: Breakdown = {
 	stages: [],
 	excluded_ms: 0,
 	slept_ms: 0,
+	yield_ms: 0,
 	waits: [],
 	implement: [],
 	pre_detach: [{ from_ms: Date.parse(FROM), to_ms: Date.parse(TO) }],
