@@ -9,6 +9,7 @@ import {
 	type CoreWaitRecord,
 	type GateRecord,
 	type HeldRecord,
+	type LaneStateChangeRecord,
 	type LedgerEntry,
 	type OverlapRecord,
 	type RoundOneRecord,
@@ -147,6 +148,10 @@ async function record_released(path?: string): Promise<void> {
 	await record({ kind: KIND.RELEASED, at: now_iso() }, path)
 }
 
+async function record_lane_state(change: LaneStateChangeRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.LANE_STATE, at: now_iso(), ...change }, path)
+}
+
 async function record_offerable(is_offerable: boolean, path?: string): Promise<void> {
 	await record({ kind: KIND.OFFERABLE, at: now_iso(), is_offerable }, path)
 }
@@ -227,6 +232,7 @@ const lane_ledger = {
 	record_dispatch,
 	record_gate,
 	record_held,
+	record_lane_state,
 	record_released,
 	record_merge,
 	record_overlap,
@@ -251,6 +257,7 @@ export type {
 	GateCheckRecord,
 	GateEntry,
 	HeldEntry,
+	LaneStateChangeEntry,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,

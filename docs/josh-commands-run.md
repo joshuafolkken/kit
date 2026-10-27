@@ -981,7 +981,7 @@ pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
-`review-fix` from `run:review` on, each call's span counted from the previous call's end.
+`review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
 
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and

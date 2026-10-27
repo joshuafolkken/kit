@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -290,6 +290,63 @@ describe('lane_measure_cli.run — stats transcripts', () => {
 		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
 
 		expect(printed).toContain('| implement sub-stage | lanes | median (min) | max (min) |')
+	})
+})
+
+const PAUSED_ISSUE = 4216
+const MS_PER_MINUTE = 60_000
+
+function at_minute(offset: number): string {
+	return new Date(NOW + offset * MS_PER_MINUTE).toISOString()
+}
+
+function lane_state(state: string, minute: number): string {
+	return JSON.stringify({ kind: 'lane-state', at: at_minute(minute), issue: PAUSED_ISSUE, state })
+}
+
+// One lane session of `PAUSED_ISSUE`: a `Read` from 20 to 10 minutes before `NOW`, then its ship.
+function paused_lane_transcript(): string {
+	const directory = path.join(
+		mkdtempSync(path.join(scratch, 'paused-')),
+		`-kit-lanes-${String(PAUSED_ISSUE)}`,
+	)
+	const read = { type: 'tool_use', id: 'r', name: 'Read', input: {} }
+	const ship = { type: 'tool_use', id: 's', name: 'Bash', input: { command: 'pnpm josh ship' } }
+	const lines = [
+		{ timestamp: at_minute(-20), message: { content: [read] } },
+		{
+			timestamp: at_minute(-10),
+			message: { content: [{ type: 'tool_result', tool_use_id: 'r' }] },
+		},
+		{ timestamp: at_minute(-9), message: { content: [ship] } },
+	]
+
+	mkdirSync(directory)
+	writeFileSync(
+		path.join(directory, SESSION_FILE),
+		lines.map((line) => JSON.stringify(line)).join('\n'),
+	)
+
+	return directory
+}
+
+// joshuafolkken/kit#5168: a ten-minute plan call that stood paused for eight of them.
+describe('lane_measure_cli.run — stats paused lanes', () => {
+	it("leaves a lane's paused time out of its implement sub-stages", async () => {
+		const context = fresh_context()
+
+		writeFileSync(
+			context.ledger_path,
+			[lane_state('paused', -19), lane_state('running', -11)].join('\n'),
+		)
+		await lane_measure_cli.run(['stats', '--period', '2'], {
+			...context,
+			transcript_directories: [paused_lane_transcript()],
+		})
+
+		const printed = String(vi.mocked(console.info).mock.calls[0]?.[0])
+
+		expect(printed).toContain('| plan | 1 | 2.0 | 2.0 |')
 	})
 })
 

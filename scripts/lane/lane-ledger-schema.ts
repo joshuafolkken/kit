@@ -21,6 +21,7 @@ const KIND = {
 	TEST_PINNED: 'test-pinned',
 	SPLIT_NOTICE: 'split-notice',
 	SPLIT_FILED: 'split-filed',
+	LANE_STATE: 'lane-state',
 } as const
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
@@ -141,6 +142,14 @@ const held_schema = z.object({
 // The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
 // the run finished, so no free lane is owed a child any more.
 const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
+// A `lane:pause` (`paused`) or `lane:resume` (`running`) of `issue`'s lane, so a measurement reads the
+// time its processes stood stopped (joshuafolkken/kit#5168) — the lane state file keeps only the last.
+const lane_state_schema = z.object({
+	kind: z.literal(KIND.LANE_STATE),
+	at: z.string(),
+	issue: z.number(),
+	state: z.enum(['paused', 'running']),
+})
 // The round 1 a `josh ship` acted on for `issue`: `verdict` is the reviewer's — `clean`, `fixed`,
 // `blocking` — or `reused` where a round recorded before the ship still described the tree, so the
 // period's ship-time rounds that passed with no fix are counted (joshuafolkken/kit#4620).
@@ -255,6 +264,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	test_pinned_schema,
 	split_notice_schema,
 	split_filed_schema,
+	lane_state_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -281,6 +291,8 @@ type SplitNoticeEntry = z.infer<typeof split_notice_schema>
 type SplitNoticeRecord = Omit<SplitNoticeEntry, 'kind' | 'at'>
 type SplitFiledEntry = z.infer<typeof split_filed_schema>
 type SplitFiledRecord = Omit<SplitFiledEntry, 'kind' | 'at'>
+type LaneStateChangeEntry = z.infer<typeof lane_state_schema>
+type LaneStateChangeRecord = Omit<LaneStateChangeEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -304,6 +316,8 @@ export type {
 	GateRecord,
 	HeldEntry,
 	HeldRecord,
+	LaneStateChangeEntry,
+	LaneStateChangeRecord,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,
