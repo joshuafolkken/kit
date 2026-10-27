@@ -33,10 +33,17 @@ const YIELD_TEXT = {
 	stays: 'The Issue stays in the run: it is offered again once the holding lane ends.',
 } as const
 
-async function record_yield(issue: number, reason: string): Promise<void> {
+// Where in the lane the yield fell, one word on the note, kept for a later count of how many the entry
+// probe caught before the investigation (joshuafolkken/kit#5211): `entry` from `run:entry`, `summary` from the
+// `lane:plan` a child runs once its work summary is set.
+type YieldAt = 'entry' | 'summary'
+
+const YIELD_AT_MARK = ' · at: '
+
+async function record_yield(issue: number, reason: string, at: YieldAt): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.NOTE,
-		`${issue_cite.plain(String(issue))}${YIELD_MARK}${reason}`,
+		`${issue_cite.plain(String(issue))}${YIELD_MARK}${reason}${YIELD_AT_MARK}${at}`,
 	)
 }
 
@@ -75,3 +82,4 @@ function is_yielded(events: ReadonlyArray<RunEvent>, issue: string): boolean {
 const lane_yield = { YIELD_REASON, YIELD_TEXT, is_yield, is_yielded, record_yield }
 
 export { lane_yield }
+export type { YieldAt }
