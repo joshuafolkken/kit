@@ -4,10 +4,13 @@ import {
 	EMPTY_LISTING,
 	gh_api_routes,
 	gh_failure,
+	GH_FAILURE,
 	PR_BRANCH,
 	pr_detail_path,
 	pr_lookup_path,
 	pr_routes,
+	rest_pull_page,
+	too_many_files_failure,
 	type GhApiAnswer,
 } from './git-gh-pr-fixture'
 import {
@@ -29,17 +32,20 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 
 const PR_BODY = 'closes #3263'
 const MERGED_AT = '2026-10-06T00:00:00Z'
+const OTHER_STATUS = 400
+const NEWER_PR_NUMBER = 973
 
 function stub(routes: Record<string, GhApiAnswer>): void {
 	mocked_api.mockImplementation(gh_api_routes(routes))
 }
 
-// The lookup resolves, and the detail read behind it fails with `failure`.
-function stub_failed_detail(failure: Error): void {
+// The lookup answers `lookup`, and the detail read behind it fails with `failure`.
+function stub_failed_detail(failure: Error, lookup = rest_pull_page([{}])): void {
 	stub(
 		pr_routes(
 			{},
 			{
+				[pr_lookup_path()]: lookup,
 				[pr_detail_path()]: async () => {
 					throw failure
 				},
@@ -48,8 +54,16 @@ function stub_failed_detail(failure: Error): void {
 	)
 }
 
+function calls_to(path: string): number {
+	return mocked_api.mock.calls.filter(([request]) => request.path === path).length
+}
+
 function detail_calls(): number {
-	return mocked_api.mock.calls.filter(([request]) => request.path === pr_detail_path()).length
+	return calls_to(pr_detail_path())
+}
+
+function lookup_calls(): number {
+	return calls_to(pr_lookup_path())
 }
 
 beforeEach(() => {
@@ -74,6 +88,67 @@ describe('pr_view tells an unreadable pull request from a missing one', () => {
 		const failure = gh_failure()
 
 		stub_failed_detail(failure)
+
+		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(
+			expect.objectContaining({ cause: failure }) as Error,
+		)
+	})
+
+	// joshuafolkken/kit#5226: the preflight prints the message alone, so the cause has to be in it.
+	it('names the cause in the message', async () => {
+		stub_failed_detail(gh_failure())
+
+		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(
+			`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${PR_BRANCH} (${GH_FAILURE})`,
+		)
+	})
+})
+
+// joshuafolkken/kit#5226: GitHub refuses some pull requests' single-pull JSON with 422 "too many files
+// changed" while the listing answers for the same one.
+describe('a detail read refused as too many files changed', () => {
+	it('answers pr_view from the listing row, with the merge state unknown', async () => {
+		stub_failed_detail(too_many_files_failure())
+
+		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).resolves.toBe(JSON.stringify({ state: 'OPEN' }))
+	})
+
+	it('answers the merge state from a merged listing row', async () => {
+		stub_failed_detail(
+			too_many_files_failure(),
+			rest_pull_page([{ state: 'closed', merged_at: MERGED_AT }]),
+		)
+
+		await expect(git_gh_pr_read.pr_get_merge_state(PR_BRANCH)).resolves.toMatchObject({
+			is_merged: true,
+			merged_at: MERGED_AT,
+			merge_state_status: undefined,
+		})
+	})
+})
+
+describe('a failed detail read the listing does not stand in for', () => {
+	it.each([
+		['any other failure', gh_failure()],
+		['a 422 about something else', too_many_files_failure(OTHER_STATUS)],
+	])('stays unreadable on %s', async (_label, failure) => {
+		stub_failed_detail(failure)
+
+		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(
+			expect.objectContaining({ cause: failure }) as Error,
+		)
+		expect(lookup_calls()).toBe(1)
+	})
+
+	it.each([
+		['is empty', EMPTY_LISTING],
+		['names a newer pull request', rest_pull_page([{ number: NEWER_PR_NUMBER }])],
+	])('stays unreadable when the listing %s', async (_label, listing) => {
+		const failure = too_many_files_failure()
+
+		stub_failed_detail(failure)
+		await git_gh_pr_read.pr_get_number(PR_BRANCH)
+		stub_failed_detail(failure, listing)
 
 		await expect(git_gh_pr_read.pr_view(PR_BRANCH)).rejects.toThrow(
 			expect.objectContaining({ cause: failure }) as Error,

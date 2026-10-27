@@ -4,6 +4,7 @@ import { note_unreadable_comments } from './git-gh-comments-unreadable'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
+import { git_gh_pr_too_large } from './git-gh-pr-too-large'
 import { to_gh_state } from './git-gh-rest-state'
 
 // Reading pull requests through REST, in the answers `gh pr view` gives.
@@ -63,10 +64,16 @@ function lookup_path(branch_name: string): string {
 	return `${git_gh_api_path.pulls_api_path()}?head=${head}&${LOOKUP_QUERY}`
 }
 
-async function fetch_pr_number(branch_name: string): Promise<number | undefined> {
+async function fetch_branch_pull(branch_name: string): Promise<RestPull | undefined> {
 	const json = await git_gh_exec.exec_gh_api({ path: lookup_path(branch_name) })
 
-	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))?.number
+	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))
+}
+
+async function fetch_pr_number(branch_name: string): Promise<number | undefined> {
+	const pull = await fetch_branch_pull(branch_name)
+
+	return pull?.number
 }
 
 // Why the resolution produced no number. `missing` is the lookup answering: the listing came back and
@@ -170,9 +177,12 @@ async function resolve_pr_number(branch_name: string): Promise<number | undefine
 }
 
 // One definition, because both callers that refuse to fold an unreadable lookup raise it —
-// `require_pr_number` and `pr_exists`.
+// `require_pr_number` and `pr_exists`. The cause's first line rides in the message: a reader that
+// prints only the message — the `josh git -y` preflight, a `josh ship` log — still says why.
 function to_unreadable_error(branch_name: string, cause: unknown): Error {
-	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause })
+	const [gist = ''] = error_text.message_of(cause).split('\n', 1)
+
+	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name} (${gist})`, { cause })
 }
 
 // The number for a caller that has nothing to fold an absence into. The reads above answer their own
@@ -215,6 +225,36 @@ async function read_remembered_pull(pr_number: number): Promise<RestPull> {
 	}
 }
 
+// The listing row for a detail read GitHub refused as too large (`git-gh-pr-too-large.ts`). The row
+// carries neither `mergeable` nor `mergeable_state`, which every reader of them already takes as
+// "not known yet". Any other failure — and a listing that no longer names the number — stays the
+// detail read's own `unreadable`.
+async function read_listed_pull(
+	detail_error: unknown,
+	branch_name: string,
+	pr_number: number,
+): Promise<RestPull | undefined> {
+	if (!git_gh_pr_too_large.is_too_many_files(detail_error)) return undefined
+	const pull = await fetch_branch_pull(branch_name)
+
+	return pull?.number === pr_number ? pull : undefined
+}
+
+async function read_pull_or_listed(
+	branch_name: string,
+	pr_number: number,
+	read: (pr_number: number) => Promise<RestPull>,
+): Promise<RestPull> {
+	try {
+		return await read(pr_number)
+	} catch (error) {
+		const listed = await read_listed_pull(error, branch_name, pr_number)
+		if (listed === undefined) throw error
+
+		return listed
+	}
+}
+
 // One pull request named by its branch: the resolution, then the detail read that carries
 // `mergeable` and `mergeable_state`, which the lookup listing does not.
 async function read_pull_of_branch(
@@ -225,7 +265,10 @@ async function read_pull_of_branch(
 	if (number_read.kind !== 'read') return number_read
 
 	try {
-		return { kind: 'read', pull: await read(number_read.pr_number) }
+		return {
+			kind: 'read',
+			pull: await read_pull_or_listed(branch_name, number_read.pr_number, read),
+		}
 	} catch (error) {
 		return { kind: 'unreadable', cause: error }
 	}
