@@ -479,6 +479,59 @@ jobs:
             .eslintcache
           key: ${{ steps.download.outputs.prefix }}${{ github.sha }}
 
+  # joshuafolkken/kit#5189: the seed above saves the pull request's cache under the Node.js release
+  # *that* run resolved. When the runner images move to a new patch release, main holds no lineage
+  # for it, and the first pull request on the new release lints cold (Static Checks 3.7 → 6.6 min).
+  # This job restores with the static-checks key on its own runner, after the seed has saved: an
+  # exact hit means the seed already wrote this release's lineage for this push, and nothing runs.
+  # A miss — a new release, or a seed that saved nothing — lints here, and `actions/cache` saves the
+  # result in its post step, so the cold lint is paid on main instead of on a pull request. The lint
+  # only saves time, so a red one does not turn the push red.
+  warm-eslint-lineage:
+    name: Warm ESLint Lineage
+    needs: [reuse-pr-checks, seed-eslint-cache]
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        id: setup-node
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Setup ESLint cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: eslint-cache
+        with:
+          path: |
+            .eslintcache
+          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
+
+      - name: Setup pnpm and install dependencies
+        if: steps.eslint-cache.outputs.cache-hit != 'true'
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint to write this release's lineage
+        id: lint
+        if: steps.eslint-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: pnpm josh lint
+
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
   # (joshuafolkken/kit#2982), which `templates/workflows/ci.yml` calls the same way, so
