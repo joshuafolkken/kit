@@ -57,8 +57,9 @@ describe('verification_inputs.configures', () => {
 })
 
 describe('verification_inputs.declaration_of', () => {
-	it('declares the scoped checks and leaves cspell and behavior undeclared', () => {
+	it('declares the scoped checks and cspell, and leaves behavior undeclared', () => {
 		expect(verification_inputs.is_declared(gate_plan.LINT_LABEL)).toBe(true)
+		expect(verification_inputs.is_declared(gate_plan.SPELL_CHECK_LABEL)).toBe(true)
 		expect(verification_inputs.is_declared(gate_plan.UNIT_LABEL)).toBe(true)
 		expect(verification_inputs.is_declared(BEHAVIOR_LABEL)).toBe(false)
 	})

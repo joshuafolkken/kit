@@ -50,6 +50,8 @@ const LINT_LABEL = 'lint'
 const TYPE_CHECK_LABEL = 'check'
 // The `josh` command the gate's type check runs, shared with `check:related` so the scoped check runs the same one.
 const TYPE_CHECK_TARGET = 'check'
+const SPELL_CHECK_LABEL = 'cspell'
+const SPELL_CHECK_TARGET = 'cspell:dot'
 const UNIT_LABEL = 'test:unit'
 const UNIT_TARGET = 'test:related'
 // **The gate's unit leg runs the whole suite for a changed file every test imports**
@@ -106,8 +108,8 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		memory_mb: core_budget.MEMORY_MB.type_check,
 	},
 	{
-		label: 'cspell',
-		target: 'cspell:dot',
+		label: SPELL_CHECK_LABEL,
+		target: SPELL_CHECK_TARGET,
 		reserved_cores: core_budget.CORE_WEIGHTS.spell_check,
 		memory_mb: core_budget.MEMORY_MB.spell_check,
 	},
@@ -529,6 +531,8 @@ const gate_plan = {
 	MEASURED_CORES,
 	METRICS_LABEL,
 	RESERVED_CORES,
+	SPELL_CHECK_LABEL,
+	SPELL_CHECK_TARGET,
 	STATIC_CHECKS,
 	TYPE_CHECK_LABEL,
 	TYPE_CHECK_TARGET,

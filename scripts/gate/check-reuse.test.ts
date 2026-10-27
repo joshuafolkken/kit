@@ -158,6 +158,24 @@ describe('check_reuse — the inputs fingerprint', () => {
 
 		vi.stubEnv('TZ', 'Etc/GMT+12')
 
-		await expect(reused(records, RECORDED)).resolves.toStrictEqual([LINT_LABEL, TYPE_CHECK_LABEL])
+		await expect(reused(records, RECORDED)).resolves.toStrictEqual(LABELS)
+	})
+})
+
+// joshuafolkken/kit#5156: cspell reads every file, so `check:related` reuses its record only while
+// nothing moved.
+describe('check_reuse — cspell', () => {
+	it('reuses cspell over the tree it was recorded on', async () => {
+		const records = await recorded()
+
+		await expect(reused(records, RECORDED)).resolves.toContain(CSPELL)
+	})
+
+	it('reuses no cspell once any file moved, a document included', async () => {
+		const records = await recorded()
+
+		base_moved(SKILL_DOC)
+
+		await expect(reused(records)).resolves.not.toContain(CSPELL)
 	})
 })

@@ -165,6 +165,20 @@ function missing_scripts(
 	return stale_checks(tree, base, sources).map((check) => check.script)
 }
 
+// The scripts whose green record still describes this tree, which `check:related` need not run again
+// (joshuafolkken/kit#5156). A tree with no answer reuses nothing, never reading silence as green.
+function green_scripts(
+	tree: Record<string, string>,
+	base: string | undefined,
+	sources: ScopedSources = {},
+): ReadonlyArray<string> {
+	if (!is_answerable(tree, base)) return []
+
+	return checks_of(sources)
+		.filter((check) => describes_tree(check, tree, base))
+		.map((check) => check.script)
+}
+
 const REFUSAL_HEADLINE = '⛔ scoped checks not green on this tree'
 
 // **The way out travels with the refusal.** A message saying only "not verified" leaves the caller
@@ -284,6 +298,7 @@ const scoped_green = {
 	SWITCH_ENV_KEY,
 	TEST_COMMAND,
 	TEST_SCRIPT,
+	green_scripts,
 	is_recordable_scope,
 	is_unmoved,
 	missing_checks,
