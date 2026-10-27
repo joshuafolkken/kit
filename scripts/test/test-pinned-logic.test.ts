@@ -232,4 +232,49 @@ describe('test_pinned_logic.report_text', () => {
 	it('prints only the counts when nothing is unpinned or unchecked', () => {
 		expect(test_pinned_logic.report_text(EMPTY_REPORT)).toBe('unpinned 0 · unchecked 0\n')
 	})
+
+	it('counts and lists a hunk a --first-unpinned run stopped before as unchecked', () => {
+		const report = { ...EMPTY_REPORT, cut: [hunk({ file: 'a.ts', new_start: 3 })] }
+
+		expect(test_pinned_logic.report_text(report)).toBe(
+			`${one_unchecked}unchecked a.ts:3 — not probed: the run stopped at the first unpinned hunk\n`,
+		)
+	})
+})
+
+// joshuafolkken/kit#5153: the probes run fewest reached tests first, so a run that stops at its first
+// unpinned hunk reaches it soonest.
+const REACH_FILES = ['wide.ts', 'mid.ts', 'narrow.ts']
+
+function reach_order(reach: ReadonlyMap<string, number>): Array<string> {
+	const probes = REACH_FILES.map((file) => ({ hunk: hunk({ file }) }))
+
+	return test_pinned_logic.by_reach(probes, reach).map((probe) => probe.hunk.file)
+}
+
+describe('test_pinned_logic.by_reach', () => {
+	it('orders the probes by the tests their file reaches, ascending', () => {
+		const reach = new Map([
+			['wide.ts', 500],
+			['mid.ts', 50],
+			['narrow.ts', 5],
+		])
+
+		expect(reach_order(reach)).toEqual(['narrow.ts', 'mid.ts', 'wide.ts'])
+	})
+
+	it('keeps the diff order where no count was read', () => {
+		expect(reach_order(new Map())).toEqual(REACH_FILES)
+	})
+})
+
+describe('test_pinned_logic.is_unpinned', () => {
+	it.each([
+		['green', true],
+		['no-test', true],
+		['red', false],
+		['stopped', false],
+	] as const)('reads a %s verdict as unpinned: %s', (verdict, expected) => {
+		expect(test_pinned_logic.is_unpinned({ verdict, failed: [], ran: 1 })).toBe(expected)
+	})
 })

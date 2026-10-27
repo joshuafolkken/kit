@@ -14,16 +14,18 @@ const CLEAN_EXIT = 0
 const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh test:pinned [--max <n>] [--record <token>] [--help]',
+	'Usage: josh test:pinned [--max <n>] [--record <token>] [--first-unpinned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
 	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
 	'  or where its revert stopped vitest before any test ran;',
-	'  --record also leaves the answer, under <token>, for `josh run:review --join`',
+	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
+	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
 ].join('\n')
 
 const PARSE_ARGS_OPTIONS = {
 	help: { type: 'boolean', short: 'h', default: false },
+	'first-unpinned': { type: 'boolean', default: false },
 	max: { type: 'string' },
 	record: { type: 'string' },
 } as const
@@ -36,6 +38,7 @@ const MOVING_NOTE = `the tree kept moving across ${String(MAX_CHECKS)} checks`
 interface PinnedOptions {
 	max_hunks: number
 	record_token: string | undefined
+	is_first_unpinned: boolean
 }
 
 // A `--max` that is not a whole number above zero is a refusal, not the default.
@@ -53,7 +56,11 @@ function options_of(argv: ReadonlyArray<string>): PinnedOptions | undefined {
 
 		if (max_hunks === undefined || values.help) return undefined
 
-		return { max_hunks, record_token: values.record }
+		return {
+			max_hunks,
+			record_token: values.record,
+			is_first_unpinned: values['first-unpinned'],
+		}
 	} catch {
 		return undefined
 	}
@@ -72,12 +79,12 @@ async function tree_digest(): Promise<string> {
 
 // The recorded check runs beside a review that may fix in place, and it reads the tree at more than
 // one moment; a check the tree moved under is run again, so its answer is about one tree.
-async function settled_run(max_hunks: number): Promise<PinnedReport> {
+async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
 	for (let attempt = 0; attempt < MAX_CHECKS; attempt += 1) {
 		// eslint-disable-next-line no-await-in-loop -- each check runs only once the last one saw the tree move
 		const before = await tree_digest()
 		// eslint-disable-next-line no-await-in-loop -- as above
-		const report = await test_pinned.run(max_hunks)
+		const report = await test_pinned.run(options.max_hunks, options.is_first_unpinned)
 		// eslint-disable-next-line no-await-in-loop -- as above
 		if ((await tree_digest()) === before) return report
 	}
@@ -87,9 +94,9 @@ async function settled_run(max_hunks: number): Promise<PinnedReport> {
 
 // `--record` leaves an answer however the run ends — a check that could not run included — so the
 // join waiting on it never waits on a check that died.
-async function recorded_run(max_hunks: number, token: string): Promise<PinnedReport> {
+async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedReport> {
 	try {
-		const report = await settled_run(max_hunks)
+		const report = await settled_run(options)
 
 		test_pinned_record.write(token, test_pinned_record.summary_of(report))
 
@@ -107,8 +114,8 @@ async function main(argv: ReadonlyArray<string>): Promise<number> {
 
 	const report =
 		options.record_token === undefined
-			? await test_pinned.run(options.max_hunks)
-			: await recorded_run(options.max_hunks, options.record_token)
+			? await test_pinned.run(options.max_hunks, options.is_first_unpinned)
+			: await recorded_run(options, options.record_token)
 
 	process.stdout.write(test_pinned_logic.report_text(report))
 

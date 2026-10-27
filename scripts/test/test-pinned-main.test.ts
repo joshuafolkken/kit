@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PinnedReport } from './test-pinned-logic'
 import { test_pinned_main } from './test-pinned-main'
 
-const { run } = vi.hoisted(() => ({ run: vi.fn<(max_hunks: number) => Promise<PinnedReport>>() }))
+const { run } = vi.hoisted(() => ({
+	run: vi.fn<(max_hunks: number, is_first_unpinned?: boolean) => Promise<PinnedReport>>(),
+}))
 
 const { write_stamp } = vi.hoisted(() => ({ write_stamp: vi.fn() }))
 
@@ -61,7 +63,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue(CLEAN_REPORT)
 
 		expect(await test_pinned_main.main([])).toBe(0)
-		expect(run).toHaveBeenCalledWith(20)
+		expect(run).toHaveBeenCalledWith(20, false)
 		expect(output.stdout.join('')).toBe('unpinned 0 · unchecked 0\n')
 	})
 
@@ -69,7 +71,7 @@ describe('test_pinned_main.main', () => {
 		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], unchecked: [HUNK], max_hunks: 1 })
 
 		expect(await test_pinned_main.main(['--max', '1'])).toBe(1)
-		expect(run).toHaveBeenCalledWith(1)
+		expect(run).toHaveBeenCalledWith(1, false)
 		expect(output.stdout.join('')).toBe(
 			'unpinned 1 · unchecked 1\n' +
 				'unpinned a.ts:4 — reverting it left every related test green\n' +
@@ -176,5 +178,29 @@ describe('test_pinned_main.main --record on a moving tree', () => {
 		await test_pinned_main.main([])
 
 		expect(run).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#5153: `--first-unpinned` stops at the first unpinned hunk and lists the rest.
+const FIRST_UNPINNED = '--first-unpinned'
+const CUT_HUNK = { ...HUNK, new_start: 9 }
+
+describe('test_pinned_main.main --first-unpinned', () => {
+	it('passes the flag through and lists the hunks it did not probe as unchecked', async () => {
+		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], cut: [CUT_HUNK] })
+
+		expect(await test_pinned_main.main([FIRST_UNPINNED])).toBe(1)
+		expect(run).toHaveBeenCalledWith(20, true)
+		expect(output.stdout.join('')).toContain(
+			'unchecked a.ts:9 — not probed: the run stopped at the first unpinned hunk',
+		)
+	})
+
+	it('records a cut answer as one', async () => {
+		run.mockResolvedValue({ ...CLEAN_REPORT, unpinned: [HUNK], cut: [CUT_HUNK] })
+
+		await test_pinned_main.main([FIRST_UNPINNED, '--record', TOKEN])
+
+		expect(write_stamp).toHaveBeenCalledWith(RECORD, expect.objectContaining({ is_cut: true }))
 	})
 })

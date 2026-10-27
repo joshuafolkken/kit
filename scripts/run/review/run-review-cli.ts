@@ -186,6 +186,18 @@ async function start_pair(plan: BriefPlan, is_early_push: boolean): Promise<numb
 	return code
 }
 
+// A fresh `josh test:pinned` on this tree in place of the last one.
+async function launch_pinned(reason: string | undefined): Promise<void> {
+	const tree = await run_review_pinned_tree.key()
+
+	run_review_pinned_steps.clear()
+	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason, tree)
+
+	if (launched.kind === 'failed') {
+		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
+	}
+}
+
 // `josh test:pinned` runs in the background beside the pair, `--unpinned-ok` or not, so the pair never
 // waits on it (joshuafolkken/kit#4793); the join judges its answer by the reason it was launched with.
 // A check that could not be launched fails open, as one that could not run does. A tree the scoped
@@ -196,14 +208,8 @@ async function run_start(plan: BriefPlan, reason?: string): Promise<number> {
 
 	if (refusal !== undefined) return review_brief_cli.report_error(refusal)
 	const is_early_push = await run_review_early_push.prepare(plan)
-	const tree = await run_review_pinned_tree.key()
 
-	run_review_pinned_steps.clear()
-	const launched = run_review_pinned_steps.launch(PROJECT_ROOT, reason, tree)
-
-	if (launched.kind === 'failed') {
-		process.stderr.write(test_pinned_record.not_run_summary(new Error(launched.note)).text)
-	}
+	await launch_pinned(reason)
 
 	return await start_pair(plan, is_early_push)
 }
@@ -305,11 +311,22 @@ async function run_join_fixing(): Promise<number> {
 
 const REUSED_NOTE =
 	'Judged the finished test:pinned answer on this tree and its green gate with the reason; nothing ran again — go on as after a join that passed.'
+const RECHECK_NOTE =
+	'The finished test:pinned answer stopped at its first unpinned place, so the reason launched the check of the whole change under it; the gate and the pair did not run again — go on as after a join that passed (`pnpm josh ship --review` reads its answer).'
 
 // The answer the join stopped on: unpinned places, judged with no reason. A clear answer, or one
 // launched under a reason, stopped nothing, so a reopen there is a new round that needs its brief.
 function is_stopped_answer(summary: PinnedSummary): boolean {
 	return summary.unpinned.length > 0 && run_review_pinned_steps.launched_reason() === undefined
+}
+
+// An answer cut at its first unpinned hunk (joshuafolkken/kit#5153) is not every place, so the reason
+// launches the whole check under it on this tree, and the pair, green on it already, does not run again.
+async function recheck_whole(reason: string): Promise<number> {
+	await launch_pinned(reason)
+	process.stderr.write(`${RECHECK_NOTE}\n`)
+
+	return SUCCESS_EXIT_CODE
 }
 
 // The finished check's stopped answer on this tree, when the pair's gate is green on it too.
@@ -331,6 +348,7 @@ async function accept_finished(
 	if (reason === undefined || is_code_only) return undefined
 	const summary = await finished_pair()
 	if (summary === undefined) return undefined
+	if (summary.is_cut === true) return await recheck_whole(reason)
 
 	run_review_pinned_steps.carry_reason(reason)
 	const verdict = await run_review_pinned_accepted.judge(summary, reason)
