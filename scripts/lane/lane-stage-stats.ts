@@ -43,6 +43,7 @@ const STAGES = [
 	lane_ledger.CI_WAIT_STAGE,
 	lane_ledger.CODERABBIT_WAIT_STAGE,
 	lane_ledger.CODERABBIT_RATE_LIMIT_STAGE,
+	lane_ledger.CODERABBIT_RETRIGGER_STAGE,
 	STAGE.REPORT,
 ] as const
 

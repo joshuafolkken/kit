@@ -65,6 +65,9 @@ const NO_DURATION = 0
 const STAGE = {
 	closes_and_context: 'closes-and-context',
 	checks_wait: 'checks-wait',
+	// Only on a run that retriggered a rate-limited CodeRabbit: the window and the review after it
+	// (joshuafolkken/kit#5289), kept out of `checks-wait` so the `ci-wait` row is the checks alone.
+	coderabbit_retrigger: 'coderabbit-retrigger',
 	coderabbit_comments: 'coderabbit-comments',
 	ai_review_comments: 'ai-review-comments',
 	// The interval of a run that merged nothing, where the send has nothing to go beside.

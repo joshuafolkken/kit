@@ -22,10 +22,9 @@ request already merged by hand** (a `prrun` stop) runs only the post-merge tail;
 Issue is not posted twice, so re-running is safe. Keep the default Issue target. Ignore a finding only
 after verifying it is inapplicable; rate-limit text is not a finding.
 
-**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** Wait out the stated
-window, post `@coderabbitai review` on the pull request, and rerun `followup`. Bypassing is Tier C — on
-explicit user instruction only, when the window is impractically long or the retrigger is rate-limited
-again.
+**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** `followup` waits
+out the window (≤30 min) and posts `@coderabbitai review` once per pull request. On its
+no-retrigger note, do that and rerun `followup`. Bypassing a second rate limit is Tier C.
 
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input sends a
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the
