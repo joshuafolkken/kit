@@ -29,6 +29,7 @@ const NO_RUN = "the call must not run at all, or only on a person's word — ref
 const STOP_NOTIFY = 'the hook sends the notify itself; it blocks only when the send fails'
 const HOLD_RELEASE = 'the hook releases the hold itself; it blocks only when that release fails'
 const FILING_OFFER = 'the filing needs a title and a body only the model can write'
+const CONCISE_REPLY = 'the shorter reply is prose only the model can write'
 
 function rewrite(): GuardRemedy {
 	return { remedy: 'rewrite', why: REWRITTEN }
@@ -94,6 +95,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'stop-notify': judgment(STOP_NOTIFY),
 	'filing-offer': judgment(FILING_OFFER),
 	'hold-release': judgment(HOLD_RELEASE),
+	'concise-reply': judgment(CONCISE_REPLY),
 }
 
 // A row family shares one class: `oracle-consulted:pkg:scout` is an `oracle-consulted` row.

@@ -10,6 +10,7 @@ const BASE: StopContext = {
 	prrun_stopped: false,
 	notified: false,
 	message: '',
+	prompt: '',
 	stop_hook_active: false,
 	cut_pending: false,
 	filed: false,

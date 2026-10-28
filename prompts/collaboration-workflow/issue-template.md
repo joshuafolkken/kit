@@ -33,7 +33,7 @@
 
 ## 発火点
 
-<AI の振る舞いを変える Issue のみ。その規則が破れる瞬間に最初に呼ばれるツールコール名を 1 つだけ書く（例 `Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`）>
+<AI の振る舞いを変える Issue のみ。その規則が破れる瞬間に最初に呼ばれるツールコール名を 1 つだけ書く（例 `Bash` / `Edit` / `Read` / `Write` / `AskUserQuestion`、回答を判定する規則は `Stop`）>
 
 ## ベースライン
 

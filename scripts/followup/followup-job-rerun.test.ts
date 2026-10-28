@@ -1,6 +1,13 @@
-import type { GhApiRequest } from '#scripts/gh/git-gh-exec'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLETE_ATTEMPTS, followup_job_rerun, REGISTER_ATTEMPTS } from './followup-job-rerun'
+import {
+	ACTIONS,
+	followup_job_rerun_fixture,
+	RUN_ID,
+	SUCCESS,
+	UNIT_ID,
+	WORKFLOW_PATH,
+} from './followup-job-rerun-fixture'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { pr_get_checks_snapshot: vi.fn() },
@@ -31,12 +38,17 @@ vi.mock(import('./followup-job-needs'), async (import_original) => {
 	return { followup_job_needs: { ...actual.followup_job_needs, read_graph: vi.fn() } }
 })
 
+vi.mock('./followup-main-move', () => ({
+	followup_main_move: { should_merge_first: vi.fn() },
+}))
+
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_gh_exec } = await import('#scripts/gh/git-gh-exec')
 const { changed_paths } = await import('#scripts/git/changed-paths')
 const { observation_record } = await import('#scripts/observations/observation-record')
 const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
 const { followup_job_needs } = await import('./followup-job-needs')
+const { followup_main_move } = await import('./followup-main-move')
 
 const fetch_checks = vi.mocked(git_gh_command.pr_get_checks_snapshot)
 const api = vi.mocked(git_gh_exec.exec_gh_api)
@@ -44,44 +56,25 @@ const read_changed = vi.mocked(changed_paths.read_changed_paths)
 const assess = vi.mocked(observation_record.assess)
 const comment = vi.mocked(git_gh_issue_write.issue_comment)
 const read_graph = vi.mocked(followup_job_needs.read_graph)
+const merge_first = vi.mocked(followup_main_move.should_merge_first)
+const { answer_actions, answer_checks, as_check, job, rerun_paths } = followup_job_rerun_fixture
 
 const BRANCH_NAME = '4813-lane'
+const ISSUE_NUMBER = 4813
 const SIGHTING = '- k:followup-unrelated-test-rerun | d1 | 2026-10-28 | a.test.ts | followup reran'
-const PR_NUMBER = 4811
-const RUN_ID = 40_117_183_013
 const OTHER_RUN_ID = 40_117_183_014
-const ACTIONS = 'repos/{owner}/{repo}/actions/'
 const CANCELLED = 'cancelled'
-const SUCCESS = 'success'
-const PASSED_STEPS = [SUCCESS, 'skipped', SUCCESS]
 const DETECT_E2E_NAME = 'Detect E2E'
 const PLAYWRIGHT_NAME = 'Resolve Playwright image'
 const UNIT_NAME = 'Unit Tests'
 const DETECT_E2E_ID = 101
-const UNIT_ID = 103
 
 const FAILURE = 'failure'
 const FAILED_STEPS = [SUCCESS, FAILURE]
 const OUTSIDE_TEST = 'scripts/run/board/run-board-frame-budget.test.ts'
 const FAILED_TEST = `${OUTSIDE_TEST} > frame budget > reads the budget`
 const UNIT_LOG = `2026-10-27T10:00:00.0000000Z  FAIL  ${FAILED_TEST}\n`
-const WORKFLOW_PATH = '.github/workflows/ci.yml'
 const CHECKS_NAME = 'Checks'
-
-interface JobInput {
-	id: number
-	name: string
-	conclusion: string
-	steps?: Array<string | undefined>
-	run_id?: number
-	run_attempt?: number
-}
-
-function job(input: JobInput): object {
-	const { steps = PASSED_STEPS, run_id = RUN_ID, ...rest } = input
-
-	return { ...rest, run_id, steps: steps.map((conclusion) => ({ conclusion })) }
-}
 
 const DETECT_E2E = job({ id: DETECT_E2E_ID, name: DETECT_E2E_NAME, conclusion: CANCELLED })
 const PLAYWRIGHT = job({ id: 102, name: PLAYWRIGHT_NAME, conclusion: 'timed_out' })
@@ -95,70 +88,6 @@ function failed_unit(run_attempt = 1): object {
 		steps: FAILED_STEPS,
 		run_attempt,
 	})
-}
-
-function as_check(item: object): object {
-	return { ...item, app: { slug: 'github-actions' } }
-}
-
-function snapshot_of(rollup: Array<object>): { pr_number: number; snapshot_json: string } {
-	return { pr_number: PR_NUMBER, snapshot_json: JSON.stringify({ statusCheckRollup: rollup }) }
-}
-
-// The first read finds the stalled checks; every later read — the registration wait — sees the
-// rerun's queued runs in their place unless told otherwise.
-function answer_checks(first: Array<object>, later: Array<object> = []): void {
-	fetch_checks.mockResolvedValueOnce(snapshot_of(first)).mockResolvedValue(snapshot_of(later))
-}
-
-interface ActionsWorld {
-	jobs: Array<object>
-	statuses?: Array<string>
-	is_rerun_refused?: boolean
-	log?: string
-}
-
-function find_job(jobs: Array<object>, path: string): object | undefined {
-	return jobs.find((item) => path.endsWith(`/jobs/${String(Reflect.get(item, 'id'))}`))
-}
-
-function answer_run(world: ActionsWorld, path: string): string {
-	if (!path.includes('/jobs?')) {
-		return JSON.stringify({ status: world.statuses?.shift() ?? 'completed', path: WORKFLOW_PATH })
-	}
-
-	const run_id = Number(/runs\/(\d+)\//u.exec(path)?.[1])
-
-	return JSON.stringify({
-		jobs: world.jobs.filter((item) => Reflect.get(item, 'run_id') === run_id),
-	})
-}
-
-function answer_read(world: ActionsWorld, path: string): string {
-	if (path.endsWith('/logs')) {
-		return path.includes(`/jobs/${String(UNIT_ID)}/`) ? (world.log ?? '') : ''
-	}
-
-	const found = find_job(world.jobs, path)
-	if (found !== undefined) return JSON.stringify(found)
-
-	return answer_run(world, path)
-}
-
-// Answers the Actions REST reads from one picture of the world; a POST is the rerun itself.
-function answer_actions(world: ActionsWorld): void {
-	api.mockImplementation(async (request: GhApiRequest) => {
-		if (request.method !== 'POST') return answer_read(world, request.path)
-		if (world.is_rerun_refused === true) throw new Error('HTTP 403')
-
-		return ''
-	})
-}
-
-function rerun_paths(): Array<string> {
-	return api.mock.calls
-		.filter(([request]) => request.method === 'POST')
-		.map(([request]) => request.path)
 }
 
 async function rerun_with_timers(): Promise<Array<string>> {
@@ -184,6 +113,7 @@ beforeEach(() => {
 	assess.mockReset().mockResolvedValue({ verdict: 'ledger', earlier: [], line: SIGHTING })
 	comment.mockReset().mockResolvedValue('https://comment')
 	read_changed.mockReset().mockResolvedValue(['scripts/followup/followup-job-rerun.ts'])
+	merge_first.mockReset().mockResolvedValue(false)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 })
 
@@ -313,6 +243,24 @@ describe('rerun_failed_jobs — a job red only on tests outside the change', () 
 
 		await expect_no_rerun()
 		expect(assess).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5316: a test main had already fixed was rerun on the old base before main came in.
+describe('rerun_failed_jobs — a failed test main has since changed', () => {
+	it('skips the rerun for a merge of main, then reruns once the merge left it red', async () => {
+		merge_first.mockResolvedValueOnce(true)
+		answer_checks([as_check(failed_unit())])
+		answer_actions({ jobs: [failed_unit()], log: UNIT_LOG })
+
+		await expect_no_rerun()
+		expect(merge_first).toHaveBeenCalledWith([OUTSIDE_TEST], ISSUE_NUMBER)
+		expect(assess).not.toHaveBeenCalled()
+
+		answer_checks([as_check(failed_unit())])
+
+		expect(await followup_job_rerun.rerun_failed_jobs(BRANCH_NAME)).toStrictEqual([UNIT_NAME])
+		expect(rerun_paths()).toHaveLength(1)
 	})
 })
 

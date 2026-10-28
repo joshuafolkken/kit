@@ -1,7 +1,6 @@
 import { agent_headless } from '#scripts/agent/agent-headless'
 import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { backlog_stalled_detect } from '#scripts/backlog/backlog-stalled-detect'
-import { repo_party } from '#scripts/discovery/repo-party'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { session_language } from '#scripts/josh/session-language'
@@ -12,7 +11,6 @@ import { lane_background } from '#scripts/rules/lane-background'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { stop_rules_fixture } from '#scripts/rules/stop-rules-fixture'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
-import { run_cut } from '#scripts/run/cut/run-cut'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_hold, type HoldRead } from '#scripts/run/hold/run-hold'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
@@ -23,10 +21,11 @@ import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { stop_guard, write_stop_decision } from './stop-guard'
+import { stop_guard_fixture } from './stop-guard-fixture'
 
 const SWITCH_KEY = stop_rules.SWITCH_ENV_KEY
 const LANG_KEY = session_language.ENV_KEY
-const UNREAD_TRANSCRIPT = 'transcript-not-read'
+const { UNREAD_TRANSCRIPT, decide_in, quiet_world } = stop_guard_fixture
 
 afterEach(() => {
 	Reflect.deleteProperty(process.env, SWITCH_KEY)
@@ -117,20 +116,6 @@ describe('write_stop_decision — the report checks are gated on a run record', 
 	})
 })
 
-// A quiet world: no hold, no cut, no backlog — so the reply is all that is judged.
-function quiet_world(): void {
-	vi.spyOn(backlog_stalled_detect, 'run_stall_check').mockResolvedValue(undefined)
-	vi.spyOn(run_stranded_detect, 'run_stranded_check').mockResolvedValue(undefined)
-	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
-	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
-	vi.spyOn(run_cut, 'carried_cut_sync').mockReturnValue(undefined)
-	vi.spyOn(run_headless, 'must_keep_waiting').mockResolvedValue(false)
-	vi.spyOn(run_headless, 'is_backlog_parent').mockResolvedValue(false)
-	vi.spyOn(run_headless, 'is_headless').mockReturnValue(true)
-	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue('')
-	vi.spyOn(repo_party, 'current_owner').mockReturnValue('joshuafolkken')
-}
-
 it('keeps a named epic session waiting when its child lane is in flight', async () => {
 	quiet_world()
 	vi.mocked(run_headless.must_keep_waiting).mockResolvedValue(true)
@@ -141,21 +126,6 @@ it('keeps a named epic session waiting when its child lane is in flight', async 
 
 	expect(String(write.mock.calls[0]?.[0])).toContain('⛔ headless parent:')
 })
-
-// The stdout writes of one stop decision on `message`, in a session configured for `lang`.
-async function decide_in(lang: string, message: string): Promise<Array<string>> {
-	quiet_world()
-	process.env[LANG_KEY] = lang
-	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
-	const payload = JSON.stringify({
-		transcript_path: UNREAD_TRANSCRIPT,
-		last_assistant_message: message,
-	})
-
-	await write_stop_decision(payload)
-
-	return write.mock.calls.map((call) => String(call[0]))
-}
 
 // joshuafolkken/kit#2470: the configured language reaches both the check and the refusal's wording.
 // `en` rather than the `ja` default, so a hard-coded default could not pass.
@@ -171,6 +141,7 @@ describe('write_stop_decision — the session language is wired', () => {
 
 	it('sends back a Japanese reply in an en session, naming en', async () => {
 		const written = await decide_in(
+			write_stop_decision,
 			'en',
 			'ゲートは通過し、PR を作成しました。レビューで修正すべき指摘はありませんでした。',
 		)
@@ -181,6 +152,7 @@ describe('write_stop_decision — the session language is wired', () => {
 
 	it('lets an English reply in an en session stop', async () => {
 		const written = await decide_in(
+			write_stop_decision,
 			'en',
 			'The gate passed and the pull request is open; nothing is left to fix.',
 		)
