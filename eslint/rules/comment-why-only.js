@@ -5,15 +5,19 @@
 // checks are separate rules so a repository can switch each on once its own comments are clean.
 
 // A bare "previously" often means "earlier in this run" ("a previously parked lane"); only the
-// sentence-opening "Previously," narrates the past.
-const HISTORY_PATTERNS = [/\bpreviously,/iu, /\bformerly\b/iu, /\bused to\b/iu, /以前は/u]
+// sentence-opening "Previously," narrates the past. "is used to" describes a purpose, not a
+// history, so the look-behind skips it.
+const HISTORY_PATTERNS = [
+	/\bpreviously,/iu,
+	/\bformerly\b/iu,
+	/(?<!\b(?:is|are|be|been|being|was|were|get|gets|got|getting|only|also|not|just) )\bused to\b/iu,
+	/以前は/u,
+]
 
-// "is used to" and a sentence opening with "Used to" describe a purpose, not a history, so they are
-// removed before the history check. A sentence opens at a line start (after a block comment's `*`)
-// or after `.`, `!`, `?` or `:`; the capital `U` keeps a lowercase "used to" that wraps onto the
-// next line of a sentence a history.
-const PURPOSE_PATTERN =
-	/\b(?:is|are|be|been|being|was|were|get|gets|got|getting|only|also|not|just) used to\b/giu
+// A sentence opening with "Used to" describes a purpose too, so that opening is cut off before the
+// history check. A sentence opens at a line start (after a block comment's `*`) or after `.`, `!`,
+// `?` or `:`; the capital `U` keeps a lowercase "used to" that wraps onto the next line of a
+// sentence a history.
 const SENTENCE_BOUNDARY = /(?<=[.!?:\n])/u
 const OPENING_PURPOSE_PATTERN = /^[\s*]*Used to\b/u
 
@@ -28,17 +32,22 @@ const MEASUREMENT_PATTERNS = [
 ]
 
 /**
+ * @param {string} sentence
+ * @returns {boolean}
+ */
+function sentence_has_history(sentence) {
+	const opening = OPENING_PURPOSE_PATTERN.exec(sentence)
+	const rest = opening ? sentence.slice(opening[0].length) : sentence
+
+	return HISTORY_PATTERNS.some((pattern) => pattern.test(rest))
+}
+
+/**
  * @param {string} text
  * @returns {boolean}
  */
 function has_history(text) {
-	const stripped = text
-		.split(SENTENCE_BOUNDARY)
-		.map((sentence) => sentence.replace(OPENING_PURPOSE_PATTERN, ''))
-		.join('')
-		.replaceAll(PURPOSE_PATTERN, '')
-
-	return HISTORY_PATTERNS.some((pattern) => pattern.test(stripped))
+	return text.split(SENTENCE_BOUNDARY).some((sentence) => sentence_has_history(sentence))
 }
 
 /**
