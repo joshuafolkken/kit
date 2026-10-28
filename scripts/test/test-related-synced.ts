@@ -75,8 +75,8 @@ function own_of(
 
 function split_with(graph: ImportGraph, inputs: SplitInputs): SyncedSplit {
 	const { root, main_only, own, universe } = inputs
-	const from_branch = graph.importers(own, universe)
-	const meeting = [...graph.importers(main_only, universe)]
+	const from_branch = graph.runtime_importers(own, universe)
+	const meeting = [...graph.runtime_importers(main_only, universe)]
 		.filter((file) => from_branch.has(file))
 		.map((file) => path.relative(root, file))
 	const shared = meeting.filter((file) => test_declared_logic.is_test_file(file))

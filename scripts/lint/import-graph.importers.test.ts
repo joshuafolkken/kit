@@ -4,8 +4,8 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { import_graph, type ImportGraph } from './import-graph'
 
-// joshuafolkken/kit#5368: `importers` walks the test runner's graph, which a type-only declaration
-// leaves, while `closure` keeps the edge a type-aware lint verdict reads.
+// joshuafolkken/kit#5368: `runtime_importers` walks the test runner's graph, which a type-only
+// declaration leaves, while `importers` and `closure` keep the edge a type-aware reader needs.
 const LEAF = 'leaf.ts'
 const READER = 'reader.ts'
 const TSCONFIG = JSON.stringify({
@@ -14,6 +14,7 @@ const TSCONFIG = JSON.stringify({
 })
 const TYPE_IMPORT = "import type { Leaf } from './leaf'\n"
 const BOTH = [LEAF, READER]
+const RUNTIME: 'importers' | 'runtime_importers' = 'runtime_importers'
 
 const roots: Array<string> = []
 
@@ -31,10 +32,10 @@ async function graph_with(reader: string): Promise<{ root: string; graph: Import
 	return { root, graph }
 }
 
-async function importers_of(reader: string): Promise<Array<string>> {
+async function importers_of(reader: string, kind = RUNTIME): Promise<Array<string>> {
 	const { root, graph } = await graph_with(reader)
 	const universe = BOTH.map((name) => path.join(root, name))
-	const reached = graph.importers([path.join(root, LEAF)], universe)
+	const reached = graph[kind]([path.join(root, LEAF)], universe)
 
 	return [...reached]
 		.map((file) => path.relative(root, file))
@@ -45,7 +46,7 @@ afterEach(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-describe('import_graph.importers', () => {
+describe('import_graph.runtime_importers', () => {
 	it('follows a value import', async () => {
 		expect(await importers_of("import { x } from './leaf'\n")).toStrictEqual(BOTH)
 	})
@@ -67,8 +68,12 @@ describe('import_graph.importers', () => {
 	})
 })
 
-describe('import_graph.closure — a type-only import', () => {
-	it('still holds the file read only for its types, as the lint cache needs', async () => {
+describe('import_graph — the readers of a type-only import', () => {
+	it('keeps the file in `importers`, which can name what the leaf exports', async () => {
+		expect(await importers_of(TYPE_IMPORT, 'importers')).toStrictEqual(BOTH)
+	})
+
+	it('keeps the leaf in `closure`, as the lint cache needs', async () => {
 		const { root, graph } = await graph_with(TYPE_IMPORT)
 
 		expect(graph.closure(path.join(root, READER))).toContain(path.join(root, LEAF))

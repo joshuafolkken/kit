@@ -28,6 +28,9 @@ const ROOT_FILE = 'cli.js'
 const ROOT_CONTENT = `export { data } from './${FIXTURE_FILE}'\n`
 const UNPINNED_HUNK = `${DRIVER_FILE}:6`
 const FIXTURE_PROBE = `${FIXTURE_FILE}:1 data`
+// A module that exports only a type, read through type-only edges (joshuafolkken/kit#5368).
+const TYPE_CONTENT = 'export type Shape = 1\n'
+const TYPE_FIXTURE_FILE = 'shape-fixture.ts'
 
 const fixture: { current?: FixtureWorkspace } = {}
 
@@ -70,6 +73,15 @@ describe('test_pinned_reach.probed_files', () => {
 		expect(await test_pinned_reach.probed_files([FIXTURE_FILE])).toEqual([FIXTURE_FILE])
 	})
 
+	// joshuafolkken/kit#5368: an `export type … from` runs nothing, so it does not make the fixture runtime code.
+	it('drops a fixture a code file reaches only through `export type … from`', async () => {
+		await build_with_fixture()
+		await write(TYPE_FIXTURE_FILE, TYPE_CONTENT)
+		await write('cli.ts', "export type { Shape } from './shape-fixture'\n")
+
+		expect(await test_pinned_reach.probed_files([TYPE_FIXTURE_FILE])).toEqual([])
+	})
+
 	it('keeps a fixture where no tsconfig.json is there to build a graph from', async () => {
 		await build_with_fixture(false)
 
@@ -84,6 +96,18 @@ describe('test_pinned_reach.reached_test_count', () => {
 		await write(ROOT_FILE, ROOT_CONTENT)
 
 		expect(await test_pinned_reach.reached_test_count([FIXTURE_FILE, FIXTURE_TEST])).toBe(1)
+	})
+
+	// joshuafolkken/kit#5368: vitest never follows an `import type`, so the reach does not either.
+	it('counts no test that reads the module only through `import type`', async () => {
+		await build_with_fixture()
+		await write('shape.ts', TYPE_CONTENT)
+		await write(
+			'shape.test.ts',
+			"import type { Shape } from './shape'\n\nexport type Read = Shape\n",
+		)
+
+		expect(await test_pinned_reach.reached_test_count(['shape.ts'])).toBe(0)
 	})
 
 	it('counts nothing for an empty scope', async () => {

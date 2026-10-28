@@ -50,8 +50,15 @@ interface ImportGraph {
 	closure_hash: (file: string) => string
 	imports: (file: string, content?: string) => ReadonlyArray<string>
 	importers: (files: ReadonlyArray<string>, universe: ReadonlyArray<string>) => ReadonlySet<string>
+	runtime_importers: (
+		files: ReadonlyArray<string>,
+		universe: ReadonlyArray<string>,
+	) => ReadonlySet<string>
 	strings: (file: string) => ReadonlyArray<string>
 }
+
+// A file's direct dependencies along one kind of edge.
+type Edges = (context: GraphContext, file: string) => ReadonlyArray<Dependency>
 
 // `typescript` is an optional peer: a project without it has no type-aware rule to go stale.
 async function load_typescript(): Promise<TypeScript | undefined> {
@@ -327,11 +334,12 @@ function append(map: Map<string, Array<string>>, key: string, value: string): vo
 function reverse_edges(
 	context: GraphContext,
 	universe: ReadonlyArray<string>,
+	edges: Edges,
 ): Map<string, Array<string>> {
 	const reverse = new Map<string, Array<string>>()
 
 	for (const file of universe) {
-		for (const dependency of runtime_dependencies(context, file)) {
+		for (const dependency of edges(context, file)) {
 			append(reverse, dependency.file, file)
 		}
 	}
@@ -339,14 +347,17 @@ function reverse_edges(
 	return reverse
 }
 
-// Every file of `universe` whose runtime imports reach one of `files`, the files themselves included —
-// the graph the test runner walks, so a file read only through `import type` reaches no test past it.
+// Every file of `universe` whose `edges` reach one of `files`, the files themselves included. Over every
+// import, the only files that can name what they export, however many re-exports and aliases stand
+// between; over the runtime imports, the graph the test runner walks, where a file read only through
+// `import type` reaches no test past it (joshuafolkken/kit#5368).
 function importers(
 	context: GraphContext,
 	files: ReadonlyArray<string>,
 	universe: ReadonlyArray<string>,
+	edges: Edges,
 ): ReadonlySet<string> {
-	const reverse = reverse_edges(context, universe)
+	const reverse = reverse_edges(context, universe, edges)
 	const reached = new Set(files)
 	const pending = [...files]
 
@@ -360,6 +371,18 @@ function importers(
 	return reached
 }
 
+function graph_of(context: GraphContext): ImportGraph {
+	return {
+		closure: (file) => closure(context, file),
+		closure_hash: (file) => closure_hash(context, file),
+		imports: (file, content) => imports(context, file, content),
+		importers: (files, universe) => importers(context, files, universe, direct_dependencies),
+		runtime_importers: (files, universe) =>
+			importers(context, files, universe, runtime_dependencies),
+		strings: (file) => strings(context.typescript, file),
+	}
+}
+
 // Undefined where nothing type-aware can run: no `typescript`, or no `tsconfig.json` at the root.
 async function create(root: string): Promise<ImportGraph | undefined> {
 	const typescript = await load_typescript()
@@ -367,7 +390,8 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 	const parsed = parsed_config(typescript, root)
 	if (parsed === undefined) return undefined
 	const { options } = parsed
-	const context: GraphContext = {
+
+	return graph_of({
 		root,
 		typescript,
 		options,
@@ -376,15 +400,7 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 		dependencies: new Map(),
 		runtime_dependencies: new Map(),
 		content_hashes: new Map(),
-	}
-
-	return {
-		closure: (file) => closure(context, file),
-		closure_hash: (file) => closure_hash(context, file),
-		imports: (file, content) => imports(context, file, content),
-		importers: (files, universe) => importers(context, files, universe),
-		strings: (file) => strings(typescript, file),
-	}
+	})
 }
 
 const import_graph = { create }

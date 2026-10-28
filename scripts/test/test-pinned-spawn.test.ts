@@ -25,6 +25,7 @@ function graph_of(strings: Record<string, ReadonlyArray<string>>): ImportGraph {
 		closure_hash: () => '',
 		imports: () => [],
 		importers: () => new Set(),
+		runtime_importers: () => new Set(),
 		strings: (file) => strings[path.basename(file)] ?? [],
 	}
 }

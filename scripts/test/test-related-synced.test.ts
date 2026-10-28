@@ -44,7 +44,8 @@ const FAKE_GRAPH: ImportGraph = {
 	closure: () => [],
 	closure_hash: () => '',
 	imports: () => [],
-	importers: (files) => importers_of(files),
+	importers: () => new Set(),
+	runtime_importers: (files) => importers_of(files),
 	strings: () => [],
 }
 
