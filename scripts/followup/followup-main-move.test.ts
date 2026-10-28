@@ -30,6 +30,7 @@ const record_entry = vi.mocked(followup_failed_tests.record_entry)
 const FAILED_TEST = 'scripts/review/review-stops-cli.test.ts'
 const MAIN_COMMIT = '0123456789abcdef0123456789abcdef01234567'
 const SHORT_COMMIT = '0123456789ab'
+const MAIN_REF = 'origin/main'
 const ISSUE = 5266
 
 beforeEach(() => {
@@ -51,15 +52,18 @@ describe('read_main_move', () => {
 			commit: MAIN_COMMIT,
 		})
 		expect(fetch_branch).toHaveBeenCalledWith('main')
-		expect(log_first_parent).toHaveBeenCalledWith(1, FAILED_TEST, 'origin/main')
+		expect(log_first_parent).toHaveBeenCalledWith(1, FAILED_TEST, MAIN_REF)
 	})
 
 	it('counts a move of the subject module the test is named after', async () => {
-		incoming_paths.mockResolvedValue(['scripts/review/review-stops-cli.ts'])
+		const subject = 'scripts/review/review-stops-cli.ts'
+
+		incoming_paths.mockResolvedValue([subject])
 
 		const move = await followup_main_move.read_main_move([FAILED_TEST])
 
-		expect(move?.files).toStrictEqual([FAILED_TEST])
+		expect(move).toStrictEqual({ files: [FAILED_TEST], commit: MAIN_COMMIT })
+		expect(log_first_parent).toHaveBeenCalledWith(1, subject, MAIN_REF)
 	})
 
 	it.each([

@@ -21,16 +21,24 @@ interface MainMove {
 	commit: string
 }
 
-function moved_files(
-	test_files: ReadonlyArray<string>,
-	incoming: ReadonlySet<string>,
-): Array<string> {
-	return test_files.filter((file) =>
-		followup_failed_tests.subjects_of(file).some((subject) => incoming.has(subject)),
-	)
+// A failed test file beside the path main moved for it: the file itself or its subject module.
+interface MovedTest {
+	file: string
+	moved: string
 }
 
-// The main-side commit is the latest on main's own line that touched the first moved file.
+function moved_tests(
+	test_files: ReadonlyArray<string>,
+	incoming: ReadonlySet<string>,
+): Array<MovedTest> {
+	return test_files.flatMap((file) => {
+		const moved = followup_failed_tests.subjects_of(file).find((subject) => incoming.has(subject))
+
+		return moved === undefined ? [] : { file, moved }
+	})
+}
+
+// The main-side commit is the latest on main's own line that touched the first moved path.
 async function latest_commit(file: string, main_reference: string): Promise<string> {
 	const [commit] = await git_command.log_first_parent(LATEST_COMMIT, file, main_reference)
 
@@ -47,12 +55,15 @@ async function read_main_move(test_files: ReadonlyArray<string>): Promise<MainMo
 	await git_command.fetch_branch(default_branch)
 
 	const incoming = new Set(await main_merge_guard.incoming_paths(default_branch))
-	const files = moved_files(test_files, incoming)
-	const [first] = files
+	const moved = moved_tests(test_files, incoming)
+	const [first] = moved
 
 	if (first === undefined) return undefined
 
-	return { files, commit: await latest_commit(first, `origin/${default_branch}`) }
+	return {
+		files: moved.map(({ file }) => file),
+		commit: await latest_commit(first.moved, `origin/${default_branch}`),
+	}
 }
 
 function observation_of(move: MainMove): ObservationEntry {

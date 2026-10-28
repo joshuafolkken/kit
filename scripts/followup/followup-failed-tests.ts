@@ -132,9 +132,9 @@ async function record_entry(entry: ObservationEntry, issue: number | undefined):
 	}
 
 	try {
-		console.info(`📝 Recorded the failed tests outside the change: ${await post(entry, issue)}`)
+		console.info(`📝 Recorded the ${entry.slug} observation: ${await post(entry, issue)}`)
 	} catch (error) {
-		console.info(`⚠️ Could not record the failed tests outside the change: ${String(error)}`)
+		console.info(`⚠️ Could not record the ${entry.slug} observation: ${String(error)}`)
 	}
 }
 
