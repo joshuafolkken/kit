@@ -1,3 +1,4 @@
+import { lane_implement_subagents, type ImplementLane } from './lane-implement-subagents'
 import { lane_paused_spans, type PausedSpan, type PausedSpans } from './lane-paused-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -35,7 +36,14 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
-const COLUMNS = ['implement sub-stage', 'lanes', 'median (min)', 'max (min)'] as const
+// `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
+const COLUMNS = [
+	'implement sub-stage',
+	'lanes',
+	'median (min)',
+	'max (min)',
+	'backgrounded',
+] as const
 
 interface Phase {
 	edited: boolean
@@ -132,18 +140,35 @@ function lanes_of(calls: ReadonlyArray<ToolCall>): Array<ReadonlyArray<ToolCall>
 	)
 }
 
+// One lane's implement calls and paused spans, or `undefined` when it never shipped.
+function implement_lane(
+	lane: ReadonlyArray<ToolCall>,
+	paused: PausedSpans,
+): ImplementLane | undefined {
+	const implement = implement_calls(lane)
+	const spans = lane_paused_spans.of_lane(paused, lane[0]?.lane ?? '')
+
+	return implement === undefined ? undefined : { calls: implement, paused: spans }
+}
+
+// The implement calls and paused spans of each lane that shipped in `window`.
+function implement_lanes(
+	calls: ReadonlyArray<ToolCall>,
+	window: StatsWindow,
+	paused: PausedSpans,
+): Array<ImplementLane> {
+	const lanes = lanes_of(lane_transcript_stats.in_period(calls, window))
+
+	return lanes.flatMap((lane) => implement_lane(lane, paused) ?? [])
+}
+
 // The sub-stage totals of each lane that shipped in `window`.
 function lane_totals_in(
 	calls: ReadonlyArray<ToolCall>,
 	window: StatsWindow,
 	paused: PausedSpans,
 ): Array<Totals> {
-	return lanes_of(lane_transcript_stats.in_period(calls, window)).flatMap((lane) => {
-		const implement = implement_calls(lane)
-		const spans = lane_paused_spans.of_lane(paused, lane[0]?.lane ?? '')
-
-		return implement === undefined ? [] : [lane_totals(implement, spans)]
-	})
+	return implement_lanes(calls, window, paused).map((lane) => lane_totals(lane.calls, lane.paused))
 }
 
 function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string> {
@@ -154,18 +179,25 @@ function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string
 		String(values.length),
 		lane_stage_stats.cell(lane_stats.median(values)),
 		lane_stage_stats.cell(lane_stats.peak(values)),
+		'',
 	]
 }
 
 // The period's table: `calls` is every lane session's calls, filtered here to `window`; `paused` is
-// each lane's paused spans (`lane-paused-spans.ts`).
+// each lane's paused spans (`lane-paused-spans.ts`). The sub-stages, then the subagents by agent type
+// (`lane-implement-subagents.ts`).
 function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: PausedSpans): string {
-	const totals = lane_totals_in(calls, window, paused)
+	const lanes = implement_lanes(calls, window, paused)
+	const totals = lanes.map((lane) => lane_totals(lane.calls, lane.paused))
+	const rows = [
+		...SUB_STAGES.map((stage) => stage_row(stage, totals)),
+		...lane_implement_subagents.rows(lanes),
+	]
 
 	return [
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...SUB_STAGES.map((stage) => lane_stats.to_row(stage_row(stage, totals))),
+		...rows.map((row) => lane_stats.to_row(row)),
 	].join('\n')
 }
 

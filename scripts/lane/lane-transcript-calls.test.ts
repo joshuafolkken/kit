@@ -37,6 +37,7 @@ describe('lane_transcript_calls.parse — timing', () => {
 				tool: 'Bash',
 				background: false,
 				command,
+				subagent: undefined,
 				output: 'ok',
 			},
 		])
@@ -68,6 +69,37 @@ describe('lane_transcript_calls.parse — tool name', () => {
 
 		expect(call?.tool).toBe('Edit')
 		expect(call?.duration_ms).toBe(SEVEN_AND_A_HALF_SECONDS)
+	})
+})
+
+function agent_call(name: string, input: Record<string, unknown>): string {
+	const block = { type: 'tool_use', id: 'g', name, input }
+
+	return JSON.stringify({ timestamp: START, message: { content: [block] } })
+}
+
+// joshuafolkken/kit#5297: the implement's subagent time splits by the agent each call dispatched.
+describe('lane_transcript_calls.parse — subagent', () => {
+	it('keeps the agent type and model an Agent or Task call names', () => {
+		const input = { subagent_type: 'investigator', model: 'sonnet', prompt: 'p' }
+		const [agent] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', input))
+		const [task] = lane_transcript_calls.parse(SOURCE, agent_call('Task', input))
+
+		expect(agent?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+		expect(task?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+	})
+
+	it('reads an Agent call naming no type as general-purpose, its model unnamed', () => {
+		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', { model: '' }))
+
+		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined })
+	})
+
+	it('gives a call of any other tool no subagent', () => {
+		const input = { subagent_type: 'investigator', command: 'ls' }
+		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Bash', input))
+
+		expect(call?.subagent).toBeUndefined()
 	})
 })
 

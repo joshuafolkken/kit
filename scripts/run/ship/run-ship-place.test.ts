@@ -60,16 +60,16 @@ beforeEach(() => {
 describe('run_ship_place.await_place on a followup stop', () => {
 	it('waits while the lanes are past the limit, then returns', async () => {
 		lane_use_mock
-			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
-			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 1 })
-			.mockResolvedValue({ ...USE, occupied: LIMIT })
+			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 2 })
+			.mockResolvedValueOnce({ ...USE, occupied: LIMIT + 2 })
+			.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
 		await run_ship_place.await_place(LANE, 'followup')
 
 		expect(lane_use_mock).toHaveBeenCalledTimes(3)
 	})
 
 	it('returns once the wait runs out with the lanes still full', async () => {
-		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 2 })
 		await run_ship_place.await_place(LANE, 'followup')
 
 		expect(lane_use_mock).toHaveBeenCalledTimes(PLACE_POLLS)
@@ -98,13 +98,25 @@ describe('run_ship_place.await_place on a followup stop', () => {
 	})
 })
 
+// joshuafolkken/kit#5172: a followup relaunch is a few minutes' work on a lane about to merge, so it
+// does not wait for a fresh lane's whole run.
+describe('run_ship_place.await_place with the lanes one past the limit', () => {
+	it('relaunches at once, its own lane being the one past the limit', async () => {
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: LIMIT + 1 })
+		await run_ship_place.await_place(LANE, 'followup')
+
+		expect(lane_use_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
 // joshuafolkken/kit#4466 round 2: every waiter counts itself, so three waiters past a limit of two each saw
-// the lanes full and waited out the hour together.
+// the lanes full and waited out the hour together. With one running lane beside the three waiters, the
+// first relaunches within the limit and the second as the one past it (joshuafolkken/kit#5172).
 describe('run_ship_place.await_place with other followup stops waiting', () => {
 	beforeEach(() => {
 		list_lanes_mock.mockResolvedValue(WAITERS)
 		place_waiting_mock.mockReturnValue(true)
-		lane_use_mock.mockResolvedValue({ ...USE, occupied: WAITERS.length })
+		lane_use_mock.mockResolvedValue({ ...USE, occupied: WAITERS.length + 1 })
 	})
 
 	it.each([
