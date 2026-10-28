@@ -1,7 +1,0 @@
-{
-	"reason": "New ship-supervisor handover (run-ship-handover.ts, run-ship-relaunch.ts) reusing the wake take-over #4849",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 129
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "Busy-machine detection for duration regressions: a new load-window module that excuses a majority of busy gate spans, and the startup split (#4709)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 89,
-		"prose.long_paragraphs": 1,
-		"prose.excess_bold": 1
-	}
-}

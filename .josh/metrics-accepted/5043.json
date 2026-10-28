@@ -1,7 +1,0 @@
-{
-	"reason": "A new 'stopped' RedVerdict: test:pinned reports a vitest-stopped probe as unchecked, keeps it out of the verdict cache, and the tests cover both",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4765 adds the relaunch-failed trace event and the re-dispatch cap park note (new run-merge-cap module)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

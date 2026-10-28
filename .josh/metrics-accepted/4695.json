@@ -1,8 +1,0 @@
-{
-	"reason": "#4695 adds the split-notice ledger record, the pre-gate run:cut refusal for an unanswered notice and the lane:stats split table; the docs name the reason line and the split route the refusal asks for. Solo gates from other lanes before this branch's gate runs already took 11.3-12.7s (ledger 11:40Z, 12:00Z) against the 7.1s baseline, so the slowdown is not from #4695's ~190 added lines; recording the current durations",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 188,
-		"ai_cost.on_demand_bytes": 187
-	}
-}

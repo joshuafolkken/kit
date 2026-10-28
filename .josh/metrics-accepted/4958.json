@@ -1,9 +1,0 @@
-{
-	"reason": "josh effect:audit and issue:measured --unmet are new code (#4958); a follow-up is linked through its run condition's pull request, read once each and bounded; the measurement.md section adds the trigger lines for them",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 344,
-		"rules.lines": 6,
-		"ai_cost.on_demand_bytes": 525
-	}
-}

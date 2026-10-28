@@ -1,7 +1,0 @@
-{
-	"reason": "#5177: gate-labels.ts leaf + its test split the check names out of gate-plan.ts, cutting gate-plan's test reach 835 -> 226",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}

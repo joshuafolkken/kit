@@ -1,8 +1,0 @@
-{
-	"reason": "run:review opens the interaction brief beside round 1's code brief (#4802): new slot selection, two-brief printing and the --unpinned-ok placement, plus the docs/josh-commands-run.md paragraph describing it",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 65,
-		"prose.long_paragraphs": 1
-	}
-}

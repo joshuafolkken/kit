@@ -1,7 +1,0 @@
-{
-	"reason": "#4887 adds the implement sub-stage table and the baseline investigation (new lane-implement-stats.ts, lane-baseline.ts, run-event-baseline.ts), plus the round-1 fixes: per-session reach, due bucket, caller-supplied env and small-cause sum lines",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 270
-	}
-}

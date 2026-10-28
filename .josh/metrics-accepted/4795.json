@@ -1,7 +1,0 @@
-{
-	"reason": "Over-budget message names the recheck command via one RECHECK_COMMAND constant (#4795)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

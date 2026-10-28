@@ -1,7 +1,0 @@
-{
-	"reason": "CI Secret Scan job (#4657): the secretlint wrapper gains a required mode for CI",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 29
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting run-wake-cli.ts and run-cut-cli.ts adds each new module's imports, header and namespace object, and the moved tests' own setup (#5270)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 37
-	}
-}

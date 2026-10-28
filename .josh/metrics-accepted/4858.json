@@ -1,7 +1,0 @@
-{
-	"reason": "Overrun investigation folds same-file causes into one issue and the board names folded issues (#4858): new fold/priority-floor prompt text, folded result parser and its row",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 55
-	}
-}

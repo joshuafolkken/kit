@@ -1,8 +1,0 @@
-{
-	"reason": "issue-template.md names the measurement words the aggregation-split refusal now covers (#5238)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 75,
-		"ai_cost.on_demand_bytes": 60
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "test:related sizes its core claim from the reached test count, and the no-base pass takes its own claim through the shared test-related-claim module",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 60
-	}
-}

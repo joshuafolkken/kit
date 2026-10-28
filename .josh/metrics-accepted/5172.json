@@ -1,7 +1,0 @@
-{
-	"reason": "RELAUNCH_OVERSHOOT names the one relaunch allowed past the lane limit (#5172)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

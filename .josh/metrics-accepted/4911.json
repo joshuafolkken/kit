@@ -1,7 +1,0 @@
-{
-	"reason": "#4911 draws each keyed small cause's mechanism and minutes on a done row; the per-key sum moved into run_event_overrun.sum_by_key and is shared with overrun:mechanisms, so the growth is the board's new rendering only",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

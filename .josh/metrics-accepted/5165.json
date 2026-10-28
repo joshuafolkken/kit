@@ -1,9 +1,0 @@
-{
-	"reason": "Moves the Git Rules, stop-notify and test-declared bodies out of resident CLAUDE.md (-919 resident bytes) into their on-demand single sources, so on-demand bytes, rule lines and the moved bold spans grow by the same text #5165",
-	"date": "2026-10-27",
-	"growth": {
-		"rules.lines": 11,
-		"ai_cost.on_demand_bytes": 1826,
-		"prose.excess_bold": 4
-	}
-}

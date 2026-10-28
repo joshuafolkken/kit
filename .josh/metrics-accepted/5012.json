@@ -1,7 +1,0 @@
-{
-	"reason": "Retry-pending env so an infra-retried unreadable-comments stop sends one confirmation on the final attempt only, plus the gh reason for an unresolved PR number (round-1 findings) #5012",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 47
-	}
-}

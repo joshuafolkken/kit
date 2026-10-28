@@ -1,8 +1,0 @@
-{
-	"reason": "#5282: the comment rule now names the eslint rule that enforces it, and tools/test/pure-files.ts lists the new rule test",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 1,
-		"ai_cost.on_demand_bytes": 103
-	}
-}

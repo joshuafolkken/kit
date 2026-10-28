@@ -1,7 +1,0 @@
-{
-	"reason": "Lane chain rule now names when check:related is skipped and when a following brief still needs it; review FIXING_NOTE names review:record",
-	"date": "2026-10-26",
-	"growth": {
-		"ai_cost.on_demand_bytes": 192
-	}
-}

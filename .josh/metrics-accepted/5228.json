@@ -1,7 +1,0 @@
-{
-	"reason": "Tag red pre-detach checks with their kinds and record the stop behind a passed preflight, so lane:stats counts unpinned stops (#5228)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

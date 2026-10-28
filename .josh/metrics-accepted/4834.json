@@ -1,8 +1,0 @@
-{
-	"reason": "review:record restarts test:pinned on a tree a round-1 fix moved, and run:review --pinned reads it (#4834)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 108,
-		"ai_cost.on_demand_bytes": 148
-	}
-}

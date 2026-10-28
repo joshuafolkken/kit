@@ -1,7 +1,0 @@
-{
-	"reason": "#5220 splits issue-sample-prime out of issue-sample-gate; the new module's own imports and port types add the lines",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

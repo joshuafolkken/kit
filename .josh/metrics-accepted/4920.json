@@ -1,7 +1,0 @@
-{
-	"reason": "#4920 adds the run:review path that judges a finished test:pinned answer with a later --unpinned-ok reason instead of re-running it (carry_reason, finished_on_tree, accept_finished)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

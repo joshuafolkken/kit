@@ -1,7 +1,0 @@
-{
-	"reason": "lane:net, lane:breakdown and lane:stats take out and time the yield-to-redispatch wait (#5216)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}

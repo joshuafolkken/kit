@@ -1,7 +1,0 @@
-{
-	"reason": "#4936 adds the per-verdict cache writer, the green recheck against added/edited tests, the cached-only read for --join --fixing, and splits the probes into test-pinned-probe.ts",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 158
-	}
-}

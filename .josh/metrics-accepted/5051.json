@@ -1,9 +1,0 @@
-{
-	"reason": "Issue form for the sample condition (#5051): closing-PR port, effect:audit issue-form branch, and the reviewer-requested MISSING hint",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 53,
-		"ai_cost.on_demand_bytes": 232,
-		"prose.long_paragraphs": 1
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "The post-merge wording is split into two patterns (regex complexity cap) that count the after character only after the citation, a particle or merge, so words such as last, around and successor no longer refuse a filing #5103",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 5
-	}
-}

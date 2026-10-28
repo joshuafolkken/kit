@@ -1,8 +1,0 @@
-{
-	"reason": "Grant a Codex backlogrun parent its run-state directory and cover every durable record in the test table",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 161,
-		"ai_cost.on_demand_bytes": 56
-	}
-}

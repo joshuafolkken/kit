@@ -1,7 +1,0 @@
-{
-	"reason": "lane-ledger split into a writer leaf and a reader (#5202): the second module's imports, namespace object and moved writer tests' harness",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 37
-	}
-}

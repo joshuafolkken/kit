@@ -1,7 +1,0 @@
-{
-	"reason": "run:board width cache and printable-ASCII fast path so a redraw measures each line once (#5185)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

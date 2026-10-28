@@ -1,8 +1,0 @@
-{
-	"reason": "#4664 acceptance criterion: lane instructions and the park reason list document how a lane handles work that needs the web",
-	"date": "2026-10-23",
-	"growth": {
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 441
-	}
-}

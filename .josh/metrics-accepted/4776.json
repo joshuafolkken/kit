@@ -1,8 +1,0 @@
-{
-	"reason": "The lane-child handover wording in the gate's scoped refusal and its one-line pointer in chain-rule.md (#4776)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 13,
-		"ai_cost.on_demand_bytes": 176
-	}
-}

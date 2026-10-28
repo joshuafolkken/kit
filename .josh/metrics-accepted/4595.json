@@ -1,7 +1,0 @@
-{
-	"reason": "A light core-budget claim passes a heavier waiter within half the wait cap, derived from the exported WAIT_CAP_MS, and josh metrics and the gate's metrics step declare their own measured memory row (#4595)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 9
-	}
-}

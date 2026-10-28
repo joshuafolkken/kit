@@ -1,8 +1,0 @@
-{
-	"reason": "Gate untrusted-author issues at run:entry, route direct issue reads through issue:read, ask write access only of the checkout's own repository when posting a plan, and spell out where issue:plan writes the plan",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 152,
-		"ai_cost.on_demand_bytes": 446
-	}
-}

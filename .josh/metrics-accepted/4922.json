@@ -1,7 +1,0 @@
-{
-	"reason": "#4922: done rows cut their end to the pane, falling back to title narrowing where the end is squeezed out; keyed causes show the largest plus a count; tests for each",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 39
-	}
-}

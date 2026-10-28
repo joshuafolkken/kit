@@ -1,7 +1,0 @@
-{
-	"reason": "A subagent-only stop reason and its pending-command reader (#4803)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

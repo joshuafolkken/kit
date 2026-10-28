@@ -1,7 +1,0 @@
-{
-	"reason": "#5107: yielded issues are offered first and root .properties files are declared; gate_scope moved to backlog-gate-scope.ts to keep backlog-next.ts under the file limit (its imports repeat there)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

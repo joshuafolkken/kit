@@ -1,7 +1,0 @@
-{
-	"reason": "split the group signal into a start-time-verified stop for a stale stamp and a not-proven-gone stop for the join's own check, so a sandbox without /proc or ps still stops a late check (#4828)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 25
-	}
-}

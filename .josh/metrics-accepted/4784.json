@@ -1,7 +1,0 @@
-{
-	"reason": "The catalog test gains a helper that puts the regeneration command in its failure message (#4784)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

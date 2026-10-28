@@ -1,7 +1,0 @@
-{
-	"reason": "chain-rule.md now says a review round's fixes are checked by one check:related after the last fix (#4949); the 21 bytes are that rule",
-	"date": "2026-10-25",
-	"growth": {
-		"ai_cost.on_demand_bytes": 21
-	}
-}

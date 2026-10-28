@@ -1,7 +1,0 @@
-{
-	"reason": "Round-2 review fixes for #4659: third-party-write cuts by program after joining backslash continuations (shared joined_continuations in shell-segments) and reads a whole-argument-quoted expanded GraphQL query",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 145
-	}
-}

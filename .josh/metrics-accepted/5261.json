@@ -1,7 +1,0 @@
-{
-	"reason": "#5261 adds test-pinned-spawn.ts and ImportGraph closure/strings so a test:pinned red rests only on code its failed test imports or names",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 76
-	}
-}

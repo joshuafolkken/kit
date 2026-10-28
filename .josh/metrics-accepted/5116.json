@@ -1,7 +1,0 @@
-{
-	"reason": "#5116: lint --changed prints prettier and eslint seconds separately (run_lint_pair / timing line), closes each tool's output with a newline, and tests pin both",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 35
-	}
-}

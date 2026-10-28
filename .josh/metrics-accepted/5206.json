@@ -1,7 +1,0 @@
-{
-	"reason": "issue:lint prints the missing section's template cut from issue-template.md (#5206): a new module plus the CLI wiring",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 33
-	}
-}

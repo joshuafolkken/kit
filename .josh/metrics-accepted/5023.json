@@ -1,8 +1,0 @@
-{
-	"reason": "test:related failure summary prints a rerun command for the failed files (#5023)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 16,
-		"ai_cost.on_demand_bytes": 187
-	}
-}

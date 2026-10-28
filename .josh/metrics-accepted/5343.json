@@ -1,7 +1,0 @@
-{
-	"reason": "#5343 adds a per-phase worker model key and the josh cost/time worker-by-phase lines (new feature code)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 132
-	}
-}

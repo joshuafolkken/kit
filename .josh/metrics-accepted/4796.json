@@ -1,7 +1,0 @@
-{
-	"reason": "#4796 adds the usage-limit wait reason to run:board, read off the carried invocation's events as backlog:drive reads them",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 28
-	}
-}

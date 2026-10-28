@@ -1,7 +1,0 @@
-{
-	"reason": "ship sync commits locally before merging (#4708)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 14
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "New round-1 closure and round-2 skip-comment modules plus the ledger disposition field, and the doc lines a lane reads for review:round2 --record (#5286)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 197,
-		"ai_cost.on_demand_bytes": 86
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New josh lane:adopt command (#4744): adoption logic, its CLI and the PR-state read",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 240
-	}
-}

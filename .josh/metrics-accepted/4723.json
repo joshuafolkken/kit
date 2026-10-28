@@ -1,7 +1,0 @@
-{
-	"reason": "test-pinned-fixture exports TEST_FILE and DEFAULT_PATH_TEST so the #4723 cache test reuses them instead of copying them",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 2
-	}
-}

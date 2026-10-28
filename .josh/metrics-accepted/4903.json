@@ -1,7 +1,0 @@
-{
-	"reason": "#4903: the investigator-foreground stand-down gains the same-body reissue predicate (field_of, is_same_dispatch) the fix needs",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

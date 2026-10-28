@@ -1,8 +1,0 @@
-{
-	"reason": "#4940: check:related prints a final verdict line naming every failed check (+7 code lines), and the piped-verification enumeration widens check to check* (+1 byte)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 8,
-		"ai_cost.on_demand_bytes": 1
-	}
-}

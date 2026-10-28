@@ -1,7 +1,0 @@
-{
-	"reason": "Retry kit's own auto-merge withdrawal like the template's reconcile step, plus fixture support and tests for running a step with its own retry env",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 12
-	}
-}

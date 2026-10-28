@@ -1,7 +1,0 @@
-{
-	"reason": "narrowed_moved hands the branch change in place of synced modules it meets, so a sync-only gate run still runs where they meet (#5066 review finding)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

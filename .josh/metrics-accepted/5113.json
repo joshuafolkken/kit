@@ -1,7 +1,0 @@
-{
-	"reason": "review:brief refuses a reviewer session so it cannot drop its own attestation (#5113)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

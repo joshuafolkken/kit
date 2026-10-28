@@ -1,7 +1,0 @@
-{
-	"reason": "review:submit CLI that writes a slot's findings, plus the path fallback for lanes whose josh predates it",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 143
-	}
-}

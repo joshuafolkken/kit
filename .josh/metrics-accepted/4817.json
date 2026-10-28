@@ -1,8 +1,0 @@
-{
-	"reason": "review:record now carries a finding's reason to the stop log (#4817): a shared finding-text module and the CLI's reason path add the code lines, and the one-argument quoting rule adds the on-demand bytes",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 51,
-		"ai_cost.on_demand_bytes": 9
-	}
-}

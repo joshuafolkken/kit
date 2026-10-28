@@ -1,8 +1,0 @@
-{
-	"reason": "#4835: review:record names the interaction review a round-1 fix made due (new review-record-interaction module, its tests and the chain-rule step-0 clause)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 23,
-		"ai_cost.on_demand_bytes": 112
-	}
-}

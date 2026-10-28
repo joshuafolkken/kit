@@ -1,7 +1,0 @@
-{
-	"reason": "Splitting the alias table into its own leaf module (josh-aliases.ts) adds its import/export lines and the split imports in its readers, +3 code lines (#5128)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 3
-	}
-}

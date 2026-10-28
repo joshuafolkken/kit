@@ -1,7 +1,0 @@
-{
-	"reason": "#5132: board hides a switched-off overrun skip; new predicate, header field and tests",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 21
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "New delivered rule round-one-check-related refuses check:related on round 1's fixes before run:review --join (#5205); chain-rule.md names the delivery",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 81,
-		"ai_cost.on_demand_bytes": 79
-	}
-}

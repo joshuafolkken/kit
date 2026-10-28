@@ -1,7 +1,0 @@
-{
-	"reason": "rule:value counts Stop-hook deliveries: stop_reasons on two rows, stop feedback field, refusals_of (#4978)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

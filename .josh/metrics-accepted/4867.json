@@ -1,7 +1,0 @@
-{
-	"reason": "#4867: the daemon fingerprint gains the changed files' content digests (new eslint-daemon-sources module) so a shell edit restarts the daemon",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 83
-	}
-}

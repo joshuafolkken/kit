@@ -1,7 +1,0 @@
-{
-	"reason": "offer_order puts backlog:plan Ready now in the waves' offer order (#5299)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 16
-	}
-}

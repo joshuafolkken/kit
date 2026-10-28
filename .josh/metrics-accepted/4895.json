@@ -1,9 +1,0 @@
-{
-	"reason": "run:review --join --fixing mode and the other-tree wait-out of test:pinned (with its live-launch guard) add the code lines #4895",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 34,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 52
-	}
-}

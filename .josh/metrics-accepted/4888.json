@@ -1,7 +1,0 @@
-{
-	"reason": "new run-review-pinned-join module shares the moved-tree restart and the per-tree answer",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 71
-	}
-}

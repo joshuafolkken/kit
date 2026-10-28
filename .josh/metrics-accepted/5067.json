@@ -1,7 +1,0 @@
-{
-	"reason": "Push the sync merge ahead of the gate onto an open pull request, with the pre-push hook's related-test path reserving the core budget like the whole suite",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 60
-	}
-}

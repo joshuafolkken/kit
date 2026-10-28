@@ -1,9 +1,0 @@
-{
-	"reason": "Round 2's Arm B counts a josh metrics approval as unexecuted, and prompts/review.md names it (#4842)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 7,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 54
-	}
-}

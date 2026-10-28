@@ -1,7 +1,0 @@
-{
-	"reason": "check:related waits for the test:pinned verdict it started and names the metrics stop on its verdict line (#4987)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 58
-	}
-}

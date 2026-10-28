@@ -1,7 +1,0 @@
-{
-	"reason": "#4714: the broker marks a refused request and the supervisor's code check re-hashes on that mark, keeping a move or suspicion until it was hashed",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}

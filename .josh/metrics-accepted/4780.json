@@ -1,7 +1,0 @@
-{
-	"reason": "Carry fixed-in-place review findings into the prior-findings record (review fix for #4780: a passing round's fixes are logged, review:stops leaves them out)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 123
-	}
-}

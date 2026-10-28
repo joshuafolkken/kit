@@ -1,7 +1,0 @@
-{
-	"reason": "#4930 adds the one-time retry of a failed overrun launch and a prompt length cap of its own",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "#4750 moves the filing cap from a transcript-tail hook row into issue:file as a per-origin step that holds only in a run's session: the --found-during flag, the async origin/stream read and the run-session check add 32 code lines, and the per-origin, run-only prose adds 232 on-demand bytes",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 32,
-		"ai_cost.on_demand_bytes": 232
-	}
-}

@@ -1,8 +1,0 @@
-{
-	"reason": "Issue #4719 adds check:related with focused execution/reporting tests and clarifies the workflow pointer so lane children run the scoped checks once; the command preserves each check's core-budget claim and green record/cache.",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 95,
-		"ai_cost.on_demand_bytes": 87
-	}
-}

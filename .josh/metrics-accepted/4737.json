@@ -1,7 +1,0 @@
-{
-	"reason": "direct-issue-comment now resolves the checkout's own owner/repo (repo_party.current_repository / is_own_repository) to refuse a spelled-out own-repo comment write (#4737)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 46
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "#5040 adds the lane spilled-read rule row and the cut digest (read files + Auto-decided lines) carried to the resume, with its CLI wiring test",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 182,
-		"rules.lines": 1,
-		"ai_cost.on_demand_bytes": 132
-	}
-}

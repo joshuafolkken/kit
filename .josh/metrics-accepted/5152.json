@@ -1,9 +1,0 @@
-{
-	"reason": "ship preflight gains the unplanned precondition, with its lane-child pointer line in chain-rule.md (#5152)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 55,
-		"ai_cost.on_demand_bytes": 195,
-		"prose.excess_bold": 1
-	}
-}
