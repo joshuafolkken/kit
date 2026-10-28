@@ -17,11 +17,15 @@ interface Row extends RankRow {
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, labels, lost_minutes: 0, dependents }
+	return { name, labels, lost_minutes: 0, gain_minutes: 0, dependents }
 }
 
 function lost(name: string, lost_minutes: number, labels: ReadonlyArray<string> = []): Row {
 	return { ...row(name, labels), lost_minutes }
+}
+
+function gained(name: string, gain_minutes: number): Row {
+	return { ...row(name), gain_minutes }
 }
 
 function names_of(rows: ReadonlyArray<Row>): Array<string> {
@@ -144,6 +148,39 @@ describe('issue_rank.rank accumulated cause loss', () => {
 		const rows = [from_body(SINGLE, [20]), from_body(RECURRING, [8, 7, 6])]
 
 		expect(names_of(rows)).toStrictEqual([RECURRING, SINGLE])
+	})
+})
+
+// joshuafolkken/kit#5302: a declared weekly speed-up is the key after the cause loss and before the
+// dependents, so a measured time-saver runs ahead of an unmeasured feature of its priority.
+describe('issue_rank.rank weekly gain', () => {
+	const SAVER = 'saver'
+	const BIG_SAVER = 'big-saver'
+	const GAIN_MINUTES = 20.8
+	const BIG_GAIN_MINUTES = 60
+	const LOST_MINUTES = 5
+
+	it('puts the declared speed-up ahead of undeclared issues, the larger gain first', () => {
+		const rows = [
+			row(PLAIN),
+			gained(SAVER, GAIN_MINUTES),
+			row(PLAIN_SECOND),
+			gained(BIG_SAVER, BIG_GAIN_MINUTES),
+		]
+
+		expect(names_of(rows)).toStrictEqual([BIG_SAVER, SAVER, PLAIN, PLAIN_SECOND])
+	})
+
+	it('keeps a declared cause loss ahead of the gain, and the gain ahead of the dependents', () => {
+		const rows = [row(WAITED_ON, [], MANY), gained(SAVER, GAIN_MINUTES), lost(DEFECT, LOST_MINUTES)]
+
+		expect(names_of(rows)).toStrictEqual([DEFECT, SAVER, WAITED_ON])
+	})
+
+	it('never lets the gain lift an issue over a higher priority', () => {
+		const rows = [gained(BIG_SAVER, BIG_GAIN_MINUTES), row(URGENT, [PRIORITY_HIGH_LABEL])]
+
+		expect(names_of(rows)).toStrictEqual([URGENT, BIG_SAVER])
 	})
 })
 
