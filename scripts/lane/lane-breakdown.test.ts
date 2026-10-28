@@ -17,12 +17,13 @@ const MERGE_MINUTE = 79.5
 const IMPLEMENT = 'implement'
 const REVIEW_START = 'review start'
 const START_TO_PLAN = 'start to plan'
+const SHIP_REVIEW = 'ship review'
 
 // #4970's stages, longest first.
 const STAGES_4970: ReadonlyArray<readonly [string, number]> = [
 	[IMPLEMENT, 51],
 	[START_TO_PLAN, 10],
-	['ship review', 8],
+	[SHIP_REVIEW, 8],
 	['ship commit', 3.5],
 	['ship followup', 3.5],
 	['ship round-2', 1.5],
@@ -112,6 +113,27 @@ describe('lane_breakdown.of — #4970', () => {
 		)
 
 		expect(names).toStrictEqual(new Set(expected))
+	})
+})
+
+// joshuafolkken/kit#5296: the ship review's event line says why it ran or was skipped.
+describe('lane_breakdown.of — ship stage reasons', () => {
+	const REUSED = 'reused: round 1 attested on this branch, its tree held'
+
+	it('keeps the newest reason of each ship stage, read off its own lane', () => {
+		const events = [
+			...events_4970(),
+			ship(72, `review skipped | ${REUSED}`),
+			ship(71.5, 'review done | ran: --review with no reusable round 1 — x'),
+			ship(72.5, 'review skipped | other lane', `#${String(OTHER)}`),
+		]
+		const breakdown = lane_breakdown.of(lane(), events, ISSUE)
+
+		expect(breakdown?.reasons).toStrictEqual(new Map([[SHIP_REVIEW, REUSED]]))
+	})
+
+	it('keeps no reason where no line gave one', () => {
+		expect(lane_breakdown.of(lane(), events_4970(), ISSUE)?.reasons).toStrictEqual(new Map())
 	})
 })
 

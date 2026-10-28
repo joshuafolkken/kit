@@ -1,0 +1,7 @@
+{
+	"reason": "The synchronous changed-paths reading gains the merge-in-progress base (#5309), with its argument lists single-sourced in git-diff-reads",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 18
+	}
+}

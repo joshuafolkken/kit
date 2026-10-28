@@ -37,10 +37,23 @@ type ShipSection = Section & {
 	preconditions?: ReadonlyArray<string>
 	// The cause a stopped review round tagged its stop with, recorded with the stop.
 	cause?: Cause
+	// The stage found nothing to do, and why it ran or was skipped — both read onto its event line.
+	is_skipped?: boolean
+	reason?: string
 }
 
-// A stage's result under its header, carrying the conflicts, the preconditions and the cause only where
-// it has them.
+// The skip and the reason a stage's event line carries, only where the stage gave them.
+function mark_of(result: StepResult): Pick<ShipSection, 'is_skipped' | 'reason'> {
+	const { is_skipped, reason } = result
+
+	return {
+		...(is_skipped !== undefined && { is_skipped }),
+		...(reason !== undefined && { reason }),
+	}
+}
+
+// A stage's result under its header, carrying the conflicts, the preconditions, the cause and the mark
+// only where it has them.
 function section_of(header: string, result: StepResult): ShipSection {
 	const { conflicts, preconditions, cause } = result
 
@@ -52,6 +65,7 @@ function section_of(header: string, result: StepResult): ShipSection {
 		...(conflicts !== undefined && { conflicts }),
 		...(preconditions !== undefined && { preconditions }),
 		...(cause !== undefined && { cause }),
+		...mark_of(result),
 	}
 }
 

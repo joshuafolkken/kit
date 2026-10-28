@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/run/ship/run-ship-sync.ts:224 | 2026-10-28 | #5294

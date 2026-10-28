@@ -188,7 +188,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh read:files` | `<path> [<path> ...]` | automation | none | Read several files in one call so edit targets fold into one turn |
 | `josh read:set` | `[<entry>] [--json]` | automation | none | Print what an entry point reads before it starts, and what that read costs |
 | `josh repo:party` | `[<owner/repo>]` | automation | none | Say whether a repository is first-party or third-party by owner equality (computed, not judged) |
-| `josh report:lint` | `(reads stdin)` | automation | none | Check a two-layer work summary on stdin against its mechanical format rules |
+| `josh report:lint` | `[--child-summary] (reads stdin)` | automation | none | Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules |
 | `josh report:template` | `summary\|done [<path>...]` | automation | files | Print the work summary or completion report skeleton in the session language: summary \| done |
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |

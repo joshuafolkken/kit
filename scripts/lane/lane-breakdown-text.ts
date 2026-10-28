@@ -53,6 +53,11 @@ function detail_text(detail: ImplementDetail): string {
 	return ` (${[...kinds, ...background].join(', ')})`
 }
 
+// Why a ship stage ran or was skipped, as its event line said (joshuafolkken/kit#5296).
+function reason_text(reason: string | undefined): string {
+	return reason === undefined ? '' : ` (${reason})`
+}
+
 // The detail a stage's line carries after its minutes, `''` for a stage with none.
 function suffix_of(name: string, report: Report): string {
 	const suffixes: Record<string, string | undefined> = {
@@ -61,7 +66,7 @@ function suffix_of(name: string, report: Report): string {
 		[lane_breakdown.FOLLOWUP_STAGE]: report.critical,
 	}
 
-	return suffixes[name] ?? ''
+	return suffixes[name] ?? reason_text(report.breakdown.reasons?.get(name))
 }
 
 function stage_entry(stage: Stage, report: Report): Entry {
