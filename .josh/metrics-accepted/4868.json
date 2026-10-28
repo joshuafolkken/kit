@@ -1,8 +1,0 @@
-{
-	"reason": "New run-cut-review module and tests carry attested-unrecorded round-1 findings across an implementation-phase cut (#4868)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 99,
-		"ai_cost.on_demand_bytes": 93
-	}
-}

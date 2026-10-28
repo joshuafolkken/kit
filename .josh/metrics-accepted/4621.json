@@ -1,9 +1,0 @@
-{
-	"reason": "measurement declaration closes issues in backlog:drive (#4621)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 201,
-		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 362
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4818 adds the overrun outcome on the merged board row: within/skipped notes, result parsing and the row rendering",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 123
-	}
-}

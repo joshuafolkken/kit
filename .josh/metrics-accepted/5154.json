@@ -1,7 +1,0 @@
-{
-	"reason": "#5154: reviewer-foreground rewrite row (new rule file) runs a lane child's background reviewer in the foreground; the removed poll-and-join wait (23 of 178 lanes, ~3 min in #5129) outweighs the code lines",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 63
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "New JOSH_LANE_INVESTIGATION switch module and its two entry checks (#5044)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 15
-	}
-}

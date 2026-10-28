@@ -1,9 +1,0 @@
-{
-	"reason": "#5302 adds the expected-effect rank key: weekly_minutes reader with its multi-week span (+35 code lines) and one sentence on the existing priority criterion F in issue-template.md",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 35,
-		"ai_cost.on_demand_bytes": 249,
-		"prose.long_paragraphs": 1
-	}
-}

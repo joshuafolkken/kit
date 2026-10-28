@@ -1,7 +1,0 @@
-{
-	"reason": "#4937: one guard line so a plan comment naming no path keeps the body's declaration (review round 1 medium)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 1
-	}
-}

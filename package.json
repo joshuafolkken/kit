@@ -1,5 +1,5 @@
 {
-	"version": "1.1784.0",
+	"version": "1.2114.0",
 	"name": "@joshuafolkken/kit",
 	"description": "Hand-off kit for Claude Code and Codex: backlogrun takes your GitHub Issues to tested, reviewed, merged PRs — in parallel and unattended — with the rules, hooks and checks that keep the agent on track",
 	"keywords": [

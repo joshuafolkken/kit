@@ -1,9 +1,0 @@
-{
-	"reason": "cost:audit gains the full cache-rewrite count (#5344)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 86,
-		"ai_cost.on_demand_bytes": 291,
-		"prose.long_paragraphs": 1
-	}
-}

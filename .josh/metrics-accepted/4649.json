@@ -1,7 +1,0 @@
-{
-	"reason": "lint:related now also scans namespaces the changed files import directly, now and at the change base (#4649): import_graph.imports, the scan scope and its base-revision tests",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 48
-	}
-}

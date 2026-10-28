@@ -1,7 +1,0 @@
-{
-	"reason": "#5029: the unit suite's environment blanks inherited ship marks by their shape and lane marks from a new leaf key module, replacing a hand-kept list",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

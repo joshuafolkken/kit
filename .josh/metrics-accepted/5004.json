@@ -1,7 +1,0 @@
-{
-	"reason": "A pure module that lets a red test:pinned verdict outlive removing lines of a green hunk, recording exactly the green hunks it reverts, with its cache wiring",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 140
-	}
-}

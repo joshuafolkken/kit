@@ -1,7 +1,0 @@
-{
-	"reason": "New run-ship-synced-scope module settles a scoped pair stale only from a merge with main (lint meets at files reaching both sides, test at whole-suite and test-read files), plus the pre-commit lint switch for ship's local commit (#4985)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 162
-	}
-}

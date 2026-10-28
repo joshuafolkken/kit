@@ -1,7 +1,0 @@
-{
-	"reason": "Read a candidate's plan comment (less its consumers section) as declared paths for dispatch, and name a shell-quoted lane:plan under implement for a lane child (#4923)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 79
-	}
-}

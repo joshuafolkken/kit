@@ -1,8 +1,0 @@
-{
-	"reason": "followup retriggers a rate-limited CodeRabbit review itself (#5289): new retrigger module, its settle step and tests",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 221,
-		"prose.long_paragraphs": 1
-	}
-}

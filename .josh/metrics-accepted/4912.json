@@ -1,7 +1,0 @@
-{
-	"reason": "test:related splits synced code modules by the import graph so a main sync no longer reruns tests only main's code reaches (#4912)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 104
-	}
-}

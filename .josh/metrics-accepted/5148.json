@@ -1,7 +1,0 @@
-{
-	"reason": "Reissue tell read off the tail's answered refusal (message and result instant) so a sibling or a later dispatch in a declaring build stays refused (#5148 round 2)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 30
-	}
-}

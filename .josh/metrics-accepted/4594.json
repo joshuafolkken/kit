@@ -1,8 +1,0 @@
-{
-	"reason": "lint:related reports kit's metrics totals growth in the loop, run only after a green bare lint (#4594)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 38,
-		"ai_cost.on_demand_bytes": 48
-	}
-}

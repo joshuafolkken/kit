@@ -1,7 +1,0 @@
-{
-	"reason": "issue:file --found-during prints the causing-lane line from lane:net (#5225): a new hint module and the shared lane-net read",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 44
-	}
-}

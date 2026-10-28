@@ -1,9 +1,0 @@
-{
-	"reason": "#4960 adds the summed cause-loss floor and the issue:priority command that re-applies it after a recurrence, with its usage section and rule text",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 101,
-		"ai_cost.on_demand_bytes": 377,
-		"prose.long_paragraphs": 1
-	}
-}

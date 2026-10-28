@@ -1,7 +1,0 @@
-{
-	"reason": "lane:value prints the four measurement values as josh commands; each tool call now carries its lane so per-lane values divide by lanes, not sessions",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 181
-	}
-}

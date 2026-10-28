@@ -1,7 +1,0 @@
-{
-	"reason": "the relaunch path tells a broker on older code apart and waits a whole supervisor pass for its reload (#4733)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 23
-	}
-}

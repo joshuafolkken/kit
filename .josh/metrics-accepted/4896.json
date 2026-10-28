@@ -1,7 +1,0 @@
-{
-	"reason": "#4896: left_out settles since-map files so a lane tree with no own change runs no test rather than the whole suite",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 17
-	}
-}

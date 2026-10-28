@@ -1,7 +1,0 @@
-{
-	"reason": "Reuse a recorded round 1 when main alone moved a covered document round 2 would not execute, proven by carrying its recorded blob #4984",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

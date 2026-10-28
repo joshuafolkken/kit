@@ -1,7 +1,0 @@
-{
-	"reason": "Thread the tick's clock through planned_layout into ReasonRead so run:board's start-time judgment stops reading the wall clock (#4848)",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 7
-	}
-}

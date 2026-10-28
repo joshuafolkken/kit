@@ -1,7 +1,0 @@
-{
-	"reason": "new related-scope heavy-test exclusion module and its tests (#5105)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 143
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "investigator-foreground stands down when the subagent tool declares no run_in_background (#4889): +18 code lines for the tail check",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.code_lines": 18
-	}
-}

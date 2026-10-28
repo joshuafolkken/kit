@@ -1,7 +1,0 @@
-{
-	"reason": "Background probe of the remaining test:pinned hunks after a pre-detach stop (#5327): launch_remaining, the cut count on the record, the note and its fail-open guard; the probe's origin on its launch stamp and discarded ledger row, and the clear a ship without --review runs",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 70
-	}
-}

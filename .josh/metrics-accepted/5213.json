@@ -1,7 +1,0 @@
-{
-	"reason": "run:entry spills its bundle to a file past the Bash cap (#5213): new run-entry-spill module",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 66
-	}
-}

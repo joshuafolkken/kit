@@ -1,8 +1,0 @@
-{
-	"reason": "Two new document-ratchet modules make the command-reference long-line ceiling and the issue-citation ratchet run in lint:related, plus the kit-repository guard that keeps both off consumer roots",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 92,
-		"ai_cost.on_demand_bytes": 2
-	}
-}

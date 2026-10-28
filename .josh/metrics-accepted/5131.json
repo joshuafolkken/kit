@@ -1,7 +1,0 @@
-{
-	"reason": "#5131: print_completion splits its two reads into read_* helpers run together and prints a completion stage row",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 22
-	}
-}

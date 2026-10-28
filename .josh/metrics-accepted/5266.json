@@ -1,9 +1,0 @@
-{
-	"reason": "#5266: piped-verification rewrites full-reading awk/sed/tee, rule:value names its refusals by shape (new module + tests), and output-bounds.md states the rewrite/refusal boundary as the AC requires",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 131,
-		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 528
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "#4929 deletes ~500 lines of mostly uncommented code (overrun:mechanisms CLI, keyed small causes, percent floor), so the comment ratio rises by deletion alone; no comment was added",
-	"date": "2026-10-25",
-	"growth": {
-		"scripts.comment_ratio": 0.01
-	}
-}

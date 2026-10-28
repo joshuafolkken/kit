@@ -1,7 +1,0 @@
-{
-	"reason": "lint:related runs the source guard tests beside its lint (#4643): a new structural-checks module shared with the ship pre-detach stop",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 50
-	}
-}

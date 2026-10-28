@@ -1,9 +1,0 @@
-{
-	"reason": "#5144 adds lane:value cell (new reader + tables module) and the 計測宣言なし declaration rule in measurement.md / issue-template.md",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 121,
-		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 568
-	}
-}

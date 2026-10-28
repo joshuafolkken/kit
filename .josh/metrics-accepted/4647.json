@@ -1,8 +1,0 @@
-{
-	"reason": "Skip the changed-path read without a merge-base (CI checkout without main), read the change through a merge in progress, and thread --unpinned-ok through main's parallel round-1 slots, plus their tests",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 268,
-		"ai_cost.on_demand_bytes": 346
-	}
-}

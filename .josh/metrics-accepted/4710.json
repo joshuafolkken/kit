@@ -1,7 +1,0 @@
-{
-	"reason": "No-base test pass for #4710: a CI-shaped checkout builder and its trigger, kit-only, with tests",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 152
-	}
-}

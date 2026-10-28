@@ -1,7 +1,0 @@
-{
-	"reason": "#4833 adds the round-1 reuse question before skipping the pre-detach test:pinned probe under --unpinned-ok",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 19
-	}
-}

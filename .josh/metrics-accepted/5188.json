@@ -1,8 +1,0 @@
-{
-	"reason": "#5188 folds the pinned report's unchecked places and keeps the full list in a log: the summary carries the counts line and log path, every printer goes through one report_text, and the review self-check points at that log",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 67,
-		"ai_cost.on_demand_bytes": 59
-	}
-}

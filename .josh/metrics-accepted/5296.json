@@ -1,7 +1,0 @@
-{
-	"reason": "#5296 adds the ship review stage's ran/skipped reason: reason module, event-line suffix, lane:breakdown column and their wiring",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 79
-	}
-}

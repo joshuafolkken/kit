@@ -1,7 +1,0 @@
-{
-	"reason": "Pre-push hook miss kinds counted in lane:stats (#5234): a new ledger kind, its writer, the gate and hook miss classifiers and the stats reader",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 80
-	}
-}

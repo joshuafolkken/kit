@@ -1,7 +1,0 @@
-{
-	"reason": "main:merge installs a lockfile the merge brought in (#4777)",
-	"date": "2026-10-24",
-	"growth": {
-		"scripts.code_lines": 26
-	}
-}

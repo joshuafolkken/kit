@@ -1,7 +1,0 @@
-{
-	"reason": "#4669 verifies the safe-chain installer against its release attestation before pinning its hash; the verification and its failure path are new behavior, not removable",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 38
-	}
-}

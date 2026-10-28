@@ -1,7 +1,0 @@
-{
-	"reason": "New pre-detach conflict probe (#5018) and its is_resolvable check, so a conflicting ship stops before the pre-detach checks while regenerated-file conflicts still go to the sync",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 52
-	}
-}

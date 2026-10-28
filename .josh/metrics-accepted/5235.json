@@ -1,7 +1,0 @@
-{
-	"reason": "test:pinned skips import-rewire hunks: a TypeScript AST binding check and token comparison (#5235)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 145
-	}
-}

@@ -1,7 +1,0 @@
-{
-	"reason": "check:related prints each check's tail; the section formatting is a new module (#5204)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 40
-	}
-}

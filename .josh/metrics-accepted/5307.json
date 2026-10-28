@@ -1,7 +1,0 @@
-{
-	"reason": "changed paths and every base paired with them are read through a merge in progress (#5307)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 6
-	}
-}

@@ -1,9 +1,0 @@
-{
-	"reason": "pre-gate-cut.md lists the guard's new handoff-Write exemption beside its other bold properties (#4975)",
-	"date": "2026-10-26",
-	"growth": {
-		"scripts.code_lines": 22,
-		"ai_cost.on_demand_bytes": 49,
-		"prose.excess_bold": 1
-	}
-}

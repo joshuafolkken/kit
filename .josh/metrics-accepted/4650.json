@@ -1,7 +1,0 @@
-{
-	"reason": "gh_api reads the method and field flags off the argv at flag positions, so a flag spelled inside a field value or a field flag with its value attached is classified correctly (round-2 review of #4650)",
-	"date": "2026-10-23",
-	"growth": {
-		"scripts.code_lines": 104
-	}
-}

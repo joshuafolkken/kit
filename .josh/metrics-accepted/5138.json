@@ -1,7 +1,0 @@
-{
-	"reason": "New lane:stats table comparing each gate check's core claim with its measured cores, with a not-measured wait cell (#5138)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 64
-	}
-}

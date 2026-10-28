@@ -1,9 +1,0 @@
-{
-	"reason": "concise-reply Stop rule: rule module, shared reply-prose helper, person_prompt reader, its principles.md section and rule-delivery row (#5328)",
-	"date": "2026-10-28",
-	"growth": {
-		"scripts.code_lines": 136,
-		"rules.lines": 13,
-		"ai_cost.on_demand_bytes": 1039
-	}
-}

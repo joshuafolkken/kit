@@ -1,7 +1,0 @@
-{
-	"reason": "direct-importers.ts narrows test:related and test:pinned probes of files every test imports to their direct importers; the gate's unit leg keeps the whole suite via --keep-whole-suite and never narrows by a bare run's green past such a file (#5122)",
-	"date": "2026-10-27",
-	"growth": {
-		"scripts.code_lines": 157
-	}
-}
