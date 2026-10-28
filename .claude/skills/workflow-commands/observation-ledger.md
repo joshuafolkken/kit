@@ -68,8 +68,9 @@ blocked depth-0 work is filed as before.
   ledger** — `pnpm josh review:record --issue <N> --comment` (`pnpm josh ship --review` does this for a
   passing round 2), so CI does not restart; so does any code round on a pushed, clean tree, a
   blocking round 2 included.
-  Once the Issue closes, the next ledger round carries the comment's lines into
-  `<N>-comment-rounds.md` (`review-comment-round.ts`).
+  Once the Issue closes, the next ledger round outside a lane carries the comment's lines into
+  `<N>-comment-rounds.md` (`review-comment-round.ts`); a lane child leaves that to
+  `pnpm josh observations:flush`.
 - **`pnpm josh followup` commits any other line appended after the run's commit onto the pull request,
   before the merge** — only when the ledger holds a pending append; a broken line refuses the merge.
 - **A lane carries its own lines, in its own pull request.**

@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { IGNORE_FOR_RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { error_text } from '#scripts/lib/error-message'
+import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { observation_ledger, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import type { BrokenLine } from './observation-ledger-line'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
@@ -12,7 +13,8 @@ import { observations_flush_landing } from './observations-flush-landing'
 // a lane's included — commits its appended lines with its own pull request (`scripts/git/
 // git-staging.ts`), and `pnpm josh followup` commits a
 // line appended after that commit before it merges, so what is left here is a line written on the
-// default branch outside any issue's run — the date-named file `observation-ledger-home.ts` resolves.
+// default branch outside any issue's run — the date-named file `observation-ledger-home.ts` resolves —
+// and the closed issues' comment rounds no lane carries (`flush` below).
 //
 // **The shape is `scripts/release/release-publish.ts`'s, deliberately.** Both open a pull request of
 // their own over one path, wait on the same required checks every other pull request waits on, and
@@ -393,6 +395,27 @@ async function prepare_ledger(): Promise<void> {
 	if (broken.length > 0) throw new Error(broken_lines_message(broken))
 }
 
+// The checkout made safe and caught up: a carried file an earlier flush left uncommitted is discarded
+// first, since it would make git refuse the fast-forward (`review-comment-carry.ts`).
+async function ready_default_branch(status_output: string): Promise<string> {
+	const default_branch = await refuse_unsafe_flush(status_output)
+
+	review_comment_carry.discard_uncommitted(status_output, process.cwd())
+	await catch_up_default(default_branch)
+
+	return default_branch
+}
+
+// **The closed issues' comment rounds are carried only once a flush will go ahead**
+// (joshuafolkken/kit#5326): a lane child leaves them to this flush, so the carried files ride its pull
+// request, and the status is read again so a carry alone is a change to flush. A carry left behind by
+// a later stop is discarded by the next flush's `ready_default_branch`.
+async function carried_status(): Promise<string> {
+	await review_comment_carry.carry_reported(process.cwd())
+
+	return await git_command.status()
+}
+
 // **Nothing pulls in front of the branch, and that is deliberate.** The ledger is dirty by
 // definition at this point, so `git pull --ff-only` aborts on it in exactly the case a pull would
 // have been for — an upstream flush that already advanced the ledger — and reports a failure about
@@ -401,19 +424,19 @@ async function prepare_ledger(): Promise<void> {
 // only where git can do it without touching the ledger: a default branch
 // that predates another merged flush still stops here — before a branch is cut — rather than opening
 // a pull request that cannot merge. An earlier flush pull request still open is checked for the same
-// reason: a branch cut beside it conflicts with it at the ledger's tail.
+// reason: a branch cut beside it conflicts with it at the ledger's tail. So the order is: ready the
+// default branch, defer to an open flush, carry, then check, prepare and land.
 async function flush(now: Date): Promise<string> {
-	const status_output = await git_command.status()
-	const default_branch = await refuse_unsafe_flush(status_output)
-
-	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
-
-	await prepare_ledger()
+	const default_branch = await ready_default_branch(await git_command.status())
 
 	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
 	if (deferred !== undefined) return deferred
 
-	await catch_up_default(default_branch)
+	const status_output = await carried_status()
+
+	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
+
+	await prepare_ledger()
 
 	const branch_name = branch_name_for(timestamp_for(now))
 

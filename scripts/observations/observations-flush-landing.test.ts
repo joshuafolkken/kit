@@ -4,6 +4,7 @@ import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
+import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { observations_flush } from './observations-flush'
 import {
@@ -55,6 +56,13 @@ vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
 // (joshuafolkken/kit#4069).
 vi.mock('./observation-ledger-prepare', () => ({
 	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
+}))
+// The comment-round carry reads GitHub and writes the ledger (joshuafolkken/kit#5326).
+vi.mock('#scripts/review/review-comment-carry', () => ({
+	review_comment_carry: {
+		carry_reported: vi.fn(async () => undefined),
+		discard_uncommitted: vi.fn(),
+	},
 }))
 
 const NO_COMMITS = 0
@@ -207,6 +215,35 @@ describe('observations_flush — an earlier flush pull request still open', () =
 		await flush_message()
 
 		expect(git_gh_command.pr_list_open_with_head_prefix).toHaveBeenCalledWith('observations/')
+	})
+})
+
+// joshuafolkken/kit#5326: a carry left untracked by a stopped flush would block the next
+// fast-forward, so it is discarded first and a deferring flush never carries.
+describe('observations_flush — the comment-round carry beside an open flush', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+	})
+
+	it('discards an uncommitted carried file before it looks', async () => {
+		await flush_message()
+
+		expect(review_comment_carry.discard_uncommitted).toHaveBeenCalledWith(
+			MODIFIED_LEDGER,
+			process.cwd(),
+		)
+		expect(first_call_order(review_comment_carry.discard_uncommitted)).toBeLessThan(
+			first_call_order(git_gh_command.pr_list_open_with_head_prefix),
+		)
+	})
+
+	it('never carries the comment rounds when it defers', async () => {
+		vi.mocked(git_gh_command.pr_list_open_with_head_prefix).mockResolvedValue([LANDING_PULL])
+
+		await flush_message()
+
+		expect(review_comment_carry.carry_reported).not.toHaveBeenCalled()
 	})
 })
 
