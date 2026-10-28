@@ -75,10 +75,10 @@ describe('run_ship_review.read_verdict — findings fixed in place', () => {
 	const FIXED_MEDIUM = `${run_ship_review.FIXED_PREFIX}bug-risks:medium:b.ts:9`
 	const LOW_COMMENT = 'comments:low:a.ts'
 
-	it('reads a fixed Medium as fixed, recording it without the mark', () => {
+	it('reads a fixed Medium as fixed, keeping the mark as its disposition', () => {
 		expect(run_ship_review.read_verdict(`${LOW_COMMENT}\n${FIXED_MEDIUM}`)).toStrictEqual({
 			kind: VERDICT.FIXED,
-			specs: [LOW_COMMENT, 'bug-risks:medium:b.ts:9'],
+			specs: [LOW_COMMENT, FIXED_MEDIUM],
 			report: [LOW_COMMENT, FIXED_MEDIUM],
 		})
 	})
@@ -180,7 +180,7 @@ describe('run_ship_review.read_verdict — a finding carries its description', (
 
 		expect(run_ship_review.read_verdict(text)).toStrictEqual({
 			kind: VERDICT.FIXED,
-			specs: [MEDIUM_OPEN],
+			specs: [`${run_ship_review.FIXED_PREFIX}${MEDIUM_OPEN}`],
 			report: [text],
 		})
 	})

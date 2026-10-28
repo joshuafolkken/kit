@@ -32,9 +32,9 @@ interface SessionFacts {
 interface NodeContext {
 	facts: (session_id: string) => SessionFacts
 	lane_issue: (file: SessionFile) => number | undefined
-	// Whether the implementation-phase cut ended this session. Asked of lane children only, since the
+	// What a lane child's own transcript records about its phase. Asked of lane children only, since the
 	// cut binds nowhere else and reading every transcript a second time would double the load.
-	took_cut: (file: SessionFile) => boolean
+	lane_marks: (file: SessionFile) => LaneMarks
 }
 
 interface RunNode {
@@ -56,7 +56,12 @@ interface RunNode {
 	// Whether the implementation-phase cut ended this session; always `false`
 	// outside a lane child.
 	took_cut: boolean
+	// Whether this lane child was relaunched into the ship phase — its `run:cut --resume` answered
+	// `resume`, the pre-gate cut's verdict; always `false` outside a lane child.
+	is_ship: boolean
 }
+
+type LaneMarks = Pick<RunNode, 'took_cut' | 'is_ship'>
 
 function branch_issue(records: ReadonlyArray<UsageRecord>): number | undefined {
 	for (const record of records) {
@@ -121,6 +126,7 @@ function to_node(
 		baseline_tokens: facts.baseline_tokens,
 		is_readable: facts.is_readable,
 		took_cut: false,
+		is_ship: false,
 		...head,
 	}
 }
@@ -152,7 +158,7 @@ function lane_node(file: SessionFile, root_id: string | undefined, context: Node
 		facts,
 	)
 
-	return { ...node, took_cut: context.took_cut(file) }
+	return { ...node, ...context.lane_marks(file) }
 }
 
 // A subagent's depth counts from the root parent, so a unit under a lane child sits one below the
@@ -203,5 +209,5 @@ const cost_run_nodes = {
 	build_nodes,
 }
 
-export type { NodeContext, RunNode, RunRole, SessionFacts }
+export type { LaneMarks, NodeContext, RunNode, RunRole, SessionFacts }
 export { cost_run_nodes }

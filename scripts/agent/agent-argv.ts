@@ -95,30 +95,28 @@ function resolve(
 	return resolved.kind === 'rejected' ? resolved : with_profile(invocation, resolved.profile)
 }
 
+function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): AgentArgvResult {
+	return resolved.kind === 'rejected'
+		? resolved
+		: with_profile_in(invocation, resolved.profile, cwd)
+}
+
 // **A cut relaunch's profile, resolved for the phase the resumed child is entering**.
-// A stored lane profile keeps its model and takes only the phase's effort; a
-// lane without one resolves the worker for the phase. An env override wins over the phase in either path.
+// A stored lane profile keeps its model unless the phase's own model key is set, and takes the phase's
+// effort; a lane without one resolves the worker for the phase. An env override wins over the phase in
+// either path.
 function resume_argv(
 	invocation: string,
 	profile: AgentProfile | undefined,
 	phase: string,
 	cwd: string,
 ): AgentArgvResult {
-	if (profile !== undefined) {
-		return with_profile_in(invocation, agent_role_profile.with_phase_effort(profile, phase), cwd)
-	}
+	const resolved =
+		profile === undefined
+			? agent_role_profile.resolve(agent_role_profile.WORKER, process.env, phase)
+			: agent_role_profile.with_phase(profile, phase)
 
-	const resolved = agent_role_profile.resolve(agent_role_profile.WORKER, process.env, phase)
-
-	return resolved.kind === 'rejected'
-		? resolved
-		: with_profile_in(invocation, resolved.profile, cwd)
-}
-
-function profiled_in(invocation: string, resolved: ProfileResult, cwd: string): AgentArgvResult {
-	return resolved.kind === 'rejected'
-		? resolved
-		: with_profile_in(invocation, resolved.profile, cwd)
+	return profiled_in(invocation, resolved, cwd)
 }
 
 function resolve_in(

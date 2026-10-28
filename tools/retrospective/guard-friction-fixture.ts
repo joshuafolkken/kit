@@ -39,6 +39,7 @@ function node(session_id: string, shape: NodeShape = {}): RunNode {
 		baseline_tokens: 0,
 		is_readable: true,
 		took_cut: false,
+		is_ship: false,
 	}
 }
 

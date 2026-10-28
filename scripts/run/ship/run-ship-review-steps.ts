@@ -30,7 +30,7 @@ import type { StepResult } from './run-ship-sync'
 // **Round 1's local fixes and round 2 stay inside the supervisor**. A round-1
 // reviewer that fixed its local Mediums in place changed the tree the background gate read, so that
 // join drains the gate rather than judging it — the ship's gate stage re-runs on the fixed tree. After
-// the commit, `round_two_stage` asks `review:round2 --round-1-closed` whether the fix delta owes a
+// the commit, `round_two_stage` asks `review:round2 --record <N>` whether the fix delta owes a
 // second round, and on `required` runs it through the same commands the chain does: the scoped pair
 // `review:brief` requires, `review:brief --round 2`, a fresh reviewer session, attest and record.
 //
@@ -43,7 +43,13 @@ import type { StepResult } from './run-ship-sync'
 // recorded first, because the round was attested, then routed back.
 
 const RUN_REVIEW = 'run:review'
-const ROUND_TWO_DECISION = ['review:round2', '--round-1-closed', '--json']
+
+// `--record` names the issue whose ledger dispositions decide round 1's closure, and where a skip
+// is commented (joshuafolkken/kit#5286).
+function round_two_decision(issue: string): ReadonlyArray<string> {
+	return ['review:round2', '--record', issue, '--json']
+}
+
 const REVIEW_BRIEF = 'review:brief'
 const ROUND_TWO_BRIEF = [REVIEW_BRIEF, '--round', '2']
 const INTERACTION_FLAG = '--interaction'
@@ -140,7 +146,8 @@ async function record_and_route(
 
 	const outcome = outcome_of(verdict)
 	const flags = [...SLOT_RECORD_FLAGS[slot], ...record_flags(round, outcome)]
-	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...verdict.specs])
+	const specs = run_ship_review.recorded_specs(verdict, outcome)
+	const recorded = await josh(['review:record', '--issue', issue, ...flags, ...specs])
 
 	if (recorded.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, recorded)
 
@@ -367,7 +374,7 @@ async function review_stage(
 // `josh lane:stats` can count the period's round-2 runs and skips by their reason code
 // (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
 async function round_two_stage(issue: string): Promise<StepResult> {
-	const decision = await josh(ROUND_TWO_DECISION)
+	const decision = await josh(round_two_decision(issue))
 
 	if (decision.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, decision)
 

@@ -11,7 +11,7 @@ import { review_stamps } from './review-stamps'
 
 // joshuafolkken/kit#1441: `record_round_one` used to overwrite the round-1 snapshot on every round-1
 // invocation. A bare `josh review:brief` run after round 1's fixes were in therefore retook it
-// against the **fixed** tree, the fix delta read empty, and `josh review:round2 --round-1-closed`
+// against the **fixed** tree, the fix delta read empty, and `josh review:round2` on a closed round 1
 // fired arm A — skipping the second round over fix code nobody had read. The mitigation in place was
 // the record's timestamp in the reason line, which nothing compared.
 //

@@ -53,7 +53,7 @@ const json_schema = z.object({
 // on a missing record would be the cheapest possible run and the most dangerous — the direction
 // `review-brief.ts` already takes when it widens a round-2 target it cannot name.
 const OPEN_FINDING_REASON =
-	'the caller did not assert that every round-1 High/Medium finding closed, so the pass that verifies them is due'
+	'the ledger does not show every round-1 High/Medium finding closed, so the pass that verifies them is due'
 const NO_SNAPSHOT_REASON =
 	'no round-1 snapshot was recorded, so the fix delta cannot be named — the round runs rather than assuming it is empty'
 const EMPTY_DELTA_REASON_PREFIX =
@@ -75,10 +75,11 @@ interface RoundTwoInput {
 	// a `skip`, which is worse than a mistargeted read — nothing gets read at all.
 	// `undefined` where it could not be resolved to a commit, which is refused exactly like a mismatch.
 	base: string | undefined
-	// Asserted by the caller from round 1's own output, because no command can read a review's
-	// findings. It is a report of a fact already written down, not a judgement made under cost
-	// pressure — and its absence is the safe answer, so a caller that forgets it pays a round.
+	// Read from the issue's ledger, where `review:record` keeps each finding's disposition
+	// (`review-round-one-closure.ts`), not asserted by the caller (joshuafolkken/kit#5286).
 	is_round_one_closed: boolean
+	// Why round 1 is open, quoted into the `required` answer. Absent falls back to the generic reason.
+	open_reason?: string
 	snapshot: FileMapStamp | undefined
 	tree: Record<string, string>
 	// The paths whose code round 1's fixes left as it was (`review_code_tree.comment_only`). Absent is
@@ -183,7 +184,10 @@ function fix_delta(
 }
 
 function decide(input: RoundTwoInput): RoundTwoDecision {
-	if (!input.is_round_one_closed) return required(CODE.OPEN_FINDING, OPEN_FINDING_REASON)
+	if (!input.is_round_one_closed) {
+		return required(CODE.OPEN_FINDING, input.open_reason ?? OPEN_FINDING_REASON)
+	}
+
 	if (input.snapshot === undefined) return required(CODE.NO_SNAPSHOT, NO_SNAPSHOT_REASON)
 
 	const delta = fix_delta(input, input.snapshot)

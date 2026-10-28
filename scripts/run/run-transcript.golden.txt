@@ -15,7 +15,7 @@ the run is cut before its gate, then resumes to the merge
   start              verdict  implement
   cut taken          command  pnpm josh run:cut --resume 2250
   resumed, pr open   command  pnpm josh followup
-  second review      command  pnpm josh review:round2
+  second review      command  pnpm josh review:round2 --record 2250
   merged             command  pnpm josh run:merge 2250
 
 ## lanes-full

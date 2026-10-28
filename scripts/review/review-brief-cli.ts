@@ -102,7 +102,7 @@ function kept_note(taken_at: string): string {
 // **It is written once per run and never retaken**. Overwriting on every
 // round-1 invocation put a wrong `skip` one command away: run a bare `josh review:brief` after round
 // 1's fixes are in and the record is retaken against the fixed tree, the fix delta reads empty, and
-// `josh review:round2 --round-1-closed` fires arm A on unreviewed fix code. Keeping the record the
+// `josh review:round2` on a closed round 1 fires arm A on unreviewed fix code. Keeping the record the
 // run already has removes that path outright — a second round-1 invocation reads it and leaves it
 // alone, so every later reading of the delta is measured from before the fixes.
 //

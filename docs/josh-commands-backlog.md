@@ -910,14 +910,14 @@ One non-inert path decides the whole change; an empty diff also takes `medium`. 
 Say whether the second /code-review round is due, or may be skipped entirely.
 
 ```bash
-pnpm josh review:round2                    # → required
-pnpm josh review:round2 --round-1-closed   # → required | skip
-pnpm josh review:round2 --json             # the verdict and the reason, machine-readable
+pnpm josh review:round2                # → required | skip, for the branch’s issue
+pnpm josh review:round2 --record 123   # → required | skip, a skip commented on that issue
+pnpm josh review:round2 --json         # the verdict and the reason, machine-readable
 ```
 
 **Options:**
 
-- `--round-1-closed` — the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.
+- `--record` — the issue whose ledger dispositions decide round 1’s closure — skip only when every High/Medium is `fixed` or `false-positive` — and where a skip is commented under `## Round 2 skipped`, once.
 - `--json` — machine-readable verdict and reason.
 
 <!-- /usage -->
