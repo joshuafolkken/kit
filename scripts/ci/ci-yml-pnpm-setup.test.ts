@@ -38,14 +38,7 @@ const COREPACK_ENABLE = 'corepack enable'
 const COREPACK_PREPARE = 'corepack prepare'
 const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
-const RUNTIME_CACHE_ID = 'runtime-cache'
-const RUNTIME_INPUT = '${{ inputs.runtime }}'
-const CACHE_RESTORE = 'actions/cache/restore@'
-const CACHE_SAVE = 'actions/cache/save@'
-const RUNTIME_KEY_PREFIX = String(
-	ACTION_STEPS.find((step) => step.id === RUNTIME_CACHE_ID)?.with?.['key'],
-)
-const RUNTIME_STORE = '~/setup-pnpm/store'
+const CACHE_ACTION = 'actions/cache'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -117,10 +110,6 @@ function expect_pnpm_before_use(steps: Steps): void {
 	expect(first_use).toBeGreaterThan(setup_index)
 }
 
-function step_input(step: WorkflowStep | undefined, name: string): unknown {
-	return step?.with?.[name]
-}
-
 function action_step(name: string): WorkflowStep | undefined {
 	return ACTION_STEPS.find((step) => step.name === name)
 }
@@ -141,13 +130,17 @@ describe('the setup-pnpm composite action', () => {
 	})
 
 	it('restores the pnpm store only when asked to', () => {
-		const store_steps = ACTION_STEPS.filter((step) => step.name?.includes('store'))
+		const setup = ACTION_STEPS.find((step) => is_pnpm_setup(step))
 
-		expect(store_steps).toHaveLength(2)
+		expect(setup?.with?.['cache']).toBe(`\${{ ${WHEN_INSTALLING} && inputs.cache == 'true' }}`)
+	})
 
-		for (const step of store_steps) {
-			expect(step.if).toBe(`${WHEN_INSTALLING} && inputs.cache == 'true'`)
-		}
+	// joshuafolkken/kit#5315: an actions/cache step restored the store only after pnpm/setup had
+	// downloaded the runtime into it, so the runtime was never restored.
+	it('leaves the store cache to pnpm/setup, which restores it before the runtime', () => {
+		const cache_steps = ACTION_STEPS.filter((step) => step.uses?.startsWith(CACHE_ACTION))
+
+		expect(cache_steps).toEqual([])
 	})
 })
 
@@ -245,7 +238,7 @@ describe('Node compatibility job', () => {
 		expect(action_call(ci_yml_fixture.RUNTIME_CI_YML, NODE_COMPAT_JOB)?.with).toEqual({
 			runtime: NODE_COMPAT_RUNTIME,
 		})
-		expect(setup?.with?.['runtime']).toBe(RUNTIME_INPUT)
+		expect(setup?.with?.['runtime']).toBe('${{ inputs.runtime }}')
 	})
 
 	it('checks the runtime, builds, then starts the bundled CLI', () => {
@@ -257,44 +250,6 @@ describe('Node compatibility job', () => {
 
 		expect(version_step?.env).toEqual({ NODE_VERSION: '${{ matrix.node }}' })
 		expect(version_step?.run).toContain('tee /dev/stderr | grep -qE "^v${NODE_VERSION}(\\.|$)"')
-	})
-})
-
-// joshuafolkken/kit#5315: the runtime pnpm/setup downloads is cached around pnpm/setup itself,
-// since the store cache restores only after it.
-describe('the Node runtime cache', () => {
-	const restore_index = ACTION_STEPS.findIndex((step) => step.id === RUNTIME_CACHE_ID)
-	const setup_index = ACTION_STEPS.findIndex((step) => is_pnpm_setup(step))
-	const save_index = ACTION_STEPS.findIndex((step) => step.uses?.startsWith(CACHE_SAVE) === true)
-	const restore = ACTION_STEPS[restore_index]
-	const save = ACTION_STEPS[save_index]
-
-	it('restores before pnpm/setup and saves after it', () => {
-		expect(restore?.uses?.startsWith(CACHE_RESTORE)).toBe(true)
-		expect(restore_index).toBeGreaterThanOrEqual(0)
-		expect(setup_index).toBeGreaterThan(restore_index)
-		expect(save_index).toBeGreaterThan(setup_index)
-	})
-
-	it('runs only for a requested runtime with the cache allowed', () => {
-		expect(restore?.if).toBe("inputs.runtime != '' && inputs.cache == 'true'")
-		expect(save?.if).toContain(`!= steps.${RUNTIME_CACHE_ID}.outputs.cache-matched-key`)
-	})
-
-	it('caches the store under pnpm/setup dest by a key prefixed with the runtime', () => {
-		const store = `${String(step_input(ACTION_STEPS[setup_index], 'dest'))}/store`
-
-		expect(store).toBe(RUNTIME_STORE)
-		expect([step_input(restore, 'path'), step_input(save, 'path')]).toEqual([store, store])
-		expect(step_input(restore, 'restore-keys')).toBe(RUNTIME_KEY_PREFIX)
-	})
-
-	it('keys the save by the resolved Node version under the same prefix', () => {
-		const key_step = ACTION_STEPS.find((step) => step.id === 'runtime-key')
-
-		expect(key_step?.run).toContain('key=$RUNNER_OS-pnpm-runtime-$RUNTIME-$(node --version)')
-		expect(key_step?.env).toEqual({ RUNTIME: RUNTIME_INPUT })
-		expect(RUNTIME_KEY_PREFIX).toBe('${{ runner.os }}-pnpm-runtime-${{ inputs.runtime }}-')
 	})
 })
 

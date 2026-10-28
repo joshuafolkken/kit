@@ -48,7 +48,6 @@ const LOCAL_ACTION_PREFIX = './'
 const ACTION_FILE = 'action.yml'
 // An action only a local composite action runs, so the resolver is shown to follow them.
 const COMPOSITE_ONLY_ACTION = 'pnpm/setup'
-const REPOSITORY_SEGMENTS = 2
 
 function by_name(left: string, right: string): number {
 	return left.localeCompare(right)
@@ -71,19 +70,13 @@ function resolve_steps(steps: ReadonlyArray<WorkflowStep>): ReadonlyArray<Workfl
 	})
 }
 
-// Dependabot names an action by its repository, so `actions/cache/restore` is the `actions/cache`
-// dependency (joshuafolkken/kit#5315).
-function action_repository(step: WorkflowStep): string {
-	return ci_yml_fixture.action_name(step).split('/').slice(0, REPOSITORY_SEGMENTS).join('/')
-}
-
 function publish_actions(): ReadonlyArray<string> {
 	const job_steps = PUBLISH_JOBS.flatMap(
 		(job) => ci_yml_fixture.find_job(PUBLISH_WORKFLOW, job)?.steps ?? [],
 	)
 	const names = resolve_steps(job_steps)
 		.filter((step) => step.uses !== undefined)
-		.map((step) => action_repository(step))
+		.map((step) => ci_yml_fixture.action_name(step))
 
 	return [...new Set(names)].toSorted(by_name)
 }
