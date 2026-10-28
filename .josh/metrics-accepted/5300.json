@@ -1,0 +1,7 @@
+{
+	"reason": "#5300: waves cap at the lane limit — a per-wave limit through the offer, the lane-limit read and its width line",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

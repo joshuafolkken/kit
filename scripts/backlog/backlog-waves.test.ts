@@ -147,13 +147,20 @@ describe('backlog_waves.build — run:solo issues across the backlog', () => {
 })
 
 // joshuafolkken/kit#2928: the plan and the run cut each wave with one selection — rank, run:solo
-// gate, cap — so wave 1 is what backlog:next offers an idle repository, past the cap included.
+// gate, cap — so wave 1 is what backlog:next offers an idle repository when both cut at one width.
 describe('backlog_waves.build — the same offer backlog:next makes', () => {
 	const STANDALONE_NUMBERS = [2801, 2802, 2803, 2804, 2805, 2806, 2807]
 	const standalone_children = STANDALONE_NUMBERS.map((number) => child(number))
 	const keys = new Set(standalone_children.map((entry) => epic_graph.key_of(entry)))
 
 	const scope: GateScope = { standalone: keys, declared: new Map() }
+	const LANE_LIMIT = 4
+
+	function first_wave_of(wave_scope: GateScope): Array<number> {
+		const wave = backlog_waves.build(result(standalone_children), REPO, wave_scope).waves[0] ?? []
+
+		return wave.map((entry) => entry.number)
+	}
 
 	it('matches what backlog:next offers an idle repository in its first wave', () => {
 		const input = result([child(FIRST), solo(SOLO_FIRST), ...standalone_children])
@@ -161,16 +168,37 @@ describe('backlog_waves.build — the same offer backlog:next makes', () => {
 			backlog_rank.gate(input, { kind: 'idle' }, REPO, scope).result,
 			REPO,
 		)
+		const same_width = { ...scope, wave_limit: git_next_issues.DISPLAY_LIMIT }
 
-		expect(backlog_waves.build(input, REPO, scope).waves[0]).toStrictEqual(offered)
+		expect(backlog_waves.build(input, REPO, same_width).waves[0]).toStrictEqual(offered)
 	})
 
-	it('caps a wave of standalone rows at five, as backlog:next does', () => {
-		const wave = backlog_waves.build(result(standalone_children), REPO, scope).waves[0] ?? []
-
-		expect(wave.map((entry) => entry.number)).toStrictEqual(
-			STANDALONE_NUMBERS.slice(0, git_next_issues.DISPLAY_LIMIT),
+	// joshuafolkken/kit#5300: a wave is as wide as the lanes, not backlog:next's printed count.
+	it('caps a wave of standalone rows at the lane limit', () => {
+		expect(first_wave_of({ ...scope, wave_limit: LANE_LIMIT })).toStrictEqual(
+			STANDALONE_NUMBERS.slice(0, LANE_LIMIT),
 		)
+	})
+
+	it('does not cap a wave when the lane limit could not be read', () => {
+		expect(first_wave_of(scope)).toStrictEqual(STANDALONE_NUMBERS)
+	})
+})
+
+// joshuafolkken/kit#5300: an issue whose blockers all close in wave k is planned in wave k+1, however
+// many standalone rows wave k held.
+describe('backlog_waves.build — a blocked issue follows its blocker', () => {
+	const READY_NUMBERS = [2811, 2812, 2813, 2814, 2815, 2816, 2817, 2818, 2819, 2820, 2821]
+	const ready = [child(FIRST), ...READY_NUMBERS.map((number) => child(number))]
+	const blocked = child(SECOND, { blocked_by: [FIRST] })
+	const keys = new Set([...ready, blocked].map((entry) => epic_graph.key_of(entry)))
+
+	it('plans the issue in the wave after its blocker', () => {
+		const scope: GateScope = { standalone: keys, declared: new Map() }
+
+		expect(
+			backlog_waves.build(result(ready, [blocked]), REPO, scope).waves.map((wave) => wave.length),
+		).toStrictEqual([ready.length, 1])
 	})
 })
 
