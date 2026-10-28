@@ -36,6 +36,7 @@ const ai_review_pull_comment_schema = z.object({
 	body: z.string().optional(),
 	url: z.string().optional(),
 	author: z.object({ login: z.string().optional() }).optional(),
+	updatedAt: z.string().optional(),
 })
 
 const pr_info_schema = z.object({
@@ -108,6 +109,7 @@ const rest_comment_schema = z.looseObject({
 	body: z.string().nullish(),
 	html_url: z.string().optional(),
 	user: z.looseObject({ login: z.string().optional() }).nullish(),
+	updated_at: z.string().optional(),
 })
 
 // The `number,state,labels,body` read, for the epic check and the `--add` closed-epic refusal.

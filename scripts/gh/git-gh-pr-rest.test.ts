@@ -90,6 +90,7 @@ const REST_COMMENT = {
 	body: 'Actionable comments posted: 2',
 	html_url: 'https://github.com/joshuafolkken/kit/pull/1#issuecomment-1',
 	user: { login: 'coderabbitai[bot]' },
+	updated_at: '2026-10-28T01:02:03Z',
 }
 
 function mapped(comment: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -99,11 +100,12 @@ function mapped(comment: Record<string, unknown>): Record<string, unknown> | und
 describe('to_pr_comments', () => {
 	// `git-pr-ai-review.ts` reads `author.login` and `url`, which REST spells `user.login` and
 	// `html_url` — its own `url` being the API endpoint.
-	it('renames user.login and html_url to the names the merge gate reads', () => {
+	it('renames user.login, html_url and updated_at to the names the merge gate reads', () => {
 		expect(mapped(REST_COMMENT)).toStrictEqual({
 			body: REST_COMMENT.body,
 			url: REST_COMMENT.html_url,
 			author: { login: REST_COMMENT.user.login },
+			updatedAt: REST_COMMENT.updated_at,
 		})
 	})
 
@@ -117,6 +119,7 @@ describe('to_pr_comments', () => {
 			body: '',
 			url: undefined,
 			author: { login: undefined },
+			updatedAt: undefined,
 		})
 	})
 })

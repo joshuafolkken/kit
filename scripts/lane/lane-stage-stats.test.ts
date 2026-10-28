@@ -102,6 +102,14 @@ describe('lane_stage_stats.table — the CodeRabbit wait', () => {
 		expect(row_of(entries, wait)).toStrictEqual(['13.5', '25.0', '2'])
 		expect(row_of(entries, rate_limit)).toStrictEqual(['20.0', '20.0', '1'])
 	})
+
+	// joshuafolkken/kit#5289: followup's one retrigger of a rate-limited CodeRabbit.
+	it('keeps the CodeRabbit retrigger on a row of its own', () => {
+		const retriggered = 'coderabbit-retriggered'
+		const entries = [stage(CI_WAIT, 3, 2), stage(retriggered, 8, 1)]
+
+		expect(row_of(entries, retriggered)).toStrictEqual(['8.0', '8.0', '1'])
+	})
 })
 
 describe('lane_stage_stats.table — the implementation, from dispatch to the first ship stage', () => {

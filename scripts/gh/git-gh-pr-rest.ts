@@ -145,7 +145,8 @@ function to_pr_info(pull: RestPull): Record<string, unknown> {
 
 // The conversation comments in the shape `gh pr view --json comments` answered with. A listing that
 // will not parse throws rather than answering an empty one — `git-pr-ai-review.ts` reads an empty
-// listing as "no reviewer left a finding" and merges.
+// listing as "no reviewer left a finding" and merges. `updatedAt` is when CodeRabbit last rewrote its
+// rate-limit notice, the moment its stated window counts from (joshuafolkken/kit#5289).
 function to_pr_comments(rest_json: string): Array<Record<string, unknown>> {
 	const parsed = parse_json_array_or_undefined(rest_json, rest_comment_schema)
 	if (parsed === undefined) throw new Error(NOT_A_COMMENT_LISTING_MESSAGE)
@@ -154,6 +155,7 @@ function to_pr_comments(rest_json: string): Array<Record<string, unknown>> {
 		body: comment.body ?? EMPTY_BODY,
 		url: comment.html_url,
 		author: { login: comment.user?.login },
+		updatedAt: comment.updated_at,
 	}))
 }
 

@@ -24,8 +24,9 @@ on the common git directory so every lane, the parent and the sampler write to t
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
 writes one of its own, `ci-wait` — the time it spent waiting for the checks — and, when its polls saw
-CodeRabbit still running or rate-limited, `coderabbit-wait` and `coderabbit-rate-limit`; these carry no
-`issue`.
+CodeRabbit still running or rate-limited, `coderabbit-wait` and `coderabbit-rate-limit`, and on a run
+that posted `@coderabbitai review` after a rate limit, `coderabbit-retriggered` — the window it waited
+out; these carry no `issue`.
 
 `unit_ms` is the unit suite's own duration, present when the gate ran it; `josh metrics` reads the
 gate and unit durations it holds to a baseline from these entries.
@@ -94,6 +95,7 @@ order a lane passes them, each with its median, its maximum and how many runs th
 | `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks           | whether to overlap the round-one review with CI                   |
 | `coderabbit-wait`             | `stage` entries `josh followup` writes for CodeRabbit's part of its waits   | whether CodeRabbit is what holds a followup up                    |
 | `coderabbit-rate-limit`       | `stage` entries `josh followup` writes for the rate-limited part of that    | whether to file a remedy for CodeRabbit's rate limit              |
+| `coderabbit-retriggered`      | `stage` entries `josh followup` writes for the window before its retrigger  | how long followup's own retrigger waits on CodeRabbit             |
 | `gate`                        | `stage` entries of `josh ship`'s gate                                       | whether to lower `JOSH_LANE_LIMIT`, beside the load columns       |
 | `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                              | the rest of the time from dispatch to the pull request            |
 | `pre-detach`                  | `stage` entries of a detached `josh ship`'s fast checks in the child's turn | the time the child's own turn spends checking before the hand-off |
