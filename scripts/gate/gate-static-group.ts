@@ -1,4 +1,5 @@
-import { gate_plan, type GateCheck } from './gate-plan'
+import { gate_labels } from './gate-labels'
+import type { GateCheck } from './gate-plan'
 
 // **CI runs the static set as three parallel legs, and each leg is still `josh gate`**
 // (joshuafolkken/kit#5215). One runner ran all seven checks for about four minutes while every unit
@@ -13,13 +14,13 @@ import { gate_plan, type GateCheck } from './gate-plan'
 const STATIC_GROUP_FLAG_PREFIX = '--static-group='
 
 const STATIC_GROUPS: Readonly<Record<string, ReadonlyArray<string>>> = {
-	lint: [gate_plan.LINT_LABEL],
-	types: [gate_plan.TYPE_CHECK_LABEL, gate_plan.EXPORTS_LABEL],
+	lint: [gate_labels.LINT_LABEL],
+	types: [gate_labels.TYPE_CHECK_LABEL, gate_labels.EXPORTS_LABEL],
 	rest: [
-		gate_plan.SPELL_CHECK_LABEL,
-		gate_plan.BEHAVIOR_LABEL,
-		gate_plan.METRICS_LABEL,
-		gate_plan.LOCKFILE_LABEL,
+		gate_labels.SPELL_CHECK_LABEL,
+		gate_labels.BEHAVIOR_LABEL,
+		gate_labels.METRICS_LABEL,
+		gate_labels.LOCKFILE_LABEL,
 	],
 }
 

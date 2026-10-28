@@ -1,5 +1,6 @@
 import { ci_yml_fixture } from '#scripts/ci/ci-yml-fixture'
 import { describe, expect, it } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
 import { gate_static_group } from './gate-static-group'
 
@@ -63,7 +64,7 @@ describe('narrow_checks', () => {
 			.narrow_checks(gate_plan.GATE_CHECKS, 'types')
 			.map((check) => check.label)
 
-		expect(labels).toEqual([gate_plan.TYPE_CHECK_LABEL, gate_plan.EXPORTS_LABEL])
+		expect(labels).toEqual([gate_labels.TYPE_CHECK_LABEL, gate_labels.EXPORTS_LABEL])
 	})
 
 	it('finds the group among the other arguments', () => {

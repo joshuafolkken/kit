@@ -43,8 +43,12 @@ vi.mock('node:fs', () => ({
 	readFileSync: fs_mock.mock_read_file_sync,
 	writeFileSync: vi.fn(),
 }))
+vi.mock('#scripts/version/development-engines-verdict', () => ({
+	development_engines_verdict: { report: vi.fn() },
+}))
 
 const { writeFileSync: write_file_sync } = await import('node:fs')
+const { development_engines_verdict } = await import('#scripts/version/development-engines-verdict')
 const { run_overrides_check, main } = await import('./overrides-check')
 
 // Every spy here is one mock for the whole file — uncleared, a call an earlier test made satisfies a
@@ -184,5 +188,14 @@ describe('overrides-check — the argument line', () => {
 		main([])
 
 		expect(console.info).toHaveBeenCalledWith(expect.stringContaining('overrides unchanged'))
+	})
+
+	it('prints the devEngines verdict even when the overrides changed', () => {
+		fs_mock.state.snapshot_content = REACT_18_SNAPSHOT
+
+		expect(() => {
+			main([])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(development_engines_verdict.report).toHaveBeenCalledOnce()
 	})
 })

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { input_fingerprint } from './input-fingerprint'
 import { toolchain_inputs } from './toolchain-inputs'
 
@@ -184,12 +184,12 @@ const SPELLING: InputDeclaration = {
 }
 
 const DECLARATIONS: ReadonlyMap<string, InputDeclaration> = new Map([
-	[gate_plan.LINT_LABEL, LINT],
-	[gate_plan.SPELL_CHECK_LABEL, SPELLING],
-	[gate_plan.TYPE_CHECK_LABEL, compiled(is_source_input)],
-	[gate_plan.EXPORTS_LABEL, compiled(is_source_input)],
-	[gate_plan.METRICS_LABEL, compiled(is_metrics_input)],
-	[gate_plan.UNIT_LABEL, UNIT],
+	[gate_labels.LINT_LABEL, LINT],
+	[gate_labels.SPELL_CHECK_LABEL, SPELLING],
+	[gate_labels.TYPE_CHECK_LABEL, compiled(is_source_input)],
+	[gate_labels.EXPORTS_LABEL, compiled(is_source_input)],
+	[gate_labels.METRICS_LABEL, compiled(is_metrics_input)],
+	[gate_labels.UNIT_LABEL, UNIT],
 ])
 
 function declaration_of(label: string): InputDeclaration | undefined {

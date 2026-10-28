@@ -1,10 +1,11 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import type { GateCheckRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { gate_report, type GateStepResult } from './gate-report'
 import { machine_capacity } from './machine-capacity'
 
@@ -97,7 +98,7 @@ async function start(ledger_path: string | undefined): Promise<GateLedgerStart> 
 // The unit leg's own facts: the whole-suite fallback it took, or the since-green no-op that ran no
 // test (joshuafolkken/kit#4457) — the two `josh lane:stats` must not time as an ordinary run.
 function unit_facts(result: GateStepResult): Pick<GateCheckRecord, 'fallback' | 'is_unmoved'> {
-	if (result.label !== gate_plan.UNIT_LABEL) return {}
+	if (result.label !== gate_labels.UNIT_LABEL) return {}
 
 	return {
 		fallback: related_scope.fallback_kind(result.output),
@@ -121,7 +122,12 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 async function record_reused(ledger_path: string | undefined, elapsed_ms: number): Promise<void> {
 	if (ledger_path === undefined) return
 
-	await lane_ledger_write.record_gate(ledger_path, { elapsed_ms, is_passed: true, is_reused: true })
+	await lane_ledger_write.record_gate(ledger_path, {
+		elapsed_ms,
+		is_passed: true,
+		is_reused: true,
+		issue: lane_paths.issue_here(),
+	})
 }
 
 // The caller measures the elapsed time before this, so the end's reading is never part of it.
@@ -134,7 +140,7 @@ async function record(
 
 	if (begun.ledger_path === undefined) return
 
-	const unit_ms = results.find((result) => result.label === gate_plan.UNIT_LABEL)?.elapsed_ms
+	const unit_ms = results.find((result) => result.label === gate_labels.UNIT_LABEL)?.elapsed_ms
 	const external_cores = peak([...begun.readings, await read_external_cores()])
 
 	await lane_ledger_write.record_gate(begun.ledger_path, {
@@ -142,6 +148,7 @@ async function record(
 		unit_ms,
 		external_cores,
 		checks: check_records(results),
+		issue: lane_paths.issue_here(),
 	})
 }
 

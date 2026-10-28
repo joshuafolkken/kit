@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { moved_paths } from '#scripts/gate/moved-paths'
@@ -138,7 +138,7 @@ async function since_green_change(
 	is_whole: boolean,
 ): Promise<ChangeReading | undefined> {
 	const parts = (await is_green_narrowable(is_whole))
-		? await since_green.read_moved_parts(review_stamps.test_related_stamp, gate_plan.UNIT_LABEL)
+		? await since_green.read_moved_parts(review_stamps.test_related_stamp, gate_labels.UNIT_LABEL)
 		: undefined
 
 	if (parts === undefined) return undefined
@@ -235,7 +235,7 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 }
 
 // A file every test imports narrows to its direct importers unless `is_whole`: the gate's unit leg, and
-// the gate's reuse of it, keep the whole suite for it (`gate_plan.KEEP_WHOLE_SUITE_FLAG`).
+// the gate's reuse of it, keep the whole suite for it (`gate_labels.KEEP_WHOLE_SUITE_FLAG`).
 async function scope_of(
 	root: string,
 	change: ChangeReading,
@@ -404,7 +404,7 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
 	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
 
-	const { KEEP_WHOLE_SUITE_FLAG } = gate_plan
+	const { KEEP_WHOLE_SUITE_FLAG } = gate_labels
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
 	const input = await read_run_input(root, command_arguments, given.includes(KEEP_WHOLE_SUITE_FLAG))

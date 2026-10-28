@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
@@ -166,14 +166,14 @@ describe('test_related.run_related_tests — the gate’s whole-suite flag', () 
 	it('runs the whole suite for a file every test imports', async () => {
 		mocked_moved.mockResolvedValue({ changed: [pure_files_entries.PURE_FILES_PATH], synced: [] })
 
-		await test_related.run_related_tests([gate_plan.KEEP_WHOLE_SUITE_FLAG])
+		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
 
 		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
 	})
 
 	// A bare run's green vouches only for that file's direct importers.
 	it('never narrows by a green past a file every test imports the branch changed', async () => {
-		await test_related.run_related_tests([gate_plan.KEEP_WHOLE_SUITE_FLAG])
+		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
 
 		expect(vitest_arguments()).toEqual(WHOLE_SUITE)
 	})

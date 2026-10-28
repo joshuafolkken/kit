@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -115,7 +115,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 
 		expect(mocked_moved).toHaveBeenCalledWith(
 			review_stamps.test_related_stamp,
-			gate_plan.UNIT_LABEL,
+			gate_labels.UNIT_LABEL,
 		)
 	})
 

@@ -46,6 +46,7 @@ import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import semver from 'semver'
 import { z } from 'zod'
+import { development_engines_verdict } from './development-engines-verdict'
 import { npm_registry } from './npm-registry'
 import { package_manager_version } from './package-manager-version'
 import { release_age } from './release-age'
@@ -392,6 +393,7 @@ function main(): number {
 	const status = bump_to_registry_target(original, extract_pnpm_major(original))
 
 	sync_development_engines()
+	development_engines_verdict.report()
 
 	return status
 }

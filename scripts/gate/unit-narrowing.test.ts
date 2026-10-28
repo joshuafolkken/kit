@@ -5,7 +5,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import type { GateStep } from './gate-report'
 import { UNIT_WORKER_FLAG, with_granted_workers } from './gate-steps'
 import { held_mark } from './held-mark'
@@ -21,7 +21,7 @@ const NARROWED = 3
 const WAIT_CAP_MS = 1000
 const BLOCKER = `${core_budget.RESERVED_PREFIX}blocker.json`
 const UNREAD: MachineReading = { busy_cores: undefined, available_mb: undefined }
-const { UNIT_LABEL } = gate_plan
+const { UNIT_LABEL } = gate_labels
 
 const probe = { directory: '' }
 

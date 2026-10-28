@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 
@@ -28,7 +29,7 @@ const SKIP_REASON = 'no TypeScript files were found'
 const TOOLKIT_CHECKER = 'svelte-check'
 const LINT_TARGET = 'lint:all'
 const CAPPED_WORKERS = `${UNIT_WORKER_FLAG}=${String(WORKER_CAP)}`
-const { LINT_LABEL, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
+const { LINT_LABEL, TYPE_CHECK_LABEL, UNIT_LABEL } = gate_labels
 
 function check(label: string, target: string = label): GateCheck {
 	return { label, target, reserved_cores: 1 }

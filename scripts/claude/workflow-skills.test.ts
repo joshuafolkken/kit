@@ -181,7 +181,7 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 		'git diff -- pnpm-workspace.yaml package.json',
 		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
 		'**quote what one printed.**',
-		'the `josh latest` lockstep pnpm bump is expected, NOT a violation',
+		'`devEngines: restore (<reason>)` — restore + ask',
 		'never touch `overrides`',
 		'never touch `devEngines`',
 	])('states %j', (marker) => {
