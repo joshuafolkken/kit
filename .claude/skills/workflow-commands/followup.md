@@ -31,6 +31,9 @@ A pre-merge failure stops the run; an unverifiable AI finding or CI failure need
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the
 named recovery without rerunning `followup`. The printed result is authoritative.
 
+A CI job red only on tests outside the change → `followup` reruns it once, after ship's main merge
+when main moved a failed test (`scripts/followup/followup-main-move.ts`).
+
 After the merge `run:tail` returns to the default branch — `ship` runs it; after a bare `followup`, run
 `pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested. The sections below are read when the output needs reading.
 
