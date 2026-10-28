@@ -1,0 +1,7 @@
+{
+	"reason": "#5297 adds subagent-type split for lane:breakdown and lane:stats (new lane-implement-subagents module, backgrounded column)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 134
+	}
+}

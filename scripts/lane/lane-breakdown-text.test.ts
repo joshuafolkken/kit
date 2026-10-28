@@ -28,6 +28,7 @@ const REPORT: Report = {
 			{ name: 'gate', ms: 10 * MINUTE_MS },
 		],
 		background: 2,
+		untimed: new Map(),
 	},
 }
 
@@ -81,6 +82,22 @@ describe('lane_breakdown_text.line', () => {
 
 		expect(lane_breakdown_text.line(report)).toContain(
 			`: ship pre-detach 1.0 min${pinned}; implement`,
+		)
+	})
+})
+
+// joshuafolkken/kit#5297: a backgrounded subagent call is counted beside its type, at no time.
+describe('lane_breakdown_text.line — subagent types', () => {
+	it('counts the backgrounded subagent calls beside their type', () => {
+		const reviewer = { name: 'subagent: reviewer', ms: 0 }
+		const detail = {
+			kinds: [...REPORT.detail.kinds, reviewer],
+			background: 1,
+			untimed: new Map([[reviewer.name, 1]]),
+		}
+
+		expect(lane_breakdown_text.line({ ...REPORT, detail })).toContain(
+			'subagent: reviewer 0.0 min + 1 backgrounded, untimed',
 		)
 	})
 })
