@@ -232,6 +232,7 @@ function with_reference(violations: ReadonlyArray<string>): ReadonlyArray<string
 }
 
 const report_lint = {
+	has_label,
 	lint_report,
 	with_reference,
 	required_labels,

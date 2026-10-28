@@ -436,10 +436,11 @@ The result reads the follow-ups' labels: `届かなかった` when one carries `
 
 <!-- usage: report:lint -->
 
-Check a two-layer work summary on stdin against its mechanical format rules.
+Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules.
 
 ```bash
 pnpm josh report:lint < summary.md
+pnpm josh report:lint --child-summary < summary.md
 ```
 
 <!-- /usage -->
@@ -447,6 +448,8 @@ pnpm josh report:lint < summary.md
 The format is `CLAUDE.md` Step 0, in `prompts/collaboration-workflow/report-format.md`. It enforces the mechanical half: labels present, no overview line over its character ceiling, no code fence around the summary, no file path or CLI flag in the overview.
 
 Prints `ok` (exit 0), or the violations one per line plus one line naming the template's section in `report-format.md` (exit 1). The writer judges whether the overview names a concrete subject. The labels follow `JOSH_SESSION_LANG` (`ja`, else English), from the table `josh report:template` prints.
+
+`--child-summary` checks a lane child's closing summary instead (`.claude/skills/workflow-commands/backlogrun-child.md` → "What the summary carries, and how long it may be"): at most 25 non-blank lines, the cause / fix / result labels in the session language, and no changed-file list — two or more consecutive bullets that are only a path. A failure's last line names that section.
 
 ### `josh report:template`
 
