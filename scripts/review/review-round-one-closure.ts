@@ -4,7 +4,9 @@ import { review_finding_ledger, type DisposedLine } from './review-finding-ledge
 // Whether round 1's High/Medium findings all closed, read from the issue's own ledger file rather
 // than asserted by the caller (joshuafolkken/kit#5286). Closed means every High/Medium `- rf:` line
 // of the issue carries `fixed` or `false-positive`; a line with no disposition, a filed or deferred
-// one, or no recorded round at all leaves round 1 open, so the answer stays `required`.
+// one, or no recorded round at all leaves round 1 open, so the answer stays `required`. Only the
+// issue's latest code round is read (joshuafolkken/kit#5359): an earlier round's unfixed lines stay
+// in the append-only ledger after a clean re-run.
 
 const BLOCKING_SEVERITIES: ReadonlySet<string> = new Set(['high', 'medium'])
 const NO_RECORD_REASON =
@@ -34,7 +36,8 @@ function open_reason(open: ReadonlyArray<DisposedLine>): string {
 }
 
 function of_content(content: string | undefined, issue: number): Closure {
-	const lines = review_finding_ledger.issue_dispositions(content ?? '', issue)
+	const latest = review_finding_ledger.latest_round(content ?? '', issue)
+	const lines = review_finding_ledger.issue_dispositions(latest, issue)
 
 	if (lines.length === 0) return { is_closed: false, reason: NO_RECORD_REASON }
 

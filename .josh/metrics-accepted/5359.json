@@ -1,0 +1,7 @@
+{
+	"reason": "A code round's boundary line in the ledger lets review:round2 read only the latest round 1 (#5359)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 21
+	}
+}

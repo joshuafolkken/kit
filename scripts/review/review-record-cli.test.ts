@@ -146,24 +146,24 @@ describe('review_record_cli.build_lines', () => {
 })
 
 describe('review_record_cli.run', () => {
-	it('appends one finding line per finding to the issue file', async () => {
+	it('appends a round boundary and one finding line per finding to the issue file', async () => {
 		const root = root_of('with-findings')
 		const argv = ['--issue', '2325', 'tests:medium:a.ts', 'security:low:b.ts']
 		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root))
 
 		expect(code).toBe(0)
 		expect(readFileSync(issue_file(root, 2325), 'utf8')).toBe(
-			'- rf:tests | medium | a.ts | 2026-09-22 | #2325\n- rf:security | low | b.ts | 2026-09-22 | #2325\n',
+			'- rb:2026-09-22 | #2325\n- rf:tests | medium | a.ts | 2026-09-22 | #2325\n- rf:security | low | b.ts | 2026-09-22 | #2325\n',
 		)
 	})
 
-	it('records a zero-finding round as one line', async () => {
+	it('records a zero-finding round as one line after its boundary', async () => {
 		const root = root_of('zero-round')
 
 		await quietly(async () => await review_record_cli.run(['--issue', '2325'], NOW, root))
 
 		expect(readFileSync(issue_file(root, 2325), 'utf8')).toBe(
-			'- rf:none | none | - | 2026-09-22 | #2325\n',
+			'- rb:2026-09-22 | #2325\n- rf:none | none | - | 2026-09-22 | #2325\n',
 		)
 	})
 
@@ -309,7 +309,7 @@ describe('review_record_cli.run — default ledger', () => {
 		)
 
 		expect(readFileSync(issue_file(root, 2419), 'utf8')).toBe(
-			'- rf:none | none | - | 2026-09-22 | #2419\n',
+			'- rb:2026-09-22 | #2419\n- rf:none | none | - | 2026-09-22 | #2419\n',
 		)
 		expect(code).toBe(0)
 	})
