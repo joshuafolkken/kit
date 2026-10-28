@@ -235,27 +235,23 @@ function is_last(body = ''): boolean {
 	return background_lines(body, ORDER_PREFIX).includes(LAST_LINE)
 }
 
-function is_raised(body: string, typed: ReadonlyArray<string>): boolean {
-	return is_typed(typed) || RAISED_LEVELS.has(declared_level(body) ?? 'normal')
+// The refusal for a body that queues itself last and is filed urgent or high as well, by its
+// declaration or its floor, or `undefined`. `josh issue:lint` reads it, so `josh issue:file` does too.
+function order_problem(body: string): string | undefined {
+	return is_last(body) && RAISED_LEVELS.has(filed_level(body) ?? 'normal')
+		? LAST_PROBLEM
+		: undefined
 }
 
-// The refusal for a body that queues itself last and raises its priority as well, or `undefined`.
-function order_problem(body: string, typed: ReadonlyArray<string> = []): string | undefined {
-	return is_last(body) && is_raised(body, typed) ? LAST_PROBLEM : undefined
-}
-
-function level_problem(body: string, typed: ReadonlyArray<string>): string | undefined {
-	if (is_typed(typed)) return undefined
+// Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list; a typed
+// label is refused only beside a run-last line, as the body's own raise is `order_problem`'s.
+function problem(body: string, typed: ReadonlyArray<string>): string | undefined {
+	if (is_typed(typed)) return is_last(body) ? LAST_PROBLEM : undefined
 	const level = filed_level(body)
 
 	if (level === undefined) return DECLARATION_PROBLEM
 
 	return malformed_problem(body) ?? floor_problem(body, level)
-}
-
-// Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list.
-function problem(body: string, typed: ReadonlyArray<string>): string | undefined {
-	return order_problem(body, typed) ?? level_problem(body, typed)
 }
 
 // The labels a new Issue is filed with — the filed level's label added unless one was typed.

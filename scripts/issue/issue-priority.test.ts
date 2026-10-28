@@ -135,17 +135,26 @@ describe('issue_priority.is_last', () => {
 
 describe('issue_priority.order_problem', () => {
 	it.each([[URGENT_CONDITION_2], [HIGH_WITH_DEADLINE]])('refuses last beside %j', (declaration) => {
-		const filed = body(declaration, `${LAST_LINE}\n`)
-
-		expect(issue_priority.order_problem(filed)).toContain(LAST_LINE)
-		expect(issue_priority.problem(filed, [])).toContain(LAST_LINE)
+		expect(issue_priority.order_problem(body(declaration, `${LAST_LINE}\n`))).toContain(LAST_LINE)
 	})
 
-	it('refuses last beside a typed priority label', () => {
+	it.each([
+		['- セキュリティ: gate の迂回\n'],
+		[`${PARK_PREFIX} #4695\n`],
+		['- 原因の損失: 32 分\n'],
+	])('refuses last beside the high floor %j sets', (floor_line) => {
+		expect(issue_priority.order_problem(body('', `${floor_line}${LAST_LINE}\n`))).toContain(
+			LAST_LINE,
+		)
+	})
+
+	it('refuses last beside a typed priority label, and not a typed one alone', () => {
 		expect(issue_priority.problem(body(LAST_LINE), [PRIORITY_HIGH_LABEL])).toContain(LAST_LINE)
+		expect(issue_priority.problem(body(''), [PRIORITY_HIGH_LABEL])).toBeUndefined()
 	})
 
 	it('accepts last alone and beside a normal declaration', () => {
+		expect(issue_priority.order_problem(body(LAST_LINE))).toBeUndefined()
 		expect(issue_priority.problem(body(LAST_LINE), [])).toBeUndefined()
 		expect(issue_priority.order_problem(body(NORMAL_DECLARATION, `${LAST_LINE}\n`))).toBeUndefined()
 	})
