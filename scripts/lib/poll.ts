@@ -1,4 +1,4 @@
-// One bounded polling loop and one sleep, in one place.
+// One polling loop — bounded by attempts, or ended only by its read — and one sleep, in one place.
 //
 // **Three modules had already written the same three-line `sleep`** — `gh/git-pr-checks.ts`,
 // `eval/eval-run.ts` and `propagate/propagate-publish.ts` — and the release command's tag watch
@@ -24,9 +24,6 @@ interface PollOptions {
 	sleeper?: (duration_ms: number) => Promise<void>
 }
 
-// **True as soon as `is_done` answers true, false when the attempts run out.** The first attempt runs
-// before any wait, so a condition already met costs nothing — which is the common case for a tag that
-// was created while the command was doing something else.
 // **The wait goes between attempts, never after the last one**, so the budget a caller computes from
 // `attempts × interval_ms` is the budget it actually spends. The pre-existing merge-gate loop in
 // `git-pr-checks.ts` guards its sleep the same way; extracted here so the loop keeps one branch.
@@ -39,21 +36,53 @@ async function wait_between(
 	if (attempt < attempts - 1) await wait(interval_ms)
 }
 
-async function poll_until(is_done: () => Promise<boolean>, options: PollOptions): Promise<boolean> {
+type WaitOptions = Omit<PollOptions, 'attempts'>
+
+// **The first value `read` answers, `undefined` when the attempts run out.** `undefined` is "not yet",
+// so a read that reaches a verdict — success or failure — answers it and the loop ends there.
+async function poll_for<T>(
+	read: () => Promise<T | undefined> | T | undefined,
+	options: PollOptions,
+): Promise<T | undefined> {
 	const wait = options.sleeper ?? sleep
 
 	for (let attempt = 0; attempt < options.attempts; attempt += 1) {
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		if (await is_done()) return true
+		const value = await read()
+		if (value !== undefined) return value
 
 		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
 		await wait_between(wait, options.interval_ms, attempt, options.attempts)
 	}
 
-	return false
+	return undefined
 }
 
-const poll = { poll_until, sleep }
+// **True as soon as `is_done` answers true, false when the attempts run out.** The first attempt runs
+// before any wait, so a condition already met costs nothing — which is the common case for a tag that
+// was created while the command was doing something else.
+async function poll_until(
+	is_done: () => Promise<boolean> | boolean,
+	options: PollOptions,
+): Promise<boolean> {
+	const is_reached = await poll_for(async () => ((await is_done()) ? true : undefined), options)
+
+	return is_reached === true
+}
+
+// **A wait that ends only when `read` answers** — a child process exiting, a ship leaving `running`.
+// Its bound, if any, is the read's own: a wall-clock deadline the read answers with its failure.
+async function wait_for<T>(
+	read: () => Promise<T | undefined> | T | undefined,
+	options: WaitOptions,
+): Promise<T> {
+	const value = await poll_for(read, { ...options, attempts: Infinity })
+	if (value === undefined) throw new Error('an unbounded poll ran out of attempts')
+
+	return value
+}
+
+const poll = { poll_for, poll_until, sleep, wait_for }
 
 export { poll }
-export type { PollOptions }
+export type { PollOptions, WaitOptions }
