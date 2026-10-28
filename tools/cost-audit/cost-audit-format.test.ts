@@ -6,6 +6,8 @@ function row(key: string, current: number, previous: number, is_regression = fal
 	return { key, current, previous, is_regression }
 }
 
+const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
+
 function audit_with(overrides: Partial<Audit> = {}): Audit {
 	return {
 		days: 7,
@@ -15,9 +17,22 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		kinds: [],
 		tools: [],
 		guards: [],
+		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
 		...overrides,
 	}
 }
+
+describe('cost_audit_format.report_lines — the full cache rewrites', () => {
+	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
+		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }
+		const lines = cost_audit_format.report_lines(
+			audit_with({ rewrites: { current, previous: NO_REWRITES } }),
+		)
+
+		expect(lines).toContain('  after a wait of 5 min or more: 631 ($182.0000) (prev 0 ($0.0000))')
+		expect(lines).toContain('  within 5 min: 2 ($0.5000) (prev 0 ($0.0000))')
+	})
+})
 
 describe('cost_audit_format.report_lines — the printed report', () => {
 	it('prints each row with its change against the previous period', () => {
