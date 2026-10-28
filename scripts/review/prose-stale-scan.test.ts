@@ -8,7 +8,7 @@ const DOC = 'docs/a.md'
 const NONE: ReadonlySet<string> = new Set()
 const OLD_COMMAND = 'old:command'
 const OLD_LIMIT_LINE = 'const OLD_LIMIT = 3'
-const EXPORT_NAME: Term = { kind: 'export', word: 'old_name' }
+const NAME: Term = { kind: 'name', word: 'old_name' }
 const CONSTANT: Term = { kind: 'constant', word: 'OLD_LIMIT' }
 const COMMAND: Term = { kind: 'command', word: OLD_COMMAND }
 const HEADING: Term = { kind: 'heading', word: 'Old heading' }
@@ -25,31 +25,30 @@ function hit(path: string, excerpt: string): Hit {
 	return { path, line: '3', excerpt }
 }
 
+const TAKEN = [
+	{ name: 'a direct export', file: CODE, line: 'export function old_name(): void {', term: NAME },
+	{ name: 'an export list entry', file: CODE, line: 'export { old_name }', term: NAME },
+	// A namespace object's member: its removed lines are a plain `function` and a `\told_name,` entry.
+	{ name: 'a top-level declaration', file: CODE, line: 'function old_name(): void {', term: NAME },
+	{ name: 'an UPPER_CASE constant', file: CODE, line: OLD_LIMIT_LINE, term: CONSTANT },
+	{
+		name: 'a josh command in prose',
+		file: DOC,
+		line: 'Run `pnpm josh old:command`.',
+		term: COMMAND,
+	},
+	{ name: 'a josh command in a comment', file: CODE, line: '// josh old:command', term: COMMAND },
+	{ name: 'a .md heading', file: DOC, line: '## Old heading ', term: HEADING },
+]
+
 describe('prose_stale_scan.stale_terms — each kind a removed line names', () => {
-	it.each([
-		{
-			name: 'a direct export',
-			file: CODE,
-			line: 'export function old_name(): void {',
-			term: EXPORT_NAME,
-		},
-		{ name: 'an export list entry', file: CODE, line: 'export { old_name }', term: EXPORT_NAME },
-		{ name: 'an UPPER_CASE constant', file: CODE, line: OLD_LIMIT_LINE, term: CONSTANT },
-		{
-			name: 'a josh command in prose',
-			file: DOC,
-			line: 'Run `pnpm josh old:command`.',
-			term: COMMAND,
-		},
-		{ name: 'a josh command in a comment', file: CODE, line: '// josh old:command', term: COMMAND },
-		{ name: 'a .md heading', file: DOC, line: '## Old heading ', term: HEADING },
-	])('takes $name', ({ file, line, term }) => {
+	it.each(TAKEN)('takes $name', ({ file, line, term }) => {
 		expect(terms([hunk(file, [line])])).toEqual([term])
 	})
 
 	it.each([
 		['a heading line outside a .md file', CODE, '# Not a heading'],
-		['a non-exported lower-case declaration', CODE, 'function helper(): void {'],
+		['a namespace object entry', CODE, '\told_name,'],
 		['an indented constant', CODE, '\tconst INNER_LIMIT = 3'],
 		['a declaration in a .md file', DOC, 'export function in_prose(): void {'],
 		['a josh command with no colon', DOC, 'Run `pnpm josh gate`.'],
@@ -107,7 +106,7 @@ describe('prose_stale_scan.pattern', () => {
 			target: '"A b"',
 			flags: [],
 		})
-		expect(prose_stale_scan.pattern({ kind: 'export', word: 'a_b' })).toEqual({
+		expect(prose_stale_scan.pattern({ kind: 'name', word: 'a_b' })).toEqual({
 			target: 'a_b',
 			flags: ['-w'],
 		})
@@ -115,7 +114,7 @@ describe('prose_stale_scan.pattern', () => {
 })
 
 describe('prose_stale_scan.report', () => {
-	const term: Term = { kind: 'export', word: 'old_name' }
+	const term: Term = { kind: 'name', word: 'old_name' }
 
 	function reference(hits: Array<Hit>, has_failed = false): Reference {
 		return { term, hits, has_failed }
@@ -137,10 +136,10 @@ describe('prose_stale_scan.report', () => {
 
 		expect(prose_stale_scan.report([reference(hits)])).toEqual({
 			text: [
-				'docs/x.md:3 export old_name',
-				'scripts/x.ts:3 export old_name',
-				'scripts/y.ts:3 export old_name',
-				'.claude/hooks/x.sh:3 export old_name',
+				'docs/x.md:3 name old_name',
+				'scripts/x.ts:3 name old_name',
+				'scripts/y.ts:3 name old_name',
+				'.claude/hooks/x.sh:3 name old_name',
 			].join('\n'),
 			exit_code: 1,
 		})
@@ -148,7 +147,7 @@ describe('prose_stale_scan.report', () => {
 
 	it('never reads a failed search as none: it is named and exits 2', () => {
 		expect(prose_stale_scan.report([reference([], true)])).toEqual({
-			text: 'search failed: export old_name',
+			text: 'search failed: name old_name',
 			exit_code: prose_stale_scan.FAILED_EXIT,
 		})
 	})

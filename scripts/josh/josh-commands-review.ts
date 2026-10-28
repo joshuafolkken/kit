@@ -90,7 +90,7 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	'prose:stale': {
 		script: 'scripts/review/prose-stale-cli.ts',
 		description:
-			'List each removed export, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name',
+			'List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name',
 		category: 'AI tools',
 		reference: ['', 'automation', ['none']],
 		usage: {

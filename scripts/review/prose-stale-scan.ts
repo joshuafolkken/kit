@@ -5,13 +5,14 @@ import { review_readers_scan } from './review-readers-scan'
 // The words a diff removed that prose may still name (joshuafolkken/kit#5287) — the self-check's
 // "Prose matches the code" (`prompts/review.md`). Pure: `prose-stale-cli.ts` reads the diff and searches.
 //
-// **A removed line names four kinds of word**: an export name and an `UPPER_CASE` constant declared on a
-// code file's removed line (the declaration reading is `review-readers-scan.ts`'s), a `josh x:y` command
+// **A removed line names four kinds of word**: a name (a top-level declaration, exported or not — a
+// namespace object's member is a plain `function` — or an `export { … }` entry) and an `UPPER_CASE`
+// constant on a code file's removed line (the declaration reading is `review-readers-scan.ts`'s), a `josh x:y` command
 // on any removed line, and a `.md` file's `#` heading. **A word the diff still writes is not removed**: an
 // identifier or command any added line carries, a heading an added `.md` line still titles, and a command
 // the registry still holds.
 
-type TermKind = 'export' | 'constant' | 'command' | 'heading'
+type TermKind = 'name' | 'constant' | 'command' | 'heading'
 
 interface Term {
 	kind: TermKind
@@ -47,12 +48,12 @@ function to_terms(kind: TermKind, words: ReadonlyArray<string>): Array<Term> {
 }
 
 function code_terms(source: string): Array<Term> {
-	const found = review_readers_scan.declarations(source)
-	const direct = found.filter((entry) => entry.is_exported).map((entry) => entry.name)
+	const declared = review_readers_scan.declarations(source).map((entry) => entry.name)
 	const listed = [...review_readers_scan.exported_names(source)]
-	const constants = found.map((entry) => entry.name).filter((name) => UPPER_CASE.test(name))
+	const constants = declared.filter((name) => UPPER_CASE.test(name))
+	const names = [...declared.filter((name) => !UPPER_CASE.test(name)), ...listed]
 
-	return [...to_terms('export', [...direct, ...listed]), ...to_terms('constant', constants)]
+	return [...to_terms('name', names), ...to_terms('constant', constants)]
 }
 
 function command_terms(lines: ReadonlyArray<string>): Array<Term> {

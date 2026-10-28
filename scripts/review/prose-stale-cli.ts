@@ -7,7 +7,7 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { test_pinned_logic, type Hunk } from '#scripts/test/test-pinned-logic'
 import { prose_stale_scan, type Reference, type Term } from './prose-stale-scan'
 
-// `josh prose:stale` — each word the change removed (an export name, a `josh x:y` command, an
+// `josh prose:stale` — each word the change removed (a declared or exported name, a `josh x:y` command, an
 // `UPPER_CASE` constant, a `.md` heading) that a `.md` line or a comment line under prompts, docs,
 // .claude or scripts still names, as `file:line kind word`; `ok` when none (joshuafolkken/kit#5287).
 // The diff runs from the change base to the working tree, so an uncommitted edit counts. Exit 1 on a
@@ -83,6 +83,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await guarded(process.argv.slice(FIRST_ARGUMENT))
 }
 
-const prose_stale_cli = { run }
+const prose_stale_cli = { guarded, references, run }
 
 export { prose_stale_cli }

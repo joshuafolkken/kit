@@ -930,7 +930,7 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:
 
 <!-- usage: prose:stale -->
 
-List each removed export, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name.
+List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name.
 
 ```bash
 pnpm josh prose:stale   # → `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)
@@ -938,7 +938,9 @@ pnpm josh prose:stale   # → `file:line kind word` per reference, or `ok` (exit
 
 <!-- /usage -->
 
-The self-check's "Prose matches the code" (`prompts/review.md`) as a search. From the change base to the working tree it takes each removed export name and `UPPER_CASE` constant (a `.ts` / `.js` declaration), `josh` command and `.md` heading. It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
+The self-check's "Prose matches the code" (`prompts/review.md`) as a search. From the change base to the working tree it takes each removed name and `UPPER_CASE` constant (a top-level `.ts` / `.js` declaration or an `export { … }` entry), `josh` command and `.md` heading.
+
+It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
 
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
