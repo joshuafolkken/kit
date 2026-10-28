@@ -1,6 +1,7 @@
 import { process_identity } from '#scripts/josh/process-identity'
 import type { GateCheckRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { core_admission } from './core-admission'
 import { core_budget } from './core-budget'
@@ -121,7 +122,12 @@ function check_records(results: ReadonlyArray<GateStepResult>): Array<GateCheckR
 async function record_reused(ledger_path: string | undefined, elapsed_ms: number): Promise<void> {
 	if (ledger_path === undefined) return
 
-	await lane_ledger_write.record_gate(ledger_path, { elapsed_ms, is_passed: true, is_reused: true })
+	await lane_ledger_write.record_gate(ledger_path, {
+		elapsed_ms,
+		is_passed: true,
+		is_reused: true,
+		issue: lane_paths.issue_here(),
+	})
 }
 
 // The caller measures the elapsed time before this, so the end's reading is never part of it.
@@ -142,6 +148,7 @@ async function record(
 		unit_ms,
 		external_cores,
 		checks: check_records(results),
+		issue: lane_paths.issue_here(),
 	})
 }
 

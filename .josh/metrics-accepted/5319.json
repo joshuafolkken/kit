@@ -1,0 +1,7 @@
+{
+	"reason": "Gate ledger rows carry the lane issue and lane:breakdown lists the gate's checks under the ship gate (#5319)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
