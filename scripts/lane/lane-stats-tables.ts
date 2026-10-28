@@ -1,5 +1,6 @@
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_check_stats } from './lane-check-stats'
+import { lane_ci_path_stats } from './lane-ci-path-stats'
 import { lane_claim_stats } from './lane-claim-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
 import { lane_gap_stats } from './lane-gap-stats'
@@ -31,6 +32,7 @@ interface PeriodRecords {
 function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
 	return [
 		lane_stage_stats.table(entries, window),
+		lane_ci_path_stats.table(entries, window),
 		lane_implement_stats.table(calls, window, lane_paused_spans.by_lane(entries)),
 		lane_stop_stats.table(entries, window, events),
 		lane_gap_stats.table(entries, window, events),

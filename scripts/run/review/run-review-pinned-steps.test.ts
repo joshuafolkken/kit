@@ -16,7 +16,7 @@ const PINNED_COMMAND = 'test:pinned'
 const ORIGIN_ARGS = ['--origin', 'run-review']
 const TIMED_OUT_NOTE = 'no answer within 120s of the gate and the review'
 const STILL_RUNNING_NOTE =
-	'it is still running on this tree; wait for its answer with `pnpm josh run:review --pinned`'
+	"it is still running on this tree; wait for its answer with `pnpm josh run:review --pinned` (a lane child: the ship's pre-detach reads it)"
 const ANSWER = { text: 'unpinned 1 · unchecked 0\n', unpinned: ['a.ts 0123456789abcdef'] }
 const START = 'Sat Oct 24 21:00:00 2026'
 const OTHER_START = 'Sun Oct 25 09:00:00 2026'

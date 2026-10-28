@@ -13,6 +13,7 @@ import {
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
 import { followup_checks_event } from './followup-checks-event'
+import { followup_ci_path } from './followup-ci-path'
 import { followup_coderabbit_wait } from './followup-coderabbit-wait'
 import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
@@ -257,9 +258,10 @@ function wait_for_green_of(
 		return await run_checks({
 			branch_name: input.branch_name,
 			is_skip_watch: input.is_skip_watch,
-			observe: followup_coderabbit_wait.both(
+			observe: followup_coderabbit_wait.all(
 				followup_checks_event.observer_of(issue_number, context.pr_url),
 				followup_coderabbit_wait.observer_of(log.coderabbit),
+				followup_ci_path.observer_of(log.ci_path),
 			),
 		})
 	}
@@ -273,6 +275,7 @@ async function run_review_checks(
 ): Promise<ReviewChecks> {
 	if (input.is_merged === true) return { notes: [], managed: [] }
 
+	git_followup_stages.hold_issue(log, issue_number)
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})

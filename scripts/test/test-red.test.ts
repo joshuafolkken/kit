@@ -26,6 +26,7 @@ const NODE_MODULES = 'node_modules'
 const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 
 const PORCELAIN = '--porcelain'
+const CONFLICT_FILE = 'conflict.txt'
 const VITEST_CONFIG_FILE = 'vitest.config.js'
 const EXCLUDING_CONFIG = `export default { test: { exclude: ['**/${TEST_FILE}'] } }\n`
 const OUTPUT_FILE_CONFIG = `export default { test: { outputFile: 'results.json' } }\n`
@@ -201,6 +202,37 @@ describe('test_red.run when nothing runs', () => {
 			const { verdict } = await test_red.run()
 
 			expect(verdict).toBe('no-test')
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5307: the changed paths are read through a merge in progress, so the pre-fix run
+// is too — here main already carries the fix, so the tree's base holds it and the test is not red.
+async function commit_all(message: string): Promise<void> {
+	await git(['add', '.'])
+	await git(['commit', '-m', message])
+}
+
+async function stop_a_merge_of_the_fix(): Promise<void> {
+	await build_fix_branch(WHOLE_OUTPUT_TEST)
+	await write(CONFLICT_FILE, 'fix\n')
+	await commit_all('fix')
+	await git(['switch', 'main'])
+	await write(REPORT_FILE, FIXED_REPORT)
+	await write(CONFLICT_FILE, 'main\n')
+	await commit_all('main')
+	await git(['switch', 'fix'])
+	await expect(git(['merge', 'main'])).rejects.toThrow()
+}
+
+describe('test_red.run during a merge stopped on a conflict', () => {
+	it(
+		'runs the changed test against the tree’s base, which already holds main’s fix',
+		async () => {
+			await stop_a_merge_of_the_fix()
+
+			expect(await test_red.run()).toEqual({ verdict: 'green', files: [TEST_FILE] })
 		},
 		RUN_TIMEOUT,
 	)

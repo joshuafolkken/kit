@@ -14,8 +14,10 @@ import {
 // `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
 // cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
 // so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
-// undeclared issue follows every declared one of its priority), then how many other open issues wait on
-// it. Below those, the caller's own order stands — the sort is stable, so recency and the defect-rate
+// undeclared issue follows every declared one of its priority), then the minutes a week its declared
+// speed-up saves (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared,
+// so a measured time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)), then how many
+// other open issues wait on it. Below those, the caller's own order stands — the sort is stable, so recency and the defect-rate
 // adjustment survive as the last key.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
@@ -25,6 +27,7 @@ import {
 interface RankRow {
 	labels: ReadonlyArray<string>
 	lost_minutes: number
+	gain_minutes: number
 	dependents: number
 }
 
@@ -62,6 +65,7 @@ function keys_of(row: RankRow): ReadonlyArray<number> {
 		-flag(is_priority(row.labels)),
 		-flag(is_verification_defect(row.labels)),
 		-row.lost_minutes,
+		-row.gain_minutes,
 		-row.dependents,
 	]
 }

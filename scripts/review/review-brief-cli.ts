@@ -311,7 +311,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 // failure it exists to prevent. Where it cannot be resolved the printed command keeps `change_base`'s
 // answer, which still runs, and the record is written without a base so the next round widens.
 async function read_bases(): Promise<{ base: string; commit: string | undefined }> {
-	const commit = await change_base.resolved()
+	const commit = await change_base.resolved_through_merge()
 
 	return { base: commit ?? (await git_command.change_base()), commit }
 }

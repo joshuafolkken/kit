@@ -1,0 +1,7 @@
+{
+	"reason": "#5303: entry_line collapses whitespace runs per field so tool-written ledger lines stay Prettier-stable (+3 lines)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

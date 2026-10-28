@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
-import type { TestPinnedEntry } from './lane-ledger'
+import type { StageEntry, TestPinnedEntry } from './lane-ledger'
 
 // joshuafolkken/kit#4995: the breakdown reads as one bullet per stage on the lane's Issue and as one
 // line at the head of the investigation's prompt, the implementation's kinds beside it.
 
 const MINUTE_MS = 60_000
 const ISSUE = 4970
+const AT = '2026-10-28T01:00:00.000Z'
 
 const REPORT: Report = {
 	breakdown: {
@@ -107,7 +108,7 @@ describe('lane_breakdown_text.report_of', () => {
 		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
 		const entry: TestPinnedEntry = {
 			kind: 'test-pinned',
-			at: '2026-10-28T01:00:00.000Z',
+			at: AT,
 			issue: ISSUE,
 			held: 0,
 			probes: [],
@@ -118,6 +119,33 @@ describe('lane_breakdown_text.report_of', () => {
 		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [entry])
 
 		expect(report.discarded).toBe('run:review background test:pinned probes discarded 1, 2.0 min')
+		read.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5295: the followup line names the check its CI wait waited on last.
+describe('lane_breakdown_text — the followup critical path', () => {
+	it('writes the last check to settle on the ship followup line', () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const ci_wait: StageEntry = {
+			kind: 'stage',
+			at: AT,
+			stage: 'ci-wait',
+			elapsed_ms: 3 * MINUTE_MS,
+			issue: ISSUE,
+			last_check: 'e2e',
+			check_ms: { e2e: 150_000, lint: 30_000 },
+		}
+		const breakdown = {
+			...REPORT.breakdown,
+			stages: [{ name: 'ship followup', ms: 4 * MINUTE_MS }],
+		}
+
+		const report = lane_breakdown_text.report_of(ISSUE, breakdown, [ci_wait])
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			'ship followup 4.0 min (last check: e2e 150.0s)',
+		)
 		read.mockRestore()
 	})
 })
