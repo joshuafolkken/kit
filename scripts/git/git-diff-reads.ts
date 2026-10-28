@@ -74,6 +74,24 @@ function merge_base_arguments(reference: string): ReadonlyArray<string> {
 	return [MERGE_BASE_COMMAND, reference, 'HEAD']
 }
 
+// Where the side a merge in progress brings in left the default branch; git fails it where no merge
+// is in progress. These three are `change_base.resolved_through_merge`'s, shared with the sync reading.
+function incoming_base_arguments(reference: string): ReadonlyArray<string> {
+	return [MERGE_BASE_COMMAND, reference, 'MERGE_HEAD']
+}
+
+// `--independent` drops every commit another one listed reaches, so of two commits on the default
+// branch's history it keeps the later — read from its output by `later_base_of`.
+function later_base_arguments(base: string, incoming: string): ReadonlyArray<string> {
+	return [MERGE_BASE_COMMAND, '--independent', base, incoming]
+}
+
+function later_base_of(output: string | undefined, base: string): string {
+	const [later = ''] = output?.split('\n', 1) ?? []
+
+	return later === '' ? base : later
+}
+
 // The commit this branch was cut from — and the base every "changed" reading below measures
 // against, in place of the default branch itself.
 //
@@ -270,6 +288,9 @@ const git_diff_reads = {
 	diff_numstat_since,
 	diff_names_since,
 	get_default_branch,
+	incoming_base_arguments,
+	later_base_arguments,
+	later_base_of,
 	merge_base_arguments,
 	names_since_arguments,
 	reference_check_arguments,
