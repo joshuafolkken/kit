@@ -46,7 +46,8 @@ type AssessResult = Refusal | Assessment
 
 type RecordResult = Refusal | (Assessment & { target: string })
 
-// Prettier's markdown pass collapses a whitespace run in a list item, so a line keeping one (vitest's
+// Prettier's markdown pass collapses a whitespace run in a list item (only the whitespace is settled
+// here; emphasis markers in a field are not), so a line keeping one (vitest's
 // padded test names, joshuafolkken/kit#5303) fails a later gate's style check on a file it never wrote.
 // Collapsed before the grammar check, so whitespace around a `|` that Prettier would turn into a
 // separator is refused like a `|` already standing as one.

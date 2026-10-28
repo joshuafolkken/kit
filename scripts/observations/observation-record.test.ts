@@ -159,7 +159,8 @@ describe('observation_record.assess — a padded vitest name', () => {
 
 	it('writes a line Prettier leaves unchanged as markdown', async () => {
 		const ledger = `${await padded_line()}\n`
-		const options = await prettier.resolveConfig(ledger_file(scratch, FIRST_DATE))
+		// Resolved inside the repository, so the project's own Prettier config decides the format.
+		const options = await prettier.resolveConfig(ledger_file(process.cwd(), FIRST_DATE))
 
 		expect(await prettier.format(ledger, { ...options, parser: 'markdown' })).toBe(ledger)
 	})
