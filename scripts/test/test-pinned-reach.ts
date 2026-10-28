@@ -92,7 +92,7 @@ function is_shared(file: string): boolean {
 // spawning it runs past any closure.
 function is_asset(view: GraphView, file: string): boolean {
 	if (is_shared(file)) return true
-	const reached = view.graph.importers([path.resolve(file)], view.universe)
+	const reached = view.graph.runtime_importers([path.resolve(file)], view.universe)
 
 	return [...reached].some((reader) => is_root(view, reader))
 }
@@ -113,9 +113,9 @@ async function probed_files(files: ReadonlyArray<string>): Promise<Array<string>
 	return files.filter((file) => !is_fixture(file) || is_asset(view, file))
 }
 
-// The test files whose imports reach `file`.
+// The test files whose runtime imports reach `file` — the graph vitest walks (joshuafolkken/kit#5368).
 function related_of(view: GraphView, file: string): Array<string> {
-	const reached = view.graph.importers([path.resolve(file)], view.universe)
+	const reached = view.graph.runtime_importers([path.resolve(file)], view.universe)
 
 	return [...reached]
 		.map((reader) => path.relative(process.cwd(), reader))

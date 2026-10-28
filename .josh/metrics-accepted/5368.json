@@ -1,0 +1,7 @@
+{
+	"reason": "Type-only import parsing for the test reach graph (#5368): a new module, a runtime edge cache and runtime_importers beside importers",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 63
+	}
+}
