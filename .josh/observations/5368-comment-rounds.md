@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lint/type-only-imports.ts:29 | 2026-10-28 | #5368

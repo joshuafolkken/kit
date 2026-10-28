@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -10,6 +12,12 @@ const PACKAGE_PUBLISH_GROUP = 'package-publish'
 const SETUP_PNPM_ACTION = './.github/actions/setup-pnpm'
 const PUBLISH_TAG_ARGUMENT = '--tag "$PUBLISH_TAG"'
 const LATEST_LOOKUP = 'dist-tags.latest'
+const KIT_SCOPE = '@joshuafolkken'
+const GITHUB_PACKAGES_REGISTRY = 'https://npm.pkg.github.com'
+const LATEST_VIEW = `npm view ${KIT_SCOPE}/kit dist-tags.latest`
+// What `npm config get` prints for a key no config sets — an npm that failed to run prints nothing.
+const UNSET_CONFIG = 'undefined'
+const SCOPE_REGISTRY_READ = `npm config get ${KIT_SCOPE}:registry`
 const VERSION_ORDER_CHECK = String.raw`printf '%s\n%s\n' "$latest" "$VERSION" | sort -V -C`
 const STEP_SCHEMA = z.object({
 	if: z.string().optional(),
@@ -108,16 +116,54 @@ describe('publish queue latest check', () => {
 	})
 })
 
+function read_lookup_lines(job_name: 'pack' | (typeof PUBLISH_JOB_NAMES)[number]): Array<string> {
+	return read_workflow()
+		.jobs[job_name].steps.flatMap((step) => (step.run ?? '').split('\n'))
+		.filter((line) => line.includes('npm view'))
+}
+
+// Runs a lookup line with `npm view` swapped for a config read, from a `$RUNNER_TEMP` holding the
+// scoped `.npmrc` setup-node writes, and prints the registry the scope resolved to.
+function resolve_scope_registry(line: string): string {
+	const runner_temporary = mkdtempSync(path.join(tmpdir(), 'publish-lookup-'))
+	const npmrc = path.join(runner_temporary, '.npmrc')
+
+	writeFileSync(npmrc, `${KIT_SCOPE}:registry=${GITHUB_PACKAGES_REGISTRY}\n`)
+	const command = line.replace(LATEST_VIEW, () => SCOPE_REGISTRY_READ)
+	const result = spawnSync('sh', ['-c', `${command}\necho "$latest"`], {
+		encoding: 'utf8',
+		env: { ...process.env, RUNNER_TEMP: runner_temporary, NPM_CONFIG_USERCONFIG: npmrc },
+	})
+
+	rmSync(runner_temporary, { recursive: true, force: true })
+
+	return result.stdout.trim()
+}
+
 describe('registry dist-tag lookup', () => {
 	it.each(['pack', ...PUBLISH_JOB_NAMES] as const)(
-		'runs the dist-tag lookup outside the repository in %s so npm skips devEngines',
+		'runs the dist-tag lookup in an empty directory in %s so npm skips devEngines and .npmrc',
 		(job_name) => {
-			const lines = read_workflow()
-				.jobs[job_name].steps.flatMap((step) => (step.run ?? '').split('\n'))
-				.filter((line) => line.includes('npm view'))
+			const lines = read_lookup_lines(job_name)
 
 			expect(lines.length).toBeGreaterThan(0)
-			for (const line of lines) expect(line).toContain('cd "$RUNNER_TEMP" && npm view')
+			for (const line of lines) expect(line).toContain('cd "$(mktemp -d)" && npm view')
+		},
+	)
+
+	// joshuafolkken/kit#5376: from `$RUNNER_TEMP`, npm read setup-node's `.npmrc` as the project
+	// config, so publish-github's lookup went to GitHub Packages without a token and failed with 401.
+	it.each(PUBLISH_JOB_NAMES)(
+		'keeps the scoped registry setup-node wrote from redirecting the lookup in %s',
+		(job_name) => {
+			const lines = read_lookup_lines(job_name)
+
+			expect(lines.length).toBeGreaterThan(0)
+
+			for (const line of lines) {
+				expect(line).toContain(LATEST_VIEW)
+				expect(resolve_scope_registry(line)).toBe(UNSET_CONFIG)
+			}
 		},
 	)
 
