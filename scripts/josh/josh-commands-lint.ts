@@ -15,10 +15,13 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'report:lint': {
 		script: 'scripts/report/report-lint-cli.ts',
-		description: 'Check a two-layer work summary on stdin against its mechanical format rules',
+		description:
+			"Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules",
 		category: 'AI tools',
-		reference: ['(reads stdin)', 'automation', ['none']],
-		usage: { examples: [{ arguments: '< summary.md' }] },
+		reference: ['[--child-summary] (reads stdin)', 'automation', ['none']],
+		usage: {
+			examples: [{ arguments: '< summary.md' }, { arguments: '--child-summary < summary.md' }],
+		},
 	},
 	'report:template': {
 		script: 'scripts/report/report-template-cli.ts',

@@ -59,6 +59,9 @@ const WORD_SEPARATOR = ' '
 const STARTED_SEPARATOR = ','
 const STARTED_INDEX = 3
 const WORD_COUNT = STARTED_INDEX + 1
+// The reason a stage ran or was skipped follows the words, behind a separator no word holds, so the
+// word readers below read the line as before.
+const REASON_SEPARATOR = ' | '
 
 // `started` lists the stages the current attempt started, kept across a supervisor that ended without a
 // stop so its successor's lines still carry them. `is_merge_waiting` is set only while `josh followup`
@@ -237,16 +240,32 @@ function event_text(
 	return full.join(WORD_SEPARATOR)
 }
 
+// A line `event_text` wrote, with why its stage ran or was skipped after it (joshuafolkken/kit#5296).
+function with_reason(text: string, reason: string | undefined): string {
+	return reason === undefined ? text : `${text}${REASON_SEPARATOR}${reason}`
+}
+
+function words_part(text: string): string {
+	return text.split(REASON_SEPARATOR, 1)[0] ?? ''
+}
+
 // The stages a line says its attempt has started, `undefined` for a three-word line.
 function started_of(text: string): ReadonlyArray<string> | undefined {
-	return text.split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
+	return words_part(text).split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
 }
 
 // The stage word and the phase word of a line `event_text` wrote, `''` where the line has none.
 function words_of(text: string): { stage: string; phase: string } {
-	const [, stage = '', phase = ''] = text.split(WORD_SEPARATOR, WORD_COUNT)
+	const [, stage = '', phase = ''] = words_part(text).split(WORD_SEPARATOR, WORD_COUNT)
 
 	return { stage, phase }
+}
+
+// Why the stage ran or was skipped, `undefined` for a line that carries no reason.
+function reason_of(text: string): string | undefined {
+	const at = text.indexOf(REASON_SEPARATOR)
+
+	return at === -1 ? undefined : text.slice(at + REASON_SEPARATOR.length)
 }
 
 // A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in,
@@ -276,8 +295,10 @@ const run_ship_stage = {
 	read_merge_waiting,
 	read_place_waiting,
 	read_started,
+	reason_of,
 	record_path,
 	started_of,
+	with_reason,
 	words_of,
 	stop_reason,
 }

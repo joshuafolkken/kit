@@ -88,6 +88,28 @@ describe('lane_breakdown_text.line', () => {
 	})
 })
 
+// joshuafolkken/kit#5296: the ship review line carries why it ran or was skipped.
+describe('lane_breakdown_text — ship stage reasons', () => {
+	const REASON = 'reused: round 1 attested on this branch, its tree held'
+	const name = 'ship review'
+	const stages = [{ name, ms: MINUTE_MS }, ...REPORT.breakdown.stages]
+	const reasons = new Map([[name, REASON]])
+
+	it('writes the reason beside the ship review minutes', () => {
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, stages, reasons } }
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			`: ship review 1.0 min (${REASON}); implement`,
+		)
+	})
+
+	it('writes the ship review minutes alone when no reason was given', () => {
+		const report = { ...REPORT, breakdown: { ...REPORT.breakdown, stages } }
+
+		expect(lane_breakdown_text.line(report)).toContain(': ship review 1.0 min; implement')
+	})
+})
+
 // joshuafolkken/kit#5294: a ship stage's laps print under it, longest first, and beside it on one line.
 describe('lane_breakdown_text — ship stage laps', () => {
 	const stages = [{ name: 'ship gate', ms: 6 * MINUTE_MS }]

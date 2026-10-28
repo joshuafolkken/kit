@@ -585,6 +585,10 @@ In scope, run the `lane:plan` command the stop prints (every path, as a re-run r
 
 A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
+A lane child always ships with `--review`, after its in-implement round 1. The `review` stage reuses a round 1 attested on this branch whose tree held, or moved only where round 2 reads, and ends `skipped` (`done` when an owed interaction review then runs); any other round 1 is reviewed again. A gate stage that reuses a green record ends `skipped` too.
+
+The review stage's `ship-stage` line carries the reason after `|` (`reused: …` or `ran: … — <cause>`), and `lane:breakdown` prints it beside the stage.
+
 A supervisor whose `sync` changed its own code hands the stages after it to a successor on that code (the wake supervisor's take-over, same launch record); a successor that does not take over leaves it running on.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".

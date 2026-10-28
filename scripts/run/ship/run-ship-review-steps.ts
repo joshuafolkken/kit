@@ -4,11 +4,12 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_reviewed_tree } from '#scripts/review/review-reviewed-tree'
-import { review_round_reuse } from '#scripts/review/review-round-reuse'
+import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-round-reuse'
 import { review_round2 } from '#scripts/review/review-round2'
 import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_review } from '#scripts/run/review/run-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
+import { run_ship_review_reason } from './run-ship-review-reason'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stage } from './run-ship-stage'
@@ -263,6 +264,14 @@ function round_one_opens(
 	}))
 }
 
+// A recorded round 1 attested on this branch, its tree held or moved only where round 2 reads: the
+// stage is skipped, and the event stream says why (joshuafolkken/kit#5296).
+async function reused_round(issue: string, reused: ReuseAnswer): Promise<StepResult> {
+	await record_outcome(issue, lane_ledger_write.ROUND_ONE_REUSED)
+
+	return { ...skipped(ROUND_ONE_RECORDED_NOTE), reason: run_ship_review_reason.reused(reused) }
+}
+
 // The round-1 review, beside the gate: scoped pair → open each slot's brief → their reviewers side by
 // side → join → attest → record, stopping at the first that did not pass.
 async function round_one_stage(
@@ -272,23 +281,22 @@ async function round_one_stage(
 	unpinned_ok: ReadonlyArray<string>,
 ): Promise<StepResult> {
 	// The reuse question `review:record --check` answers too (`review-round-reuse.ts`).
-	if (await review_round_reuse.is_reusable(Number(issue), is_stale)) {
-		await record_outcome(issue, lane_ledger_write.ROUND_ONE_REUSED)
+	const reused = await review_round_reuse.answer(Number(issue), is_stale)
 
-		return skipped(ROUND_ONE_RECORDED_NOTE)
-	}
+	if (reused.reuse !== review_round_reuse.REUSE.AGAIN) return await reused_round(issue, reused)
 
 	// A stale record narrows nothing: the next round reads the whole change under the new specification.
 	if (is_stale) review_reviewed_tree.discard()
 	const opens = round_one_opens(slots, unpinned_ok)
-
-	return await run_phases([
+	const ran = await run_phases([
 		tagged_phase(CAUSE.CHECK, scoped_pair),
 		...reviewed_together(opens, run_ship_review.reviewer_prompt, issue, ROUND_ONE),
 		tagged_phase(CAUSE.CHECK, async () => await join_gate(slots)),
 		attest_phase,
 		async () => await code_round_one_record(issue, slots),
 	])
+
+	return { ...ran, reason: run_ship_review_reason.ran(reused) }
 }
 
 // The interaction review alone (joshuafolkken/kit#4276), after a reused round 1: scoped pair →
@@ -323,6 +331,14 @@ async function is_interaction_owed(issue: string, first: StepResult): Promise<bo
 	return await is_interaction_due(issue)
 }
 
+// Both passes' output under round 1's reason: the interaction pass ran, so the stage is never skipped.
+function after_interaction(first: StepResult, second: StepResult): StepResult {
+	const out = [first.out, second.out].join('\n')
+	const { reason } = first
+
+	return { code: SUCCESS_EXIT_CODE, out, ...(reason !== undefined && { reason }) }
+}
+
 // **The interaction review runs beside round 1 where it is due and not yet recorded**
 // (joshuafolkken/kit#4672), so the two take one wait and one stop. **It is asked again after a round 1
 // that passed**: a reused round 1 still owes it, and a round-1 fix may be the first to touch the run
@@ -341,7 +357,7 @@ async function review_stage(
 
 	if (second.code !== SUCCESS_EXIT_CODE) return second
 
-	return { code: SUCCESS_EXIT_CODE, out: [first.out, second.out].join('\n') }
+	return after_interaction(first, second)
 }
 
 // The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix
