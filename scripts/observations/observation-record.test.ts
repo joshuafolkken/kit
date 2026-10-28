@@ -1,7 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { followup_failed_tests } from '#scripts/followup/followup-failed-tests'
 import { git_spawn } from '#scripts/git/git-spawn'
+import prettier from 'prettier'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import {
@@ -121,5 +123,57 @@ describe('observation_record.assess', () => {
 			line: line_on(SECOND_DATE),
 		})
 		expect(existsSync(ledger_file(checkout, SECOND_DATE))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5303: vitest pads a workspace test name, and a ledger file holding the padding
+// failed a later lane's Prettier check.
+async function line_or_reason(entry: ObservationEntry, name: string): Promise<string> {
+	const result = await observation_record.assess({
+		entry,
+		checkout: fresh_checkout(name),
+		now: FIRST_DAY,
+	})
+
+	return result.verdict === REFUSED_VERDICT ? result.reason : result.line
+}
+
+describe('observation_record.assess — a padded vitest name', () => {
+	const PADDED_LOG = ' FAIL  |isolated|  scripts/test/test-related.claim.test.ts > claim > holds'
+
+	async function padded_line(): Promise<string> {
+		const tests = followup_failed_tests.read_failed_tests(PADDED_LOG)
+
+		return await line_or_reason(
+			followup_failed_tests.observation_of([{ job: 'Unit Tests (5/6)', tests }]),
+			'padded',
+		)
+	}
+
+	it('collapses every whitespace run in the line to one space', async () => {
+		const line = await padded_line()
+
+		expect(line).toContain('/isolated/ scripts/test/test-related.claim.test.ts > claim > holds')
+		expect(line).not.toMatch(/\s{2}/u)
+	})
+
+	it('writes a line Prettier leaves unchanged as markdown', async () => {
+		const ledger = `${await padded_line()}\n`
+		// Resolved inside the repository, so the project's own Prettier config decides the format.
+		const options = await prettier.resolveConfig(ledger_file(process.cwd(), FIRST_DATE))
+
+		expect(await prettier.format(ledger, { ...options, parser: 'markdown' })).toBe(ledger)
+	})
+})
+
+describe('observation_record.assess — whitespace in a field', () => {
+	it('collapses a tab, a newline and the edge spaces of each field', async () => {
+		expect(await line_or_reason({ ...ENTRY, where: ' a\tb ', what: 'c\n  d ' }, 'edges')).toBe(
+			`- k:${ENTRY.slug} | d1 | ${FIRST_DATE} | a b | c d`,
+		)
+	})
+
+	it('refuses a field whose collapsed whitespace around a pipe reads as a separator', async () => {
+		expect(await line_or_reason({ ...ENTRY, what: 'c\t|  d' }, 'pipe')).toContain('fields')
 	})
 })
