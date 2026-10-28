@@ -13,7 +13,6 @@ import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
 import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
-import { bash_triggers } from './bash-triggers'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
 import { shell_segments } from './shell-segments'
 
@@ -40,7 +39,7 @@ function is_edit_tool(name: string): boolean {
 
 // The one spelling that takes this cut rather than the pre-gate one: `--impl`. A bare `pnpm josh
 // run:cut <N>` is the pre-gate boundary and `--resume` / `--end` / `--json` ask about a cut rather than
-// take one, so the compliance test looks for the flag that makes it the implementation-phase cut.
+// take one, so `cost-run-cut.ts` looks for the flag that makes it the implementation-phase cut.
 const CUT_COMMANDS: ReadonlySet<string> = new Set(['run:cut'])
 const IMPL_FLAG = /(?:^|\s)--impl(?:[=\s]|$)/u
 
@@ -239,14 +238,15 @@ function decide(
 }
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `decide` fires it per threshold crossing
-// in a run that can cut; `keeps` is the implementation cut command, read from a `Bash` call the same
-// way `pre-gate-cut`'s is.
+// in a run that can cut. It declares no `keeps`: the trigger is a budget threshold the child cannot
+// observe, so no run takes `run:cut --impl` before crossing it unaided, and the row is reported
+// unmeasured rather than scored 0% on an act it cannot make (`rule-value.ts` → "A rule with no
+// `keeps` predicate is reported as unmeasured").
 const ROW = {
 	id: 'implementation-cut',
 	is_trigger: is_over_threshold_edit,
 	reason: IMPLEMENTATION_CUT_REASON,
 	decide,
-	keeps: bash_triggers.on_bash_command(takes_the_impl_cut),
 	// The opening the reason carried before it was cut to the action and the next command.
 	former_reasons: [
 		'⛔ implementation-phase cut: this checkout is a lane dispatched',

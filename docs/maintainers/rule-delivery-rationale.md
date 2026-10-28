@@ -249,6 +249,8 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
   handoff carries the instruction so the fresh process resumes on it (joshuafolkken/kit#2354);
   joshuafolkken/kit#1933 built the boundary and joshuafolkken/kit#2310 measured it firing 0 times while
   the verdict was read only at session entry.
+  - It declares no `keeps`: a guard fired on a budget threshold the model cannot observe has no act a
+    run could keep unaided, so `rule:value` reports it unmeasured, not `0%` (joshuafolkken/kit#5267).
 - `issue-comments` — comments changed a diagnosis (joshuafolkken/kit#1537), a default and an
   acceptance criterion (joshuafolkken/kit#1520), and handed a scope to another Issue
   (joshuafolkken/kit#1304).
