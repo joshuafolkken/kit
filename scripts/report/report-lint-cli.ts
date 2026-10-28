@@ -13,6 +13,7 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const OK_MESSAGE = 'ok'
 const CHILD_SUMMARY_FLAG = '--child-summary'
+const ARGV_OFFSET = 2
 const NO_INPUT_MESSAGE =
 	'✖ nothing on stdin — pipe the summary in, e.g. `pnpm josh report:lint < summary.md`'
 
@@ -26,14 +27,14 @@ function lint(summary: string, is_child_summary: boolean): ReadonlyArray<string>
 	return report_lint.with_reference(report_lint.lint_report(summary))
 }
 
-function run(summary: string, is_child_summary: boolean): number {
+function run(summary: string, argv: ReadonlyArray<string>): number {
 	if (summary.trim().length === 0) {
 		console.error(NO_INPUT_MESSAGE)
 
 		return FAILURE_EXIT_CODE
 	}
 
-	const violations = lint(summary, is_child_summary)
+	const violations = lint(summary, argv.includes(CHILD_SUMMARY_FLAG))
 
 	if (violations.length === 0) {
 		console.info(OK_MESSAGE)
@@ -47,10 +48,10 @@ function run(summary: string, is_child_summary: boolean): number {
 }
 
 async function read_and_run(): Promise<number> {
-	const is_child_summary = process.argv.includes(CHILD_SUMMARY_FLAG)
-	if (process.stdin.isTTY) return run('', is_child_summary)
+	const argv = process.argv.slice(ARGV_OFFSET)
+	if (process.stdin.isTTY) return run('', argv)
 
-	return run(await text(process.stdin), is_child_summary)
+	return run(await text(process.stdin), argv)
 }
 
 // `.env` is read here, on the command path alone, so the labels follow the session language.
@@ -59,4 +60,8 @@ async function main(): Promise<void> {
 	process.exitCode = await read_and_run()
 }
 
+const report_lint_cli = { run }
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main()
+
+export { report_lint_cli }

@@ -449,7 +449,7 @@ The format is `CLAUDE.md` Step 0, in `prompts/collaboration-workflow/report-form
 
 Prints `ok` (exit 0), or the violations one per line plus one line naming the template's section in `report-format.md` (exit 1). The writer judges whether the overview names a concrete subject. The labels follow `JOSH_SESSION_LANG` (`ja`, else English), from the table `josh report:template` prints.
 
-`--child-summary` checks a lane child's closing summary instead (`.claude/skills/workflow-commands/backlogrun-child.md` → "What the summary carries, and how long it may be"): at most 25 non-blank lines, the cause / fix / result labels in the session language, and no changed-file list — two or more consecutive bullets that are only a path. A failure's last line names that section.
+`--child-summary` checks a lane child's closing summary instead: its line bound over non-blank lines, the cause / fix / result labels in the session language, and no changed-file list (two or more consecutive path-only bullets). A failure's last line names the section that shapes it.
 
 ### `josh report:template`
 
