@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { check_reuse } from '#scripts/gate/check-reuse'
+import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { error_text } from '#scripts/lib/error-message'
@@ -7,6 +8,8 @@ import { review_round_reuse } from '#scripts/review/review-round-reuse'
 import { run_review_pinned } from '#scripts/run/review/run-review-pinned'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
 import { run_review_pinned_join } from '#scripts/run/review/run-review-pinned-join'
+import { run_review_pinned_steps } from '#scripts/run/review/run-review-pinned-steps'
+import { run_review_pinned_tree } from '#scripts/run/review/run-review-pinned-tree'
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
@@ -52,6 +55,37 @@ async function own_summary(reason: string | undefined): Promise<PinnedSummary> {
 	return answer ?? test_pinned_record.not_run_summary(result.output)
 }
 
+function remaining_note(remaining: number | undefined): string {
+	const hunks =
+		remaining === undefined ? 'the remaining hunks' : `${String(remaining)} remaining hunks`
+
+	return `test:pinned: probing ${hunks} in the background — the next ship's pre-detach reads their verdicts\n`
+}
+
+// **A stop at the first unpinned hunk leaves the rest probing in the background**
+// (joshuafolkken/kit#5327): the ship still stops on it, and the next pre-detach joins that probe on
+// this tree, or waits it out on a fixed one so its verdicts reach the cache and only the hunks the fix
+// moved are probed again. A launch that failed or threw adds no note, and never fails the check.
+async function is_rest_launched(): Promise<boolean> {
+	try {
+		const tree = await run_review_pinned_tree.key()
+
+		run_review_pinned_steps.clear()
+
+		return run_review_pinned_steps.launch_remaining(PROJECT_ROOT, tree).kind === 'launched'
+	} catch (error) {
+		error_text.trace_swallowed('run_ship_pre_detach_pinned.is_rest_launched', error)
+
+		return false
+	}
+}
+
+async function continued(answer: PinnedSummary): Promise<PinnedSummary> {
+	if (answer.is_cut !== true || !(await is_rest_launched())) return answer
+
+	return { ...answer, text: `${answer.text}${remaining_note(answer.remaining)}` }
+}
+
 // **The tree `run:review` checked is not checked twice** (joshuafolkken/kit#4888): its background
 // check's answer is read, waited for while it still runs; only another tree, or a check that left no
 // answer, runs one here. **A reason never judges a check that stopped at its first unpinned hunk**
@@ -60,7 +94,7 @@ async function summary(reason: string | undefined): Promise<PinnedSummary> {
 	const answer = await run_review_pinned_join.answer_on_tree()
 	const is_whole = answer?.is_cut !== true || reason === undefined
 
-	return answer !== undefined && is_whole ? answer : await own_summary(reason)
+	return await continued(answer !== undefined && is_whole ? answer : await own_summary(reason))
 }
 
 // The verdicts an earlier probe left for this very tree, read from the cache without a probe
@@ -116,9 +150,26 @@ async function pinned_check(options: CheckOptions): Promise<JoshResult> {
 	}
 }
 
+// **A ship with no `--review` reads no background probe, so it stops the one left running**
+// (joshuafolkken/kit#5327) rather than leave it holding cores unread. A clear that throws never fails
+// the ship.
+function cleared(): void {
+	try {
+		run_review_pinned_steps.clear()
+	} catch (error) {
+		error_text.trace_swallowed('run_ship_pre_detach_pinned.cleared', error)
+	}
+}
+
 // The pre-detach checks this ship runs, `test:pinned` among them under `--review`.
 function checks_for(options: PinnedOptions): () => Promise<PreDetachResult> {
-	if (!options.is_review) return async () => await run_ship_pre_detach.checks()
+	if (!options.is_review) {
+		return async () => {
+			cleared()
+
+			return await run_ship_pre_detach.checks()
+		}
+	}
 
 	return async () =>
 		await run_ship_pre_detach.checks(process.cwd(), check_reuse.DEFAULT_RECORDS, async () => {

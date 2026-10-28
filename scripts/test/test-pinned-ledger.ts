@@ -65,14 +65,18 @@ async function record(
 }
 
 // A background check stopped before its answer writes no row of its own, so its stop writes this one:
-// the wall time it ran, and nothing it probed.
-async function record_discarded(elapsed_ms: number): Promise<void> {
+// the wall time it ran, and nothing it probed. `origin` is its launcher: `run:review`'s check, or the
+// pre-detach's probe of the hunks past its stop (joshuafolkken/kit#5327).
+async function record_discarded(
+	elapsed_ms: number,
+	origin: PinnedOrigin = BACKGROUND_ORIGIN,
+): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
 		issue: issue_here(),
 		held: 0,
 		probes: [],
 		elapsed_ms,
-		origin: BACKGROUND_ORIGIN,
+		origin,
 		discarded: true,
 	})
 }
