@@ -28,8 +28,9 @@ function none(): Staged {
 	return { direct: 0, escalated: 0 }
 }
 
+// No direct importer, or as many as the reach, leaves no smaller first stage to run.
 function is_wide(reach: number, direct: number): boolean {
-	if (direct === 0) return false
+	if (direct === 0 || direct >= reach) return false
 
 	return reach >= WIDE_REACH || reach >= WIDE_RATIO * direct
 }

@@ -28,6 +28,12 @@ describe('test_pinned_stage.plan_over', () => {
 		expect(test_pinned_stage.plan_over(FILE, DIRECT, narrow)).toEqual({ reach: [FILE] })
 	})
 
+	it('runs the reach once where every test reaching the file imports it directly', () => {
+		const every = Array.from({ length: WIDE_REACH }, (_unused, index) => `${String(index)}.test.ts`)
+
+		expect(test_pinned_stage.plan_over(FILE, every, WIDE_REACH)).toEqual({ reach: [FILE] })
+	})
+
 	it('runs the reach once where no test imports the file directly', () => {
 		expect(test_pinned_stage.plan_over(FILE, [], WIDE_REACH)).toEqual({ reach: [FILE] })
 	})
