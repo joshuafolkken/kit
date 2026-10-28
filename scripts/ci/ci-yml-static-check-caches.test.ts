@@ -1,4 +1,4 @@
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_static_group } from '#scripts/gate/gate-static-group'
 import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
@@ -111,10 +111,10 @@ describe.each(WORKFLOW_CASES)('static-check caches in $relative_path', (workflow
 // its checks never write would save it back unchanged under the same sha key, racing the leg that
 // writes it. So each cache restores only on the leg whose group holds the check that writes the file.
 const RUNTIME_CACHE_WRITERS: ReadonlyArray<readonly [string, string]> = [
-	[ESLINT_CACHE_STEP, gate_plan.LINT_LABEL],
-	[PRETTIER_CACHE_STEP, gate_plan.LINT_LABEL],
-	[TS_BUILD_CACHE_STEP, gate_plan.TYPE_CHECK_LABEL],
-	[CSPELL_CACHE_STEP, gate_plan.SPELL_CHECK_LABEL],
+	[ESLINT_CACHE_STEP, gate_labels.LINT_LABEL],
+	[PRETTIER_CACHE_STEP, gate_labels.LINT_LABEL],
+	[TS_BUILD_CACHE_STEP, gate_labels.TYPE_CHECK_LABEL],
+	[CSPELL_CACHE_STEP, gate_labels.SPELL_CHECK_LABEL],
 ]
 
 function group_holding(label: string): string | undefined {

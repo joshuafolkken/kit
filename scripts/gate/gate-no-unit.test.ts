@@ -1,5 +1,6 @@
 import { USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
 import { gate_static_group } from './gate-static-group'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
@@ -89,21 +90,21 @@ describe('josh gate --no-unit', () => {
 		await run_gate(NO_UNIT)
 
 		expect(spawned_checks()).toHaveLength(gate_plan.STATIC_CHECKS.length)
-		expect(spawned_checks().join('\n')).not.toContain(gate_plan.UNIT_TARGET)
+		expect(spawned_checks().join('\n')).not.toContain(gate_labels.UNIT_TARGET)
 	})
 
 	it('still runs all four when the flag is absent', async () => {
 		await run_gate([])
 
 		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
-		expect(spawned_checks().join('\n')).toContain(gate_plan.UNIT_TARGET)
+		expect(spawned_checks().join('\n')).toContain(gate_labels.UNIT_TARGET)
 	})
 })
 
 // joshuafolkken/kit#5215: a CI matrix leg names one static group, and the group implies `--no-unit`, so
 // a leg run without that flag still makes none of the claims below.
 const LINT_GROUP: ReadonlyArray<string> = [
-	`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${gate_plan.LINT_LABEL}`,
+	`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${gate_labels.LINT_LABEL}`,
 ]
 
 describe('josh gate --static-group', () => {

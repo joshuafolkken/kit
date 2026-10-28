@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { environment_flags } from '@joshuafolkken/kit/env'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { verification_inputs } from '#scripts/gate/verification-inputs'
 import {
 	changed_file_scope,
@@ -60,7 +60,7 @@ function all_scope(reason: string): ChangedFileScope {
 // reads them too.
 function configures_lint(files: ReadonlyArray<string>, root: string): boolean {
 	return verification_inputs.configures(
-		gate_plan.LINT_LABEL,
+		gate_labels.LINT_LABEL,
 		files.map((file) => path.relative(root, file).split(path.sep).join('/')),
 	)
 }

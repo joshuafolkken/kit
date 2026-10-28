@@ -10,7 +10,20 @@ const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'
 // every module it imports into each test that reaches the reader (joshuafolkken/kit#5128).
 const COMMAND_TABLE = 'josh-command-map'
 const CORE_BUDGET = 'core-budget'
+const GATE_PLAN = 'gate-plan'
 const LEAF_READERS: ReadonlyArray<{ reader: string; hub: string }> = [
+	// joshuafolkken/kit#5177: these read only the check names, which `gate-labels.ts` holds.
+	{ reader: 'scripts/gate/verification-inputs.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/review/review-stamps.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/run/ship/run-ship-synced-scope.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/run/ship/run-ship-pre-detach.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/gate/gate-report.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/gate/gate-ledger.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/gate/check-related.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/gate/check-related-reuse.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/lint/lint-gate-scope.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/lint/lint-related.ts', hub: GATE_PLAN },
+	{ reader: 'scripts/test/test-related.ts', hub: GATE_PLAN },
 	{ reader: 'scripts/time-runtime/time-shell.ts', hub: COMMAND_TABLE },
 	{ reader: 'scripts/time-runtime/time-bundle-call.ts', hub: COMMAND_TABLE },
 	{ reader: 'scripts/gate/gate-plan.ts', hub: CORE_BUDGET },

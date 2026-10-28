@@ -4,7 +4,7 @@ import path from 'node:path'
 import { git_spawn } from '#scripts/git/git-spawn'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { gate_tree, type GateTree } from './gate-tree'
 import { since_green } from './since-green'
 
@@ -25,7 +25,7 @@ const SOURCE = 'scripts/a.ts'
 const FIXED = 'scripts/b.ts'
 const RECORDED: GateTree = { files: { [SOURCE]: 'digest-a', [FIXED]: 'digest-b' }, base: 'base-a' }
 const LABEL = 'josh test:related'
-const { LINT_LABEL, UNIT_LABEL } = gate_plan
+const { LINT_LABEL, UNIT_LABEL } = gate_labels
 
 function record_at(name: string, tree: GateTree = RECORDED, writer = stamp): string {
 	const target = path.join(scratch, `${name}.json`)

@@ -5,6 +5,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_cpu, type CheckCpu } from './check-cpu'
 import { core_budget, type Admission } from './core-budget'
 import { free_cores } from './free-cores'
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GatePlan } from './gate-plan'
 import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
@@ -122,7 +123,7 @@ async function admitted_step(
 	admission: Admission,
 	available_cores: number,
 ): Promise<GateStep> {
-	if (reserved.step.label !== gate_plan.UNIT_LABEL) return reserved.step
+	if (reserved.step.label !== gate_labels.UNIT_LABEL) return reserved.step
 
 	const { memory_workers } = await free_cores.read({ available_cores })
 	const asked = admission.granted ?? reserved.worker_cap
@@ -158,7 +159,7 @@ async function run_reserved_step(
 			budget: budget.available_cores,
 			memory_mb: reserved.memory_mb,
 			command: `gate ${reserved.step.label}`,
-			is_unit: reserved.step.label === gate_plan.UNIT_LABEL,
+			is_unit: reserved.step.label === gate_labels.UNIT_LABEL,
 		},
 	)
 }
