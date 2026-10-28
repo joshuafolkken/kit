@@ -11,6 +11,9 @@ import {
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
+vi.mock('./development-engines-verdict', () => ({
+	development_engines_verdict: { report: vi.fn() },
+}))
 
 const PINNED_VERSION = '11.4.0+sha512.abc'
 const MANIFEST = JSON.stringify({

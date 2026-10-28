@@ -125,7 +125,7 @@ Duplicates are scored by title token overlap: ≥2 significant shared words and 
 
 <!-- usage: issue:file -->
 
-File an Issue with every filing step: filing cap, fold, then lint, Origin, start condition, auto-ok label, WIP cap and duplicate scout in one pass, labels, then epic:bundle.
+File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle.
 
 ```bash
 pnpm josh issue:file "<title>" --body-file body.md
