@@ -1,12 +1,10 @@
 import path from 'node:path'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { lane_child_marker, type MarkerSource } from '#scripts/lane/lane-child-marker'
 import { lane_paths } from '#scripts/lane/lane-paths'
-import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
@@ -195,16 +193,16 @@ function is_over_threshold_edit(
 	return warrants_the_cut(state) && state.can_cut(issue)
 }
 
-// **The threshold in the refusal text is assembled from the constant, never spelled**.
-// A spelled literal is left behind when the shared threshold moves, telling agents the wrong number;
-// building it from `CONTEXT_CUT_THRESHOLD` keeps the two from drifting. `figure_format.format_tokens` renders it the way every cost report does.
-const THRESHOLD_TEXT = `${figure_format.format_tokens(CONTEXT_CUT_THRESHOLD)}-token`
+// **The threshold in the refusal text is named by its command, never spelled**. It is priced at the
+// session's own model (`context-cut-payback.ts`), so no one number is right for every reader, and a
+// spelled literal is left behind when the price list moves.
+const THRESHOLD_TEXT = '`pnpm josh cost --cut`'
 
 // The instruction in the shape a refusal can carry: the handoff in the format the parser reads, the
 // cut, and the one verdict that ends the turn — `cut` is the only one, so a run told merely to "take
 // the cut" is not left to look it up.
 const IMPLEMENTATION_CUT_REASON =
-	`⛔ implementation-phase cut: refused on every edit past the ${THRESHOLD_TEXT} line. ` +
+	`⛔ implementation-phase cut: refused on every edit over ${THRESHOLD_TEXT}. ` +
 	`Write \`${run_cut_handoff.HANDOFF_PATH}\`: ${run_cut_handoff.HANDOFF_FORMAT}, run ` +
 	'`pnpm josh run:cut --impl <N> --handoff <path>`; `cut`: end the turn immediately, no Telegram ' +
 	'is owed; else reissue the edit (`.claude/skills/workflow-commands/pre-gate-cut.md`).'

@@ -167,7 +167,7 @@ words:
   # joshuafolkken/kit#2282 names the threshold-tuning question it declines to treat as an error.
   - miscalibration
   # "halving it moves the unsimulated parent hand-off too" — the pre-gate-cut decision for
-  # joshuafolkken/kit#2366 names the three shared uses of CONTEXT_CUT_THRESHOLD the lane simulation
+  # joshuafolkken/kit#2366 names the three shared uses of the context-cut threshold the lane simulation
   # did not price.
   - unsimulated
   # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into

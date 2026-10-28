@@ -26,7 +26,7 @@ it('keeps a running detached ship in flight without classifying its issue', asyn
 		child: '2639',
 		epic: undefined,
 		repo: undefined,
-		over: 1,
+		over: true,
 		owner: {},
 	})
 

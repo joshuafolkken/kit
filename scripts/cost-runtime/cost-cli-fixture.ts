@@ -24,6 +24,17 @@ function usage_line(request_id: string, branch: string, output_tokens: number): 
 	})
 }
 
+// A request billed `input_tokens` on `model`, for the suites that price the cut at a session's model
+// (joshuafolkken/kit#5341).
+function priced_line(request_id: string, model: string, input_tokens: number): string {
+	return JSON.stringify({
+		type: 'assistant',
+		requestId: request_id,
+		gitBranch: MAIN,
+		message: { model, usage: { input_tokens, output_tokens: 1 } },
+	})
+}
+
 // Mutated properties rather than reassigned bindings, so `beforeEach` never assigns to a top-level
 // variable from inside a function.
 const state = { home: '', printed: [] as Array<string>, out: [] as Array<string> }
@@ -83,6 +94,7 @@ const cost_cli_fixture = {
 	MAIN,
 	SESSION_A,
 	usage_line,
+	priced_line,
 	write_session,
 	write_session_under,
 	output,

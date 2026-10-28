@@ -139,7 +139,7 @@ function uncut_lane_issue(state: LaneCutState): string | undefined {
 }
 
 // **The cut is taken only when the current context is worth its resume**.
-// Below the shared `CONTEXT_CUT_THRESHOLD` a short lane has no accumulation a cut would drop, so the
+// Below the model-priced `pnpm josh cost --cut` threshold a short lane has no accumulation a cut would drop, so the
 // gate runs uncut rather than paying for a relaunch; an unmeasurable session keeps the old
 // unconditional cut as the safety net. The verdict is
 // `cost_cli.session_verdict`'s, the same statistic and threshold `run:cut` and the implementation-phase

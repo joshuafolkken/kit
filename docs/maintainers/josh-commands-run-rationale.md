@@ -191,7 +191,7 @@ Each wait runs from the park, outage or usage-limit stop to the issue's next shi
 
 ## `josh cost` in detail
 
-Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the shared 135,000 limit — the break-even context a cut pays back at, derived by `context-cut-payback.ts`; `--over <tokens>` sets an explicit one; any other flag is a usage error (exit 1). `josh time` carries the hand-off aggregates. History: [josh-commands-rationale.md](./josh-commands-rationale.md) — "`josh cost` and `josh time` lost their report scopes" above.
+Answer whether the next turn exceeds a threshold from active-provider usage. `--cut` selects the break-even context a cut pays back at, derived by `context-cut-payback.ts` at the newest record's model (joshuafolkken/kit#5341); `--over <tokens>` sets an explicit one; any other flag is a usage error (exit 1). `josh time` carries the hand-off aggregates. History: [josh-commands-rationale.md](./josh-commands-rationale.md) — "`josh cost` and `josh time` lost their report scopes" above.
 
 ## `josh read:set` in detail
 
