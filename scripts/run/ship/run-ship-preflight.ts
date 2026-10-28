@@ -13,6 +13,7 @@ import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
 import { run_ship_planned } from './run-ship-planned'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -172,7 +173,10 @@ async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> 
 }
 
 async function stage(request: PreflightRequest): Promise<PreflightResult> {
-	const problems = await asked_problems(request)
+	const problems = await run_ship_lap.timed(
+		run_ship_lap.STEP.PRECONDITIONS,
+		async () => await asked_problems(request),
+	)
 
 	if (problems.length > 0) return refusal(problems)
 

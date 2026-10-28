@@ -103,6 +103,16 @@ describe('lane_breakdown.of — #4970', () => {
 
 		expect(minutes_of(breakdown_of_lane)).toStrictEqual(STAGES_4970)
 	})
+
+	// joshuafolkken/kit#5294: the windows a ship stage's laps and the fixes between stages are read in.
+	it('keeps the ship stages and the time between them as its ship segments', () => {
+		const names = new Set(breakdown?.ship.map((segment) => segment.stage))
+		const expected = STAGES_4970.map(([name]) => name).filter(
+			(name) => name !== IMPLEMENT && name !== START_TO_PLAN,
+		)
+
+		expect(names).toStrictEqual(new Set(expected))
+	})
 })
 
 // joshuafolkken/kit#5216: #5171 yielded before its plan, so its start to plan ran from its first

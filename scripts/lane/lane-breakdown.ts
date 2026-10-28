@@ -45,10 +45,17 @@ interface Breakdown {
 	// The ship pre-detach stage's spans — the window its `test:pinned` rows are read in
 	// (joshuafolkken/kit#5078).
 	pre_detach: ReadonlyArray<LaneSpan>
+	// Each ship stage's spans and the spans between them, waits left in — the windows its laps and the
+	// fixes between stages are read in (joshuafolkken/kit#5294).
+	ship: ReadonlyArray<Segment>
 }
 
 interface Segment extends LaneSpan {
 	stage: string
+}
+
+function is_ship(segment: Segment): boolean {
+	return segment.stage.startsWith(SHIP_LEAD) || segment.stage === BETWEEN_STAGE
 }
 
 interface Marker {
@@ -173,6 +180,7 @@ function of(
 		waits,
 		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
 		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),
+		ship: segments.filter((segment) => is_ship(segment)),
 	}
 }
 
@@ -190,6 +198,7 @@ function longest_of(breakdown: Breakdown): { name: string; minutes: number } | u
 }
 
 const lane_breakdown = {
+	BETWEEN_STAGE,
 	FOLLOWUP_STAGE,
 	IMPLEMENT_STAGE,
 	PRE_DETACH_STAGE,
@@ -201,4 +210,4 @@ const lane_breakdown = {
 }
 
 export { lane_breakdown }
-export type { Breakdown, Stage }
+export type { Breakdown, Segment, Stage }

@@ -1,30 +1,11 @@
 import { z } from 'zod'
+import { lane_ledger_kind } from './lane-ledger-kind'
+import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
-const KIND = {
-	MERGE: 'merge',
-	GATE: 'gate',
-	LOAD: 'load',
-	DISPATCH: 'dispatch',
-	STAGE: 'stage',
-	STOP: 'stop',
-	OVERLAP: 'overlap',
-	HELD: 'held',
-	RELEASED: 'released',
-	ROUND_ONE: 'round-one',
-	ROUND_TWO: 'round-two',
-	OFFERABLE: 'offerable',
-	CORE_WAIT: 'core-wait',
-	UNIT_FILES: 'unit-files',
-	TEST_RELATED: 'test-related',
-	TEST_PINNED: 'test-pinned',
-	SPLIT_NOTICE: 'split-notice',
-	SPLIT_FILED: 'split-filed',
-	UNPLANNED_NOTICE: 'unplanned-notice',
-	LANE_STATE: 'lane-state',
-	PUSH_MISS: 'push-miss',
-} as const
+const { KIND } = lane_ledger_kind
+const { ship_lap_schema, stop_schema, unplanned_notice_schema } = lane_ledger_schema_ship
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -104,24 +85,6 @@ const stage_schema = z.object({
 	issue: z.number().optional(),
 	last_check: z.string().optional(),
 	check_ms: z.record(z.string(), z.number()).optional(),
-})
-// A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
-// retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
-// before it had one. `preconditions` names the kinds a preflight stop found unmet (`run-ship-preflight.ts`),
-// with `pre-detach` where a lane child's fast checks went red (joshuafolkken/kit#4478) and `unpinned`
-// where its `test:pinned` did (joshuafolkken/kit#5228), beside them or alone, absent on any other
-// stop and on one recorded before it had them. `findings` names the `<category>:<severity>` of each
-// finding that decided a review or round-2 stop — the blocking ones, else the fixed ones
-// (joshuafolkken/kit#4426), absent where none decided the stop. How long it stayed stopped is derived
-// from the next ship stage, not recorded, so a resumed ship never has to know the stop it ends.
-const stop_schema = z.object({
-	kind: z.literal(KIND.STOP),
-	at: z.string(),
-	issue: z.number(),
-	reason: z.string(),
-	cause: z.string().optional(),
-	preconditions: z.array(z.string()).optional(),
-	findings: z.array(z.string()).optional(),
 })
 // A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
 // before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
@@ -259,14 +222,6 @@ const split_filed_schema = z.object({
 	issue: z.number(),
 	child: z.string(),
 })
-// The ship's `unplanned` answer `josh check:related` printed to the lane of `issue` ahead of the ship,
-// so a preflight `unplanned` stop after it is told apart in `lane:stats` (joshuafolkken/kit#5203).
-const unplanned_notice_schema = z.object({
-	kind: z.literal(KIND.UNPLANNED_NOTICE),
-	at: z.string(),
-	issue: z.number(),
-	files: z.array(z.string()),
-})
 // A pre-push hook that could not reuse the green gate record and ran the `whole` or the `related`
 // suite: `reason` is the miss's kind (`hook_gate_reuse.miss_kind`), never its sentence (joshuafolkken/kit#5234).
 const push_miss_schema = z.object({
@@ -297,6 +252,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	unplanned_notice_schema,
 	lane_state_schema,
 	push_miss_schema,
+	ship_lap_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -329,6 +285,8 @@ type LaneStateChangeEntry = z.infer<typeof lane_state_schema>
 type LaneStateChangeRecord = Omit<LaneStateChangeEntry, 'kind' | 'at'>
 type PushMissEntry = z.infer<typeof push_miss_schema>
 type PushMissRecord = Omit<PushMissEntry, 'kind' | 'at'>
+type ShipLapEntry = z.infer<typeof ship_lap_schema>
+type ShipLapRecord = Omit<ShipLapEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -366,6 +324,8 @@ export type {
 	RoundOneRecord,
 	RoundTwoEntry,
 	RoundTwoRecord,
+	ShipLapEntry,
+	ShipLapRecord,
 	SplitFiledEntry,
 	SplitFiledRecord,
 	SplitNoticeEntry,

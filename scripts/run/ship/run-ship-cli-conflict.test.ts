@@ -6,6 +6,7 @@ import { run_ship_cli } from './run-ship-cli'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover } from './run-ship-handover'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
@@ -83,5 +84,25 @@ describe('josh ship --detach — no conflict with origin/main', () => {
 		expect(run_ship_pre_detach_timed.checks).toHaveBeenCalledOnce()
 		expect(run_ship_detach.detach).toHaveBeenCalledOnce()
 		expect(lane_ledger_write.record_stop).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5294: a stage's inner step is timed under the stage and issue it ran in.
+describe('josh ship — the laps of a stage', () => {
+	it('records an inner step under the stage it ran in', async () => {
+		const record_lap = vi.spyOn(lane_ledger_write, 'record_ship_lap').mockResolvedValue()
+
+		vi.spyOn(run_ship_preflight, 'stage').mockImplementation(
+			async () =>
+				await run_ship_lap.timed(run_ship_lap.STEP.PRECONDITIONS, async () => ({
+					code: OK,
+					out: 'ready',
+				})),
+		)
+		await run_ship_cli.run([TITLE, '--detach'])
+
+		expect(record_lap.mock.calls.map(([lap]) => [lap.stage, lap.step, lap.issue])).toStrictEqual([
+			['preflight', 'preconditions', 5018],
+		])
 	})
 })

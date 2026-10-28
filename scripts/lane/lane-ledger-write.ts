@@ -13,6 +13,7 @@ import {
 	type PushMissRecord,
 	type RoundOneRecord,
 	type RoundTwoRecord,
+	type ShipLapRecord,
 	type SplitFiledRecord,
 	type SplitNoticeRecord,
 	type StageRecord,
@@ -203,6 +204,10 @@ async function record_push_miss(miss: PushMissRecord, path?: string): Promise<vo
 	await record({ kind: KIND.PUSH_MISS, at: now_iso(), ...miss }, path)
 }
 
+async function record_ship_lap(lap: ShipLapRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SHIP_LAP, at: now_iso(), ...lap }, path)
+}
+
 async function record_unplanned_notice(
 	notice: UnplannedNoticeRecord,
 	path?: string,
@@ -232,6 +237,7 @@ const lane_ledger_write = {
 	record_push_miss,
 	record_round_one,
 	record_round_two,
+	record_ship_lap,
 	record_split_filed,
 	record_split_notice,
 	record_stage,
