@@ -80,6 +80,7 @@ export type {
 	PushMissEntry,
 	RoundOneEntry,
 	RoundTwoEntry,
+	ShipLapEntry,
 	SplitFiledEntry,
 	SplitNoticeEntry,
 	StageEntry,
