@@ -271,7 +271,7 @@ async function should_merge_first(
 	branch_name: string,
 	entries: ReadonlyArray<Judged>,
 ): Promise<boolean> {
-	const files = entries.flatMap(({ tests }) => tests?.files ?? [])
+	const files = [...new Set(entries.flatMap(({ tests }) => tests?.files ?? []))]
 
 	return await followup_main_move.should_merge_first(
 		files,
