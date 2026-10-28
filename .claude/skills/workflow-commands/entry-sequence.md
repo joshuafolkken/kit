@@ -24,7 +24,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
    continues; `over` (or unanswerable) stops before the title — `run:entry` sends the `confirmation`
    Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`. **Skip it when
-   dispatched by a batch** (that batch owns the question). The verdict and the shared 135,000 threshold
+   dispatched by a batch** (that batch owns the question). The verdict and the model-priced threshold
    are the command's own.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body and comments
    (`issue-comments.md`), `issue:state`'s state, labels and `human_review`, and `latest:scope`'s

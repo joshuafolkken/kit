@@ -57,6 +57,16 @@ const investigation_refusal = GUARD.refusal
 const investigation_outcome = GUARD.outcome
 const { is_enabled, refusal_path } = GUARD
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
+const STAMP = hook_decision.create_refusal_stamp(STAMP_PREFIX)
+
+// Whether this guard refuses the call in hand, asked with its real record — so the batching guard's
+// lane-child search refusal can stand aside for it: only one reason surfaces per call, and delegating
+// the reading supersedes batching it.
+function will_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	if (!is_enabled() || !investigation_reads.is_refusable_call(call)) return false
+
+	return should_block(tail, call, STAMP.last_ms(STAMP.path(run.transcript)), run)
+}
 
 export {
 	deny_envelope,
@@ -65,6 +75,7 @@ export {
 	is_enabled,
 	load_environment_file,
 	refusal_path,
+	will_refuse,
 	DISABLED_VALUES,
 	SWITCH_ENV_KEY,
 }

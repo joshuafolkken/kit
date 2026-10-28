@@ -1,5 +1,6 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import type { Audit, AuditRow } from './cost-audit'
+import { cost_audit_density, type Density } from './cost-audit-density'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
@@ -45,6 +46,22 @@ function merge_lines(audit: Audit): Array<string> {
 	const counts = `  merges: ${String(audit.merges.current)} (prev ${String(audit.merges.previous)})`
 
 	return audit.per_merge === undefined ? [counts] : [counts, row_line(audit.per_merge)]
+}
+
+const DENSITY_DECIMALS = 2
+
+function density_text(density: Density): string {
+	const calls = cost_audit_density.calls_per_request(density).toFixed(DENSITY_DECIMALS)
+	const single = (cost_audit_density.single_share(density) * PERCENT).toFixed(PERCENT_DECIMALS)
+
+	return `${calls} calls/request, ${single}% single-call`
+}
+
+// The lane children's round-trip density, the figure a batching change is read against (kit#5342).
+function density_line(audit: Audit): string {
+	const { current, previous } = audit.lane_density
+
+	return `  lane-child density: ${density_text(current)} (prev ${density_text(previous)})`
 }
 
 function rewrite_figures(count: RewriteCount): string {
@@ -99,6 +116,7 @@ function report_lines(audit: Audit): Array<string> {
 		`Cost audit — the last ${days} day(s) against the ${days} before`,
 		row_line(audit.total),
 		...merge_lines(audit),
+		density_line(audit),
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
 		'',

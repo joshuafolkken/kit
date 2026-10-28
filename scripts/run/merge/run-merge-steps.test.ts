@@ -1,7 +1,6 @@
 import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -39,7 +38,7 @@ const CONTEXT = {
 	child: '2070',
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
@@ -122,16 +121,6 @@ describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
 		expect(result.is_refused).toBe(true)
 		expect(unmark_mock).not.toHaveBeenCalled()
 		expect(add_label_mock).not.toHaveBeenCalled()
-	})
-})
-
-describe('run_merge_steps.is_over_budget — a loop no session owns', () => {
-	it('answers under without measuring when no threshold is given', async () => {
-		const subprocess = vi.spyOn(josh_command, 'josh_run')
-
-		expect(await run_merge_steps.is_over_budget(undefined)).toBe(false)
-		expect(subprocess).not.toHaveBeenCalled()
-		subprocess.mockRestore()
 	})
 })
 

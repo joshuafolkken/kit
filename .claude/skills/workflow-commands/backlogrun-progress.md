@@ -44,9 +44,8 @@ summary, and who propagates" below.
 **The check is asked at every merge, and delegation does not excuse it** — `pnpm josh cost --cut`
 after every child's merge and `pnpm josh ms`, never wired to `pnpm josh delegate epic-child`. Crossing it **hands the session off to a fresh one,
 carrying the budget** (`backlogrun-steps.md` → "The session cut is inside the invocation"); it is not a
-stop. The threshold is `CONTEXT_CUT_THRESHOLD` in `scripts/cost-runtime/context-cut-threshold.ts`
-(135,000, shared by the scheduler entry, hand-off and the lane worker cut, `pre-gate-cut.md` → "The
-implementation-phase cut").
+stop. The threshold is the one `pnpm josh cost --cut` prints, priced at the session's model and
+shared by the scheduler entry, hand-off and the lane worker cut (`pre-gate-cut.md` → "The threshold").
 
 | It answers | What the run does |
 | --- | --- |

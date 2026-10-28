@@ -56,8 +56,9 @@ function session(
 	kind: string,
 	records: ReadonlyArray<UsageRecord>,
 	categories: ReadonlyArray<readonly [string, ReadonlyArray<ToolCategory>]> = [],
+	is_lane = false,
 ): AuditSession {
-	return { kind, records, categories: new Map(categories), lines: [] }
+	return { kind, is_lane, records, categories: new Map(categories), lines: [] }
 }
 
 // The minute `days` after the fixture epoch, so a period boundary falls on a whole day.

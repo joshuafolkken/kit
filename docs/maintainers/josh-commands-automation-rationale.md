@@ -16,6 +16,11 @@ most recent lanes) — below the 1.40 target and under the pre-restore baseline 
 off for good: a `PreToolUse` hook cannot see the turn it is in, so a notice is structurally unable to
 reach the turn it would pack.
 
+A chain of single-call searches is the exception: its own `search-batching` row refuses it in a lane
+child, because search chains were the largest share of the child's single-call pairs
+(joshuafolkken/kit#5342). It re-fires every third such turn and stands aside where the investigation
+guard refuses the same call.
+
 In the main line the guard once fired once per run and fell silent for the rest of a run that ignored
 it; it now re-fires, the notice on a tighter interval than the refusal (joshuafolkken/kit#2276).
 
@@ -64,7 +69,7 @@ The batching guard refuses a tool call that would make a third consecutive singl
 - Inside one of Claude Code's own worktrees (`EnterWorktree`, an `isolation: "worktree"` subagent) `CLAUDE_PROJECT_DIR` still names the main checkout while the hook is launched from the worktree (measured, joshuafolkken/kit#4617). The prefix exports the launch directory as `JOSH_HOOK_CWD`; the launcher takes its code from the main checkout — a fresh worktree has no install and no bundles — and moves the working directory into `.claude/worktrees/<name>`, by parameter expansion alone, so no `git` starts.
 - The launcher clears the git location variables with the shell's own `unset`, and only when one is set and git still resolves without them, so the ordinary call pays nothing for it. The prefix stays one short line in every `settings.json` and `hooks.json`.
 - The ready gate (`tools/hooks/hook-bundle-ready.ts`, run by plain `node`) compares a content digest of the bundle inputs recorded at build time (`dist/hooks/inputs.json`) with the source on disk. Fresh → the bundle runs in the gate's own process, so a hook call starts node once. Stale → it rebuilds `dist/hooks/` in-process (a fraction of a second) and says so on stderr, so an edited guard is never shadowed by its old bundle. A checkout that cannot build drops to the `pnpm josh` fallback with a stderr warning — that path is slow and a hook exceeding its timeout lets the call through unguarded.
-- Silent in a dispatched lane child (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, and a `PreToolUse` hook cannot see the turn it is in, so the notice is `off`; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`. Why: "The batching guard is off in a lane child" above.
+- Silent in a dispatched lane child (`JOSH_LANE_CHILD`): a _refusal_ ends a headless child's turn, and a `PreToolUse` hook cannot see the turn it is in, so the notice is `off`; the lever that moves the density is a composite command (`read:files` / `edit:files`). Decided in `scripts/lane/lane-guard-policy.ts` — `refuse` / `notice` / `off`; a chain of single-call searches is still refused there (`search-batching`). Why: "The batching guard is off in a lane child" above.
 - Fires more than once per run (main line). The first firing lands when a run of single-call turns reaches the limit; if the run keeps single-calling it fires again — the refusal every `REFIRE_EVERY` further turns (the initial limit), the notice every `NOTICE_REFIRE_EVERY` (tighter, since a notice cannot wedge a run). Both are single constants in `time-batch-guard.ts`. A call re-issued unchanged after a firing is let through, and a batched turn starts a fresh sequence.
 
 ## `josh time:density` in detail
@@ -85,7 +90,7 @@ Set `JOSH_RULE_GUARD` to `off` / `0` / `false` / `no` to disable. Some rows deli
 
 ## `josh pretool:guard` in detail
 
-**How each of the four behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `refuse` (its notice was measured not to move the reading), `batching` is `off` (a notice is structurally unable to reach the turn it would pack), `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
+**How each guard row behaves in a dispatched lane child is an enumeration, not a judgement**. A denial is guidance to an interactive main line but a fatal turn-ender to a headless `claude -p` child, so `scripts/lane/lane-guard-policy.ts` lists, in one place, each guard's three-valued mode for a lane child (`JOSH_LANE_CHILD`) — `refuse`, `notice`, or `off`: `investigation` is `refuse` (its notice was measured not to move the reading), `batching` is `off` (a notice is structurally unable to reach the turn it would pack) save its `search-batching` row, which refuses a chain of single-call searches, `duplicate-read` is `notice` (a refusal would kill the child, and the unchanged re-reads it catches are measured in those very children — so it nudges rather than silences), while `rule` stays `refuse` — it carries the lane-only rules a child depends on (`pre-gate-cut`, `lane-park`) and the safety rules it must still obey. `lane-guard-policy.test.ts` pins that the enumeration and the guards' live behavior cannot disagree.
 
 ## `josh stop:guard` in detail
 

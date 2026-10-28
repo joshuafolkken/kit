@@ -1,6 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -46,11 +45,6 @@ const CUT_PREFIX = 'josh-run-cut-'
 // `IMPLEMENTATION_PHASE` drops the thinking accumulated *during* implementation and resumes back into
 // implementation (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
 const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
-// **The measurement is the parent hand-off's, never a second one.** The lane child decides whether
-// to take this cut with `pnpm josh cost --cut` — the same per-request billed-input measurement (`cost_verdict.per_request_cost`) the parent's
-// `pnpm josh cost --cut` hand-off uses (`backlogrun-progress.md` → "The hand-off"). The shared
-// threshold prevents the scheduler and worker boundaries from drifting apart.
-const IMPLEMENTATION_CONTEXT_THRESHOLD = CONTEXT_CUT_THRESHOLD
 // **The bound is `backlog-budget.ts`'s idle wait, imported rather than restated**, so the eight hours
 // stay written once. A resume is expected within seconds of the cut, so this age is only a backstop
 // against a fresh process that never started; an expired record is cleared and replaced by the next
@@ -472,7 +466,6 @@ const run_cut = {
 	CUT_MAX_AGE_HOURS,
 	CUT_MAX_AGE_MS,
 	END_COMMAND,
-	IMPLEMENTATION_CONTEXT_THRESHOLD,
 	IMPLEMENTATION_PHASE,
 	MAX_HANDOFF_BYTES,
 	PRE_GATE_PHASE,

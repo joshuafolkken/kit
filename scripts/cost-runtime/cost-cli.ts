@@ -1,7 +1,7 @@
 import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { codex_usage } from './codex-usage'
-import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
+import { context_cut_payback } from './context-cut-payback'
 import { cost_corpus } from './cost-corpus'
 import { cost_transcript, type SessionUsage } from './cost-transcript'
 import { cost_usage } from './cost-usage'
@@ -16,7 +16,7 @@ import { transcript_cwd } from './transcript-cwd'
 // (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were
 // retired because no rule or decision read them — leaving only the entry judgment `fullrun` /
 // `backlogrun` / `halfrun` / `pre-gate-cut` ask, and the `josh time` run-timing report keeps the
-// hand-off aggregates used to compare the shared context-cut threshold.
+// hand-off aggregates used to compare the `--cut` break-even.
 
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh cost (--cut | --over <tokens-per-request>) [--path <dir>]'
@@ -32,8 +32,14 @@ interface SessionFigures {
 	threshold: number
 }
 
+// `--cut` is not a number at parse time: its threshold is the break-even of the model the session's
+// newest request ran on, known only once the transcript is read.
+const CUT_LIMIT = 'cut'
+
+type Limit = number | typeof CUT_LIMIT
+
 interface Options {
-	over?: number
+	over?: Limit
 	// The target project whose transcripts to read, or absent for this process's own working
 	// directory. From the kit checkout, `--path <dir>` reads another
 	// project's cost.
@@ -49,7 +55,7 @@ interface RawValues {
 type Environment = Readonly<Record<string, string | undefined>>
 
 interface RunContext {
-	over: number
+	over: Limit
 	path: string | undefined
 	provider: AgentProvider
 }
@@ -72,10 +78,14 @@ function is_unparsed(raw: string | undefined, parsed: number | undefined): boole
 	return parsed === undefined && raw !== undefined
 }
 
-function selected_threshold(values: RawValues): number | undefined {
-	if (values.cut === true) return CONTEXT_CUT_THRESHOLD
+// The cut threshold of a measured session: the break-even for its newest request's model. With no
+// measurement it is the standard-rate break-even, the figure a report quotes beside no cost.
+function cut_threshold(measurement: OverMeasurement | undefined): number {
+	return context_cut_payback.break_even_context(measurement?.model)
+}
 
-	return to_threshold(values.over)
+function limit_of(limit: Limit, measurement: OverMeasurement): number {
+	return limit === CUT_LIMIT ? cut_threshold(measurement) : limit
 }
 
 function threshold_option(over: number | undefined): Pick<Options, 'over'> {
@@ -86,12 +96,17 @@ function path_option(path: string | undefined): Pick<Options, 'path'> {
 	return path === undefined ? {} : { path }
 }
 
+// `--cut` and `--over` name the same limit, so giving both is a refusal.
+function cut_options(values: RawValues): Options | undefined {
+	return values.over === undefined ? { over: CUT_LIMIT, ...path_option(values.path) } : undefined
+}
+
 // `exactOptionalPropertyTypes` rejects `{ over: undefined }`, so an absent flag contributes no key
 // at all rather than an undefined one.
 function to_options(values: RawValues): Options | undefined {
-	if (values.cut === true && values.over !== undefined) return undefined
+	if (values.cut === true) return cut_options(values)
 
-	const over = selected_threshold(values)
+	const over = to_threshold(values.over)
 
 	if (is_unparsed(values.over, over)) return undefined
 
@@ -147,6 +162,7 @@ function measurement_of(session: SessionUsage): OverMeasurement {
 		billed_input_per_request: session.records.map((record) =>
 			cost_usage.billed_input(record.totals),
 		),
+		model: session.records.at(-1)?.model,
 	}
 }
 
@@ -206,15 +222,20 @@ function measure(
 // missing message; `empty` → the whole-corpus missing message. A measured session that billed
 // nothing falls to `report_over`'s "no requests", which keeps a 0-request transcript distinct from a
 // transcript that is not there at all.
-function run_over_anthropic(own: OwnMeasurement, target: string, limit: number): number {
-	if (own.kind === 'measured') return cost_verdict.report_over(own.measurement, limit)
+function run_over_anthropic(own: OwnMeasurement, target: string, limit: Limit): number {
+	if (own.kind === 'measured') {
+		return cost_verdict.report_over(own.measurement, limit_of(limit, own.measurement))
+	}
 
 	return report_empty(target, own.kind === 'absent' ? own.session_id : undefined)
 }
 
-function run_over_codex(target: string, limit: number, environment: Environment): number {
+function run_over_codex(target: string, limit: Limit, environment: Environment): number {
 	const measurement = measure(target, 'openai', environment)
-	if (measurement !== undefined) return cost_verdict.report_over(measurement, limit)
+
+	if (measurement !== undefined) {
+		return cost_verdict.report_over(measurement, limit_of(limit, measurement))
+	}
 
 	console.error(`No Codex usage found for the current OpenAI thread under ${target}.`)
 
@@ -225,7 +246,7 @@ function run_over_codex(target: string, limit: number, environment: Environment)
 // alone — identified by id, not by mtime.
 function run_over(
 	target: string,
-	limit: number,
+	limit: Limit,
 	provider: AgentProvider,
 	environment: Environment,
 ): number {
@@ -243,7 +264,7 @@ function verdict_of(measurement: OverMeasurement | undefined): CostVerdict {
 		return UNMEASURABLE_VERDICT
 	}
 
-	return cost_verdict.classify(measurement, CONTEXT_CUT_THRESHOLD)
+	return cost_verdict.classify(measurement, cut_threshold(measurement))
 }
 
 // The verdict with the figures it was decided on — the newest request's billed input and the shared
@@ -254,7 +275,7 @@ function figures_of(measurement: OverMeasurement | undefined): SessionFigures {
 	const is_priced = measurement !== undefined && verdict !== UNMEASURABLE_VERDICT
 	const cost = is_priced ? cost_verdict.per_request_cost(measurement) : undefined
 
-	return { verdict, cost, threshold: CONTEXT_CUT_THRESHOLD }
+	return { verdict, cost, threshold: cut_threshold(measurement) }
 }
 
 // The `--cut` verdict and its figures as a value, printing nothing. `run:report --handoff` quotes the

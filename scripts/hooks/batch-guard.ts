@@ -1,4 +1,5 @@
-import { hook_decision } from '#scripts/josh/hook-decision'
+import { will_refuse as will_investigation_refuse } from '#scripts/delegation/investigation-guard'
+import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { lane_guard_policy, type LaneGuardMode } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 
@@ -40,29 +41,39 @@ function is_batch_candidate(call: GuardedCall): boolean {
 
 // **How the batching guard behaves for the session in hand, decided from the one-place enumeration**.
 // Outside a lane child the mode is `refuse` and the guard is exactly what it always was; in a dispatched
-// lane child it is `notice` — kit#2178 took it to `off` after kit#2164's generic notice did not move the
-// density, and kit#2276 restores it as a notice that names the concrete recent calls and recurs every
-// single-call turn, the two things #2164's notice lacked, so the density can be re-measured with the
-// notice actually firing where it is measured. The wrappers below are three-valued so this needs no
-// change beyond the enumeration. The enumeration reads `is_child_of` — the dispatch mark against this
-// checkout's own issue — only for a guard whose mode it would actually change, so a person working in a
-// lane sees the guard unchanged.
+// lane child the general rule is `off` and only the `search-batching` row still refuses — a chain of
+// searches issued one per turn, the largest share of the child's single-call pairs (kit#5342). The
+// enumeration reads `is_child_of` — the dispatch mark against this checkout's own issue — only for a
+// guard whose mode it would actually change, so a person working in a lane sees the guard unchanged.
 function batching_mode(): LaneGuardMode {
 	return lane_guard_policy.mode_here('batching')
 }
 
-// A guard the enumeration turns fully `off` says nothing at all. The lane-child mode and its reason
-// live in `lane-guard-policy.ts`; on the main line the mode is `refuse`.
-function is_candidate(call: GuardedCall): boolean {
-	return is_batch_candidate(call) && batching_mode() !== 'off'
+function is_search_refused_here(): boolean {
+	return lane_guard_policy.mode_here('search-batching') === 'refuse'
 }
 
-// A refusable call is refused only where the mode is `refuse`. Under any other mode it is withheld the
-// refusal; why a lane child takes that mode is its `because` in `lane-guard-policy.ts`.
-function should_block_here(tail: string, call: GuardedCall, refused_at_ms: number): boolean {
-	if (batching_mode() !== 'refuse') return false
+// Where the general rule is `off`, only a search the narrower refusal judges is read for. The
+// lane-child modes and their reasons live in `lane-guard-policy.ts`; on the main line both are `refuse`.
+function is_candidate(call: GuardedCall): boolean {
+	if (batching_mode() !== 'off') return is_batch_candidate(call)
 
-	return time_batch_guard.should_block(tail, call, refused_at_ms)
+	return is_search_refused_here() && time_batch_guard.is_search_chain_call(call)
+}
+
+// A refusable call is refused only where the mode is `refuse`; elsewhere a search chain alone is, under
+// the `search-batching` row, standing aside for the investigation guard's refusal of the same call.
+// Why a lane child takes each mode is its `because` in `lane-guard-policy.ts`.
+function should_block_here(
+	tail: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+	run: GuardRun,
+): boolean {
+	if (batching_mode() === 'refuse') return time_batch_guard.should_block(tail, call, refused_at_ms)
+	if (!is_search_refused_here() || will_investigation_refuse(tail, call, run)) return false
+
+	return time_batch_guard.should_block_search_chain(tail, call, refused_at_ms)
 }
 
 // The whole-file write earns a notice on every run. The second branch turns a
@@ -81,9 +92,8 @@ function should_notify_here(tail: string, call: GuardedCall, notified_at_ms: num
 }
 
 // The wording each notice carries, with the concrete calls the run just issued one-per-turn appended.
-// The whole-file write keeps its own base text; the lane notice is reached
-// under the `notice`-mode guard batching takes in a lane child again since kit#2276, so a headless
-// child is shown *which* recent calls it could have batched rather than only told to batch.
+// The whole-file write keeps its own base text; the lane notice is reached only under a `notice`-mode
+// batching row, so a headless child would be shown *which* recent calls it could have batched.
 function notice_text(call: GuardedCall, tail: string): string {
 	const base = time_batch_guard.is_notice_call(call)
 		? time_batch_guard.NOTICE
@@ -99,8 +109,7 @@ const GUARD = hook_decision.create_transcript_guard({
 	should_block: should_block_here,
 	reason: time_batch_guard.REASON,
 	// The whole-file write is notified rather than refused, on a record of its own so it never spends
-	// the refusal's stamp; the lane-child refusable-call notice kit#2164 added
-	// here fires again since kit#2276 restored batching to `notice` in a lane child.
+	// the refusal's stamp; the refusable-call notice fires only under a `notice`-mode batching row.
 	notify: {
 		prefix: time_batch_guard.NOTICE_STAMP_PREFIX,
 		should_notify: should_notify_here,
@@ -117,6 +126,15 @@ const notice_refusal_path = hook_decision.create_refusal_stamp(
 	time_batch_guard.NOTICE_STAMP_PREFIX,
 ).path
 const { deny_envelope, load_environment_file, DISABLED_VALUES } = hook_decision
+const STAMP = hook_decision.create_refusal_stamp(time_batch_guard.STAMP_PREFIX)
+
+// Whether this guard refuses the call in hand, asked with its real record — the rule guard stands
+// aside for it, so the two never decide apart.
+function will_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
+	if (!is_enabled() || !is_candidate(call)) return false
+
+	return should_block_here(tail, call, STAMP.last_ms(STAMP.path(run.transcript)), run)
+}
 
 export {
 	batch_outcome,
@@ -126,6 +144,7 @@ export {
 	load_environment_file,
 	notice_refusal_path,
 	refusal_path,
+	will_refuse,
 	DISABLED_VALUES,
 	SWITCH_ENV_KEY,
 }

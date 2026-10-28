@@ -1,16 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 
-// joshuafolkken/kit#2133: prose in skill files and docs states the context-cut threshold value.
-// Drifting the constant without updating the docs (or vice versa) fails here rather than being
-// caught by a reader who compares the two manually. The bash output cap and entry-read figure
-// are pinned separately so a bulk replace cannot silently sweep them up.
+// joshuafolkken/kit#2133: prose in skill files and docs states the context-cut threshold. Since
+// joshuafolkken/kit#5341 the threshold is priced at the session's model, so no fixed figure is right
+// for every run — the docs name the command that prints it, and the old fixed figure is pinned out
+// so a doc cannot keep telling one model another's number. The bash output cap is pinned separately
+// so a bulk replace cannot silently sweep it up.
 
-const THRESHOLD_RAW = CONTEXT_CUT_THRESHOLD
-const THRESHOLD_COMMA = new Intl.NumberFormat('en-US').format(THRESHOLD_RAW)
-const THRESHOLD_UNDERSCORE = THRESHOLD_COMMA.replaceAll(',', '_')
+const CUT_COMMAND = '`pnpm josh cost --cut`'
+const STALE_FIXED_THRESHOLDS = ['135,000', '135_000']
 
 const BASH_OUTPUT_CAP_UNDERSCORE = '150_000'
 const OUTPUT_BOUNDS_CAP_COMMA = '150,000'
@@ -19,10 +18,6 @@ const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
 function read_repo_file(relative_path: string): string {
 	return readFileSync(`${REPO_ROOT}/${relative_path}`, 'utf8')
-}
-
-function contains_threshold(content: string): boolean {
-	return content.includes(THRESHOLD_COMMA) || content.includes(THRESHOLD_UNDERSCORE)
 }
 
 const CONTEXT_CUT_DOCS = [
@@ -35,12 +30,16 @@ const CONTEXT_CUT_DOCS = [
 ]
 
 // joshuafolkken/kit#4155: `retrospective.md` stated a 150,000-token session budget beside the
-// 135,000 everywhere else — the Bash output cap's figure, not the threshold's.
+// threshold everywhere else — the Bash output cap's figure, not the threshold's.
 const STALE_SESSION_BUDGET = '150,000-token'
 
-describe.each(CONTEXT_CUT_DOCS)('%s states the context-cut threshold', (path) => {
-	it('contains the current threshold value', () => {
-		expect(contains_threshold(read_repo_file(path))).toBe(true)
+describe.each(CONTEXT_CUT_DOCS)('%s names the context-cut threshold', (path) => {
+	it('names the command that prices it', () => {
+		expect(read_repo_file(path)).toContain(CUT_COMMAND)
+	})
+
+	it.each(STALE_FIXED_THRESHOLDS)('spells no fixed %s threshold', (literal) => {
+		expect(read_repo_file(path)).not.toContain(literal)
 	})
 
 	it('does not state the stale session budget', () => {
@@ -48,7 +47,7 @@ describe.each(CONTEXT_CUT_DOCS)('%s states the context-cut threshold', (path) =>
 	})
 })
 
-describe('bash output cap and entry-read figure stay at 150,000', () => {
+describe('bash output cap stays at 150,000', () => {
 	it('bash-output-cap.test.ts pins the Bash output cap at 150_000', () => {
 		expect(read_repo_file('scripts/lib/bash-output-cap.test.ts')).toContain(
 			BASH_OUTPUT_CAP_UNDERSCORE,
