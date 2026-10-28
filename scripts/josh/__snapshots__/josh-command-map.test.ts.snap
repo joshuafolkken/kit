@@ -942,6 +942,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "prose:stale": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "ranges": [
       "",
       "developer",

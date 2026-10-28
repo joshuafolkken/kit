@@ -1,0 +1,8 @@
+{
+	"reason": "New josh prose:stale command (scan + CLI + tests) and its review-brief line #5287",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 188,
+		"ai_cost.on_demand_bytes": 49
+	}
+}

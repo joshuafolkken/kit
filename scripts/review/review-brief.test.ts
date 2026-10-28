@@ -110,11 +110,9 @@ function gate_line(
 	input: { gate?: FileMapStamp; in_flight?: FileMapStamp; base?: string },
 	tree: Tree,
 ): string {
-	return review_brief.gate_line(
-		{ gate: input.gate, in_flight: input.in_flight },
-		tree,
-		input.base ?? BASE,
-	)
+	const { gate, in_flight, base = BASE } = input
+
+	return review_brief.gate_line({ gate, in_flight }, tree, base)
 }
 
 describe('review_brief.compose — the level stays first', () => {
@@ -125,7 +123,10 @@ describe('review_brief.compose — the level stays first', () => {
 	})
 
 	it('always names the project test command', () => {
-		expect(compose({ round: 1, tree: {} })).toContain(review_brief.TEST_COMMAND_LINE)
+		// The self-check's prose question follows as `prose:stale` on its own line.
+		const lines = `${review_brief.TEST_COMMAND_LINE}\n${review_brief.PROSE_STALE_LINE}\n`
+
+		expect(compose({ round: 1, tree: {} })).toContain(lines)
 	})
 })
 

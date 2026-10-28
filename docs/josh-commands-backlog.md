@@ -926,6 +926,26 @@ Run it after round 1's fixes. `skip` when the fix delta is empty or touches only
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:round2` in detail".
 
+### `josh prose:stale`
+
+<!-- usage: prose:stale -->
+
+List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name.
+
+```bash
+pnpm josh prose:stale   # → `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)
+```
+
+<!-- /usage -->
+
+The self-check's "Prose matches the code" (`prompts/review.md`) as a search. From the change base to the working tree it takes each removed name and `UPPER_CASE` constant (a top-level `.ts` / `.js` declaration or an `export { … }` entry), `josh` command and `.md` heading.
+
+It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
+
+It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
+
+Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
+
 ### `josh disposition`
 
 <!-- usage: disposition -->
