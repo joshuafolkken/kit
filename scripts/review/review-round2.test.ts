@@ -55,6 +55,20 @@ describe('review_round2.decide — the round is required unless something says o
 		expect(decision.delta).toStrictEqual([])
 	})
 
+	// joshuafolkken/kit#5286: the ledger's reason for an open round 1 is quoted rather than the default.
+	it('quotes the reason the caller read round 1 open by', () => {
+		const open_reason = 'round 1 left a Medium deferred'
+		const decision = review_round2.decide({
+			base: BASE,
+			is_round_one_closed: false,
+			open_reason,
+			snapshot: SNAPSHOT,
+			tree: IMPLEMENTATION,
+		})
+
+		expect(decision.reason).toBe(open_reason)
+	})
+
 	it('requires the round when no round-1 snapshot was recorded', () => {
 		const decision = review_round2.decide({
 			base: BASE,
