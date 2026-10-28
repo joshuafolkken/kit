@@ -1,5 +1,6 @@
 import { verification_tail, type KeptLog } from '#scripts/gate/verification-tail'
 import { test_declared_logic } from './test-declared-logic'
+import { test_pinned_stage, type Staged } from './test-pinned-stage'
 import type { RedProbe, RedVerdict } from './test-red-logic'
 import { related_scope } from './test-related-scope'
 
@@ -64,6 +65,8 @@ interface HunkOutcome {
 	// Whether every checked hunk had a verdict — false when a cache-only read found one the cache no
 	// longer holds (joshuafolkken/kit#5078).
 	is_held?: boolean
+	// How many fresh probes the direct importers decided or escalated (joshuafolkken/kit#5292).
+	staged?: Staged
 }
 
 interface PinnedReport extends HunkOutcome {
@@ -277,7 +280,9 @@ function folded_unchecked(report: PinnedReport): Array<string> {
 function counts_line(report: PinnedReport): string {
 	const unchecked = String(unchecked_places(report).length)
 
-	return `unpinned ${String(report.unpinned.length)} · unchecked ${unchecked}`
+	const staged = test_pinned_stage.counts_suffix(report.staged)
+
+	return `unpinned ${String(report.unpinned.length)} · unchecked ${unchecked}${staged}`
 }
 
 // The report's parts: each unpinned place and the folded unchecked lines, and the counts line.

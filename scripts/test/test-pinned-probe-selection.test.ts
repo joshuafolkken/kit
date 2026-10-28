@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_probe, type Probe } from './test-pinned-probe'
+import { test_pinned_stage } from './test-pinned-stage'
 import { unit_durations } from './unit-durations'
 
 // joshuafolkken/kit#5122: a probe narrows by `josh test:related`'s rule — a file every test imports
@@ -36,30 +37,37 @@ const FIXTURE_FILES: Readonly<Record<string, string>> = {
 	[HEAVY_TEST]: "import { harness } from './harness'\n",
 }
 
-function probe_of(file: string): Probe {
-	return { hunk: { file, new_start: 1, new_count: 1, old_lines: [] }, index: 0 }
+function probe_of(file: string, reach?: number): Probe {
+	return { hunk: { file, new_start: 1, new_count: 1, old_lines: [] }, index: 0, reach }
+}
+
+const held: { fixture?: FixtureWorkspace } = {}
+
+async function open_fixture(): Promise<void> {
+	const fixture = git_fixture_workspace.open_workspace('test-pinned-selection-')
+
+	held.fixture = fixture
+	await git_fixture_workspace.git(fixture.workspace, ['init', '--quiet'])
+
+	for (const [file, content] of Object.entries(FIXTURE_FILES)) {
+		mkdirSync(path.dirname(path.join(fixture.workspace, file)), { recursive: true })
+		writeFileSync(path.join(fixture.workspace, file), content)
+	}
+}
+
+async function close_fixture(): Promise<void> {
+	if (held.fixture !== undefined) await git_fixture_workspace.close_workspace(held.fixture)
+}
+
+async function selection(file: string, reach?: number): Promise<Array<string> | undefined> {
+	const root = held.fixture?.workspace ?? ''
+
+	return await test_pinned_probe.selection_of(root, probe_of(file, reach), WORKERS)
 }
 
 describe('test_pinned_probe.selection_of', () => {
-	let fixture: FixtureWorkspace
-
-	beforeEach(async () => {
-		fixture = git_fixture_workspace.open_workspace('test-pinned-selection-')
-		await git_fixture_workspace.git(fixture.workspace, ['init', '--quiet'])
-
-		for (const [file, content] of Object.entries(FIXTURE_FILES)) {
-			mkdirSync(path.dirname(path.join(fixture.workspace, file)), { recursive: true })
-			writeFileSync(path.join(fixture.workspace, file), content)
-		}
-	})
-
-	afterEach(async () => {
-		await git_fixture_workspace.close_workspace(fixture)
-	})
-
-	async function selection(file: string): Promise<Array<string> | undefined> {
-		return await test_pinned_probe.selection_of(fixture.workspace, probe_of(file), WORKERS)
-	}
+	beforeEach(open_fixture)
+	afterEach(close_fixture)
 
 	it('lists the test files importing a file every test imports, not the file itself', async () => {
 		const argv = await selection(EVERY_TEST_MODULE)
@@ -77,6 +85,24 @@ describe('test_pinned_probe.selection_of', () => {
 
 		expect(argv?.slice(0, 2)).toEqual(['related', HUB_MODULE])
 		expect(argv).toEqual(expect.arrayContaining([EXCLUDE_FLAG, HEAVY_TEST]))
+	})
+})
+
+// joshuafolkken/kit#5292: a wide reach runs the direct importers first.
+describe('test_pinned_probe.selection_of — a counted reach', () => {
+	beforeEach(open_fixture)
+	afterEach(close_fixture)
+
+	it('runs first the test files importing a file whose reach is wide', async () => {
+		const argv = await selection(HUB_MODULE, test_pinned_stage.WIDE_REACH)
+
+		expect(argv?.slice(0, 2)).toEqual(['related', HUB_TEST])
+	})
+
+	it('runs the whole reach of a file whose reach is narrow', async () => {
+		const argv = await selection(HUB_MODULE, 1)
+
+		expect(argv?.slice(0, 2)).toEqual(['related', HUB_MODULE])
 	})
 })
 
