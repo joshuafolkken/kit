@@ -29,4 +29,12 @@ describe('epic_rank.rank', () => {
 
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 1])
 	})
+
+	// joshuafolkken/kit#5302: the body's declared weekly speed-up reaches the ranking.
+	it('puts the child that declares an expected effect ahead of undeclared ones', () => {
+		const effect = '## 期待効果\n\n- 効く率: 週 5 回\n- 1 回あたりの得: 約 250 秒\n'
+		const children = [child(1), child(2), child(3, effect)]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([3, 1, 2])
+	})
 })

@@ -9,7 +9,18 @@ import { markdown_section } from './markdown-section'
 const DECLARATION_LINE = '- 目的: 時間短縮'
 const BACKGROUND_HEADING = '## 背景'
 const HEADING = '## 期待効果'
-const ITEM_LABELS: ReadonlyArray<string> = ['効く率', '1 回あたりの得', '外れたときの損', '出典']
+const RATE_LABEL = '効く率'
+const GAIN_LABEL = '1 回あたりの得'
+const ITEM_LABELS: ReadonlyArray<string> = [RATE_LABEL, GAIN_LABEL, '外れたときの損', '出典']
+// The numbers the backlog ranking reads off the rate and the gain (joshuafolkken/kit#5302).
+const WEEK = '週'
+const COUNT = /(?<![\d.])(?<count>\d+) ?回/gu
+const SPAN = /(?<![\d.])(?<weeks>\d+) ?週/u
+const ONE_WEEK = 1
+const DURATION = /(?<![\d.])(?<amount>\d+(?:\.\d+)?) ?(?<unit>[分秒])/u
+const SECONDS_UNIT = '秒'
+const SECONDS_PER_MINUTE = 60
+const NONE = 0
 // A template placeholder value — the `<...>` guidance a filed Issue replaces. It is not an estimate, but a
 // value that only opens with `<` (an upper bound such as `<1 min`) is one, so the placeholder must close with `>` too.
 const PLACEHOLDER = /^<.*>$/u
@@ -48,6 +59,38 @@ function value_of(body: string, label: string): string | undefined {
 	return stated_value(effect_lines(body), label)
 }
 
+// The weeks a rate is counted over: its stated span ("10 in 2 weeks", "1 every 2 weeks"), else one.
+function weeks_of(rate: string): number {
+	const weeks = SPAN.exec(rate)?.groups?.['weeks']
+
+	return Math.max(Number(weeks ?? ONE_WEEK), ONE_WEEK)
+}
+
+// The hits a week a rate states: its last count, so "5 of 23 a week" reads the 5 the speed-up applies to,
+// over its span of weeks. `0` when the rate names no week or no count.
+function weekly_hits(rate: string | undefined): number {
+	if (!rate?.includes(WEEK)) return NONE
+	const counts = [...rate.matchAll(COUNT)].map((match) => Number(match.groups?.['count']))
+
+	return (counts.at(-1) ?? NONE) / weeks_of(rate)
+}
+
+// The minutes one hit saves: the first number the gain states in seconds or minutes — a range written
+// with one closing unit ("3-6 min") reads its upper bound. `0` when it states none.
+function minutes_per_hit(gain = ''): number {
+	const groups = DURATION.exec(gain)?.groups
+	if (groups === undefined) return NONE
+	const amount = Number(groups['amount'])
+
+	return groups['unit'] === SECONDS_UNIT ? amount / SECONDS_PER_MINUTE : amount
+}
+
+// The minutes a week the declared speed-up saves — hits a week times the gain per hit — on the same
+// minute scale as `issue_priority.lost_minutes`. `0` when the rate or the gain is not a number.
+function weekly_minutes(body = ''): number {
+	return weekly_hits(value_of(body, RATE_LABEL)) * minutes_per_hit(value_of(body, GAIN_LABEL))
+}
+
 // Every expected-effect problem a body has, or an empty array. A body without the declaration has none.
 function problems(body: string): ReadonlyArray<string> {
 	if (!is_target(body)) return []
@@ -66,6 +109,7 @@ const expected_effect_lint = {
 	is_target,
 	problems,
 	value_of,
+	weekly_minutes,
 }
 
 export { expected_effect_lint }
