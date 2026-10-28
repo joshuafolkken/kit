@@ -80,21 +80,24 @@ describe('followup_coderabbit_wait.observer_of', () => {
 	})
 })
 
-describe('followup_coderabbit_wait.both', () => {
-	it('hands every poll to both observers, in order', async () => {
+describe('followup_coderabbit_wait.all', () => {
+	it('hands every poll to every observer, in order', async () => {
 		const seen: Array<string> = []
-		const observe = followup_coderabbit_wait.both(
+		const observe = followup_coderabbit_wait.all(
 			async () => {
 				seen.push('first')
 			},
 			async () => {
 				seen.push('second')
 			},
+			async () => {
+				seen.push('third')
+			},
 		)
 
 		await observe(snapshot(CI))
 
-		expect(seen).toStrictEqual(['first', 'second'])
+		expect(seen).toStrictEqual(['first', 'second', 'third'])
 	})
 })
 

@@ -57,11 +57,14 @@ function observer_of(wait: CodeRabbitWait): SnapshotObserver {
 	}
 }
 
-// Both observers on every poll — the board's event line and this timer.
-function both(first: SnapshotObserver, second: SnapshotObserver): SnapshotObserver {
-	return async function observe_both(snapshot: PrStateSnapshot): Promise<void> {
-		await first(snapshot)
-		await second(snapshot)
+// Every observer on every poll, started in order — the board's event line and the wait's timers.
+function all(...observers: ReadonlyArray<SnapshotObserver>): SnapshotObserver {
+	return async function observe_all(snapshot: PrStateSnapshot): Promise<void> {
+		await Promise.all(
+			observers.map(async (observer) => {
+				await observer(snapshot)
+			}),
+		)
 	}
 }
 
@@ -76,7 +79,7 @@ async function record(wait: CodeRabbitWait): Promise<void> {
 	await record_part(lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE, wait.rate_limited_ms)
 }
 
-const followup_coderabbit_wait = { both, new_wait, observe, observer_of, record }
+const followup_coderabbit_wait = { all, new_wait, observe, observer_of, record }
 
 export type { CodeRabbitWait }
 export { followup_coderabbit_wait }
