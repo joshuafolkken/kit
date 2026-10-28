@@ -6,6 +6,7 @@ import { changed_paths_sync } from '#scripts/git/changed-paths-sync'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
+import { time_search_call } from '#scripts/time-runtime/time-search-call'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { delegation_policy } from './delegation-policy'
@@ -32,12 +33,6 @@ const CONTENT_READ_COMMANDS: ReadonlyArray<string> = [
 ]
 const CONTENT_READ_LABELS: ReadonlySet<string> = new Set(
 	CONTENT_READ_COMMANDS.map((command) => time_shell.bash_label(command)),
-)
-
-// A search carries no file text but costs a turn, so searches count in turns: parallel ones count once.
-const SEARCH_COMMANDS: ReadonlyArray<string> = ['fd', 'find', 'grep', 'rg']
-const SEARCH_LABELS: ReadonlySet<string> = new Set(
-	SEARCH_COMMANDS.map((command) => time_shell.bash_label(command)),
 )
 
 const { INVESTIGATOR_AGENT } = delegation_policy
@@ -190,10 +185,6 @@ interface Accumulation {
 	searches: Map<string, number>
 }
 
-function is_read_only_search(span: Span): boolean {
-	return SEARCH_LABELS.has(span.label) && span.is_bundleable && !span.may_write
-}
-
 // A span with no message id is a turn of its own, as in every other turn counter.
 function search_turn_key(searches: ReadonlyMap<string, number>, span: Span): string {
 	if (span.message_id !== time_spans.NO_MESSAGE_ID) return span.message_id
@@ -212,7 +203,10 @@ function apply_search(searches: Map<string, number>, span: Span): void {
 
 	const turn = search_turn_key(searches, span)
 
-	if (is_read_only_search(span) && !searches.has(turn)) searches.set(turn, span.ended_ms)
+	// A search carries no file text but costs a turn, so searches count in turns: parallel ones count once.
+	if (time_search_call.is_read_only_search(span) && !searches.has(turn)) {
+		searches.set(turn, span.ended_ms)
+	}
 }
 
 // A refused dispatch (`investigator-foreground`, `agent-model`) ran no unit, so it resets nothing.
@@ -327,7 +321,9 @@ function is_read_only_command(call: GuardedCall, labels: ReadonlySet<string>): b
 
 // A search is refusable without a subject target: a bare-directory sweep is what this count is for.
 function is_search_call(call: GuardedCall): boolean {
-	return is_read_only_command(call, SEARCH_LABELS)
+	return time_search_call.is_read_only_search(
+		time_spans.to_tool_call(call.name, call.input, time_spans.NO_MESSAGE_ID),
+	)
 }
 
 // This guard counts reading, so a `Bash` line that also writes is never refused, and neither is a call

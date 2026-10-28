@@ -1,3 +1,5 @@
+import { homedir } from 'node:os'
+import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { cost_usage, type UsageRecord } from '#scripts/cost-runtime/cost-usage'
@@ -23,6 +25,9 @@ import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
 interface AuditSession {
 	kind: string
+	// Whether the transcript is a dispatched lane child's own session: in a lane checkout's directory and
+	// not a delegated unit, which the kind cannot tell apart when its prompt names `/code-review`.
+	is_lane: boolean
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
@@ -71,13 +76,14 @@ function add_line(parts: SessionParts, raw: string): void {
 }
 
 // One transcript's text read into a session — the pure half a test drives with fixture lines.
-function session_of(text: string, is_delegated: boolean): AuditSession {
+function session_of(text: string, is_delegated: boolean, is_lane = false): AuditSession {
 	const parts: SessionParts = { records: [], categories: new Map(), lines: [], prompt: '' }
 
 	for (const raw of text.split('\n')) add_line(parts, raw)
 
 	return {
 		kind: cost_audit_kind.kind_of(parts.prompt, is_delegated),
+		is_lane: is_lane && !is_delegated,
 		records: cost_usage.dedupe(parts.records),
 		categories: parts.categories,
 		lines: parts.lines,
@@ -106,11 +112,20 @@ function session_files(cwd: string, since_ms: number): Array<SessionFile> {
 	return files.filter((file) => file.modified_ms >= since_ms).toReversed()
 }
 
+// A delegated unit's transcript sits below its session's directory, so the test is a path prefix.
+function is_lane_file(file: SessionFile, lanes: ReadonlyArray<string>): boolean {
+	return lanes.some((directory) => file.path.startsWith(`${directory}${path.sep}`))
+}
+
 // Every session touched since `since_ms`. A file last written before then holds no request inside the
 // window, so it is not read at all.
 function load(cwd: string, since_ms: number): Array<AuditSession> {
+	const lanes = cost_transcript.lane_transcript_directories(
+		cost_transcript.session_cwd(cwd),
+		homedir(),
+	)
 	const sessions = session_files(cwd, since_ms).map((file) =>
-		session_of(cost_transcript.read_raw(file), file.is_delegated),
+		session_of(cost_transcript.read_raw(file), file.is_delegated, is_lane_file(file, lanes)),
 	)
 
 	return dedupe_across(sessions)

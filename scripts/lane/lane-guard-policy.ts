@@ -26,7 +26,7 @@ import { lane_child_marker, type MarkerSource } from './lane-child-marker'
 // The three ways a guard may behave in a lane child. Outside a lane child every
 // guard is `refuse`, which is why that is also the fail-safe default below.
 type LaneGuardMode = 'refuse' | 'notice' | 'off'
-type LaneGuardId = 'investigation' | 'batching' | 'rule' | 'duplicate-read'
+type LaneGuardId = 'investigation' | 'batching' | 'search-batching' | 'rule' | 'duplicate-read'
 
 // The mode outside a lane child, and the fail-safe for a guard nobody enumerated: a denial, the same
 // direction `delegation-policy.ts` takes, because a silenced rule is the one mistake that ships unseen.
@@ -54,6 +54,12 @@ const LANE_GUARD_POLICY: ReadonlyArray<LaneGuardEntry> = [
 		mode_in_lane_child: 'off',
 		because:
 			'a refusal ends a child turn and every advisory notice was measured not to move the call density, so the guard is off and the density stays readable through `josh time:density`',
+	},
+	{
+		id: 'search-batching',
+		mode_in_lane_child: 'refuse',
+		because:
+			'the largest share of single-call pairs in lane children is a search chain (`grep` / `sed` issued one per turn, about 10,600 pairs in 14 days), and a refusal re-fires only every third single-call search turn, so one refused round trip (about $0.036) is repaid once it folds two later searches into one turn',
 	},
 	{
 		id: 'duplicate-read',

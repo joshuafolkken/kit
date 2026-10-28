@@ -1,6 +1,6 @@
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
+import { will_refuse as will_batch_refuse } from '#scripts/hooks/batch-guard'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
-import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
@@ -310,14 +310,11 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 
 // Asked with its real record, not `NEVER_MS`: that guard never refuses one sequence twice.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	// In a lane child the batching guard only notices, so there is nothing to stand aside for.
-	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
-
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
 
 	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
 
-	return time_batch_guard.should_block(tail, call, refused_at_ms)
+	return will_batch_refuse(tail, call, run)
 }
 
 function is_first_delivery(

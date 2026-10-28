@@ -228,6 +228,18 @@ function target_turn_lines(
 	return [...open_turn_lines(turn, targets, name), ...results]
 }
 
+// One single-call shell turn, closed by its result unless it is the turn still in flight — the
+// search-chain cases (joshuafolkken/kit#5342).
+function bash_turn_lines(turn: number, command: string, is_closed = true): Array<string> {
+	const [id = CALL_ID] = call_ids(turn, 1)
+	const call = turn_call_line(turn_minute(turn), `msg-${String(turn)}`, id, {
+		name: 'Bash',
+		input: { command },
+	})
+
+	return is_closed ? [call, result_line(turn_minute(turn) + 1, BRANCH, id)] : [call]
+}
+
 // The body the harness writes back for a call this guard denied (joshuafolkken/kit#1979). It opens
 // with the ⛔ and the `batching` token `time-transcript-line.ts` reads a refusal's guard off, so a span
 // built from it carries `refusal_guard: 'batching'`.
@@ -348,6 +360,7 @@ const time_transcript_fixture = {
 	turn_lines,
 	open_turn_lines,
 	target_turn_lines,
+	bash_turn_lines,
 	refused_turn_lines,
 	density_text,
 	issue_lines,
