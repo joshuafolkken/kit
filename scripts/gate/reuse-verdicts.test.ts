@@ -10,7 +10,7 @@ import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
 import fc from 'fast-check'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { check_reuse } from './check-reuse'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import { gate_skip } from './gate-skip'
 import { gate_tree } from './gate-tree'
@@ -36,11 +36,11 @@ function check_record(label: string): string {
 }
 
 const SCOPED_LABELS: ReadonlyArray<string> = [
-	gate_plan.LINT_LABEL,
-	gate_plan.TYPE_CHECK_LABEL,
-	gate_plan.EXPORTS_LABEL,
-	gate_plan.METRICS_LABEL,
-	gate_plan.UNIT_LABEL,
+	gate_labels.LINT_LABEL,
+	gate_labels.TYPE_CHECK_LABEL,
+	gate_labels.EXPORTS_LABEL,
+	gate_labels.METRICS_LABEL,
+	gate_labels.UNIT_LABEL,
 ]
 // The kinds of path each scoped check reads, written from what the check does rather than from
 // `verification-inputs.ts`: a module, a declaration and a config file are inputs of every check. The
@@ -49,14 +49,14 @@ const SCOPED_LABELS: ReadonlyArray<string> = [
 // configuration is a source of the unit step, not its configuration (joshuafolkken/kit#4495).
 const SHARED_INPUTS: ReadonlyArray<Kind> = ['module', 'declaration', 'globals', 'config']
 const INPUTS: ReadonlyMap<string, ReadonlySet<Kind>> = new Map([
-	[gate_plan.LINT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc', 'style'])],
-	[gate_plan.TYPE_CHECK_LABEL, new Set<Kind>(SHARED_INPUTS)],
-	[gate_plan.EXPORTS_LABEL, new Set<Kind>(SHARED_INPUTS)],
-	[gate_plan.METRICS_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
-	[gate_plan.UNIT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
+	[gate_labels.LINT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc', 'style'])],
+	[gate_labels.TYPE_CHECK_LABEL, new Set<Kind>(SHARED_INPUTS)],
+	[gate_labels.EXPORTS_LABEL, new Set<Kind>(SHARED_INPUTS)],
+	[gate_labels.METRICS_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
+	[gate_labels.UNIT_LABEL, new Set<Kind>([...SHARED_INPUTS, 'doc'])],
 ])
 const CONFIGURES_OTHERS: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
-	[gate_plan.UNIT_LABEL, ['eslint.config.js']],
+	[gate_labels.UNIT_LABEL, ['eslint.config.js']],
 ])
 const DOC_READER = 'src/guide.test.ts'
 const documents = [...reuse_world.create_world().contents.keys()].filter(
@@ -130,8 +130,8 @@ async function actual_verdicts(world: World): Promise<Verdicts> {
 	const gate = gate_skip.gate_reuse(tree.files, tree.base, gate_record)
 	const checks = await check_reuse.reusable_checks(SCOPED_LABELS, tree, check_record)
 	const { lint_related_stamp, test_related_stamp } = review_stamps
-	const lint = await since_green.read_moved(lint_related_stamp, gate_plan.LINT_LABEL, lint_record)
-	const unit = await since_green.read_moved(test_related_stamp, gate_plan.UNIT_LABEL, unit_record)
+	const lint = await since_green.read_moved(lint_related_stamp, gate_labels.LINT_LABEL, lint_record)
+	const unit = await since_green.read_moved(test_related_stamp, gate_labels.UNIT_LABEL, unit_record)
 
 	return {
 		gate_reused: 'stamp' in gate,
@@ -167,8 +167,8 @@ function expected_verdicts(world: World): Verdicts {
 	return {
 		gate_reused: moved.length === 0,
 		checks_reused: labels.toSorted(reuse_world.by_name),
-		lint_narrowed_to: narrowed_to(gate_plan.LINT_LABEL, moved),
-		unit_narrowed_to: narrowed_to(gate_plan.UNIT_LABEL, moved),
+		lint_narrowed_to: narrowed_to(gate_labels.LINT_LABEL, moved),
+		unit_narrowed_to: narrowed_to(gate_labels.UNIT_LABEL, moved),
 	}
 }
 

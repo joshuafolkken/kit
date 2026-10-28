@@ -1,4 +1,4 @@
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { verification_inputs } from '#scripts/gate/verification-inputs'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
@@ -46,12 +46,12 @@ const reviewed_stamp: FileMapStampAccess = file_map_stamp.create(REVIEWED_PREFIX
 const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	LINT_RELATED_PREFIX,
 	PROJECT_ROOT,
-	inputs_of([gate_plan.LINT_LABEL]),
+	inputs_of([gate_labels.LINT_LABEL]),
 )
 const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	TEST_RELATED_PREFIX,
 	PROJECT_ROOT,
-	inputs_of([gate_plan.UNIT_LABEL]),
+	inputs_of([gate_labels.UNIT_LABEL]),
 )
 const e2e_stamp: FileMapStampAccess = file_map_stamp.create(E2E_PREFIX, PROJECT_ROOT)
 

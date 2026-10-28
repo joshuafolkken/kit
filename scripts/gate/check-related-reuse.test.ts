@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_reuse } from './check-related-reuse'
 import { check_reuse, type CheckRecords } from './check-reuse'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
 
@@ -11,7 +11,7 @@ import { scoped_green } from './scoped-green'
 
 const { CHECKS } = check_related
 const [LINT = '', TEST = '', TYPE_CHECK = '', CSPELL = ''] = CHECKS
-const { TYPE_CHECK_LABEL, SPELL_CHECK_LABEL } = gate_plan
+const { TYPE_CHECK_LABEL, SPELL_CHECK_LABEL } = gate_labels
 const SOURCE = 'scripts/a.ts'
 const TREE: GateTree = { files: { [SOURCE]: 'digest-a' }, base: 'base-a' }
 const AT = '2026-10-27T00:00:00.000Z'
