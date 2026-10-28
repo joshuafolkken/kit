@@ -206,6 +206,7 @@ describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
 
 // joshuafolkken/kit#4574: a wait that polled CodeRabbit rate-limited records its part beside it.
 describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () => {
+	// The `e2e` job pins #5295's wiring too: its settle reaches the `ci-wait` row with the issue.
 	it('records the CodeRabbit wait the polls saw beside the CI wait', async () => {
 		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 		const rate_limited = { name: 'CodeRabbit', status: 'pass', description: 'Rate limited' }
@@ -219,8 +220,8 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 		vi.spyOn(performance, 'now').mockImplementation(() => (now_ms += 1000))
 		vi.mocked(git_pr_checks.wait_for_pr_success).mockImplementation(
 			async (_branch, _reads, _before, observe) => {
-				await observe?.(polled)
-				await observe?.(polled)
+				await observe?.({ ...polled, rollup: [rate_limited, { name: 'e2e', status: 'pending' }] })
+				await observe?.({ ...polled, rollup: [rate_limited, { name: 'e2e', status: 'pass' }] })
 
 				return { ...polled, head_sha: CHECKED_SHA }
 			},
@@ -233,6 +234,7 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 			lane_ledger_write.CODERABBIT_WAIT_STAGE,
 			lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE,
 		])
+		expect(record.mock.calls[0]?.[0]).toMatchObject({ issue: 42, last_check: 'e2e' })
 	})
 })
 

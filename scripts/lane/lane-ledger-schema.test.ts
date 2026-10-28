@@ -103,3 +103,20 @@ describe('lane_ledger_schema.entry_schema — round one', () => {
 		expect(entry_schema.safeParse(round).data).toStrictEqual(round)
 	})
 })
+
+// joshuafolkken/kit#5295: followup's CI wait keeps its critical path.
+describe('lane_ledger_schema.entry_schema — the ci-wait critical path', () => {
+	it('keeps the last check to settle and each check time on a stage row', () => {
+		const row = {
+			kind: KIND.STAGE,
+			at: AT,
+			stage: 'ci-wait',
+			elapsed_ms: 9,
+			issue: 5295,
+			last_check: 'e2e',
+			check_ms: { lint: 3, e2e: 8 },
+		}
+
+		expect(entry_schema.safeParse(row).data).toStrictEqual(row)
+	})
+})

@@ -21,6 +21,7 @@ const BETWEEN_STAGE = 'between ship stages'
 const SHIP_LEAD = 'ship '
 const IMPLEMENT_SUFFIX = ' implement'
 const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
+const FOLLOWUP_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.FOLLOWUP}`
 
 // One stage's net milliseconds.
 interface Stage {
@@ -189,6 +190,7 @@ function longest_of(breakdown: Breakdown): { name: string; minutes: number } | u
 }
 
 const lane_breakdown = {
+	FOLLOWUP_STAGE,
 	IMPLEMENT_STAGE,
 	PRE_DETACH_STAGE,
 	covered_ms,

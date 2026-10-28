@@ -503,7 +503,7 @@ pnpm josh run:review --code-only                 # josh ship's own open: code's 
 pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
 pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
 pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
-pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway)
+pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once
 pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
 ```
 
@@ -984,6 +984,10 @@ Under the stage table, the implement stage is broken down from the lane transcri
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
 `review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
 
+Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
+its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
+left to the `coderabbit-wait` row (`followup-ci-path.ts`).
+
 Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
 claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
 runs with no `cpu_ms` left out. It only reports: a core weight is changed in its own Issue, from this table.
@@ -1040,6 +1044,8 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
 A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
+
+The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 ### `josh lane:plan`
 

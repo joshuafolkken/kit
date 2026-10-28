@@ -4,6 +4,7 @@ import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
@@ -48,7 +49,8 @@ import { run_review_steps } from './run-review-steps'
 // `josh check:related` before its round is recorded, joshuafolkken/kit#4948) starts it again on a tree a round-1 fix
 // moved, after the join has closed the pair, and reads its answer without joining a gate that already
 // settled. The ship's pre-detach reads that answer anyway, so a lane need not
-// (joshuafolkken/kit#4895). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
+// (joshuafolkken/kit#4895), and a lane child's `--pinned` returns at once rather than wait in the
+// foreground (joshuafolkken/kit#5293). **`--join --fixing` waits no grace on the check**: round 1's fixes will move
 // its tree. **A lane child's open commits first and `--push` pushes at the green gate**
 // (`run-review-early-push.ts`).
 
@@ -56,6 +58,8 @@ const ARGV_OFFSET = 2
 const JOIN_FLAG = '--join'
 const FIXING_FLAG = '--fixing'
 const PINNED_FLAG = '--pinned'
+const LANE_PINNED_NOTE =
+	"Lane child — not waiting on test:pinned; the ship's pre-detach joins this check."
 const INTERACTION_FLAG = '--interaction'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -363,6 +367,12 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 }
 
 async function run_pinned(): Promise<number> {
+	if (lane_child_marker.is_child_of(process.cwd())) {
+		process.stdout.write(`${LANE_PINNED_NOTE}\n`)
+
+		return SUCCESS_EXIT_CODE
+	}
+
 	const is_unpinned = await show_pinned(
 		run_review_join_read.read_with(run_review_pinned_steps.wait_alone),
 	)
