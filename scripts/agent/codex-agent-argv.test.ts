@@ -25,8 +25,6 @@ const GRANT_PATTERN = /("(?:[^"\\]|\\.)*")=("(?:read|write)")/gu
 const WORKTREE_CONFIG = 'config.worktree'
 const OTHER_WORKTREE = path.join('worktrees', 'other-lane')
 
-type Grant = [string, string]
-
 const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 const repository_directory = vi.spyOn(git_common_directory, 'repository')
 
@@ -53,6 +51,8 @@ function parse_string(literal: string): string {
 }
 
 function grants(args: ReadonlyArray<string>): Record<string, string> {
+	type Grant = [string, string]
+
 	const table = args.find((argument) => argument.startsWith(FILESYSTEM_PREFIX)) ?? ''
 	const pairs = [...table.matchAll(GRANT_PATTERN)].map(
 		([, target = '""', access = '""']): Grant => [parse_string(target), parse_string(access)],

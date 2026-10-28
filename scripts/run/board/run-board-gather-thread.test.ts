@@ -17,13 +17,13 @@ const READ: GatherState = { ...FRESH_GATHER, local: LOCAL, read_ms: START }
 
 const FAILED_READ = new RegExp(String.raw`❗ ${WORDS.read} \d{2}:\d{2}`, 'u')
 
-type Listener = (value: unknown) => void
-
 interface Fake extends GatherWorker {
 	emit: (event: string, value?: unknown) => void
 }
 
 function fake_worker(): Fake {
+	type Listener = (value: unknown) => void
+
 	const listeners = new Map<string, Listener>()
 
 	return {
