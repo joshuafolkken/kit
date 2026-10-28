@@ -13,7 +13,7 @@ decision oracles:
     source    prompts/review.md
   review:round2
     decision  Whether the second /code-review round is due
-    command   pnpm josh review:round2 [--round-1-closed]
+    command   pnpm josh review:round2 [--record <N>]
     answers   required | skip
     no firing it answers a status question and governs no action of its own to gate before
     source    .claude/skills/workflow-commands/chain-rule.md

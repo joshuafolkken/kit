@@ -1081,10 +1081,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:round2": [
-      "[--round-1-closed] [--json]",
+      "[--record <N>] [--json]",
       "automation",
       [
-        "none",
+        "network",
       ],
     ],
     "review:stops": [

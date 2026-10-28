@@ -66,7 +66,7 @@ const DECISION_ORACLES: ReadonlyArray<DecisionOracle> = [
 	{
 		name: 'review:round2',
 		decision: 'Whether the second /code-review round is due',
-		args: '[--round-1-closed]',
+		args: '[--record <N>]',
 		vocabulary: [REQUIRED, SKIP],
 		single_source: CHAIN_RULE_MD,
 	},
