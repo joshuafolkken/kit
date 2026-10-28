@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { ALIASES, CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
+import { ALIASES } from './josh-aliases'
+import { CATEGORY_ORDER, COMMAND_MAP, type CommandEntry } from './josh-command-map'
 import { COMMAND_AUDIENCES, COMMAND_SIDE_EFFECTS } from './josh-command-types'
 import { composite_arguments } from './josh-composite-arguments'
 
@@ -125,7 +126,8 @@ describe('COMMAND_MAP — reference metadata', () => {
 			Object.entries(COMMAND_MAP).map(([name, entry]) => [name, entry.reference]),
 		)
 
-		expect({ aliases: ALIASES, references }).toMatchSnapshot()
+		// The hint is printed with a mismatch, so a stale snapshot names the command that rewrites it (#4970).
+		expect({ aliases: ALIASES, references }).toMatchSnapshot('regenerate: pnpm josh command:derive')
 	})
 })
 

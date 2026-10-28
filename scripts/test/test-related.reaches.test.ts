@@ -32,6 +32,7 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'f00dcafe',
 	dirty: {},
+	change: [],
 	directories: [],
 	readers: { [READ_DOCUMENT]: [READER] },
 }
@@ -76,12 +77,12 @@ describe('test_related.reaches_tests', () => {
 		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
 	})
 
-	// joshuafolkken/kit#4532: a source changed since the map reaches only through naming what moved; a
-	// test always does.
-	it('answers true when a test changed since the map was recorded, whatever moved', async () => {
+	// joshuafolkken/kit#4532, joshuafolkken/kit#4896: code changed since the map — a test among it —
+	// reaches only through naming what moved.
+	it('answers false when a test changed since the map names no moved file', async () => {
 		mocked_since.mockResolvedValue([READER])
 
-		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(true)
+		await expect(test_related.reaches_tests(ROOT, [UNREAD_DOCUMENT])).resolves.toBe(false)
 	})
 
 	it('answers true when a source changed since the map names a moved file', async () => {

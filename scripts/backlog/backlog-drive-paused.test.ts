@@ -1,5 +1,10 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
+import { lane_plan } from '#scripts/lane/lane-plan'
 import type { LaneStateRecord } from '#scripts/lane/lane-state'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { DEFAULT_SILENT_MINUTES } from '#scripts/run/run-liveness'
@@ -16,7 +21,8 @@ const NOW_MS = Date.parse('2026-10-20T09:00Z')
 const PAUSED_ISSUE = '4211'
 const WINDOW_MS = DEFAULT_SILENT_MINUTES * MS_PER_MINUTE
 const WAITING_ISSUE = 4300
-const SHARED_PATH = 'Touches `scripts/lane/lane-state.ts`.'
+const SHARED_FILE = 'scripts/lane/lane-state.ts'
+const SHARED_PATH = `Touches \`${SHARED_FILE}\`.`
 const OTHER_PATH = 'Touches `scripts/run/run-board.ts`.'
 
 function record(state_name: LaneStateRecord['state'], age_ms: number): LaneStateRecord {
@@ -103,6 +109,25 @@ describe('backlog_drive_paused.notify', () => {
 		await backlog_drive_paused.notify(ports)
 
 		expect(ports.send).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4864: a paused lane holds the files its recorded plan names as it holds its body's.
+describe('backlog_drive_paused.notify — a paused lane that holds a planned file', () => {
+	it('sends the notice when only its plan overlaps the waiting candidate', async () => {
+		const repository = mkdtempSync(path.join(tmpdir(), 'drive-paused-'))
+
+		vi.spyOn(git_common_directory, 'repository').mockReturnValue(repository)
+		lane_plan.record(
+			{ issue: Number(PAUSED_ISSUE), paths: [SHARED_FILE], planned_at: '2026-10-20T08:00Z' },
+			process.cwd(),
+		)
+		const pool = [issue_of(Number(PAUSED_ISSUE), OTHER_PATH), issue_of(WAITING_ISSUE, SHARED_PATH)]
+		const ports = paused_ports([record('paused', WINDOW_MS)], { read_issues: async () => pool })
+
+		await backlog_drive_paused.notify(ports)
+
+		expect(ports.send).toHaveBeenCalledOnce()
 	})
 })
 

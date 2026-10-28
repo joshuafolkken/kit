@@ -1,0 +1,2 @@
+- rf:bug-risks | medium | scripts/rules/investigator-foreground.ts:167 | 2026-10-27 | #5148
+- rf:tests | low | scripts/rules/investigator-foreground.test.ts:92 | 2026-10-27 | #5148

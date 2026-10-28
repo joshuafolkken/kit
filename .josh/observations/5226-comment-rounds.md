@@ -1,0 +1,1 @@
+- rf:performance | low | scripts/gh/git-gh-pr-read.ts:67 | 2026-10-27 | #5226

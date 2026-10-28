@@ -1,6 +1,7 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_review_steps } from './run-ship-review-steps'
@@ -23,6 +24,8 @@ interface ShipArguments {
 	cites: ReadonlyArray<string>
 	is_review: boolean
 	is_detach: boolean
+	// `--unpinned-ok "<reason>"` as given, forwarded to round 1's `run:review` alone; empty when absent.
+	unpinned_ok: ReadonlyArray<string>
 }
 
 interface Step {
@@ -65,7 +68,21 @@ async function gate_stage(): Promise<StepResult> {
 const SYNC_STEP: Step = {
 	stage: STAGE.SYNC,
 	header: run_ship.SYNC_HEADER,
-	run: async (args) => await run_ship_sync.sync_stage(args.number),
+	run: async (args, state) =>
+		await run_ship_sync.sync_stage(args.number, args.title, state.is_dirty === true),
+}
+
+// A default branch that moved since the sync stage is merged and gated again before the push
+// (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
+// that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+async function commit_stage(args: ShipArguments, state: ShipState): Promise<StepResult> {
+	const stop = run_ship_stage.is_shipped(state) ? undefined : await run_ship_sync.catch_up()
+
+	if (stop !== undefined) return stop
+
+	const argv = ['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]
+
+	return await run_ship_lap.timed(run_ship_lap.STEP.COMMIT, async () => await josh(argv))
 }
 
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
@@ -81,8 +98,7 @@ const COMMIT_STEPS: ReadonlyArray<Step> = [
 	{
 		stage: STAGE.COMMIT,
 		header: run_ship.COMMIT_HEADER,
-		run: async (args, state) =>
-			await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]),
+		run: async (args, state) => await commit_stage(args, state),
 	},
 ]
 
@@ -133,7 +149,11 @@ const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
 	run: async (args, state) =>
-		await run_ship_review_steps.review_stage(args.number, state.is_review_stale === true),
+		await run_ship_review_steps.review_stage(
+			args.number,
+			state.is_review_stale === true,
+			args.unpinned_ok,
+		),
 }
 const ROUND_TWO_STEP: Step = {
 	stage: STAGE.ROUND_TWO,

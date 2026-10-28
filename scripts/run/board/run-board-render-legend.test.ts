@@ -30,7 +30,7 @@ function row(number: number, extra: Partial<BoardRow> = {}): BoardRow {
 // The legend for `rows`, each leading with its state's icon unless `drawn` names what the frame draws.
 function legend_of(rows: ReadonlyArray<BoardRow>, drawn: Partial<LegendDrawn> = {}): Array<string> {
 	const leads = new Set(rows.map((entry) => STATE_ICONS[entry.state]))
-	const whole = { leads, icons: leads, named: [], checks: [], held: [], ...drawn }
+	const whole = { leads, icons: leads, named: [], checks: [], held: [], solo: false, ...drawn }
 
 	return run_board_render_legend
 		.legend_of(rows, whole, [])
@@ -144,6 +144,7 @@ describe('run_board_render_legend.legend_of wait icons', () => {
 		['📋', 'named order'],
 		['✋', 'held by triage'],
 		['🧠', 'memory headroom'],
+		['🪫', 'usage limit'],
 		['📅', 'not before'],
 	])('names %s as "%s"', (icon, word) => {
 		expect(legend_of([row(1, { reason: { icon } })])).toStrictEqual([`${icon} ${word}`])
@@ -191,9 +192,30 @@ describe('run_board_render_legend.legend_of run:solo icons', () => {
 		expect(legend_of([row(1)]).join('\n')).not.toContain(WAIT_ICONS.solo_running)
 	})
 
+	// joshuafolkken/kit#4625: 🧍 in a solo lane row's indent.
+	it('names 🧍 once where a solo lane row draws it, beside a waiting row leading with it or not', () => {
+		const waiting = row(2, { reason: { icon: WAIT_ICONS.solo, issues: ['1'] } })
+
+		const named = ['🧍 runs alone']
+
+		expect(legend_of([row(1)], { solo: true })).toStrictEqual(named)
+		expect(legend_of([row(1), waiting], { solo: true })).toStrictEqual(named)
+	})
+
 	it('names neither where no row leads with them', () => {
 		expect(legend_of([row(1, { reason: { icon: WAIT_ICONS.lane } })])).toStrictEqual([
 			'🧵 free lane',
 		])
+	})
+})
+
+// joshuafolkken/kit#4772: 🔍 at a done row's end, where no spinner turns for its overrun investigation.
+describe('run_board_render_legend.legend_of overrun investigation', () => {
+	it('names 🔍 while a done row draws it', () => {
+		expect(legend_of([row(1)], { overrun: true })).toStrictEqual(['🔍 overrun investigation'])
+	})
+
+	it('names nothing where no row draws it', () => {
+		expect(legend_of([row(1)])).toStrictEqual([])
 	})
 })

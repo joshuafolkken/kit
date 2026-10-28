@@ -131,6 +131,27 @@ describe('classify_child — a child that could not authenticate', () => {
 	})
 })
 
+// joshuafolkken/kit#4745: a usage limit is read before the outage and the failure, after an
+// authentication failure, and counts nothing.
+describe('classify_child — a child a usage limit stopped', () => {
+	const in_progress = issue_state_of({ labels: [IN_PROGRESS] })
+	const usage_limit = 'usage-limit'
+
+	it('reads an OPEN unparked child carrying a reset time as usage-limit, ahead of the outage', () => {
+		expect(run_merge.classify_child(in_progress, { ...OUTAGE, resume_ms: 1 })).toBe(usage_limit)
+	})
+
+	it('reads an authentication failure first', () => {
+		const signals = { ...OUTAGE, resume_ms: 1, is_auth_failure: true }
+
+		expect(run_merge.classify_child(in_progress, signals)).toBe('unauthenticated')
+	})
+
+	it('counts nothing for a usage-limited child', () => {
+		expect(run_merge.change_of(usage_limit)).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#2484: a child that ended its session with a declared cut its successor never adopted
 // is resumed, not parked — and only an OPEN, unparked child is read that way.
 describe('classify_child — a declared cut', () => {
@@ -196,6 +217,20 @@ describe('classify_child — withdrawn by a person', () => {
 
 	it('counts nothing for it', () => {
 		expect(run_merge.change_of('withdrawn')).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4926: a child that gave its lane back on its `lane:plan` is neither a merge, a
+// failure nor an outage, and its OPEN issue stays in the run.
+describe('classify_child — a child that yielded its lane', () => {
+	const open = issue_state_of({ labels: [IN_PROGRESS] })
+
+	it('reads an OPEN child that yielded as yielded, ahead of the outage', () => {
+		expect(run_merge.classify_child(open, { ...OUTAGE, is_yielded: true })).toBe('yielded')
+	})
+
+	it('counts neither a merge nor a failure for it', () => {
+		expect(run_merge.change_of('yielded')).toBeUndefined()
 	})
 })
 

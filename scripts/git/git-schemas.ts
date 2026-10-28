@@ -36,6 +36,7 @@ const ai_review_pull_comment_schema = z.object({
 	body: z.string().optional(),
 	url: z.string().optional(),
 	author: z.object({ login: z.string().optional() }).optional(),
+	updatedAt: z.string().optional(),
 })
 
 const pr_info_schema = z.object({
@@ -108,6 +109,7 @@ const rest_comment_schema = z.looseObject({
 	body: z.string().nullish(),
 	html_url: z.string().optional(),
 	user: z.looseObject({ login: z.string().optional() }).nullish(),
+	updated_at: z.string().optional(),
 })
 
 // The `number,state,labels,body` read, for the epic check and the `--add` closed-epic refusal.
@@ -137,6 +139,12 @@ const epic_subject_schema = z.object({
 // So `blockedBy` is optional for the reason it is absent in practice — the display and the busy
 // check never ask for it, and a field that was not asked for is left out of the mapped row rather
 // than filled in.
+// Who wrote an issue, as REST names it — read through `gh_author_association.author_of`.
+const author_fields_schema = {
+	author_association: z.string().nullish(),
+	user: z.looseObject({ login: z.string() }).nullish(),
+}
+
 const open_issue_schema = z.object({
 	number: z.number(),
 	title: z.string(),
@@ -145,6 +153,10 @@ const open_issue_schema = z.object({
 	blockedBy: blocked_by_schema,
 	// Present only on the pickup listing, which reads it for the paths each issue declares.
 	body: z.string().optional(),
+	...author_fields_schema,
+	// Assembled by the pickup from the author above, never read off the listing: whether the author
+	// has write access. Absent on every other listing.
+	author_trusted: z.boolean().optional(),
 })
 
 type RollupItemData = z.infer<typeof rollup_item_schema>
@@ -154,6 +166,7 @@ type OpenIssueData = z.infer<typeof open_issue_schema>
 type RestCommentData = z.infer<typeof rest_comment_schema>
 
 export {
+	author_fields_schema,
 	package_name_schema,
 	rollup_item_schema,
 	pr_raw_schema,

@@ -1,6 +1,7 @@
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { path_decision } from '#scripts/josh/path-decision'
 import { json_value } from '#scripts/lib/json-value'
+import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { z } from 'zod'
 import { review_level } from './review-level'
 
@@ -13,7 +14,8 @@ import { review_level } from './review-level'
 // because round 1's *fix code* is unreviewed, and that is structural. Arm A applies where there is no fix code — the findings closed without an edit — so
 // the premise is absent rather than overridden. Arm B applies where the fix leaves what executes
 // unchanged: `review-level.ts`'s inert set, documentation under `docs/` and the root `README.md`,
-// `prompts/`, and source files whose only change is in comments (`review-code-tree.ts`).
+// `prompts/`, `josh metrics` approvals, and source files whose only change is in comments
+// (`review-code-tree.ts`).
 //
 // **Arm B is wider than the review level's inert set, on purpose** (joshuafolkken/kit#3787). Round 1
 // still reviews a documentation or prompt change in full, and the fix to its findings is still made;
@@ -51,13 +53,13 @@ const json_schema = z.object({
 // on a missing record would be the cheapest possible run and the most dangerous — the direction
 // `review-brief.ts` already takes when it widens a round-2 target it cannot name.
 const OPEN_FINDING_REASON =
-	'the caller did not assert that every round-1 High/Medium finding closed, so the pass that verifies them is due'
+	'the ledger does not show every round-1 High/Medium finding closed, so the pass that verifies them is due'
 const NO_SNAPSHOT_REASON =
 	'no round-1 snapshot was recorded, so the fix delta cannot be named — the round runs rather than assuming it is empty'
 const EMPTY_DELTA_REASON_PREFIX =
 	'the fix delta is empty: round 1 wrote no fix code, so there is no unreviewed fix for a verification pass to read'
 const INERT_DELTA_REASON_PREFIX =
-	'every path round 1 fixed leaves what executes unchanged — inert, documentation, a prompt, or a comment-only edit'
+	'every path round 1 fixed leaves what executes unchanged — inert, documentation, a prompt, a metrics approval, or a comment-only edit'
 const README_PATH = 'README.md'
 const DOCUMENTATION_PREFIX = 'docs/'
 const MARKDOWN_EXTENSION = '.md'
@@ -73,10 +75,11 @@ interface RoundTwoInput {
 	// a `skip`, which is worse than a mistargeted read — nothing gets read at all.
 	// `undefined` where it could not be resolved to a commit, which is refused exactly like a mismatch.
 	base: string | undefined
-	// Asserted by the caller from round 1's own output, because no command can read a review's
-	// findings. It is a report of a fact already written down, not a judgement made under cost
-	// pressure — and its absence is the safe answer, so a caller that forgets it pays a round.
+	// Read from the issue's ledger, where `review:record` keeps each finding's disposition
+	// (`review-round-one-closure.ts`), not asserted by the caller (joshuafolkken/kit#5286).
 	is_round_one_closed: boolean
+	// Why round 1 is open, quoted into the `required` answer. Absent falls back to the generic reason.
+	open_reason?: string
 	snapshot: FileMapStamp | undefined
 	tree: Record<string, string>
 	// The paths whose code round 1's fixes left as it was (`review_code_tree.comment_only`). Absent is
@@ -130,8 +133,17 @@ function is_documentation(relative: string): boolean {
 	return relative.startsWith(DOCUMENTATION_PREFIX) && relative.endsWith(MARKDOWN_EXTENSION)
 }
 
+// **A `josh metrics` approval is data, not code** (joshuafolkken/kit#4842): the ship's pre-detach
+// re-record rewrites it after round 1, and the gate's own metrics step checks it — the same reason
+// `review-reviewed-tree.ts` reads it as no move.
 function is_unexecuted(relative: string, comment_only: ReadonlyArray<string>): boolean {
-	if (review_level.is_inert(relative) || is_documentation(relative)) return true
+	if (
+		review_level.is_inert(relative) ||
+		is_documentation(relative) ||
+		release_approval_prune.is_approval(relative)
+	) {
+		return true
+	}
 
 	return comment_only.includes(relative)
 }
@@ -172,7 +184,10 @@ function fix_delta(
 }
 
 function decide(input: RoundTwoInput): RoundTwoDecision {
-	if (!input.is_round_one_closed) return required(CODE.OPEN_FINDING, OPEN_FINDING_REASON)
+	if (!input.is_round_one_closed) {
+		return required(CODE.OPEN_FINDING, input.open_reason ?? OPEN_FINDING_REASON)
+	}
+
 	if (input.snapshot === undefined) return required(CODE.NO_SNAPSHOT, NO_SNAPSHOT_REASON)
 
 	const delta = fix_delta(input, input.snapshot)
@@ -204,6 +219,7 @@ const review_round2 = {
 	empty_reason,
 	INERT_DELTA_REASON_PREFIX,
 	inert_reason,
+	is_unexecuted,
 	JSON_KEY,
 	live_reason,
 	NO_SNAPSHOT_REASON,

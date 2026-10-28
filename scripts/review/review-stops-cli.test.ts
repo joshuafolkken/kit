@@ -12,6 +12,7 @@ const NOW_MS = Date.parse('2026-10-22T12:00:00.000Z')
 const OLD_AT = '2026-10-01T00:00:00.000Z'
 const RECENT_AT = '2026-10-21T00:00:00.000Z'
 const MEDIUM = 'bug-risks:medium'
+const NO_FINDINGS = 'no review stop findings'
 const WHERE = `${session_cite.issue(7)} review 2026-10-21`
 
 function stop(kind: string, location: string, at: string = RECENT_AT): StopLine {
@@ -75,7 +76,7 @@ describe('review_stops_cli.run', () => {
 		review_stop_log.record({ issue: 7, stage: 'review', findings: [stop(MEDIUM, 'a.ts')] }, log)
 
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const code = review_stops_cli.run([], { log_path: log })
+		const code = review_stops_cli.run([], { log_path: log, now_ms: NOW_MS })
 		const text = String(info.mock.calls[0]?.[0])
 
 		info.mockRestore()
@@ -84,12 +85,23 @@ describe('review_stops_cli.run', () => {
 		expect(text).toContain(`${MEDIUM}  a.ts  ${session_cite.issue(7)} review`)
 	})
 
+	it('leaves out a finding a passing round fixed in place, which stopped nothing', () => {
+		const log = fresh_log()
+
+		review_stop_log.record(
+			{ issue: 7, stage: 'review', findings: [stop(MEDIUM, 'fixed.ts')], is_fixed: true },
+			log,
+		)
+
+		expect(captured([], log).text).toContain(NO_FINDINGS)
+	})
+
 	it('drops a finding older than the period', () => {
 		const log = fresh_log()
 
 		appendFileSync(log, `${JSON.stringify(stop(MEDIUM, 'old.ts', OLD_AT))}\n`)
 
-		expect(captured(['--period', '7'], log).text).toContain('no review stop findings')
+		expect(captured(['--period', '7'], log).text).toContain(NO_FINDINGS)
 		expect(captured(['--period', '30'], log).text).toContain(`${MEDIUM}  old.ts`)
 	})
 

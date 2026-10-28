@@ -1,10 +1,11 @@
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GateCheck, type GatePlan } from './gate-plan'
 import type { GateStep } from './gate-report'
 import { project_checks } from './project-checks'
 import { type_check_step } from './type-check-step'
 
 const JOSH = 'josh'
-const { TYPE_CHECK_LABEL, UNIT_LABEL } = gate_plan
+const { TYPE_CHECK_LABEL, UNIT_LABEL } = gate_labels
 const UNIT_WORKER_FLAG = '--maxWorkers'
 
 function unit_worker_args(check: GateCheck, plan: GatePlan): ReadonlyArray<string> {

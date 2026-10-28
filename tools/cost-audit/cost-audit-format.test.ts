@@ -6,18 +6,54 @@ function row(key: string, current: number, previous: number, is_regression = fal
 	return { key, current, previous, is_regression }
 }
 
+const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
+const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
+
 function audit_with(overrides: Partial<Audit> = {}): Audit {
 	return {
 		days: 7,
+		lane_density: { current: NO_DENSITY, previous: NO_DENSITY },
 		total: row('total', 12, 10),
 		merges: undefined,
 		per_merge: undefined,
 		kinds: [],
 		tools: [],
 		guards: [],
+		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
 		...overrides,
 	}
 }
+
+describe('cost_audit_format.report_lines — the lane-child density line', () => {
+	it('prints the lane children calls per request and single-call share beside the previous period', () => {
+		const lane_density = {
+			current: { requests: 4, calls: 8, single: 1 },
+			previous: { requests: 100, calls: 145, single: 79 },
+		}
+
+		expect(cost_audit_format.report_lines(audit_with({ lane_density }))).toContain(
+			'  lane-child density: 2.00 calls/request, 25.0% single-call (prev 1.45 calls/request, 79.0% single-call)',
+		)
+	})
+
+	it('prints a zero density, not a division by zero, where no lane child called a tool', () => {
+		expect(cost_audit_format.report_lines(audit_with())).toContain(
+			'  lane-child density: 0.00 calls/request, 0.0% single-call (prev 0.00 calls/request, 0.0% single-call)',
+		)
+	})
+})
+
+describe('cost_audit_format.report_lines — the full cache rewrites', () => {
+	it('prints the rewrites after a wait and within the TTL beside the previous period', () => {
+		const current = { after_wait: { count: 631, usd: 182 }, within_ttl: { count: 2, usd: 0.5 } }
+		const lines = cost_audit_format.report_lines(
+			audit_with({ rewrites: { current, previous: NO_REWRITES } }),
+		)
+
+		expect(lines).toContain('  after a wait of 5 min or more: 631 ($182.0000) (prev 0 ($0.0000))')
+		expect(lines).toContain('  within 5 min: 2 ($0.5000) (prev 0 ($0.0000))')
+	})
+})
 
 describe('cost_audit_format.report_lines — the printed report', () => {
 	it('prints each row with its change against the previous period', () => {

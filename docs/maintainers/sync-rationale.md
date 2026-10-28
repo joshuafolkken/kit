@@ -189,7 +189,9 @@ nothing left to undo it. Both copies declare `group: ${{ github.workflow }}-${{ 
 another's. `ci.yml`'s sha-per-`push` clause never fires here, and copied without its
 `github.event_name == 'push'` guard it would give each push its own group and cancel nothing. kit's
 **own** copy has no upstream-managed exclusion and so nothing to withdraw: there
-`.github/workflows/*` is the source of truth.
+`.github/workflows/*` is the source of truth. It still arms with `--match-head-commit`, so a run
+whose branch moved before its arming refuses to arm; a push after the arming leaves auto-merge on
+(joshuafolkken/kit#4654).
 
 ## The Allow auto-merge prerequisite
 

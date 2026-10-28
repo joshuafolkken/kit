@@ -35,7 +35,7 @@ import { shell_segments } from './shell-segments'
 // one command cannot disagree: an opening subshell parenthesis, environment assignments, and the
 // package-manager wrapper in either of its spellings. Left out, `JOSH_CI_TIMEOUT_SECONDS=600 pnpm
 // josh git -y` and `(pnpm josh git -y)` are silently not the push step, and the run pays the tail the
-// rule exists to stop. `g` is the alias `josh-command-map.ts` resolves to `git`.
+// rule exists to stop. `g` is the alias `josh-aliases.ts` resolves to `git`.
 const SEGMENT_PREFIX = String.raw`(?:\(\s*)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:npx\s+|pnpm\s+(?:exec\s+|run\s+)?)?`
 // A closing parenthesis ends a word as a space does, so every boundary below admits it — without
 // that, a subshell defeats the flag test even where it does not defeat the command test.

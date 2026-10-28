@@ -1,5 +1,9 @@
 import { api_auth } from '#scripts/agent/api-auth'
+import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
+import { MERGE_UNCONFIRMED_MESSAGE } from '#scripts/gh/git-gh-pr'
+import { gh_retry } from '#scripts/gh/git-gh-retry'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
+import { git_error } from '#scripts/git/git-error'
 import { describe, expect, it } from 'vitest'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
 
@@ -33,6 +37,22 @@ describe('run_ship_stop_cause.cause_of', () => {
 
 const RED_CHECK = 'CI / test failed'
 
+// joshuafolkken/kit#5012: a merge gate that stopped on reviewer comments it could not read is a read to
+// retry, read on the note the gate prints to the standard output, whatever gh's own reason said.
+describe('run_ship_stop_cause.cause_of — an unreadable comment listing', () => {
+	const STOPPED = `⚠️ ${UNREADABLE_COMMENTS_STOP}`
+
+	it('reads a followup the unreadable comments stopped as the infrastructure', () => {
+		const failed = { body: `${STOPPED}\n❌ Error: comments could not be read`, out: STOPPED }
+
+		expect(cause_of('followup', failed)).toBe(CAUSE.INFRA)
+	})
+
+	it('reads it as a check when only the standard error names it', () => {
+		expect(cause_of('followup', { body: STOPPED, out: RED_CHECK })).toBe(CAUSE.CHECK)
+	})
+})
+
 // joshuafolkken/kit#4589: a failed stage's body carries its stderr, where a poll warns of a transient
 // rate limit it then recovered from.
 describe('run_ship_stop_cause.cause_of — the standard output a stage kept', () => {
@@ -41,6 +61,48 @@ describe('run_ship_stop_cause.cause_of — the standard output a stage kept', ()
 
 		expect(cause_of('followup', failed)).toBe(CAUSE.CHECK)
 	})
+})
+
+// joshuafolkken/kit#5052: a request gh found transient to its last attempt notes so on stderr alone.
+describe('run_ship_stop_cause.cause_of — a gh request whose retries ran out', () => {
+	const EMPTY_ANSWER = 'unexpected end of JSON input'
+	const RETRY_NOTE = `gh: request failed transiently (attempt 1/3: ${EMPTY_ANSWER}) — retrying in 2000 ms`
+	const SPENT = gh_retry.spent_note(EMPTY_ANSWER)
+	const { DETAILS_PREFIX, FAILURE_PREFIX } = git_error
+
+	it('reads a followup stopped on it as the infrastructure, though its stdout names none', () => {
+		const failed = { body: `${RETRY_NOTE}\n${SPENT}\n${FAILURE_PREFIX} ${EMPTY_ANSWER}`, out: '' }
+
+		expect(cause_of('followup', failed)).toBe(CAUSE.INFRA)
+	})
+
+	it('reads a red check whose stderr notes only a recovered retry as a check', () => {
+		expect(cause_of('followup', { body: `${RETRY_NOTE}\n${RED_CHECK}`, out: RED_CHECK })).toBe(
+			CAUSE.CHECK,
+		)
+	})
+
+	it('reads a followup stopped on a failure caused by it as the infrastructure', () => {
+		const unconfirmed = `${FAILURE_PREFIX} ${MERGE_UNCONFIRMED_MESSAGE}\n\n${DETAILS_PREFIX} ${EMPTY_ANSWER}`
+
+		expect(cause_of('followup', { body: `${SPENT}\n${unconfirmed}`, out: '' })).toBe(CAUSE.INFRA)
+	})
+
+	it('reads a red check stopped on after a caught spent request as a check', () => {
+		const body = `${SPENT}\n${RED_CHECK}\n${FAILURE_PREFIX} ${RED_CHECK}`
+
+		expect(cause_of('followup', { body, out: RED_CHECK })).toBe(CAUSE.CHECK)
+	})
+})
+
+// joshuafolkken/kit#4825: the commit and followup stages gate a merged tree themselves.
+describe('run_ship_stop_cause.cause_of — a stop tagged as a check', () => {
+	it.each(['commit', 'followup'] as const)(
+		'reads a %s stop tagged as a check as one, whatever its output names',
+		(stage) => {
+			expect(cause_of(stage, { body: RATE_LIMITED, cause: CAUSE.CHECK })).toBe(CAUSE.CHECK)
+		},
+	)
 })
 
 describe('run_ship_stop_cause.cause_of — every stop that is not the infrastructure', () => {

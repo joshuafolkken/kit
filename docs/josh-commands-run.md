@@ -2,7 +2,7 @@
 
 The commands a run and its lanes call to hold, step, cut and ship, plus the session-budget and document-reading commands a run uses. Where each command came from: `docs/maintainers/josh-commands-run-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `pnpm josh command:derive` — edit the entry, not the span.
 
 ## Run lifecycle
 
@@ -194,14 +194,14 @@ start, or does not claim the run within two minutes, is a `failed` stop; an uncl
 
 **Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
 
-| Provider  | scheduler                    | worker                       | reviewer                   |
-| --------- | ---------------------------- | ---------------------------- | -------------------------- |
-| Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `high` |
-| OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `high`     |
+| Provider  | scheduler                    | worker                       | reviewer                     |
+| --------- | ---------------------------- | ---------------------------- | ---------------------------- |
+| Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |
+| OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     |
 
 Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
 either provider, and legacy `JOSH_LANE_*` values to the worker only. Review round 2 and later (the
-verification pass) runs Anthropic on `claude-sonnet-5-5` / `high`, overridable by
+verification pass) runs Anthropic on `claude-sonnet-5-5` / `high` and OpenAI on `gpt-6.1-sol` / `high`, overridable by
 `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}`, then `JOSH_REVIEWER_*`. With no session marker and no
 `JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
 launch from a plain terminal. Invalid configuration, conflicting session markers, or a missing,
@@ -416,7 +416,9 @@ the supervisor's driver runs the idle watch — `pnpm josh retrospective` at a d
 at the cut cap, `stop` once the session has handed the record off, and `unknown` (exit 1, with the usage
 on stderr) in a lane child or when no record is this session's.
 
-When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the one action line.
+When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
+
+A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
@@ -443,31 +445,48 @@ pnpm josh run:merge <N> --owner "$PPID"                                         
 
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
 - `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
-- `--output <path>` — the transcript the outage split reads; absent, it is off.
+- `--output <path>` — the transcript the outage and usage-limit splits read; absent, they are off.
 - `--driver` — the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.
 
 <!-- /usage -->
 
 Confirms the child from GitHub and does its post-merge steps: a **merged**
-child (CLOSED) closes any epic it completed, then `main:sync`, is counted into the carry record
-(resetting the failure streak),
-`lane:close <N>`, and the counters mirrored onto the epic comment; a **parked** child (`needs-decision`,
+child (CLOSED by a merge, read off its timeline) closes epics beside `main:sync`, is counted (resets the failure streak) and its `merge`
+logged once at confirmation, then `lane:close <N>` and the epic counters; a merged lane over 40 minutes of net time
+(`lane:net`) comments its breakdown by stage (`lane:breakdown`) on the lane's Issue once and launches a detached session that searches the longest stages first and files its unfiled causes against the lane, recorded as a `note`
+event (the start note carrying the longest stage, which the board draws after 🔍) (`lane-overrun.ts`, its wording `run-event-overrun.ts`), its result `folded #A,#B` / `filed` / `recurred #M` / `none: <why>` — the causes one file or mechanism shares filed as one Issue, or folded into an open one touching the same files;
+a lane within 40 minutes notes `#N net: M min`, one with no net time `#N overrun skipped: <reason>`; a launch that failed (`not investigated: <why>`) is launched once more at the next merge, whichever child merged; every 30th merge in the
+lane ledger launches one baseline investigation of the median lane — the stages and sub-stages that spend the most per merge
+in `lane:stats --period 3`, its causes filed by the overrun's rules (at most five, the largest reducible minutes first, each 1 minute or more) — noted `baseline @M merges: <outcome>` (`lane-baseline.ts`,
+its wording `run-event-baseline.ts`), a finding on the board. Both investigations are off by default and run only while
+`JOSH_LANE_INVESTIGATION` is `on` ([environment variables](./environment-variables.md#runs)): off, a lane over 40 minutes notes
+`#N overrun skipped: disabled (JOSH_LANE_INVESTIGATION is not on)` with no breakdown comment or launch, no failed launch is retried, the other notes are unchanged, and a due baseline launches and notes nothing. The board's
+merged row ends `M′`, the child's own filed numbers, then that outcome (`⏭`, `🔍`, `🔍 ↪N`, `🔍 ∅`, `🔍 💥`, spinner)
+and the investigation's (its launch's `JOSH_LANE_OVERRUN` mark, on the `filed` event), groups two spaces apart
+(`47′  4847  🔍 implement 31′ · 4856`), and while `JOSH_LANE_INVESTIGATION` stays off every merged row ends on its filed numbers alone, whatever its note (no `M′`, no outcome); a 🏁 row keeps all the numbers; a failed sync logs nothing; a **parked** child (`needs-decision`,
 `run:stalled` or `already-done`) only has its `in-progress` dropped; an **outage** child (OPEN, unparked, exit record shows it could not
 reach the API, or a host restart killed it — dispatched before the host booted, its log not ending on an exit record) has it dropped, unparked and uncounted: re-dispatchable;
+a **usage-limit** child (OPEN, unparked, exit record shows a Claude usage limit stopped it) has it dropped, unparked and counted
+against no streak, and a `usage-limit` event names the reset (unreadable or past: 30 minutes on); `backlog:drive` launches nothing before it;
 a **failed** child (OPEN, unparked, not an outage) has it dropped, is parked with `run:stalled` and counts against the failure guard — unless it records
 an open blocker, a `- 実施可能日:` still ahead or a `- 実施可能条件:` not yet met (or, its body unreadable, carries `not-before`): then it
 is **waiting**, unparked and uncounted, its comment naming the wait.
+A **withdrawn** child (a `lane:withdraw` on the stream, or CLOSED with no merged pull request) counts and logs nothing
+and launches no investigation; its lane is withdrawn through `lane:withdraw`'s path unless already withdrawn — kept, as the `run:wake` sweep keeps one, where its branch has commits on no remote; a retry where the withdrawal cannot read it.
 A failed child whose detached `josh ship` ended is parked for its stop: the comment's `Why` names the
-newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`.
+newest `ship-stop` line since launch, else the ship's result and `pnpm josh ship --log <N>`. A stop
+followed by `relaunch-failed` (the relaunch started nothing) is unanswered, re-dispatched whatever the
+dispatch log's mtime; a child parked at the per-child re-dispatch cap leads its `Why` with the cap, its
+re-dispatch count and its newest `relaunch-failed` line.
 A **cut** child (OPEN, unparked, its lane holding a declared cut no successor adopted) is neither
 parked nor counted: its successor is relaunched in its lane once
 per cut; a relaunch that cannot start, or a second unadopted return, is the failed child instead. An OpenAI lane is left to its supervisor.
-A parked, failed, waiting or outage child's lane is closed when vacant (no commit past the default
+A parked, failed, waiting, outage or usage-limit child's lane is closed when vacant (no commit past the default
 branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed the shared 135,000 context threshold: hand the lanes over and cut), `human-review` (the child stopped
+`over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut), `human-review` (the child stopped
 before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped,
 or a child could not authenticate; it keeps `in-progress`, uncounted, for `/login`), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
 (unreadable), `busy` (refused count; exit 1).
@@ -476,21 +495,41 @@ or a child could not authenticate; it keeps `in-progress`, uncounted, for `/logi
 
 <!-- usage: run:review -->
 
-Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict).
+Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change).
 
 ```bash
-pnpm josh run:review          # detach the gate, print the brief; then launch the /code-review subagent
-pnpm josh run:review --join   # after the review returns: join the gate, check its verdict
+pnpm josh run:review                             # detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief
+pnpm josh run:review --code-only                 # josh ship's own open: code's brief alone, since the ship opens the interaction brief itself
+pnpm josh run:review --unpinned-ok "only logs"   # check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places
+pnpm josh run:review --join                      # after the review returns: join the gate and test:pinned; exit 3 on an unpinned change
+pnpm josh run:review --join --fixing             # the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds
+pnpm josh run:review --pinned                    # read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once
+pnpm josh run:review --push                      # launched by a lane open: push and open the PR at a green gate
 ```
 
 <!-- /usage -->
 
 It composes `josh gate` and `josh review:brief` and changes neither, so `review:attest --check`'s nonce/checkout contract is unchanged.
+Where this branch's issue owes an interaction review not yet recorded, the `review:brief --interaction`
+brief is written to its own file after code's and both paths are printed, so the round-1 reviewers run
+side by side and `josh ship` reuses both records; `--code-only` is the ship's own open and prints code's
+brief, since the ship opens the interaction brief itself.
 
-The default waits only for the gate to _start_ and prints the brief;
+The default waits only for the gate to _start_ and writes the brief to a file and prints its path;
 `--join` waits for it to finish, prints the gate/review overlap, and **exits non-zero on a red gate** —
-"a review verdict is not adopted over a red gate". The overlap's reader is
-`chain-rule.md`.
+"a review verdict is not adopted over a red gate". A gate that passed on a tree that moved after it
+(a review fix in place) exits `2` and says so rather than `Gate RED`; `josh ship --review` drains it
+and its gate stage re-runs on the moved tree. `josh test:pinned --record <token>` runs detached beside
+the gate; `--join` prints its lines and **exits `3` on an unpinned change**, which `josh ship --review`
+never drains (`--unpinned-ok`: above). A check `--join` started again on a moved tree is not waited on:
+it is left running for the ship's pre-detach, as under `--fixing`. `review:record` reads a skipped
+`--join`. The reason and places `--unpinned-ok` accepted stay for the
+branch in the git directory (`josh-unpinned-ok.json`); a later run with no reason carries on under it
+while every place, keyed by file, function and the lines replaced and put in, is recorded, and a
+`josh ship --review` given no reason carries it as its `--unpinned-ok`. A scoped refusal launches
+neither; a reopen stops the last check. A dispatched lane child whose round 1 is recorded on a tree
+`josh ship` reuses is refused before either launches, pointed at `josh ship --detach --review`, and
+`josh review:record` names the same next step after a code round the ship reuses. The overlap's reader is `chain-rule.md`.
 
 ### `josh run:tail`
 
@@ -528,20 +567,67 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
-- `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.
-- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off, the checks even after a preflight refusal, so one stop reports every failure; a stop returns to the same session.
+- `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.
+- `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
+- `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 
 <!-- /usage -->
 
-It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate never reaches the commit, and the report closes with the name of the stopped step.
+It runs `git -y`, `followup` (kept in the foreground) and `run:tail` in order, under one header per step. A red gate stops the ship before the followup merges; a sync that merged the default branch pushes onto an open pull request ahead of the gate, and the commit stage pushes the gated tree. The the report closes with the name of the stopped step.
 
 The first positional is the `"<title> #<N>"` string `git -y` and `followup` take; `run:tail` gets the issue number off its tail. Further positionals are follow-up citations filed this run (branch-2 filing runs before `ship`), forwarded to `run:tail` after the closed issue.
 
 A `preflight` stage first asks every pull-request precondition together, so a stop lands before the review and the gate.
 
+One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
+
+In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once `check:related` printed it.
+
 A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
+A lane child always ships with `--review`, after its in-implement round 1. The `review` stage reuses a round 1 attested on this branch whose tree held, or moved only where round 2 reads, and ends `skipped` (`done` when an owed interaction review then runs); any other round 1 is reviewed again. A gate stage that reuses a green record ends `skipped` too.
+
+The review stage's `ship-stage` line carries the reason after `|` (`reused: …` or `ran: … — <cause>`), and `lane:breakdown` prints it beside the stage.
+
+A supervisor whose `sync` changed its own code hands the stages after it to a successor on that code (the wake supervisor's take-over, same launch record); a successor that does not take over leaves it running on.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in detail".
+
+### `josh review:submit`
+
+<!-- usage: review:submit -->
+
+Write a ship reviewer's findings, read from stdin, where the ship reads them.
+
+```bash
+pnpm josh review:submit < findings.txt                 # the /code-review slot
+pnpm josh review:submit --interaction < findings.txt   # the interaction review slot
+pnpm josh review:submit --none                         # a review with no findings
+```
+
+**Options:**
+
+- `--none` — a review with no findings; empty stdin without it is refused.
+
+<!-- /usage -->
+
+The reviewer `josh ship --review` launches pipes its findings here, one `review:record` line each. The command writes them to the slot's findings file, where the ship reads them, so the reviewer never copies a path. A line outside the grammar is refused, and nothing is written.
+
+### `josh ship:wait`
+
+<!-- usage: ship:wait -->
+
+Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending).
+
+```bash
+pnpm josh ship:wait <N>   # re-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix
+```
+
+<!-- /usage -->
+
+A stop in the gate or review round 1 returns to the lane session waiting here; with no session waiting, a fresh one is launched as before.
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` in detail".
 
 ### `josh run:report`
 
@@ -585,14 +671,14 @@ Keyed to the common git directory `run:carry` uses, so parent and lane children 
 `--follow` is `--from` that waits, returning at an event or else at the interval. Events go to stdout and the next position to stderr — the same before
 and after a cut. `--watch` loops that pass, printing `HH:MM · <label> · <text>` in the session language.
 
-`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `cut`,
+`<kind>` is one the single enumeration names (`plan`, `child-launch`, `merge`, `park`, `outage`, `usage-limit`, `cut`,
 `resume`, `stop`, `pr-opened`, `review-round`, `filed`, `note`, `lane-phase`, `setup`, `pr-checks`); a kind outside it is refused.
 `lane-phase` is a lane child's first implementation edit, written by the PreToolUse hook.
 `pr-checks` is `josh followup`'s poll of a PR's checks, written only on change.
 `setup` is one stage the run works through (`planning`, `dispatching #<N>`, …) — a trace `run:board` times, never a position.
 `filed` is an Issue `issue:file` created, and `note` a one-line
-observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`
-and `outage`; other steps call `--append`. The stream is bounded.
+observation below the filing bar (`run:board` shows both). `run:merge` appends `merge`, `park`,
+`outage` and `usage-limit`; other steps call `--append`. The stream is bounded.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:event` in detail".
 
@@ -677,12 +763,13 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker that overruns the column — another repository's `owner/repo#N` — leaves it blank, and every blocker follows the title.
 - `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local time; `backlog:next` keeps the UTC spelling.
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
+  The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
 - `✋ <N>` — judged and unblocked, but the unblocked untriaged issue `<N>` withholds the whole pool.
 - `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and waits …" from.
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
-- `📂 <N>` — a path its body declares overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
+- `📂 <N>` — a path it declares — its recorded plan, else its plan comment, else its body — overlaps one the running issue `<N>` declares, the path after the title; `backlog:next` answers "waits: its `<file>` overlaps …".
 - `🧵 <used>/<limit>` — the open lanes fill the limit `lane:limit` prints, read at the board's last local read. It counts every lane `lane:limit` does, even an earlier run's no row shows; an unread limit leaves the column blank.
 - `🧠 <n>%` — a lane is free, but the driver opens none while the kernel reads critical memory pressure, 🧠 is red or 💾 swaps at a red rate, `💾 <n>M/s` after the title; it resumes within one poll once the kernel reads under critical and both are under yellow. The ledger records the hold as `memory` (its own `lane:stats` row); an unread figure is left out.
 - `⏳` with a blank column — no wait is read.
@@ -808,8 +895,8 @@ pnpm josh lane:dispatch 1749   # prints the child's pid; a refusal is an empty c
 **Options:**
 
 - `JOSH_{SCHEDULER,WORKER,REVIEWER}_MODEL` — Claude Code role overrides; Anthropic defaults are respectively `claude-opus-5-5`, `claude-opus-5-5`, and `claude-opus-5-5`. Codex keeps its provider-specific model.
-- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.
-- `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}` — review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.
+- `JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT` — role effort overrides for either provider; defaults are `medium`, `medium`, and `medium`.
+- `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}` — review round 2 and later (the verification pass); defaults are `claude-sonnet-5-5` / `high` on Anthropic and `high` on OpenAI, falling back to `JOSH_REVIEWER_*`.
 
 <!-- /usage -->
 
@@ -889,7 +976,7 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used.
 
 ```bash
 pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
@@ -897,9 +984,104 @@ pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
 
 <!-- /usage -->
 
+Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
+(`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
+`review-fix` from `run:review` on, each call's span counted from the previous call's end, less its `lane:pause` time.
+
+Between them, the followup critical path table (`lane-ci-path-stats.ts`) counts, per check that settled last in `followup`'s CI wait,
+its runs and the median and maximum seconds into the wait it settled at. A check is timed only once seen pending, and CodeRabbit is
+left to the `coderabbit-wait` row (`followup-ci-path.ts`).
+
+Under the gate check table, the claim-versus-measured table (`lane-claim-stats.ts`) prints, per check, the median cores it
+claimed, the cores it used (`cpu_ms ÷ elapsed_ms`: median, p90, maximum) and the seconds its claims waited — reused runs and
+runs with no `cpu_ms` left out. It only reports: a core weight is changed in its own Issue, from this table.
+
 Procedure and columns for measuring a lane limit: [lane-limit-measurement.md](./maintainers/lane-limit-measurement.md).
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample` / `josh lane:stats` in detail".
+
+#### `josh lane:value`
+
+<!-- usage: lane:value -->
+
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+
+```bash
+pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant
+pnpm josh lane:value cell --table "test:related scope" --row related --column "median (s)" --since 2026-10-23T03:29Z   # one lane:stats table cell since an instant
+```
+
+<!-- /usage -->
+
+The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
+
+`cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
+
+#### `josh lane:net`
+
+<!-- usage: lane:net -->
+
+Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood and the host's sleeps.
+
+```bash
+pnpm josh lane:net 4695   # the net minutes a causing-lane line declares
+```
+
+<!-- /usage -->
+
+The whole minutes are what an Issue's `- 原因のレーン:` line declares; a lane the ledger holds no dispatch and merge of exits non-zero.
+
+Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:net` in detail".
+
+#### `josh lane:breakdown`
+
+<!-- usage: lane:breakdown -->
+
+Print a merged lane's net time by stage, longest first, the implementation split by its tool calls.
+
+```bash
+pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation comments on the lane
+```
+
+<!-- /usage -->
+
+The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
+
+A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
+
+The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
+
+Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
+`between ship stages` lists the child's Bash there by kind. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
+
+### `josh lane:plan`
+
+<!-- usage: lane:plan -->
+
+Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue.
+
+```bash
+pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts
+```
+
+<!-- /usage -->
+
+A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
+
+A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+
+On a clash the child gives its lane back instead of polling with its seat taken:
+
+- It notes its yield on the event stream, releases its `run:hold`, and the session ends with no edit.
+- `run:merge` books it `yielded` — not a merge, a failure or an outage — and closes the lane with a withdrawal naming `its own lane:plan`.
+- Its plan stays recorded, uncleared and marked yielded: `backlog:next` holds the issue back on it and offers it again once the holder's lane ends. Unlike `lane:withdraw`, a yield keeps the issue in the run.
+- The note ends `· at: summary`, or `· at: entry` for the entry probe below.
+
+`--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
+
+A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body, so a candidate whose plan names a running lane's file is held back before dispatch and a path its body only cites holds nothing.
+
+**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
 
@@ -910,7 +1092,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 Say whether the next turn of a run crosses the context-cut threshold (--cut) or a given tokens-per-request figure (--over).
 
 ```bash
-pnpm josh cost --cut                # compare billed input per request with the shared 135,000 context-cut threshold
+pnpm josh cost --cut                # compare billed input per request with the context-cut threshold priced at the session model
 pnpm josh cost --over <tokens>      # compare with an explicit limit
 pnpm josh cost --cut --path <dir>   # Anthropic project or current OpenAI worktree
 ```
@@ -1089,7 +1271,9 @@ pnpm josh time --split-at 2026-10-16T21:33:19Z   # the same tree compared by rol
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `tools/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
 
-**Output:** a header, a by-role breakdown and a per-session list, led by a run-state block when the run is unfinished. An unmeasured figure prints `not measured`.
+**Output:** a header, a by-role breakdown, a worker-by-phase block and a per-session list, led by a run-state block when the run is unfinished. An unmeasured figure prints `not measured`.
+
+The worker-by-phase block (`worker_phases` in `--json`) splits the lane children into `implement` and `ship`, each with its session count, request count and cost. A lane session whose `run:cut --resume` answered `resume` is `ship`; every other lane session is `implement`. A run without a lane child prints no block.
 
 **Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 
@@ -1135,6 +1319,8 @@ pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. It reads kit's own transcript store, kit-lanes included.
 
 It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`tools/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
+
+Under the cost per merge, `lane-child density` gives the lane children's tool calls per request and their share of single-call requests, beside the period before.
 
 It exits `0` on a report, and `1` with the usage on a bad `--period`.
 

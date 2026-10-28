@@ -1,4 +1,5 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_invocation } from '#scripts/run/run-invocation'
@@ -14,7 +15,8 @@ const ERROR_PREFIX = 'error '
 // **The driver is bounded so the supervisor reaches its pass boundary between dispatches**
 // (joshuafolkken/kit#4509): unbounded, `backlog:drive` dispatches, collects and merges lanes in its own
 // loop until a judgment hand-off, and the code check at the pass boundary would wait for that.
-const WINDOW_MINUTES = '5'
+const WINDOW_MINUTES = 5
+const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
 const WINDOW_VERDICT = 'window'
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
@@ -27,7 +29,7 @@ function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 		'--owner',
 		String(process.pid),
 		'--window',
-		WINDOW_MINUTES,
+		String(WINDOW_MINUTES),
 		...rebuilt.split(' ').slice(1 + named_count),
 	]
 }
@@ -222,4 +224,4 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 	)
 }
 
-export const run_wake_driver = { RERUN_LIMIT, drive, driver_args, driver_result }
+export const run_wake_driver = { RERUN_LIMIT, WINDOW_MS, drive, driver_args, driver_result }

@@ -3,7 +3,7 @@ import { run_merge_outcome } from './run-merge-outcome'
 
 // joshuafolkken/kit#4102: the names `run:merge --driver` prints and the driver reads back against.
 describe('run_merge_outcome.CHILD_OUTCOMES', () => {
-	it.each(['merged', 'parked', 'failed', 'unresolved'])('holds %s', (outcome) => {
+	it.each(['merged', 'parked', 'usage-limit', 'failed', 'unresolved'])('holds %s', (outcome) => {
 		expect(run_merge_outcome.CHILD_OUTCOMES).toContain(outcome)
 	})
 

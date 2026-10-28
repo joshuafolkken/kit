@@ -19,6 +19,7 @@ const NESTED_README = 'scripts/README.md'
 const CLAUDE_SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CLAUDE_MD = 'CLAUDE.md'
 const CONFIG = 'cspell.config.yaml'
+const APPROVAL = '.josh/metrics-accepted/4765.json'
 const BEFORE = 'aaa'
 const AFTER = 'bbb'
 // What `review-tree.ts` records for a path the change lists but the working tree no longer holds.
@@ -52,6 +53,20 @@ describe('review_round2.decide — the round is required unless something says o
 		expect(decision.reason).toBe(review_round2.OPEN_FINDING_REASON)
 		// The flag is read before the tree, so an empty delta cannot answer for a standing finding.
 		expect(decision.delta).toStrictEqual([])
+	})
+
+	// joshuafolkken/kit#5286: the ledger's reason for an open round 1 is quoted rather than the default.
+	it('quotes the reason the caller read round 1 open by', () => {
+		const open_reason = 'round 1 left a Medium deferred'
+		const decision = review_round2.decide({
+			base: BASE,
+			is_round_one_closed: false,
+			open_reason,
+			snapshot: SNAPSHOT,
+			tree: IMPLEMENTATION,
+		})
+
+		expect(decision.reason).toBe(open_reason)
 	})
 
 	it('requires the round when no round-1 snapshot was recorded', () => {
@@ -205,6 +220,15 @@ describe('review_round2.decide — a fix that leaves what executes unchanged', (
 		expect(decision.reason).toContain(review_round2.INERT_DELTA_REASON_PREFIX)
 	})
 
+	// joshuafolkken/kit#4842: the ship's pre-detach re-record rewrites the approval after round 1.
+	it('skips the round when a fix delta holds only a metrics approval', () => {
+		const decision = decide_fix([APPROVAL])
+
+		expect(decision.verdict).toBe(review_round2.SKIPPED_VERDICT)
+		expect(decision.reason).toContain(review_round2.INERT_DELTA_REASON_PREFIX)
+		expect(decision.delta).toStrictEqual([APPROVAL])
+	})
+
 	it('skips the round when a fix changed only the comments of a source file', () => {
 		const decision = decide_fix([SOURCE, DOCUMENT], [SOURCE])
 
@@ -251,6 +275,17 @@ describe('review_round2.decide — a fix outside that range still gets the round
 		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
 		expect(decision.reason).toContain(SOURCE)
 		expect(decision.delta).toStrictEqual([CHANGELOG, SOURCE])
+	})
+})
+
+// joshuafolkken/kit#4842: the approval is skippable only alone; code beside it still decides.
+describe('review_round2.decide — a metrics approval beside code', () => {
+	it('requires the round when a fix changed code beside a metrics approval', () => {
+		const decision = decide_fix([APPROVAL, SOURCE])
+
+		expect(decision.verdict).toBe(review_round2.REQUIRED_VERDICT)
+		expect(decision.reason).toContain(SOURCE)
+		expect(decision.reason).not.toContain(APPROVAL)
 	})
 })
 

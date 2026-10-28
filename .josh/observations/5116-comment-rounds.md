@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lint/lint-parallel.ts:166 | 2026-10-27 | #5116
+- rf:project-conventions | low | scripts/ci/ci-yml-static-check-caches.test.ts:52 | 2026-10-27 | #5116

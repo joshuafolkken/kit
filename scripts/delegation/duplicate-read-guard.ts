@@ -210,6 +210,7 @@ const notice_refusal_path = hook_decision.create_refusal_stamp(NOTICE_STAMP_PREF
 const { deny_envelope, DISABLED_VALUES } = hook_decision
 
 const duplicate_reads = {
+	is_successful_read,
 	REASON,
 	NOTICE,
 }

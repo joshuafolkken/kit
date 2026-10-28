@@ -11,7 +11,7 @@ import { run_park } from '#scripts/run/park/run-park'
 import { run_label } from '#scripts/run/run-label'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
-import { lane_ledger } from './lane-ledger'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_state, type RecordOutcome } from './lane-state'
@@ -90,7 +90,7 @@ describe('lane_dispatch.dispatch_child — the launch record the stall detector 
 // implementation from it, and the capped stream would have dropped a period's earlier dispatches.
 describe('lane_dispatch.dispatch_child — the dispatch the implementation is timed from', () => {
 	it('records the dispatch in the lane ledger once the child has started', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_dispatch').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_dispatch').mockResolvedValue()
 
 		launch.mockReturnValue({ kind: 'launched', pid: PID })
 		await lane_dispatch.dispatch_child(ISSUE)
@@ -99,7 +99,7 @@ describe('lane_dispatch.dispatch_child — the dispatch the implementation is ti
 	})
 
 	it('records no dispatch when the launch started no child', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_dispatch').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_dispatch').mockResolvedValue()
 
 		launch.mockReturnValue({ kind: 'failed', note: SPAWN_FAILURE })
 		await lane_dispatch.dispatch_child(ISSUE)

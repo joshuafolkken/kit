@@ -88,6 +88,8 @@ For each finding:
 - Cite `file_path:line_number`
 - State severity (`high` / `medium` / `low`) by the two tests in "Severity"
 - Explain the concrete problem and the minimal fix
+- On a `high` or `medium`, cite every other site of the same pattern in the change's files and their
+  callers as `file_path:line_number`, so one fix pass closes them all
 - On a test-1 finding rated `low`, write `no failure scenario — <what you tried>`
 
 A category with no findings needs a proof statement, e.g. `No issues — checked null returns on X,
@@ -139,6 +141,9 @@ Actively try to break the changed code.
 - Impact outside the diff: open the callers of every changed export or signature and verify they still
   hold; flag duplication the change introduces
 - Regressions in existing behavior covered elsewhere
+- Commands the changed prose tells a reader to run, run from a cwd other than the root with absolute,
+  relative and empty inputs, in a scratch copy when they write: `prompts/review.md` → "Before round 1
+  — the implementer's self-check", question 10
 
 **`No issues` requires at least one explicit trace statement.**
 
@@ -204,6 +209,9 @@ concerns"; if nothing is uncertain, trace the logic path that gives that confide
   not describe.
 - High findings → must fix before committing
 - Medium findings → must fix before opening the PR
+- A finding wholly covered by an open follow-up this Issue filed (a `先送り: #M <title>` comment on
+  it, which `issue:file --found-during <N>` posts) → record it as `low` citing `#M`, never `medium`
+  or `high`, so it does not stop the ship
 - Low findings → document in the PR body if skipped
 
 If the diff is empty or trivial (e.g. whitespace only), state that and skip the review.

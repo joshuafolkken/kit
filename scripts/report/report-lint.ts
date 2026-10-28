@@ -1,3 +1,4 @@
+import { markdown_shape } from './markdown-shape'
 import { report_format_reference } from './report-format-reference'
 import { report_labels, type ReportLabels } from './report-labels'
 
@@ -39,19 +40,6 @@ const LETTER_PATTERN = /^\p{L}/u
 const MIN_BREAK_CONDITIONS = 3
 const LIST_ITEM_PATTERN = /^\s*(?:\d+\.|[-*])\s+/u
 const REASON_SEPARATORS = /^[\s:：—|、,.。-]+/u
-
-function first_content_line(summary: string): string {
-	return (
-		summary
-			.split('\n')
-			.find((line) => line.trim().length > 0)
-			?.trim() ?? ''
-	)
-}
-
-function is_fenced(summary: string): boolean {
-	return first_content_line(summary).startsWith('```')
-}
 
 // A label counts only where no letter follows it, so `Change` is not found inside `Changes and tests`.
 function has_label(summary: string, label: string): boolean {
@@ -109,12 +97,6 @@ function has_path_or_flag(sentence: string): boolean {
 		FILE_EXTENSION_PATTERN.test(sentence) ||
 		CLI_FLAG_PATTERN.test(sentence)
 	)
-}
-
-function fence_violation(summary: string): ReadonlyArray<string> {
-	return is_fenced(summary)
-		? ['✖ the summary is wrapped in a code fence — write it as plain markdown']
-		: []
 }
 
 function label_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
@@ -212,7 +194,7 @@ function lint_report(
 	labels: ReportLabels = report_labels.session_labels(),
 ): ReadonlyArray<string> {
 	return [
-		...fence_violation(summary),
+		...markdown_shape.fence_violation(summary, 'summary'),
 		...label_violations(summary, labels),
 		...length_violations(summary, labels),
 		...intrusion_violations(summary, labels),

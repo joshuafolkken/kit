@@ -134,6 +134,30 @@ describe('lane_stats.row — the lane median', () => {
 	})
 })
 
+// joshuafolkken/kit#4910: the median hides the lanes past the 40-minute overrun threshold.
+describe('lane_stats.row — the lane tail', () => {
+	const OVER = 'lanes over 40 min'
+	const P90 = 'lane p90 (min)'
+	const LANE_MINUTES = [20, 40, 41, 60]
+
+	function lanes(): Array<LedgerEntry> {
+		return LANE_MINUTES.flatMap((minutes, issue) => [
+			{ kind: 'dispatch', at: hours_before_now(minutes / 60 + 1), issue },
+			{ kind: 'merge', at: hours_before_now(1), issue },
+		])
+	}
+
+	it('counts the lanes over the threshold and takes the nearest-rank 90th percentile', () => {
+		expect(cell_of(lanes(), OVER)).toBe('2')
+		expect(cell_of(lanes(), P90)).toBe('60.0')
+	})
+
+	it('prints no lane over and the missing mark with no lane', () => {
+		expect(cell_of(MERGES, OVER)).toBe('0')
+		expect(cell_of(MERGES, P90)).toBe(lane_stats.MISSING)
+	})
+})
+
 describe('lane_stats.row', () => {
 	it('labels the row with the limit and the period', () => {
 		expect(cells([]).slice(0, 2)).toStrictEqual(['4', '1'])

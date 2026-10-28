@@ -1,7 +1,9 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { parse_json_array_safe } from '#scripts/git/parse-json-array'
+import { expected_effect_lint } from './expected-effect-lint'
 import { has_any_label, NOT_DIRECTLY_RUNNABLE_LABELS } from './issue-labels'
+import { issue_priority } from './issue-priority'
 import { issue_rank, type DependencyRow } from './issue-rank'
 import { session_cite } from './session-cite'
 
@@ -63,7 +65,10 @@ function order(
 	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
 
 	return issue_rank.rank(candidates, (issue) => ({
+		is_last: issue_priority.is_last(issue.body),
 		labels: (issue.labels ?? []).map((label) => label.name),
+		lost_minutes: issue_priority.lost_minutes(issue.body),
+		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
 		dependents: dependents.get(String(issue.number)) ?? 0,
 	}))
 }

@@ -15,6 +15,7 @@ const { COMMAND_MAP, josh_logic, SPAWN_ERROR_EXIT_CODE, USAGE_ERROR_EXIT_CODE } 
 	await import('./josh-logic')
 const { core_budget } = await import('#scripts/gate/core-budget')
 const { gate_plan } = await import('#scripts/gate/gate-plan')
+const { OPTIONAL_ENV_FILE_FLAGS } = await import('./josh-command-types')
 
 const SPAWN_ERROR_MESSAGE = 'ENOENT: no such file or directory'
 const SCRIPT_ARGS = ['scripts/josh/josh.ts']
@@ -120,6 +121,27 @@ describe('josh_logic.run_command — composite commands reject extra arguments',
 	})
 })
 
+// joshuafolkken/kit#4660: node's own `--env-file` loader would take a guard switch from `.env`, so the
+// dispatcher loads the file itself and the flag never reaches the spawned node.
+describe('josh_logic.run_command — the .env flag', () => {
+	beforeEach(() => {
+		execa_sync_mock.mockClear()
+		execa_sync_mock.mockReturnValue(SPAWN_SUCCESS)
+	})
+
+	it('spawns a command declaring the flag without it', async () => {
+		const [environment_flag] = OPTIONAL_ENV_FILE_FLAGS
+		const name = Object.keys(COMMAND_MAP).find((key) =>
+			COMMAND_MAP[key]?.tsx_arguments?.includes(environment_flag ?? ''),
+		)
+
+		await josh_logic.run_command(name ?? '', [])
+
+		expect(execa_sync_mock).toHaveBeenCalledOnce()
+		expect(execa_sync_mock.mock.calls[0]?.[1]).not.toContain(environment_flag)
+	})
+})
+
 // joshuafolkken/kit#3345: the heavy commands an agent calls directly used to start their tools outside
 // the machine-wide core budget. Each one now declares a weight, and the dispatch every command passes
 // through reserves it.
@@ -131,7 +153,6 @@ const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'check',
 	'cspell:dot',
 	'test:unit',
-	'test:related',
 	// joshuafolkken/kit#4516
 	'test:pinned',
 	// joshuafolkken/kit#3944
@@ -173,6 +194,13 @@ describe('josh_logic.run_command — the core budget a command reserves', () => 
 
 		await expect(josh_logic.run_command(TEST_CMD, [])).resolves.toBe(SPAWN_SUCCESS.exitCode)
 		expect(reservation).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#5135: the dispatch reserves before the related scope resolves, so it could
+	// only claim the whole width — `josh test:related` claims in its body instead.
+	it('declares no weight for test:related, which claims once its scope is known', () => {
+		expect(COMMAND_MAP['test:related']?.core_weight).toBeUndefined()
+		expect(COMMAND_MAP['test:related']?.is_unit_claim).toBeUndefined()
 	})
 
 	// One table of weights: a direct `josh lint` claims exactly what the gate's lint check claims.

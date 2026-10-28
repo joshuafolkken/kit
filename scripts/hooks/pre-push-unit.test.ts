@@ -4,7 +4,9 @@ import path from 'node:path'
 import { core_budget } from '#scripts/gate/core-budget'
 import { gate_skip } from '#scripts/gate/gate-skip'
 import { gate_test_fixture } from '#scripts/gate/gate-test-fixture'
+import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -69,11 +71,16 @@ const run_guarded_unit = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
 
 vi.mock('#scripts/test/test-unit-guard', () => ({ test_unit_guard: { run_guarded_unit } }))
 
+const run_related_tests = vi.hoisted(() => vi.fn(async (): Promise<number> => 0))
+
+vi.mock('#scripts/test/test-related', () => ({ test_related: { run_related_tests } }))
+
 const { pre_push_unit } = await import('./pre-push-unit')
 
 const { capture_stdout } = gate_test_fixture
 
 const SCRIPT_PATH = 'scripts/hooks/pre-push-unit.ts'
+const OTHER_PATH = 'scripts/gate/gate-skip.ts'
 const CHANGED_TREE: Record<string, string> = { [SCRIPT_PATH]: 'digest-one' }
 const MOVED_TREE: Record<string, string> = { [SCRIPT_PATH]: 'digest-two' }
 const EMPTY_TREE: Record<string, string> = {}
@@ -84,6 +91,8 @@ const UNCOMMITTED = ` M ${SCRIPT_PATH}`
 const NOTHING_RAN = 0
 const SUITE_RAN = 1
 const FORCE_ENV = 'JOSH_PRE_PUSH_FORCE'
+const RELATED_ENV = pre_push_related_switch.SWITCH_ENV_KEY
+const RELATED_ON = pre_push_related_switch.SWITCH_ON
 const SPEC_FILTER = '--project=unit'
 const COMMAND_NAME = 'pre-push-unit'
 
@@ -107,6 +116,8 @@ async function run_hook(extra_arguments: ReadonlyArray<string> = []): Promise<[n
 	}
 }
 
+const record_push_miss = vi.spyOn(lane_ledger_write, 'record_push_miss')
+
 function suite_run_count(): number {
 	return run_guarded_unit.mock.calls.length
 }
@@ -119,6 +130,9 @@ beforeEach(() => {
 	repository.status = CLEAN
 	repository.unreadable = READS_FINE
 	vi.stubEnv(FORCE_ENV, '')
+	// joshuafolkken/kit#5187: `josh ship`'s push ahead of the gate runs this file under the switch it
+	// tests, so every test pins it off and only the ones about it switch it on.
+	vi.stubEnv(RELATED_ENV, '')
 })
 
 afterEach(() => {
@@ -273,6 +287,8 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		expect(text).toContain(
 			`${MISS_LEAD}the merge base moved since the green gate (${ADVANCED_BASE} → ${BASE}).`,
 		)
+		// joshuafolkken/kit#5234: the miss's kind reaches the lane ledger, for `lane:stats` to count.
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'base-moved' })
 	})
 
 	it('names the paths that leave the working tree dirty', async () => {
@@ -282,6 +298,7 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).toContain(`${MISS_LEAD}the working tree differs from HEAD ( M pnpm-lock.yaml).`)
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'whole', reason: 'tree-not-carried' })
 	})
 
 	it('names a missing record', async () => {
@@ -305,6 +322,76 @@ describe('a fall back to the whole suite names its reason in one line', () => {
 		const [, text] = await run_hook()
 
 		expect(text).not.toContain(MISS_LEAD)
+		expect(record_push_miss).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5214: `josh ship`'s catch-up merge moves the merge base to the default branch it
+// brought in; the gate after it keys its record on that base and the tree the push then carries.
+describe('a catch-up merge gated green before its push', () => {
+	it('runs no unit suite, reusing the record taken on the new base', async () => {
+		repository.base = ADVANCED_BASE
+		record_green(CHANGED_TREE, ADVANCED_BASE)
+
+		const [code] = await run_hook()
+
+		expect(code).toBe(0)
+		expect(suite_run_count()).toBe(NOTHING_RAN)
+	})
+
+	// A record over other files is told apart from none, by how far it is off.
+	it('counts the files a record over another tree is off by', async () => {
+		record_green({ ...MOVED_TREE, [OTHER_PATH]: 'digest-three' }, BASE)
+
+		const [, text] = await run_hook()
+
+		expect(text).toContain(
+			'no green gate record matches the changed files (1 changed, record covers 2, 2 differ).',
+		)
+	})
+})
+
+// joshuafolkken/kit#5067: `josh ship` pushes its sync merge ahead of the gate, whose whole suite runs
+// over the same tree next, so that push asks for the related tests instead.
+describe('a push ahead of its gate runs the related tests', () => {
+	beforeEach(() => {
+		vi.stubEnv(RELATED_ENV, RELATED_ON)
+	})
+
+	it('runs the related tests, not the whole suite, when no record covers the push', async () => {
+		const [code, text] = await run_hook()
+
+		expect(code).toBe(0)
+		expect(run_related_tests).toHaveBeenCalledWith([])
+		expect(suite_run_count()).toBe(NOTHING_RAN)
+		expect(text).toContain('running the related unit tests')
+		expect(record_push_miss).toHaveBeenCalledWith({ scope: 'related', reason: 'no-record' })
+	})
+
+	it('still reuses a record that covers the push', async () => {
+		record_green(CHANGED_TREE, BASE)
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+	})
+
+	it('runs the whole suite when the escape hatch is set too', async () => {
+		vi.stubEnv(FORCE_ENV, '1')
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+		expect(suite_run_count()).toBe(SUITE_RAN)
+	})
+
+	it('runs the whole suite without the switch', async () => {
+		vi.stubEnv(RELATED_ENV, '')
+
+		await run_hook()
+
+		expect(run_related_tests).not.toHaveBeenCalled()
+		expect(suite_run_count()).toBe(SUITE_RAN)
 	})
 })
 
@@ -338,6 +425,20 @@ describe('the whole suite holds a place in the core budget', () => {
 		await run_hook()
 
 		expect(reservation).not.toHaveBeenCalled()
+	})
+
+	it('reserves the same weight before it runs the related tests ahead of the gate', async () => {
+		const reservation = vi
+			.spyOn(core_budget, 'with_command_reservation')
+			.mockImplementation(async (_weight, run) => await run())
+
+		vi.stubEnv(RELATED_ENV, RELATED_ON)
+		await run_hook()
+
+		expect(reservation).toHaveBeenCalledTimes(1)
+		expect(reservation.mock.calls[0]?.[2]?.command).toBe('pre-push test:related')
+		expect(reservation.mock.calls[0]?.[2]?.is_unit).toBe(true)
+		expect(run_related_tests).toHaveBeenCalledWith([])
 	})
 })
 

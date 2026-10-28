@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { change_base } from '#scripts/git/change-base'
 import { git_spawn } from '#scripts/git/git-spawn'
@@ -31,9 +31,9 @@ const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'pre-detach-reuse-'))
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
-const read_base = vi.spyOn(change_base, 'resolved')
+const read_base = vi.spyOn(change_base, 'resolved_through_merge')
 const read_git = vi.spyOn(git_spawn, 'read')
-const { EXPORTS_LABEL, TYPE_CHECK_LABEL } = gate_plan
+const { EXPORTS_LABEL, TYPE_CHECK_LABEL } = gate_labels
 const LABELS = [TYPE_CHECK_LABEL, EXPORTS_LABEL, 'cspell']
 const SOURCE = 'scripts/a.ts'
 const FILES = { [SOURCE]: 'digest-a' }

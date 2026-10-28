@@ -65,15 +65,15 @@ is **the entry point for the `Stop` event**. It is wired as a **single entry** w
 **It shares the foundation and reuses the verdicts.** The switch (`JOSH_STOP_GUARD`) and the `.env`
 read come from `hook-decision.ts`; whether a message is a stop notice comes from the pattern in
 `lane-park.ts`; whether a hold is in place comes from the `run:hold` record — **no second verdict
-mechanism is built**. Whether anything was filed uses the count in `filing-cap.ts`, and whether a
+mechanism is built**. Whether anything was filed uses the count in `turn-filings.ts`, and whether a
 repository is first-party uses the comparison in `repo-party.ts`. Only the event differs: a `Stop`
 payload carries no tool call. A row that needs the model answers with `{"decision":"block","reason":…}`,
 the only route by which a `Stop` event can put text in front of the model (joshuafolkken/kit#2247).
 
 **A row whose answer is fixed acts instead of refusing** (joshuafolkken/kit#3919). The stop
-notification, the hold release and the citation lines are each one operation whose arguments the hook
-already holds, so `stop-actions.ts` runs them in process — the same `send_values`, `run_hold_cli.run`
-and `issue_cite_cli.cite` the commands call, since three `pnpm` launches would spend most of the
+notification and the hold release are each one operation whose arguments the hook already holds, so
+`stop-actions.ts` runs them in process — the same `send_values` and `run_hold_cli.run` the commands
+call, since two `pnpm` launches would spend most of the
 20-second budget — and reports them as a `systemMessage`. A refusal there cost a whole model turn to
 run a command the hook already knew. Only an action that fails falls back to its old refusal, and
 never past `stop_hook_active`. The actions run only on a stop that goes through, so a refused stop
@@ -99,13 +99,11 @@ The implementation reuse and verdict details taken out of the procedure's list.
 
 - **The direct-filing refusal** — `issue:file` runs the duplicate search, the body check and type
   label, the `## Origin` check and `epic:bundle`, so none of them is watched by a row of its own
-- **The 10-filings-per-run cap** — reuses `is_issue_filing` rather than a new predicate; an
-  `issue:file` that exits non-zero is not counted as a filing
 - **The early progress report** — a waiting-only `Bash` is one that is `sleep` throughout, or `sleep`
   beside nothing but `echo` / `:` / `date`
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
 - **The implementation-phase cut** — the cost is measured with the same statistics and the same
-  `CONTEXT_CUT_THRESHOLD` as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
+  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
   through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
   joshuafolkken/kit#2385), and it lets the
   immediate reissue of the same edit through, so `busy` / `failed` do not spin
@@ -116,8 +114,8 @@ The implementation reuse and verdict details taken out of the procedure's list.
 - **No file body on the shell** — the existence check is one `stat`
 - **The stop notice / releasing the hold** — the hold is read off the `run:hold` record, and a clean
   tree as an empty `git status --porcelain`
-- **The Issue-citation format / the offer to file** — reads `last_assistant_message`; whether
-  anything was filed uses `filing_cap`'s count, a third party is judged by `repo_party.classify`, and
+- **The offer to file** — reads `last_assistant_message`; whether
+  anything was filed uses `turn_filings`' count, a third party is judged by `repo_party.classify`, and
   the row stays silent while `stop_hook_active` is set
 - **Appending to a rule body** — the stand-down came with joshuafolkken/kit#2324: it stands down once the transcript tail records both `oracle:list` and
   `run:step` having run (it passes on "were the questions answered", not on a reminder)
@@ -251,6 +249,8 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
   handoff carries the instruction so the fresh process resumes on it (joshuafolkken/kit#2354);
   joshuafolkken/kit#1933 built the boundary and joshuafolkken/kit#2310 measured it firing 0 times while
   the verdict was read only at session entry.
+  - It declares no `keeps`: a guard fired on a budget threshold the model cannot observe has no act a
+    run could keep unaided, so `rule:value` reports it unmeasured, not `0%` (joshuafolkken/kit#5267).
 - `issue-comments` — comments changed a diagnosis (joshuafolkken/kit#1537), a default and an
   acceptance criterion (joshuafolkken/kit#1520), and handed a scope to another Issue
   (joshuafolkken/kit#1304).
@@ -299,6 +299,9 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
   against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,
   #1390). A `PreToolUse` hook cannot see the turn it is in; the lever that moved the density is a
   composite command (`read:files` / `edit:files`, joshuafolkken/kit#2202, #2311).
+- `search-batching` → `refuse`. Search chains (`grep` / `sed` one per turn) were the largest share of
+  lane-child single-call pairs, about 10,600 in 14 days (joshuafolkken/kit#5342); a refusal re-fires
+  every third single-call search turn and stands aside where the investigation guard refuses the call.
 - `duplicate-read` → `notice`. Unchanged re-reads are measured in lane children above all
   (joshuafolkken/kit#2298 baseline: 8.0 per lane run), so `off` would neuter it where the count lives.
 - `rule` → `refuse`. A cut carried as prose fired 0 times (joshuafolkken/kit#1864,
@@ -356,11 +359,10 @@ test file pins:
   a lane, without the marker, for a non-edit, after the cut and under the threshold)
 - `scripts/rules/delivered-rules-filing.test.ts` — a direct filing (`gh issue create`, a POST with a
   `title` to `…/issues`) is refused every time and pointed to `pnpm josh issue:file`, and the
-  `issue:file` call itself is not refused. The same suite pins that the cap and fold rows fire on an
-  `issue:file` call, and that a failed `issue:file` call is not counted as a filing
-- `scripts/rules/filing-cap.test.ts` — pins the filing count (a refused filing is not counted).
-  `scripts/rules/delivered-rules.test.ts` pins firing and silence (silent through the tenth, refused at
-  the eleventh, every time)
+  `issue:file` call itself is not refused — not even past ten filings on the transcript, since the
+  filing cap is `issue:file`'s own step per originating work item (joshuafolkken/kit#4750)
+- `scripts/rules/turn-filings.test.ts` — pins the turn's filing count the `Stop` hook reads (a refused
+  filing is not counted)
 - `scripts/rules/lane-park-rule.test.ts` — the lane child's park procedure exists as its single source
   in `.claude/skills/workflow-commands/pre-gate-cut.md`, and the message points at that section.
   `scripts/rules/lane-park.test.ts` pins firing and silence (it refuses only a lane child's stop
@@ -404,18 +406,20 @@ test file pins:
   `Bash` call in the spellings the `gh pr merge*` glob misses (`curl … /pulls/<N>/merge`, a GraphQL
   merge mutation or a file-sourced GraphQL body, joshuafolkken/kit#4038). It is delivered as the
   fifth row of `permission-guards.ts`
+- `scripts/rules/repo-admin.test.ts` — pins the predicate that stops a non-`DELETE` write to the
+  repository's administration in every `gh api` and `gh` CLI spelling (joshuafolkken/kit#4650), the
+  sixth row of `permission-guards.ts`
 - `scripts/rules/rule-body-guard.test.ts` — pins the predicate, the message and the enumeration entry
   for an `Edit` / `Write` that appends a rule body to prose (joshuafolkken/kit#2272). This one suite pins firing (an append to
   a rule document), silence (a typo fix, a link swap, a deletion, a non-rule file, a non-Edit/Write),
   and, on the real delivery route, "refused every time until both commands have run". The same suite
   checks that the message carries question 0 (`oracle:list`) and the ordering question (`run:step`),
   and that the single source is `residency.md`
-- `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the four stop rules (the stop
-  notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`, `issue-citation.md`)
-  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts`,
-  `scripts/rules/filing-offer.test.ts` and `scripts/rules/issue-citation.test.ts` pin firing and
+- `scripts/rules/stop-rules-rule.test.ts` — pins the single sources of the three stop rules (the stop
+  notification in `CLAUDE.md`, `working-tree-hold.md`, `observation-filing.md`)
+  and their entry in `pnpm josh rule:list`. `scripts/rules/stop-rules.test.ts` and
+  `scripts/rules/filing-offer.test.ts` pin firing and
   silence (hold × no notice sends the notify; clean × hold releases it; dirty or notified is silent;
   `stop_hook_active` never blocks; an unattended offer to file × nothing filed blocks, while an interactive session, filed, a third-party
-  repository or an unknown owner is silent; a bare `#N` prints the citation lines, while one in link form, a code fence,
-  inline code, a quoted line or a PR reference is silent), and
+  repository or an unknown owner is silent; a bare `#N` in the reply neither acts nor blocks), and
   `scripts/claude/claude-settings-hooks.test.ts` pins the `Stop` hook's wiring

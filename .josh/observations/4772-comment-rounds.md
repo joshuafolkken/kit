@@ -1,0 +1,2 @@
+- rf:project-conventions | low | scripts/run/board/run-board-found.ts:94 | 2026-10-24 | #4772
+- rf:tests | low | scripts/run/board/run-board-read.test.ts:111 | 2026-10-24 | #4772

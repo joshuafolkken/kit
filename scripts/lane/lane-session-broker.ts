@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
 import { lane_broker_server, type BrokerServer } from './lane-broker-server'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_action, type BrokerAction, type BrokerAnswer } from './lane-session-action'
+import { lane_session_reread } from './lane-session-reread'
 
 // The sessions a lane child's detached `josh ship` cannot start itself, started for it by a process
 // that can: the round-1 and round-2 reviewer, and the fresh child a stopped ship hands back to. An
@@ -38,9 +39,7 @@ const REQUEST_LIMIT_MINUTES: Readonly<Record<BrokerAction['kind'], number>> = {
 	review: 30,
 	relaunch: 2,
 }
-const request_schema = z
-	.object({ session: z.uuid(), nonce: z.uuid(), action: lane_session_action.action_schema })
-	.strict()
+const { request_schema } = lane_session_action
 // **A request this broker cannot read is still answered**: the supervisor reloads on new code only at
 // its next pass boundary (`run-wake-code.ts`), so until then a lane's ship can run a newer main than
 // the broker's, and a field the ship added made the request unreadable and
@@ -49,6 +48,15 @@ const request_schema = z
 // broker's schema had never learned even on one main (joshuafolkken/kit#4489).
 const envelope_schema = z.looseObject({ session: z.uuid(), nonce: z.uuid() })
 const UNREADABLE_REASON = 'the broker could not read the request'
+// **A refused request is read as a version difference, never dropped silently** (joshuafolkken/kit#4714):
+// the refusal marks the supervisor's code as suspect, so its next pass re-hashes the code even where the
+// commit did not move or the hash at its start could not be read, and reloads when it differs. Only the
+// `run:wake` supervisor takes the mark: an OpenAI lane's own supervisor never re-checks its code.
+// **Before it is refused, the code on disk reads it** (`lane-session-reread.ts`), so a schema main widened
+// since the supervisor started is answered now rather than after the reload (joshuafolkken/kit#4732).
+const VERSION_NOTE =
+	"the broker's code differs from the ship's; a run:wake supervisor re-checks its code at its next pass"
+const refusal = { is_pending: false }
 const response_schema = z
 	.object({
 		session: z.uuid(),
@@ -103,15 +111,31 @@ function refused_field(issue: z.core.$ZodIssue): ReadonlyArray<string> {
 function unreadable(error: z.ZodError): BrokerAnswer {
 	const fields = error.issues.flatMap((issue) => refused_field(issue))
 
-	return failure(`${UNREADABLE_REASON} — ${fields.join('; ')}`)
+	return failure(`${UNREADABLE_REASON} — ${VERSION_NOTE} — ${fields.join('; ')}`)
+}
+
+// The answer of a broker on code older than the request, which the ship can still fall back from.
+function is_unreadable(answer: BrokerAnswer): boolean {
+	return !answer.is_success && answer.reason.includes(UNREADABLE_REASON)
 }
 
 async function answer_request(lane: LaneInfo, received: BrokerEnvelope): Promise<BrokerAnswer> {
 	const parsed = request_schema.safeParse(received)
+	if (parsed.success) return await lane_session_action.answer(lane, parsed.data.action)
 
-	return parsed.success
-		? await lane_session_action.answer(lane, parsed.data.action)
-		: unreadable(parsed.error)
+	refusal.is_pending = true
+
+	return (await lane_session_reread.reread(lane.issue, received)) ?? unreadable(parsed.error)
+}
+
+// Whether a request was refused since the supervisor last asked, clearing the mark — the supervisor
+// re-checks its code on it (`run-wake-code.ts`).
+function take_refusal(): boolean {
+	const { is_pending } = refusal
+
+	refusal.is_pending = false
+
+	return is_pending
 }
 
 // The requests this process's servers are answering now — what the supervisor's reload waits out
@@ -152,21 +176,23 @@ async function serve(
 	response: string,
 	state: { is_running: boolean; current: BrokerResponse },
 ): Promise<void> {
-	let last_nonce = ''
+	const served = { nonce: '' }
 	const target = request_path(lane.directory, lane.issue)
 
-	while (state.is_running) {
+	// Requests are served one at a time, in arrival order: a pass ends only once its request is answered.
+	async function serve_pass(): Promise<true | undefined> {
+		if (!state.is_running) return true
 		const received = read_record(target, envelope_schema)
 
-		if (received?.session === session && received.nonce !== last_nonce) {
-			last_nonce = received.nonce
-			// eslint-disable-next-line no-await-in-loop -- requests are served one at a time, in arrival order
+		if (received?.session === session && received.nonce !== served.nonce) {
+			served.nonce = received.nonce
 			await process_request(lane, response, received, state)
 		}
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_MS)
+		return undefined
 	}
+
+	await poll.wait_for(serve_pass, { interval_ms: POLL_MS })
 }
 
 // The server record is written before the response, so a ship that finds the response finds it too.
@@ -291,15 +317,15 @@ async function wait_response(
 	const limit_minutes = REQUEST_LIMIT_MINUTES[kind]
 	const deadline = Date.now() + limit_minutes * MINUTE_MS
 
-	while (Date.now() < deadline) {
-		const verdict = response_verdict(target, session, nonce)
-		if (verdict !== undefined) return verdict
+	function verdict_by_deadline(): BrokerAnswer | undefined {
+		if (Date.now() >= deadline) {
+			return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
+		}
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_MS)
+		return response_verdict(target, session, nonce)
 	}
 
-	return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
+	return await poll.wait_for(verdict_by_deadline, { interval_ms: POLL_MS })
 }
 
 function live_response(target: string): BrokerResponse | undefined {
@@ -374,11 +400,13 @@ async function request(
 const lane_session_broker = {
 	is_answering,
 	is_serving,
+	is_unreadable,
 	request,
 	request_path,
 	response_path,
 	review_paths: lane_session_action.review_paths,
 	serving_session,
+	take_refusal,
 	with_server,
 }
 

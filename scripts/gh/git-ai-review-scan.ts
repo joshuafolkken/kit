@@ -149,5 +149,5 @@ function classify_ai_review_comments(comments: ReadonlyArray<ReviewComment>): Cl
 	}
 }
 
-export { classify_ai_review_comments }
+export { classify_ai_review_comments, is_coderabbit_author, is_coderabbit_rate_limit }
 export type { ReviewComment, ClassifiedFinding, ClassifiedFindings, FindingKind }

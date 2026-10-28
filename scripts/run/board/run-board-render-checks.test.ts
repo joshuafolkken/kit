@@ -29,6 +29,10 @@ function running(phase: Phase): BoardRow {
 	return { number: 3754, title: 'Issue', kind: undefined, state: 'running', status, waits: [] }
 }
 
+function angled(number: number): string {
+	return `<${String(number)}>`
+}
+
 function board(checks: PrChecks = CHECKS): BoardHeader {
 	const activity = { last_event_ms: NOW, is_stopped: false, pr_checks: new Map([[3754, checks]]) }
 
@@ -41,20 +45,25 @@ afterEach(() => {
 
 describe('run_board_render_checks.checks_part', () => {
 	it('draws the pull request, each count of some and CodeRabbit’s state', () => {
-		expect(run_board_render_checks.checks_part(CHECKS)).toBe(DRAWN)
+		expect(run_board_render_checks.checks_part(CHECKS, String)).toBe(DRAWN)
 	})
 
 	it('leaves out CodeRabbit where it has no check', () => {
-		expect(run_board_render_checks.checks_part({ ...CHECKS, coderabbit: 'none' })).toBe(
+		expect(run_board_render_checks.checks_part({ ...CHECKS, coderabbit: 'none' }, String)).toBe(
 			'PR 3765  ✓ 6  ⏳ 2',
 		)
+	})
+
+	// joshuafolkken/kit#4625: the number opens the pull request; `PR` stays plain.
+	it('links only the pull request’s number', () => {
+		expect(run_board_render_checks.checks_part(CHECKS, angled)).toBe('PR <3765>  ✓ 6  ⏳ 2  🐰 ⏳')
 	})
 
 	it('draws a failure red and a rate limit yellow', () => {
 		vi.stubEnv('FORCE_COLOR', '1')
 		const checks: PrChecks = { ...LIMITED, pending: 0, fail: 1 }
 
-		expect(run_board_render_checks.checks_part(checks)).toBe(
+		expect(run_board_render_checks.checks_part(checks, String)).toBe(
 			`PR 3765  ✓ 6  ${styleText('red', '✗ 1')}  ${styleText('yellow', '🐰 ⛔')}`,
 		)
 	})

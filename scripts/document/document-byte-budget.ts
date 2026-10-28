@@ -73,10 +73,18 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: '.claude/skills/workflow-commands/prerequisite.md', bytes: 8192 },
 	{ path: '.claude/skills/workflow-commands/target-repository.md', bytes: 4096 },
 	{ path: '.claude/skills/workflow-commands/working-tree-hold.md', bytes: 8192 },
-	{ path: 'docs/josh-commands-automation.md', bytes: 45_056 },
-	{ path: 'docs/josh-commands-run.md', bytes: 69_632 },
-	{ path: 'docs/josh-commands-backlog.md', bytes: 57_344 },
-	{ path: 'docs/josh-commands.md', bytes: 53_248 },
+	// `command:derive`'s usage section (joshuafolkken/kit#4970) crossed the 45056 block.
+	{ path: 'docs/josh-commands-automation.md', bytes: 49_152 },
+	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
+	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
+	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 86_016 },
+	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
+	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 65_536 },
+	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
+	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
+	{ path: 'docs/josh-commands.md', bytes: 61_440 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 4096 },
@@ -84,8 +92,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/gh-rest.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/glossary.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/issue-citation.md', bytes: 4096 },
-	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block.
-	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 12_288 },
+	// The priority declaration and its criteria (joshuafolkken/kit#4383) crossed the 8192 block; the
+	// causing-lane declaration and criteria F / G (joshuafolkken/kit#4749) crossed the 12288 one.
+	{ path: 'prompts/collaboration-workflow/issue-template.md', bytes: 16_384 },
 	{ path: 'prompts/collaboration-workflow/lane-instructions.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/measurement.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow/operating-rules.md', bytes: 8192 },
@@ -103,7 +112,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 8192 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
 	{ path: 'prompts/review-rubric.md', bytes: 12_288 },
-	{ path: 'prompts/review.md', bytes: 12_288 },
+	// Self-check 2's `josh prose:stale` pointer (joshuafolkken/kit#5287) crossed the 12288 block.
+	{ path: 'prompts/review.md', bytes: 16_384 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
 	{ path: 'prompts/testing-guide.md', bytes: 12_288 },
 ]

@@ -8,7 +8,8 @@ const run_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: {
 		run_buffered_process: run_mock,
-		is_process_failed: (result: { exit_code: number }): boolean => result.exit_code !== 0,
+		is_process_failed: (result: { exit_code: number | undefined }): boolean =>
+			result.exit_code !== 0,
 	},
 }))
 vi.mock('#scripts/gate/type-check-step', () => ({
@@ -23,12 +24,13 @@ vi.mock('#scripts/gate/project-checks', () => ({
 
 const record_mock = vi.hoisted(() => vi.fn())
 const READ_TREE = vi.hoisted(() => ({ files: { digest_of: 'digest-a' }, base: 'base-a' }))
+const read_tree_mock = vi.hoisted(() => vi.fn(async () => READ_TREE))
 
 vi.mock('#scripts/gate/check-reuse', () => ({
 	check_reuse: { DEFAULT_RECORDS: (): string => '', record_green_checks: record_mock },
 }))
 vi.mock('#scripts/gate/gate-tree', () => ({
-	gate_tree: { read_gate_tree: vi.fn(async () => READ_TREE) },
+	gate_tree: { read_gate_tree: read_tree_mock },
 }))
 
 const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
@@ -46,13 +48,18 @@ const GUARD_TESTS = `${GUARD_TEST_COMMAND} ${GUARD_TARGET}`
 const TYPE_ERROR = 'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature'
 const ACCEPT_HINT = 'pnpm josh metrics --accept --reason "<why>"'
 const GUARD_FAILURE = 'FAIL scripts/document/document-byte-budget.test.ts > stays under budget'
+const STATIC_RED = ['pre-detach']
 
 interface Answer {
-	exit_code: number
+	exit_code: number | undefined
 	output: string
 }
 
 const tree = { directory: '' }
+
+function heading(command: string, exit_code = FAILED): string {
+	return `✗ ${command} — exit code ${String(exit_code)}`
+}
 
 function commands(): ReadonlyArray<string> {
 	return run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
@@ -130,7 +137,8 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: TYPE_ERROR,
+			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
+			preconditions: STATIC_RED,
 		})
 	})
 
@@ -140,10 +148,13 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: GUARD_FAILURE,
+			out: `${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
+			preconditions: STATIC_RED,
 		})
 	})
+})
 
+describe('run_ship_pre_detach.checks — every failure', () => {
 	it('reports every failure at once', async () => {
 		create(GUARD_TARGET)
 		answer(
@@ -155,7 +166,64 @@ describe('run_ship_pre_detach.checks — what fails', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: `${TYPE_ERROR}\n\n${GUARD_FAILURE}`,
+			out: [
+				`${heading(TYPE_CHECK)}\n${TYPE_ERROR}`,
+				`${heading(GUARD_TESTS)}\n${GUARD_FAILURE}`,
+			].join('\n\n'),
+			preconditions: STATIC_RED,
+		})
+	})
+})
+
+// joshuafolkken/kit#4785: a `--review` ship's `test:pinned` stop joins the other checks' report.
+// joshuafolkken/kit#5228: its kind, `unpinned`, rides beside the static checks' `pre-detach`.
+describe('run_ship_pre_detach.checks — the pinned check', () => {
+	const PINNED_STOP = 'unpinned scripts/a.ts:3\n'
+
+	async function pinned_stop(): Promise<{ code: number; out: string }> {
+		return { code: FAILED, out: PINNED_STOP }
+	}
+
+	it('stops on the pinned check alone, as unpinned, when every other check passed', async () => {
+		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
+			code: FAILED,
+			out: PINNED_STOP,
+			preconditions: [run_ship_pre_detach.UNPINNED],
+		})
+	})
+
+	it('reports the pinned stop after the other failures, with both kinds', async () => {
+		answer(new Map([[TYPE_CHECK, { exit_code: FAILED, output: TYPE_ERROR }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory, undefined, pinned_stop)).toStrictEqual({
+			code: FAILED,
+			out: `${heading(TYPE_CHECK)}\n${TYPE_ERROR}\n\n${PINNED_STOP}`,
+			preconditions: [...STATIC_RED, run_ship_pre_detach.UNPINNED],
+		})
+	})
+})
+
+// joshuafolkken/kit#4594: a failure that printed nothing still names its check and how it ended.
+describe('run_ship_pre_detach.checks — the failed check is named', () => {
+	const NO_OUTPUT_EXIT = 2
+
+	it('names the check and its exit code when it failed with no output', async () => {
+		answer(new Map([[EXPORTS, { exit_code: NO_OUTPUT_EXIT, output: '' }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: FAILED,
+			out: heading(EXPORTS, NO_OUTPUT_EXIT),
+			preconditions: STATIC_RED,
+		})
+	})
+
+	it('names the check as ended without an exit code when it timed out', async () => {
+		answer(new Map([[TYPE_CHECK, { exit_code: undefined, output: '' }]]))
+
+		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
+			code: FAILED,
+			out: `✗ ${TYPE_CHECK} — no exit code (timed out or ended by a signal)`,
+			preconditions: STATIC_RED,
 		})
 	})
 })
@@ -175,7 +243,8 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: unread,
+			out: `${heading(EXPORTS)}\n${unread}`,
+			preconditions: STATIC_RED,
 		})
 	})
 
@@ -192,7 +261,7 @@ describe('run_ship_pre_detach.checks — what the ship gate stopped on', () => {
 
 // joshuafolkken/kit#3568: the metrics totals, in kit only, so a grown total stops the session that grew it.
 describe('run_ship_pre_detach.checks — the metrics totals', () => {
-	const metrics = run_ship_pre_detach.METRICS_TOTALS_COMMAND.join(' ')
+	const metrics = run_ship_pre_detach.METRICS_RERECORD_COMMAND.join(' ')
 	const grown = `josh metrics: 1 total(s) grew past the baseline\n${ACCEPT_HINT}`
 
 	it('runs no metrics outside kit', async () => {
@@ -208,7 +277,23 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 			code: OK,
 			out: run_ship_pre_detach.PASSED,
 		})
-		expect(commands()).toStrictEqual([...STATIC, metrics])
+		expect(commands()).toStrictEqual([metrics, ...STATIC])
+	})
+
+	// joshuafolkken/kit#4716: the totals may re-record the approval file, so they finish before the tree
+	// the gate records are written for is read.
+	it('runs the totals alone, before the tree is read and the other checks start', async () => {
+		is_kit_mock.mockReturnValue(true)
+		read_tree_mock.mockClear()
+
+		await run_ship_pre_detach.checks(tree.directory)
+
+		const [metrics_order = 0, ...others] = run_mock.mock.invocationCallOrder
+		const [tree_order = 0] = read_tree_mock.mock.invocationCallOrder
+
+		expect(commands()[0]).toBe(metrics)
+		expect(metrics_order).toBeLessThan(tree_order)
+		expect(others.every((order) => order > tree_order)).toBe(true)
 	})
 
 	it('fails in kit with the accept hint when a total grew', async () => {
@@ -217,7 +302,8 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 
 		expect(await run_ship_pre_detach.checks(tree.directory)).toStrictEqual({
 			code: FAILED,
-			out: grown,
+			out: `${heading(metrics)}\n${grown}`,
+			preconditions: STATIC_RED,
 		})
 	})
 })

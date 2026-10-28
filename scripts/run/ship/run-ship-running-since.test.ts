@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { describe, expect, it } from 'vitest'
 import { run_ship_detach } from './run-ship-detach'
@@ -12,7 +13,9 @@ const CLAIM_WINDOW_MS = 120_000
 function write_launch(launched_at: number): string {
 	const repository = `/tmp/josh-ship-running-since-test-${randomUUID()}`
 
-	stamp_file.replace_stamp(stamp_file.stamp_path(`josh-ship-result-${NUMBER}-`, repository), {
+	const result = durable_state.path(`${durable_state.PREFIX.SHIP_RESULT}${NUMBER}-`, repository)
+
+	stamp_file.replace_stamp(result, {
 		pid: process.pid,
 		launch_id: 'bare',
 		launched_at,

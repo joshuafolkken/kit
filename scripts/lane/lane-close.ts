@@ -3,6 +3,7 @@ import { git_command } from '#scripts/git/git-command'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { error_text } from '#scripts/lib/error-message'
 import { lane_paths } from './lane-paths'
+import { lane_plan } from './lane-plan'
 import { lane_reap } from './lane-reap'
 import { lane_reap_settle } from './lane-reap-settle'
 import { lane_registry, type LaneInfo } from './lane-registry'
@@ -160,6 +161,12 @@ async function left_behind_of(issue: string, targets: LaneTargets): Promise<Arra
 	return [...(await residue(targets)), ...survivors]
 }
 
+// An ended lane's cleared plan goes with it; a plan its lane yielded on stays (`lane_plan.release`).
+async function record_end(issue: string): Promise<void> {
+	await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
+	lane_plan.release(Number(issue), process.cwd())
+}
+
 async function close_lane(issue: string): Promise<CloseOutcome> {
 	const { existing, targets } = await resolve_lane(issue)
 	const did_exist = existing !== undefined || existsSync(targets.directory)
@@ -174,9 +181,7 @@ async function close_lane(issue: string): Promise<CloseOutcome> {
 	const left_behind = await left_behind_of(issue, targets)
 	const kind = close_kind(did_exist, left_behind)
 
-	if (await is_ending(issue, kind)) {
-		await lane_state.record_change({ issue, state: 'ended', command: 'lane:close' })
-	}
+	if (await is_ending(issue, kind)) await record_end(issue)
 
 	return { issue, kind, left_behind, reaped, residents }
 }

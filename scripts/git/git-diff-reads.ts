@@ -31,6 +31,16 @@ async function get_default_branch(): Promise<string> {
 
 const MERGE_BASE_COMMAND = 'merge-base'
 
+// The argument lists below are shared with `changed-paths-sync.ts`, so the hook-side synchronous
+// reading cannot drift from this one.
+function reference_check_arguments(reference: string): ReadonlyArray<string> {
+	return ['rev-parse', '--verify', '--quiet', reference]
+}
+
+function remote_reference_of(default_branch: string): string {
+	return `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
+}
+
 // **The ref the default branch is actually at**, which is not the same thing as its name.
 // `get_default_branch` returns the bare name, and git resolves that to the
 // *local* `refs/heads/<default>` — a ref nothing in this workflow advances, because merges happen on
@@ -45,7 +55,7 @@ const MERGE_BASE_COMMAND = 'merge-base'
 // `prevent-main-commit.ts` exists to stop.
 async function reference_exists(reference: string): Promise<boolean> {
 	try {
-		await git_spawn.read(['rev-parse', '--verify', '--quiet', reference])
+		await git_spawn.read([...reference_check_arguments(reference)])
 
 		return true
 	} catch {
@@ -55,9 +65,31 @@ async function reference_exists(reference: string): Promise<boolean> {
 
 async function default_branch_reference(): Promise<string> {
 	const default_branch = await get_default_branch()
-	const remote_reference = `${REFS_REMOTES_ORIGIN_PREFIX}${default_branch}`
+	const remote_reference = remote_reference_of(default_branch)
 
 	return (await reference_exists(remote_reference)) ? remote_reference : default_branch
+}
+
+function merge_base_arguments(reference: string): ReadonlyArray<string> {
+	return [MERGE_BASE_COMMAND, reference, 'HEAD']
+}
+
+// Where the side a merge in progress brings in left the default branch; git fails it where no merge
+// is in progress. These three are `change_base.resolved_through_merge`'s, shared with the sync reading.
+function incoming_base_arguments(reference: string): ReadonlyArray<string> {
+	return [MERGE_BASE_COMMAND, reference, 'MERGE_HEAD']
+}
+
+// `--independent` drops every commit another one listed reaches, so of two commits on the default
+// branch's history it keeps the later — read from its output by `later_base_of`.
+function later_base_arguments(base: string, incoming: string): ReadonlyArray<string> {
+	return [MERGE_BASE_COMMAND, '--independent', base, incoming]
+}
+
+function later_base_of(output: string | undefined, base: string): string {
+	const [later = ''] = output?.split('\n', 1) ?? []
+
+	return later === '' ? base : later
 }
 
 // The commit this branch was cut from — and the base every "changed" reading below measures
@@ -89,7 +121,7 @@ async function change_base(): Promise<string> {
 	const default_branch = await default_branch_reference()
 
 	try {
-		return await git_spawn.read([MERGE_BASE_COMMAND, default_branch, 'HEAD'])
+		return await git_spawn.read([...merge_base_arguments(default_branch)])
 	} catch {
 		return default_branch
 	}
@@ -153,8 +185,8 @@ async function change_base_commit(): Promise<string> {
 
 // The working tree against any commit, with the same flags as the branch diff. `josh test:related`
 // reads the change since the commit its test-read map was recorded on, which is not the merge base.
-async function diff_names_since(commit: string): Promise<string> {
-	return await git_spawn.read([
+function names_since_arguments(commit: string): ReadonlyArray<string> {
+	return [
 		...NO_PATH_QUOTING,
 		'diff',
 		NAME_ONLY_FLAG,
@@ -162,7 +194,11 @@ async function diff_names_since(commit: string): Promise<string> {
 		NO_RENAME_DETECTION,
 		commit,
 		'--',
-	])
+	]
+}
+
+async function diff_names_since(commit: string): Promise<string> {
+	return await git_spawn.read([...names_since_arguments(commit)])
 }
 
 // Which of `paths` a commit's tree holds. `josh test:related` asks it of the tree its test-read map
@@ -197,17 +233,17 @@ async function diff_cached_names(): Promise<string> {
 	])
 }
 
-// The branch diff as `added\tdeleted\tpath` rows — the same base and flags as `diff_main_names`, so
-// the size read against and the name read agree on what "changed" is. A binary file prints `-` for
-// both counts; the parser above `josh split:assess` reads it treats those as zero changed lines.
-async function diff_main_numstat(): Promise<string> {
+// The diff since `base` as `added\tdeleted\tpath` rows — the same flags as `diff_names_since`, so the
+// size read and the name read agree on what "changed" is. A binary file prints `-` for both counts;
+// the parser above `josh split:assess` reads it treats those as zero changed lines.
+async function diff_numstat_since(base: string): Promise<string> {
 	return await git_spawn.read([
 		...NO_PATH_QUOTING,
 		'diff',
 		'--numstat',
 		NO_RELATIVE_PATHS,
 		NO_RENAME_DETECTION,
-		await change_base(),
+		base,
 		'--',
 	])
 }
@@ -226,19 +262,22 @@ async function diff_main_numstat(): Promise<string> {
 // pathspec restores the whole tree; the flag restores the root-relative spelling.
 const WHOLE_TREE_PATHSPEC = ':/'
 
+const UNTRACKED_ARGUMENTS: ReadonlyArray<string> = [
+	...NO_PATH_QUOTING,
+	'ls-files',
+	'--others',
+	'--exclude-standard',
+	'--full-name',
+	WHOLE_TREE_PATHSPEC,
+]
+
 async function untracked_names(): Promise<string> {
-	return await git_spawn.read([
-		...NO_PATH_QUOTING,
-		'ls-files',
-		'--others',
-		'--exclude-standard',
-		'--full-name',
-		WHOLE_TREE_PATHSPEC,
-	])
+	return await git_spawn.read([...UNTRACKED_ARGUMENTS])
 }
 
 const git_diff_reads = {
 	DEFAULT_BRANCH_ARGUMENTS,
+	UNTRACKED_ARGUMENTS,
 	change_base,
 	change_base_commit,
 	default_branch_of,
@@ -246,9 +285,16 @@ const git_diff_reads = {
 	diff_cached_names,
 	diff_main,
 	diff_main_names,
-	diff_main_numstat,
+	diff_numstat_since,
 	diff_names_since,
 	get_default_branch,
+	incoming_base_arguments,
+	later_base_arguments,
+	later_base_of,
+	merge_base_arguments,
+	names_since_arguments,
+	reference_check_arguments,
+	remote_reference_of,
 	tree_names_at,
 	untracked_names,
 }

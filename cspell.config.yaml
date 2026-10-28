@@ -2,6 +2,13 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # awk's `getline` and `nextfile`, which reach outside the pipe or leave it early, so an `awk` filter using one is not rewritten (#5266).
+  - getline
+  - nextfile
+  # macOS `caffeinate -i -s -w <pid>`, which keeps the host awake while a supervisor runs (#5173).
+  - caffeinate
+  # SonarJasmin, the SonarQube JS/TS taint engine; `sonar.jasmin.internal.*` keys a test keeps out (#5093).
+  - jasmin
   # `nohup pnpm josh gate`, a wrapper the shell command walk skips (#4525).
   - nohup
   # `ps -o pgid=`, the process group `lane:close` spares when it ends a lane's leftovers (#4304).
@@ -18,6 +25,8 @@ words:
   # macOS's process-start scanners, named where hook launches cut their process count (#3946).
   - Xprotect
   - syspolicyd
+  # `gh api`'s method flag with its value attached, in the repository-administration guard (#4650).
+  - XPUT
   # The gh apt repository's paths and bash's flags for a shell that reads no rc file, in the
   # fresh-machine image and probes (#3714).
   - keyrings
@@ -158,7 +167,7 @@ words:
   # joshuafolkken/kit#2282 names the threshold-tuning question it declines to treat as an error.
   - miscalibration
   # "halving it moves the unsimulated parent hand-off too" — the pre-gate-cut decision for
-  # joshuafolkken/kit#2366 names the three shared uses of CONTEXT_CUT_THRESHOLD the lane simulation
+  # joshuafolkken/kit#2366 names the three shared uses of the context-cut threshold the lane simulation
   # did not price.
   - unsimulated
   # Wrapped in backticks, as a past participle. `josh epic --add` writes the relation it replaced into

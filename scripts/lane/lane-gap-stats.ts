@@ -2,6 +2,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
+import { lane_net_time } from './lane-net-time'
 import { lane_spans, type Span } from './lane-spans'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
@@ -17,6 +18,8 @@ import { lane_stop_stats } from './lane-stop-stats'
 //   entry. A pool that stays full writes no line after its one `released`, and a driver handed back
 //   writes none, so a gap over the offer interval is a full pool or no driver, never the hand-over
 //   (joshuafolkken/kit#4410). The ship's cap park and the driver's collection of it are each timed.
+// - `yield → redispatch`: a yield (`lane:plan` gave the seat back) until its issue's next `dispatch`, the
+//   wait `josh lane:net` takes out (`lane-net-time.ts`, joshuafolkken/kit#5216).
 // - `followup → merge`: the ship's last `followup` stage before the merge until the parent wrote the
 //   `merge` line, the step that releases the slot. A merge with no `followup` stage has no start.
 //
@@ -26,10 +29,11 @@ const COLUMNS = ['gap', 'count', 'median (s)', 'max (s)', 'not ended'] as const
 const RELAUNCH = 'cut → resume'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
+const YIELD = 'yield → redispatch'
 const MERGE = 'followup → merge'
 const FOLLOWUP_STAGE = 'followup'
 const IMPLEMENTATION_CUT = `cut (${agent_role_profile.IMPLEMENTATION_PHASE})`
-const { NOT_MEASURED, is_dispatch, is_number, is_stage } = lane_stage_stats
+const { NOT_MEASURED, is_dispatch, is_merge, is_number, is_stage } = lane_stage_stats
 const { EVENT_KIND } = run_event_stream
 // The offer answers that are not a dispatch: a free lane held, or the pool found full.
 const OFFER_ANSWERS: ReadonlySet<string> = new Set([
@@ -38,7 +42,7 @@ const OFFER_ANSWERS: ReadonlySet<string> = new Set([
 ])
 
 // Only an implementation cut appends a `resume` when it is adopted; a pre-gate resume appends nothing,
-// so its cut would read as never ended (`run-cut-cli.ts` → `emit_resume_event`).
+// so its cut would read as never ended (`run-cut-resume.ts` → `emit_resume_event`).
 function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
 }
@@ -79,10 +83,6 @@ function park_spans(
 	return lane_stop_stats
 		.events_of(events, EVENT_KIND.PARK)
 		.map((park) => ({ from_ms: park.at_ms, end_ms: offers.find((at) => at > park.at_ms) }))
-}
-
-function is_merge(entry: LedgerEntry): entry is MergeEntry {
-	return entry.kind === lane_ledger.KIND.MERGE
 }
 
 function is_followup_of(entry: LedgerEntry, merge: MergeEntry): boolean {
@@ -147,6 +147,7 @@ function table(
 		gap_row(RELAUNCH, relaunch_spans(events), window),
 		gap_row(OUTAGE, outage_spans(events), window),
 		gap_row(PARK, park_spans(entries, events), window),
+		gap_row(YIELD, lane_net_time.yield_spans(entries, events), window),
 		gap_row(MERGE, merge_spans(entries), window),
 	].join('\n')
 }

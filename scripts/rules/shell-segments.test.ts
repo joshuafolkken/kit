@@ -10,6 +10,18 @@ const BOTH: ReadonlyArray<string> = [FIRST, SECOND]
 const LONE_COMMAND = 'pnpm josh gate'
 const QUOTED_SEPARATOR = "echo 'x && y'"
 
+describe('joined_continuations', () => {
+	it('joins a backslash-continued line into one command', () => {
+		expect(shell_segments.joined_continuations('gh pr comment 5 \\\n-R o/r')).toBe(
+			'gh pr comment 5  -R o/r',
+		)
+	})
+
+	it('leaves a plain newline a separator', () => {
+		expect(shell_segments.joined_continuations(`${FIRST}\n${SECOND}`)).toBe(`${FIRST}\n${SECOND}`)
+	})
+})
+
 describe('segments_of', () => {
 	it.each([
 		[LONE_COMMAND, [LONE_COMMAND]],

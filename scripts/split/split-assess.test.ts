@@ -80,6 +80,12 @@ describe('verdict needs both guides exceeded', () => {
 		expect(split_assess.assess(runtime_numstat(11, 1)).verdict).toBe('single')
 	})
 
+	it('judges a bare file and line count by the same rule', () => {
+		expect(split_assess.verdict_for(11, 401)).toBe('split')
+		expect(split_assess.verdict_for(11, 400)).toBe('single')
+		expect(split_assess.verdict_for(10, 401)).toBe('single')
+	})
+
 	it('is single for an empty diff', () => {
 		const measurement = split_assess.assess('')
 
@@ -109,7 +115,10 @@ describe('notice', () => {
 		const notice = split_assess.notice({ files: 12, lines: 500, verdict: 'split' })
 
 		expect(notice).toContain('12 changed file(s), 500 changed line(s)')
-		expect(notice).toContain('record why it stays one Issue, or carve the rest out')
+		expect(notice).toContain(
+			`record why it stays one Issue in an Issue comment line \`${split_assess.REASON_PREFIX}`,
+		)
+		expect(notice).toContain('pnpm josh issue:file --route split')
 		expect(notice).toContain('Over the guide before the gate')
 	})
 

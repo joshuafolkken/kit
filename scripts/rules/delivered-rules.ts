@@ -1,16 +1,19 @@
 import { investigation_reads } from '#scripts/delegation/investigation-reads'
+import { will_refuse as will_batch_refuse } from '#scripts/hooks/batch-guard'
 import { hook_decision, type GuardRun, type TranscriptGuardSpec } from '#scripts/josh/hook-decision'
-import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
+import { concise_reply } from './concise-reply'
+import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
+import { direct_issue_read } from './direct-issue-read'
 import { early_heartbeat } from './early-heartbeat'
-import { file_body } from './file-body'
-import { filing_cap } from './filing-cap'
+import { file_edit_rows } from './file-edit-rows'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
+import { investigator_foreground } from './investigator-foreground'
 import { issue_comments } from './issue-comments'
 import { josh_git_bare } from './josh-git-bare'
 import { lane_background } from './lane-background'
@@ -18,6 +21,7 @@ import { lane_carry_conflict } from './lane-carry-conflict'
 import { lane_direct_tool } from './lane-direct-tool'
 import { lane_interactive_ask } from './lane-interactive-ask'
 import { lane_park } from './lane-park'
+import { lane_spilled_read } from './lane-spilled-read'
 import { lane_split_park } from './lane-split-park'
 import { lane_switch_main } from './lane-switch-main'
 import { oracle_consulted } from './oracle-consulted'
@@ -26,6 +30,8 @@ import { piped_verification } from './piped-verification'
 import { poll_loop } from './poll-loop'
 import { pre_gate_cut } from './pre-gate-cut'
 import { raw_field_body } from './raw-field-body'
+import { reviewer_foreground } from './reviewer-foreground'
+import { round_one_check_related } from './round-one-check-related'
 import { rule_body_guard } from './rule-body-guard'
 import { run_tail_rule } from './run-tail-rule'
 import { shell_body_trigger } from './shell-body-trigger'
@@ -77,8 +83,8 @@ interface DeliveredRule {
 	reason: string
 	about: RuleAbout
 	// A stand-down when an earlier act on the tail already satisfied the rule; checked first, so a
-	// satisfied call spends no record.
-	already_satisfied?: (tail: string, call: GuardedCall) => boolean
+	// satisfied call spends no record. `run` names the session, for a stand-down that outlives the tail.
+	already_satisfied?: (tail: string, call: GuardedCall, run: GuardRun) => boolean
 	// For a rule that binds on every occurrence instead of once per run. `at_ms` is this row's own last
 	// refusal, so an immediate reissue can be let through.
 	decide?: (call: GuardedCall, run: GuardRun, can_record: boolean, at_ms: number) => boolean
@@ -96,6 +102,9 @@ interface DeliveredRule {
 	// Openings the reason had before it was reworded, so `rule-value.ts` still credits a refusal
 	// delivered with the old text while those transcripts remain in its window.
 	former_reasons?: ReadonlyArray<string>
+	// The reasons a Stop hook sends a turn back with on this row's behalf, so `rule-value.ts` counts
+	// that block as this row's refusal.
+	stop_reasons?: ReadonlyArray<string>
 }
 
 // Scored but possibly delivered by its own guard inside `pretool-guard.ts` (batching, investigation) — joining `DELIVERED_RULES`
@@ -115,13 +124,17 @@ const { SHELL_BODY_REASON, carries_a_body, is_shell_evaluated_body, keeps_body_s
 const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// First: a third-party write is stopped before the first-party filing rows count anything.
 	third_party_write.ROW,
-	// The direct call only; `filing-cap` below triggers on `issue:file`. The WIP cap and the fold
-	// question are `issue:file`'s own steps, so no row gates them.
+	// Before every first-party row: a credential is refused whatever the call's other faults, and the
+	// commands those rows point at run the same scan in-process.
+	credential_body.ROW,
+	// The direct call only. The filing cap, the WIP cap and the fold question are `issue:file`'s own
+	// steps, so no row gates them.
 	direct_filing.ROW,
 	// Before the body rows: a comment posted by hand is refused whatever its body, and the command it
 	// points at takes the body by path, so the body rows have nothing left to say.
 	direct_issue_comment.ROW,
-	filing_cap.ROW,
+	// Before `issue-comments`, whose rewrite would add the unfiltered comments to the same read.
+	direct_issue_read.ROW,
 	issue_comments.ROW,
 	{
 		id: 'shell-body',
@@ -138,6 +151,8 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 		},
 	},
 	raw_field_body.ROW,
+	// Before `piped-verification`, whose rewrite would run under `pipefail` a check that must not run.
+	round_one_check_related.ROW,
 	{
 		id: 'piped-verification',
 		is_trigger: on_bash_command(piped_verification.is_masked_verification),
@@ -151,7 +166,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 			title: 'Piped verification',
 			topic: '`output-bounds.md`',
 			fires:
-				'a pass/fail josh check (`gate` / `check` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise',
+				'a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early and carries no `<` / `>` / `&`), refused otherwise',
 			quiet: 'the exit code reaches the caller — a failure reads as a failure',
 		},
 	},
@@ -214,24 +229,30 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	lane_park.ROW,
 	lane_interactive_ask.ROW,
 	agent_model.ROW,
+	investigator_foreground.ROW,
+	reviewer_foreground.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first
 	// act, and `lane-direct-tool` delivers on the reissue of a `time`-prefixed tool.
 	timed_rerun.ROW,
 	lane_direct_tool.ROW,
+	lane_spilled_read.ROW,
 	// Disjoint from `run-tail` by the `-y` flag.
 	josh_git_bare.ROW,
 	// The Bash-string gaps the deny glob cannot express, read by argv; `delivered-rules-bash.test.ts`
 	// pins that no two rows claim one command.
 	git_force.ROW,
 	worktree_guard.ROW,
-	file_body.ROW,
+	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
 	// the reissue in the fresh process.
 	implementation_cut.ROW,
+	// Before `rule-body`, its one overlap (a whole-file `Write` of a rule document): the right tool is
+	// chosen before the placement questions are asked of its text.
+	file_edit_rows.REWRITE_ROW,
 	rule_body_guard.ROW,
 	...oracle_consulted.ROWS,
 ]
@@ -277,6 +298,8 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	...DELIVERED_RULES,
 	BATCHING_RULE,
 	INVESTIGATION_RULE,
+	// Delivered by `stop:guard`; listed here so `rule:value` counts its refusals.
+	concise_reply.ROW,
 ]
 
 // Once per run, so a run that obeyed is never wedged. A call the batching guard may refuse is stepped
@@ -290,14 +313,11 @@ const BATCH_REFUSAL_WINDOW_MS = 10_000
 
 // Asked with its real record, not `NEVER_MS`: that guard never refuses one sequence twice.
 function will_batch_guard_refuse(tail: string, call: GuardedCall, run: GuardRun): boolean {
-	// In a lane child the batching guard only notices, so there is nothing to stand aside for.
-	if (lane_guard_policy.mode_here('batching') !== 'refuse') return false
-
 	const refused_at_ms = BATCH_STAMP.last_ms(BATCH_STAMP.path(run.transcript))
 
 	if (run.now_ms - refused_at_ms < BATCH_REFUSAL_WINDOW_MS) return true
 
-	return time_batch_guard.should_block(tail, call, refused_at_ms)
+	return will_batch_refuse(tail, call, run)
 }
 
 function is_first_delivery(
@@ -323,7 +343,7 @@ function delivery_decision(rule: DeliveredRule): TranscriptGuardSpec['should_blo
 		delivered_at_ms: number,
 		run: GuardRun,
 	): boolean {
-		if (already_satisfied?.(tail, call) === true) return false
+		if (already_satisfied?.(tail, call, run) === true) return false
 		if (decide === undefined) return true
 
 		return decide(call, run, !will_batch_guard_refuse(tail, call, run), delivered_at_ms)
@@ -366,9 +386,8 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
-	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
+	FILE_BODY_REASON: file_edit_rows.FILE_BODY_REASON,
 	DIRECT_FILING_REASON: direct_filing.DIRECT_FILING_REASON,
-	FILING_CAP_REASON: filing_cap.FILING_CAP_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
 	LANE_INTERACTIVE_ASK_REASON: lane_interactive_ask.LANE_INTERACTIVE_ASK_REASON,

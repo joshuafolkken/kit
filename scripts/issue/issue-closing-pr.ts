@@ -88,6 +88,13 @@ async function read_closing_pr(issue: string): Promise<string | undefined> {
 	}
 }
 
-const issue_closing_pr = { read_closing_pr }
+// The closing pull request's number, read off the URL `read_closing_pr` answers.
+async function read_closing_number(issue: number): Promise<number | undefined> {
+	const url = await read_closing_pr(String(issue))
+
+	return url === undefined ? undefined : Number(url.slice(url.lastIndexOf('/') + 1))
+}
+
+const issue_closing_pr = { read_closing_number, read_closing_pr }
 
 export { issue_closing_pr }

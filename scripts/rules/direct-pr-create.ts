@@ -21,28 +21,8 @@ const HELP_FLAGS: ReadonlySet<string> = new Set(['-h', '--help'])
 // The repository selector gh accepts before `pr` or between `pr` and its action; with no `=` it
 // swallows the next word, so that word is not read as the group or the action.
 const VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set(['-R', '--repo'])
-// `gh api`'s own flags that take a value as the next word, beside the repository selector — skipped
-// so `-X POST` or `-f body=…` is not read as the endpoint.
-const API_VALUE_TAKING_FLAGS: ReadonlySet<string> = new Set([
-	...VALUE_TAKING_FLAGS,
-	'-X',
-	'--method',
-	'-f',
-	'--raw-field',
-	'-F',
-	'--field',
-	'-H',
-	'--header',
-	'--input',
-	'-q',
-	'--jq',
-	'-t',
-	'--template',
-	'--hostname',
-	'-p',
-	'--preview',
-	'--cache',
-])
+// `gh api`'s own flags that take a value as the next word — `gh-api.ts` owns the list.
+const { API_VALUE_TAKING_FLAGS } = gh_api
 const API_SUBCOMMAND = 'api'
 // The pull-request collection itself — a write there opens a PR. Anchored on the whole endpoint
 // argument, so `…/pulls/5/comments` is not read as the collection. A full API URL names the same
@@ -144,7 +124,7 @@ function is_direct_pr_create(command: string): boolean {
 const DIRECT_PR_CREATE_REASON =
 	'⛔ direct PR creation: `gh pr create` (or a `gh api` POST to `repos/<o>/<r>/pulls`) bypasses ' +
 	'`build_body`, which writes the `closes #N` line — the Issue would stay open after the merge ' +
-	'(`CLAUDE.md` → Git Rules). Open the PR with `pnpm josh pr` instead; after a failed push, fix, push, ' +
+	'(`operating-rules.md` → "git-rules"). Open the PR with `pnpm josh pr` instead; after a failed push, fix, push, ' +
 	'then run `pnpm josh pr`. **This rule fires on every occurrence, not once per run.**'
 
 const ROW = {
@@ -154,7 +134,7 @@ const ROW = {
 	decide: (): boolean => true,
 	about: {
 		title: 'Direct PR creation',
-		topic: '`CLAUDE.md` → Git Rules',
+		topic: '`operating-rules.md` → "git-rules"',
 		fires:
 			'`gh pr create`, or a `gh api` write to `repos/<o>/<r>/pulls`; it points at `pnpm josh pr`. Every occurrence',
 		quiet: '`pnpm josh pr`, or reading a PR — the path that writes `closes #N`',

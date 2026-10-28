@@ -5,13 +5,14 @@ import { issue_watch } from '#scripts/issue/issue-watch'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_plan_check } from '#scripts/lane/lane-plan-check'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
 import { run_event_plan } from '#scripts/run/event/run-event-plan'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
 import { run_next } from '#scripts/run/run-next'
-import { run_prep } from '#scripts/run/run-prep'
+import type { PrepParts } from '#scripts/run/run-prep'
 import { run_prep_cli } from '#scripts/run/run-prep-cli'
 import { run_prrun_resume } from '#scripts/run/run-prrun-resume'
 import {
@@ -24,7 +25,9 @@ import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop } from './run-entry-stop'
+import { run_entry_trust, type TrustStop } from './run-entry-trust'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
 // trip each on `run:hold`, `cost --cut`, `run:prep` and `run:step`, re-billing a lane's full context
@@ -50,6 +53,8 @@ const NEWLINE = '\n'
 const HOLD_STOP_NOTE =
 	'(tree not held — see the reason above; clean up and retry, or release with `pnpm josh run:release`)'
 const COST_STOP_NOTE = '(session budget spent — see the figure above; resume in a fresh session)'
+const YIELD_NOTE =
+	'(lane given back at the entry — see the overlap above; end the session now, with no edit)'
 const { BUDGET_REASON, HOLD_REASON } = run_entry_stop
 const HALFRUN_RESUME_TOKEN = 'halfrun'
 
@@ -123,8 +128,9 @@ async function check_cost(): Promise<string> {
 }
 
 interface Reads {
-	report: string
+	prep: PrepParts
 	verdict: string
+	trust_stop: TrustStop | undefined
 }
 
 // The issue reads and the pre-implementation verdict, from the one gather `run:prep` and `run:next`
@@ -132,20 +138,33 @@ interface Reads {
 // formatter, the verdict is `run:step`'s `pre_verdict` over the same parts.
 async function gather_reads(issue_number: string): Promise<Reads> {
 	const reads = await run_prep_cli.gather(issue_number)
-	const parts = run_prep_cli.to_parts(issue_number, reads)
-	const verdict = run_step.pre_verdict(run_next.to_input(parts))
+	const prep = run_prep_cli.to_parts(issue_number, reads)
+	const verdict = run_step.pre_verdict(run_next.to_input(prep))
+	const trust_stop = run_entry_trust.stop_of(reads.content, reads.state, issue_number)
 
-	return { report: run_prep.format_report(parts), verdict }
+	return { prep, verdict, trust_stop }
+}
+
+function entry_text(parts: EntryParts): string {
+	return session_cite.text(run_entry.format_report(parts))
 }
 
 function emit(parts: EntryParts): number {
-	console.info(session_cite.text(run_entry.format_report(parts)))
+	console.info(entry_text(parts))
 
 	return run_entry.exit_code(parts)
 }
 
-// The summary of a run that stopped before it read the issue: the token that stopped it, no verdict,
-// and the note that stands in for the report body.
+// The bundle emitted as it fits the Bash result, measured on the composite `emit` prints.
+function emit_fitted(entry: Omit<EntryParts, 'report'>, prep: PrepParts): number {
+	const report = run_entry_spill.fit(prep, (text) => entry_text({ ...entry, report: text }))
+
+	return emit({ ...entry, report })
+}
+
+// The summary of a run that stopped without a report — before it read the issue, or after reading an
+// issue it will not run: the token that stopped it, no verdict, and the note that stands in for the
+// report body.
 function stop_report(issue_number: string, hold: string, cost: string, report: string): number {
 	return emit({ issue_number, hold, cost, verdict: run_entry.NO_VERDICT, report })
 }
@@ -157,14 +176,35 @@ interface StopCall {
 	command: StageCommand
 	reason: string
 	should_release: boolean
+	recommended?: string
 }
 
-async function stop_run({ parts, command, reason, should_release }: StopCall): Promise<number> {
+async function stop_run({ parts, command, ...notice }: StopCall): Promise<number> {
 	const code = stop_report(parts.issue_number, parts.hold, parts.cost, parts.report)
 
-	await run_entry_stop.stop({ issue_number: parts.issue_number, command, reason, should_release })
+	await run_entry_stop.stop({ issue_number: parts.issue_number, command, ...notice })
 
 	return code
+}
+
+// **An untrusted author's issue stops after the reads, not before the claim** — the trust is decided
+// by the read `run:prep` already makes, so the gate adds no call; the hold this call claimed is
+// released. It exits non-zero though the hold and the budget both allowed the run. A trust read that
+// failed stops here too, under its own reason (`run-entry-trust.ts`).
+async function stop_untrusted(
+	{ issue_number, command }: EntryRequest,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+	{ reason, report, recommended }: TrustStop,
+): Promise<number> {
+	await stop_run({
+		parts: { issue_number, hold, cost, report },
+		command,
+		reason,
+		should_release: true,
+		recommended,
+	})
+
+	return FAILURE_EXIT_CODE
 }
 
 interface Resume {
@@ -250,17 +290,50 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 	if (state === run_stage.PLANNED) await run_event_plan.emit_plan(issue_number)
 }
 
+// **A lane child probes its declared paths before the investigation** (joshuafolkken/kit#5211): a running
+// lane that planned one of them since dispatch takes the lane back here, at the cost of the entry
+// alone, rather than after the investigation `lane:plan` would otherwise yield on. `lane:plan` has
+// already released the hold and noted the yield, so this only reports it — no stop notice, as for
+// any yield.
+async function yields_at_entry(issue_number: string): Promise<boolean> {
+	if (!lane_child_marker.is_child_of(process.cwd())) return false
+
+	return await lane_plan_check.yield_at_entry(Number(issue_number))
+}
+
+// The report of a lane given back at the entry, exiting as `lane:plan` does on a yield.
+function yield_report(
+	issue_number: string,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+): number {
+	stop_report(issue_number, hold, cost, YIELD_NOTE)
+
+	return lane_plan_check.YIELD_EXIT_CODE
+}
+
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // — the label then shows in the `labels:` line the report below carries.
-async function proceed(issue_number: string, hold: string, cost: string): Promise<number> {
+// The plan event is written only once the run passed the trust gate.
+async function proceed(
+	request: EntryRequest,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+	state: StageState,
+): Promise<number> {
+	const { issue_number } = request
+
 	await run_label.mark(issue_number)
 	const reads = await gather_reads(issue_number)
+
+	if (reads.trust_stop) return await stop_untrusted(request, { hold, cost }, reads.trust_stop)
+	if (await yields_at_entry(issue_number)) return yield_report(issue_number, { hold, cost })
+
+	await mark_planned(issue_number, state)
 
 	// The issue the report prints is the one the run has read, so it is the baseline a person's later
 	// update is measured against (`issue-watch.ts`).
 	await issue_watch.record_baseline_here(issue_number)
 
-	const code = emit({ issue_number, hold, cost, verdict: reads.verdict, report: reads.report })
+	const code = emit_fitted({ issue_number, hold, cost, verdict: reads.verdict }, reads.prep)
 
 	// The entry's own read — the split assessment every run answers before its work — printed here so
 	// the reader does not spend a turn fetching it.
@@ -269,10 +342,8 @@ async function proceed(issue_number: string, hold: string, cost: string): Promis
 	return run_step_section.print_section(run_step_section.ENTRY)
 }
 
-async function claim_run(
-	{ issue_number, command }: EntryRequest,
-	state: StageState,
-): Promise<number> {
+async function claim_run(request: EntryRequest, state: StageState): Promise<number> {
+	const { issue_number, command } = request
 	const hold = await claim_hold(issue_number, command)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
@@ -289,9 +360,7 @@ async function claim_run(
 		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
 	}
 
-	await mark_planned(issue_number, state)
-
-	return await proceed(issue_number, hold, cost)
+	return await proceed(request, { hold, cost }, state)
 }
 
 // A carried cut is asked first, before anything is read (`run:cut --resume`); `kickoff` claims and cuts

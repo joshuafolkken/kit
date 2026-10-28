@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MISSING_NOTICE, secretlint_scan } from './secretlint-scan'
+import { MISSING_NOTICE, REQUIRED_MISSING_ERROR, secretlint_scan } from './secretlint-scan'
 
 const STAGED_FILES = ['src/(app)/[id]/+page.svelte', 'README.md']
 const BIN_NAME = process.platform === 'win32' ? 'secretlint.cmd' : 'secretlint'
@@ -47,7 +47,19 @@ describe('secretlint_scan.build_scan_arguments', () => {
 	it('passes --no-glob ahead of the staged files', () => {
 		expect(secretlint_scan.build_scan_arguments(STAGED_FILES)).toStrictEqual([
 			'--no-glob',
+			'--',
 			...STAGED_FILES,
+		])
+	})
+
+	// A staged file can be named like a flag; behind `--` secretlint reads it as a path.
+	it('places a file name starting with - after the end of the options', () => {
+		const flag_like = '--secretlintrc=evil.json'
+
+		expect(secretlint_scan.build_scan_arguments([flag_like])).toStrictEqual([
+			'--no-glob',
+			'--',
+			flag_like,
 		])
 	})
 
@@ -96,6 +108,35 @@ describe('secretlint_scan.main', () => {
 	it('exits zero without warning when nothing is staged', () => {
 		expect(secretlint_scan.main([], ctx.project_root)).toBe(0)
 		expect(console.warn).not.toHaveBeenCalled()
+	})
+})
+
+// The CI `Secret Scan` job requires the scan: a skip there would pass a pull request nothing read.
+describe('secretlint_scan with the scan required', () => {
+	it('plans a failure instead of a skip when secretlint is missing', () => {
+		const decision = secretlint_scan.plan_scan(STAGED_FILES, ctx.project_root, true)
+
+		expect(decision).toStrictEqual({ kind: 'fail', error: REQUIRED_MISSING_ERROR })
+	})
+
+	it('exits non-zero and reports the error when secretlint is missing', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(secretlint_scan.main(STAGED_FILES, ctx.project_root, true)).not.toBe(0)
+		expect(console.error).toHaveBeenCalledWith(REQUIRED_MISSING_ERROR)
+	})
+
+	it('still scans with the resolved shim when secretlint is installed', () => {
+		const binary = install_secretlint_binary()
+
+		expect(secretlint_scan.plan_scan(STAGED_FILES, ctx.project_root, true)).toStrictEqual({
+			kind: 'scan',
+			binary,
+		})
+	})
+
+	it('skips without a failure when nothing changed', () => {
+		expect(secretlint_scan.plan_scan([], ctx.project_root, true)).toStrictEqual({ kind: 'skip' })
 	})
 })
 

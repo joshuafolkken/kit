@@ -1,4 +1,11 @@
-import type { FrameParts, PlanLine, PlanSection, TerminalSize, YieldStage } from './run-board-fit'
+import {
+	run_board_fit,
+	type FrameParts,
+	type PlanLine,
+	type PlanSection,
+	type TerminalSize,
+	type YieldStage,
+} from './run-board-fit'
 import { run_board_fold, type FrameBounds } from './run-board-fold'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_header, type BoardHeader } from './run-board-header'
@@ -14,6 +21,7 @@ import { run_board_notes, type BoardNote } from './run-board-notes'
 import { run_board_priority } from './run-board-priority'
 import { run_board_render_condition } from './run-board-render-condition'
 import { run_board_render_foot } from './run-board-render-foot'
+import { run_board_render_found } from './run-board-render-found'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
@@ -38,14 +46,18 @@ const { time_of, time_width } = run_board_render_time
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
-const { LANE_INDENT, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
-const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, reason_text, row_overrun, title_of } =
+const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, columns_cut, fitted, reason_text, row_overrun, title_of } =
 	run_board_render_title
+const { width_of } = run_board_fit
 const { padded } = run_board_fresh
 const { condition_of, waits_of } = run_board_render_condition
 const { legend_lines, resume_lines, thanks_part } = run_board_render_foot
 const { ROW_INDENT, done_section, keyed, plan_section } = run_board_render_section
 const GAP = '  '
+// The fewest columns a done row's end is cut to before its title gives them up: its minutes and a cut
+// start of what follows.
+const FOUND_FLOOR = 8
 const FILED_LEAD = `${run_board_labels.FILED_RUN_MARK} `
 const BRANCH = `${ROW_INDENT}   ├ `
 const LAST_BRANCH = `${ROW_INDENT}   └ `
@@ -87,6 +99,8 @@ interface RowFrame {
 	// The lanes section draws each row's lead — progress, phase and times — before its cells
 	// (`run-board-render-lead.ts`).
 	is_lane_row?: boolean | undefined
+	// A done row whose title gives up the columns draws what was filed during it whole.
+	is_end_kept?: boolean | undefined
 }
 
 // A row drawn before the plan is read has no title yet, and says so.
@@ -159,40 +173,90 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 	return joined([lead, time])
 }
 
-// Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
-// (`run-board-render-tail.ts`), and a row with nothing after its padded columns ends where its text does.
-function row_text(row: BoardRow, frame: RowFrame): string {
-	const { header } = frame
-	const tail = run_board_render_tail.tail_of(row, header)
-	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
-
-	return joined([head_text(row, frame), ...tail, ...notes]).trimEnd()
+function same(reference: string): string {
+	return reference
 }
 
-// A row drawn whole or cut, after its indent.
-function row_draw(indent: string, row: BoardRow, frame: RowFrame): (cut: RowCut) => string {
-	return (cut) => `${indent}${row_text(row, { ...frame, ...cut })}`
+// A row up to what was filed during it: its head, then its tail where it draws one.
+function tailed_head(row: BoardRow, frame: RowFrame): string {
+	return joined([head_text(row, frame), ...run_board_render_tail.tail_of(row, frame.header)])
+}
+
+// The columns the pane leaves after `head` and its gap, where the frame is kept within one and the
+// row's end is not kept whole.
+function room_after(indent: string, head: string, frame: RowFrame): number | undefined {
+	if (frame.columns === undefined || frame.is_end_kept === true) return undefined
+
+	return frame.columns - width_of(`${indent}${head}${GAP}`)
+}
+
+// What was filed during a done row, in `room`: a pane too narrow for it cuts its end on an ellipsis
+// rather than the title, so the time column stays where every other row has it
+// (joshuafolkken/kit#4922). The cut text's references are left unlinked, so no hyperlink escape is cut
+// in two.
+function found_fitted(room: number | undefined, row: BoardRow, header: BoardHeader): string {
+	const found = run_board_render_found.found_text(row, header)
+
+	if (found === '' || room === undefined || width_of(found) <= room) return found
+
+	const unlinked = run_board_render_found.found_text(row, { ...header, link: same })
+
+	return columns_cut(unlinked, Math.max(1, room))
+}
+
+// Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
+// (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
+// and a row with nothing after its padded columns ends where its text does.
+function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
+	const { header } = frame
+	const head = tailed_head(row, frame)
+	const found = found_fitted(room_after(indent, head, frame), row, header)
+	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
+
+	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
+}
+
+// A pane narrower than a done row's head leaves its end too few columns to say anything in, so there
+// the title gives up the columns instead, as before joshuafolkken/kit#4922.
+function is_found_squeezed(indent: string, row: BoardRow, frame: RowFrame): boolean {
+	if (run_board_render_found.found_text(row, frame.header) === '') return false
+
+	return (room_after(indent, tailed_head(row, frame), frame) ?? FOUND_FLOOR) < FOUND_FLOOR
+}
+
+// A row drawn whole or cut, after its indent; a row that keeps its line keeps its end whole too, its
+// title giving up the columns.
+function row_draw(
+	indent: string,
+	row: BoardRow,
+	frame: RowFrame,
+	fit: RowFit,
+): (cut: RowCut) => string {
+	const is_end_kept = fit.is_line_kept === true
+
+	return (cut) => row_text(indent, row, { ...frame, ...cut, is_end_kept })
 }
 
 // A row drawn with lane cells keeps its head on one line, its title giving up their columns where the
 // pane is narrow. A row that draws a tail keeps its whole line, giving up the columns its section's
-// rows give up together (joshuafolkken/kit#4226).
+// rows give up together (joshuafolkken/kit#4226). A done row keeps its title's width and cuts the end of
+// what was filed during it instead (`found_fitted`), unless that end is squeezed out.
 function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
-	const is_line_kept = run_board_render_tail.tail_of(row, frame.header).length > 0
+	const is_tailed = run_board_render_tail.tail_of(row, frame.header).length > 0
 
 	return {
-		is_line_kept,
+		is_line_kept: is_tailed || is_found_squeezed(indent, row, frame),
 		lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
 		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
 		is_head_kept: frame.cells !== undefined,
-		shared: is_line_kept ? frame.shared : undefined,
+		shared: is_tailed ? frame.shared : undefined,
 	}
 }
 
 // A plan line that draws one issue row, and one that draws none — a blank, a rule, an epic's own line.
 function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldStage): PlanLine {
 	const fit = row_fit(indent, row, frame)
-	const text = fitted(row, frame.columns, row_draw(indent, row, frame), fit)
+	const text = fitted(row, frame.columns, row_draw(indent, row, frame, fit), fit)
 
 	return { text, row: run_board_row_yield.yield_of(row, stage) }
 }
@@ -201,10 +265,10 @@ function row_line(indent: string, row: BoardRow, frame: RowFrame, stage?: YieldS
 // their titles end in one column and the tails after them start in one.
 function shared_overrun(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number {
 	const overruns = rows.map((row) => {
-		const fit = row_fit(LANE_INDENT, row, frame)
+		const fit = row_fit(indent_of(row), row, frame)
 
 		return fit.is_line_kept === true
-			? row_overrun(row, frame.columns, row_draw(LANE_INDENT, row, frame), fit)
+			? row_overrun(row, frame.columns, row_draw(indent_of(row), row, frame, fit), fit)
 			: 0
 	})
 
@@ -290,7 +354,7 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 	const lane_frame = { ...frame, cells, is_lane_row: true }
 	const shared = shared_overrun(lead, lane_frame)
 	const lanes = lanes_section(
-		lead.map((row) => row_line(LANE_INDENT, row, { ...lane_frame, shared })),
+		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
 		cells,
 	)
 

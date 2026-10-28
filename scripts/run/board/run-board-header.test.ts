@@ -53,10 +53,12 @@ function header(extra: Partial<BoardHeader> = {}): BoardHeader {
 		plan_failed_ms: undefined,
 		is_plan_loading: false,
 		machine: undefined,
+		is_investigation_on: false,
 		spinner: undefined,
 		form: 'screen',
 		repo: undefined,
 		link: (reference) => reference,
+		pull_link: String,
 		...extra,
 	}
 }

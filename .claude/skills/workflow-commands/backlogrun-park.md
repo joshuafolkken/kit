@@ -72,7 +72,9 @@ lane:launch <N>`.
 
 - a design choice nobody has made;
 - a Tier B toss-up, or a Tier C action (`CLAUDE.md` → "Decision autonomy");
-- an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`).
+- an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`);
+- information only the web holds — no lane launches a web tool (`scripts/agent/claude-agent-argv.ts`),
+  so a person fetches it.
 
 It never carries:
 
@@ -81,7 +83,8 @@ It never carries:
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
   (`prerequisite.md`);
 - a defect in the running repository's own run tooling — the run fixes it and resumes
-  (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合");
+  (`prompts/collaboration-workflow/upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合"),
+  its filing carrying the `- 原因の park:` line when it parked or stopped an Issue (`issue-template.md` → I);
 - a wait on an open blocker or a start date — `run:merge` releases it (`run-merge-steps.ts`);
 - a mechanical failure — the driver applies `run:stalled` (`RUN_STALLED_LABEL` in `issue-labels.ts`).
 

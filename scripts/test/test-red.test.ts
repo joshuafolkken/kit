@@ -26,6 +26,7 @@ const NODE_MODULES = 'node_modules'
 const PROJECT_NODE_MODULES = path.resolve(NODE_MODULES)
 
 const PORCELAIN = '--porcelain'
+const CONFLICT_FILE = 'conflict.txt'
 const VITEST_CONFIG_FILE = 'vitest.config.js'
 const EXCLUDING_CONFIG = `export default { test: { exclude: ['**/${TEST_FILE}'] } }\n`
 const OUTPUT_FILE_CONFIG = `export default { test: { outputFile: 'results.json' } }\n`
@@ -37,6 +38,16 @@ const WHOLE_OUTPUT_TEST = `${TEST_IMPORTS}it('reports only the invocation', () =
 `
 const SHALLOW_TEST = `${TEST_IMPORTS}it('exports report', () => {
 	expect(typeof report).toBe('function')
+})
+`
+
+// joshuafolkken/kit#4770: the tree's run names a Vite cache of its own, outside the borrowed
+// `node_modules`, so it never re-bundles the dependencies a gate beside it is importing.
+const OWN_CACHE_TEST = `import { expect, it } from 'vitest'
+it('runs on a cache of its own', () => {
+	const directory = process.env.JOSH_VITEST_CACHE_DIR ?? ''
+	expect(directory).not.toBe('')
+	expect(directory).not.toContain('node_modules')
 })
 `
 
@@ -148,6 +159,18 @@ describe('test_red.run', () => {
 	)
 })
 
+describe('test_red.run beside a gate', () => {
+	it(
+		'runs the tree on a Vite cache outside the borrowed node_modules',
+		async () => {
+			await build_fix_branch(OWN_CACHE_TEST)
+
+			expect(await test_red.run()).toEqual({ verdict: 'green', files: [TEST_FILE] })
+		},
+		RUN_TIMEOUT,
+	)
+})
+
 describe('test_red.run when nothing runs', () => {
 	it(
 		'is no-test when the merge-base config excludes the changed test, so nothing ran',
@@ -179,6 +202,37 @@ describe('test_red.run when nothing runs', () => {
 			const { verdict } = await test_red.run()
 
 			expect(verdict).toBe('no-test')
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5307: the changed paths are read through a merge in progress, so the pre-fix run
+// is too — here main already carries the fix, so the tree's base holds it and the test is not red.
+async function commit_all(message: string): Promise<void> {
+	await git(['add', '.'])
+	await git(['commit', '-m', message])
+}
+
+async function stop_a_merge_of_the_fix(): Promise<void> {
+	await build_fix_branch(WHOLE_OUTPUT_TEST)
+	await write(CONFLICT_FILE, 'fix\n')
+	await commit_all('fix')
+	await git(['switch', 'main'])
+	await write(REPORT_FILE, FIXED_REPORT)
+	await write(CONFLICT_FILE, 'main\n')
+	await commit_all('main')
+	await git(['switch', 'fix'])
+	await expect(git(['merge', 'main'])).rejects.toThrow()
+}
+
+describe('test_red.run during a merge stopped on a conflict', () => {
+	it(
+		'runs the changed test against the tree’s base, which already holds main’s fix',
+		async () => {
+			await stop_a_merge_of_the_fix()
+
+			expect(await test_red.run()).toEqual({ verdict: 'green', files: [TEST_FILE] })
 		},
 		RUN_TIMEOUT,
 	)

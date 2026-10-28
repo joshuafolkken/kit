@@ -4,7 +4,7 @@ const LEVEL_ONLY = '--level-only'
 const CHECK = '--check'
 const MACHINE_READABLE = 'the verdict and the reason, machine-readable'
 const JSON_FLAG = '--json'
-const ROUND_1_CLOSED = '--round-1-closed'
+const RECORD = '--record'
 
 // The review and delegation commands, split out of `josh-commands-ai.ts` when each command's usage
 // moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its
@@ -67,22 +67,57 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'review:submit': {
+		script: 'scripts/review/review-submit-cli.ts',
+		description: "Write a ship reviewer's findings, read from stdin, where the ship reads them",
+		category: 'AI tools',
+		reference: ['[--interaction] < findings | [--interaction] --none', 'automation', ['files']],
+		usage: {
+			examples: [
+				{ arguments: '< findings.txt', note: 'the /code-review slot' },
+				{ arguments: '--interaction < findings.txt', note: 'the interaction review slot' },
+				{ arguments: '--none', note: 'a review with no findings' },
+			],
+			flags: [
+				{
+					names: ['--none'],
+					description: 'a review with no findings; empty stdin without it is refused.',
+				},
+			],
+		},
+	},
+	// The self-check's "Prose matches the code" as a search: each word the diff removed that prose still names.
+	'prose:stale': {
+		script: 'scripts/review/prose-stale-cli.ts',
+		description:
+			'List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name',
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)',
+				},
+			],
+		},
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',
 		category: 'AI tools',
-		reference: ['[--round-1-closed] [--json]', 'automation', ['none']],
+		reference: ['[--record <N>] [--json]', 'automation', ['network']],
 		usage: {
 			examples: [
-				{ arguments: '', note: '→ required' },
-				{ arguments: ROUND_1_CLOSED, note: '→ required | skip' },
+				{ arguments: '', note: '→ required | skip, for the branch’s issue' },
+				{ arguments: `${RECORD} 123`, note: '→ required | skip, a skip commented on that issue' },
 				{ arguments: JSON_FLAG, note: MACHINE_READABLE },
 			],
 			flags: [
 				{
-					names: [ROUND_1_CLOSED],
+					names: [RECORD],
 					description:
-						'the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.',
+						'the issue whose ledger dispositions decide round 1’s closure — skip only when every High/Medium is `fixed` or `false-positive` — and where a skip is commented under `## Round 2 skipped`, once.',
 				},
 				{ names: [JSON_FLAG], description: 'machine-readable verdict and reason.' },
 			],

@@ -56,9 +56,13 @@ const LOCATION_VARIABLES =
 	'GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE'
 const ROOT_LOOKUP = 'git rev-parse --show-toplevel'
 const LEGACY_ROOT_PREFIX = `if project_root="$(unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null)"; then unset ${LOCATION_VARIABLES}; else project_root="$(${ROOT_LOOKUP})"; fi && cd "$project_root" && `
+// The root prefix kit wrote until joshuafolkken/kit#4617 exported the launch directory for a worktree.
+// History, never edited; removable from kit 2.0.0.
+const PRE_WORKTREE_ROOT_PREFIX = `project_root="\${CLAUDE_PROJECT_DIR:-$( (unset ${LOCATION_VARIABLES}; ${ROOT_LOOKUP} 2>/dev/null) || ${ROOT_LOOKUP})}" && cd "$project_root" && `
 // The values below are matched inside raw JSON text, so each root prefix is taken in its escaped form.
 const ROOT_PREFIXES: ReadonlyArray<string> = [
 	hook_launch.PROJECT_ROOT_PREFIX,
+	PRE_WORKTREE_ROOT_PREFIX,
 	LEGACY_ROOT_PREFIX,
 ].map((prefix) => JSON.stringify(prefix).slice(1, -1))
 const [PROJECT_ROOT_PREFIX = ''] = ROOT_PREFIXES
@@ -87,7 +91,7 @@ function rewrite_command_value(value: string): string {
 }
 
 // kit's own commands already start from the root (`hook-launch.ts`), and so does an already-rewritten
-// value. The prefix — the current one or the one before it — is taken off before the rewrite and the
+// value. The prefix — the current one or an earlier one — is taken off before the rewrite and the
 // current one put back after it, so the install guard sits behind the `cd` it depends on and a second
 // pass never doubles the prefix.
 function without_root_prefix(value: string): string {

@@ -1,29 +1,49 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { review_tree } from '#scripts/review/review-tree'
 import { test_pinned } from './test-pinned'
+import { test_pinned_ledger, type PinnedOrigin } from './test-pinned-ledger'
 import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
+import { test_pinned_record, type PinnedSummary } from './test-pinned-record'
 
-// The `josh test:pinned` entry: read `--max`, run, print one line per unpinned or unchecked hunk, and
-// exit non-zero when any checked hunk is unpinned. An unchecked hunk alone does not fail the run — it
+// The `josh test:pinned` entry: read `--max`, run, print one line per unpinned hunk and per unchecked
+// reason (each unchecked place in the `full output:` log), and exit non-zero when any checked hunk is unpinned. An unchecked hunk alone does not fail the run — it
 // was not asked about.
 
 const CLEAN_EXIT = 0
 const FAILED_EXIT = 1
 const ARGV_OFFSET = 2
 const USAGE = [
-	'Usage: josh test:pinned [--max <n>] [--help]',
-	'  revert each changed hunk of a non-test code file and run its related tests;',
+	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--help]',
+	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
-	`  \`unchecked <file>:<line>\` past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
+	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
+	'  or whose revert stopped vitest before any test ran, each place listed in the `full output:` log;',
+	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
+	'  --origin names what started the run on its lane ledger row (default manual);',
+	'  hunks run fewest reached tests first, and --first-unpinned starts no probe once one is unpinned',
 ].join('\n')
 
 const PARSE_ARGS_OPTIONS = {
 	help: { type: 'boolean', short: 'h', default: false },
+	'first-unpinned': { type: 'boolean', default: false },
 	max: { type: 'string' },
+	origin: { type: 'string' },
+	record: { type: 'string' },
 } as const
 
 const HELP_FLAGS: ReadonlySet<string> = new Set(['--help', '-h'])
+// A tree still moving after this many checks is answered as not checked rather than waited on.
+const MAX_CHECKS = 3
+const MOVING_NOTE = `the tree kept moving across ${String(MAX_CHECKS)} checks`
+
+interface PinnedOptions {
+	max_hunks: number
+	record_token: string | undefined
+	is_first_unpinned: boolean
+	origin: PinnedOrigin
+}
 
 // A `--max` that is not a whole number above zero is a refusal, not the default.
 function valid_max(raw: string | undefined): number | undefined {
@@ -32,12 +52,22 @@ function valid_max(raw: string | undefined): number | undefined {
 	return Number.isSafeInteger(max) && max > 0 ? max : undefined
 }
 
-// `undefined` prints the usage: a help request, an unknown flag, or a missing or invalid `--max`.
-function max_hunks_of(argv: ReadonlyArray<string>): number | undefined {
+// `undefined` prints the usage: a help request, an unknown flag, a missing or invalid `--max`, or an
+// `--origin` not among the three.
+function options_of(argv: ReadonlyArray<string>): PinnedOptions | undefined {
 	try {
 		const { values } = parseArgs({ args: [...argv], options: PARSE_ARGS_OPTIONS, strict: true })
+		const max_hunks = valid_max(values.max)
+		const origin = test_pinned_ledger.origin_of(values.origin)
 
-		return values.help ? undefined : valid_max(values.max)
+		if (max_hunks === undefined || origin === undefined || values.help) return undefined
+
+		return {
+			max_hunks,
+			record_token: values.record,
+			is_first_unpinned: values['first-unpinned'],
+			origin,
+		}
 	} catch {
 		return undefined
 	}
@@ -50,23 +80,59 @@ function print_usage(argv: ReadonlyArray<string>): number {
 	return argv.some((argument) => HELP_FLAGS.has(argument)) ? CLEAN_EXIT : FAILED_EXIT
 }
 
-function output(report: PinnedReport): string {
-	const unpinned = String(report.unpinned.length)
-	const unchecked = String(report.unchecked.length)
-	const lines = [`unpinned ${unpinned} · unchecked ${unchecked}`, test_pinned_logic.format(report)]
+async function tree_digest(): Promise<string> {
+	return JSON.stringify(await review_tree.read_changed_tree())
+}
 
-	return `${lines.filter((line) => line !== '').join('\n')}\n`
+// The recorded check runs beside a review that may fix in place, and it reads the tree at more than
+// one moment; a check the tree moved under is run again, so its answer is about one tree.
+async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
+	for (let attempt = 0; attempt < MAX_CHECKS; attempt += 1) {
+		// eslint-disable-next-line no-await-in-loop -- each check runs only once the last one saw the tree move
+		const before = await tree_digest()
+		// eslint-disable-next-line no-await-in-loop -- as above
+		const report = await test_pinned.run(
+			options.max_hunks,
+			options.is_first_unpinned,
+			options.origin,
+		)
+		// eslint-disable-next-line no-await-in-loop -- as above
+		if ((await tree_digest()) === before) return report
+	}
+
+	throw new Error(MOVING_NOTE)
+}
+
+// `--record` leaves an answer however the run ends — a check that could not run included — so the
+// join waiting on it never waits on a check that died.
+async function recorded_run(options: PinnedOptions, token: string): Promise<PinnedSummary> {
+	try {
+		const summary = test_pinned_record.summary_of(await settled_run(options))
+
+		test_pinned_record.write(token, summary)
+
+		return summary
+	} catch (error: unknown) {
+		test_pinned_record.write(token, test_pinned_record.not_run_summary(error))
+
+		throw error
+	}
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<number> {
-	const max_hunks = max_hunks_of(argv)
-	if (max_hunks === undefined) return print_usage(argv)
+	const options = options_of(argv)
+	if (options === undefined) return print_usage(argv)
 
-	const report = await test_pinned.run(max_hunks)
+	const summary =
+		options.record_token === undefined
+			? test_pinned_record.summary_of(
+					await test_pinned.run(options.max_hunks, options.is_first_unpinned, options.origin),
+				)
+			: await recorded_run(options, options.record_token)
 
-	process.stdout.write(output(report))
+	process.stdout.write(test_pinned_logic.report_text(summary))
 
-	return report.unpinned.length === 0 ? CLEAN_EXIT : FAILED_EXIT
+	return summary.unpinned.length === 0 ? CLEAN_EXIT : FAILED_EXIT
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

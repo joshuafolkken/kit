@@ -20,9 +20,11 @@ vi.spyOn(lane_withdraw, 'describe').mockReturnValue(DESCRIBED)
 function withdrawn(is_noted: boolean): WithdrawOutcome {
 	return {
 		kind: 'withdrawn',
+		by: 'person',
 		reaped: 1,
 		stash: undefined,
 		is_noted,
+		is_closed: false,
 		lane: 'closed',
 		residents: [],
 	}

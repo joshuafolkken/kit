@@ -19,6 +19,7 @@ const FOURTH = 4200
 const ADDED = 4300
 const NO_LANE_LEFT = 0
 const ONE_LANE_LEFT = 1
+const NOW_MS = Date.parse('2026-10-19T00:10:00.000Z')
 const { WAIT_ICONS } = run_board_labels
 const CARRY: RunCarry = {
 	invocation: `backlogrun #${String(FIRST)} #${String(RUNNING)} #${String(THIRD)} #${String(FOURTH)} --only`,
@@ -62,6 +63,7 @@ function reasons(extra: Partial<ReasonRead> = {}): Array<RowReason | undefined> 
 		free_lanes: ONE_LANE_LEFT,
 		carry: CARRY,
 		is_stopped: false,
+		now_ms: NOW_MS,
 		...extra,
 	})
 

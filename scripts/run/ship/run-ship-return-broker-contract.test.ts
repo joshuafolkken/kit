@@ -20,7 +20,12 @@ vi.mock('#scripts/lane/lane-session-broker', () => ({
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => ['scripts/changed.ts'] },
 }))
-vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: async () => true } }))
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: {
+		read_review_stale: async () => true,
+		repository_directory: async () => undefined,
+	},
+}))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: async () => false },
 }))
@@ -41,6 +46,7 @@ const ARGS = {
 	cites: [],
 	is_review: true,
 	is_detach: true,
+	unpinned_ok: [],
 }
 const FAILED = { body: 'FAIL gate', conflicts: ['scripts/a.ts'], cause: 'finding' } as const
 // Typed `Required`, so a field the stop gains fails the type check until it is filled here as well.
@@ -49,6 +55,7 @@ const EVERY_FIELD: Required<ShipStop> = {
 	title: '',
 	flags: [],
 	is_review: true,
+	unpinned_ok: [],
 	conflicts: [],
 	cause: 'finding',
 	is_review_stale: true,

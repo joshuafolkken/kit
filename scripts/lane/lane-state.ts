@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs'
 import path from 'node:path'
 import { repository_lock } from '#scripts/git/repository-lock'
 import { session_cite } from '#scripts/issue/session-cite'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
@@ -12,10 +13,10 @@ import { z } from 'zod'
 // the lane commands (joshuafolkken/kit#4268), so a reader asks the record rather than guessing from
 // the `.env` mtime, the event stream or the `ps` state.
 //
-// **It is a `stamp_path` keyed on the common git directory**, beside the carry record and the event
-// stream and outside every work tree, so it is the same file from the main checkout and from inside
-// the lane, it outlives `lane:close`'s removal of the lane, and `JOSH_TEMP_ROOT` moves it with every
-// other record the run keeps.
+// **It is a `durable_state` path keyed on the common git directory**, in
+// `<common git dir>/josh/run-state` beside the carry record and the event stream and outside every
+// work tree, so it is the same file from the main checkout and from inside the lane, it outlives
+// `lane:close`'s removal of the lane, and a reboot does not clear it.
 //
 // **The write is `stamp_file.replace_stamp`'s** — a temporary file beside the target, renamed over it —
 // so two commands writing the same lane at once leave one whole record, never a torn one. **The read,
@@ -26,7 +27,7 @@ import { z } from 'zod'
 // warned about and the command carries on, as it does when the record cannot be written at all — the
 // record never fails the command that keeps it.
 
-const STATE_PREFIX = 'josh-lane-state-'
+const STATE_PREFIX = durable_state.PREFIX.LANE_STATE
 const STATE_SUFFIX = '.json'
 const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
@@ -85,7 +86,7 @@ type RecordOutcome =
 	{ kind: 'written'; record: LaneStateRecord } | { kind: 'skipped'; reason: string }
 
 function state_path(directory: string, issue: string): string {
-	return stamp_file.stamp_path(STATE_PREFIX, directory, `-${issue}${STATE_SUFFIX}`)
+	return durable_state.path(STATE_PREFIX, directory, `-${issue}${STATE_SUFFIX}`)
 }
 
 function is_allowed(from: LaneState | undefined, to: LaneState): boolean {
@@ -180,9 +181,10 @@ async function outcome_of(change: LaneChange, options: StateOptions): Promise<Re
 	return apply(change, directory, options.now ?? new Date())
 }
 
-async function settled_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
+// A write that threw is a write skipped for that reason, never an error out of the lane command.
+async function settled(write: () => Promise<RecordOutcome>): Promise<RecordOutcome> {
 	try {
-		return await outcome_of(change, options)
+		return await write()
 	} catch (error: unknown) {
 		return { kind: 'skipped', reason: error instanceof Error ? error.message : String(error) }
 	}
@@ -192,7 +194,7 @@ async function record_change(
 	change: LaneChange,
 	options: StateOptions = {},
 ): Promise<RecordOutcome> {
-	const outcome = await settled_outcome(change, options)
+	const outcome = await settled(async () => await outcome_of(change, options))
 
 	if (outcome.kind === 'skipped') warn(change, outcome.reason)
 
@@ -255,6 +257,35 @@ async function record_stuck(
 	return locked(root, issue, () => stuck_held(issue, stuck, root))
 }
 
+function adopted_held(change: LaneChange, directory: string, now: Date): RecordOutcome {
+	if (read_record(directory, change.issue) !== undefined) {
+		return { kind: 'skipped', reason: 'a record exists' }
+	}
+
+	return apply_held(change, directory, now)
+}
+
+/**
+ * Write `change` for a lane that has no record, and only then: a record that appeared since the caller
+ * read none is the lane command's, and is never overwritten (`lane:adopt`).
+ */
+async function adopted_outcome(change: LaneChange, options: StateOptions): Promise<RecordOutcome> {
+	const directory = await resolve_directory(options.directory)
+
+	if (directory === undefined) return NO_DIRECTORY
+
+	const now = options.now ?? new Date()
+
+	return locked(directory, change.issue, () => adopted_held(change, directory, now))
+}
+
+async function record_adopted(
+	change: LaneChange,
+	options: StateOptions = {},
+): Promise<RecordOutcome> {
+	return await settled(async () => await adopted_outcome(change, options))
+}
+
 /** Each of `issues`' records, by issue; an issue with none is left out. */
 async function read_states(
 	issues: ReadonlyArray<string>,
@@ -293,6 +324,7 @@ const lane_state = {
 	read_records,
 	read_state,
 	read_states,
+	record_adopted,
 	record_change,
 	record_stuck,
 	state_path,

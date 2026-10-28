@@ -14,7 +14,7 @@
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.
 - **Durable rules belong in prompts/docs, not local MEMORY.** `prompts/collaboration-workflow/principles.md` → "durable-rules".
-- **Hook-delivered rules** (file edits, shell bodies, turn batching, Issue citation, …): `prompts/collaboration-workflow/rule-delivery.md` → "配送されている規則".
+- **Hook-delivered rules** (file edits, shell bodies, turn batching, …): `prompts/collaboration-workflow/rule-delivery.md` → "配送されている規則".
 
 ### Decision autonomy
 
@@ -41,10 +41,10 @@ Before building a feature, run `pnpm josh pkg:scout <keywords>`: `clear` → use
 
 ## Code Change Rules
 
-0. **Work summary + test declaration** — before writing any implementation code, once per Issue: Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation; a runtime change with no test is refused at `pnpm josh git -y` on `required` (`pnpm josh test:declared`).
+0. **Work summary + test declaration** — before writing any implementation code, once per Issue: Now / Change / Check, then every change with its test (`prompts/collaboration-workflow/report-format.md` → "作業前サマリはいつ・どう出すか"). **Tests are required for ALL changes** — zero tests without explicit approval is a violation.
 1. **Refactor first** — `prompts/refactoring.md`; no high/medium refactoring left on new/modified code.
 2. **Tests** — those declared in Step 0 (`prompts/testing-guide.md`).
-3. **Verification gate** — `pnpm josh gate`; while implementing re-run one check (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`). Add legitimate flagged terms to `cspell.config.yaml`.
+3. **Verification gate** — `pnpm josh gate`, never piped: `| tail` reports a red gate as green, and its last lines carry the verdict (`prompts/collaboration-workflow/output-bounds.md`); while implementing re-run one check (`pnpm josh lint:related` / `pnpm josh cspell:dot` / `pnpm josh test:related`). Add legitimate flagged terms to `cspell.config.yaml`.
 4. **IDE feedback** — zero errors on changed files; never say "it should pass" without running it. Do not modify `eslint.config.js` unless asked.
 
 ## Completion gate (before you tell the user work is done)
@@ -57,10 +57,7 @@ Before every `git commit`, a subagent runs `/code-review` per `prompts/review.md
 
 ## Git Rules
 
-- **No commits** unless explicitly requested. **No merges, branch deletions, force pushes or other shared-state mutations** unless requested in the current turn — except invoking `fullrun` or `backlogrun` authorizes the merge via `pnpm josh followup`; `prrun` does not. `.claude/settings.json` denies these, but the deny is narrower than the rule — never read "the tool let me" as permission.
-- **Never stage or mutate the git index on your own** — only on explicit instruction or via `pnpm josh git`. `prompts/collaboration-workflow/operating-rules.md` → "no-self-staging".
-- **Use `pnpm josh git`; open a PR with `pnpm josh pr`** — the `direct-pr-create` row of `pnpm josh rule:list` refuses a direct `gh pr create`. GitHub operations are `gh api` (REST) — `prompts/collaboration-workflow/gh-rest.md`.
-- **Run `git status` (and `git stash list`) live** before acting on any tree assumption.
+Commits, the index and shared state (merge, branch delete, force push) only on explicit instruction, through `pnpm josh git` / `pnpm josh pr`; run `git status` live before any tree assumption: `prompts/collaboration-workflow/operating-rules.md` → "git-rules".
 
 ## Collaboration Workflow
 
@@ -76,8 +73,4 @@ Never start a `kickoff` / `halfrun` / `prrun` / `fullrun` / `backlogrun` workflo
 
 #### Mid-workflow stop notification (`confirmation`)
 
-The `Stop` hook sends it when your held run awaits a decision — lead with the reason, end with `Recommended: <choice>`. Send it yourself only when the hook refuses the stop:
-
-```bash
-pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
-```
+The `Stop` hook sends it; send it yourself only when the hook refuses the stop: `prompts/collaboration-workflow/rule-delivery.md` → "stop-notify". A lane child stopping for a person → `pnpm josh run:park`, no notify: `backlogrun-park.md` → "park and continue".

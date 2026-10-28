@@ -8,14 +8,15 @@ import { package_version_schema } from '#scripts/lib/schemas'
 import { resolve_spawn_exit } from '#scripts/lib/spawn-exit'
 import { execaSync } from 'execa'
 import { command_suggest } from './command-suggest'
+import { ALIASES } from './josh-aliases'
 import {
-	ALIASES,
 	CATEGORY_ORDER,
 	COMMAND_MAP,
 	type CommandCategory,
 	type CommandEntry,
 } from './josh-command-map'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
+import { josh_environment_file } from './josh-environment-file'
 import { josh_in_process } from './josh-in-process'
 import { kit_only } from './kit-only'
 import { find_package_directory } from './package-directory'
@@ -193,7 +194,7 @@ function spawn_script_entry(
 
 	return spawn_script(runner.executable, [
 		...runner.leading_arguments,
-		...(entry.tsx_arguments ?? []),
+		...josh_environment_file.apply_node_flags(entry.tsx_arguments ?? []),
 		script_path,
 		...script_arguments,
 	])
@@ -309,7 +310,8 @@ const josh_logic = {
 }
 
 export type { CommandEntry } from './josh-command-map'
-export { ALIASES, COMMAND_MAP } from './josh-command-map'
+export { ALIASES } from './josh-aliases'
+export { COMMAND_MAP } from './josh-command-map'
 export { SPAWN_ERROR_EXIT_CODE } from '#scripts/lib/spawn-exit'
 export { composite_arguments, USAGE_ERROR_EXIT_CODE } from './josh-composite-arguments'
 export {

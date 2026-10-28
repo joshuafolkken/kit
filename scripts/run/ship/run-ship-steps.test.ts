@@ -24,6 +24,7 @@ const ARGS: ShipArguments = {
 	cites: ['--cite', '#1'],
 	is_review: false,
 	is_detach: false,
+	unpinned_ok: [],
 }
 
 const FRESH: ShipState = { is_committed: false, is_pushed: false, is_merged: false }
@@ -37,9 +38,11 @@ const review_spy = vi.spyOn(run_ship_review_steps, 'review_stage')
 const round_two_spy = vi.spyOn(run_ship_review_steps, 'round_two_stage')
 const sync_spy = vi.spyOn(run_ship_sync, 'sync_stage')
 const followup_spy = vi.spyOn(run_ship_sync, 'followup_stage')
+const catch_up_spy = vi.spyOn(run_ship_sync, 'catch_up')
 const remove_draft_spy = vi.spyOn(run_ship_body_draft, 'remove')
 
 beforeEach(() => {
+	catch_up_spy.mockReset().mockResolvedValue(undefined)
 	remove_draft_spy.mockReset().mockResolvedValue(undefined)
 	josh_spy.mockReset().mockResolvedValue(OK)
 	preflight_spy.mockReset().mockResolvedValue(OK)
@@ -86,6 +89,17 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 		])
 	})
 
+	// joshuafolkken/kit#5067: the sync pushes its merge ahead of the gate, so the merge still waits on
+	// that gate — a red one stops the ship (`run-ship-cli.test.ts`) before the followup merges anything.
+	it('puts the gate between the sync push and the followup, with or without --review', () => {
+		for (const is_review of [false, true]) {
+			const stages = run_ship_steps.steps({ ...ARGS, is_review }).map((step) => step.stage)
+
+			expect(stages.indexOf(STAGE.SYNC)).toBeLessThan(stages.indexOf(STAGE.GATE))
+			expect(stages.indexOf(STAGE.GATE)).toBeLessThan(stages.indexOf(STAGE.FOLLOWUP))
+		}
+	})
+
 	it('always starts with the exported preflight step', () => {
 		expect(run_ship_steps.steps(ARGS)[0]).toBe(run_ship_steps.PREFLIGHT_STEP)
 	})
@@ -101,14 +115,14 @@ describe('run_ship_steps — preflight and review stages delegate', () => {
 		await step_for(STAGE.REVIEW).run(ARGS, FRESH)
 		await step_for(STAGE.ROUND_TWO).run(ARGS, FRESH)
 
-		expect(review_spy).toHaveBeenCalledWith(ISSUE, false)
+		expect(review_spy).toHaveBeenCalledWith(ISSUE, false, [])
 		expect(round_two_spy).toHaveBeenCalledWith(ISSUE)
 	})
 
 	it('hands round 1 a stale review, so a recorded round is not skipped (joshuafolkken/kit#4221)', async () => {
 		await step_for(STAGE.REVIEW).run(ARGS, { ...FRESH, is_review_stale: true })
 
-		expect(review_spy).toHaveBeenCalledWith(ISSUE, true)
+		expect(review_spy).toHaveBeenCalledWith(ISSUE, true, [])
 	})
 })
 
@@ -168,6 +182,52 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		expect(await step_for(STAGE.SYNC).run(ARGS, FRESH)).toBe(OK)
 		expect(await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)).toBe(OK)
 		expect(followup_spy).toHaveBeenCalledWith(TITLE, ARGS.notify, expect.any(Function))
+	})
+})
+
+// joshuafolkken/kit#4825: a default branch that moved since the sync is merged and gated before the push.
+describe('run_ship_steps — the catch-up before the push', () => {
+	it('catches up with the default branch before the push', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, FRESH)
+
+		expect(catch_up_spy).toHaveBeenCalledOnce()
+		expect(catch_up_spy.mock.invocationCallOrder[0]).toBeLessThan(
+			josh_spy.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('stops on the catch-up before committing or pushing', async () => {
+		catch_up_spy.mockResolvedValue(FAILED)
+
+		expect(await step_for(STAGE.COMMIT).run(ARGS, FRESH)).toBe(FAILED)
+		expect(josh_spy).not.toHaveBeenCalled()
+	})
+
+	it('leaves the catch-up to the followup once a resumed ship already pushed', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, { ...FRESH, is_committed: true, is_pushed: true })
+
+		expect(catch_up_spy).not.toHaveBeenCalled()
+	})
+
+	it('catches up on a pushed branch that carries new work still to push', async () => {
+		await step_for(STAGE.COMMIT).run(ARGS, { ...FRESH, is_dirty: true, is_pushed: true })
+
+		expect(catch_up_spy).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#4708: the sync commits the probe's dirty tree locally under the ship's title.
+describe('run_ship_steps — the sync stage', () => {
+	it('hands the sync the title and whether the probe read the tree dirty', async () => {
+		sync_spy.mockReset().mockResolvedValue(OK)
+
+		await step_for(STAGE.SYNC).run(ARGS, { ...FRESH, is_dirty: true })
+		await step_for(STAGE.SYNC).run(ARGS, FRESH)
+
+		expect(sync_spy.mock.calls).toStrictEqual([
+			[ISSUE, TITLE, true],
+			[ISSUE, TITLE, false],
+		])
 	})
 })
 

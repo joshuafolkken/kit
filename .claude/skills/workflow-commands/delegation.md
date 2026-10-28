@@ -46,9 +46,10 @@ forecast** — where the guard refuses, not a budget. Brief the unit on what was
 **Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
 the `model` its definition names.
 
-**The main line does not idle while the unit reads:** read files this run will edit, then verify the
-unit's cited lines. Independent investigations launch together; a brief that needs another unit's
-answer waits for that answer.
+**The main line does not idle while the unit reads** — the reads of files this run will edit go in
+the same message (the `investigator-foreground` row of `pnpm josh rule:list`); then verify the unit's
+cited lines. Independent investigations launch
+together; a brief that needs another unit's answer waits for that answer.
 
 **When the Issue already names the file, function or rule, read that edit target in the main line.**
 It is not `survey`, and it is not `diagnosis`: the unit describes how the subject works;
@@ -56,6 +57,5 @@ the main line decides what that means and what to change.
 
 ## A `general-purpose` subagent names its model
 
-**A `general-purpose` dispatch → set `model`**: `sonnet` for routine work, `opus` for judgment; a review
-takes the alias of the `model=` id its brief prints (`claude-opus-5-5` → `opus`). Delivered by the
-`agent-model` row of `pnpm josh rule:list`.
+**A `general-purpose` dispatch sets `model`** — `sonnet` for routine work, `opus` for judgment (the
+`agent-model` row of `pnpm josh rule:list`).

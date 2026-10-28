@@ -13,7 +13,9 @@ import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_lock } from './run-ship-lock'
+import { run_ship_planned } from './run-ship-planned'
 import { run_ship_scoped } from './run-ship-scoped'
 
 // `josh ship`'s first stage. The commit stage (`git -y`'s preflight) and the merge (`followup`'s
@@ -22,7 +24,8 @@ import { run_ship_scoped } from './run-ship-scoped'
 // once.** No check is new: the classification, issue and branch answers
 // are `git_preflight.problems_of`, and the evidence answer is `live_evidence.verdict_for` over the same
 // changed paths and the body this ship will deliver — `--body-file` when given, else the ship body
-// draft, else the open PR's.
+// draft, else the open PR's. The `unplanned` answer is the branch's code files the lane's `lane:plan`
+// record never listed (`run-ship-planned.ts`).
 //
 // The scoped pair runs last, met rather than stopped on (`run-ship-scoped.ts`), so the review and the
 // gate start on a tree both checks are green on.
@@ -39,6 +42,7 @@ const PRECONDITION = {
 	REMOVED_TESTS: 'removed-tests',
 	LOCK: 'lock',
 	SCOPED: 'scoped',
+	UNPLANNED: run_ship_planned.PRECONDITION,
 	UNREADABLE: 'unreadable',
 } as const
 const EVIDENCE_PROBLEM = `This change touches runtime code, but the body this ship delivers has no ${live_evidence.EVIDENCE_HEADING} section: run the acceptance criteria for real and write it into the ship body draft run:prep wrote (josh ship reads it when --body-file is omitted), or pass the body with --body-file <path>. Write it ${live_evidence.EVIDENCE_FORMAT}`
@@ -149,22 +153,30 @@ async function lock_problems(): Promise<Array<Unmet>> {
 	return of_kind(PRECONDITION.LOCK, await run_ship_lock.lock_problems())
 }
 
+async function planned_problems(): Promise<Array<Unmet>> {
+	return of_kind(PRECONDITION.UNPLANNED, await run_ship_planned.problems())
+}
+
 // The lock file is asked here too, so a drift stops the ship before the gate
 // rather than being rewritten by the pre-push hook's install under the push.
 async function asked_problems(request: PreflightRequest): Promise<Array<Unmet>> {
-	const [preflight, evidence, acceptance, removed, lock] = await Promise.all([
+	const [preflight, evidence, acceptance, removed, lock, planned] = await Promise.all([
 		caught(git_preflight.problems_of({ cli_input: request.title, will_open_pr: true })),
 		caught(evidence_problems(request.body_path)),
 		caught(acceptance_problems(request.body_path)),
 		caught(removed_test_problems(request.body_path)),
 		caught(lock_problems()),
+		caught(planned_problems()),
 	])
 
-	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock]
+	return [...preflight, ...evidence, ...acceptance, ...removed, ...lock, ...planned]
 }
 
 async function stage(request: PreflightRequest): Promise<PreflightResult> {
-	const problems = await asked_problems(request)
+	const problems = await run_ship_lap.timed(
+		run_ship_lap.STEP.PRECONDITIONS,
+		async () => await asked_problems(request),
+	)
 
 	if (problems.length > 0) return refusal(problems)
 

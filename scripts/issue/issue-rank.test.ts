@@ -6,6 +6,7 @@ import {
 	PRIORITY_HIGH_LABEL,
 	RUN_SOLO_LABEL,
 } from './issue-labels'
+import { issue_priority } from './issue-priority'
 import { issue_rank, type RankRow } from './issue-rank'
 
 // joshuafolkken/kit#2928: priority:high, then a verification-path defect, then dependents, then the
@@ -16,7 +17,19 @@ interface Row extends RankRow {
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, labels, dependents }
+	return { name, is_last: false, labels, lost_minutes: 0, gain_minutes: 0, dependents }
+}
+
+function last(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
+	return { ...row(name, labels, dependents), is_last: true }
+}
+
+function lost(name: string, lost_minutes: number, labels: ReadonlyArray<string> = []): Row {
+	return { ...row(name, labels), lost_minutes }
+}
+
+function gained(name: string, gain_minutes: number): Row {
+	return { ...row(name), gain_minutes }
 }
 
 function names_of(rows: ReadonlyArray<Row>): Array<string> {
@@ -77,6 +90,132 @@ describe('issue_rank.rank priority:critical', () => {
 		]
 
 		expect(names_of(rows)).toStrictEqual([CRITICAL, URGENT, DEFECT])
+	})
+})
+
+// joshuafolkken/kit#4859: within one priority, the larger declared causing lane goes first.
+describe('issue_rank.rank lane minutes', () => {
+	const LONG = 'long'
+	const SHORT = 'short'
+	const LONG_MINUTES = 16
+	const SHORT_MINUTES = 4
+
+	it('puts the larger causing lane ahead within one priority', () => {
+		const rows = [
+			lost(SHORT, SHORT_MINUTES, [PRIORITY_HIGH_LABEL]),
+			lost(LONG, LONG_MINUTES, [PRIORITY_HIGH_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([LONG, SHORT])
+	})
+
+	it('puts an undeclared issue after every declared one of its priority, in the given order', () => {
+		const rows = [row(PLAIN, [], MANY), lost(SHORT, SHORT_MINUTES), row(PLAIN_SECOND)]
+
+		expect(names_of(rows)).toStrictEqual([SHORT, PLAIN, PLAIN_SECOND])
+	})
+
+	it('keeps a verification-path defect ahead of a larger causing lane', () => {
+		const rows = [lost(LONG, LONG_MINUTES), row(DEFECT, [BUG_LABEL, RUN_SOLO_LABEL])]
+
+		expect(names_of(rows)).toStrictEqual([DEFECT, LONG])
+	})
+
+	it('never lets the minutes reorder issues of different priorities', () => {
+		const rows = [
+			lost(LONG, LONG_MINUTES),
+			lost(SHORT, SHORT_MINUTES, [PRIORITY_HIGH_LABEL]),
+			row(CRITICAL, [PRIORITY_CRITICAL_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([CRITICAL, SHORT, LONG])
+	})
+})
+
+// joshuafolkken/kit#4928: a recurrence appends a cause-loss line, so a cause that recurs ranks by its
+// accumulated minutes, ahead of one larger in a single lane.
+function cause_body(lines: ReadonlyArray<number>): string {
+	const losses = lines.map((minutes) => `- 原因の損失: ${String(minutes)} 分\n`).join('')
+
+	return `## 背景\n\n- 原因のレーン: 77 分（#4887）\n${losses}`
+}
+
+function from_body(name: string, lines: ReadonlyArray<number>): Row {
+	return lost(name, issue_priority.lost_minutes(cause_body(lines)))
+}
+
+describe('issue_rank.rank accumulated cause loss', () => {
+	const RECURRING = 'recurring'
+	const SINGLE = 'single'
+
+	it('orders by the sum of every recurrence, not by the largest single loss', () => {
+		const rows = [from_body(SINGLE, [20]), from_body(RECURRING, [8, 7, 6])]
+
+		expect(names_of(rows)).toStrictEqual([RECURRING, SINGLE])
+	})
+})
+
+// joshuafolkken/kit#5302: a declared weekly speed-up is the key after the cause loss and before the
+// dependents, so a measured time-saver runs ahead of an unmeasured feature of its priority.
+describe('issue_rank.rank weekly gain', () => {
+	const SAVER = 'saver'
+	const BIG_SAVER = 'big-saver'
+	const GAIN_MINUTES = 20.8
+	const BIG_GAIN_MINUTES = 60
+	const LOST_MINUTES = 5
+
+	it('puts the declared speed-up ahead of undeclared issues, the larger gain first', () => {
+		const rows = [
+			row(PLAIN),
+			gained(SAVER, GAIN_MINUTES),
+			row(PLAIN_SECOND),
+			gained(BIG_SAVER, BIG_GAIN_MINUTES),
+		]
+
+		expect(names_of(rows)).toStrictEqual([BIG_SAVER, SAVER, PLAIN, PLAIN_SECOND])
+	})
+
+	it('keeps a declared cause loss ahead of the gain, and the gain ahead of the dependents', () => {
+		const rows = [row(WAITED_ON, [], MANY), gained(SAVER, GAIN_MINUTES), lost(DEFECT, LOST_MINUTES)]
+
+		expect(names_of(rows)).toStrictEqual([DEFECT, SAVER, WAITED_ON])
+	})
+
+	it('never lets the gain lift an issue over a higher priority', () => {
+		const rows = [gained(BIG_SAVER, BIG_GAIN_MINUTES), row(URGENT, [PRIORITY_HIGH_LABEL])]
+
+		expect(names_of(rows)).toStrictEqual([URGENT, BIG_SAVER])
+	})
+})
+
+// joshuafolkken/kit#5310: an issue declared to run last follows every undeclared one, whatever its
+// other keys, and declared ones rank among themselves by those keys.
+describe('issue_rank.rank declared last', () => {
+	const UPGRADE = 'upgrade'
+	const UPGRADE_URGENT = 'upgrade-urgent'
+	const UPGRADE_WAITED_ON = 'upgrade-waited-on'
+
+	it('puts a declared issue behind every undeclared one', () => {
+		const rows = [last(UPGRADE, [], MANY), row(PLAIN), gained('saver', 1), row(PLAIN_SECOND)]
+
+		expect(names_of(rows)).toStrictEqual(['saver', PLAIN, PLAIN_SECOND, UPGRADE])
+	})
+
+	it('puts a declared priority:high issue behind an undeclared plain one', () => {
+		expect(names_of([last(UPGRADE_URGENT, [PRIORITY_HIGH_LABEL]), row(PLAIN)])).toStrictEqual([
+			PLAIN,
+			UPGRADE_URGENT,
+		])
+	})
+
+	it('orders declared issues among themselves by the existing keys', () => {
+		const rows = [
+			last(UPGRADE),
+			last(UPGRADE_WAITED_ON, [], MANY),
+			last(UPGRADE_URGENT, [PRIORITY_HIGH_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([UPGRADE_URGENT, UPGRADE_WAITED_ON, UPGRADE])
 	})
 })
 

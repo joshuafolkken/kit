@@ -6,6 +6,7 @@ const KIND = run_event_stream.EVENT_KIND
 const ISSUE = '2248'
 const MERGE_COMMAND = `pnpm josh run:merge ${ISSUE}`
 const FOLLOWUP_COMMAND = 'pnpm josh followup'
+const OFFER_COMMAND = 'pnpm josh backlog:next'
 
 function input(overrides: Partial<StepInput>): StepInput {
 	return {
@@ -149,10 +150,11 @@ describe('run_step.next_action — no cut at the setup→implementation boundary
 describe('run_step.next_action — event-driven position', () => {
 	it.each([
 		[KIND.PR_OPENED, FOLLOWUP_COMMAND],
-		[KIND.REVIEW_ROUND, 'pnpm josh review:round2'],
+		[KIND.REVIEW_ROUND, `pnpm josh review:round2 --record ${ISSUE}`],
 		[KIND.MERGE, MERGE_COMMAND],
 		[KIND.OUTAGE, MERGE_COMMAND],
-		[KIND.PARK, 'pnpm josh backlog:next'],
+		[KIND.PARK, OFFER_COMMAND],
+		[KIND.USAGE_LIMIT, OFFER_COMMAND],
 		[KIND.CUT, `pnpm josh run:cut --resume ${ISSUE}`],
 		[KIND.SHIP_STOP, `pnpm josh ship --log ${ISSUE}`],
 	])('dispatches to a command after %s', (last_event, line) => {
@@ -289,11 +291,14 @@ describe('run_step.next_action — the retrospective at the drain, before the id
 // command, which returns `busy` in a child (joshuafolkken/kit#2267). It stops at a parent-only
 // position instead, so the child is never pointed at a command the runtime guard would refuse.
 describe('run_step.next_action — the lane child never reaches run:merge', () => {
-	it.each([[KIND.MERGE], [KIND.OUTAGE]])('answers stop after %s in a lane child', (last_event) => {
-		expect(run_step.next_action(input({ last_event, is_lane_child: true })).line).toBe(
-			run_step.STOP,
-		)
-	})
+	it.each([[KIND.MERGE], [KIND.OUTAGE], [KIND.USAGE_LIMIT]])(
+		'answers stop after %s in a lane child',
+		(last_event) => {
+			expect(run_step.next_action(input({ last_event, is_lane_child: true })).line).toBe(
+				run_step.STOP,
+			)
+		},
+	)
 
 	it.each([[KIND.MERGE], [KIND.OUTAGE]])(
 		'still dispatches run:merge after %s outside a lane',

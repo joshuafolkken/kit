@@ -36,12 +36,16 @@ const IMPORTED_BY_EVERY_TEST: ReadonlyArray<string> = [
 	'scripts/josh/process-identity.ts',
 	'scripts/josh/process-owner.ts',
 	'scripts/josh/stamp-file.ts',
+	'scripts/lane/lane-child-mark-keys.ts',
 	'scripts/lib/atomic-write.ts',
 	'scripts/lib/json-value.ts',
 	'scripts/lib/read-file.ts',
 	'scripts/lib/timeouts.ts',
+	'scripts/test/unit-durations.ts',
 	'scripts/test/unit-run-marker.ts',
 	'scripts/test/unit-setup-files.ts',
+	'scripts/test/vitest-cache-directory.ts',
+	'scripts/test/vitest-cli-excludes.ts',
 	'tools/test/duration-sequencer.ts',
 	'tools/test/duration-shard.ts',
 	'tools/test/pure-files.ts',
@@ -58,6 +62,13 @@ const WHOLE_SUITE_FILES: ReadonlySet<string> = new Set(
 	[...ROOT_FILES, ...IMPORTED_BY_EVERY_TEST, ...SETUP_FILES].map((file) => path.normalize(file)),
 )
 
-const whole_suite_files = { WHOLE_SUITE_FILES }
+// The part of `WHOLE_SUITE_FILES` a scoped run narrows to the test files importing it directly
+// (`direct-importers.ts`, joshuafolkken/kit#5122): each is a module some test imports by name, unlike a
+// root or setup file, which only the whole suite reaches.
+const EVERY_TEST_IMPORTS: ReadonlySet<string> = new Set(
+	IMPORTED_BY_EVERY_TEST.map((file) => path.normalize(file)),
+)
+
+const whole_suite_files = { EVERY_TEST_IMPORTS, WHOLE_SUITE_FILES }
 
 export { whole_suite_files }

@@ -10,7 +10,7 @@ See also:
 
 `josh` is available as `pnpm josh` (or `pnpm exec josh`) after running `josh init`. Run `pnpm josh help` to print a grouped summary in the terminal, and `pnpm josh help <command>` for one command's usage. How the dispatcher runs a command in kit's own checkout, and the shape a new script keeps: `docs/maintainers/josh-commands-rationale.md` → "How a command runs".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `pnpm josh command:derive` — edit the entry, not the span.
 
 ## Development
 
@@ -37,9 +37,10 @@ Also runs [behavior](#josh-behavior), [unused namespace members](#josh-exportsun
 - A tree recorded green is reused unless `--force` or the changed-file map moved; otherwise `lint`, `check`, `exports` and `metrics` are each reused while none of their inputs moved since they last passed silently (`scripts/gate/check-inputs.ts`), and `test:unit` while `josh test:related` would run no test for what moved (no test-read map, or one git can no longer diff against, runs it); the header reads `reused — inputs unchanged since it passed at <time>`.
 - The other checks always run; `--force` reuses nothing.
 - **Refuses to start when the scoped pair has not been green on this tree**: a unit-included local gate reads the record `josh review:brief` does and names `pnpm josh lint:related && pnpm josh test:related`. Not for `--no-unit` or `--force`; `JOSH_SCOPED_GREEN=0` turns it off.
+- `--static-group=<lint|types|rest>` implies `--no-unit`: one part of the static set per CI matrix leg (`scripts/gate/gate-static-group.ts`).
 - **On failure, a line per failed check with the command to re-run is printed just above the verdict**, so a `tail` keeps every failure.
 - **The last line is the verdict, counting ran apart from skipped**: `✔ verification gate passed (6 checks) in 41.2s.`, or `⚠ verification gate not verified (0 ran, 6 skipped) in 0.2s.` — which exits `0` but writes no green record.
-- Exit `1` if any check failed. Refuses any argument other than the three flags.
+- Exit `1` if any check failed. Refuses any argument other than the three flags and `--static-group=<group>`.
 - [`josh test:related`](#josh-testrelated) narrows the unit leg; CI runs the whole sharded suite regardless.
 - **Each check waits for a place in a machine-wide core budget** (`scripts/gate/core-budget.ts`). Weighting: `docs/maintainers/josh-commands-rationale.md` → "`josh gate`'s core budget".
 
@@ -64,7 +65,7 @@ pnpm josh lint --changed   # the branch's changed files — the gate's form
 
 <!-- usage: lint:related -->
 
-Check only the changed files with prettier and eslint (whole tree on fallback).
+Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback).
 
 ```bash
 pnpm josh lint:related
@@ -76,8 +77,9 @@ pnpm josh lint:related scripts/thing.ts   # narrow by the given files instead
 Keeps caches of its own, apart from the gate's.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
-- A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
+- A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
+- In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
 
 ### `josh lines`
@@ -140,11 +142,11 @@ pnpm josh metrics --accept --reason "<why>"   # record this branch's growth and 
 
 The totals: code and comment lines and the comment ratio under `scripts/` (non-test), the lines of `CLAUDE.md` and `prompts/**/*.md`, the number of `*:guard` commands, and the AI cost in bytes.
 
-- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
+- **A ratchet, and a step of [`josh gate`](#josh-gate)**: exits `1` when a total grew past the merge-base's; the only way up is `--accept --reason "<why>"`, once — `josh ship` re-records a later growth of a total the approval names. History: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' totals".
 - **kit only**: a consumer's gate leaves the step out.
 - The prose density is held too, over `README.md`, `docs/`, `prompts/` and `.claude/skills/`. It counts paragraphs over 400 characters, and bold spans beyond the first in each section.
 - Code lines are lint's own `max-lines` count (one lower than `josh lines` on a `#!` file); a comment line is any other non-blank line.
-- **Durations** fail past +10% of this machine's baseline; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
+- **Durations** fail past +10% of this machine's baseline; the gate and unit durations only warn where another lane worked or the load average passed the cores during most of the gates measured; a gate times no startup — `docs/maintainers/josh-commands-rationale.md` → "`josh metrics`' durations".
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh metrics` in detail".
 
@@ -175,6 +177,33 @@ pnpm josh cspell:dot   # includes dotfiles
 <!-- /usage -->
 
 - Runs with `--no-progress`: only the unknown-word lines and the summary print.
+
+### `josh check:related`
+
+<!-- usage: check:related -->
+
+Run related lint, unit, type and dotfile spelling checks in parallel.
+
+```bash
+pnpm josh check:related
+pnpm josh check:related --full   # whole outputs
+```
+
+<!-- /usage -->
+
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+
+A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
+
+A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict line lists it as `(reused: …)`. A check that failed last time left no record and runs again.
+
+`lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
+
+A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
+
+When a `josh test:pinned` launched on the current tree has already answered with unpinned places the ship's pre-detach would stop on, they are printed there too, with the `josh ship --review … --unpinned-ok "<reason>"` form, so the first ship can carry the reason; a check this run did not start, if still running, prints nothing and is not waited on.
+
+In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`. That check is waited for after the four, until it answers, ends, the tree moves again, or 240 seconds pass; only an answer on the current tree is printed.
 
 ### `josh behavior`
 
@@ -251,6 +280,7 @@ Run only the unit tests related to the changed files (full suite on fallback).
 ```bash
 pnpm josh test:related
 pnpm josh test:related scripts/thing.ts   # narrow by the given files instead
+pnpm josh test:related --touched          # only the diff's tests and its modules' same-named ones
 pnpm josh test:related --silent           # flags are forwarded to vitest
 ```
 
@@ -258,11 +288,18 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 `josh gate` runs it as its unit leg.
 
+- `--touched` is the implementation loop's re-check: the diff's test files (or the given files') plus each changed module's colocated `foo.test.ts` / `foo.*.test.ts`, with no test-read map and no import graph (`scripts/test/test-related-touched.ts`). It leaves no green record, so `josh review:brief` and the gate's reuse count only a full-reach run; the lane ledger records it as `touched`.
+
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
+- A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
+- An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
-- A source file that differs only from the map's tree joins only when its text names a file this change moved; such a test file always joins.
+- The core claim is taken once the scope resolves: a narrowed run claims one worker per 285 test files its imports reach (about 30 s each), between `MIN_WORKERS` and `josh test:unit`'s share, plus vitest's process; the whole suite, or no import graph, claims `josh test:unit`'s full width (`scoped_unit_weight` in `scripts/gate/gate-plan.ts`).
+- `--maxWorkers` is at most the claim less vitest's process. Each vitest pass claims for itself, the no-base pass (`scripts/test/test-no-base.ts`) by its own files (`scripts/test/test-related-claim.ts`). A run that reaches no test claims nothing; under `josh gate` the gate's claim covers it.
+- A file that differs only from the map's tree joins only as code whose text names a file this change moved.
 - A bare run after a green one reads only what moved since, main syncs included, plus the branch's own test files; nothing moved runs no test. The whole change when no record compares (none, or other tools, `NODE_ENV` or `TZ`), a non-code file moved (the map cannot see its read), or a toolchain, TypeScript or test-runner config moved (`scripts/gate/verification-inputs.ts`).
+- In kit, after a green run, the related tests of each changed code file that names the base branch's resolution (`change_base`, `default_branch`, `diff_main`, a quoted `main`) run again in a checkout shaped like CI's — detached, one commit deep, no local `main`, `origin` kept — and a failure there fails the run (`scripts/test/test-no-base.ts`). A change that names none builds no checkout.
 
 ### `josh test:declared`
 
@@ -288,10 +325,10 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:declared` 
 
 <!-- usage: test:red -->
 
-Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only.
+Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/stopped/test-only.
 
 ```bash
-pnpm josh test:red   # red, green, no-test or test-only
+pnpm josh test:red   # red, green, no-test, stopped or test-only
 ```
 
 <!-- /usage -->
@@ -304,11 +341,14 @@ Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh test:red` in de
 
 <!-- usage: test:pinned -->
 
-Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on.
+Revert each changed hunk outside tests and fixtures only they reach, and replace each added file's top-level function bodies with a throw, in a HEAD worktree, run the related tests, and list what no test went red on.
 
 ```bash
-pnpm josh test:pinned           # unpinned / unchecked <file>:<line> lines
-pnpm josh test:pinned --max 5   # check at most 5 hunks; the rest print as unchecked
+pnpm josh test:pinned                       # unpinned <file>:<line> lines; unchecked counted per reason
+pnpm josh test:pinned --max 5               # check at most 5 hunks; the rest count as unchecked
+pnpm josh test:pinned --record <token>      # also leave the answer, under the launch token, for run:review --join
+pnpm josh test:pinned --origin pre-detach   # name what started the run on its lane ledger row (default manual)
+pnpm josh test:pinned --first-unpinned      # start no probe once one hunk is unpinned; the rest count as unchecked
 ```
 
 <!-- /usage -->
@@ -664,7 +704,7 @@ pnpm josh main:merge
 
 <!-- /usage -->
 
-**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on generated files (`scripts/git/main-merge-regenerate.ts`) is regenerated and committed; any other conflict, or uncommitted work on an incoming path, fails.
+**Behavior:** merges with an explicit strategy rather than rebasing, so a diverged branch merges cleanly without a force push. A conflict only on the files `scripts/git/main-merge-regenerate.ts` lists is resolved and committed; any other conflict, or uncommitted work on an incoming path, fails.
 
 ---
 
@@ -785,7 +825,7 @@ pnpm josh audit
 
 <!-- /usage -->
 
-The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`). With neither the audit exits non-zero and prints how to get one — never skipped.
+The scanner is looked up on `PATH`, then in the `josh audit:provision` cache (`node_modules/.cache/josh-tools/`) — in a linked work tree, the primary checkout's cache, so every work tree shares one binary and one failed-download record. With neither the audit exits non-zero and prints how to get one — never skipped.
 
 ### `josh overrides`
 
@@ -921,7 +961,7 @@ The run keeps the environment it started with, so this writes an override onto t
 - The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A lane with no child in it is not counted — its tree, branch and port seat stay, and when its issue is picked up again the driver starts it ahead of a fresh launch, inside the free lanes.
 - A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
 - `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
-- The limit counts lanes, not memory: the driver opens no lane under memory pressure, and `run:board` leads the waiting row with `🧠`.
+- The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
 - A limit above the nine port seats is counted at the seats, as `JOSH_LANE_LIMIT` is; a value that is not a positive integer is refused.
 - The override lives and ends with the run (`run:carry --end` removes it). With no run in progress, the command refuses and points at `JOSH_LANE_LIMIT`.
 
@@ -957,10 +997,12 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 <!-- /usage -->
 
 - In order: records a `withdraw` event, stops the child's process tree, stashes the lane's uncommitted work as `<N>: uncommitted work at lane withdraw`, comments on the Issue that it stays open with a `- Why: <reason>` line, comments the `stash:pop` line, removes the `in-progress` marker and closes the lane. A child that had already ended is still withdrawn.
+- A closed issue's lane is withdrawn by `run:wake`, or by `run:merge` when it closed without a merge.
+- `run:merge` also closes the lane of a child whose `lane:plan` yielded (`josh lane:plan` in `docs/josh-commands-run.md`), booked `yielded`, not `withdrawn`; that issue stays in the run and is offered again once the holding lane ends.
 - The Issue stays open, its state reason unchanged: the withdrawal ends this run's attempt, not the work. This run's `backlog:next` / `backlog:offer` exclude it (read off the `withdraw` event); a later run offers it again.
 - The event comes first: `run:merge` and `run:board` book the child `withdrawn` from the stream before reading GitHub, so it is never resumed as an outage, parked `needs-decision` or counted as a failure, and the run moves on.
 
-**Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. A closed issue, no open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
+**Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. No open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
 
 ### `josh lane:pause` / `josh lane:resume`
 
@@ -987,17 +1029,40 @@ pnpm josh lane:resume --all   # every open lane
 <!-- /usage -->
 
 - Signals the tree `lane:close` would end; a pause re-reads it until no new process appears. Work tree, branch and Issue are untouched; the child keeps its memory.
-- A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record.
+- A lane with a process signalled has its state record set to `paused` / `running` and gets one `lane-state` line on the run's event stream (`#<N> paused by lane:pause`), so who halted it and when is on record, and one `lane-state` line on the lane ledger, so `lane:stats` leaves the stopped time out of the lane's implement sub-stages.
 - The lane's processes are its child's tree plus every process still running from the lane (working directory under its checkout, or the lane's `JOSH_LANE_CHILD` mark inherited in its environment, application bundles excepted; macOS), the caller's own ancestry spared.
 - A detached `eslint_d` or `ship --detach` re-parented to pid 1 is among them. A pause stops them all, so a resume continues what it stopped.
 - `lane:close` ends the same set and prints how many it ended: SIGTERM, then SIGKILL. A process alive after both leaves the close `incomplete`, with no `ended` record. `lane:withdraw` and `lane:restart` end it too.
 - The supervisor retries such a close on every pass; `run:board` marks its leftover row `↻` (being ended) or `⚠ <reason> (pid <pid>)`.
 - `run:board` draws a lane whose live processes are all stopped (also a hand-sent `kill -STOP`) as `🧊 paused`, its time frozen when first seen.
-- Each lane has one state record, `josh-lane-state-<key>-<N>.json` in the temp directory, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it): the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
-- Only the lane commands write it: `lane:open` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
-- A lane with no record is never guessed at from its processes: it is counted in use, its state unknown.
+- Each lane has one state record, `josh-lane-state-<key>-<N>.json` in `<common git dir>/josh/run-state/`, keyed on the common git directory like the carry record (`JOSH_TEMP_ROOT` moves it), so it survives a reboot.
+- The record holds the Issue, the run that launched it (the carry's start and owner), the state (`open` / `running` / `paused` / `ended`), the last launch time, and when and by which command the state last changed. It outlives `lane:close`.
+- Only the lane commands write it: `lane:open` and `lane:adopt` (`open`), `lane:dispatch` / `lane:launch` / `lane:restart` (`running`, a launch), `lane:pause` / `lane:resume`, `lane:withdraw` / `lane:close` and `run:merge` (`ended`). The write is atomic; a transition the lifecycle lacks (an `ended` lane paused) is warned about and not written, and a failed write never fails the command.
+- A lane with no record is never guessed at from its processes: it is counted in use, its state unknown. `lane:adopt` gives it a record again.
 
 **Output / exit codes:** one line per lane (`paused N process(es)`), exit 0. A named lane with nothing to signal, or bad arguments, exit 1; under `--all` an idle lane is no failure.
+
+### `josh lane:adopt`
+
+<!-- usage: lane:adopt -->
+
+Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched.
+
+```bash
+pnpm josh lane:adopt 4744
+pnpm josh lane:adopt --all   # every open lane with no record
+```
+
+<!-- /usage -->
+
+- For a lane whose record was lost (a restart, a usage limit, an interrupted run). Its branch, work tree, stash and pull request are never touched.
+- A lane is recorded `open` only when every fact reads: its process probe answers that no child is there, and its work tree status, unpushed commits, pull request and issue all read. Any one unread leaves it unknown, counted in use as before. A lane with a record is left as it is.
+- The pull request is the branch's open one, else its newest, printed with its state — a reopened lane's branch can still carry the merged one.
+- `open`, not `paused`: nobody suspended it. The next launch moves it to `running`, and the next `backlogrun` takes the lane back while its issue still carries `in-progress`.
+- It still holds its port seat, as every open lane does.
+- An adoption adds one `note` line to the run's event stream (`#<N> adopted by lane:adopt`) — not a `lane-state` line, which would re-send the paused-lanes notice though no paused lane changed.
+
+**Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> <OPEN|MERGED|CLOSED> · issue OPEN (<labels>)`, `already recorded <state>`, or `left unknown — <reason>`. Exit 0, also for a lane already recorded. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.
 
 ### `josh rule:value`
 
@@ -1006,7 +1071,8 @@ pnpm josh lane:resume --all   # every open lane
 Print each delivered rule's unaided compliance — runs reached, kept rate, refusals.
 
 ```bash
-pnpm josh rule:value
+pnpm josh rule:value             # a reading cached under 15 minutes ago, else measure
+pnpm josh rule:value --fresh     # measure now, whatever the cache holds
 pnpm josh rule:value --refresh   # write the reading to the loop-head cache instead of stdout
 ```
 
@@ -1017,5 +1083,7 @@ The kept rate is the share kept before the rule's trigger fired (`scripts/rules/
 - A lane's transcript counts with the parent run that dispatched it.
 - It reports and never fails: an environment with no measurable transcript prints `no measurement targets` and exits zero.
 - Printed from a cache at the `backlogrun` loop head (`josh backlog:offer`), refreshed at most every 15 minutes.
+- Bare, it prints that cache while under 15 minutes old, then `cached reading taken at <ISO time>`. A lane reads its parent's cache.
+- On stdout only, a `candidates:` section follows the table: `retire` lists measurable rules no run reached once the reading covers `MIN_RUNS_FOR_RETIREMENT` runs, and `condense` lists rules a hook refuses on every occurrence that it has refused (`scripts/rules/rule-value-candidates.ts`). The cache keeps the table alone, so `--fresh` prints them.
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh rule:value` in detail".

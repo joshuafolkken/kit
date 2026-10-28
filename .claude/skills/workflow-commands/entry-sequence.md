@@ -24,7 +24,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
    continues; `over` (or unanswerable) stops before the title — `run:entry` sends the `confirmation`
    Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`. **Skip it when
-   dispatched by a batch** (that batch owns the question). The verdict and the shared 135,000 threshold
+   dispatched by a batch** (that batch owns the question). The verdict and the model-priced threshold
    are the command's own.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body and comments
    (`issue-comments.md`), `issue:state`'s state, labels and `human_review`, and `latest:scope`'s
@@ -54,7 +54,7 @@ lane child starts none and never reads that document (`pnpm josh read:set lane-c
   source of the filing, the pause and the epic:bundle branch.
 - **An observation** — `observation-filing.md` (ask first if interactive).
 
-**The per-run filing cap is `prerequisite.md`'s** (the `filing-cap` row); on its refusal, stop and report.
+**The per-origin filing cap is `prerequisite.md`'s** (`issue:file`'s own step); on its refusal, stop and report.
 
 **The `into <target>` suffix** (a `new` entry) inserts the artifact into a named epic —
 `into-target.md`, read when the suffix is typed.

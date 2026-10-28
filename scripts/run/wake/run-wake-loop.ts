@@ -50,7 +50,8 @@ interface LoopPorts {
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
 	sleep: (milliseconds: number) => Promise<void>
 	now: () => Date
-	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`).
+	// Closes again a lane a process outlived, once the process is gone (`lane_close.retry_closes`), and
+	// withdraws a lane whose issue was closed as not planned (`lane_withdraw_closed.withdraw_closed`).
 	retry_closes: () => Promise<void>
 	// Whether the code this process loaded differs from the code on disk now (`run-wake-code.ts`).
 	is_code_stale: () => Promise<boolean>
@@ -159,8 +160,9 @@ async function decide_pass(wake: RunWake, ports: LoopPorts): Promise<WakeDecisio
 	return run_wake.decide({ ...input, has_work: await ports.has_work(input.read) })
 }
 
-// A lane whose close a process outlived ends once the process is gone (joshuafolkken/kit#4300). A
-// failed retry is the next pass's to try again, never a reason to stop the run.
+// A lane whose close a process outlived ends once the process is gone (joshuafolkken/kit#4300), and
+// a lane whose issue was closed as not planned is withdrawn (joshuafolkken/kit#4915). A failed retry
+// is the next pass's to try again, never a reason to stop the run.
 async function retry_closes(ports: LoopPorts): Promise<void> {
 	try {
 		await ports.retry_closes()

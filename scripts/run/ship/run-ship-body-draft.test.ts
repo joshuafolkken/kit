@@ -35,6 +35,7 @@ const ARGS: ShipArguments = {
 	cites: [],
 	is_review: false,
 	is_detach: false,
+	unpinned_ok: [],
 }
 
 mkdirSync(GIT_DIRECTORY)

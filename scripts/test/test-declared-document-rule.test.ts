@@ -39,13 +39,20 @@ function code_exempt_paths(): Array<string> {
 	].toSorted((left, right) => left.localeCompare(right))
 }
 
-describe('the test-declared rule is routed to the command in CLAUDE.md', () => {
+// joshuafolkken/kit#5165 moved the commit refusal from `CLAUDE.md` to the testing guide, the source the
+// `test-declared` row cites; `CLAUDE.md` keeps Step 0's requirement and its pointer to the guide.
+describe('the test-declared rule is routed to the command in the testing guide', () => {
 	it('names the command', () => {
-		expect(read_repo_file(CLAUDE)).toContain(COMMAND)
+		expect(read_repo_file(TESTING_GUIDE)).toContain(COMMAND)
 	})
 
 	it('says a runtime change with no test is refused on required', () => {
-		expect(read_repo_file(CLAUDE)).toContain('refused at `pnpm josh git -y` on `required`')
+		expect(read_repo_file(TESTING_GUIDE)).toContain('refused at the commit')
+		expect(read_repo_file(TESTING_GUIDE)).toContain('answers `required`')
+	})
+
+	it('keeps the pointer to the testing guide in CLAUDE.md', () => {
+		expect(read_repo_file(CLAUDE)).toContain(`\`${TESTING_GUIDE}\``)
 	})
 })
 

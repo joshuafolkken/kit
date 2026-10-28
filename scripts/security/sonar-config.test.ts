@@ -50,6 +50,54 @@ describe(SONAR_PROPERTIES_FILE, () => {
 	})
 })
 
+// joshuafolkken/kit#5083: the taint analysis reads production code only once the test files are tests
+// (#5072), judged by the job time rather than by finishing before Checks (#5073).
+describe(`${SONAR_PROPERTIES_FILE} test files`, () => {
+	const properties = load_sonar_properties()
+	const test_inclusions = (properties['sonar.test.inclusions'] ?? '').split(',')
+	const cpd_exclusions = (properties['sonar.cpd.exclusions'] ?? '').split(',')
+	const exclusions = (properties['sonar.exclusions'] ?? '').split(',')
+
+	it('declares the test files with the test extensions of sonar.cpd.exclusions', () => {
+		const test_patterns = cpd_exclusions.filter((pattern) =>
+			/\.(test|spec|e2e)\.ts$/u.test(pattern),
+		)
+
+		expect(test_inclusions).toStrictEqual(test_patterns)
+		expect(properties['sonar.tests']).toBe('.')
+		// Once sonar.tests is set the scanner no longer defaults sonar.sources to the base directory.
+		expect(properties['sonar.sources']).toBe('.')
+	})
+
+	it('keeps the declared test files out of the main sources', () => {
+		expect(exclusions).toStrictEqual(expect.arrayContaining(test_inclusions))
+	})
+})
+
+// joshuafolkken/kit#5093: neither `sonar.jasmin.internal.*` key switched to a legacy engine —
+// `.disabled` left JsSecuritySensorV2 running (#5091), `.js.ts.disabled` turned the taint analysis off.
+describe(`${SONAR_PROPERTIES_FILE} taint engine`, () => {
+	const properties = load_sonar_properties()
+
+	it('leaves the taint analysis on', () => {
+		const jasmin_keys = Object.keys(properties).filter((key) =>
+			key.startsWith('sonar.jasmin.internal.'),
+		)
+
+		expect(jasmin_keys).toEqual([])
+	})
+
+	it('keeps the taint rules analyzed on every file', () => {
+		const prefix = 'sonar.issue.ignore.multicriteria'
+		const muted_everywhere = (properties[prefix] ?? '')
+			.split(',')
+			.filter((id) => properties[`${prefix}.${id}.resourceKey`] === '**/*')
+			.map((id) => properties[`${prefix}.${id}.ruleKey`] ?? '')
+
+		expect(muted_everywhere.filter((rule) => /^(?:ts|js)security:/u.test(rule))).toEqual([])
+	})
+})
+
 // joshuafolkken/kit#3047: ESLint's `no-await-in-loop` is the gate for S9382, and SonarJS does not read
 // the `eslint-disable-next-line` comments that record each intentional sequential await.
 describe.each([SONAR_PROPERTIES_FILE, SONAR_TEMPLATE_FILE])('%s S9382 suppression', (file) => {

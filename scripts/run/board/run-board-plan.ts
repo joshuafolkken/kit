@@ -1,5 +1,5 @@
 import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
-import type { OptedIn } from '#scripts/backlog/backlog-next'
+import type { OptedIn } from '#scripts/backlog/backlog-gate-scope'
 import { backlog_plan, type NamedPlan } from '#scripts/backlog/backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from '#scripts/backlog/backlog-plan-read'
 import { backlog_waves } from '#scripts/backlog/backlog-waves'

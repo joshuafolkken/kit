@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { bash_output_cap_reader } from '#scripts/document/bash-output-cap'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { change_base } from '#scripts/git/change-base'
@@ -15,7 +16,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { removed_tests_check } from './removed-tests-check'
-import { review_attest } from './review-attest'
+import { review_attest, type ReviewSlot } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
@@ -23,6 +24,7 @@ import type { DiffParts } from './review-diff-parts'
 import { review_diff_write } from './review-diff-write'
 import { review_interaction } from './review-interaction'
 import { review_level, type ReviewLevel } from './review-level'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_round_one_blobs } from './review-round-one-blobs'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
@@ -100,7 +102,7 @@ function kept_note(taken_at: string): string {
 // **It is written once per run and never retaken**. Overwriting on every
 // round-1 invocation put a wrong `skip` one command away: run a bare `josh review:brief` after round
 // 1's fixes are in and the record is retaken against the fixed tree, the fix delta reads empty, and
-// `josh review:round2 --round-1-closed` fires arm A on unreviewed fix code. Keeping the record the
+// `josh review:round2` on a closed round 1 fires arm A on unreviewed fix code. Keeping the record the
 // run already has removes that path outright — a second round-1 invocation reads it and leaves it
 // alone, so every later reading of the delta is measured from before the fixes.
 //
@@ -165,7 +167,7 @@ function record_round_one(
 // **The narrowing is measured from the tree that review was briefed on**, and only when that record
 // was written by the brief the pointer names: one left by an earlier brief is not the tree the
 // finished review read, so the resume reads the whole change instead.
-function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
+function findings_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
 	const { findings } = lane_session_broker.review_paths(PROJECT_ROOT)
 	const briefed = review_stamps.briefed_stamp.read()
 
@@ -180,18 +182,31 @@ function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
 	return is_clean ? briefed : undefined
 }
 
-async function open_contract(): Promise<{
+// **A recorded round narrows first**, from the tree `review:record` wrote it on — a lane's review
+// before the ship writes no findings file, and its fixes are in that tree (joshuafolkken/kit#4620).
+function attested_tree(checkout: ReviewCheckout): FileMapStamp | undefined {
+	return review_reviewed_tree.resume_point(checkout) ?? findings_tree(checkout)
+}
+
+function slot_of(interaction: ReadonlyArray<string> | undefined): ReviewSlot {
+	const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+
+	return interaction === undefined ? CODE : INTERACTION
+}
+
+async function open_contract(slot: ReviewSlot): Promise<{
 	checkout: ReviewCheckout
 	nonce: string
 	resumed_from: FileMapStamp | undefined
 }> {
 	const checkout = await review_checkout.read_checkout()
 	const resumed_from = attested_tree(checkout)
-
 	// Keyed on the root git just answered with, never on `process.cwd()`: the check made before the
 	// merge asks git the same question, and the two hash different keys the moment one of them runs
 	// from a subdirectory — a mismatch that would drop the guard with nothing printed.
-	return { checkout, nonce: review_attest.record_target(checkout, checkout.root), resumed_from }
+	const nonce = review_attest.record_target(checkout, checkout.root, slot)
+
+	return { checkout, nonce, resumed_from }
 }
 
 // Retaken on every round-1 brief, after the pointer it pairs with. Swallowed:
@@ -258,7 +273,7 @@ async function read_readers(
 
 async function compose_brief(request: ComposeRequest): Promise<string> {
 	const { round, paths, tree, base, profile, interaction } = request
-	const opened = await open_contract()
+	const opened = await open_contract(slot_of(interaction))
 	// The interaction review reads the whole change, never a resume's narrowing (joshuafolkken/kit#4276).
 	const contract = interaction === undefined ? opened : { ...opened, resumed_from: undefined }
 	const stamps = {
@@ -285,6 +300,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 		readers: await read_readers(contract.checkout.root, base, paths),
 		removed_tests: await read_removed_tests(),
 		interaction,
+		high_cited: review_reviewed_tree.high_cited(),
 	})
 }
 
@@ -295,7 +311,7 @@ async function compose_brief(request: ComposeRequest): Promise<string> {
 // failure it exists to prevent. Where it cannot be resolved the printed command keeps `change_base`'s
 // answer, which still runs, and the record is written without a base so the next round widens.
 async function read_bases(): Promise<{ base: string; commit: string | undefined }> {
-	const commit = await change_base.resolved()
+	const commit = await change_base.resolved_through_merge()
 
 	return { base: commit ?? (await git_command.change_base()), commit }
 }
@@ -344,6 +360,8 @@ interface ChangeReading {
 	tree: Record<string, string>
 }
 
+type Emit = (text: string) => void
+
 // One reading, used by every half below. Read twice, the level could describe a different change from
 // the digests printed beside it — and it would cost four git spawns to do so.
 async function read_change(): Promise<ChangeReading> {
@@ -370,6 +388,7 @@ async function record_review(
 async function run_review(
 	round: number,
 	reading: ChangeReading,
+	emit: Emit,
 	interaction?: ReadonlyArray<string>,
 ): Promise<number> {
 	const { base, commit, paths, tree } = reading
@@ -382,7 +401,7 @@ async function run_review(
 	agent_role_profile.warn_of_default()
 	const { profile } = resolved
 
-	console.info(await compose_brief({ round, paths, tree, base, profile, interaction }))
+	emit(await compose_brief({ round, paths, tree, base, profile, interaction }))
 	if (interaction === undefined) await record_review(round, tree, commit)
 
 	return 0
@@ -391,15 +410,15 @@ async function run_review(
 // The interaction review's brief (joshuafolkken/kit#4276): `/code-review`'s round-1 brief over the
 // whole change, with the role and the run-tooling paths appended. Not due, it says so and exits 0.
 //
-// **An issue update taken in after round 1's brief refuses it**: minting this brief moves the pointer
-// `josh followup` measures that update against (`issue-watch-gate.ts`), so a round 1 that read the
-// earlier specification would merge without that refusal.
-async function run_interaction(): Promise<number> {
+// **An issue update taken in after round 1's brief refuses it**: this brief is minted on its own slot
+// beside round 1's (joshuafolkken/kit#4672), so it is refused here rather than briefed over an earlier
+// specification round 1 read.
+async function run_interaction(emit: Emit): Promise<number> {
 	const reading = await read_change()
 	const targets = review_interaction.due_paths(reading.paths)
 
 	if (targets.length === 0) {
-		console.info(review_interaction.NOT_DUE_LINE)
+		emit(review_interaction.NOT_DUE_LINE)
 
 		return 0
 	}
@@ -408,21 +427,48 @@ async function run_interaction(): Promise<number> {
 
 	if (stale !== undefined) return report_error(stale)
 
-	return await run_review(FIRST_ROUND, reading, targets)
+	return await run_review(FIRST_ROUND, reading, emit, targets)
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
-	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
-	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction()
+// The scoped-green refusal a brief on this tree would print, read without composing one — so
+// `josh run:review` refuses before it launches anything beside the brief (joshuafolkken/kit#4828).
+async function scoped_refusal(): Promise<string | undefined> {
+	const { tree, commit } = await read_change()
+
+	return scoped_green.refusal_for(tree, commit)
+}
+
+// **A reviewer never mints a brief** (joshuafolkken/kit#5113): every brief takes a fresh nonce and drops
+// the previous one's records, so a reviewer that re-briefs after attesting erases the attestation its
+// supervisor is about to check, and a finished review reads as none. `--level-only` mints nothing.
+const REVIEWER_REFUSAL =
+	'review:brief refused: this is a reviewer session (JOSH_AGENT_ROLE=reviewer). A new brief would drop the attestation this review already left — review the brief you were handed and report.'
+
+async function run_brief(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
+	if (argv.length === 1 && argv[0] === INTERACTION_FLAG) return await run_interaction(emit)
 
 	const round = parse_round(argv)
 
 	if (round === undefined) return report_error(USAGE)
 
-	return await run_review(round, await read_change())
+	return await run_review(round, await read_change(), emit)
+}
+
+// `emit` takes the brief: `josh run:review` writes it to a file, because its two briefs together exceed
+// the Bash output cap (joshuafolkken/kit#4863). `run` prints it.
+async function run_to(argv: ReadonlyArray<string>, emit: Emit): Promise<number> {
+	if (argv[0] === LEVEL_ONLY_FLAG) return await run_level(argv.slice(1))
+	if (agent_session_role.is_reviewer()) return report_error(REVIEWER_REFUSAL)
+
+	return await run_brief(argv, emit)
+}
+
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	return await run_to(argv, console.info)
 }
 
 const review_brief_cli = {
+	attested_tree,
 	FIRST_ROUND,
 	format_reason,
 	KEPT_NOTE_PREFIX,
@@ -431,6 +477,9 @@ const review_brief_cli = {
 	record_round_one,
 	report_error,
 	run,
+	run_to,
+	scoped_refusal,
 }
 
+export type { Emit }
 export { review_brief_cli }

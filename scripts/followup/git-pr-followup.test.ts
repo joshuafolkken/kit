@@ -67,7 +67,7 @@ vi.mock('#scripts/notify/telegram-notify', () => ({
 }))
 
 // **The missing mock, added while the merge-gate recovery in joshuafolkken/kit#1077 was being
-// verified.** `notify_completion` asks this collaborator for the unreleased-merge line, and the real
+// verified.** `completion_sender` asks this collaborator for the unreleased-merge line, and the real
 // one resolves the tip by running `git fetch origin main` — measured at about 5 seconds in a linked
 // work tree. Every one of this file's tests calls `run`, so every one of them made that request, and
 // against the 10-second `testTimeout` a handful of them failed on network variance rather than on

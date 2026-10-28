@@ -7,7 +7,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, NOT_BEFORE_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_park } from '#scripts/issue/issue-park'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
@@ -18,6 +18,7 @@ import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { poll } from '#scripts/lib/poll'
+import { settled_together } from '#scripts/lib/settled-together'
 import {
 	run_carry,
 	type CarryChange,
@@ -26,11 +27,11 @@ import {
 } from '#scripts/run/carry/run-carry'
 import { run_carry_conversation } from '#scripts/run/carry/run-carry-conversation'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
-import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
+import type { StallCause } from '#scripts/run/park/run-stalled'
 import { run_label } from '#scripts/run/run-label'
-import { run_merge } from './run-merge'
+import { run_merge, type EndingSignals } from './run-merge'
+import { run_merge_cap } from './run-merge-cap'
 import { run_merge_close } from './run-merge-close'
-import { run_merge_ship } from './run-merge-ship'
 
 // The result of attempting to apply a carry change. Distinguishing `refused` from `applied` lets
 // callers surface the refusal as a hard failure rather than silently continuing on a carry that was
@@ -56,25 +57,24 @@ const GIT_ENTRY = '.git'
 const OPEN_STATE = 'OPEN'
 const SYNC_RETRY = { attempts: 3, interval_ms: 5000 }
 
-// One returned child's context, gathered from the command line by the CLI.
-interface MergeContext {
+// One returned child's context, gathered from the command line by the CLI, and the ending signals its
+// handlers act on — each one's meaning is `EndingSignals`'s.
+interface MergeContext extends Pick<
+	EndingSignals,
+	'merged_pr' | 'is_streak_exempt' | 'capped_note' | 'resume_ms'
+> {
 	child: string
 	epic: string | undefined
 	repo: string | undefined
-	// The hand-off threshold, or `undefined` where no AI session owns the loop — the supervisor's
-	// `backlog:drive` has no context to cut, so a merge there is never handed back as `over`.
-	over: number | undefined
+	// `true` where the merge asks the session's `pnpm josh cost --cut` verdict, or `undefined` where no
+	// AI session owns the loop — the supervisor's `backlog:drive` has no context to cut, so a merge
+	// there is never handed back as `over`.
+	over: true | undefined
 	owner: CarryOwner
 	// The child's transcript output path, when the caller passed `--output`. Read to tell an API-outage
 	// ending apart from a genuine child failure; absent leaves outage detection off, so the child is
 	// classified from its GitHub state alone.
 	output?: string | undefined
-	// The merged pull request that closes the child, when GitHub left the child OPEN after the merge —
-	// the one `merged` child whose issue this command still has to close.
-	merged_pr?: string | undefined
-	// The outage is not an API outage (`EndingSignals.is_streak_exempt`): re-dispatched, but not added
-	// to the streak.
-	is_streak_exempt?: boolean | undefined
 }
 
 interface FailedResult {
@@ -213,6 +213,10 @@ async function preserve_uncommitted(child: string): Promise<boolean> {
 	}
 }
 
+async function close_preserved_lane(child: string): Promise<void> {
+	if (await preserve_uncommitted(child)) await close_lane(child)
+}
+
 function kept_lane_comment(directory: string): string {
 	return `The split left this issue's lane open: it still holds a commit, an uncommitted change or a live process — ${directory}`
 }
@@ -251,27 +255,44 @@ async function post_counters(ctx: MergeContext, carry: RunCarry | undefined): Pr
 	await git_gh_issue_write.issue_try_comment(ctx.epic, run_merge.counters_comment(carry))
 }
 
-// A merged child: close it if GitHub left it OPEN and close the epics it completed
-// (`run-merge-close.ts`), count the merge (which resets the failure streak), return to the default branch,
-// stash any uncommitted work the lane still holds and close it, and mirror the counters onto the epic. Returns the carry when the ownership check
-// fails — the caller treats a non-undefined return as a hard refusal and must not offer a next child.
-// Returns `undefined` on success.
-async function do_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
+// Count the merge, which resets the failure streak.
+async function count_merged(ctx: MergeContext): Promise<ApplyCarryResult> {
+	return await apply_carry(ctx, {
+		...run_merge.change_of('merged'),
+		merged_issue: Number(ctx.child),
+	})
+}
+
+// A merged child: closed if GitHub left it OPEN, with the epics it completed (`run-merge-close.ts`),
+// while the primary checkout returns to the default branch; then counted and put on record by `record`,
+// dated to the moment the ownership check passed (joshuafolkken/kit#4734); then the lane — stashed of
+// any uncommitted work — is closed while the counters are mirrored onto the epic. **A failed sync
+// leaves neither the count nor the record**, so the run's next pass (a restored drive, `run:carry
+// --end`) still reads the child as unsettled and collects it again. **What the next offer reads ends
+// before this returns**: the closed issue and epics, the count, the lane's freed seat, and the default
+// branch whose code the next `josh` runs. Returns the carry when the ownership check fails — the caller
+// treats a non-undefined return as a hard refusal and must not offer a next child. Returns `undefined`
+// on success.
+async function do_merged(
+	ctx: MergeContext,
+	record: (child: string, at: Date) => Promise<void>,
+): Promise<RunCarry | undefined> {
 	const refused = await refused_carry(ctx)
 
 	if (refused !== undefined) return refused
 
-	await run_merge_close.close_merged(ctx)
-	await sync_main()
-	const result = await apply_carry(ctx, {
-		...run_merge.change_of('merged'),
-		merged_issue: Number(ctx.child),
-	})
+	const confirmed_at = new Date()
+
+	await settled_together(run_merge_close.close_merged(ctx), sync_main())
+	const result = await count_merged(ctx)
 
 	if (result.kind === 'refused') return result.carry
 
-	if (await preserve_uncommitted(ctx.child)) await close_lane(ctx.child)
-	await post_counters(ctx, result.kind === 'applied' ? result.carry : undefined)
+	await record(ctx.child, confirmed_at)
+
+	const carry = result.kind === 'applied' ? result.carry : undefined
+
+	await Promise.all([close_preserved_lane(ctx.child), post_counters(ctx, carry)])
 
 	return undefined
 }
@@ -319,7 +340,7 @@ async function start_date_wait(ctx: MergeContext): Promise<ReadonlyArray<string>
 
 	if (body === undefined) return (await has_not_before_label(ctx)) ? [NOT_BEFORE_WAIT] : NO_WAITS
 
-	await issue_sample_gate.prime([body])
+	await issue_sample_prime.prime([body])
 	const reason = issue_not_before.waiting_reason(body)
 
 	return reason === undefined ? NO_WAITS : [reason]
@@ -379,9 +400,7 @@ async function do_failed(ctx: MergeContext, cause?: StallCause): Promise<FailedR
 
 	if (waits.length > 0) return await do_waiting(ctx, waits)
 
-	const judged = cause ?? run_merge_ship.cause(ctx.child) ?? run_stalled.SESSION_UNFINISHED
-
-	return await park_failed(ctx, judged)
+	return await park_failed(ctx, run_merge_cap.park_cause(ctx.child, cause, ctx.capped_note))
 }
 
 // The outcome of counting an outage: the record to read the streak against, and whether the count was
@@ -463,11 +482,12 @@ async function resume_cut(child: string): Promise<boolean> {
 }
 
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
-// is read as `over` — "could not measure" is never "still cheap". No threshold is no session to measure.
-async function is_over_budget(over: number | undefined): Promise<boolean> {
+// is read as `over` — "could not measure" is never "still cheap". No check is no session to measure.
+// `--cut`, not a number: the threshold is priced at the session's own model.
+async function is_over_budget(over: true | undefined): Promise<boolean> {
 	if (over === undefined) return false
 
-	const result = await josh(['cost', '--over', String(over)])
+	const result = await josh(['cost', '--cut'])
 
 	return result.code !== 0 || result.out === OVER
 }

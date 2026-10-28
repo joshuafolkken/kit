@@ -72,6 +72,13 @@ source's pointer is trimmed to its trigger under "trimming is moving" without wa
 license it. A rule shown as `-` declares no compliance test: it is **unmeasured**, not zero, and that
 alone does not make it a candidate.
 
+**Its `candidates:` section is evidence, not a permit** (joshuafolkken/kit#4959). Retirement was
+otherwise argued only from copies, so a rule no run ever reached, or one whose hook already refuses
+every occurrence, stayed in the documents with nothing to point at. `retire` lists measurable rows only,
+because an unmeasured row's trigger is the violation and its `reached 0` means the guard was never
+crossed — the failure-not-recurring case above. Each candidate still goes through an Issue of its own
+that retires, condenses or records why it stays.
+
 ## The resident-rule list
 
 **This list covers the resident rules that have a procedure on the on-demand side** — a skill or an
@@ -259,7 +266,7 @@ rejected" prose that travels with them, piling up in documents read at run time 
 references) cited 328 issue numbers. Cutting them alone does not last: nothing stopped the next PR
 adding them back, the same pattern the byte budget answered for size.
 
-**The rule is computable, so a check answers it (question 0).** `tools/document/issue-citation-budget.ts`
+**The rule is computable, so a check answers it (question 0).** `scripts/document/issue-citation-budget.ts`
 records each document's count, and its suite fails `pnpm josh gate` on growth and on a reduction left
 unrecorded. `residency.md` carries one line pointing at it, beside the other budget rules.
 

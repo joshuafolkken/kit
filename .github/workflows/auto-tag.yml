@@ -13,11 +13,44 @@ jobs:
       actions: write
       contents: write
     steps:
+      # The dispatch payload is only a claim: any holder of a contents:write token can send
+      # ci-passed-on-main with any sha, including a commit main's branch protection never saw
+      # (joshuafolkken/kit#4651). Only a commit main contains, whose push-event CI run reached its
+      # Notify Auto Tag job, is tagged — that job runs only once every check it needs has passed.
+      - name: Verify the dispatched commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.client_payload.sha }}
+        run: |
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::ci-passed-on-main carried no full commit sha: $SHA" >&2
+            exit 1
+          fi
+
+          STATUS=$(gh api "repos/$GH_REPO/compare/main...$SHA" --jq '.status')
+          if [ "$STATUS" != "identical" ] && [ "$STATUS" != "behind" ]; then
+            echo "::error::$SHA is not on main (compare status: $STATUS)" >&2
+            exit 1
+          fi
+
+          RUN_IDS=$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?head_sha=$SHA&event=push&branch=main" --jq '.workflow_runs[].id')
+          for RUN_ID in $RUN_IDS; do
+            if gh api "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "Notify Auto Tag") | "\(.status)/\(.conclusion)"' | grep -Eqx 'in_progress/null|completed/success'; then
+              echo "✅ $SHA is on main and passed CI run $RUN_ID"
+              exit 0
+            fi
+          done
+
+          echo "::error::No push-event CI run on main passed for $SHA" >&2
+          exit 1
+
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.client_payload.sha }}
           fetch-depth: 2
+          persist-credentials: false
 
       # No Node.js setup: this job installs nothing and reads package.json with jq, which the runner
       # image ships, so a Node.js version step would only add time (joshuafolkken/kit#3326).
@@ -68,9 +101,16 @@ jobs:
         id: tag_check
         if: steps.version_check.outputs.changed == 'true'
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.current_version.outputs.version }}
         run: |
           TAG="v$VERSION"
+
+          # The checkout keeps no credentials, so the token reaches git for this step only, through
+          # the environment rather than .git/config; a private repository needs it to fetch.
+          BASIC=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$BASIC"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $BASIC"
 
           # Shallow checkout (fetch-depth: 2) does not fetch tags, so the existence
           # check would miss tags that already exist on the remote. Fetch them first.
@@ -88,9 +128,14 @@ jobs:
         id: create_tag
         if: steps.version_check.outputs.changed == 'true' && steps.tag_check.outputs.exists == 'false'
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.current_version.outputs.version }}
         run: |
           TAG="v$VERSION"
+
+          BASIC=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$BASIC"
+          export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $BASIC"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

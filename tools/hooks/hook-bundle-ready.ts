@@ -29,6 +29,8 @@ import { error_text } from '#scripts/lib/error-message'
 
 const PACKAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const OUT_DIR = path.join(PACKAGE_DIR, 'dist', 'hooks')
+const TSX_BIN = path.join(PACKAGE_DIR, 'node_modules', '.bin', 'tsx')
+const JOSH_ENTRY = path.join(PACKAGE_DIR, 'scripts', 'josh', 'josh.ts')
 const FALLBACK_FAILED_EXIT = 1
 // `process.argv` is node, this script, then the hook name, its josh command and its arguments.
 const LAUNCH_ARGUMENTS_START = 2
@@ -77,8 +79,11 @@ async function run_bundle(bundle: string, hook_arguments: ReadonlyArray<string>)
 	await import(pathToFileURL(bundle_path).href)
 }
 
+// This checkout's own `tsx` and josh entry, run in the hook's working directory: a hook launched in
+// one of Claude Code's own worktrees runs there, and that worktree has no install for `pnpm josh` —
+// while `pnpm --dir` would move the hook back to the main checkout (joshuafolkken/kit#4617).
 function run_from_source(josh_command: string, hook_arguments: ReadonlyArray<string>): void {
-	const { status } = spawnSync('pnpm', ['josh', josh_command, ...hook_arguments], {
+	const { status } = spawnSync(TSX_BIN, [JOSH_ENTRY, josh_command, ...hook_arguments], {
 		stdio: 'inherit',
 	})
 

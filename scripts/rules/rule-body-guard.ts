@@ -2,6 +2,7 @@ import { json_value } from '#scripts/lib/json-value'
 import { file_reader } from '#scripts/lib/read-file'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { bash_triggers } from './bash-triggers'
+import { edit_tool } from './edit-tool'
 import { shell_segments } from './shell-segments'
 import { tail_commands } from './tail-commands'
 
@@ -29,10 +30,9 @@ import { tail_commands } from './tail-commands'
 // refuses until it is met. It passes on answering the questions, not on reading the
 // reminder. Keeping the rule is therefore running those two commands, which `keeps` names.
 
-// The two edit tools the `PreToolUse` matcher routes here. A `Write` carries the whole new file; an
-// `Edit` carries the region as `old_string` / `new_string`.
-const EDIT_TOOL = 'Edit'
-const WRITE_TOOL = 'Write'
+// The two edit tools the `PreToolUse` matcher routes here (`edit-tool.ts`). A `Write` carries the whole
+// new file; an `Edit` carries the region as `old_string` / `new_string`.
+const { WRITE, is_edit_tool, string_field } = edit_tool
 
 // The three rule-document families question 0 must be pushed at: the resident source, the
 // collaboration-workflow prompts, and the skill bodies. Anchored at a path separator or the string
@@ -69,12 +69,6 @@ function adds_rule_prose(old_text: string, new_text: string): boolean {
 	return prose_of(new_text).length - prose_of(old_text).length >= MIN_APPENDED_PROSE
 }
 
-function string_field(input: Record<string, unknown>, key: string): string {
-	const value = input[key]
-
-	return typeof value === 'string' ? value : ''
-}
-
 // The file's current text, read synchronously before the write lands so a `Write` has an `old` to
 // measure against. Injected so the suite controls it without touching the real filesystem, the way
 // `file-body.ts` injects its existence check. A new file reads as empty, so its whole body is added.
@@ -87,7 +81,7 @@ function texts_of(
 	input: Record<string, unknown>,
 	read: (file_path: string) => string,
 ): { old_text: string; new_text: string } {
-	if (name === WRITE_TOOL) {
+	if (name === WRITE) {
 		return {
 			old_text: read(string_field(input, 'file_path')),
 			new_text: string_field(input, 'content'),
@@ -98,10 +92,6 @@ function texts_of(
 		old_text: string_field(input, 'old_string'),
 		new_text: string_field(input, 'new_string'),
 	}
-}
-
-function is_edit_tool(name: string): boolean {
-	return name === EDIT_TOOL || name === WRITE_TOOL
 }
 
 // The call's input when it is an edit of a rule document, and `undefined` otherwise. The tool-name and

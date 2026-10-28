@@ -1,8 +1,9 @@
 import { ports } from '#ports'
-import { core_budget } from '#scripts/gate/core-budget'
+import { core_weights } from '#scripts/gate/core-weights'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_COMMAND, type CommandEntry } from './josh-command-types'
 import { AGENT_HOOK_COMMANDS } from './josh-commands-agent-hooks'
+import { TEST_CHECK_COMMANDS } from './josh-commands-test-check'
 
 const NARROWED = { arguments: 'scripts/thing.ts', note: 'narrow by the given files instead' }
 // The unseeded ports are read from `ports/index.js`, their one definition (#818).
@@ -11,7 +12,6 @@ const UNSEEDED: Readonly<Record<string, string | undefined>> = {}
 const FILE_ARGUMENTS = '[files...]'
 const REQUIRED_FILE_ARGUMENTS = '<files...>'
 const FILTER_ARGUMENTS = '[filters...]'
-const MATCH_ARGUMENTS = '[--match]'
 const PATH_ARGUMENTS = '<path...>'
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -29,7 +29,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/gate/verification-gate.ts',
 		description: 'Run lint, type check, spell check and unit tests concurrently',
 		category: 'Development',
-		reference: ['[--verbose|--force|--no-unit]', 'developer', ['files', 'processes']],
+		reference: [
+			'[--verbose|--force|--no-unit|--static-group=<group>]',
+			'developer',
+			['files', 'processes'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '' },
@@ -44,8 +48,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Check code with prettier and eslint (skips a tool a basic project lacks)',
 		category: 'Development',
 		reference: ['[--changed]', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		core_weight: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: {
 			examples: [
 				{ arguments: '' },
@@ -55,11 +59,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'lint:related': {
 		script: 'scripts/lint/lint-related.ts',
-		description: 'Check only the changed files with prettier and eslint (whole tree on fallback)',
+		description:
+			'Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		core_weight: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 		usage: { examples: [{ arguments: '' }, NARROWED] },
 	},
 	lines: {
@@ -67,8 +72,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: "Print a file's code lines against the max-lines limit and the headroom left",
 		category: 'Development',
 		reference: [REQUIRED_FILE_ARGUMENTS, 'developer', ['none']],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.eslint_scan,
 		usage: {
 			examples: [{ arguments: 'scripts/hooks/format-edited-file.ts scripts/josh/josh-logic.ts' }],
 		},
@@ -79,12 +84,12 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline',
 		category: 'Development',
 		reference: [
-			'[--no-startup | --totals-only | --accept --reason "<why>"]',
+			'[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]',
 			'developer',
 			['files'],
 		],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 		usage: {
 			examples: [
@@ -99,8 +104,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 			'List refactoring candidates in the changed scope by category and answer clear/candidates',
 		category: 'Development',
 		reference: ['', 'automation', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.eslint_scan,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		core_weight: core_weights.CORE_WEIGHTS.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.eslint_scan,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	bytes: {
@@ -121,10 +126,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			"Print each delivered rule's unaided compliance — runs reached, kept rate, refusals",
 		category: 'AI tools',
-		reference: ['[--refresh]', 'developer', ['files']],
+		reference: ['[--fresh | --refresh]', 'developer', ['files']],
 		usage: {
 			examples: [
-				{ arguments: '' },
+				{ arguments: '', note: 'a reading cached under 15 minutes ago, else measure' },
+				{ arguments: '--fresh', note: 'measure now, whatever the cache holds' },
 				{
 					arguments: '--refresh',
 					note: 'write the reading to the loop-head cache instead of stdout',
@@ -147,15 +153,45 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['', 'developer', ['files', 'processes']],
 		usage: { examples: [{ arguments: '' }] },
 	},
+	rename: {
+		script: 'scripts/lint/rename-cli.ts',
+		description:
+			'Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree',
+		category: 'Development',
+		reference: [
+			'<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>',
+			'automation',
+			['files', 'processes'],
+		],
+		usage: {
+			examples: [
+				{ arguments: 'old_name new_name scripts/a.ts scripts/b.ts' },
+				{
+					arguments:
+						"lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' scripts/gate/core-wait-record.ts",
+					note: 'the identifier and its module together',
+				},
+			],
+		},
+	},
 	...AGENT_HOOK_COMMANDS,
 	'cspell:dot': {
 		script: 'scripts/lint/cspell-cached.ts',
 		description: 'Run spell check including dotfiles',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.spell_check,
-		memory_mb: core_budget.MEMORY_MB.spell_check,
+		core_weight: core_weights.CORE_WEIGHTS.spell_check,
+		memory_mb: core_weights.MEMORY_MB.spell_check,
 		usage: { examples: [{ arguments: '', note: 'includes dotfiles' }] },
+	},
+	'check:related': {
+		script: 'scripts/gate/check-related.ts',
+		description: 'Run related lint, unit, type and dotfile spelling checks in parallel',
+		category: 'Development',
+		reference: ['', 'developer', ['processes']],
+		usage: {
+			examples: [{ arguments: '' }, { arguments: '--full', note: 'whole outputs' }],
+		},
 	},
 	behavior: {
 		script: 'scripts/behavior/behavior-cli.ts',
@@ -187,51 +223,16 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Run only the unit tests related to the changed files (full suite on fallback)',
 		category: 'Development',
 		reference: [FILE_ARGUMENTS, 'developer', ['processes']],
-		...gate_plan.DIRECT_UNIT_CLAIM,
 		usage: {
 			examples: [
 				{ arguments: '' },
 				NARROWED,
+				{ arguments: '--touched', note: "only the diff's tests and its modules' same-named ones" },
 				{ arguments: '--silent', note: 'flags are forwarded to vitest' },
 			],
 		},
 	},
-	'test:declared': {
-		script: 'scripts/test/test-declared.ts',
-		description:
-			'Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin',
-		category: 'Development',
-		reference: [MATCH_ARGUMENTS, 'developer', ['processes']],
-		usage: {
-			examples: [
-				{ arguments: '' },
-				{ arguments: '--match', note: 'check Step 0 declarations on stdin' },
-				{ arguments: '--help', note: 'print usage, including the --match stdin form' },
-			],
-		},
-	},
-	'test:red': {
-		script: 'scripts/test/test-red-main.ts',
-		description:
-			'Run the changed unit tests against the pre-fix tree (merge-base worktree) and report red/green/no-test/test-only',
-		category: 'Development',
-		reference: ['', 'developer', ['git', 'processes']],
-		usage: { examples: [{ arguments: '', note: 'red, green, no-test or test-only' }] },
-	},
-	'test:pinned': {
-		script: 'scripts/test/test-pinned-main.ts',
-		description:
-			'Revert each changed non-test hunk in a HEAD worktree, run its related tests, and list the hunks no test went red on',
-		category: 'Development',
-		reference: ['[--max <n>]', 'developer', ['git', 'processes']],
-		...gate_plan.DIRECT_UNIT_CLAIM,
-		usage: {
-			examples: [
-				{ arguments: '', note: 'unpinned / unchecked <file>:<line> lines' },
-				{ arguments: '--max 5', note: 'check at most 5 hunks; the rest print as unchecked' },
-			],
-		},
-	},
+	...TEST_CHECK_COMMANDS,
 	disposition: {
 		script: 'scripts/review/disposition-cli.ts',
 		description:
@@ -267,8 +268,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Type-check with tsc (skips a basic project with no TypeScript to check)',
 		category: 'Development',
 		reference: ['[arguments...]', 'developer', ['processes']],
-		core_weight: core_budget.CORE_WEIGHTS.type_check,
-		memory_mb: core_budget.MEMORY_MB.type_check,
+		core_weight: core_weights.CORE_WEIGHTS.type_check,
+		memory_mb: core_weights.MEMORY_MB.type_check,
 		usage: { examples: [{ arguments: '' }] },
 	},
 	port: {

@@ -36,6 +36,10 @@ interface FileArguments {
 	labels: ReadonlyArray<string>
 	repo: string | undefined
 	distinct: ReadonlyArray<number>
+	// `--found-during <N>`: the work item the filing came from when it is not the checkout's own — a
+	// long lane the parent investigated, the Issue a prerequisite or an observation came out of. The
+	// filing cap counts per origin (`issue-file-cap.ts`); absent, the finder is read (`issue-file-fold.ts`).
+	found_during: string | undefined
 	// `--over-cap`: the run is blocked by this filing, so the WIP cap does not hold it (`issue-wip.ts`).
 	is_over_cap: boolean
 	// `--no-auto-ok`: the Issue needs a person's judgement, so `auto-ok` is not applied (`issue-auto-ok.ts`).
@@ -43,6 +47,9 @@ interface FileArguments {
 	// `--release`: the change reaches a consumer only once published, so the Issue is linked to the
 	// repository's release Issue as a blocker (`issue-release-cli.ts`).
 	is_release: boolean
+	// `--blocks-finder`: an interrupt the finder cannot go on without, so the finder is recorded as
+	// blocked by it (`issue-file-interrupt.ts`). An interrupt that blocks nobody omits it (`wip-cap.md`).
+	is_blocking_finder: boolean
 }
 
 const OPTIONS = {
@@ -51,9 +58,11 @@ const OPTIONS = {
 	label: { type: 'string', multiple: true },
 	repo: { type: 'string' },
 	distinct: { type: 'string', multiple: true },
+	'found-during': { type: 'string' },
 	'over-cap': { type: 'boolean' },
 	'no-auto-ok': { type: 'boolean' },
 	release: { type: 'boolean' },
+	'blocks-finder': { type: 'boolean' },
 } as const
 
 // The label a `--route` value names, or `undefined` when it names none — read against the route
@@ -95,15 +104,27 @@ function has_text(value: string | undefined): value is string {
 	return value !== undefined && value.trim() !== ''
 }
 
-// The labelled half of the arguments, or `undefined` when a route or `--distinct` entry is not one the
-// command knows.
-function labelled_of(values: ParsedValues): Pick<FileArguments, 'route' | 'distinct'> | undefined {
+// `--found-during 3423` or `#3423` → `'3423'`; `undefined` when absent, `false` when it names no single
+// issue number, so a typo is refused rather than counted against no origin.
+function found_during_of(value: string | undefined): string | undefined | false {
+	if (value === undefined) return undefined
+	const numbers = distinct_numbers([value])
+
+	return numbers?.length === 1 ? String(numbers[0]) : false
+}
+
+type Labelled = Pick<FileArguments, 'route' | 'distinct' | 'found_during'>
+
+// The labelled half of the arguments, or `undefined` when a route, `--distinct` or `--found-during`
+// entry is not one the command knows.
+function labelled_of(values: ParsedValues): Labelled | undefined {
 	const route = route_of(values)
 	const distinct = distinct_numbers(values.distinct ?? [])
+	const found_during = found_during_of(values['found-during'])
 
-	if (route === false || distinct === undefined) return undefined
+	if (route === false || distinct === undefined || found_during === false) return undefined
 
-	return { route, distinct }
+	return { route, distinct, found_during }
 }
 
 function arguments_of(values: ParsedValues, title: string | undefined): FileArguments | undefined {
@@ -121,6 +142,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		is_over_cap: values['over-cap'] === true,
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,
 		is_release: values.release === true,
+		is_blocking_finder: values['blocks-finder'] === true,
 	}
 }
 
@@ -143,7 +165,7 @@ function is_undeclared_classification(label: string, body: string): boolean {
 // the body declares (`issue_classification.labels_for`, which merges case-insensitively), then any
 // extra `--label`, then `auto-ok` when the filing is judged in (`issue-auto-ok.ts`) and no `--label`
 // already named it, `not-before` while the body's start time is ahead (`issue-not-before-label.ts`), and
-// the declared priority's label unless a `--label` typed one (`issue-priority.ts`).
+// the filed priority's label (the declaration, else its floor) unless a `--label` typed one (`issue-priority.ts`).
 // One request applies them all, so no label is a separate step to forget.
 function labels_of(args: FileArguments, body: string, is_auto_ok = false): ReadonlyArray<string> {
 	const extra = args.labels.filter((label) => !is_undeclared_classification(label, body))
@@ -221,12 +243,27 @@ function unacknowledged(
 	return candidates.filter((candidate) => !distinct.includes(candidate))
 }
 
+// The candidates the filing has already answered: its `--distinct` numbers and, filing into this
+// repository, its `--found-during` origin. The work the finding turned up during is never its duplicate,
+// though a body citing it makes the scout name it (joshuafolkken/kit#4762). The origin is an Issue here,
+// so in another repository the same number is an unrelated Issue the scout may rightly hold.
+function acknowledged(
+	args: Pick<FileArguments, 'distinct' | 'found_during'>,
+	target: string,
+	current: string,
+): ReadonlyArray<number> {
+	if (args.found_during === undefined || !is_same_repository(target, current)) return args.distinct
+
+	return [...args.distinct, Number(args.found_during)]
+}
+
 const issue_file = {
 	parse,
 	labels_of,
 	origin_problem,
 	triage_problem,
 	unacknowledged,
+	acknowledged,
 	is_same_repository,
 }
 

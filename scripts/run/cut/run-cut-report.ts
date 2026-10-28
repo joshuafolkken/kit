@@ -38,6 +38,7 @@ const UNKNOWN_VERDICT = 'unknown'
 // The asking session is over the shared context-cut threshold, so an implementation cut was not
 // resumed into it — the same refusal `run:carry` answers `over` with.
 const OVER_VERDICT = 'over'
+const SPLIT_UNRESOLVED_VERDICT = 'split-unresolved'
 
 function report(verdict: string, code: number): number {
 	console.info(verdict)
@@ -127,12 +128,13 @@ function report_under_threshold(): number {
 }
 
 // **A ship reviewer takes no cut, of either phase** (joshuafolkken/kit#3623). Its supervisor is waiting
-// on the findings file it has yet to write, so a relaunch would stand a second child in the lane beside
+// on the findings it has yet to submit, so a relaunch would stand a second child in the lane beside
 // the one the supervisor repairs with. Answered `not-a-lane`, the verdict that already means "nothing
-// was cut and this process carries on".
+// was cut and this process carries on". The message names no sink: its review prompt says whether it
+// submits through `review:submit` or, on a lane that predates it, writes a path (joshuafolkken/kit#4799).
 function report_reviewer(): number {
 	console.error(
-		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Write the findings file and finish the review in this process.',
+		'This session is a ship reviewer, which its supervisor is waiting on, so nothing was cut and nothing was relaunched. Finish the review in this process and submit its findings the way your review prompt says.',
 	)
 
 	return report(NOT_A_LANE_VERDICT, SUCCESS_EXIT_CODE)
@@ -174,6 +176,22 @@ function report_over(): number {
 	return report(OVER_VERDICT, FAILURE_EXIT_CODE)
 }
 
+function report_missing_supervisor(issue: string): number {
+	console.error(
+		`The OpenAI supervisor for ${session_cite.issue(issue)} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
+	)
+
+	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
+}
+
+// The lane got the split notice and has answered it neither way, so nothing was cut and the run does
+// not go on to the gate until it does (joshuafolkken/kit#4695). `note` says which answers it takes.
+function report_split_unresolved(note: string): number {
+	console.error(note)
+
+	return report(SPLIT_UNRESOLVED_VERDICT, FAILURE_EXIT_CODE)
+}
+
 const run_cut_report = {
 	BAD_HANDOFF_VERDICT,
 	BUSY_VERDICT,
@@ -191,6 +209,7 @@ const run_cut_report = {
 	RELAUNCHED_CUT_MARKER,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
+	SPLIT_UNRESOLVED_VERDICT,
 	STALE_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
@@ -205,9 +224,11 @@ const run_cut_report = {
 	report_handed_off,
 	report_held_cut,
 	report_incomplete,
+	report_missing_supervisor,
 	report_over,
 	report_relaunched_cut,
 	report_reviewer,
+	report_split_unresolved,
 	report_stale,
 	report_under_threshold,
 	report_unknown,

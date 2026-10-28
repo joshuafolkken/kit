@@ -156,6 +156,7 @@ jobs:
       reuse: ${{ steps.prove.outputs.reuse }}
       run-id: ${{ steps.prove.outputs.run-id }}
       pull-number: ${{ steps.prove.outputs.pull-number }}
+      author-association: ${{ steps.prove.outputs.author-association }}
     steps:
       - name: Prove the pushed tree passed PR Checks
         id: prove
@@ -171,7 +172,7 @@ jobs:
             exit 0
           fi
           if ! pull=$(printf '%s' "${pulls}" | jq -r --arg sha "${CURRENT_SHA}" \
-            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at] | @tsv else empty end'); then
+            '[.[] | select(.merged_at != null and .merge_commit_sha == $sha and .base.ref == "main")] | if length == 1 then .[0] | [.number, .head.sha, .head.ref, .created_at, .merged_at, .author_association] | @tsv else empty end'); then
             echo '::notice::Could not parse the pull request; running the verification jobs.'
             exit 0
           fi
@@ -179,7 +180,7 @@ jobs:
             echo 'No unique merged pull request matched this push; running the verification jobs.'
             exit 0
           fi
-          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at <<< "${pull}"
+          IFS=$'\t' read -r pull_number head_sha head_ref created_at merged_at author_association <<< "${pull}"
 
           if ! current_tree=$(gh api "repos/${REPOSITORY}/git/commits/${CURRENT_SHA}" --jq '.tree.sha') || \
             ! pr_tree=$(gh api "repos/${REPOSITORY}/git/commits/${head_sha}" --jq '.tree.sha'); then
@@ -225,6 +226,7 @@ jobs:
           echo 'reuse=true' >> "$GITHUB_OUTPUT"
           echo "run-id=${run_id}" >> "$GITHUB_OUTPUT"
           echo "pull-number=${pull_number}" >> "$GITHUB_OUTPUT"
+          echo "author-association=${author_association}" >> "$GITHUB_OUTPUT"
           echo "Reusing successful PR Checks for tree ${current_tree}."
 
   # joshuafolkken/kit#1226 split the gate's four checks across two runners. The unit suite is the only
@@ -240,12 +242,23 @@ jobs:
   # needed a ruleset edit to stay as strict as it was, and left every merge between the two
   # unguarded. So the two halves run under new names and `Checks` stays exactly what the ruleset
   # already requires: a job that is green only when both halves are.
+  #
+  # **The static half is a matrix of three legs** (joshuafolkken/kit#5215). On one runner its seven
+  # checks took 4.1 minutes while every unit shard was done in about two, so it was the critical path
+  # to `Checks`. Each leg is still `josh gate`, narrowed by `--static-group` to the partition
+  # `scripts/gate/gate-static-group.ts` defines, and restores only the caches its checks write — a leg
+  # that restored a cache it never writes would save it back unchanged under the same sha-keyed name,
+  # racing the leg that does write it. `needs.static-checks.result` is `success` only when every leg is.
   static-checks:
-    name: Static Checks
+    name: Static Checks (${{ matrix.group }})
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [lint, types, rest]
     permissions:
       contents: read
       packages: read
@@ -267,6 +280,7 @@ jobs:
           registry-url: 'https://npm.pkg.github.com'
 
       - name: Setup ESLint cache
+        if: matrix.group == 'lint'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: eslint-cache
         with:
@@ -307,6 +321,7 @@ jobs:
       # `josh check` runs `tsc --noEmit --incremental --tsBuildInfoFile .tsbuildinfo` and `josh
       # cspell:dot` runs `cspell . --dot --cache --cache-strategy content --cache-location .cspellcache`.
       - name: Setup TypeScript build cache
+        if: matrix.group == 'types'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: tsbuildinfo-cache
         with:
@@ -318,6 +333,7 @@ jobs:
             ${{ runner.os }}-tsbuildinfo-
 
       - name: Setup cspell cache
+        if: matrix.group == 'rest'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: cspell-cache
         with:
@@ -327,6 +343,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cspell-cache-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-cspell-cache-
+
+      # joshuafolkken/kit#5116: `josh lint --changed` runs `prettier --check . --cache --cache-strategy
+      # content --cache-location .prettiercache` beside eslint, and with no restored cache it walked
+      # the whole tree cold on every run. Prettier hashes each file's absolute path into its entry
+      # (`scripts/josh/josh-command-types.ts` → `GATE_CACHE_SPECS`), which is why no lane shares it,
+      # but the runner checks out to the same path on every run, so an earlier run's entries hit. The
+      # key is the eslint cache's shape: lockfile and prettier config hashes, then the sha.
+      - name: Setup prettier cache
+        if: matrix.group == 'lint'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: prettier-cache
+        with:
+          path: |
+            .prettiercache
+          key: ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('prettier.config.js', 'prettier/**/*.js') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('prettier.config.js', 'prettier/**/*.js') }}-
+            ${{ runner.os }}-prettier-cache-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-prettier-cache-
 
       - name: Setup pnpm and install dependencies
         uses: ./.github/actions/setup-pnpm
@@ -374,9 +409,10 @@ jobs:
       # default branch itself. A name that does not resolve fails the step rather than comparing
       # with nothing.
       - name: Run verification gate
-        run: pnpm josh gate --verbose --no-unit
+        run: pnpm josh gate --verbose --no-unit "--static-group=${STATIC_GROUP}"
         env:
           JOSH_METRICS_BASE: HEAD^1
+          STATIC_GROUP: ${{ matrix.group }}
 
       # joshuafolkken/kit#4449: a main push that reuses this run skips the job above, so it saves no
       # ESLint cache, and a later pull request restored an entry several merges old. Since
@@ -388,13 +424,13 @@ jobs:
       # transient artifact-service error must not turn this required job red; it continues on error.
       - name: Write ESLint cache prefix
         id: eslint-cache-prefix
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.group == 'lint'
         env:
           ESLINT_CACHE_PREFIX: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
         run: printf '%s\n' "${ESLINT_CACHE_PREFIX}" > eslint-cache-prefix
 
       - name: Upload ESLint cache
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && matrix.group == 'lint'
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -411,6 +447,9 @@ jobs:
   # fresh key and saves the downloaded file in its post step; the prefix is checked before it becomes
   # a key. A missing artifact — a run from before this — or a prefix that is not a key saves nothing
   # and leaves the push green; the next pull request then restores an older entry, as it did before.
+  # Only a pull request whose author holds a trusted association (OWNER / MEMBER / COLLABORATOR) is promoted:
+  # an outside author's run can write any `.eslintcache` it likes, and main's scope would then let
+  # later pull requests skip lint on that forged record (joshuafolkken/kit#5050).
   seed-eslint-cache:
     name: Seed ESLint Cache
     needs: reuse-pr-checks
@@ -427,7 +466,15 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ needs.reuse-pr-checks.outputs.run-id }}
           PULL_NUMBER: ${{ needs.reuse-pr-checks.outputs.pull-number }}
+          AUTHOR_ASSOCIATION: ${{ needs.reuse-pr-checks.outputs.author-association }}
         run: |
+          case "${AUTHOR_ASSOCIATION}" in
+            OWNER | MEMBER | COLLABORATOR) ;;
+            *)
+              echo "::notice::The pull request's author association (${AUTHOR_ASSOCIATION:-unknown}) is not trusted; saving nothing."
+              exit 0
+              ;;
+          esac
           if ! gh run download "${RUN_ID}" --repo "${REPOSITORY}" --name "eslint-cache-${PULL_NUMBER}"; then
             echo '::notice::The reused run left no ESLint cache; saving nothing.'
             exit 0
@@ -448,15 +495,68 @@ jobs:
             .eslintcache
           key: ${{ steps.download.outputs.prefix }}${{ github.sha }}
 
+  # joshuafolkken/kit#5189: the seed above saves the pull request's cache under the Node.js release
+  # *that* run resolved. When the runner images move to a new patch release, main holds no lineage
+  # for it, and the first pull request on the new release lints cold (Static Checks 3.7 → 6.6 min).
+  # This job restores with the static-checks key on its own runner, after the seed has saved: an
+  # exact hit means the seed already wrote this release's lineage for this push, and nothing runs.
+  # A miss — a new release, or a seed that saved nothing — lints here, and `actions/cache` saves the
+  # result in its post step, so the cold lint is paid on main instead of on a pull request. The lint
+  # only saves time, so its step continues on error: a red lint still saves, and leaves the job green.
+  warm-eslint-lineage:
+    name: Warm ESLint Lineage
+    needs: [reuse-pr-checks, seed-eslint-cache]
+    if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        id: setup-node
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Setup ESLint cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: eslint-cache
+        with:
+          path: |
+            .eslintcache
+          key: ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('eslint.config.js', 'eslint/**/*.js') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-eslint-cache-${{ steps.setup-node.outputs.node-version }}-
+
+      - name: Setup pnpm and install dependencies
+        if: steps.eslint-cache.outputs.cache-hit != 'true'
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lint to write this release's lineage
+        id: lint
+        if: steps.eslint-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: pnpm josh lint
+
   # The other half of the gate, on a runner of its own. A GitHub job is its own machine, so this job
   # sets Node up again; the pnpm preamble is the shared `.github/actions/setup-pnpm` action
   # (joshuafolkken/kit#2982), which `templates/workflows/ci.yml` calls the same way, so
   # `scripts/ci/ci-yml-action-parity.test.ts` compares the two files without the action's own pins
   # (joshuafolkken/kit#3095).
   #
-  # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `gate-plan.ts` leaves
-  # any machine below its measured 11 cores uncapped, so vitest sizes its own pool from the runner
-  # exactly as it did inside the gate step.
+  # No ESLint cache here — nothing in this job lints — and no `--maxWorkers`: `josh test:unit` sizes a
+  # lone run's claim on a 4-core runner at vitest's own default, three workers plus vitest itself
+  # (`gate_plan.direct_unit_weight`, joshuafolkken/kit#4607).
   # **Sharded across runners, because one runner is already saturated** (joshuafolkken/kit#3220).
   # Alone on a 4-core runner vitest takes every core, so the suite can only get faster by spreading
   # its files over more machines. `fail-fast: false` keeps a red shard from cancelling the others,
@@ -464,19 +564,19 @@ jobs:
   # which for a matrix is `success` only when every shard succeeded — no change there is needed.
   # The shards split by the recorded per-file durations in `tools/test/unit-durations.json`, not by
   # file count, so they finish together (`tools/test/duration-shard.ts`, joshuafolkken/kit#4467).
-  # Four shards, not three (joshuafolkken/kit#4573): balanced at three, each shard still ran its tests
-  # for 196–227 seconds and set the CI wait; a fourth cuts each slice by a quarter for about 12
-  # seconds of duplicated setup.
+  # Six shards (joshuafolkken/kit#5090): at three (joshuafolkken/kit#4610) the slowest shard had
+  # become the last check `Checks` waited on, past Static Checks. Six bring a shard's recorded load
+  # to about two minutes; past that the longest single file, not the shard count, sets the floor.
   # Only kit shards: the distributed template runs the unit suite inside its single `checks` job,
   # where a small consumer suite would pay the duplicated setup and could leave a shard with no file.
   unit:
-    name: Unit Tests (${{ matrix.shard }}/4)
+    name: Unit Tests (${{ matrix.shard }}/6)
     needs: reuse-pr-checks
     if: ${{ !cancelled() && needs.reuse-pr-checks.outputs.reuse != 'true' }}
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -508,7 +608,7 @@ jobs:
       # `scripts/ci/ci-yml-unit-job.test.ts` pins the command; the guard itself is
       # `scripts/test/test-unit-guard.ts`.
       - name: Run unit tests
-        run: pnpm josh test:unit --shard=${{ matrix.shard }}/4
+        run: pnpm josh test:unit --shard=${{ matrix.shard }}/6
 
       # One shard is enough: the check does not depend on which test files ran beside it.
       - name: Verify optional ESLint consumer install
@@ -585,6 +685,46 @@ jobs:
           name: pr-checks-${{ github.event.pull_request.number }}
           path: pr-checks-evidence
           retention-days: 1
+
+  # The pre-commit secretlint scan skips when its binary is missing and never runs on a commit made
+  # with `--no-verify`, so this job scans the pull request's changes again where neither applies
+  # (joshuafolkken/kit#4657). It needs no other job and none needs it, so it stays off the critical
+  # path, and its own `Secret Scan` context is what makes a finding block the merge. Only the files
+  # the pull request adds or changes are read: the merge commit's first parent is the base, which is
+  # why the checkout fetches two commits. secretlint comes from the same store cache every other job
+  # installs from, and `JOSH_SECRETLINT_REQUIRE` turns the hook's missing-binary skip into a failure.
+  # `shell: bash` adds `pipefail`, so a diff that fails cannot hand `xargs` an empty list and pass.
+  secret-scan:
+    name: Secret Scan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Setup pnpm and install dependencies
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-auth-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan the changed files for secrets
+        id: scan
+        shell: bash
+        env:
+          JOSH_SECRETLINT_REQUIRE: '1'
+        run: git diff -z --name-only --diff-filter=d HEAD^1 HEAD | xargs -0 -r pnpm josh secretlint-scan
 
   security:
     name: Security Audit

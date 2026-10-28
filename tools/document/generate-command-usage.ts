@@ -1,13 +1,15 @@
-import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { command_usage } from '#scripts/josh/command-usage'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { derived_artifacts } from './derived-artifacts'
 
 // A reference page keeps its headings and its hand-written behavior prose; only the span between
 // `<!-- usage: <command> -->` and `<!-- /usage -->` is generated, from the same description and usage
 // `josh help <command>` prints. The headings stay put because other documents point at them (#3932).
-// Run `tsx tools/document/generate-command-usage.ts` to regenerate.
+// A stale-page test failure names REGENERATE_COMMAND, so the failure says how to fix it (#4784): the
+// one command that writes every artifact the command map derives (#4970).
 
+const REGENERATE_COMMAND = derived_artifacts.DERIVE_COMMAND
 const { USAGE_PAGES } = command_usage
 const USAGE_BLOCK = /<!-- usage: (?<name>\S+) -->\n[\s\S]*?<!-- \/usage -->/gu
 
@@ -41,21 +43,12 @@ function page_path(page: string): string {
 	return fileURLToPath(new URL(`../../${page}`, import.meta.url))
 }
 
-function regenerate_pages(): void {
-	for (const page of USAGE_PAGES) {
-		const file = page_path(page)
-
-		writeFileSync(file, fill_usage_blocks(readFileSync(file, 'utf8')))
-	}
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) regenerate_pages()
-
 const generate_command_usage = {
 	USAGE_PAGES,
 	as_sentence,
 	fill_usage_blocks,
 	page_path,
+	REGENERATE_COMMAND,
 	usage_spans,
 }
 

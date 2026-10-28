@@ -17,19 +17,23 @@
 - ファイルは範囲を指定する（`sed -n '120,180p' <file>`、または `Read` の `offset` / `limit`）
 - 一覧は件数を絞る（`--limit`、`| head -30`）、JSON は必要な項目だけ取り出す（`gh api … --jq '…'`）
 - 全量が要るときは、ファイルへ落として（`> <file>`）から範囲を読む
+- 退避された `tool-results/<id>.txt` → `grep -n` ／ `sed -n` で読む（`lane-spilled-read` 行、`pnpm josh rule:list`）
 
 ## 切り詰められた出力を、完全な出力として読まない
 
 **検証ゲートと差分は、切り詰められた結果で判断しない。**
 
-- `pnpm josh gate` は合否の 1 行を末尾に出す。失敗の内訳が切れたら、合否行の直前の `full output: <path>` のファイルを読む（joshuafolkken/kit#1227）
+- 検証コマンド（`gate` ／ `check:related` ／ `lint:related` ／ `test:related`）の末尾を読む → 失敗と次のコマンド、`full output: <path>`（`lint:related` には無い）、最終行の合否の順（`scripts/gate/verification-tail.ts`）。内訳が切れたら `full output:` のファイルを読む（joshuafolkken/kit#1227）
+- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。読むための再実行はしない。直したら、まず要約の `rerun failed:` 行で失敗したファイルだけを回し、関連集合の全体は最後の `check:related` で 1 回だけ回す（`scripts/test/vitest-failure-summary.ts`）
 - 差分には判定行が無い。差分はファイルへ落としてから範囲で読む（`git diff main...HEAD > /tmp/diff.patch && wc -l /tmp/diff.patch`）
 
 ## 検証コマンドをパイプに繋がない（joshuafolkken/kit#1556）
 
 **パイプラインの終了コードは最後のコマンドのものである。** `pnpm josh gate 2>&1 | tail -40` は赤いゲートを成功として返す。**これは `josh gate` の欠陥ではない。** **既定はパイプなしで実行する。** 避けられないなら `set -o pipefail` を前置する。どの形でも、印字された判定行を読む。`piped-verification` 行（`rule-delivery.md`）が強制する。
 
-対象は結果が合否を意味するコマンドだけ — `gate` ／ `check` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。
+境界は判定が残るかどうか: 入力を最後まで読むフィルタ（`tail` ／ `grep` ／ `cut` ／ `sort` ／ `uniq` ／ `wc` ／ `tee`、`exit` も外部コマンドも `<`・`>`・`&`（比較を含む）も使わない `awk`、`p`・`d`・`s///` だけの `sed`）だけのパイプは `;` 鎖の中でも `pipefail` 付きに書き換えて通り、`head`・先頭一致で止まる `grep`・`2>/dev/null` などのリダイレクトを伴う形は拒否される（`scripts/rules/piped-verification.ts`）。
+
+対象は結果が合否を意味するコマンドだけ — `gate` ／ `check*` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。
 
 ## 検査
 

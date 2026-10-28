@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
@@ -17,7 +18,7 @@ import type { CarryRead } from './run-carry'
 // **One record, overwritten by the next `--end`**: the board keeps only the run before the next one, and
 // a run that begins replaces nothing here — its carry record is what the board reads while it runs.
 
-const ENDED_PREFIX = 'josh-run-ended-'
+const ENDED_PREFIX = durable_state.PREFIX.ENDED
 const TRANSCRIPT_SUFFIX = '.jsonl'
 
 const ended_run_schema = z.object({
@@ -32,7 +33,7 @@ type EndedRun = z.infer<typeof ended_run_schema>
 
 // Keyed on the common git directory, as the carry record is, so every lane reads the same one.
 function ended_path(git_directory: string): string {
-	return stamp_file.stamp_path(ENDED_PREFIX, git_directory)
+	return durable_state.path(ENDED_PREFIX, git_directory)
 }
 
 function session_of(transcript: string | undefined): string | undefined {

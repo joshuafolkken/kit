@@ -25,20 +25,23 @@ describe('rule-delivery.md — the Stop hook is a second entry on the one founda
 		expect(text).toContain('stop:guard')
 	})
 
-	it('lists a row for each of the four stop-time rules', () => {
+	it('lists a row for each of the three stop-time rules', () => {
 		const text = rule_list.render()
 
 		expect(text).toContain('Stop notification')
 		expect(text).toContain('Hold release')
-		expect(text).toContain('Issue citation')
 		expect(text).toContain('Offer to file')
+	})
+
+	// joshuafolkken/kit#4626: the reply's Issue references are no longer the stop guard's to correct.
+	it('lists no Issue citation row for the stop guard', () => {
+		expect(rule_list.render()).not.toContain('`issue-citation`')
 	})
 })
 
 describe('stop_rules — each delivered text names its single source', () => {
-	it('the stop notification reason points at the CLAUDE.md rule', () => {
-		expect(stop_rules.STOP_NOTIFY_REASON).toContain('Mid-workflow stop notification')
-		expect(stop_rules.STOP_NOTIFY_REASON).toContain('CLAUDE.md')
+	it('the stop notification reason points at rule-delivery.md', () => {
+		expect(stop_rules.STOP_NOTIFY_REASON).toContain('`rule-delivery.md` → "stop-notify"')
 	})
 
 	it('the hold release reason points at working-tree-hold.md', () => {
@@ -53,9 +56,5 @@ describe('stop_rules — each delivered text names its single source', () => {
 
 	it('the filing offer reason says it binds an unattended run', () => {
 		expect(stop_rules.FILING_OFFER_REASON).toContain('this run is unattended')
-	})
-
-	it('the issue citation reason points at issue-citation.md', () => {
-		expect(stop_rules.ISSUE_CITATION_REASON).toContain('issue-citation.md')
 	})
 })

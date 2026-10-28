@@ -14,8 +14,8 @@ import { version_targets } from '#scripts/version/version-targets'
 // command's own modules rather than re-derived here, and it doubles as the visible signal that a
 // release is owed — a count that keeps climbing is a release nobody has run.
 
-// **The Telegram is sent before the merge**, deliberately: `git-pr-followup.ts` cuts its wrap-up
-// there because that is the last point at which the run can still fail safely. So the count taken
+// **The Telegram's body is read before the merge**, deliberately, though the send goes out beside it
+// (#5080): `git-pr-followup.ts` reads this line before it issues the merge. So the count taken
 // there cannot include this run's own merge, and a bare number would be understated by exactly one.
 // Saying so is the honest form of the same measurement. The console line printed after the merge
 // passes `false` and carries no note, because by then the merge is on the remote and the fetch below
@@ -61,7 +61,7 @@ async function read_tip(options: PendingReadOptions): Promise<string> {
 // remove.
 // The manifest read is **inside** the `try` with the rest. `readFileSync` can throw after
 // `existsSync` passed — EACCES, EISDIR, a racing write — and this function is called from
-// `notify_completion`, which runs *before* `pr_merge`: an escaping rejection there would abort the
+// `completion_sender`, which runs *before* `pr_merge`: an escaping rejection there would abort the
 // run and lose a merge over a cosmetic line.
 async function read_pending(options: PendingReadOptions): Promise<number | undefined> {
 	try {

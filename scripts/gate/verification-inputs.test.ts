@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { verification_inputs } from './verification-inputs'
 
 // joshuafolkken/kit#4495: each verification's inputs are declared once, and every reuse answers from
@@ -40,15 +40,15 @@ describe('verification_inputs.configures', () => {
 	it.each(['eslint/rules/thing.ts', 'eslint.config.js', 'prettier.config.js', 'tsconfig.json'])(
 		'reads %j as a lint configuration',
 		(relative) => {
-			expect(verification_inputs.configures(gate_plan.LINT_LABEL, [relative])).toBe(true)
+			expect(verification_inputs.configures(gate_labels.LINT_LABEL, [relative])).toBe(true)
 		},
 	)
 
 	it('reads a vitest configuration as the unit step’s alone', () => {
 		const relatives = ['vitest.config.ts']
 
-		expect(verification_inputs.configures(gate_plan.UNIT_LABEL, relatives)).toBe(true)
-		expect(verification_inputs.configures(gate_plan.LINT_LABEL, relatives)).toBe(false)
+		expect(verification_inputs.configures(gate_labels.UNIT_LABEL, relatives)).toBe(true)
+		expect(verification_inputs.configures(gate_labels.LINT_LABEL, relatives)).toBe(false)
 	})
 
 	it('answers true for an undeclared check, which no narrowing reads past', () => {
@@ -57,15 +57,16 @@ describe('verification_inputs.configures', () => {
 })
 
 describe('verification_inputs.declaration_of', () => {
-	it('declares the scoped checks and leaves cspell and behavior undeclared', () => {
-		expect(verification_inputs.is_declared(gate_plan.LINT_LABEL)).toBe(true)
-		expect(verification_inputs.is_declared(gate_plan.UNIT_LABEL)).toBe(true)
+	it('declares the scoped checks and cspell, and leaves behavior undeclared', () => {
+		expect(verification_inputs.is_declared(gate_labels.LINT_LABEL)).toBe(true)
+		expect(verification_inputs.is_declared(gate_labels.SPELL_CHECK_LABEL)).toBe(true)
+		expect(verification_inputs.is_declared(gate_labels.UNIT_LABEL)).toBe(true)
 		expect(verification_inputs.is_declared(BEHAVIOR_LABEL)).toBe(false)
 	})
 
 	it('declares the run-time read record as the unit step’s inputs alone', () => {
-		expect(verification_inputs.declaration_of(gate_plan.UNIT_LABEL)?.reads).toBe('recorded')
-		expect(verification_inputs.declaration_of(gate_plan.LINT_LABEL)?.reads).toBe('matched')
+		expect(verification_inputs.declaration_of(gate_labels.UNIT_LABEL)?.reads).toBe('recorded')
+		expect(verification_inputs.declaration_of(gate_labels.LINT_LABEL)?.reads).toBe('matched')
 	})
 })
 
@@ -93,26 +94,26 @@ describe('verification_inputs.fingerprint', () => {
 	}
 
 	it('moves when a declared tool is reinstalled at another version', () => {
-		const before = of(gate_plan.TYPE_CHECK_LABEL)
+		const before = of(gate_labels.TYPE_CHECK_LABEL)
 
 		install(root, 'typescript', '5.1.0')
 
-		expect(of(gate_plan.TYPE_CHECK_LABEL)).not.toBe(before)
+		expect(of(gate_labels.TYPE_CHECK_LABEL)).not.toBe(before)
 	})
 
 	it('moves when a declared environment variable changes', () => {
-		const before = of(gate_plan.TYPE_CHECK_LABEL)
+		const before = of(gate_labels.TYPE_CHECK_LABEL)
 
-		expect(of(gate_plan.TYPE_CHECK_LABEL, { [NODE_ENV]: TEST_ENV })).not.toBe(before)
+		expect(of(gate_labels.TYPE_CHECK_LABEL, { [NODE_ENV]: TEST_ENV })).not.toBe(before)
 	})
 
 	it('stays put while only an undeclared environment variable or tool moves', () => {
-		const before = of(gate_plan.TYPE_CHECK_LABEL)
+		const before = of(gate_labels.TYPE_CHECK_LABEL)
 
 		install(root, 'vitest', '3.0.0')
 
-		expect(of(gate_plan.TYPE_CHECK_LABEL, { TZ: 'UTC' })).toBe(before)
-		expect(of(gate_plan.UNIT_LABEL, { TZ: 'UTC' })).not.toBe(of(gate_plan.UNIT_LABEL))
+		expect(of(gate_labels.TYPE_CHECK_LABEL, { TZ: 'UTC' })).toBe(before)
+		expect(of(gate_labels.UNIT_LABEL, { TZ: 'UTC' })).not.toBe(of(gate_labels.UNIT_LABEL))
 	})
 
 	it('answers the whole gate from the union of every declaration', () => {

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 
 // The payload machinery two delivery suites share. `delivered-rules.test.ts`
-// had it first; the filing rules — the scout gate and the per-run cap — need the same temp transcript,
+// had it first; the filing rules — the direct-filing refusal — need the same temp transcript,
 // payload envelope and per-rule stamp cleanup, so a second copy in `delivered-rules-filing.test.ts`
 // would be the clone `CLAUDE.md` prohibits. Each suite calls `create_harness()` once, so each gets its
 // own work directory and its own tracked transcripts.

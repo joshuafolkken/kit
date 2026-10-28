@@ -1,3 +1,4 @@
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 import type { ShipArguments } from './run-ship-steps'
 import type { Cause } from './run-ship-stop-cause'
@@ -14,9 +15,9 @@ import type { Cause } from './run-ship-stop-cause'
 //
 // **Every route is a re-detach.** The prompt only ever reaches a lane child, and a lane child's commit
 // and push belong to the detached ship (`scripts/rules/lane-background.ts`), so a `josh git -y` here could never
-// run. The rounds are the supervisor's too: under `--review` it skips a round 1 already recorded for the
-// issue and asks `review:round2` itself after the commit (`run-ship-review-steps.ts`), so the fix delta
-// is verified as round 2 rather than reviewed again as round 1.
+// run. The rounds are the supervisor's too: under `--review` it reuses a round 1 recorded on a tree
+// unmoved or moved only where round 2 reads, reviews only the delta from that record otherwise, and asks `review:round2` itself after the
+// commit (`run-ship-review-steps.ts`), so the whole change is never reviewed again as round 1.
 //
 // **The re-run carries the stopped ship's own options.** A preflight that stopped on missing live
 // evidence asks for `--body-file`, and `followup` delivers the body from it; a command naming only
@@ -30,18 +31,15 @@ const COMMAND = {
 	DETACH_REVIEW: 'pnpm josh ship --detach --review',
 } as const
 
-// A single quote cannot appear inside single quotes, so it closes the quote, escapes one, and reopens.
-const ESCAPED_QUOTE = String.raw`'\''`
-
-// A token of only these characters means the same to the shell quoted or not, so it is left bare.
-const BARE_WORD = /^[\w%+,./:=@-]+$/u
-
 // What a stopped ship is re-run with: its title, every option it was started with, and whether it
 // carried `--review` — the one option a route decides rather than repeats.
 interface ShipResume {
 	title: string
 	flags: ReadonlyArray<string>
 	is_review: boolean
+	// `--unpinned-ok "<reason>"` as started; `josh ship` refuses it without `--review`, so only a
+	// command that carries `--review` repeats it.
+	unpinned_ok?: ReadonlyArray<string>
 	// The paths a merge of the default branch left unmerged.
 	conflicts?: ReadonlyArray<string>
 	// The cause a stopped review round tagged its stop with (`run-ship-stop-cause.ts`).
@@ -50,17 +48,8 @@ interface ShipResume {
 	is_review_stale?: boolean
 }
 
-// Single quotes, so a `$` or a backtick in a title is never expanded by the shell that runs it.
-function quoted(title: string): string {
-	return `'${title.split("'").join(ESCAPED_QUOTE)}'`
-}
-
-function shell_word(token: string): string {
-	return BARE_WORD.test(token) ? token : quoted(token)
-}
-
 // A supervised ship's notify tail is already file-form (`run-ship-detach.ts`), so every flag is a path
-// or an issue number and fits the prompt.
+// or an issue number and fits the prompt; `shell_quote.word` quotes the `--unpinned-ok` reason.
 function resume_of(args: ShipArguments): ShipResume {
 	const cites = args.cites.flatMap((cite) => ['--cite', cite])
 
@@ -68,14 +57,25 @@ function resume_of(args: ShipArguments): ShipResume {
 		title: args.title,
 		flags: [...args.notify, ...args.body, ...cites],
 		is_review: args.is_review,
+		unpinned_ok: args.unpinned_ok,
 	}
 }
 
 // The command prefix stays as written; only the stopped ship's own tokens are quoted where needed.
-function ship_command(command: string, resume: ShipResume): string {
-	const words = [...resume.flags, resume.title].map((token) => shell_word(token))
+function ship_command(
+	command: string,
+	resume: ShipResume,
+	review_flags: ReadonlyArray<string> = [],
+): string {
+	const words = [...review_flags, ...resume.flags, resume.title].map((token) =>
+		shell_quote.word(token),
+	)
 
 	return [command, ...words].join(' ')
+}
+
+function review_command(resume: ShipResume): string {
+	return ship_command(COMMAND.DETACH_REVIEW, resume, resume.unpinned_ok)
 }
 
 // After the merge-side stages, or after round 2 — which is final — the re-detach reviews nothing.
@@ -84,12 +84,13 @@ function detach_again(resume: ShipResume): string {
 }
 
 // Before round 2 the re-run takes the stopped ship's own shape: `--review` only when it carried it. A
-// reviewing ship skips its recorded round 1 and decides round 2 after the commit; a ship started
+// reviewing ship reviews only the fix delta from its recorded round 1 and decides round 2 after the
+// commit; a ship started
 // without `--review` was re-detached after round 2, which is final, so it reviews nothing.
 function detach_as_started(resume: ShipResume): string {
-	const command = resume.is_review ? COMMAND.DETACH_REVIEW : COMMAND.DETACH
+	const command = resume.is_review ? review_command(resume) : ship_command(COMMAND.DETACH, resume)
 
-	return `leave the fix uncommitted and run \`${ship_command(command, resume)}\`.`
+	return `leave the fix uncommitted and run \`${command}\`.`
 }
 
 const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
@@ -107,7 +108,7 @@ const AFTER_FIX: Record<Stage, (resume: ShipResume) => string> = {
 // supervisor reviews it again even on a committed tree (`run-ship-stage.ts`), and `josh followup`
 // refuses the merge until it has (joshuafolkken/kit#4221).
 function detach_review_again(resume: ShipResume): string {
-	return `leave the fix uncommitted and run \`${ship_command(COMMAND.DETACH_REVIEW, resume)}\` — the review read the issue before its update, so the supervisor reviews round 1 again.`
+	return `leave the fix uncommitted and run \`${review_command(resume)}\` — the review read the issue before its update, so the supervisor reviews round 1 again.`
 }
 
 function after_fix(stage: Stage, resume: ShipResume): string {
@@ -137,6 +138,6 @@ function next_step(issue: string, stage: Stage, resume: ShipResume, is_excerpted
 	return `${fix_step(issue, stage, is_excerpted)}, then ${after_fix(stage, resume)}`
 }
 
-const run_ship_next = { COMMAND, next_step, quoted, resume_of }
+const run_ship_next = { COMMAND, next_step, resume_of }
 
 export { run_ship_next, type ShipResume }

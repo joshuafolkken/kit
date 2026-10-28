@@ -145,6 +145,8 @@ The following table describes the `full` profile. The profile table above lists 
 | `.vscode/settings.json`   | Created from package template                                                                                                                               | Missing keys merged in; a key the project already owns gains kit's missing entries when both values are objects (project entries win)       |
 | `.vscode/tasks.json`      | Created from package template                                                                                                                               | Merged per task `label`: a task with a kit label is replaced in place, a missing kit task is appended, every other task is kept as authored |
 
+> `.vscode/settings.json` distributes `files.watcherExclude` and `search.exclude` for josh's run records (`.git/josh`, `.josh/observations`) and build outputs (`.svelte-kit` at any depth; `coverage`, `build` and `dist` at the root only, so a source folder such as `scripts/build` stays searchable); a project's own exclude entries are kept and kit's missing ones are added.
+
 > Kit-only `.vscode/settings.json` keys (currently `sonarlint.connectedMode.project`) are never written into consumer projects.
 
 ### Claude Code permission mode
@@ -152,17 +154,26 @@ The following table describes the `full` profile. The profile table above lists 
 kit ships with permission prompts off, so the unattended commands (`fullrun`, `backlogrun`, …) do not stall:
 
 - `.vscode/settings.json` sets `claudeCode.initialPermissionMode` to `bypassPermissions` and `claudeCode.allowDangerouslySkipPermissions` to `true`.
-- `.claude/settings.json` sets `permissions.defaultMode` to `bypassPermissions` with `Bash(*)` allowed.
+- `.claude/settings.json` allows `Bash(*)`. It ships no `permissions.defaultMode`, so `josh sync` leaves your own mode as it is. A file synced before kit stopped shipping it keeps the `bypassPermissions` line; that line is now yours, and deleting it survives a sync.
+- `backlogrun` starts its sessions with `--permission-mode bypassPermissions`.
 
-The `permissions.deny` list and the `pretool-guard` hook still refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable). A script that opens the file itself is outside both.
+The `permissions.deny` list and the `pretool-guard` hook are a guardrail, not a sandbox. They refuse destructive commands and reads of `.env`, `.env.*` and `.dev.vars` (`.env.example` and `.env.test` stay readable).
 
-**Since Claude Code v2.1.257, a `permissions.defaultMode` of `bypassPermissions` is ignored in `.claude/settings.json` and `.claude/settings.local.json`.** For an unattended run on a current CLI, set it in `~/.claude/settings.json` or pass `--permission-mode bypassPermissions`. `backlogrun` passes that flag to the sessions it starts.
+The deny list matches the start of a command, so `git -C . …` or `command git …` passes it. The hook reads git's own arguments past those, but a git command inside `bash -c '…'`, a `python -c` one-liner or a script that opens the file itself still gets through. A command they let through is not thereby permitted.
+
+With the prompts off, text the agent reads can run with your permissions. An instruction planted in an Issue, a pull request, a comment or a dependency's README may be followed, and the guardrail does not stop it. Two measures keep the exposure small:
+
+- `pnpm josh issue:read` withholds a comment from an author without write access and marks such an author's Issue body as a report, not an instruction; the workflows read Issues through it.
+- Give `gh` only the scopes the work needs — for example `gh auth refresh --remove-scopes delete_repo,admin:public_key`.
+
+kit does not turn on Claude Code's sandbox by default ([#4022](https://github.com/joshuafolkken/kit/issues/4022)). The `gh` token stays reachable through github.com, which an allowlist has to keep, so the sandbox would not stop a leak through GitHub; and on macOS it breaks the `gh` and SSH `git push` calls `pnpm josh` makes.
+
+**Since Claude Code v2.1.257, a `permissions.defaultMode` of `bypassPermissions` is ignored in `.claude/settings.json` and `.claude/settings.local.json`.** For an unattended run on a current CLI, set it in `~/.claude/settings.json` or pass `--permission-mode bypassPermissions`. On an older CLI, set it in `~/.claude/settings.json` or `.claude/settings.local.json`.
 
 **To opt out, decide before the first session:**
 
 - To keep the prompts in the VS Code extension, set `"claudeCode.initialPermissionMode": "default"` and `"claudeCode.allowDangerouslySkipPermissions": false` in your `.vscode/settings.json`. Set the values rather than deleting the keys — `josh sync` adds a missing key back.
-- On a Claude Code older than v2.1.257, override `permissions.defaultMode` in `.claude/settings.local.json`, not the project file — `josh sync` resets kit's keys there ([sync.md](./sync.md)).
-- To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` in either file; kit does not ship that key, so it survives a sync.
+- To rule the mode out on any version, set `"permissions": { "disableBypassPermissionsMode": "disable" }` in `.claude/settings.json` or `.claude/settings.local.json`; kit does not ship that key, so it survives a sync.
 
 ### tsconfig merge strategy
 

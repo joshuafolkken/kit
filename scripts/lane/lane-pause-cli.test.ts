@@ -1,6 +1,7 @@
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_pause } from './lane-pause'
 import { lane_pause_cli } from './lane-pause-cli'
 import { lane_registry } from './lane-registry'
@@ -32,6 +33,7 @@ const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
 const record_change = vi.spyOn(lane_state, 'record_change')
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
+const record_lane_state = vi.spyOn(lane_ledger_write, 'record_lane_state')
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -39,6 +41,7 @@ beforeEach(() => {
 	info.mockImplementation(vi.fn())
 	record_change.mockResolvedValue({ kind: 'skipped', reason: 'test' })
 	emit.mockResolvedValue(undefined)
+	record_lane_state.mockResolvedValue(undefined)
 	pause_lane.mockReturnValue(TREE)
 	resume_lane.mockReturnValue(TREE)
 	lane_of.mockResolvedValue(LANE)
@@ -90,6 +93,19 @@ describe('lane_pause_cli.run — one lane', () => {
 	})
 })
 
+// joshuafolkken/kit#5168: the ledger keeps every change, so `lane:stats` reads the paused spans.
+describe('lane_pause_cli.run — the ledger', () => {
+	it('appends each pause and resume to the lane ledger', async () => {
+		await lane_pause_cli.run(['pause', ISSUE])
+		await lane_pause_cli.run(['resume', ISSUE])
+
+		expect(record_lane_state.mock.calls).toStrictEqual([
+			[{ issue: Number(ISSUE), state: 'paused' }],
+			[{ issue: Number(ISSUE), state: 'running' }],
+		])
+	})
+})
+
 // joshuafolkken/kit#4268: a lane whose processes were signalled has the change on its state record and
 // on the run's event stream.
 describe('lane_pause_cli.run — the record', () => {
@@ -122,6 +138,7 @@ describe('lane_pause_cli.run — the record', () => {
 		await lane_pause_cli.run(['pause', ISSUE])
 
 		expect(record_change).not.toHaveBeenCalled()
+		expect(record_lane_state).not.toHaveBeenCalled()
 		expect(emit).not.toHaveBeenCalled()
 	})
 })

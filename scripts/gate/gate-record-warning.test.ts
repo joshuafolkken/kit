@@ -1,9 +1,9 @@
-import { unused_members_cli } from '#scripts/exports/unused-members-cli'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { gate_test_fixture } from './gate-test-fixture'
 import { project_checks } from './project-checks'
 import { verification_gate, type GateStepResult } from './verification-gate'
@@ -54,10 +54,10 @@ afterEach(RECORDS.clear)
 describe('record_green_gate — a benign warning does not withhold the record', () => {
 	it('writes the reusable record when a non-checker step forwarded a benign warning', async () => {
 		await record_with([
-			plain(gate_plan.LINT_LABEL),
-			plain(gate_plan.TYPE_CHECK_LABEL),
+			plain(gate_labels.LINT_LABEL),
+			plain(gate_labels.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
-			green_saying(gate_plan.UNIT_LABEL, VITE_DEPRECATION),
+			green_saying(gate_labels.UNIT_LABEL, VITE_DEPRECATION),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
@@ -65,10 +65,10 @@ describe('record_green_gate — a benign warning does not withhold the record', 
 
 	it('still withholds the record when a checker step passed with its own warnings', async () => {
 		await record_with([
-			green_saying(gate_plan.LINT_LABEL, ESLINT_WARNING),
-			plain(gate_plan.TYPE_CHECK_LABEL),
+			green_saying(gate_labels.LINT_LABEL, ESLINT_WARNING),
+			plain(gate_labels.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
-			plain(gate_plan.UNIT_LABEL),
+			plain(gate_labels.UNIT_LABEL),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
@@ -80,11 +80,11 @@ describe('record_green_gate — a benign warning does not withhold the record', 
 describe('record_green_gate — a consumer exports notice does not withhold the record', () => {
 	it('writes the record when the exports step printed the consumer notice', async () => {
 		await record_with([
-			plain(gate_plan.LINT_LABEL),
-			plain(gate_plan.TYPE_CHECK_LABEL),
+			plain(gate_labels.LINT_LABEL),
+			plain(gate_labels.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
-			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
-			plain(gate_plan.UNIT_LABEL),
+			green_saying(EXPORTS_LABEL, unused_members_check.CONSUMER_NOTICE),
+			plain(gate_labels.UNIT_LABEL),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
@@ -92,9 +92,9 @@ describe('record_green_gate — a consumer exports notice does not withhold the 
 
 	it('still withholds the record when the unit suite passed without running', async () => {
 		await record_with([
-			plain(gate_plan.LINT_LABEL),
-			green_saying(EXPORTS_LABEL, unused_members_cli.CONSUMER_NOTICE),
-			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
+			plain(gate_labels.LINT_LABEL),
+			green_saying(EXPORTS_LABEL, unused_members_check.CONSUMER_NOTICE),
+			green_saying(gate_labels.UNIT_LABEL, UNIT_SKIP_NOTICE),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()
@@ -109,10 +109,10 @@ const ESLINT_NOT_USED = project_checks.skip_notice('eslint', 'no ESLint configur
 describe('record_green_gate — a skip of a tool the project does not use', () => {
 	it('writes the record when lint skipped eslint for a project with no ESLint configuration', async () => {
 		await record_with([
-			green_saying(gate_plan.LINT_LABEL, `Checking formatting...\n${ESLINT_NOT_USED}\n`),
-			plain(gate_plan.TYPE_CHECK_LABEL),
+			green_saying(gate_labels.LINT_LABEL, `Checking formatting...\n${ESLINT_NOT_USED}\n`),
+			plain(gate_labels.TYPE_CHECK_LABEL),
 			plain(CSPELL_LABEL),
-			plain(gate_plan.UNIT_LABEL),
+			plain(gate_labels.UNIT_LABEL),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeDefined()
@@ -120,8 +120,8 @@ describe('record_green_gate — a skip of a tool the project does not use', () =
 
 	it('still withholds the record when the unit suite skipped beside it', async () => {
 		await record_with([
-			green_saying(gate_plan.LINT_LABEL, ESLINT_NOT_USED),
-			green_saying(gate_plan.UNIT_LABEL, UNIT_SKIP_NOTICE),
+			green_saying(gate_labels.LINT_LABEL, ESLINT_NOT_USED),
+			green_saying(gate_labels.UNIT_LABEL, UNIT_SKIP_NOTICE),
 		])
 
 		expect(review_stamps.gate_stamp.read(RECORDS.stamp_path)).toBeUndefined()

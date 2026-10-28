@@ -23,6 +23,21 @@ it('ignores a ship launch from an earlier generation', async () => {
 	expect(await openai_lane_ship.wait_for_ship(ISSUE, 'old')).toBe('none')
 })
 
+it('reports a ship that already ended without reading it again', async () => {
+	result_mock.mockReturnValue({ launch_id: 'new', result: 'success' })
+
+	expect(await openai_lane_ship.wait_for_ship(ISSUE, 'old')).toBe('success')
+	expect(result_mock).toHaveBeenCalledOnce()
+})
+
+it('reports abnormal when a running ship’s result disappears', async () => {
+	result_mock
+		.mockReturnValueOnce({ launch_id: 'new', result: 'running' })
+		.mockReturnValue(undefined)
+
+	expect(await openai_lane_ship.wait_for_ship(ISSUE, 'old')).toBe('abnormal')
+})
+
 it.each(['success', 'failed', 'abnormal'] as const)(
 	'waits through a running ship and reports its final %s result',
 	async (result) => {

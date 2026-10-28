@@ -115,6 +115,37 @@ describe('metrics_durations.from_ledger — the median', () => {
 	})
 })
 
+describe('metrics_durations.windows', () => {
+	it('spans each of the last five solo gates alone, the gaps between them left out', () => {
+		const entries = [10, 20, 30, 40, 50, 59].map((minute) =>
+			gate_at(`2026-10-08T00:${String(minute)}:00Z`, 60_000),
+		)
+		const spans = [20, 30, 40, 50, 59].map((minute) => ({
+			start_ms: Date.parse(`2026-10-08T00:${String(minute)}:00Z`) - 60_000,
+			end_ms: Date.parse(`2026-10-08T00:${String(minute)}:00Z`),
+		}))
+
+		expect(metrics_durations.windows(entries)).toStrictEqual(spans)
+	})
+
+	it('opens no window on fewer than five solo gates', () => {
+		const entries = [10, 20].map((minute) => gate_at(`2026-10-08T00:${String(minute)}:00Z`, 60_000))
+
+		expect(metrics_durations.windows(entries)).toStrictEqual([])
+	})
+})
+
+describe('metrics_durations.is_recorded', () => {
+	it('names the gate and unit durations, never a startup', () => {
+		const names = ['gate', 'unit', 'josh_startup', 'guard_startup']
+		const recorded = names.filter((name) =>
+			metrics_durations.is_recorded({ name, baseline: BASELINE_MS, current: PAST_TOLERANCE_MS }),
+		)
+
+		expect(recorded).toStrictEqual(['gate', 'unit'])
+	})
+})
+
 describe('metrics_durations.from_ledger — solo gates', () => {
 	// joshuafolkken/kit#3409: only solo gates compare — a gate that overlapped another, failed or
 	// passed, ran under its load.
@@ -187,7 +218,7 @@ describe('metrics_durations.render_regressions', () => {
 	it('says the gate median trails a fix by up to three gates', () => {
 		const text = metrics_durations.render_regressions(
 			[{ name: 'gate', baseline: BASELINE_MS, current: PAST_TOLERANCE_MS }],
-			'josh-metrics-durations.json',
+			'metrics-durations.json',
 		)
 
 		expect(text).toContain('gate  baseline 1.0s → current 1.1s')

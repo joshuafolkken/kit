@@ -27,6 +27,8 @@ const CATEGORY_STEMS: ReadonlyArray<string> = [
 	'Edge inputs and environments',
 	// joshuafolkken/kit#4479: wrong premises about another component, the top theme still stopping lanes.
 	'Claims about other components are checked in their code',
+	// joshuafolkken/kit#5021: a command a refusal tells the reader to run, broken outside the root.
+	'Commands your prose tells a reader to run are run',
 ]
 
 // The intro's count, indexed by the number of items, so adding an item without rewording
@@ -48,7 +50,7 @@ const COUNT_WORDS: ReadonlyArray<string> = [
 // The two chain-rule entries — each its numbered item's opening, and the words its scoped pair is
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
-	['0. **A lane child**', 'the scoped pair, the ship body draft'],
+	['0. **A lane child**', '`pnpm josh check:related`'],
 	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
 ]
 
@@ -110,4 +112,47 @@ describe('the implementer self-check before review round 1', () => {
 			expect(pointer_at).toBeLessThan(step.indexOf(scoped_pair))
 		},
 	)
+})
+
+// joshuafolkken/kit#4647: question 1 reads the command's output rather than asking for a hand check.
+// joshuafolkken/kit#4770: the check runs beside the gate, so its lines arrive at `--join`.
+describe('the self-check question 1 and josh test:pinned', () => {
+	it('question 1 reads the test:pinned lines run:review --join prints', () => {
+		expect(self_check_section()).toContain(
+			'read the `unpinned` and `unchecked` lines `pnpm josh run:review --join` prints from `pnpm josh test:pinned`',
+		)
+	})
+
+	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
+		const step = read_unwrapped(CHAIN_RULE)
+
+		expect(step).toContain("its `--join`'s `test:pinned` lines answer the self-check")
+		expect(step).toContain(
+			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
+		)
+		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
+		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.
+		expect(step).toContain('`3` on an `unpinned` line (its note names the `--unpinned-ok` call)')
+	})
+})
+
+// joshuafolkken/kit#5021: the reviewer reads the rubric, not the self-check, so the rubric's bug-risk
+// category points at the question that runs the commands the changed prose names.
+describe('the review rubric and the self-check question 10', () => {
+	it('the rubric bug-risk category points at question 10 of the self-check', () => {
+		const category = unwrapped(
+			document_section.section(
+				read_repo_file('prompts/review-rubric.md'),
+				'1. Bug risks & logic errors',
+			)?.text ?? '',
+		)
+
+		expect(category).toContain(`\`prompts/review.md\` → "${HEADING}", question 10`)
+	})
+
+	it('question 10 of the self-check is the one that runs the named commands', () => {
+		expect(raw_self_check_section()).toMatch(
+			/^10\. \*\*Commands your prose tells a reader to run/mu,
+		)
+	})
 })

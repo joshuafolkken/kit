@@ -2,13 +2,15 @@ import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
 import { git_gh_branch_rules } from './git-gh-branch-rules'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_poll_read } from './git-gh-poll-read'
-import { require_pr_number } from './git-gh-pr-read'
-import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
+import { git_gh_pr_graphql_state } from './git-gh-pr-graphql-state'
+import { read_listed_pull, read_pull, require_pr_number } from './git-gh-pr-read'
+import type { RestPull } from './git-gh-pr-rest'
 import { git_gh_pr_review } from './git-gh-pr-review'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 import { to_gh_state } from './git-gh-rest-state'
 
-// The merge gate's pull request state snapshot, rebuilt from REST.
+// The merge gate's pull request state snapshot, rebuilt from REST — GraphQL only for the merge state
+// of a pull request whose REST detail GitHub refuses as too large (`resolve_pull`).
 //
 // `gh pr view --json mergeStateStatus,reviewDecision,statusCheckRollup` is answered 403 in a cloud
 // session, and all three fields are GraphQL-only: one has no REST
@@ -93,13 +95,26 @@ interface ResolvedPull {
 // **The detail is read without an ETag.** GitHub computes `mergeable_state` lazily and can change it
 // under an unchanged ETag, so a 304 answered from the poll cache kept the gate reading a stale
 // `blocked` on a pull request that had turned `clean` (joshuafolkken/kit#4589).
+//
+// **A detail GitHub refuses as too many files changed** is stood in for by the listing row, whose
+// missing `mergeable_state` is read from GraphQL (`git-gh-pr-graphql-state.ts`) — or the snapshot
+// throws with the reason, since an unknown state would hold the gate pending until its budget ran out.
+async function read_detail_or_listed(branch_name: string, pr_number: number): Promise<RestPull> {
+	try {
+		return await read_pull(pr_number)
+	} catch (error) {
+		const listed = await read_listed_pull(error, branch_name, pr_number)
+		if (listed === undefined) throw error
+		const state = await git_gh_pr_graphql_state.read_merge_state_status(listed, error)
+
+		return { ...listed, mergeable_state: state }
+	}
+}
+
 async function resolve_pull(branch_name: string): Promise<ResolvedPull> {
 	const pr_number = await require_pr_number(branch_name)
-	const json = await git_gh_exec.exec_gh_api({
-		path: git_gh_api_path.pull_api_path(String(pr_number)),
-	})
 
-	return { pr_number, pull: git_gh_pr_rest.parse_rest_pull(json) }
+	return { pr_number, pull: await read_detail_or_listed(branch_name, pr_number) }
 }
 
 // Everything the snapshot carries except the review decision: three requests rather than four.

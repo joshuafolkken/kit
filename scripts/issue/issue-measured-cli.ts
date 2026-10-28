@@ -1,48 +1,26 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { epic_close } from '#scripts/epic/epic-close'
-import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_evidence_exit } from '#scripts/issue/issue-evidence-exit'
-import { MEASURED_LABEL } from '#scripts/issue/issue-labels'
-import { session_cite } from '#scripts/issue/session-cite'
+import { issue_measured_close } from '#scripts/issue/issue-measured-close'
 
 // `josh issue:measured <N> --evidence-file <path>` — the completion of a measurement-only Issue
 // (`issue-comments.md` → "A measurement-only Issue"): the result comment, the
-// `measured` label, the close and the `run:release`, in that order (`issue-evidence-exit.ts`).
-//
-// **The close is the run's own**: such an Issue changes no code, so no pull request's `closes #N`
-// can close it, and an OPEN child `run:merge` reads as `failed` and parks with `run:stalled`. A
-// CLOSED one it reads as `merged` (`run-merge.ts` → `classify_child`). The label goes on before the
-// close because it is what every sweep — `run:carry --end`, `run:tidy` — tells this close from a
-// person's by (`issue-merged.ts`); a close without it would be one they never count as merged.
+// `measured` label, the close and the `run:release`, in that order (`issue-evidence-exit.ts`,
+// `issue-measured-close.ts`). `--unmet` records that the measurement fell short of the expected
+// effect, with the `measured:unmet` label `josh effect:audit` reads.
 
 const ARGV_OFFSET = 2
-
-async function apply_label(issue_number: string): Promise<boolean> {
-	const write = await git_gh_command.issue_apply_label(issue_number, MEASURED_LABEL)
-
-	if (!write.is_applied) console.error(`${MEASURED_LABEL} not applied: ${write.reason}`)
-
-	return write.is_applied
-}
-
-// A closed measurement may be its epic's last child, and no `followup` runs for it — so the epic
-// auto-close is run here, through the one entry every child close takes (`epic-close.ts`).
-async function close_issue(issue_number: string): Promise<boolean> {
-	const is_closed = await git_gh_command.issue_close(issue_number, undefined)
-
-	if (is_closed) await epic_close.close_completed_epics({ issue_number, is_merged: true })
-	else console.error(`Issue ${session_cite.issue(issue_number)} not closed`)
-
-	return is_closed
-}
-
-async function label_and_close(issue_number: string): Promise<boolean> {
-	return (await apply_label(issue_number)) && (await close_issue(issue_number))
-}
+const UNMET_FLAG = '--unmet'
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	return await issue_evidence_exit.run(argv, { command: 'issue:measured', finish: label_and_close })
+	const exit = argv.includes(UNMET_FLAG)
+		? issue_measured_close.MEASURED_UNMET_EXIT
+		: issue_measured_close.MEASURED_EXIT
+
+	return await issue_evidence_exit.run(
+		argv.filter((argument) => argument !== UNMET_FLAG),
+		exit,
+	)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

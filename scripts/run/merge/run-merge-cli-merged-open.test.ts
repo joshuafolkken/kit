@@ -1,5 +1,6 @@
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_merge_steps_fixture } from './run-merge-steps-fixture'
 
 // joshuafolkken/kit#2769: `run:merge` over a child GitHub merged but left OPEN, and over a cut that
 // could not be relaunched — the two paths the park-reason work changed, end to end with the reads and
@@ -21,12 +22,20 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 	issue_closing_pr: { read_closing_pr: read_closing_pr_mock },
 }))
 
-vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock, current_events: vi.fn().mockResolvedValue([]) },
+vi.mock('#scripts/issue/issue-merged', () => ({
+	issue_merged: { read_merge_state: vi.fn().mockResolvedValue(true) },
 }))
 
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_merge: vi.fn() },
+vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
+	run_event_stream_emit: {
+		emit: emit_mock,
+		current_events: vi.fn().mockResolvedValue([]),
+		invocation_or_all_events: vi.fn().mockResolvedValue([]),
+	},
+}))
+
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_merge: vi.fn() },
 }))
 
 vi.mock('./run-merge-steps', () => ({
@@ -47,6 +56,7 @@ const { run_merge_cli } = await import('./run-merge-cli')
 const CHILD = '2761'
 const PR_URL = 'https://github.com/joshuafolkken/kit/pull/2768'
 const OPEN_IN_PROGRESS = { kind: 'state', state: { state: 'OPEN', labels: ['in-progress'] } }
+const { CONFIRMED_AT } = run_merge_steps_fixture
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 	const ctx = run_merge_cli.parse([CHILD])
@@ -59,7 +69,7 @@ function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 beforeEach(() => {
 	read_issue_mock.mockReset().mockResolvedValue(OPEN_IN_PROGRESS)
 	read_closing_pr_mock.mockReset().mockResolvedValue(undefined)
-	do_merged_mock.mockReset().mockResolvedValue(undefined)
+	do_merged_mock.mockReset().mockImplementation(run_merge_steps_fixture.record_merged)
 	do_failed_mock
 		.mockReset()
 		.mockResolvedValue({ carry: undefined, is_parked: true, is_refused: false, waits: [] })
@@ -76,7 +86,10 @@ describe('run_merge_cli.merge_child — a child merged while its issue stayed OP
 
 		expect(result.outcome).toBe('merged')
 		expect(do_failed_mock).not.toHaveBeenCalled()
-		expect(do_merged_mock).toHaveBeenCalledWith(expect.objectContaining({ merged_pr: PR_URL }))
+		expect(do_merged_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ merged_pr: PR_URL }),
+			expect.any(Function),
+		)
 	})
 
 	it('carries no merged pull request for a child GitHub already closed', async () => {
@@ -87,7 +100,10 @@ describe('run_merge_cli.merge_child — a child merged while its issue stayed OP
 
 		expect(result.outcome).toBe('merged')
 		expect(read_closing_pr_mock).not.toHaveBeenCalled()
-		expect(do_merged_mock).toHaveBeenCalledWith(expect.objectContaining({ merged_pr: undefined }))
+		expect(do_merged_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ merged_pr: undefined }),
+			expect.any(Function),
+		)
 	})
 
 	// joshuafolkken/kit#3442: a parent that counted the merge by hand still owes the stream its event.
@@ -96,7 +112,7 @@ describe('run_merge_cli.merge_child — a child merged while its issue stayed OP
 
 		await run_merge_cli.merge_child(context())
 
-		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
+		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`, CONFIRMED_AT)
 	})
 
 	it('still parks an OPEN child no merged pull request closes', async () => {

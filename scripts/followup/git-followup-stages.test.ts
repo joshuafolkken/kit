@@ -1,6 +1,10 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
+import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { time_followup_stage } from '#scripts/time-runtime/time-followup-stage'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { followup_ci_path } from './followup-ci-path'
 import { git_followup_stages, type StageLog } from './git-followup-stages'
 
 const { STAGE, STAGE_LINE_PREFIX, STAGE_TOTAL_PREFIX } = git_followup_stages
@@ -32,7 +36,7 @@ function two_lap_log(): StageLog {
 	const log = git_followup_stages.new_log()
 
 	git_followup_stages.lap(log, STAGE.checks_wait)
-	git_followup_stages.lap(log, STAGE.merge)
+	git_followup_stages.lap(log, STAGE.telegram_and_merge)
 
 	return log
 }
@@ -45,7 +49,10 @@ describe('git_followup_stages.lap', () => {
 	it('records each stage in the order it was marked', () => {
 		const log = two_lap_log()
 
-		expect(log.stages.map((stage) => stage.name)).toStrictEqual([STAGE.checks_wait, STAGE.merge])
+		expect(log.stages.map((stage) => stage.name)).toStrictEqual([
+			STAGE.checks_wait,
+			STAGE.telegram_and_merge,
+		])
 	})
 
 	it('measures a lap from the previous mark, not from the log opening', () => {
@@ -105,6 +112,20 @@ describe('git_followup_stages.format_stages', () => {
 	})
 })
 
+// #5131: the completion row is printed outside the block, so the one row has to read back on its own.
+describe('git_followup_stages.format_stage', () => {
+	it('prints a lone row the stage reader reads back', () => {
+		const row = git_followup_stages.format_stage({
+			name: STAGE.completion,
+			duration_ms: FIRST_LAP_MS,
+		})
+
+		expect(time_followup_stage.read_stages(row)).toStrictEqual([
+			{ name: STAGE.completion, duration_ms: FIRST_LAP_MS },
+		])
+	})
+})
+
 describe('git_followup_stages.print_stages', () => {
 	it('writes one console line per formatted row', () => {
 		const log = two_lap_log()
@@ -114,5 +135,44 @@ describe('git_followup_stages.print_stages', () => {
 		git_followup_stages.print_stages(log)
 
 		expect(info.mock.calls.map(([line]) => String(line))).toStrictEqual(expected)
+	})
+})
+
+// joshuafolkken/kit#5295: the `ci-wait` row names the check that settled last, and when each did.
+function e2e(status: string): PrStateSnapshot {
+	return {
+		rollup: [{ name: 'e2e', status }],
+		merge_state_status: undefined,
+		review_decision: undefined,
+	}
+}
+
+describe('git_followup_stages.record_waits — the CI wait critical path', () => {
+	it('carries the last check to settle and each check time on the ci-wait row', async () => {
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
+		const log = git_followup_stages.new_log()
+
+		git_followup_stages.hold_issue(log, '42')
+		followup_ci_path.observe(log.ci_path, e2e('pending'), 0)
+		followup_ci_path.observe(log.ci_path, e2e('pass'), FIRST_LAP_MS)
+		git_followup_stages.lap(log, STAGE.checks_wait)
+		await git_followup_stages.record_waits(log)
+
+		expect(record.mock.calls[0]?.[0]).toMatchObject({
+			stage: lane_ledger_write.CI_WAIT_STAGE,
+			issue: 42,
+			last_check: 'e2e',
+			check_ms: { e2e: FIRST_LAP_MS },
+		})
+	})
+})
+
+describe('git_followup_stages.hold_issue', () => {
+	it.each([undefined, '', 'abc', '0'])('holds no issue for %j', (issue_number) => {
+		const log = git_followup_stages.new_log()
+
+		git_followup_stages.hold_issue(log, issue_number)
+
+		expect(log.issue).toBeUndefined()
 	})
 })

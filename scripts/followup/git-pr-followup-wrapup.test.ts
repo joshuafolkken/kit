@@ -15,7 +15,7 @@ import {
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_get_body: vi.fn(),
+		issue_view_json: vi.fn(),
 		issue_edit_body: vi.fn(),
 		issue_comment: vi.fn(),
 		pr_comment: vi.fn(),
@@ -59,9 +59,10 @@ const BASE_INPUT: WrapupInput = {
 	managed_notes: [],
 	checked: CHECKED,
 	wait_for_green: vi.fn(),
+	send_completion: vi.fn().mockResolvedValue(undefined),
 }
 
-const mocked_get_body = vi.mocked(git_gh_command.issue_get_body)
+const mocked_get_body = vi.mocked(git_gh_command.issue_view_json)
 const mocked_edit_body = vi.mocked(git_gh_command.issue_edit_body)
 const mocked_comment = vi.mocked(git_gh_command.issue_comment)
 const mocked_close_epics = vi.mocked(epic_close.close_completed_epics)
@@ -87,7 +88,7 @@ function warned_text(): string {
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-	mocked_get_body.mockResolvedValue('existing content')
+	mocked_get_body.mockResolvedValue('{"body":"existing content"}')
 	mocked_comment.mockResolvedValue('')
 	mocked_close_epics.mockResolvedValue()
 	mocked_strip_label.mockResolvedValue()
@@ -149,7 +150,7 @@ describe('post_notify_issue — blank body uses edit, non-blank uses comment', (
 	const NOTIFY_BODY = 'Completion notification'
 
 	it('calls issue_edit_body when issue body is blank', async () => {
-		mocked_get_body.mockResolvedValue('')
+		mocked_get_body.mockResolvedValue('{"body":"","author_association":"OWNER"}')
 		mocked_edit_body.mockResolvedValue('')
 
 		await post_notify_issue({ issue_number: ISSUE_NUMBER, body: NOTIFY_BODY })

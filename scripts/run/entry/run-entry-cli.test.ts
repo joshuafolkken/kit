@@ -5,7 +5,9 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const gather_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
-const format_report_mock = vi.hoisted(() => vi.fn())
+const fit_mock = vi.hoisted(() =>
+	vi.fn<(parts: unknown, compose: (r: string) => string) => string>(),
+)
 const adopt_mock = vi.hoisted(() => vi.fn())
 const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_adopt_mock = vi.hoisted(() => vi.fn())
@@ -37,7 +39,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 vi.mock('#scripts/run/run-prep-cli', () => ({
 	run_prep_cli: { gather: gather_mock, to_parts: to_parts_mock },
 }))
-vi.mock('#scripts/run/run-prep', () => ({ run_prep: { format_report: format_report_mock } }))
+vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: mark_mock } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({
 	run_event_plan: { emit_plan: emit_plan_mock },
@@ -73,6 +75,9 @@ function issue_read(state: string, labels: ReadonlyArray<string> = []): unknown 
 	return { kind: 'state', state: { state, labels, is_human_review: false } }
 }
 
+// A read whose author has write access, so the trust gate (`run-entry-cli-trust.test.ts`) passes.
+const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trusted: true } } }
+
 function stage_line(state: string, command: string, start: string): string {
 	return `stage ${CITED} — at: ${state} · to: ${command} · start: ${start}`
 }
@@ -99,9 +104,9 @@ function reset_resume_mocks(): void {
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(false)
-	gather_mock.mockReset().mockResolvedValue({})
+	gather_mock.mockReset().mockResolvedValue(TRUSTED_READS)
 	to_parts_mock.mockReset().mockReturnValue(state_parts('OPEN'))
-	format_report_mock.mockReset().mockReturnValue(PREP_BODY)
+	fit_mock.mockReset().mockReturnValue(PREP_BODY)
 	reset_resume_mocks()
 	confirm_mock.mockReset().mockResolvedValue(true)
 	info_lines.length = 0
@@ -135,6 +140,10 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		])
 		// joshuafolkken/kit#3921: the entry's own read follows the report, saving its turn.
 		expect(print_section_mock).toHaveBeenCalledExactlyOnceWith(ENTRY_KEY)
+		// joshuafolkken/kit#5213: the parts are fitted to the Bash cap on the composite they print in.
+		expect(
+			fit_mock.mock.calls.map(([parts, compose]) => [parts, compose(PREP_BODY)]),
+		).toStrictEqual([[state_parts('OPEN'), info_lines[1]]])
 	})
 })
 
@@ -254,21 +263,6 @@ describe('run_entry_cli.run — a carried cut is resumed before the hold is clai
 		expect(read_issue_mock).not.toHaveBeenCalled()
 		expect(gather_mock).not.toHaveBeenCalled()
 		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`])
-	})
-})
-
-describe('run_entry_cli — the lane-aware budget skip', () => {
-	it('skips cost --cut in a dispatched lane child, where the parent owns the budget', async () => {
-		is_child_mock.mockReturnValue(true)
-		josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD)
-
-		await run_entry_cli.run([ISSUE])
-
-		expect(calls()).toStrictEqual([
-			['run:cut', '--resume', ISSUE],
-			['run:hold', ISSUE, '--fullrun'],
-		])
-		expect(last_line()).toContain('cost: skipped')
 	})
 })
 

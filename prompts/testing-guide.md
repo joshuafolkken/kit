@@ -10,6 +10,7 @@ Every requirement gets a test (`CLAUDE.md` → "Code Change Rules" Step 0); the 
 - Logic/utility change (pure functions, filters, transforms) → a unit test. Bug fix → a regression test; refactor → tests pinning the existing behavior BEFORE the change (`prompts/refactoring.md`).
 - **Non-runtime updates (pre-approved manual-only exception):** a change touching no executable runtime code path — docs, non-executable config, editor/IDE files, cosmetic asset swaps with no selector/path change — may be verified by hand; declare it in Step 0 with the reason. The mechanically exempt (`*.md`, `.editorconfig`, `.idea/**`, `.vscode/**`, `prompts/**`) need no declaration. A runtime change whose test is infeasible needs the reason and user approval.
 - **basic で kit がテストできない言語だけの変更:** `package.json` に `josh.profile: basic`（改名前の `static` も同じ）があり、変更が HTML/CSS や Lua などのソースだけなら自動テストは不要。HTML/CSS はブラウザーで対象ページを開き、想定する画面幅でレイアウト・リンク・HTML 内の操作を確認する。そのほかのソースは変更した処理を実際に動かす。どちらも結果を記録する。JavaScript または TypeScript のファイルを含む変更は自動テストを行う。
+- **A runtime change with no test is refused at the commit** — `pnpm josh git -y` refuses it while `pnpm josh test:declared` answers `required` (the `test-declared` row of `pnpm josh rule:list`).
 - Test infeasible (e.g., a native OS date-picker Playwright cannot drive) → comment why in the test file and test the closest observable behavior (e.g., the editor stays open after `change`).
 
 ### Verification checklist (add to the completion gate)

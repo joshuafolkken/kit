@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { MovedParts } from '#scripts/gate/moved-paths'
 import { since_green } from '#scripts/gate/since-green'
 import { changed_paths } from '#scripts/git/changed-paths'
@@ -7,8 +7,10 @@ import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_read_map } from './test-read-map'
+import { test_read_trace } from './test-read-trace'
 import { test_related } from './test-related'
 import { test_related_record } from './test-related-record'
+import { test_related_synced } from './test-related-synced'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#4393: a ship retry re-ran every test the whole branch diff reaches. A bare run now
@@ -22,6 +24,7 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_held_at: vi.fn(),
 	},
 }))
+vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -29,8 +32,13 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
+// The reason is the real one, since the unmoved case below asserts the line it prints.
 vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(), read_moved_parts: vi.fn() },
+	since_green: {
+		UNMOVED_REASON: 'nothing moved since its last green run on this checkout',
+		describe: vi.fn(),
+		read_moved_parts: vi.fn(),
+	},
 }))
 
 const mocked_moved = vi.mocked(since_green.read_moved_parts)
@@ -47,6 +55,8 @@ const NAMING_SOURCE = path.join('scripts', 'test', 'test-related-main.ts')
 const SCOPE_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.test.ts')
 const NARROWING_LINE = 'since its last green run'
 const MAP_TREE = 'f00dcafe'
+const READER = path.join('scripts', 'review', 'review-tree.ts')
+const APPROVALS = path.join('.josh', 'metrics-accepted')
 const PRUNED_TREE = new Error('bad object')
 const NOT_A_REPOSITORY = new Error('not a git repository')
 
@@ -57,6 +67,7 @@ function map_with(
 		version: test_read_map.MAP_VERSION,
 		commit: MAP_TREE,
 		dirty: {},
+		change: [],
 		directories: [],
 		readers,
 	}
@@ -104,7 +115,7 @@ describe('test_related.run_related_tests — since the last green run', () => {
 
 		expect(mocked_moved).toHaveBeenCalledWith(
 			review_stamps.test_related_stamp,
-			gate_plan.UNIT_LABEL,
+			gate_labels.UNIT_LABEL,
 		)
 	})
 
@@ -197,6 +208,7 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 	it('runs the map readers of a moved non-code file and the source changed since the map', async () => {
 		vi.mocked(test_read_map.read_map).mockReturnValue(map_with({ [document]: [document_reader] }))
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([document_source, document])
+		mocked_changed.mockResolvedValue([document])
 		mocked_moved.mockResolvedValue(changed_only(document))
 
 		await test_related.run_related_tests([])
@@ -231,10 +243,21 @@ describe('test_related.run_related_tests — a moved file read through a newer s
 	})
 })
 
-// joshuafolkken/kit#4532: a test the map holds no entry for may reach a moved file through a helper.
+// joshuafolkken/kit#4896: a test changed since the map is main's or another lane's, which CI verified.
 describe('test_related.run_related_tests — a test changed since the map', () => {
-	it('runs it though it names no moved file', async () => {
+	it('leaves it out when it names no moved file', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([UNTOUCHED_SOURCE, SCOPE_TEST])
+		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', absolute(FIXED_SOURCE), '--run'])
+	})
+
+	// joshuafolkken/kit#4393: the branch's own test runs again on every bare run after a green one.
+	it('runs it though it names no moved file when the branch changed it', async () => {
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([SCOPE_TEST])
+		mocked_changed.mockResolvedValue([FIXED_SOURCE, SCOPE_TEST])
 		mocked_moved.mockResolvedValue(changed_only(FIXED_SOURCE))
 
 		await test_related.run_related_tests([])
@@ -251,7 +274,8 @@ describe('test_related.run_related_tests — a test changed since the map', () =
 // joshuafolkken/kit#4572: a sync brought in `.josh/metrics-accepted/<N>.json`, which no recorded test
 // read, and the run went to the whole suite as if this branch had added it.
 describe('test_related.run_related_tests — a non-code file a main sync brought in', () => {
-	const accepted = path.join('.josh', 'metrics-accepted', '4527.json')
+	const accepted = path.join(APPROVALS, '4527.json')
+	const other_accepted = path.join(APPROVALS, '4516.json')
 
 	it('runs no test for it rather than the whole suite', async () => {
 		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
@@ -262,22 +286,94 @@ describe('test_related.run_related_tests — a non-code file a main sync brought
 		expect(mocked_run).not.toHaveBeenCalled()
 	})
 
-	it('still runs the whole suite when this branch changed it too', async () => {
-		mocked_changed.mockResolvedValue([accepted])
-		mocked_moved.mockResolvedValue({ changed: [accepted], synced: [accepted] })
+	// joshuafolkken/kit#5001: a run record reaches only a test that read it by name, not one beside it.
+	it.each([
+		['this branch changed it too', [accepted]],
+		['the branch change cannot be read', []],
+	])('runs no test when %s and a test read beside it', async (_case, changed) => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with({ [other_accepted]: [READER] }))
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
+		if (changed.length === 0) mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
+		else mocked_changed.mockResolvedValue(changed)
+		mocked_moved.mockResolvedValue({ changed, synced: [accepted] })
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual(['run'])
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4597: a lane child writes `.josh/metrics-accepted/<N>.json` on its own branch, into a
+// directory the release pruned from the map's tree, and the run went to the whole suite.
+describe('test_related.run_related_tests — a metrics approval file this branch added', () => {
+	const accepted = path.join(APPROVALS, '4597.json')
+	const metrics_reader = path.join('tools', 'metrics', 'metrics-base.ts')
+
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([accepted])
+		mocked_moved.mockResolvedValue(changed_only(accepted))
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([accepted])
 	})
 
-	it('still runs the whole suite when the branch change cannot be read', async () => {
-		mocked_changed.mockRejectedValue(NOT_A_REPOSITORY)
-		mocked_moved.mockResolvedValue({ changed: [], synced: [accepted] })
+	// joshuafolkken/kit#5001: a listing of the directory reads the checkout around it, not the record.
+	it.each([
+		['no recorded test read inside its directory', {}],
+		[
+			'a module only lists the directory',
+			{ [test_read_trace.read_key(APPROVALS, 'listing')]: [metrics_reader] },
+		],
+	])('runs no test for it when %s', async (_case, readers) => {
+		vi.spyOn(test_read_map, 'read_map').mockReturnValue(map_with(readers))
 
 		await test_related.run_related_tests([])
 
-		expect(vitest_arguments()).toEqual(['run'])
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4912: a sync brought in ~430 files, and every test importing a synced module ran
+// again, though main's CI had run them against it.
+function split_into(left: Array<string>, shared: Array<string>): void {
+	vi.spyOn(test_related_synced, 'split').mockResolvedValue({ left, shared, meeting: [] })
+}
+
+describe('test_related.run_related_tests — a code module a main sync brought in', () => {
+	beforeEach(() => {
+		mocked_changed.mockResolvedValue([FIXED_SOURCE, BRANCH_TEST])
+		mocked_moved.mockResolvedValue({ changed: [FIXED_SOURCE], synced: [UNTOUCHED_SOURCE] })
+	})
+
+	// joshuafolkken/kit#5066: the import graph's shared tests were handed on too, 612 of them for a change
+	// `vitest related` walks to 126.
+	it('hands vitest the branch change alone in place of the module, never the shared tests', async () => {
+		split_into([UNTOUCHED_SOURCE], [SCOPE_TEST])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual([
+			'related',
+			absolute(FIXED_SOURCE),
+			absolute(BRANCH_TEST),
+			'--run',
+		])
+	})
+
+	it('runs no test rather than the whole suite when only a module it leaves out moved', async () => {
+		mocked_moved.mockResolvedValue({ changed: [], synced: [UNTOUCHED_SOURCE] })
+		vi.mocked(changed_paths.read_changed_since).mockResolvedValue([])
+		split_into([UNTOUCHED_SOURCE], [])
+
+		await test_related.run_related_tests([])
+
+		expect(mocked_run).not.toHaveBeenCalled()
+	})
+
+	it('still hands vitest the module where the split leaves nothing out', async () => {
+		split_into([], [])
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toContain(absolute(UNTOUCHED_SOURCE))
 	})
 })
 

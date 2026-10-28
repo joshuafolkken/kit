@@ -1,4 +1,4 @@
-import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_brief } from '#scripts/review/review-brief'
 import { review_stamps } from '#scripts/review/review-stamps'
 
@@ -64,11 +64,15 @@ const FORCE_FLAG = '--force'
 // rewritten by the hook's own install each cost minutes before anyone could tell them apart.
 type GateReuse = { stamp: FileMapStamp } | { miss: string }
 
+const NO_BASE = 'the merge base could not be read'
+const NO_CHANGE = 'no file differs from the merge base'
+
 // The fingerprint of every declared check's tools and environment (`verification-inputs.ts`).
 const INPUTS_MOVED = 'a checked tool or environment variable changed since the green gate'
+const BASE_MOVED = 'the merge base moved since the green gate'
 
 function base_moved(recorded: string | undefined, base: string): string {
-	return `the merge base moved since the green gate (${recorded ?? 'none'} → ${base})`
+	return `${BASE_MOVED} (${recorded ?? 'none'} → ${base})`
 }
 
 function stamp_miss(stamp: FileMapStamp, base: string): string | undefined {
@@ -77,21 +81,55 @@ function stamp_miss(stamp: FileMapStamp, base: string): string | undefined {
 	return review_stamps.gate_stamp.describes_inputs(stamp) ? undefined : INPUTS_MOVED
 }
 
+const NO_MATCHING_RECORD = 'no green gate record matches the changed files'
+
+// joshuafolkken/kit#5214: a record that exists but covers other files is told apart from no record
+// at all, with the sizes of the two maps, so a log shows how far the tree had moved past it.
+function record_miss(recorded: FileMapStamp | undefined, tree: Record<string, string>): string {
+	if (recorded === undefined) return NO_MATCHING_RECORD
+
+	const changed = String(Object.keys(tree).length)
+	const covered = String(Object.keys(recorded.files).length)
+	const differing = String(file_map_stamp.changed_since(recorded, tree).length)
+
+	return `${NO_MATCHING_RECORD} (${changed} changed, record covers ${covered}, ${differing} differ)`
+}
+
 function gate_reuse(
 	tree: Record<string, string>,
 	base: string | undefined,
 	source?: string,
 ): GateReuse {
-	if (base === undefined) return { miss: 'the merge base could not be read' }
-	if (Object.keys(tree).length === 0) return { miss: 'no file differs from the merge base' }
+	if (base === undefined) return { miss: NO_BASE }
+	if (Object.keys(tree).length === 0) return { miss: NO_CHANGE }
 
-	const stamp = review_brief.matching_stamp(review_stamps.gate_stamp.read(source), tree)
+	const recorded = review_stamps.gate_stamp.read(source)
+	const stamp = review_brief.matching_stamp(recorded, tree)
 
-	if (stamp === undefined) return { miss: 'no green gate record matches the changed files' }
+	if (stamp === undefined) return { miss: record_miss(recorded, tree) }
 
 	const miss = stamp_miss(stamp, base)
 
 	return miss === undefined ? { stamp } : { miss }
+}
+
+// joshuafolkken/kit#5234: the kind of a miss, read off the sentence `gate_reuse` wrote, so a ledger
+// counts the reasons without a second wording of them. A record that covers other files is checked
+// before no record at all, since its sentence starts with the other's. A miss no prefix names is
+// `other`; a hook's own refusals are told apart first, by `hook_gate_reuse.miss_kind`.
+const MISS_KINDS: ReadonlyArray<readonly [string, string]> = [
+	[NO_BASE, 'no-base'],
+	[NO_CHANGE, 'no-change'],
+	[`${NO_MATCHING_RECORD} (`, 'record-differs'],
+	[NO_MATCHING_RECORD, 'no-record'],
+	[BASE_MOVED, 'base-moved'],
+	[INPUTS_MOVED, 'inputs-moved'],
+]
+
+const OTHER_MISS = 'other'
+
+function miss_kind(miss: string): string {
+	return MISS_KINDS.find(([prefix]) => miss.startsWith(prefix))?.[1] ?? OTHER_MISS
 }
 
 function stamp_of(reuse: GateReuse): FileMapStamp | undefined {
@@ -153,6 +191,7 @@ const gate_skip = {
 	format_reuse_notice,
 	format_skip,
 	gate_reuse,
+	miss_kind,
 	reusable_green_gate,
 	stamp_of,
 }

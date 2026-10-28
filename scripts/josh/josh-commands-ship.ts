@@ -36,7 +36,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: [OUTPUT],
-					description: 'the transcript the outage split reads; absent, it is off.',
+					description:
+						'the transcript the outage and usage-limit splits read; absent, they are off.',
 				},
 				{
 					names: ['--driver'],
@@ -49,16 +50,43 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:review': {
 		script: 'scripts/run/review/run-review-cli.ts',
 		description:
-			'Start the gate in the background and print the /code-review brief in one call so the two overlap (--join to join the gate and check its verdict)',
+			'Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change)',
 		category: 'AI tools',
-		reference: ['[--join]', 'automation', ['processes', 'files']],
+		reference: [
+			'[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push',
+			'automation',
+			['processes', 'files', 'git', 'network'],
+		],
 		usage: {
 			examples: [
 				{
 					arguments: '',
-					note: 'detach the gate, print the brief; then launch the /code-review subagent',
+					note: 'detach test:pinned and the gate, write the brief (the interaction brief after it where due) to a file and print its path, then launch a reviewer per brief',
 				},
-				{ arguments: '--join', note: 'after the review returns: join the gate, check its verdict' },
+				{
+					arguments: '--code-only',
+					note: "josh ship's own open: code's brief alone, since the ship opens the interaction brief itself",
+				},
+				{
+					arguments: '--unpinned-ok "only logs"',
+					note: 'check beside the pair as ever; the join prints the list and the reason and carries on past unpinned places',
+				},
+				{
+					arguments: '--join',
+					note: 'after the review returns: join the gate and test:pinned; exit 3 on an unpinned change',
+				},
+				{
+					arguments: '--join --fixing',
+					note: 'the join when round 1 has fixes to make: no grace on test:pinned, left running; prints the unpinned places the cache already holds',
+				},
+				{
+					arguments: '--pinned',
+					note: "read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once",
+				},
+				{
+					arguments: '--push',
+					note: 'launched by a lane open: push and open the PR at a green gate',
+				},
 			],
 		},
 	},
@@ -91,7 +119,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step',
 		category: 'AI tools',
 		reference: [
-			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
+			'"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>',
 			'automation',
 			['git', 'network'],
 		],
@@ -112,12 +140,32 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--review'],
 					description:
-						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.',
+						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.',
+				},
+				{
+					names: ['--unpinned-ok <reason>'],
+					description:
+						"forwarded to round 1's `run:review`, past `unpinned` places no test can pin.",
 				},
 				{
 					names: ['--detach'],
 					description:
-						'hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell and guard tests run before the hand-off, the checks even after a preflight refusal, so one stop reports every failure; a stop returns to the same session.',
+						'hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.',
+				},
+			],
+		},
+	},
+	'ship:wait': {
+		script: 'scripts/run/ship/run-ship-wait-cli.ts',
+		description:
+			'Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending)',
+		category: 'AI tools',
+		reference: ['<N>', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '<N>',
+					note: 're-issue it on `pending` while `cost --cut` is `under`; `returned` prints the stop to fix',
 				},
 			],
 		},

@@ -25,6 +25,17 @@ describe('core_weights — the declared cost of each heavy tool', () => {
 		}
 	})
 
+	// joshuafolkken/kit#4595: metrics runs only an untyped `max-lines` eslint pass, so even with its
+	// merge-base child it holds less than the typed whole-tree eslint scan.
+	it('sizes the metrics memory below the whole-tree eslint scan peak', () => {
+		expect(core_weights.MEMORY_MB.metrics).toBeLessThan(core_weights.MEMORY_MB.eslint_scan)
+	})
+
+	// joshuafolkken/kit#5140: the gate ledger's cspell runs kept a median of 0.91 cores busy.
+	it('weighs the spell check at one core', () => {
+		expect(core_weights.CORE_WEIGHTS.spell_check).toBe(1)
+	})
+
 	it.each(['lint', 'eslint_scan'] as const)(
 		'never weighs the %s eslint run below the cores it was measured at',
 		(tool) => {

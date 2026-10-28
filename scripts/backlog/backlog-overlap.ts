@@ -17,11 +17,16 @@ import { lane_state, type LaneRecords } from '#scripts/lane/lane-state'
 const CODE_SPAN = /`([^`\s]+)`/gu
 const LINE_SUFFIX = /:\d+(?:[-:]\d+)?$/u
 const FILE_EXTENSION = /\.[a-z]\w*$/iu
-const ROOT_FILE_EXTENSION = /\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt)$/u
+// `properties`: `sonar-project.properties`, which joshuafolkken/kit#5083 and its holder both named
+// and neither declared (joshuafolkken/kit#5107).
+const ROOT_FILE_EXTENSION =
+	/\.(?:[cm]?[jt]sx?|svelte|jsonc?|md|ya?ml|css|html|sh|toml|txt|properties)$/u
 const GLOB = '*'
 const ISSUE_MARK = '#'
 const SEPARATOR = '/'
 const MIN_DIRECTORY_DEPTH = 2
+const DOCS_DIRECTORY = 'docs/'
+const MARKDOWN = '.md'
 
 // The paths each issue declares, by issue number. A directory ends in `/`; anything else is a file.
 type Declared = ReadonlyMap<number, ReadonlySet<string>>
@@ -52,14 +57,18 @@ function claim_of(path: string): string | undefined {
 	return is_file(path) ? path : undefined
 }
 
-// The backticked files and directories `body` declares.
-function declared_paths(body: string): ReadonlySet<string> {
-	const tokens = [...body.matchAll(CODE_SPAN)].map((match) => match[1] ?? '')
+// The files and directories `tokens` claim — a body's code spans, or the paths a lane plans to edit.
+function path_claims(tokens: ReadonlyArray<string>): ReadonlySet<string> {
 	const paths = tokens
 		.filter((token) => !token.includes(ISSUE_MARK))
 		.map((token) => claim_of(without_glob(token.replace(LINE_SUFFIX, ''))))
 
 	return new Set(paths.filter((path) => path !== undefined))
+}
+
+// The backticked files and directories `body` declares.
+function declared_paths(body: string): ReadonlySet<string> {
+	return path_claims([...body.matchAll(CODE_SPAN)].map((match) => match[1] ?? ''))
 }
 
 function declared_of(issues: ReadonlyArray<DeclaringIssue>): Declared {
@@ -70,7 +79,17 @@ function contains(outer: string, inner: string): boolean {
 	return outer.endsWith(SEPARATOR) ? inner.startsWith(outer) : outer === inner
 }
 
+// A document under `docs/` — a Markdown file or a directory of them. Nearly every issue edits one
+// (`docs/josh-commands-run.md`), and the lane's sync with main resolves the overlap, so holding a lane
+// back for it cost a whole lane each (joshuafolkken/kit#4926). `prompts/` and `.claude/` are the rules
+// themselves and still count.
+function is_shared_document(path: string): boolean {
+	return path.startsWith(DOCS_DIRECTORY) && (path.endsWith(SEPARATOR) || path.endsWith(MARKDOWN))
+}
+
 function overlaps(left: string, right: string): boolean {
+	if (is_shared_document(left) || is_shared_document(right)) return false
+
 	return contains(left, right) || contains(right, left)
 }
 
@@ -125,12 +144,19 @@ interface Holding {
 	repo: string
 }
 
+// The path of `paths` that one of `holders` already declares — what `lane:plan` yields on.
+function path_clash(
+	paths: ReadonlySet<string>,
+	declared: Declared,
+	holders: ReadonlyArray<number>,
+): Clash | undefined {
+	return clash_of(claims_of(declared, holders), paths)
+}
+
 // The path `child` declares that one of the running `holders` already declares — the clash `separate`
 // withholds a candidate on, for a reader that names the running issues itself (`run:board`).
 function running_clash(child: EpicChild, declared: Declared, holding: Holding): Clash | undefined {
-	const claims = claims_of(declared, holding.holders)
-
-	return clash_of(claims, paths_of(child, declared, holding.repo))
+	return path_clash(paths_of(child, declared, holding.repo), declared, holding.holders)
 }
 
 // Whether `waiting` declares a path `holder` declares — the overlap `separate` withholds it on.
@@ -207,7 +233,15 @@ function separate(
 	return { offered: walk.offered, withheld, ...(notice !== undefined && { notice }) }
 }
 
-const backlog_overlap = { declared_of, declared_paths, holds, running_clash, separate }
+const backlog_overlap = {
+	declared_of,
+	declared_paths,
+	holds,
+	path_claims,
+	path_clash,
+	running_clash,
+	separate,
+}
 
 export { backlog_overlap }
 export type { Clash, Declared }

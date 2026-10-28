@@ -173,7 +173,7 @@ function tail_of(row: BoardRow, header: BoardHeader): Array<string> {
 
 	const checks = checks_of(row, header)
 
-	if (checks !== undefined) return [run_board_render_checks.checks_part(checks)]
+	if (checks !== undefined) return [run_board_render_checks.checks_part(checks, header.pull_link)]
 
 	return [activity_part(row, header)]
 }

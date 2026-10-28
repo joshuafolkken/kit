@@ -1,8 +1,10 @@
 import { extract_issue_number } from '#scripts/hooks/check-commit-message'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
+import { lane_install } from '#scripts/lane/lane-install'
 import { error_text } from '#scripts/lib/error-message'
 import { split_assess } from '#scripts/split/split-assess'
+import { split_early_notice } from '#scripts/split/split-early-notice'
 import { split_measure } from '#scripts/split/split-measure'
 import { git_command } from './git-command'
 import { main_merge_guard } from './main-merge-guard'
@@ -33,6 +35,9 @@ const FAILURE_EXIT_CODE = 1
 const COMMAND_NAME = 'main:merge'
 const SPLIT_UNMEASURED =
 	'split notice: the diff could not be measured — run `pnpm josh split:assess`'
+const LOCKFILE = 'pnpm-lock.yaml'
+const INSTALL_OWED =
+	'the merge brought in a lockfile change, but installing it failed — run `pnpm install --frozen-lockfile`'
 
 // git's default merge message carries no `#N`, so on an issue branch the `commit-msg` hook refuses
 // it and leaves the index mid-merge. The number is read with the hook's
@@ -47,7 +52,7 @@ function merge_message(default_branch: string, current_branch: string): string |
 }
 
 // What one merge of the default branch came to. `josh ship` merges it again
-// before the commit and on a conflicting pull request, and branches on the answer rather than on an
+// before the gate, before the push and on a followup failed on its checks, and branches on the answer rather than on an
 // exit code: `current` brought nothing in, so the tree is unchanged; `merged` changed it; `refused`
 // is the guard's answer, nothing attempted; `conflict` names the paths git left unmerged, so a resumed
 // session goes straight to them instead of asking git again.
@@ -65,7 +70,7 @@ interface MergeTarget {
 
 // A failure that left no unmerged path — a remote that cannot be reached, a hook that refused — is not
 // a conflict, so it is rethrown rather than reported as one with nothing to resolve. A conflict only on
-// generated files is regenerated and committed (`main-merge-regenerate.ts`), so it answers `undefined`
+// the files `main-merge-regenerate.ts` resolves is resolved and committed, so it answers `undefined`
 // and the merge reads as finished.
 async function unresolved_conflict(error: unknown): Promise<MergeOutcome | undefined> {
 	const files = main_merge_guard.unmerged_paths(await git_command.status())
@@ -89,6 +94,32 @@ async function merge_into(target: MergeTarget): Promise<MergeOutcome> {
 	return { kind: target.is_current ? 'current' : 'merged', branch: default_branch }
 }
 
+// joshuafolkken/kit#4777: a merge that brings in a lockfile change leaves `node_modules` on the old
+// one, so the next check fails on files this branch never touched. Only a finished merge installs — a
+// conflict or a refusal changed no dependency yet. A failed install does not fail the merge; it says
+// the install is still owed, with pnpm's output. A throw is caught for the same reason: the merge is
+// already committed, so `josh ship` must not read it as refused.
+async function install_failure(): Promise<string | undefined> {
+	try {
+		const result = await lane_install.install_dependencies(await git_command.repository_root())
+
+		return result.is_installed ? undefined : result.output
+	} catch (error) {
+		return error_text.message_of(error)
+	}
+}
+
+async function install_merged_lockfile(
+	outcome: MergeOutcome,
+	incoming: ReadonlyArray<string>,
+): Promise<void> {
+	if (outcome.kind !== 'merged' || !incoming.includes(LOCKFILE)) return
+
+	const failure = await install_failure()
+
+	if (failure !== undefined) console.warn(`${INSTALL_OWED}\n${failure}`)
+}
+
 // The fetch is what makes `origin/<default>` current before the merge reads it. `git pull` did the
 // two together, which is the only thing it was doing here that is worth keeping. The refusal is read
 // after the fetch, so the incoming paths are the ones the merge would bring in.
@@ -104,14 +135,22 @@ async function merge(): Promise<MergeOutcome> {
 
 	if (message !== undefined) return { kind: 'refused', message }
 
-	return await merge_into({ default_branch, current_branch, is_current: incoming.length === 0 })
+	const outcome = await merge_into({
+		default_branch,
+		current_branch,
+		is_current: incoming.length === 0,
+	})
+
+	await install_merged_lockfile(outcome, incoming)
+
+	return outcome
 }
 
 // A merge that stops on a conflict keeps git's report and adds how to finish it, so the next step is
 // the sanctioned commit rather than a request for `git add`.
 function failure_text(outcome: MergeOutcome): string | undefined {
 	if (outcome.kind === 'refused') return outcome.message
-	if (outcome.kind === 'conflict') return main_merge_guard.CONFLICT_HINT
+	if (outcome.kind === 'conflict') return main_merge_guard.conflict_hint()
 
 	return undefined
 }
@@ -121,9 +160,18 @@ function failure_text(outcome: MergeOutcome): string | undefined {
 // advisory: a finished merge never fails on it, and an unreadable diff says so rather than reading as
 // under the guide. It sits on the command, not on `merge()`, because `josh ship` merges again past the
 // point a run can act on it.
+async function measured_notice(): Promise<string | undefined> {
+	const measurement = await split_measure.read_branch()
+	const notice = split_assess.notice(measurement)
+
+	if (notice !== undefined) await split_early_notice.record(measurement)
+
+	return notice
+}
+
 async function split_notice(): Promise<string | undefined> {
 	try {
-		return split_assess.notice(await split_measure.read_branch())
+		return await measured_notice()
 	} catch (error) {
 		return `${SPLIT_UNMEASURED}: ${error_text.message_of(error)}`
 	}

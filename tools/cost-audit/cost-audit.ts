@@ -1,7 +1,9 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { guard_friction } from '#tools/retrospective/guard-friction'
+import { cost_audit_density, type Density } from './cost-audit-density'
 import type { AuditSession } from './cost-audit-read'
+import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_tool } from './cost-audit-tool'
 
 // The aggregation half of `josh cost:audit`: one period's cost broken down by session kind, tool
@@ -38,14 +40,21 @@ interface AuditRow {
 	is_regression: boolean
 }
 
+interface LaneDensity {
+	current: Density
+	previous: Density
+}
+
 interface Audit {
 	days: number
+	lane_density: LaneDensity
 	total: AuditRow
 	merges: MergeCounts | undefined
 	per_merge: AuditRow | undefined
 	kinds: ReadonlyArray<AuditRow>
 	tools: ReadonlyArray<AuditRow>
 	guards: ReadonlyArray<AuditRow>
+	rewrites: { current: Rewrites; previous: Rewrites }
 }
 
 interface AuditInput {
@@ -148,6 +157,10 @@ function per_merge(
 	return row('per merge', current.total / merges.current, previous.total / merges.previous)
 }
 
+function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWindow): Rewrites {
+	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
+}
+
 function audit(input: AuditInput): Audit {
 	const [current_window, previous_window] = windows_of(input.days, input.now_ms)
 	const current = period_cost(input.sessions, current_window)
@@ -155,12 +168,20 @@ function audit(input: AuditInput): Audit {
 
 	return {
 		days: input.days,
+		lane_density: {
+			current: cost_audit_density.density_of(inside(input.sessions, current_window)),
+			previous: cost_audit_density.density_of(inside(input.sessions, previous_window)),
+		},
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
 		kinds: rows_of(current.kinds, previous.kinds),
 		tools: rows_of(current.tools, previous.tools),
 		guards: rows_of(current.guards, previous.guards),
+		rewrites: {
+			current: rewrites_inside(input.sessions, current_window),
+			previous: rewrites_inside(input.sessions, previous_window),
+		},
 	}
 }
 
@@ -171,5 +192,5 @@ function since_ms(days: number, now_ms: number): number {
 
 const cost_audit = { DEFAULT_PERIOD_DAYS, audit, since_ms, windows_of }
 
-export type { Audit, AuditRow, AuditWindow, MergeCounts }
+export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
 export { cost_audit }

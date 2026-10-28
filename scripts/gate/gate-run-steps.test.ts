@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_cpu } from './check-cpu'
 import { core_budget } from './core-budget'
 import { free_cores } from './free-cores'
+import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
 import { UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_test_fixture } from './gate-test-fixture'
@@ -40,6 +41,27 @@ function unit_step_args(): string | undefined {
 		.find((text) => text.includes(UNIT_WORKER_FLAG))
 }
 
+// joshuafolkken/kit#4609: the pool starts the checks in the order `resolve_concurrency` counted them,
+// so a zero-weight check never queues behind one waiting for cores.
+describe('run_gate_steps — the start order', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mocked_execa.mockImplementation(gate_test_fixture.as_execa_implementation(fake_execa))
+	})
+
+	it('starts the zero-weight checks first and reports in declaration order', async () => {
+		const plan = gate_plan.plan_of(1, undefined, gate_plan.select_gate_checks(false, true))
+
+		const results = await gate_run_steps.run_gate_steps(plan, UNRESERVED_BUDGET)
+		const started = mocked_execa.mock.calls.map((call) => JSON.stringify(call[1]))
+
+		expect(started[0]).toContain('behavior')
+		// The type check is the last of the two-core checks; the one-core spell check starts before both.
+		expect(started.at(-1)).toContain('"check"')
+		expect(results.map((result) => result.label)).toEqual(plan.checks.map((check) => check.label))
+	})
+})
+
 // joshuafolkken/kit#3903: a check whose inputs did not move since its record is reused, not run.
 describe('run_gate_steps — a reused check', () => {
 	beforeEach(() => {
@@ -48,10 +70,10 @@ describe('run_gate_steps — a reused check', () => {
 	})
 
 	it('starts no process for a reused check and reports when it last passed', async () => {
-		const reused = new Map([[gate_plan.LINT_LABEL, TAKEN_AT]])
+		const reused = new Map([[gate_labels.LINT_LABEL, TAKEN_AT]])
 
 		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET, reused)
-		const lint = results.find((result) => result.label === gate_plan.LINT_LABEL)
+		const lint = results.find((result) => result.label === gate_labels.LINT_LABEL)
 
 		expect(mocked_execa).toHaveBeenCalledTimes(SERIAL_PLAN.checks.length - 1)
 		expect(lint).toMatchObject({ exit_code: 0, elapsed_ms: 0, reused_at: TAKEN_AT })
@@ -88,7 +110,7 @@ describe('run_gate_steps — a unit claim admitted narrowed', () => {
 			.map((call) => JSON.stringify(call[1]))
 			.find((text) => text.includes(UNIT_WORKER_FLAG))
 
-		expect(marks).toContainEqual([`gate ${gate_plan.UNIT_LABEL}`, true])
+		expect(marks).toContainEqual([`gate ${gate_labels.UNIT_LABEL}`, true])
 		expect(marks.filter(([, is_unit]) => is_unit === true)).toHaveLength(1)
 		expect(unit_args).toContain(`${UNIT_WORKER_FLAG}=${String(GRANTED)}`)
 	})
@@ -178,11 +200,11 @@ describe('run_gate_steps — each check CPU', () => {
 
 	it('returns the CPU each check that ran spent, and none for a reused one', async () => {
 		vi.spyOn(check_cpu, 'check_cpu_reader').mockReturnValue(() => CHECK_CPU_MS)
-		const reused = new Map([[gate_plan.LINT_LABEL, TAKEN_AT]])
+		const reused = new Map([[gate_labels.LINT_LABEL, TAKEN_AT]])
 
 		const results = await gate_run_steps.run_gate_steps(SERIAL_PLAN, UNRESERVED_BUDGET, reused)
-		const ran = results.filter((result) => result.label !== gate_plan.LINT_LABEL)
-		const lint = results.find((result) => result.label === gate_plan.LINT_LABEL)
+		const ran = results.filter((result) => result.label !== gate_labels.LINT_LABEL)
+		const lint = results.find((result) => result.label === gate_labels.LINT_LABEL)
 
 		expect(ran.map((result) => result.cpu_ms)).toStrictEqual(ran.map(() => CHECK_CPU_MS))
 		expect(lint?.cpu_ms).toBeUndefined()

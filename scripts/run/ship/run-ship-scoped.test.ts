@@ -3,13 +3,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const missing_mock = vi.hoisted(() => vi.fn<() => Array<string>>())
 const reusable_mock = vi.hoisted(() => vi.fn<() => object | undefined>())
+const rerecord_mock = vi.hoisted(() => vi.fn(async () => false))
+const settle_mock = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => undefined))
+const read_tree_mock = vi.hoisted(() =>
+	vi.fn(async (): Promise<{ files: Record<string, string>; base: string }> => ({
+		files: {},
+		base: 'base',
+	})),
+)
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('#scripts/gate/gate-tree', () => ({
-	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
-}))
+vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: read_tree_mock } }))
+vi.mock('#scripts/gate/metrics-totals', () => ({ metrics_totals: { rerecord: rerecord_mock } }))
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
 vi.mock('#scripts/gate/gate-skip', () => ({ gate_skip: { reusable_green_gate: reusable_mock } }))
+vi.mock('./run-ship-synced-scope', () => ({ run_ship_synced_scope: { settle: settle_mock } }))
 
 const { run_ship_scoped } = await import('./run-ship-scoped')
 
@@ -28,6 +36,36 @@ function commands(): ReadonlyArray<string> {
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	missing_mock.mockReset().mockReturnValue([])
+	rerecord_mock.mockClear()
+	read_tree_mock.mockClear()
+	settle_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4985: a pair stale only because a merge moved the base, over files that share
+// nothing with the branch, runs nothing and says why.
+describe('run_ship_scoped.scoped_pair — after a merge with the default branch', () => {
+	const SETTLED = 'scoped pair: lint:related and test:related not re-run — no overlap.'
+
+	it('runs neither check when the merge shares nothing with the branch', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		missing_mock.mockReturnValue([LINT, TEST])
+		settle_mock.mockResolvedValue(SETTLED)
+
+		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: OK, out: SETTLED })
+		expect(commands()).toStrictEqual([])
+		expect(write).toHaveBeenCalledWith(`${SETTLED}\n`)
+		expect(settle_mock).toHaveBeenCalledWith({ files: {}, base: 'base' }, [LINT, TEST])
+		write.mockRestore()
+	})
+
+	it('runs the stale checks when the merge meets the branch', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(commands()).toStrictEqual([LINT, TEST])
+	})
 })
 
 describe('run_ship_scoped.scoped_pair', () => {
@@ -49,6 +87,26 @@ describe('run_ship_scoped.scoped_pair', () => {
 
 		expect(await run_ship_scoped.scoped_pair()).toStrictEqual({ code: FAILED, out: 'lint red' })
 		expect(commands()).toStrictEqual([LINT])
+	})
+
+	// joshuafolkken/kit#4716: a review fix's re-grown total is re-recorded before the pair reads the tree.
+	it('asks for the re-record with the tree it read', async () => {
+		await run_ship_scoped.scoped_pair()
+
+		expect(rerecord_mock).toHaveBeenCalledWith(process.cwd(), {})
+		expect(read_tree_mock).toHaveBeenCalledOnce()
+	})
+
+	it('reads the tree again after a re-record and asks the pair about that tree', async () => {
+		const files = Object.fromEntries([['.josh/metrics-accepted/4716.json', 'new']])
+
+		rerecord_mock.mockResolvedValueOnce(true)
+		read_tree_mock.mockResolvedValueOnce({ files: {}, base: 'base' })
+		read_tree_mock.mockResolvedValueOnce({ files, base: 'base' })
+
+		await run_ship_scoped.scoped_pair()
+
+		expect(missing_mock).toHaveBeenCalledWith(files, 'base')
 	})
 })
 

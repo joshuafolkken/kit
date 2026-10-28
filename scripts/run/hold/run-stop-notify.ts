@@ -3,6 +3,7 @@ import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import { git_gh_repo } from '#scripts/gh/git-gh-repo'
 import { git_command } from '#scripts/git/git-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { shell_quote } from '#scripts/lib/shell-quote'
 import { stdout_on_stderr } from '#scripts/lib/stdout-on-stderr'
 import { telegram_test } from '#scripts/notify/telegram-test'
 import type { CliValues } from '#scripts/notify/telegram-test-logic'
@@ -22,9 +23,6 @@ const TITLE_PLACEHOLDER = '<title>'
 const PR_PLACEHOLDER = '<pr-url>'
 const HALFRUN = 'halfrun'
 const PRRUN = 'prrun'
-// Single quotes expand nothing, so a title stays one argument whatever it carries; its own `'` closes
-// the quote, emits an escaped one and reopens.
-const QUOTE = "'"
 
 interface StopFacts {
 	issue: string
@@ -38,17 +36,14 @@ interface Composed {
 	title: string | undefined
 }
 
-function single_quoted(text: string): string {
-	return QUOTE + text.replaceAll(QUOTE, String.raw`'\''`) + QUOTE
-}
-
 // Plain, not linked: every line is a command a person copies out of the Telegram.
 function reference_of(facts: StopFacts): string {
 	return issue_cite.plain(facts.issue)
 }
 
 function commit_title(facts: StopFacts): string {
-	return single_quoted(`${facts.title ?? TITLE_PLACEHOLDER} ${reference_of(facts)}`)
+	// Single quotes expand nothing, so a title stays one argument whatever it carries.
+	return shell_quote.single_quoted(`${facts.title ?? TITLE_PLACEHOLDER} ${reference_of(facts)}`)
 }
 
 function with_urls(values: CliValues, facts: StopFacts): CliValues {

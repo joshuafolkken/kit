@@ -30,6 +30,14 @@ describe('reproduction_measure.has_command_output — heading parameter', () => 
 	})
 })
 
+describe('reproduction_measure.has_command_output — template placeholder', () => {
+	it('refuses the unfilled template block, whose command is a <...> placeholder', () => {
+		const body = body_with(['- `<再現コマンド>`', '', '```', '<実際の出力>', '```'])
+
+		expect(reproduction_measure.has_command_output(body)).toBe(false)
+	})
+})
+
 describe('reproduction_measure.has_command_output', () => {
 	it('accepts a backticked command with a fenced output block', () => {
 		const body = body_with([COMMAND, '', '```', '0', '```'])

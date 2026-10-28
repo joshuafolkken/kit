@@ -1,4 +1,3 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge_token } from './run-merge-token'
 
@@ -26,14 +25,15 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 }))
 
 vi.mock('#scripts/issue/issue-closing-pr')
-vi.mock('#scripts/lane/lane-ledger')
+vi.mock('#scripts/issue/issue-merged', () => ({
+	issue_merged: { read_merge_state: vi.fn().mockResolvedValue(true) },
+}))
+vi.mock('#scripts/lane/lane-ledger-write')
 vi.mock('./run-merge-ship')
 
 vi.mock('#scripts/agent/api-outage', () => ({ api_outage: { is_outage: is_outage_mock } }))
 
-vi.mock('#scripts/run/run-ending', () => ({
-	run_ending: { ended_mid_turn: vi.fn(), read_exit: vi.fn(), read_transcript: vi.fn() },
-}))
+vi.mock('#scripts/run/run-ending')
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock, current_events: async () => [] },
@@ -116,7 +116,7 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
 		expect(do_merged_mock).toHaveBeenCalledOnce()
 		expect(info_mock).toHaveBeenCalledWith(NEXT)
-		expect(emit_mock).toHaveBeenCalledWith('merge', `#${CHILD} merged`)
+		expect(do_merged_mock).toHaveBeenCalledWith(expect.anything(), expect.any(Function))
 	})
 
 	it('leaves the next offer to the driver under --driver', async () => {
@@ -345,13 +345,13 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RETRY)
 	})
 
-	it('uses the shared threshold without a numeric argument', () => {
-		expect(run_merge_cli.parse([CHILD])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	it('asks the cut verdict without a numeric argument', () => {
+		expect(run_merge_cli.parse([CHILD])?.over).toBe(true)
 	})
 
 	it('accepts but ignores an in-flight legacy threshold', () => {
-		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
-		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(true)
+		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(true)
 	})
 
 	it('keeps legacy threshold parsing strict', () => {

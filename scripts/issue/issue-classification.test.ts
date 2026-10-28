@@ -99,6 +99,12 @@ describe('defect origin line', () => {
 	it('accepts a bug body that declares its origin', () => {
 		expect(issue_classification.problems(`${BODY}${BUG}\n${ORIGIN}\n`)).toEqual([])
 	})
+
+	it('refuses an untraced bug body with no reproduction', () => {
+		expect(issue_classification.problems(`${BODY}${BUG}\n- 原因: 不明（追えない）\n`)).toEqual([
+			defect_origin_line.MISSING_REPRODUCTION,
+		])
+	})
 })
 
 describe('fenced classification examples', () => {

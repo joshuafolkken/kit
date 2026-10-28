@@ -1,11 +1,13 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
+import { RETRY_PENDING_KEY, RETRY_PENDING_VALUE } from '#scripts/gh/git-gh-comments-unreadable'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
+import { lane_child_mark_keys } from '#scripts/lane/lane-child-mark-keys'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { PURE_FILES } from '#tools/test/pure-files'
 import { unit_projects, type UnitProject } from '#tools/test/unit-projects'
 import { VITEST_INCLUDE_GLOBS } from '#tools/test/vitest-include-globs'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const {
 	DEPENDENCY_OPTIMIZER,
@@ -19,6 +21,8 @@ const {
 	STDOUT_GUARD,
 	TELEGRAM_GUARD,
 	UNIT_PROJECTS,
+	unit_environment,
+	unit_projects_for,
 } = unit_projects
 
 function project(name: string): UnitProject['test'] {
@@ -65,6 +69,18 @@ describe('the two projects partition the suite without gaps or overlap', () => {
 		}
 	})
 
+	// joshuafolkken/kit#5105: vitest applies a command line's `--exclude` to the root config alone.
+	it('adds a command line --exclude to both projects, and nothing without one', () => {
+		const excluded = 'tools/test/heavy.test.ts'
+		const narrowed = unit_projects_for(['vitest', 'related', '--exclude', excluded, '--run'])
+
+		for (const entry of narrowed) expect(entry.test.exclude).toContain(excluded)
+
+		for (const entry of unit_projects_for(['vitest', 'run'])) {
+			expect(entry.test.exclude).not.toContain(excluded)
+		}
+	})
+
 	it('keeps the packed-consumer smoke test out of both projects', () => {
 		expect(project(PURE_PROJECT).include).not.toContain(MAIN_EXCLUDE[0])
 		expect(project(ISOLATED_PROJECT).exclude).toEqual(expect.arrayContaining([...MAIN_EXCLUDE]))
@@ -107,6 +123,42 @@ describe('each project carries the per-run environment and timeout', () => {
 	// cut-guard delivery fixture, which then stands down where the refusal is expected.
 	it.each([PURE_PROJECT, ISOLATED_PROJECT])('blanks the agent session role for %s', (name) => {
 		expect(project(name).env[agent_session_role.KEY]).toBe('')
+	})
+})
+
+// joshuafolkken/kit#5029: the supervisor's retry-pending mark reached the gate's run alone, so a test
+// green in the lane's `test:related` went red in the ship's gate.
+describe('the unit environment blanks inherited ship and lane marks without a list', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+		vi.resetModules()
+	})
+
+	it('builds the projects env from the environment the config process inherits', async () => {
+		vi.stubEnv(RETRY_PENDING_KEY, RETRY_PENDING_VALUE)
+		vi.resetModules()
+		const loaded = await import('#tools/test/unit-projects')
+
+		expect(loaded.unit_projects.ENV[RETRY_PENDING_KEY]).toBe('')
+	})
+
+	it('blanks the retry-pending mark a ship supervisor sets', () => {
+		const environment = unit_environment({ [RETRY_PENDING_KEY]: RETRY_PENDING_VALUE })
+
+		expect(environment[RETRY_PENDING_KEY]).toBe('')
+	})
+
+	it('blanks a ship mark it has no entry for, by its prefix alone', () => {
+		const environment = unit_environment({ JOSH_SHIP_FUTURE_MARK: '1', JOSH_SESSION_LANG: 'ja' })
+
+		expect(environment['JOSH_SHIP_FUTURE_MARK']).toBe('')
+		expect(Object.hasOwn(environment, 'JOSH_SESSION_LANG')).toBe(false)
+	})
+
+	it('blanks every mark a lane launcher sets on a child', () => {
+		const environment = unit_environment({})
+
+		for (const key of lane_child_mark_keys.MARK_KEYS) expect(environment[key]).toBe('')
 	})
 })
 

@@ -88,6 +88,8 @@ interface RunActivity extends Partial<SetupRead> {
 const KIND = run_event_stream.EVENT_KIND
 const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 	[KIND.MERGE]: 'merged',
+	// A drive-closed measurement completes its issue as a merge does (`issue-merged.ts` → `is_measured`).
+	[KIND.MEASURED]: 'merged',
 	[KIND.PARK]: 'parked',
 	[KIND.SPLIT]: 'done',
 	[KIND.STOP]: 'done',

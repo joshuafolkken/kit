@@ -1,5 +1,8 @@
+import { USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
+import { gate_static_group } from './gate-static-group'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 
 // joshuafolkken/kit#1226: `josh gate --no-unit` runs the three static checks, because CI now runs the
@@ -87,14 +90,59 @@ describe('josh gate --no-unit', () => {
 		await run_gate(NO_UNIT)
 
 		expect(spawned_checks()).toHaveLength(gate_plan.STATIC_CHECKS.length)
-		expect(spawned_checks().join('\n')).not.toContain(gate_plan.UNIT_TARGET)
+		expect(spawned_checks().join('\n')).not.toContain(gate_labels.UNIT_TARGET)
 	})
 
 	it('still runs all four when the flag is absent', async () => {
 		await run_gate([])
 
 		expect(spawned_checks()).toHaveLength(gate_plan.GATE_CHECKS.length)
-		expect(spawned_checks().join('\n')).toContain(gate_plan.UNIT_TARGET)
+		expect(spawned_checks().join('\n')).toContain(gate_labels.UNIT_TARGET)
+	})
+})
+
+// joshuafolkken/kit#5215: a CI matrix leg names one static group, and the group implies `--no-unit`, so
+// a leg run without that flag still makes none of the claims below.
+const LINT_GROUP: ReadonlyArray<string> = [
+	`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}${gate_labels.LINT_LABEL}`,
+]
+
+describe('josh gate --static-group', () => {
+	it('starts only the named group', async () => {
+		await run_gate(LINT_GROUP)
+
+		expect(spawned_checks()).toEqual([expect.stringMatching(/^josh lint\b/u)])
+	})
+
+	it('writes no green-gate record, as `--no-unit` does', async () => {
+		const write = vi.spyOn(review_stamps.gate_stamp, 'write')
+
+		await run_gate(LINT_GROUP)
+
+		expect(write).not.toHaveBeenCalled()
+	})
+
+	it('refuses a group the gate does not define', async () => {
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+
+		expect(await run_gate([`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}nope`])).toBe(
+			USAGE_ERROR_EXIT_CODE,
+		)
+		expect(spawned_checks()).toEqual([])
+		stderr.mockRestore()
+	})
+
+	// The accepted-here line is built from `STATIC_GROUPS`, so a group added there is offered here too.
+	it('names every group it accepts in the refusal', async () => {
+		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
+		const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
+
+		await run_gate(['--nope'])
+
+		expect(stderr.mock.calls.map((call) => String(call[0])).join('')).toContain(
+			`${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>`,
+		)
+		stderr.mockRestore()
 	})
 })
 

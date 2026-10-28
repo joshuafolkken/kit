@@ -30,11 +30,13 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
 // Never `missing`, so these cases run no interaction review — its own are in
 // `run-ship-review-interaction.test.ts` (joshuafolkken/kit#4276).
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: async () => undefined },
-}))
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_round_two: record_round_two_mock },
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: async () => undefined } }
+})
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_round_one: vi.fn(), record_round_two: record_round_two_mock },
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
@@ -46,12 +48,13 @@ const { review_round2 } = await import('#scripts/review/review-round2')
 
 const OK = 0
 const FAILED = 1
+const MOVED = 2
 // A round with nothing to review passes, and says it ran no review so the ship does not time it.
 const SKIPPED = { code: OK, is_skipped: true }
 const ISSUE = '2427'
 const BRIEF = 'medium\nbrief body'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const JOIN = 'run:review --join'
 const ATTEST = 'review:attest --check'
 const RECORD = `review:record --issue ${ISSUE}`
@@ -59,34 +62,34 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const MEDIUM_UNFIXED = 'tests:medium:b.ts'
 const LOW = 'tests:low:a.ts'
-const DECIDE = 'review:round2 --round-1-closed --json'
+const DECIDE = `review:round2 --record ${ISSUE} --json`
 const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
-const COMPLETED = { kind: 'completed', pid: 1 } as const
 const SPAWN_NOTE = 'spawn failed'
 const PROFILE_NOTE = 'bad model'
+const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 
 function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
 }
 
-function answer_with(failing: string | undefined): void {
+function answer_with(failing: string | undefined, failed_code = FAILED): void {
 	josh_run_mock.mockImplementation(async (argv: ReadonlyArray<string>) => {
 		const command = argv.join(' ')
 
-		return { code: command === failing ? FAILED : OK, out: command === OPEN ? BRIEF : '' }
+		return { code: command === failing ? failed_code : OK, out: command === OPEN ? BRIEF : '' }
 	})
 }
 
-async function stage(is_stale = false): Promise<unknown> {
-	return await run_ship_review_steps.review_stage(ISSUE, is_stale)
+async function stage(): Promise<unknown> {
+	return await run_ship_review_steps.review_stage(ISSUE, false)
 }
 
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	answer_with(undefined)
-	launch.mockReset().mockResolvedValue({ ...COMPLETED, exit_code: OK })
+	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
 	review_in_mock.mockReset().mockReturnValue({
 		kind: 'argv',
 		argv: ARGV,
@@ -100,28 +103,7 @@ beforeEach(() => {
 	record_round_two_mock.mockClear()
 })
 
-// joshuafolkken/kit#2964: a ship relaunched with `--review` after a round-1 stop leaves the fix delta
-// to round 2 rather than reviewing the whole change again as round 1.
-describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
-	// joshuafolkken/kit#3643: a round that ran no review says so, so the ship does not time it as one.
-	it('skips the review when the issue already has a recorded round', async () => {
-		record_check_mock.mockResolvedValueOnce({ status: 'ok' })
-
-		expect(await run_ship_review_steps.review_stage(ISSUE)).toMatchObject(SKIPPED)
-		expect(record_check_mock).toHaveBeenCalledWith(Number(ISSUE))
-		expect(commands()).toStrictEqual([])
-		expect(launch).not.toHaveBeenCalled()
-	})
-
-	// joshuafolkken/kit#4221: an `ok` record is no skip once the review is stale — it read the issue
-	// before its update — so that case runs stale.
-	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
-		record_check_mock.mockResolvedValueOnce({ status })
-
-		expect(await stage(status === 'ok')).toHaveProperty('code', OK)
-		expect(commands()).toContain(OPEN)
-	})
-})
+// The recorded-round cases are in `run-ship-review-steps-reuse.test.ts` (joshuafolkken/kit#4620).
 
 describe('run_ship_review_steps.review_stage — the clean path', () => {
 	it('opens, reviews, joins, attests and records a clean round without stopping', async () => {
@@ -131,6 +113,12 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 		expect(launch.mock.calls[0]?.[0]).toMatchObject({ argv: ARGV })
 	})
 
+	it('hands --unpinned-ok and its reason to the round-1 review it opens', async () => {
+		await run_ship_review_steps.review_stage(ISSUE, false, ['--unpinned-ok', 'dead code'])
+
+		expect(commands()[0]).toBe(`${OPEN} --unpinned-ok dead code`)
+	})
+
 	it('records Low findings and ships on', async () => {
 		stamps.read_stamp_text.mockReturnValue(`${LOW}\n`)
 
@@ -138,7 +126,7 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 		expect(commands()).toContain(`${RECORD} ${LOW}`)
 	})
 
-	it('launches under the round-1 reviewer, handed the brief and findings paths', async () => {
+	it('launches under the round-1 reviewer, handed the brief path and the submit command', async () => {
 		const stderr = vi.spyOn(process.stderr, 'write').mockReturnValue(true)
 
 		await run_ship_review_steps.review_stage(ISSUE)
@@ -151,7 +139,8 @@ describe('run_ship_review_steps.review_stage — the clean path', () => {
 
 		expect(round).toBe(1)
 		expect(prompt).toContain('josh-ship-review-brief-')
-		expect(prompt).toContain('josh-ship-review-findings-')
+		expect(prompt).toContain(run_ship_review.submit_command('code'))
+		expect(prompt).not.toContain(FINDINGS_PREFIX)
 	})
 })
 
@@ -185,11 +174,15 @@ describe('run_ship_review_steps.review_stage — a finding or a refusal stops it
 		expect(launch).not.toHaveBeenCalled()
 	})
 
-	it('stops on an unfinished review (no findings file) without recording', async () => {
+	// joshuafolkken/kit#4774: the stop names the path, ahead of a join that would read `Gate RED`.
+	it('stops on an unfinished review (no findings file) at the reviewer, naming its path', async () => {
 		stamps.read_stamp_text.mockReturnValue(undefined)
 
-		expect(await stage()).toHaveProperty('cause', 'infra')
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST])
+		const stopped = await stage()
+
+		expect(stopped).toHaveProperty('cause', 'infra')
+		expect(stopped).toHaveProperty('out', expect.stringContaining(FINDINGS_PREFIX))
+		expect(commands()).toStrictEqual([OPEN])
 	})
 })
 
@@ -218,7 +211,24 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		answer_with(JOIN)
 
 		expect(await stage()).toHaveProperty('code', OK)
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${FIXED_MEDIUM}`])
+	})
+
+	// joshuafolkken/kit#4774: the join's own code says the tree moved after a green gate.
+	it('ships on past a join whose gate passed before the tree moved, whatever the findings say', async () => {
+		answer_with(JOIN, MOVED)
+
+		expect(await stage()).toHaveProperty('code', OK)
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, RECORD])
+	})
+
+	// joshuafolkken/kit#4770: the background `test:pinned` answers at the join; a fix moved the tree,
+	// not that answer.
+	it('stops at a join that found an unpinned change, even past a reviewer fix', async () => {
+		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
+		answer_with(JOIN, 3)
+
+		expect(await stage()).toMatchObject({ cause: 'check', code: 3 })
 	})
 
 	it('still stops at a red join when nothing was fixed', async () => {
@@ -275,7 +285,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
 
 		expect(await stage()).toHaveProperty('code', OK)
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${MEDIUM}`])
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${FIXED_MEDIUM}`])
 	})
 
 	it('records a fix the pair turned down as unfixed, then stops', async () => {

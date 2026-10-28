@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import type { Durations } from '#tools/test/duration-shard'
+import { unit_durations, type Durations } from '#scripts/test/unit-durations'
 import { test_module_elapsed, type TimedModule } from '#tools/test/test-module-elapsed'
 import type { Reporter, TestModule } from 'vitest/node'
 
@@ -8,8 +8,9 @@ import type { Reporter, TestModule } from 'vitest/node'
 // reporter that refreshes them. **Recording is opt-in** — `JOSH_UNIT_DURATIONS=record pnpm josh
 // test:unit` — so an ordinary run never rewrites a tracked file. A run merges what it measured into
 // the record and drops the files that no longer exist, so a filtered run refreshes its own files only.
+// Reading the record is `scripts/test/unit-durations.ts`, which the published package carries.
 
-const RECORD_FILE = 'tools/test/unit-durations.json'
+const { RECORD_FILE, read } = unit_durations
 const RECORD_FLAG = 'JOSH_UNIT_DURATIONS'
 const RECORD_VALUE = 'record'
 const INDENT = '\t'
@@ -17,27 +18,6 @@ const INDENT = '\t'
 // Repository-relative and `/`-separated, the one key the record and the sequencer both use.
 function relative_file(root: string, module_id: string): string {
 	return path.relative(root, module_id).split(path.sep).join(path.posix.sep)
-}
-
-function parse(text: string): Durations {
-	const parsed: unknown = JSON.parse(text)
-
-	if (typeof parsed !== 'object' || parsed === null) return {}
-
-	return Object.fromEntries(
-		Object.entries(parsed).filter(
-			(entry): entry is [string, number] => typeof entry[1] === 'number',
-		),
-	)
-}
-
-// A missing or unreadable record is an empty one: every file then weighs the same fallback.
-function read(root: string): Durations {
-	try {
-		return parse(readFileSync(path.join(root, RECORD_FILE), 'utf8'))
-	} catch {
-		return {}
-	}
 }
 
 function merge(
@@ -94,7 +74,6 @@ const unit_duration_record = {
 	RECORD_VALUE,
 	measured_of,
 	merge,
-	parse,
 	read,
 	relative_file,
 	reporters,

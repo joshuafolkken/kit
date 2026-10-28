@@ -1,0 +1,81 @@
+import path from 'node:path'
+import { direct_importers, type SourceReader } from './direct-importers'
+import type { RelatedScope } from './test-related-scope'
+import { unit_durations, type Durations } from './unit-durations'
+import { vitest_cli_excludes } from './vitest-cli-excludes'
+
+// **A scoped run leaves out the heavy test files a change reaches only indirectly**
+// (joshuafolkken/kit#5105). A hub module's change reaches the integration tests importing it through
+// the shared harnesses, and a scoped run's wall clock is bounded below by its longest file — over
+// `HEAVY_TEST_MS` each — whatever else it narrows. A heavy file still runs when this change moved it,
+// the module it is named for, or a file it imports directly, so the test written for a module is never
+// left out with it, even when it reaches that module through a harness.
+//
+// "Heavy" is read off the CI shards' duration record (`unit-durations.json`), never a named list, so
+// a file that slows down or speeds up moves in or out on the record's next refresh. The whole-suite
+// fallback and every CI shard carry no exclusion, so a heavy file left out here still runs before the
+// merge.
+
+const HEAVY_TEST_MS = 10_000
+const { EXCLUDE_FLAG } = vitest_cli_excludes
+// The suffix a test file's module key carries past the module it is named for.
+const TEST_SUFFIX_PATTERN = /(?:\.integration)?\.test$/u
+const { module_key } = direct_importers
+
+interface HeavyReader extends SourceReader {
+	durations: Durations
+}
+
+function heavy_tests(durations: Durations): Array<string> {
+	return Object.keys(durations).filter((file) => (durations[file] ?? 0) > HEAVY_TEST_MS)
+}
+
+function imports_directly(file: string, scoped: ReadonlySet<string>, reader: HeavyReader): boolean {
+	const source = reader.read_source(file)
+
+	if (source === undefined) return true
+
+	return direct_importers.names_any(source, file, scoped, reader.imports)
+}
+
+function is_kept(file: string, scoped: ReadonlySet<string>, reader: HeavyReader): boolean {
+	const key = module_key(file)
+
+	if (scoped.has(key) || scoped.has(key.replace(TEST_SUFFIX_PATTERN, ''))) return true
+
+	return imports_directly(file, scoped, reader)
+}
+
+// The heavy files to leave out of a scoped run: every one this scope neither holds, names nor imports from.
+function excluded_tests(scoped_files: ReadonlyArray<string>, reader: HeavyReader): Array<string> {
+	const scoped = new Set(scoped_files.map((file) => module_key(file)))
+
+	return heavy_tests(reader.durations).filter((file) => !is_kept(file, scoped, reader))
+}
+
+function file_reader(root: string): HeavyReader {
+	return { ...direct_importers.source_reader(root), durations: unit_durations.read(root) }
+}
+
+// The `--exclude` flags a scope's vitest run carries: none unless it narrowed to related files.
+function exclude_flags(
+	scope: RelatedScope,
+	root: string,
+	reader: HeavyReader = file_reader(root),
+): Array<string> {
+	if (scope.mode !== 'related') return []
+
+	const scoped = scope.files.map((file) => path.relative(root, file))
+
+	return excluded_tests(scoped, reader).flatMap((file) => [EXCLUDE_FLAG, file])
+}
+
+const related_heavy_tests = {
+	EXCLUDE_FLAG,
+	HEAVY_TEST_MS,
+	exclude_flags,
+	heavy_tests,
+}
+
+export type { HeavyReader }
+export { related_heavy_tests }

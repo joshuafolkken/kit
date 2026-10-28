@@ -16,6 +16,7 @@ const LANE_SCRIPT = 'scripts/lane/lane-cli.ts'
 // has to read `.env` to see them — without this the two are documented and unreachable.
 const LANE_ARGUMENTS = { script: LANE_SCRIPT, tsx_arguments: OPTIONAL_ENV_FILE_FLAGS } as const
 const ISSUE_WITH_OPTIONS = '<issue> [options]'
+const ISSUE_OR_ALL = '<issue> | --all'
 const MEASURE_ARGUMENTS = {
 	script: 'scripts/lane/lane-measure-cli.ts',
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
@@ -25,7 +26,7 @@ const PAUSE_ARGUMENTS = {
 	script: 'scripts/lane/lane-pause-cli.ts',
 	tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 	category: 'AI tools',
-	reference: ['<issue> | --all', 'developer', ['processes']],
+	reference: [ISSUE_OR_ALL, 'developer', ['processes']],
 } satisfies Partial<CommandEntry>
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -101,12 +102,12 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['JOSH_{SCHEDULER,WORKER,REVIEWER}_EFFORT'],
 					description:
-						'role effort overrides for either provider; defaults are `medium`, `medium`, and `high`.',
+						'role effort overrides for either provider; defaults are `medium`, `medium`, and `medium`.',
 				},
 				{
 					names: ['JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}'],
 					description:
-						'review round 2 and later (the verification pass); Anthropic defaults are `claude-sonnet-5-5` / `high`, falling back to `JOSH_REVIEWER_*`.',
+						'review round 2 and later (the verification pass); defaults are `claude-sonnet-5-5` / `high` on Anthropic and `high` on OpenAI, falling back to `JOSH_REVIEWER_*`.',
 				},
 			],
 		},
@@ -168,6 +169,18 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '3769 --reason "folded into a broader issue"' }],
 		},
 	},
+	// `.env` is read for the Telegram settings the yield's hold release reaches (`run-hold-cli.ts`).
+	'lane:plan': {
+		script: 'scripts/lane/lane-plan-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue',
+		category: 'AI tools',
+		reference: ['<issue> <path>... [--probe]', 'automation', ['files', 'network']],
+		usage: {
+			examples: [{ arguments: '4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.ts' }],
+		},
+	},
 	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
 	'lane:pause': {
 		...PAUSE_ARGUMENTS,
@@ -181,6 +194,21 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Let a paused lane child carry on from where it stopped (SIGCONT)',
 		default_script_arguments: ['resume'],
 		usage: { examples: LANE_SIGNAL_EXAMPLES },
+	},
+	// `.env` is read for `JOSH_LANE_ROOT`, as every lane command reads it, so `--all` finds the lanes.
+	'lane:adopt': {
+		script: 'scripts/lane/lane-adopt-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			'Give an open lane that lost its state record a record again, read from its process, work tree, unpushed commits, pull request and issue — its work untouched',
+		category: 'AI tools',
+		reference: [ISSUE_OR_ALL, 'developer', ['files', 'git', 'processes', 'network']],
+		usage: {
+			examples: [
+				{ arguments: '4744' },
+				{ arguments: '--all', note: 'every open lane with no record' },
+			],
+		},
 	},
 	// A live run's lane limit: `.env` is read so the bare form reports the
 	// `JOSH_LANE_LIMIT` a person set there when no override stands.
@@ -213,12 +241,67 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			'Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, and the duration and reuse count of each gate check last',
+			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used",
 		category: 'AI tools',
 		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
 		default_script_arguments: ['stats'],
 		usage: {
 			examples: [{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" }],
+		},
+	},
+	// One lane measurement as one number on the last line, for an Issue's measurement declaration
+	// (joshuafolkken/kit#4630).
+	'lane:value': {
+		...MEASURE_ARGUMENTS,
+		description:
+			'Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit)',
+		category: 'AI tools',
+		reference: ['<metric> --since <instant>', 'maintainer', ['none']],
+		default_script_arguments: ['value'],
+		usage: {
+			examples: [
+				{
+					arguments: 'edit --since 2026-10-23T03:29Z',
+					note: 'the median Edit time since an instant',
+				},
+				{
+					arguments:
+						'cell --table "test:related scope" --row related --column "median (s)" --since 2026-10-23T03:29Z',
+					note: 'one lane:stats table cell since an instant',
+				},
+			],
+		},
+	},
+	'lane:net': {
+		...MEASURE_ARGUMENTS,
+		description:
+			"Print a lane's net minutes: its issue's first dispatch to its merge, less the waits its parks, outages, usage-limit stops and yields stood and the host's sleeps",
+		category: 'AI tools',
+		reference: ['<issue>', 'maintainer', ['none']],
+		default_script_arguments: ['net'],
+		usage: {
+			examples: [
+				{
+					arguments: '4695',
+					note: 'the net minutes a causing-lane line declares',
+				},
+			],
+		},
+	},
+	'lane:breakdown': {
+		script: 'scripts/lane/lane-breakdown-cli.ts',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		description:
+			"Print a merged lane's net time by stage, longest first, the implementation split by its tool calls",
+		category: 'AI tools',
+		reference: ['<issue>', 'maintainer', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '4970',
+					note: 'the breakdown the overrun investigation comments on the lane',
+				},
+			],
 		},
 	},
 }

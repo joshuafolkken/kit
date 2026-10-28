@@ -67,7 +67,8 @@ function run(argv: ReadonlyArray<string>, context: StopsContext = {}): number {
 	}
 
 	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
-	const stops = lane_stats.in_window(review_stop_log.read(context.log_path), window)
+	const stopped = review_stop_log.read(context.log_path).filter((line) => line.fixed !== true)
+	const stops = lane_stats.in_window(stopped, window)
 
 	console.info(format_report(stops, period_days))
 

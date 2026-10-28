@@ -1,4 +1,5 @@
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
+import { hook_context_line } from './hook-context-line'
 import { rule_value, type RuleReading } from './rule-value'
 
 // The transcript shapes `rule_value.measure` reads, built once for every suite that scores a rule.
@@ -45,6 +46,44 @@ function result_line(content: string, timestamp: string = TIMESTAMP): string {
 	})
 }
 
+// A call and the errored result that answers it, paired by the call's id (joshuafolkken/kit#5266).
+function answered_call(command: string, index: number, content: string): string {
+	const call = assistant_line(
+		[tool_use_block(command, index)],
+		TIMESTAMP,
+		time_transcript_line.NO_MESSAGE_ID,
+	)
+	const result = {
+		type: 'tool_result',
+		tool_use_id: `toolu_${String(index)}`,
+		content,
+		is_error: true,
+	}
+	const answer = JSON.stringify({
+		type: 'user',
+		timestamp: TIMESTAMP,
+		message: { content: [result] },
+	})
+
+	return `${call}\n${answer}`
+}
+
+// The user turn the harness writes back where a Stop hook blocked the turn's end (joshuafolkken/kit#4978).
+function stop_line(reason: string, timestamp: string = TIMESTAMP): string {
+	return JSON.stringify({
+		type: 'user',
+		timestamp,
+		message: { role: 'user', content: `Stop hook feedback:\n${reason}` },
+	})
+}
+
+// The note a hook attaches where it rewrites a call instead of refusing it (joshuafolkken/kit#3570).
+function context_line(content: string, timestamp: string = TIMESTAMP): string {
+	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
+
+	return JSON.stringify({ type: 'attachment', timestamp, attachment })
+}
+
 // One run's worth of lone calls, in the order given.
 function session(...commands: ReadonlyArray<string>): string {
 	return commands.map((command) => call_line(command)).join('\n')
@@ -63,10 +102,13 @@ function reading_for(id: string, runs: ReadonlyArray<ReadonlyArray<string>>): Ru
 const rule_value_fixture = {
 	TIMESTAMP,
 	reading_for,
+	answered_call,
 	assistant_line,
 	call_line,
+	context_line,
 	result_line,
 	session,
+	stop_line,
 	tool_use_block,
 }
 

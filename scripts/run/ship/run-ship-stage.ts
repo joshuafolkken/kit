@@ -14,7 +14,7 @@ import { z } from 'zod'
 // the state, and a stale one is overruled by it. Neither can produce a second commit, push or merge.
 //
 // **The gate is never skipped on the record's word.** It is passed over only once its output — a
-// commit — exists; otherwise it runs, and `josh gate`'s own tree-keyed green record is what makes a
+// pushed commit — exists; otherwise it runs, and `josh gate`'s own tree-keyed green record is what makes a
 // re-run on an unchanged tree a reuse rather than a second execution. No quality gate is folded away.
 
 const STAGE = {
@@ -47,6 +47,8 @@ interface ShipState {
 	// The issue changed after the recorded review's brief (`issue-watch-gate.ts`), so the review re-runs
 	// even on a committed tree (joshuafolkken/kit#4221).
 	is_review_stale?: boolean
+	// The tree holds uncommitted work, which the sync stage commits locally before it merges.
+	is_dirty?: boolean
 }
 
 const RECORD_PREFIX = 'josh-ship-stages-'
@@ -57,6 +59,9 @@ const WORD_SEPARATOR = ' '
 const STARTED_SEPARATOR = ','
 const STARTED_INDEX = 3
 const WORD_COUNT = STARTED_INDEX + 1
+// The reason a stage ran or was skipped follows the words, behind a separator no word holds, so the
+// word readers below read the line as before.
+const REASON_SEPARATOR = ' | '
 
 // `started` lists the stages the current attempt started, kept across a supervisor that ended without a
 // stop so its successor's lines still carry them. `is_merge_waiting` is set only while `josh followup`
@@ -164,19 +169,23 @@ function is_shipped(state: ShipState): boolean {
 	return state.is_committed && state.is_pushed
 }
 
+// A lane child's `run:review` commits and pushes before the ship runs (joshuafolkken/kit#4907), so a
+// commit or a push is a stage's output only beside the ship's own record of that stage.
 const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => boolean> = {
 	// The preflight asks what the commit stage would refuse on, so a commit is
-	// its output as it is the gate's; a resumed commit stage still asks `git -y`'s own preflight.
-	[STAGE.PREFLIGHT]: (_done, state) => state.is_merged || state.is_committed,
-	// The `--review` round precedes the commit, so a commit is its output as it
-	// is the gate's. A record alone is not honored: before a commit the tree may have been edited since
-	// the recorded round, and only a commit pins the tree that round read — unless the issue changed since.
-	[STAGE.REVIEW]: (_done, state) =>
-		state.is_merged || (state.is_committed && state.is_review_stale !== true),
-	[STAGE.GATE]: (_done, state) => state.is_merged || state.is_committed,
-	// The merge of the default branch before the commit: once committed, a
-	// conflicting pull request is the followup's to merge again.
-	[STAGE.SYNC]: (_done, state) => state.is_merged || state.is_committed,
+	// its output; a resumed commit stage still asks `git -y`'s own preflight.
+	[STAGE.PREFLIGHT]: (done, state) =>
+		state.is_merged || (done.has(STAGE.PREFLIGHT) && state.is_committed),
+	// The sync stage commits locally before the review round and the gate, without pushing
+	// (`run-ship-sync.ts`), so a commit is neither's output: a pushed one on a clean tree is, as only the
+	// commit stage after the gate pushes — unless the issue changed since.
+	[STAGE.REVIEW]: (done, state) =>
+		state.is_merged ||
+		(done.has(STAGE.REVIEW) && is_shipped(state) && state.is_review_stale !== true),
+	[STAGE.GATE]: (done, state) => state.is_merged || (done.has(STAGE.GATE) && is_shipped(state)),
+	// The merge of the default branch before the gate: once pushed, a default branch that
+	// moved is the followup's to merge again.
+	[STAGE.SYNC]: (done, state) => state.is_merged || (done.has(STAGE.SYNC) && is_shipped(state)),
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
 	// The round-2 pass reads the pushed fix delta, so its record is honored only
 	// while that push still stands — new work pushed on top reruns it.
@@ -231,9 +240,32 @@ function event_text(
 	return full.join(WORD_SEPARATOR)
 }
 
+// A line `event_text` wrote, with why its stage ran or was skipped after it (joshuafolkken/kit#5296).
+function with_reason(text: string, reason: string | undefined): string {
+	return reason === undefined ? text : `${text}${REASON_SEPARATOR}${reason}`
+}
+
+function words_part(text: string): string {
+	return text.split(REASON_SEPARATOR, 1)[0] ?? ''
+}
+
 // The stages a line says its attempt has started, `undefined` for a three-word line.
 function started_of(text: string): ReadonlyArray<string> | undefined {
-	return text.split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
+	return words_part(text).split(WORD_SEPARATOR, WORD_COUNT)[STARTED_INDEX]?.split(STARTED_SEPARATOR)
+}
+
+// The stage word and the phase word of a line `event_text` wrote, `''` where the line has none.
+function words_of(text: string): { stage: string; phase: string } {
+	const [, stage = '', phase = ''] = words_part(text).split(WORD_SEPARATOR, WORD_COUNT)
+
+	return { stage, phase }
+}
+
+// Why the stage ran or was skipped, `undefined` for a line that carries no reason.
+function reason_of(text: string): string | undefined {
+	const at = text.indexOf(REASON_SEPARATOR)
+
+	return at === -1 ? undefined : text.slice(at + REASON_SEPARATOR.length)
 }
 
 // A stop on a merge git could not finish is named `conflict` rather than by the stage it happened in,
@@ -254,6 +286,7 @@ const run_ship_stage = {
 	end_attempt,
 	event_text,
 	is_done,
+	is_shipped,
 	mark_done,
 	mark_merge_waiting,
 	mark_place_waiting,
@@ -262,8 +295,11 @@ const run_ship_stage = {
 	read_merge_waiting,
 	read_place_waiting,
 	read_started,
+	reason_of,
 	record_path,
 	started_of,
+	with_reason,
+	words_of,
 	stop_reason,
 }
 

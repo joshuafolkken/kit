@@ -1,4 +1,5 @@
 import { repository_lock } from '#scripts/git/repository-lock'
+import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
@@ -24,7 +25,7 @@ import { z } from 'zod'
 // must never fail the work it reports on, so `run-event-stream-emit.ts` wraps
 // every append in a swallow; this module is free to throw on a genuinely broken write.
 
-const EVENT_PREFIX = 'josh-run-events-'
+const EVENT_PREFIX = durable_state.PREFIX.EVENTS
 // `.jsonl` rather than `.json`: the file is one JSON event per line, appended to, and the suffix tells
 // every reader — a person, an editor — that it is a line stream rather than a single document, the same
 // distinction the ambient `.log` draws.
@@ -56,6 +57,10 @@ const EVENT_KIND = {
 	PARK: 'park',
 	SPLIT: 'split',
 	OUTAGE: 'outage',
+	// A Claude usage limit stopped a lane child (joshuafolkken/kit#4745). Its text names the reset time,
+	// which `backlog:drive` reads to hold launches until then; it counts against no streak, so it is not an
+	// `OUTAGE`.
+	USAGE_LIMIT: 'usage-limit',
 	CUT: 'cut',
 	// A fresh session adopted an implementation cut — `run:cut --resume` answered `resume-impl`. The
 	// resume clears the cut record, so without this the `cut` would stay the newest position and
@@ -116,6 +121,11 @@ const EVENT_KIND = {
 	// The position that hands control back: `run:step` prints the command that
 	// shows the stopped report, so the agent fixes it and relaunches rather than rebuilding the context.
 	SHIP_STOP: 'ship-stop',
+	// The relaunch meant to answer a `SHIP_STOP` started nothing — the broker refused it, or the direct
+	// spawn failed (joshuafolkken/kit#4765). `run:merge` reads it, not the transcript's mtime, to tell the
+	// stop went unanswered, and a re-dispatch cap's park names its reason. A trace: the stop stays the
+	// position `run:step` answers.
+	RELAUNCH_FAILED: 'relaunch-failed',
 	// An Issue the run filed on its way, written by `issue:file`, so a run started from the command line
 	// still surfaces what it found — `run:board`'s findings section reads it.
 	FILED: 'filed',
@@ -157,6 +167,14 @@ const EVENT_KIND = {
 	// silent window (joshuafolkken/kit#4270). Emitted once per pause episode (`emit_once_since_with`,
 	// reset by `LANE_STATE`), it is the dedup marker for the one paused-lane Telegram. A trace.
 	PAUSED_NOTICE: 'paused-notice',
+	// `backlog:drive` ran a due issue's measurement declaration itself, found it within its bound and
+	// closed the issue through `issue:measured` — no lane was launched for it (joshuafolkken/kit#4621).
+	// `run:board` draws it merged. A trace: the parent's position is the drive's, not this close.
+	MEASURED: 'measured',
+	// The host slept while `backlog:drive` sampled its load (joshuafolkken/kit#5032): the sampler's timer
+	// ran late by more than a few intervals. `at` is the wake and `elapsed_ms` how long the sleep
+	// lasted; every lane's net time takes it out (`lane-sleep.ts`). A trace.
+	SLEEP: 'sleep',
 } as const
 
 type EventKind = (typeof EVENT_KIND)[keyof typeof EVENT_KIND]
@@ -179,6 +197,9 @@ const TRACE_KINDS: ReadonlySet<string> = new Set([
 	EVENT_KIND.IDLE_NOTICE,
 	EVENT_KIND.LANE_STATE,
 	EVENT_KIND.PAUSED_NOTICE,
+	EVENT_KIND.MEASURED,
+	EVENT_KIND.RELAUNCH_FAILED,
+	EVENT_KIND.SLEEP,
 ])
 
 // The trace kinds that say only that the run was alive, so the bound rolls them off first. A `filed` or
@@ -199,7 +220,8 @@ const event_schema = z.object({
 	kind: z.string(),
 	text: z.string(),
 	// The child's time on a lane, recorded once by the writer of an ending (joshuafolkken/kit#4481), so a
-	// reader never has to find its launch again. An event written before it has none.
+	// reader never has to find its launch again. An event written before it has none. A `sleep` event
+	// carries the sleep's length here.
 	elapsed_ms: z.number().optional(),
 })
 
@@ -224,7 +246,7 @@ function is_event_kind(value: string): value is EventKind {
 // The stream's path, keyed on the run's identity the caller resolved. `.jsonl` so the append surface is
 // named for what it is.
 function target_of(repository: string): string {
-	return stamp_file.stamp_path(EVENT_PREFIX, repository, EVENT_SUFFIX)
+	return durable_state.path(EVENT_PREFIX, repository, EVENT_SUFFIX)
 }
 
 function is_present(event: RunEvent | undefined): event is RunEvent {

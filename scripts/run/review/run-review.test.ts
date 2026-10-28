@@ -29,6 +29,15 @@ describe('gate_state', () => {
 	it('reads no green stamp and no live marker as red', () => {
 		expect(run_review.gate_state(false, false)).toBe(run_review.GATE_RED)
 	})
+
+	// joshuafolkken/kit#4774: a reviewer's fix in place moved the tree after the gate passed.
+	it('reads a green that no longer covers the tree as moved, not red', () => {
+		expect(run_review.gate_state(false, false, true)).toBe(run_review.GATE_MOVED)
+	})
+
+	it('reads a live marker as running even when an earlier green has moved', () => {
+		expect(run_review.gate_state(false, true, true)).toBe(run_review.GATE_RUNNING)
+	})
 })
 
 describe('is_gate_settled', () => {

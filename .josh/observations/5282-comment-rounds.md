@@ -1,0 +1,1 @@
+- rf:bug-risks | medium | eslint/rules/comment-why-only.js:21 | 2026-10-28 | #5282

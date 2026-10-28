@@ -6,7 +6,13 @@ import { git_gh_exec } from './git-gh-exec'
 import { gh_failure } from './git-gh-failure'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_issue_write } from './git-gh-issue-write'
-import { forget_pr_numbers, git_gh_pr_read, read_pull, require_pr_number } from './git-gh-pr-read'
+import {
+	forget_pr_numbers,
+	git_gh_pr_read,
+	read_pull,
+	read_pull_or_listed,
+	require_pr_number,
+} from './git-gh-pr-read'
 import { git_gh_pr_rest } from './git-gh-pr-rest'
 import { git_gh_pr_snapshot } from './git-gh-pr-snapshot'
 
@@ -188,10 +194,14 @@ function is_head_moved(error: unknown): boolean {
 }
 
 // `undefined` is "nobody read it", kept apart from the `false` that means "the pull request is not
-// merged". Folding the two would report an unread state as a settled answer.
-async function read_merge_state(pr_number: number): Promise<boolean | undefined> {
+// merged". Folding the two would report an unread state as a settled answer. The listing row, which
+// carries `merged_at` too, stands in for a detail GitHub refuses as too many files changed.
+async function read_merge_state(
+	branch_name: string,
+	pr_number: number,
+): Promise<boolean | undefined> {
 	try {
-		return git_gh_pr_rest.is_merged(await read_pull(pr_number))
+		return git_gh_pr_rest.is_merged(await read_pull_or_listed(branch_name, pr_number, read_pull))
 	} catch (error) {
 		// The reason goes in the line, for the same reason the poll loop's warning carries one: the
 		// failure this throws below names the *merge* request as its cause, so without this an operator
@@ -220,10 +230,14 @@ async function sleep_between_read_backs(attempt: number): Promise<void> {
 // **A read that failed is still not an answer.** Out of attempts it throws rather than reporting
 // `false`, carrying the merge failure as its `cause`, so no run ever concludes "the merge did not
 // happen" from a read nobody got.
-async function has_merge_landed(pr_number: number, merge_error: unknown): Promise<boolean> {
+async function has_merge_landed(
+	branch_name: string,
+	pr_number: number,
+	merge_error: unknown,
+): Promise<boolean> {
 	for (let attempt = 0; attempt < MERGE_READ_BACK_ATTEMPTS; attempt += 1) {
 		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		const is_merged = await read_merge_state(pr_number)
+		const is_merged = await read_merge_state(branch_name, pr_number)
 		if (is_merged !== undefined) return is_merged
 
 		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
@@ -257,7 +271,7 @@ async function pr_merge(branch_name: string, head_sha: string): Promise<void> {
 	try {
 		await put_merge(pr_number, head_sha)
 	} catch (error) {
-		if (!(await has_merge_landed(pr_number, error))) throw error
+		if (!(await has_merge_landed(branch_name, pr_number, error))) throw error
 	}
 }
 

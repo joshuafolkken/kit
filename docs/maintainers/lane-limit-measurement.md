@@ -9,7 +9,7 @@ throughput, gate duration and machine load side by side.
 
 ## Where the numbers come from
 
-One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in the josh temp root, keyed
+One append-only ledger per repository, `josh-lane-ledger-<digest>.jsonl` in `<common git dir>/josh/run-state/`, keyed
 on the common git directory so every lane, the parent and the sampler write to the same file.
 
 | Entry       | Written by                                                    | Fields                                                               |
@@ -24,8 +24,9 @@ on the common git directory so every lane, the parent and the sampler write to t
 
 A `stage` entry's `at` is when the stage ended, so it began `elapsed_ms` earlier. `josh followup`
 writes one of its own, `ci-wait` — the time it spent waiting for the checks — and, when its polls saw
-CodeRabbit still running or rate-limited, `coderabbit-wait` and `coderabbit-rate-limit`; these carry no
-`issue`.
+CodeRabbit still running or rate-limited, `coderabbit-wait` and `coderabbit-rate-limit`, and on a run
+that posted `@coderabbitai review` after a rate limit, `coderabbit-retriggered` — the window it waited
+out; these carry no `issue`.
 
 `unit_ms` is the unit suite's own duration, present when the gate ran it; `josh metrics` reads the
 gate and unit durations it holds to a baseline from these entries.
@@ -52,9 +53,6 @@ measures. Test suites never write to it.
 runs and stops with it, so a period holds the load of the runs themselves. `pnpm josh lane:sample` is
 still there for a reading outside a run.
 
-**Close the period before a reboot.** The ledger lives in the temp root, which a reboot clears; a
-period that has to span one is closed before it and continued as a second row.
-
 ## The columns
 
 | Column                          | Source                                                           |
@@ -65,6 +63,8 @@ period that has to span one is closed before it and continued as a second row.
 | `merges / hour`                 | merges per active hour — time `load` samples saw a lane working  |
 | `effective lanes`               | mean of the working `load` samples' `lanes` (child running)      |
 | `lane median (min)`             | median per merge of the time since its issue's latest `dispatch` |
+| `lanes over 40 min`             | merges whose lane time is over the overrun threshold             |
+| `lane p90 (min)`                | nearest-rank 90th percentile of the same lane times              |
 | `gate median (min)` / `max`     | `gate` entries' `elapsed_ms`                                     |
 | `load peak` / `mean`            | `load` samples' one-minute load average                          |
 | `swapped peak` / `mean (GB/h)`  | the `swapped_mb` difference between consecutive `load` samples   |
@@ -95,6 +95,7 @@ order a lane passes them, each with its median, its maximum and how many runs th
 | `ci-wait`                     | `stage` entries `josh followup` writes for its wait on the checks           | whether to overlap the round-one review with CI                   |
 | `coderabbit-wait`             | `stage` entries `josh followup` writes for CodeRabbit's part of its waits   | whether CodeRabbit is what holds a followup up                    |
 | `coderabbit-rate-limit`       | `stage` entries `josh followup` writes for the rate-limited part of that    | whether to file a remedy for CodeRabbit's rate limit              |
+| `coderabbit-retriggered`      | `stage` entries `josh followup` writes for the window before its retrigger  | how long followup's own retrigger waits on CodeRabbit             |
 | `gate`                        | `stage` entries of `josh ship`'s gate                                       | whether to lower `JOSH_LANE_LIMIT`, beside the load columns       |
 | `preflight`, `sync`, `commit` | `stage` entries of `josh ship`                                              | the rest of the time from dispatch to the pull request            |
 | `pre-detach`                  | `stage` entries of a detached `josh ship`'s fast checks in the child's turn | the time the child's own turn spends checking before the hand-off |
@@ -202,8 +203,10 @@ once under each when it found two:
 - `issue`, `branch`, `classification`, `live-evidence`, `acceptance-map`, `lock`
 - `scoped` — the scoped pair went red
 - `unreadable` — a precondition could not be read
-- `pre-detach` — not a precondition: a lane child's fast checks went red beside the refusal
-  (`run-ship-cli.ts`), so a preflight stop's causes can outnumber its unmet preconditions
+- `pre-detach` — not a precondition: a lane child's fast checks went red (`run-ship-pre-detach.ts`),
+  beside the refusal or behind a passed preflight (`run-ship-cli.ts`), so a preflight stop's causes
+  can outnumber its unmet preconditions
+- `unpinned` — likewise, a `--review` ship's pre-detach `test:pinned` stopped on an unpinned place
 
 A preflight stop recorded before the preconditions were kept reads under its cause.
 
@@ -227,13 +230,22 @@ the `conflict` row of the same period.
 Under the stop table, `lane:stats` prints one row per round-2 verdict and reason code, most frequent
 first, with how many decisions fell there. A period with no decision prints a `none` row.
 
-`josh ship` reads `review:round2 --round-1-closed --json` and records the verdict and its `code` as a
+`josh ship` reads `review:round2 --record <N> --json` and records the verdict and its `code` as a
 `round-two` entry before acting on it. The codes are one per branch of `review-round2.ts`: `open-finding`,
 `no-snapshot`, `base-moved`, `empty`, `inert` and `live`.
 
 **The decision the table is for**: what to change next. A frequent `live` shows how often round 1's
 fixes reach code that runs. A frequent `open-finding`, `no-snapshot` or `base-moved` means the procedure
 is not giving the decision what it needs.
+
+## Whether the split notice led to a split
+
+Under the round-2 table, `lane:stats` prints one row: how many lanes got the split notice in the period
+(`noticed lanes`), and how many of those filed a split child (`split`), whenever it was filed.
+
+The first showing of the notice writes a `split-notice` entry with the Issue and the measured files and
+lines (`split-early-notice.ts`); `josh issue:file --route split` from a lane writes a `split-filed`
+entry (`split-resolution.ts`).
 
 ## Why a free lane stayed empty
 
@@ -310,6 +322,11 @@ gate median ([#4397](https://github.com/joshuafolkken/kit/issues/4397)).
 A unit leg that ran the whole suite carries `fallback`, the reason's stable kind read off the line
 `test:related` printed (`related_scope.fallback_kind`). A table under it counts the fallbacks by kind.
 
+A pre-push hook that could not reuse the green record writes a `push-miss` entry
+(`scripts/hooks/pre-push-unit.ts`, the kind from `hook_gate_reuse.miss_kind`); the same table counts it
+as `pre-push <scope>: <kind>`, so its rows outnumber the checks table's `fallback` column
+([#5234](https://github.com/joshuafolkken/kit/issues/5234)).
+
 **A reused check is counted, never timed** — it started no process, so its zero would pull the median
 toward a check that never ran. A check that was only ever reused prints `not measured`. A gate recorded
 before the field existed contributes no check row.
@@ -318,6 +335,28 @@ The unit leg's since-green no-op is counted the same way — `test:related` foun
 its last green run and ran no test, so the check carries `is_unmoved` (`related_scope.is_unmoved`) and
 its second stays out of the median and maximum
 ([#4457](https://github.com/joshuafolkken/kit/issues/4457)).
+
+## What a gate check claimed against what it used
+
+Under the check table, `lane:stats` prints one row per check comparing its core-budget claim with the
+cores it kept busy ([#5138](https://github.com/joshuafolkken/kit/issues/5138)). The columns are:
+
+- `claim`: the median of `claim.requested`.
+- `runs`: the measured runs.
+- `cores median`, `cores p90` and `cores max`: a run's cores are its `cpu_ms ÷ elapsed_ms`. The p90 is
+  the nearest-rank one.
+- `wait (s)`: the total `claim.waited_ms`.
+
+Only a measured run is counted. A reused check started no process, and a check with no `cpu_ms` was
+recorded before the field existed, so both stay out of every column.
+
+Read it as: a claim well above `cores p90` asks for cores the check does not use, which other claims
+then wait for. `claim` is the requested weight, and a unit claim narrowed at the wait cap ran at its
+`granted`. `wait (s)` is how long this check's own claims waited to be admitted, not how long it made
+others wait.
+
+**The table does not change the weights.** A weight in `scripts/gate/core-weights.ts` is changed in its
+own Issue, which cites this table as its evidence.
 
 ## What the lane sessions' transcripts show
 

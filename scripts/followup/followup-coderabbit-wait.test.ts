@@ -1,5 +1,5 @@
 import type { PrStateSnapshot, RollupCheck } from '#scripts/gh/git-pr-checks-parse'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-coderabbit-wait'
 
@@ -80,48 +80,51 @@ describe('followup_coderabbit_wait.observer_of', () => {
 	})
 })
 
-describe('followup_coderabbit_wait.both', () => {
-	it('hands every poll to both observers, in order', async () => {
+describe('followup_coderabbit_wait.all', () => {
+	it('hands every poll to every observer, in order', async () => {
 		const seen: Array<string> = []
-		const observe = followup_coderabbit_wait.both(
+		const observe = followup_coderabbit_wait.all(
 			async () => {
 				seen.push('first')
 			},
 			async () => {
 				seen.push('second')
 			},
+			async () => {
+				seen.push('third')
+			},
 		)
 
 		await observe(snapshot(CI))
 
-		expect(seen).toStrictEqual(['first', 'second'])
+		expect(seen).toStrictEqual(['first', 'second', 'third'])
 	})
 })
 
 describe('followup_coderabbit_wait.record — the lane ledger', () => {
 	it('records the wait and its rate-limited part as stages of their own', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		await followup_coderabbit_wait.record({ wait_ms: 40 * SECONDS, rate_limited_ms: 30 * SECONDS })
 
 		expect(record.mock.calls.map(([stage]) => stage)).toStrictEqual([
-			{ stage: lane_ledger.CODERABBIT_WAIT_STAGE, elapsed_ms: 40 * SECONDS },
-			{ stage: lane_ledger.CODERABBIT_RATE_LIMIT_STAGE, elapsed_ms: 30 * SECONDS },
+			{ stage: lane_ledger_write.CODERABBIT_WAIT_STAGE, elapsed_ms: 40 * SECONDS },
+			{ stage: lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE, elapsed_ms: 30 * SECONDS },
 		])
 	})
 
 	it('records no rate-limit stage for a wait CodeRabbit was never rate-limited in', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		await followup_coderabbit_wait.record({ wait_ms: 40 * SECONDS, rate_limited_ms: 0 })
 
 		expect(record.mock.calls.map(([stage]) => stage.stage)).toStrictEqual([
-			lane_ledger.CODERABBIT_WAIT_STAGE,
+			lane_ledger_write.CODERABBIT_WAIT_STAGE,
 		])
 	})
 
 	it('records nothing for a run that never saw CodeRabbit waiting', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		await followup_coderabbit_wait.record(followup_coderabbit_wait.new_wait())
 

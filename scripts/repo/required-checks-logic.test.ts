@@ -107,6 +107,7 @@ describe('expected_checks', () => {
 			CHECKS,
 			'Detect E2E',
 			E2E,
+			'Secret Scan',
 			'Security Audit',
 			SONAR_QUBE,
 			RELEASE_CLASSIFICATION,

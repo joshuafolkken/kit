@@ -2,9 +2,11 @@ import { stripVTControlCharacters } from 'node:util'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { z } from 'zod'
 import { run_ship_next } from './run-ship-next'
 import { run_ship_probe } from './run-ship-probe'
+import type { StopFinding } from './run-ship-review'
 
 // What a relaunched lane child needs in front of it to fix a stopped ship: the tail of the failed
 // stage's output — a red check, or the High/Medium findings a review stage reports — and the branch's
@@ -14,6 +16,9 @@ import { run_ship_probe } from './run-ship-probe'
 // **Both are bounded**, so a long gate log never becomes the whole prompt. The tail is kept because a
 // check reports its verdict last; the lines left out go to a file whose path and line range the prompt
 // names, so nothing is lost and the session reads only the range it needs.
+//
+// **A review stop also carries the lane's earlier findings on the files it cites** (joshuafolkken/kit#4780),
+// so the fix meets the constraint an earlier round set on the same line rather than breaking it.
 
 const EXCERPT_LINE_LIMIT = 40
 const EXCERPT_LINE_WIDTH = 240
@@ -33,6 +38,7 @@ const stop_context_schema = z
 		omitted: omitted_schema.optional(),
 		changed: z.array(z.string()).readonly().optional(),
 		more_changed: z.number().int(),
+		prior: z.array(z.string()).readonly().optional(),
 	})
 	.strict()
 
@@ -121,8 +127,18 @@ async function changed_of(): Promise<Pick<StopContext, 'changed' | 'more_changed
 	}
 }
 
-async function build(issue: string, output: string): Promise<StopContext> {
-	return { ...(await excerpt_of(issue, output)), ...(await changed_of()) }
+async function build(
+	issue: string,
+	output: string,
+	findings: ReadonlyArray<StopFinding> = [],
+): Promise<StopContext> {
+	const prior = review_prior_findings.on_files(issue, findings)
+
+	return {
+		...(await excerpt_of(issue, output)),
+		...(await changed_of()),
+		...(prior.length > 0 && { prior }),
+	}
 }
 
 function has_excerpt(context: StopContext | undefined): boolean {
@@ -168,17 +184,12 @@ function changed_text(context: StopContext): string {
 	return `Changed files on the branch: ${context.changed.join(', ')}${more}.`
 }
 
-// The block the ship-stop prompt carries between the next command and the closing invocation.
-//
-// **It fits the `budget` the prompt leaves it** — the prompt is one argv element, refused past
-// `MAX_VALUE_LENGTH` (joshuafolkken/kit#3964) — by dropping the excerpt's head first, since a check
-// reports its verdict last; the tail line always stays.
-function describe(
-	issue: string,
-	context: StopContext,
-	budget: number = agent_role_profile.MAX_VALUE_LENGTH,
-): string {
-	const changed = changed_text(context)
+function trailer_text(context: StopContext): string {
+	return [changed_text(context), ...review_prior_findings.fix_lines(context.prior)].join(LINE_BREAK)
+}
+
+function fitted_block(issue: string, context: StopContext, budget: number): string {
+	const changed = trailer_text(context)
 
 	if (!has_excerpt(context)) return changed
 
@@ -188,6 +199,32 @@ function describe(
 	while (block.length > budget && dropped < context.excerpt.length - 1) {
 		dropped += 1
 		block = excerpt_block(issue, context, changed, dropped)
+	}
+
+	return block
+}
+
+function has_prior(context: StopContext): boolean {
+	return context.prior !== undefined && context.prior.length > 0
+}
+
+// The block the ship-stop prompt carries between the next command and the closing invocation.
+//
+// **It fits the `budget` the prompt leaves it** — the prompt is one argv element, kept within
+// `MAX_VALUE_LENGTH` (joshuafolkken/kit#3964), well under the launch gate's prompt cap — by dropping
+// the excerpt's head first, since a check
+// reports its verdict last; the tail line always stays. Past that, the earlier findings go oldest first.
+function describe(
+	issue: string,
+	context: StopContext,
+	budget: number = agent_role_profile.MAX_VALUE_LENGTH,
+): string {
+	let fitted = context
+	let block = fitted_block(issue, fitted, budget)
+
+	while (block.length > budget && has_prior(fitted)) {
+		fitted = { ...fitted, prior: fitted.prior?.slice(1) }
+		block = fitted_block(issue, fitted, budget)
 	}
 
 	return block

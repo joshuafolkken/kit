@@ -1,0 +1,143 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { git_command } from '#scripts/git/git-command'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_review_pinned } from './run-review-pinned'
+import { run_review_pinned_accepted } from './run-review-pinned-accepted'
+
+// joshuafolkken/kit#4775: a reason an earlier run on the branch accepted carries a later run with none
+// past the same places, and only those.
+
+const REASON = 'the branch only logs'
+const SITE = 'scripts/a.ts 0123456789abcdef'
+const OTHER_SITE = 'scripts/b.ts 89abcdef01234567'
+const BRANCH = '4775-lane'
+const OTHER_BRANCH = 'other-branch'
+
+const scratch = { directory: '' }
+
+beforeEach(() => {
+	scratch.directory = mkdtempSync(path.join(tmpdir(), 'run-review-pinned-accepted-'))
+	vi.spyOn(git_command, 'git_directories').mockResolvedValue([scratch.directory])
+	vi.spyOn(git_command, 'branch').mockResolvedValue(BRANCH)
+})
+
+afterEach(() => {
+	vi.restoreAllMocks()
+	rmSync(scratch.directory, { recursive: true, force: true })
+})
+
+async function accept(unpinned: ReadonlyArray<string>): Promise<void> {
+	await run_review_pinned_accepted.judge({ text: 'LIST\n', unpinned }, REASON)
+}
+
+async function later(
+	unpinned: ReadonlyArray<string>,
+): ReturnType<typeof run_review_pinned_accepted.judge> {
+	return await run_review_pinned_accepted.judge({ text: 'L\n', unpinned }, undefined)
+}
+
+describe('run_review_pinned_accepted.judge — the record', () => {
+	it('records the reason and the places it accepted in the git directory', async () => {
+		await accept([SITE])
+
+		const target = path.join(scratch.directory, run_review_pinned_accepted.RECORD_NAME)
+		const recorded: unknown = JSON.parse(readFileSync(target, 'utf8'))
+
+		expect(recorded).toStrictEqual({ branch: BRANCH, reason: REASON, unpinned: [SITE] })
+	})
+})
+
+describe('run_review_pinned_accepted.judge — the reason an earlier run accepted', () => {
+	it('accepts a later run with no reason under the recorded one while every place is recorded', async () => {
+		await accept([SITE, OTHER_SITE])
+
+		expect(await later([SITE])).toStrictEqual({
+			kind: 'accepted',
+			text: `L\nUnpinned accepted by an earlier run on this branch: ${REASON}\n`,
+		})
+	})
+
+	it('stops a later run with a place the record does not hold', async () => {
+		await accept([SITE])
+
+		expect(await later([SITE, OTHER_SITE])).toStrictEqual({
+			kind: 'stop',
+			text: `L\n${run_review_pinned.STOP_NOTE}\n`,
+		})
+	})
+
+	it("stops on another branch's record", async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockResolvedValue(OTHER_BRANCH)
+
+		const verdict = await later([SITE])
+
+		expect(verdict.kind).toBe('stop')
+	})
+
+	it('stops when there is no git directory to hold a record', async () => {
+		vi.mocked(git_command.git_directories).mockResolvedValue([])
+		await accept([SITE])
+
+		const verdict = await later([SITE])
+
+		expect(verdict.kind).toBe('stop')
+	})
+})
+
+// joshuafolkken/kit#5188: the note and the full list path sit above the counts line, which ends it.
+describe('run_review_pinned_accepted.judge — the verification-tail shape', () => {
+	it('ends the accepted report on its counts line, with the note and the full list path above it', async () => {
+		await accept([SITE])
+
+		const summary = { text: 'L\n', counts: 'COUNTS', log: { path: 'LOG' }, unpinned: [SITE] }
+		const verdict = await run_review_pinned_accepted.judge(summary, undefined)
+
+		expect(verdict.text).toBe(
+			`L\nUnpinned accepted by an earlier run on this branch: ${REASON}\nfull output: LOG\nCOUNTS\n`,
+		)
+	})
+})
+
+// joshuafolkken/kit#5153: a cut answer lists only its first unpinned place, so the rest may be new.
+describe('run_review_pinned_accepted.judge — a check cut at its first unpinned hunk', () => {
+	it('stops a later run with no reason, though the record holds the place it listed', async () => {
+		await accept([SITE])
+
+		const verdict = await run_review_pinned_accepted.judge(
+			{ text: 'L\n', unpinned: [SITE], is_cut: true },
+			undefined,
+		)
+
+		expect(verdict.kind).toBe('stop')
+	})
+})
+
+// joshuafolkken/kit#4974: the pre-detach check skips its probe under the reason this branch recorded.
+describe('run_review_pinned_accepted.recorded_reason', () => {
+	it("returns this branch's recorded reason", async () => {
+		await accept([SITE])
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBe(REASON)
+	})
+
+	it("returns none for another branch's record", async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockResolvedValue(OTHER_BRANCH)
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+
+	it('returns none when nothing was recorded', async () => {
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+
+	it('returns none when the branch could not be read', async () => {
+		await accept([SITE])
+		vi.mocked(git_command.branch).mockRejectedValue(new Error('git failed'))
+
+		expect(await run_review_pinned_accepted.recorded_reason()).toBeUndefined()
+	})
+})

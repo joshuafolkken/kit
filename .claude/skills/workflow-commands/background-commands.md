@@ -4,7 +4,9 @@
 
 - **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
   foreground `followup` → `run:tail`). The calls below serve a due second round.
-- Background `pnpm josh gate` beside the review; join it before commit.
+- Background `pnpm josh gate` beside the review; join it before commit. Also `lint:related` /
+  `test:related` / `check:related` / `metrics` with work to overlap: a wait past the 5-min cache TTL
+  rewrites the context.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - `pnpm josh followup` stays in the foreground (`followup.md`).
@@ -16,17 +18,18 @@
   session-cost check after the merge.
 - A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
 
-Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
-
 ## How the wait ends — the task's exit, never a regex over its output
 
 **Background it from the first, then end the turn.** A `run_in_background` command re-invokes the run
 when it *exits* — that completion notification is what ends the wait, not a regex match or the block
-limit.
+limit. A backgrounded `Agent` → the same; in a lane child → the `lane-background` row of `pnpm josh rule:list`.
 
-**Never hand-write a `while`/`until` … `sleep` loop over the output file** — a regex that never matches
+**Never hand-write a `while`/`until` … `sleep` loop over the output file, or a counted `for` that sleeps** — a regex that never matches
 waits to the block limit, one that matches a mid-run line exits early. the `poll-loop` row of `pnpm josh rule:list` refuses it
 (`prompts/collaboration-workflow/rule-delivery.md`).
+
+Nor a `sleep` chain followed by a read before the completion notification (`sleep 20; tail …/x.output`,
+`sleep 20; ps -p <pid>`) — the same poll unrolled; the same row refuses it.
 
 **To glance at interim output, `Read` the output file once**, never in a sleep loop. CI is waited on by
 `pnpm josh followup`; a progress heartbeat is `run:progress --wait`'s job (`early-heartbeat` refuses a

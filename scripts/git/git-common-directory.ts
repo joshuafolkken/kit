@@ -8,6 +8,9 @@ import { git_location_environment, GIT_LOCATION_VARIABLES } from './git-location
 // cannot name different directories. It had been run in three places with three timeouts and no
 // memory of the answer, though a `PreToolUse` hook may ask it several times in one call.
 
+// josh's own per-clone state inside the common git directory, in one entry of it so nothing josh writes
+// sits at its root beside git's own files.
+const STATE_DIRECTORY = 'josh'
 const OWN_GIT_DIRECTORY = 0
 const COMMON_GIT_DIRECTORY = 1
 // The read runs inside `PreToolUse` hooks, which hold the tool call for as long as it takes;
@@ -97,6 +100,13 @@ function resolve(cwd: string): string | undefined {
 	return select_linked(directories(cwd))
 }
 
-const git_common_directory = { directories, own, repository, resolve, select_linked }
+const git_common_directory = {
+	STATE_DIRECTORY,
+	directories,
+	own,
+	repository,
+	resolve,
+	select_linked,
+}
 
 export { git_common_directory }

@@ -1,23 +1,11 @@
 import { z } from 'zod'
+import { lane_ledger_kind } from './lane-ledger-kind'
+import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
-const KIND = {
-	MERGE: 'merge',
-	GATE: 'gate',
-	LOAD: 'load',
-	DISPATCH: 'dispatch',
-	STAGE: 'stage',
-	STOP: 'stop',
-	OVERLAP: 'overlap',
-	HELD: 'held',
-	RELEASED: 'released',
-	ROUND_TWO: 'round-two',
-	OFFERABLE: 'offerable',
-	CORE_WAIT: 'core-wait',
-	UNIT_FILES: 'unit-files',
-	TEST_RELATED: 'test-related',
-} as const
+const { KIND } = lane_ledger_kind
+const { ship_lap_schema, stop_schema, unplanned_notice_schema } = lane_ledger_schema_ship
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -55,6 +43,9 @@ const gate_schema = z.object({
 	// A gate that reused a green record for this tree and base and started no check: counted, never
 	// timed (joshuafolkken/kit#4397).
 	is_reused: z.boolean().optional(),
+	// The lane the gate ran in, so `josh lane:breakdown` puts its checks under the lane's ship gate;
+	// absent outside a lane and on a row written before it (joshuafolkken/kit#5319).
+	issue: z.number().optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still
@@ -86,31 +77,17 @@ const dispatch_schema = z.object({
 })
 // One finished stage of a lane's run, passed or failed: `at` is its end and `elapsed_ms` its length, so
 // its start is read from the two. `issue` is absent where the writer does not hold one — `followup`'s
-// CI wait, which is timed on a path that fails before the issue is known.
+// CI wait where the run did not know its issue. On that `ci-wait` row,
+// `check_ms` is each check seen pending and then settled, by the time it settled into the wait, and
+// `last_check` the one that settled last — the wait's critical path (joshuafolkken/kit#5295).
 const stage_schema = z.object({
 	kind: z.literal(KIND.STAGE),
 	at: z.string(),
 	stage: z.string(),
 	elapsed_ms: z.number(),
 	issue: z.number().optional(),
-})
-// A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
-// retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded
-// before it had one. `preconditions` names the kinds a preflight stop found unmet (`run-ship-preflight.ts`),
-// with `pre-detach` where a lane child's fast checks went red beside them (joshuafolkken/kit#4478),
-// absent on any other stop and on one recorded before it had them. `findings` names the
-// `<category>:<severity>` of each finding that decided a review or round-2 stop — the blocking ones, else
-// the fixed ones (joshuafolkken/kit#4426),
-// absent where none decided the stop. How long it stayed stopped is derived from the next ship stage, not recorded, so a
-// resumed ship never has to know the stop it ends.
-const stop_schema = z.object({
-	kind: z.literal(KIND.STOP),
-	at: z.string(),
-	issue: z.number(),
-	reason: z.string(),
-	cause: z.string().optional(),
-	preconditions: z.array(z.string()).optional(),
-	findings: z.array(z.string()).optional(),
+	last_check: z.string().optional(),
+	check_ms: z.record(z.string(), z.number()).optional(),
 })
 // A `josh ship` on `issue` whose actual change overlapped the open pull requests of `lanes` on `paths`
 // before its sync: it waited `waited_ms` for their ships to end, and `is_cleared` is false where the
@@ -137,6 +114,23 @@ const held_schema = z.object({
 // The end of a hold no dispatch ended: every lane taken — one opened outside the driver included — or
 // the run finished, so no free lane is owed a child any more.
 const released_schema = z.object({ kind: z.literal(KIND.RELEASED), at: z.string() })
+// A `lane:pause` (`paused`) or `lane:resume` (`running`) of `issue`'s lane, so a measurement reads the
+// time its processes stood stopped (joshuafolkken/kit#5168) — the lane state file keeps only the last.
+const lane_state_schema = z.object({
+	kind: z.literal(KIND.LANE_STATE),
+	at: z.string(),
+	issue: z.number(),
+	state: z.enum(['paused', 'running']),
+})
+// The round 1 a `josh ship` acted on for `issue`: `verdict` is the reviewer's — `clean`, `fixed`,
+// `blocking` — or `reused` where a round recorded before the ship still described the tree, so the
+// period's ship-time rounds that passed with no fix are counted (joshuafolkken/kit#4620).
+const round_one_schema = z.object({
+	kind: z.literal(KIND.ROUND_ONE),
+	at: z.string(),
+	issue: z.number(),
+	verdict: z.string(),
+})
 // One `review:round2` decision a `josh ship` acted on for `issue`: `verdict` and the stable reason
 // `code` it fell under, so the period's skips and runs are counted by why (joshuafolkken/kit#4064).
 const round_two_schema = z.object({
@@ -190,6 +184,55 @@ const test_related_schema = z.object({
 	trigger_files: z.array(z.string()).optional(),
 	elapsed_ms: z.number(),
 })
+// One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
+// answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
+// report) and its wall time. `issue` is the lane it ran in, absent outside a lane. `rewired` counts the
+// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
+// `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
+// its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
+// older rows.
+const pinned_origin_schema = z.enum(['run-review', 'pre-detach', 'manual'])
+const test_pinned_probe_schema = z.object({
+	file: z.string(),
+	tests: z.number().optional(),
+	elapsed_ms: z.number(),
+})
+const test_pinned_schema = z.object({
+	kind: z.literal(KIND.TEST_PINNED),
+	at: z.string(),
+	issue: z.number().optional(),
+	held: z.number(),
+	rewired: z.number().optional(),
+	probes: z.array(test_pinned_probe_schema),
+	elapsed_ms: z.number(),
+	origin: pinned_origin_schema.optional(),
+	discarded: z.boolean().optional(),
+})
+// The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
+// Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
+// (joshuafolkken/kit#4695).
+const split_notice_schema = z.object({
+	kind: z.literal(KIND.SPLIT_NOTICE),
+	at: z.string(),
+	issue: z.number(),
+	files: z.number(),
+	lines: z.number(),
+})
+// One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
+const split_filed_schema = z.object({
+	kind: z.literal(KIND.SPLIT_FILED),
+	at: z.string(),
+	issue: z.number(),
+	child: z.string(),
+})
+// A pre-push hook that could not reuse the green gate record and ran the `whole` or the `related`
+// suite: `reason` is the miss's kind (`hook_gate_reuse.miss_kind`), never its sentence (joshuafolkken/kit#5234).
+const push_miss_schema = z.object({
+	kind: z.literal(KIND.PUSH_MISS),
+	at: z.string(),
+	scope: z.enum(['whole', 'related']),
+	reason: z.string(),
+})
 const entry_schema = z.discriminatedUnion('kind', [
 	merge_schema,
 	gate_schema,
@@ -200,11 +243,19 @@ const entry_schema = z.discriminatedUnion('kind', [
 	overlap_schema,
 	held_schema,
 	released_schema,
+	round_one_schema,
 	round_two_schema,
 	offerable_schema,
 	core_wait_schema,
 	unit_files_schema,
 	test_related_schema,
+	test_pinned_schema,
+	split_notice_schema,
+	split_filed_schema,
+	unplanned_notice_schema,
+	lane_state_schema,
+	push_miss_schema,
+	ship_lap_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -216,6 +267,7 @@ type StageEntry = z.infer<typeof stage_schema>
 type StopEntry = z.infer<typeof stop_schema>
 type OverlapEntry = z.infer<typeof overlap_schema>
 type HeldEntry = z.infer<typeof held_schema>
+type RoundOneEntry = z.infer<typeof round_one_schema>
 type RoundTwoEntry = z.infer<typeof round_two_schema>
 type OfferableEntry = z.infer<typeof offerable_schema>
 type CoreWaitEntry = z.infer<typeof core_wait_schema>
@@ -224,6 +276,21 @@ type UnitFilesEntry = z.infer<typeof unit_files_schema>
 type UnitFileRecord = z.infer<typeof unit_file_schema>
 type TestRelatedEntry = z.infer<typeof test_related_schema>
 type TestRelatedRecord = Omit<TestRelatedEntry, 'kind' | 'at'>
+type TestPinnedEntry = z.infer<typeof test_pinned_schema>
+type TestPinnedRecord = Omit<TestPinnedEntry, 'kind' | 'at'>
+type SplitNoticeEntry = z.infer<typeof split_notice_schema>
+type SplitNoticeRecord = Omit<SplitNoticeEntry, 'kind' | 'at'>
+type SplitFiledEntry = z.infer<typeof split_filed_schema>
+type SplitFiledRecord = Omit<SplitFiledEntry, 'kind' | 'at'>
+type UnplannedNoticeEntry = z.infer<typeof unplanned_notice_schema>
+type UnplannedNoticeRecord = Omit<UnplannedNoticeEntry, 'kind' | 'at'>
+type LaneStateChangeEntry = z.infer<typeof lane_state_schema>
+type LaneStateChangeRecord = Omit<LaneStateChangeEntry, 'kind' | 'at'>
+type PushMissEntry = z.infer<typeof push_miss_schema>
+type PushMissRecord = Omit<PushMissEntry, 'kind' | 'at'>
+type ShipLapEntry = z.infer<typeof ship_lap_schema>
+type ShipLapRecord = Omit<ShipLapEntry, 'kind' | 'at'>
+type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
 type GateRecord = Omit<GateEntry, 'kind' | 'at'>
@@ -235,7 +302,7 @@ type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 	waiting?: ReadonlyArray<number> | undefined
 }
 
-const lane_ledger_schema = { KIND, entry_schema }
+const lane_ledger_schema = { KIND, entry_schema, pinned_origin_schema }
 
 export type {
 	CoreWaitEntry,
@@ -246,21 +313,37 @@ export type {
 	GateRecord,
 	HeldEntry,
 	HeldRecord,
+	LaneStateChangeEntry,
+	LaneStateChangeRecord,
 	LedgerEntry,
 	LoadEntry,
 	MergeEntry,
 	OfferableEntry,
 	OverlapEntry,
 	OverlapRecord,
+	PushMissEntry,
+	PushMissRecord,
+	RoundOneEntry,
+	RoundOneRecord,
 	RoundTwoEntry,
 	RoundTwoRecord,
+	ShipLapEntry,
+	ShipLapRecord,
+	SplitFiledEntry,
+	SplitFiledRecord,
+	SplitNoticeEntry,
+	SplitNoticeRecord,
 	StageEntry,
 	StageRecord,
 	StopEntry,
 	StopRecord,
+	TestPinnedEntry,
+	TestPinnedRecord,
 	TestRelatedEntry,
 	TestRelatedRecord,
 	UnitFileRecord,
 	UnitFilesEntry,
+	UnplannedNoticeEntry,
+	UnplannedNoticeRecord,
 }
 export { lane_ledger_schema }

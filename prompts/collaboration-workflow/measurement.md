@@ -20,7 +20,8 @@
 
 PR の効果を測る後続 Issue を起票するとき:
 
-- 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。`#<PR>` は元の PR の番号で、Issue の番号は `issue:file` が refuse する。
+- 開始条件は日数でなく標本数で書く: `## 背景` に `- 実施可能条件: #<PR> のマージ後 <K> マージ`（`issue-template.md`）。`#<PR>` は元の PR の番号で、Issue の番号は `issue:file` が refuse する。元の PR がまだ無い（レーンが `josh ship` の前に起票する）→ `- 実施可能条件: #<Issue> を閉じる PR のマージ後 <K> マージ` と書く。`#<Issue>` を閉じたマージ済み PR から数える。`- 計測宣言:` のある Issue と、見積もりが 0 ファイルで受け入れ条件が `#<N>` の後・以降か記録（`lane:stats` 等）を読む Issue に条件が無いときも、`issue:file` が refuse する。
+- 判定は既定で `## 背景` の `- 計測宣言:` に書く（`issue-template.md`）。`lane:stats` の表の 1 セル → `pnpm josh lane:value cell`（`docs/josh-commands-run.md` → "`josh lane:value`"）。1 コマンドで出せない値 → `- 計測宣言なし: <理由>`。どちらも無ければ `issue:file` が refuse する。
 - K は測る値の種類で決める:
   - 事象の回数の率（停止・再利用など）: 変更前の率で 10 件以上見込める最小のマージ数（K ≥ 10 ÷ 変更前の率）。変更前の標本数を上限の目安にする。
   - 連続値の平均・差（所要時間など）: 5〜10。
@@ -28,6 +29,12 @@ PR の効果を測る後続 Issue を起票するとき:
 - 受け入れ条件の集計は固定日数でなく `pnpm josh lane:stats --period <days>` とし、`<days>` は元 PR のマージからの経過日数（小数可）にする。
 
 計測を記録し終えた → `pnpm josh issue:measured <N> --evidence-file <path>`。`.claude/skills/workflow-commands/issue-comments.md` →「A measurement-only Issue」。
+
+## 期待効果に届かなかったとき
+
+- 計測が期待効果に届かなかった → `pnpm josh issue:measured <N> --unmet --evidence-file <path>`。
+- 届かなかった機構の撤去候補を起票する → `pnpm josh effect:audit --draft <元 Issue>`（元 Issue が 30 日より前に閉じたときは `--days <N>` を足す）、表示された `issue:file` の行で起票する（重複は scout が止める）。
+- 時間短縮 Issue の効果を一覧する → `pnpm josh effect:audit [--days <N>]`。
 
 ## 手元で再実行してよいとき
 

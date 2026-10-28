@@ -1,3 +1,4 @@
+import { gate_plan } from '#scripts/gate/gate-plan'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_unit_guard } from './test-unit-guard'
 import { unit_share_fixture } from './unit-share-fixture'
@@ -22,6 +23,9 @@ const LATER_SHARE = 5
 const ASKED = 7
 const ASKED_WORKERS = ASKED - unit_worker_share.MAIN_PROCESS_CORES
 const NARROWED = 1
+// A GitHub-hosted runner, and the workers vitest opens there by default: one per core but one.
+const CI_CORES = 4
+const CI_DEFAULT = 3
 
 async function worker_arguments_for(): Promise<ReadonlyArray<string>> {
 	return unit_worker_share.worker_arguments([], await test_unit_guard.vitest_share([]))
@@ -62,6 +66,26 @@ describe('test_unit_guard.vitest_share — the claim the run was admitted on', (
 		stub_claim(undefined)
 
 		expect(await worker_arguments_for()).toStrictEqual([])
+	})
+
+	// joshuafolkken/kit#4607: a lone direct run on a four-core CI runner started at one worker.
+	it("starts a lone direct run on four cores at vitest's default of three workers", async () => {
+		stub_share(undefined)
+		stub_claim({ weight: gate_plan.direct_unit_weight(CI_CORES, 0) })
+
+		expect(await worker_arguments_for()).toStrictEqual([`--maxWorkers=${String(CI_DEFAULT)}`])
+	})
+
+	// joshuafolkken/kit#5135: a narrowed `josh test:related` opens as many workers as it claimed.
+	it('starts a narrowed related run at its scoped claim less vitest itself', async () => {
+		const weight = gate_plan.scoped_unit_weight(gate_plan.FILES_PER_WORKER * 2, PINNED_CORES, 0)
+
+		stub_share(undefined)
+		stub_claim({ weight })
+
+		expect(await worker_arguments_for()).toStrictEqual([
+			`--maxWorkers=${String(weight - unit_worker_share.MAIN_PROCESS_CORES)}`,
+		])
 	})
 })
 

@@ -8,7 +8,7 @@ import type { WrapupInput } from './git-pr-followup-wrapup'
 
 vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: {
-		issue_get_body: vi.fn(),
+		issue_view_json: vi.fn(),
 		issue_edit_body: vi.fn(),
 		issue_comment: vi.fn(),
 		pr_comment: vi.fn(),
@@ -57,6 +57,7 @@ const BASE_INPUT: WrapupInput = {
 		head_sha: 'c0ffee1',
 	},
 	wait_for_green: vi.fn(),
+	send_completion: vi.fn().mockResolvedValue(undefined),
 }
 
 const mocked_merge = vi.mocked(git_gh_command.pr_merge)

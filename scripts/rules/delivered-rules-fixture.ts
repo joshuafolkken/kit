@@ -1,7 +1,7 @@
 import { time_transcript_fixture } from '#tools/time/time-transcript-fixture'
 
 // Command and transcript-tail fixtures shared by the delivery suites — `delivered-rules.test.ts`,
-// `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `filing-cap.test.ts`.
+// `delivered-rules-predicates.test.ts`, `delivered-rules-filing.test.ts` and `turn-filings.test.ts`.
 // These are used across the suites, so they live here rather than being redeclared in each (no
 // clones — single source).
 
@@ -12,18 +12,21 @@ const FILING_COMMAND = 'pnpm josh issue:file "x" --body-file body.md'
 // The two hand-built spellings of a filing, which the `direct-filing` row refuses on every occurrence.
 const DIRECT_FILING_COMMAND = 'gh issue create --title "x"'
 const DIRECT_FILING_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues -f title="x" -f body="y"'
+// The Issue reads below name another repository: a read of the checkout's own is `direct-issue-read`'s
+// (joshuafolkken/kit#4703), so only another repository's read reaches the `issue-comments` row.
+//
 // The read the body-only rule asks for. It has to pass both rows, or obeying would wedge the run — so
 // it serves as a non-trigger fixture for each of them.
-const COMMENTED_READ_COMMAND = 'gh issue view 1319 --comments'
+const COMMENTED_READ_COMMAND = 'gh issue view 1319 --repo other/repo --comments'
 // The shortest body-only Issue read, and the `gh api` spelling of the same. Reused wherever a case
 // needs the second row's trigger to match.
-const BODY_READ_COMMAND = 'gh issue view 1319'
-const BODY_READ_API_COMMAND = 'gh api repos/joshuafolkken/kit/issues/1319'
+const BODY_READ_COMMAND = 'gh issue view 1319 --repo other/repo'
+const BODY_READ_API_COMMAND = 'gh api repos/other/repo/issues/1319'
 // A read that fetches the same Issue only to project its state or labels — a state check, not the body
 // read the rule guards, so it is not a trigger.
-const STATE_CHECK_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '{state, labels}'"
+const STATE_CHECK_COMMAND = "gh api repos/other/repo/issues/1319 --jq '{state, labels}'"
 // The `--jq` spelling that still names the body, so it stays a body read.
-const BODY_JQ_COMMAND = "gh api repos/joshuafolkken/kit/issues/1319 --jq '.body'"
+const BODY_JQ_COMMAND = "gh api repos/other/repo/issues/1319 --jq '.body'"
 
 // The minute the first fixture filing lands on.
 const A_FILING_MINUTE = 2

@@ -159,7 +159,8 @@ function observe_call(
 }
 
 // One transcript line, parsed once, as the things a reading is taken from: the calls it issued, the
-// bodies of the results the harness wrote back as failures, and the context a hook attached.
+// refusals the harness wrote back (failed results and Stop-hook blocks), and the context a hook
+// attached.
 interface DatedLine {
 	at_ms: number
 	message_id: string
@@ -183,6 +184,14 @@ function errors_of(parsed: TranscriptLine): Array<string> {
 		.filter((text) => text !== '')
 }
 
+// **A Stop-hook block is a refusal too** — of ending the turn — so its reason joins the
+// tool results the harness wrote back as failures (joshuafolkken/kit#4978).
+function refusals_of(parsed: TranscriptLine): Array<string> {
+	const errors = errors_of(parsed)
+
+	return parsed.stop_feedback === '' ? errors : [...errors, parsed.stop_feedback]
+}
+
 function dated_line(line: string): DatedLine | undefined {
 	const parsed = line === '' ? undefined : time_transcript_line.parse_line(line)
 
@@ -192,7 +201,7 @@ function dated_line(line: string): DatedLine | undefined {
 		at_ms: parsed.timestamp_ms,
 		message_id: parsed.message_id,
 		calls: calls_of(parsed),
-		errors: errors_of(parsed),
+		errors: refusals_of(parsed),
 		contexts: hook_context_line.hook_contexts_of(line),
 	}
 }
@@ -250,10 +259,14 @@ function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<Issu
 // each of them; the file opens with its imports, so under this test nothing claims it. Position is
 // what separates the two, so no count of how many signatures appear is needed — and a body naming
 // several can no longer be attributed to any of them.
+//
+// **The harness's own label is not the body.** It writes a deny as `PreToolUse:<Tool> hook error: ⛔ …`,
+// so the label is stripped before the opening is read; compared raw, no recorded refusal matched
+// (joshuafolkken/kit#4961).
 function refused_id(text: string): string | undefined {
-	const body = text.trimStart()
+	const body = time_transcript_line.refusal_body(text)
 	const found = delivered_rules.MEASURED_RULES.find((rule) =>
-		[rule.reason, ...(rule.former_reasons ?? [])].some((reason) =>
+		[rule.reason, ...(rule.former_reasons ?? []), ...(rule.stop_reasons ?? [])].some((reason) =>
 			body.startsWith(reason.slice(0, REASON_SIGNATURE_LENGTH)),
 		),
 	)

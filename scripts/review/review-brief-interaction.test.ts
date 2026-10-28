@@ -11,10 +11,12 @@ import { removed_tests_check } from './removed-tests-check'
 import { review_attest } from './review-attest'
 import { review_brief } from './review-brief'
 import { review_brief_cli } from './review-brief-cli'
+import { review_brief_paths } from './review-brief-paths'
 import { review_checkout } from './review-checkout'
 import { review_code_tree } from './review-code-tree'
 import { review_diff_write } from './review-diff-write'
 import { review_interaction } from './review-interaction'
+import { review_reviewed_tree } from './review-reviewed-tree'
 import { review_stamps } from './review-stamps'
 import { review_tree } from './review-tree'
 
@@ -27,9 +29,11 @@ const COMMIT = 'fedcba9876543210fedcba9876543210fedcba98'
 const OUTPUT_CAP = 30_000
 const INTERACTION_FLAG = '--interaction'
 const STALE_REFUSAL = 'issue-updated-after-round-one-sentinel'
+const INTERACTION_HEADING = '## Interaction review'
+const WHOLE_CHANGE = 'Target: the whole change'
 
 function stub_change(paths: ReadonlyArray<string>): void {
-	vi.spyOn(change_base, 'resolved').mockResolvedValue(COMMIT)
+	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(COMMIT)
 	vi.spyOn(changed_paths, 'read_changed_paths').mockResolvedValue([...paths])
 	vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue(
 		Object.fromEntries(paths.map((file) => [file, 'digest'])),
@@ -114,7 +118,7 @@ describe('review:brief --interaction', () => {
 		stub_change([DUE_FILE, OTHER_FILE])
 
 		await expect(review_brief_cli.run([INTERACTION_FLAG])).resolves.toBe(0)
-		expect(printed()).toContain('## Interaction review')
+		expect(printed()).toContain(INTERACTION_HEADING)
 		expect(printed()).toContain(`- ${DUE_FILE}`)
 		expect(printed()).not.toContain(`- ${OTHER_FILE}`)
 	})
@@ -138,13 +142,56 @@ describe('review:brief --interaction', () => {
 		await review_brief_cli.run([INTERACTION_FLAG])
 
 		expect(printed()).not.toContain(review_brief.RESUMED_HEADING)
-		expect(printed()).toContain('Target: the whole change')
+		expect(printed()).toContain(WHOLE_CHANGE)
 	})
 
 	it('reads an extra argument as a usage error', async () => {
 		stub_change([DUE_FILE])
 
 		await expect(review_brief_cli.run([INTERACTION_FLAG, 'extra'])).resolves.toBe(1)
+	})
+})
+
+// joshuafolkken/kit#4941: the round-2 brief names the files a recorded High cites, from its record.
+describe('review:brief --round 2 — the High-cited files', () => {
+	it('names the files the reviewed-tree record cites', async () => {
+		stub_change([DUE_FILE])
+		vi.spyOn(review_reviewed_tree, 'high_cited').mockReturnValue([DUE_FILE])
+
+		await expect(review_brief_cli.run(['--round', '2'])).resolves.toBe(0)
+		expect(printed()).toContain(`${review_brief_paths.HIGH_FIX_LINE}\n  /lanes/4276/${DUE_FILE}`)
+	})
+})
+
+// `josh run:review` hands `run_to` a writer, since its two briefs together exceed the Bash output cap
+// (joshuafolkken/kit#4863): every brief and the not-due line go to it, none to the console.
+describe('review:brief run_to', () => {
+	it('sends the code brief to emit, printing nothing', async () => {
+		stub_change([DUE_FILE, OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([], emit)).resolves.toBe(0)
+		expect(emit).toHaveBeenCalledTimes(1)
+		expect(String(emit.mock.calls[0]?.[0])).toContain(WHOLE_CHANGE)
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('sends the interaction brief to emit, printing nothing', async () => {
+		stub_change([DUE_FILE, OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([INTERACTION_FLAG], emit)).resolves.toBe(0)
+		expect(String(emit.mock.calls[0]?.[0])).toContain(INTERACTION_HEADING)
+		expect(console.info).not.toHaveBeenCalled()
+	})
+
+	it('sends the not-due line to emit, printing nothing', async () => {
+		stub_change([OTHER_FILE])
+		const emit = vi.fn<(text: string) => void>()
+
+		await expect(review_brief_cli.run_to([INTERACTION_FLAG], emit)).resolves.toBe(0)
+		expect(emit).toHaveBeenCalledWith(review_interaction.NOT_DUE_LINE)
+		expect(console.info).not.toHaveBeenCalled()
 	})
 })
 

@@ -16,10 +16,12 @@ import {
 	INTERRUPT_ROUTE_LABEL,
 	label_name_of,
 	MEASURED_LABEL,
+	MEASURED_UNMET_LABEL,
 	NEEDS_DECISION_LABEL,
 	NEEDS_HUMAN_REVIEW_LABEL,
 	NOT_BEFORE_LABEL,
 	NOT_DIRECTLY_RUNNABLE_LABELS,
+	parked_label_of,
 	PARKED_LABELS,
 	PLANNED_LABEL,
 	PRIORITY_CRITICAL_LABEL,
@@ -54,6 +56,8 @@ const NEEDS_HUMAN_REVIEW_SPELLING = 'needs-human-review'
 const ALREADY_DONE_SPELLING = 'already-done'
 // joshuafolkken/kit#4475: the mark `run:carry --end` collects a measurement-only lane by.
 const MEASURED_SPELLING = 'measured'
+// joshuafolkken/kit#4958: the shortfall `effect:audit` reads a retirement candidate off.
+const MEASURED_UNMET_SPELLING = 'measured:unmet'
 // joshuafolkken/kit#4102: the park a mechanical failure gets, kept apart from a person's decision.
 const RUN_STALLED_SPELLING = 'run:stalled'
 const RUN_STALLED_CREATED_CASING = 'Run:Stalled'
@@ -83,6 +87,7 @@ describe('the label names', () => {
 		[NEEDS_HUMAN_REVIEW_LABEL, NEEDS_HUMAN_REVIEW_SPELLING],
 		[ALREADY_DONE_LABEL, ALREADY_DONE_SPELLING],
 		[MEASURED_LABEL, MEASURED_SPELLING],
+		[MEASURED_UNMET_LABEL, MEASURED_UNMET_SPELLING],
 		[DEFERRED_LABEL, DEFERRED_SPELLING],
 		[INTERRUPT_ROUTE_LABEL, INTERRUPT_ROUTE_SPELLING],
 		[REVIEW_CAP_ROUTE_LABEL, REVIEW_CAP_ROUTE_SPELLING],
@@ -136,6 +141,7 @@ describe('WORKFLOW_LABELS', () => {
 			NEEDS_HUMAN_REVIEW_LABEL,
 			ALREADY_DONE_LABEL,
 			MEASURED_LABEL,
+			MEASURED_UNMET_LABEL,
 			DEFERRED_LABEL,
 			NOT_BEFORE_LABEL,
 			BUG_LABEL,
@@ -317,6 +323,19 @@ describe('has_parked_label', () => {
 
 	it('does not read in-progress or the human-review label as parked', () => {
 		expect(has_parked_label([IN_PROGRESS_SPELLING, NEEDS_HUMAN_REVIEW_SPELLING])).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4746: an `--only` run's stop names the park each unmerged issue sits on.
+describe('parked_label_of', () => {
+	it('names the park label, whatever casing GitHub answers with', () => {
+		expect(parked_label_of([UNRELATED_SPELLING, RUN_STALLED_CREATED_CASING])).toBe(
+			RUN_STALLED_SPELLING,
+		)
+	})
+
+	it('names no label for an issue that is not parked', () => {
+		expect(parked_label_of([IN_PROGRESS_SPELLING])).toBeUndefined()
 	})
 })
 

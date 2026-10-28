@@ -35,12 +35,13 @@ pnpm josh run:cut <N>
 
 - `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
   successor after this process exits; Anthropic relaunches directly). **End the turn immediately.**
-- `under-threshold` (0) — the newest request's billed input is under `CONTEXT_CUT_THRESHOLD`; **continue to the gate.**
+- `under-threshold` (0) — the newest request's billed input is under the `pnpm josh cost --cut` threshold; **continue to the gate.**
 - `not-a-lane` (0) — not a dispatched child. **Continue to the gate.**
 - `unready` (1) — the tree is clean or on the default branch. Continue to the gate.
 - `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
 - `failed` (1) — no live OpenAI supervisor, or the Anthropic relaunch could not start. Continue.
 - `unknown` (1) — the git directory could not be read. Continue to the gate.
+- `split-unresolved` (1) — `split-assessment.md` → "Over the guide before the gate".
 
 **`cut` is the only verdict that ends the turn.**
 
@@ -63,7 +64,8 @@ pnpm josh run:cut --resume <N>
   implementation**; re-read the issue body and comments, then go straight to `pnpm josh gate`.
 - `resume-impl` (0) — the cut was taken **during** implementation. Skip the title, the plan, the
   fresh hold claim and the split assessment, re-read the plan, then **continue implementation** — do
-  **not** go straight to the gate.
+  **not** go straight to the gate. A round 1 the resume prints is continued, not rerun
+  (`scripts/run/cut/run-cut-review.ts`).
 - `handed-off` (0) — a successor already adopted this cut. **End the turn quietly and do nothing**;
   no Telegram owed.
 - `stale` (1) — the record does not match the tree (branch, clean tree, expired, or unknown hand-off).
@@ -99,8 +101,7 @@ The child ends mid-implementation and a fresh one resumes **back into implementa
 ### The measurement is the parent hand-off's, never a second one
 
 Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `backlogrun-progress.md` →
-"The hand-off"; `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` aliases the **135_000**
-`CONTEXT_CUT_THRESHOLD`.
+"The hand-off", against the same threshold `pnpm josh cost --cut` prints.
 
 ### It is a guard, fired at the edit that crosses the threshold
 
@@ -112,15 +113,16 @@ record**, so the cut may fire again. **A cut that relaunches its successor owes 
 clears. Outside a
 lane, `run:cut --impl` prints the held run's instruction: on `over`, keep the hold, send a
 `confirmation` Telegram naming `fullrun #<N>`, end the turn. **It fires on every threshold crossing,
-not once per run**; **An edit reissued right after a refusal passes**; **An unmeasurable session
+not once per run**; **An edit reissued right after a refusal passes**; **The run's own handoff
+`Write` always passes**; **An unmeasurable session
 warrants the cut**; **It is silent between a cut and its resume** (`scripts/rules/implementation-cut.ts`).
 A child that ended without cutting is detected by
 `pnpm josh run:ending <N> --output <path>`.
 
 ## The threshold
 
-`CONTEXT_CUT_THRESHOLD` and `cost_verdict.per_request_cost` live in
-`scripts/cost-runtime/context-cut-payback.ts`; both cuts and the parent hand-off read the same verdict,
+The threshold is the break-even context `scripts/cost-runtime/context-cut-payback.ts` prices at the
+session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict,
 and an unmeasurable session is always cut. Both cuts end the turn **before** the gate, so the push is never a
 turn boundary (`chain-rule.md`).
 

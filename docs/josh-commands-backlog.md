@@ -2,7 +2,7 @@
 
 The commands the issue-driven workflow calls to read and file issues, track epics, pick and plan a backlog, brief and attest a review, and decide what a run delegates. Where each command came from: `docs/maintainers/josh-commands-backlog-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `pnpm josh command:derive` — edit the entry, not the span.
 
 ## Issues
 
@@ -37,9 +37,21 @@ pnpm josh issue:ack 3773
 
 <!-- /usage -->
 
-`josh run:entry` records the issue as the baseline; the PreToolUse hook shows a person's body edit or new comment once, and `issue:ack` makes that read the new baseline.
+`josh run:entry` records the issue as the baseline; the PreToolUse hook shows a person's body edit or new comment once, and `issue:ack` makes that read the new baseline. A body edit on an issue whose author lacks write access is shown once as a notice with the text withheld; it needs no `issue:ack`.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:ack` in detail".
+
+### `josh issue:priority`
+
+<!-- usage: issue:priority -->
+
+Apply priority:high to an issue whose body reached the high floor after filing.
+
+```bash
+pnpm josh issue:priority 4960
+```
+
+<!-- /usage -->
 
 ### `josh issue:state`
 
@@ -113,7 +125,7 @@ Duplicates are scored by title token overlap: ≥2 significant shared words and 
 
 <!-- usage: issue:file -->
 
-File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle.
+File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle.
 
 ```bash
 pnpm josh issue:file "<title>" --body-file body.md
@@ -128,9 +140,11 @@ pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
 - `--distinct <N,…>` — duplicate candidates you read and judged distinct.
-- `--over-cap` — the run is blocked by this filing; the cap lets it through.
+- `--found-during <N>` — the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.
+- `--over-cap` — the run is blocked by this filing; the WIP cap lets it through.
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
+- `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
 
 <!-- /usage -->
 
@@ -138,19 +152,26 @@ The `direct-filing` guard refuses `gh api …/issues` and `gh issue create`, poi
 
 **Steps (run in this order):**
 
-1. Refuse when the target is third-party (Tier C).
-2. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below the floor its required `- 1 マージあたりの短縮:` percentage sets (`issue-template.md`); a typed `--label priority:*` skips this judgement.
-3. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件:` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
-4. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
-5. On a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
+Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: each prints its refusal and the pass goes on, so one call prints every problem, the duplicate candidates of a body the lint refused included. Any refusal in the pass files nothing.
+
+1. Refuse unless the target is first-party: a third-party target (Tier C), and one whose owner cannot be read (`unknown`). The `third-party-write` guard stays silent on `unknown`; this command files only to a tracker known to be ours.
+2. In a run's session, refuse an origin's eleventh run filing (origin: `--found-during <N>`, else the lane or branch issue; none: the run invocation). Then, on a finder's second filing into the same repository, ask the [`josh issue:fold`](#josh-issuefold) question; only `fold` refuses, and `--distinct <N>` declares a separate deliverable. A split child (`--route split`) asks nothing.
+3. Check the body against the same criteria as [`josh issue:lint`](#josh-issuelint), and for exactly one `- 人の判断: 不要` / `- 人の判断: 要` line under `## 背景`. Refuse on any problem, including a `- 優先度:` declaration that names no basis or sits below its floor (`issue-template.md`); a typed `--label priority:*` skips this judgement.
+   A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
+   A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-run.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
+   A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
+   A `- 規模見積もり:` over the split guide on both axes ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`.
+4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
+   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, is not read: it waits on the pull request that closes the issue, for a follow-up filed before that pull request exists.
+5. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
 6. Count the target's open issues and print `wip: <count> open in <owner/repo> · cap <cap> · <verdict>`: `within` up to the cap; past it `exempt` (route `interrupt` / `split` / `tier-a`, or `--over-cap`), else `held`, which asks the exemption question and refuses; an unreadable count warns.
 7. Run the same duplicate search as [`josh issue:scout`](#josh-issuescout) and print its report. File nothing until every candidate is named in `--distinct`; a duplicate is folded into the existing issue by `issue-fold-existing.md`. A filing to another repository points `GH_REPO` at the target, so the search and the epic decision run there.
 8. Create any missing workflow label with its color and description — the same set as [`josh sync`](josh-commands.md#josh-sync). A label that cannot be created warns, and the filing goes on.
-9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL.
+9. File with all labels in one request, plus the `priority:critical` / `priority:high` the declaration names; print the URL. A `--route interrupt --blocks-finder` filing in this repository then records its finder (step 2's origin) as blocked by the filed issue; a write that fails prints `⚠` with the `gh api` call to re-run, and the exit code stays 0; one that records nothing prints why.
 10. With `--release`, link the filed issue to the target's release issue, as [`josh issue:release`](#josh-issuerelease) does. A link that does not complete prints `⚠` with that command to re-run, prefixed with `GH_REPO=<target>` for a `--repo` filing.
 11. Run [`josh epic:bundle`](#josh-epicbundle) on the filed issue. When it gives no answer, print `⚠` with the command to re-run; the exit code stays 0.
 
-A refusal in steps 1–7 files nothing and exits 1. The per-run filing cap (`filing-cap`) applies to calls of this command; a refused call is not counted. No delivered rule refuses the call ahead of the WIP cap and fold steps.
+A refusal in steps 1–7 files nothing and exits 1, and a filing that files nothing is never counted toward the cap. No delivered rule refuses the call ahead of the filing cap, WIP cap and fold steps.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:file` in detail".
 
@@ -299,12 +320,14 @@ See `issue-comments.md` → "When the work turns out to be already merged". Step
 Complete a measurement-only issue: post the result, label it measured, close it, release the hold.
 
 ```bash
-pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md   # comment, label, close, release — in that order
+pnpm josh issue:measured 4452 --evidence-file .josh/tmp/measured.md           # comment, label, close, release — in that order
+pnpm josh issue:measured 4452 --unmet --evidence-file .josh/tmp/measured.md   # the measurement fell short of the expected effect: measured:unmet as well
 ```
 
 **Options:**
 
 - `--evidence-file <path>` — the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.
+- `--unmet` — the measurement fell short of the expected effect it checked; adds the measured:unmet label `josh effect:audit` reads
 
 <!-- /usage -->
 
@@ -350,6 +373,8 @@ Prints `ok` and the labels to apply when the headings and one `- 種別:` declar
 
 A `実施可能条件` or `実施可能日` heading exits 1 and shows the `## 背景` declaration line to write instead.
 
+A non-epic body without a well-formed `- 規模見積もり: 約 <N> ファイル / <M> 行（テスト除く）` line under `## 背景` exits 1. An epic (a body with `## Split rationale`) declares none.
+
 A `- 種別: 振る舞い変更` body also needs `## 発火点`, `## ベースライン` (a re-runnable `` `<command>` → <value> ``) and `## 再現` (a command with its actual output). [`josh measure:rerun`](josh-commands-automation.md#josh-measurererun) re-runs the baseline after merge.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh issue:lint` in detail".
@@ -382,14 +407,40 @@ pnpm josh defect:report   # every issue labelled bug, open or closed
 
 Counts the `bug` issues by their `- 原因:` origin pull request, by its change kind (add / fix / remove, read off the pull request's changed files) and by area, plus the defects filed within 7 days of a mechanism-adding merge. Unknown and undeclared origins are counted apart.
 
+### `josh effect:audit`
+
+<!-- usage: effect:audit -->
+
+List closed run-time-shortening issues with their expected effect, follow-up measurement and result.
+
+```bash
+pnpm josh effect:audit                # issues closed in the last 30 days, one line each
+pnpm josh effect:audit --days 7       # a shorter window
+pnpm josh effect:audit --draft 4896   # write the retirement candidate of a shortfall and print its issue:file line
+```
+
+**Options:**
+
+- `--days <N>` — the window, in days back from now (default 30)
+- `--draft <issue>` — an issue whose measurement carries measured:unmet: write its retirement-candidate body to a temporary file
+
+<!-- /usage -->
+
+One line per closed `- 目的: 時間短縮` issue of the window: its expected effect (`効く率` · `1 回あたりの得` · `外れたときの損`), the follow-up measurements that cite it with a `- 実施可能条件:` line, and the result, then a tally.
+
+The result reads the follow-ups' labels: `届かなかった` when one carries `measured:unmet` ([`josh issue:measured --unmet`](#josh-issuemeasured)), `届いた` when one carries `measured`, `未計測` otherwise.
+
+`--draft <issue>` takes an issue whose result is `届かなかった`, writes its retirement-candidate body to a temporary file and prints the `josh issue:file` line to file it; any other result is refused. The body's angle-bracket lines are left for the filer, and `issue:file`'s scout stops a duplicate. When to run it: `prompts/collaboration-workflow/measurement.md` → "期待効果に届かなかったとき".
+
 ### `josh report:lint`
 
 <!-- usage: report:lint -->
 
-Check a two-layer work summary on stdin against its mechanical format rules.
+Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules.
 
 ```bash
 pnpm josh report:lint < summary.md
+pnpm josh report:lint --child-summary < summary.md
 ```
 
 <!-- /usage -->
@@ -397,6 +448,8 @@ pnpm josh report:lint < summary.md
 The format is `CLAUDE.md` Step 0, in `prompts/collaboration-workflow/report-format.md`. It enforces the mechanical half: labels present, no overview line over its character ceiling, no code fence around the summary, no file path or CLI flag in the overview.
 
 Prints `ok` (exit 0), or the violations one per line plus one line naming the template's section in `report-format.md` (exit 1). The writer judges whether the overview names a concrete subject. The labels follow `JOSH_SESSION_LANG` (`ja`, else English), from the table `josh report:template` prints.
+
+`--child-summary` checks a lane child's closing summary instead: its line bound over non-blank lines, the cause / fix / result labels in the session language, and no changed-file list (two or more consecutive path-only bullets). A failure's last line names the section that shapes it.
 
 ### `josh report:template`
 
@@ -647,8 +700,8 @@ pnpm josh auto-ok:next --exclude 906   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on, then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
-or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read`.
+Read-only. Ranks `priority:critical`, then `priority:high`, then a verification-path defect (`bug` with `run:solo`, or `route:interrupt`), then issues other open issues wait on (all keys: **Ranking** below), then newest-first, skipping `epic`, `in-progress`, `needs-decision` and any candidate whose `blockedBy` is still open or whose `- 実施可能日:` (`YYYY-MM-DDTHH:MMZ`) has not arrived,
+or whose `- 実施可能条件: #<PR> のマージ後 <K> マージ` (or `#<issue> を閉じる PR のマージ後 <K> マージ`) is not yet met; `backlog:next` prints `#N not before <time>`, or for the condition `until #<PR> merges`, `<n>/<K> merges after #<PR>` or `until the merge of #<PR> is read` — `the pull request closing #<issue>` in place of `#<PR>` for the issue form.
 
 `josh start` creates the `auto-ok` label, and `josh sync` adds it to a repository that lacks it. stdout is the issue number, `none`, or empty with exit 1 if the listing could not be read; explanations to stderr.
 
@@ -700,9 +753,9 @@ Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `
 
 **Triage gate**: while any candidate carries neither `run:solo` nor `run:lane`, it prints `triage` and no numbers, naming the untriaged issues on stderr.
 
-**Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back.
+**Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
-**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then the number of issues it blocks; standalone numbers are cut to five.
+**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
@@ -727,7 +780,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 
 <!-- /usage -->
 
-It uses `backlog:next`'s own classification, kept separate because that command's stdout is bare tokens a loop branches on.
+It uses `backlog:next`'s own classification, kept separate because that command's stdout is bare tokens a loop branches on. A wave holds at most the lane limit's standalone issues, not `backlog:next`'s five, and none is cut when the limit cannot be read; the header says which.
 
 ```text
 Wave 1  #2770 [run:solo]
@@ -735,7 +788,7 @@ Wave 2  #2765 [run:solo]
 Wave 3  #2774 #2766 #2769   (parallel)
 ```
 
-Sections: **Ready now** (runnable children grouped by repository; a `run:solo` row is marked `[run:solo]`, one with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
+Sections: **Ready now** (runnable children grouped by repository, in the order the offer walks them — an issue that yielded its lane first, then the rank — so each wave keeps this order; a `run:solo` row is marked `[run:solo]`, one with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
 **Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each naming its label), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
@@ -857,21 +910,41 @@ One non-inert path decides the whole change; an empty diff also takes `medium`. 
 Say whether the second /code-review round is due, or may be skipped entirely.
 
 ```bash
-pnpm josh review:round2                    # → required
-pnpm josh review:round2 --round-1-closed   # → required | skip
-pnpm josh review:round2 --json             # the verdict and the reason, machine-readable
+pnpm josh review:round2                # → required | skip, for the branch’s issue
+pnpm josh review:round2 --record 123   # → required | skip, a skip commented on that issue
+pnpm josh review:round2 --json         # the verdict and the reason, machine-readable
 ```
 
 **Options:**
 
-- `--round-1-closed` — the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.
+- `--record` — the issue whose ledger dispositions decide round 1’s closure — skip only when every High/Medium is `fixed` or `false-positive` — and where a skip is commented under `## Round 2 skipped`, once.
 - `--json` — machine-readable verdict and reason.
 
 <!-- /usage -->
 
-Run it after round 1's fixes. `skip` when the fix delta is empty or touches only inert paths (docs, prompts, comment-only code); `required` otherwise. Full reasoning: `prompts/review.md`.
+Run it after round 1's fixes. `skip` when the fix delta is empty or touches only inert paths (docs, prompts, `josh metrics` approvals, comment-only code); `required` otherwise. Full reasoning: `prompts/review.md`.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:round2` in detail".
+
+### `josh prose:stale`
+
+<!-- usage: prose:stale -->
+
+List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name.
+
+```bash
+pnpm josh prose:stale   # → `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)
+```
+
+<!-- /usage -->
+
+The self-check's "Prose matches the code" (`prompts/review.md`) as a search. From the change base to the working tree it takes each removed name and `UPPER_CASE` constant (a top-level `.ts` / `.js` declaration or an `export { … }` entry), `josh` command and `.md` heading.
+
+It drops the ones an added line still writes (an added `.md` heading, for a heading) and the commands the registry still holds.
+
+It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
+
+Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
 
 ### `josh disposition`
 
@@ -910,6 +983,23 @@ A `/code-review` is forked into the session's working directory, so a lane run c
 Answers `ok`, `missing` (a refusal), `mismatch` or `not-required`; an attestation expires after eight hours, and `ok` is refused on an unread issue update ([`josh issue:ack`](#josh-issueack)).
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:attest` in detail".
+
+### `josh review:lint`
+
+<!-- usage: review:lint -->
+
+Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass.
+
+```bash
+pnpm josh review:lint < review.md
+pnpm josh review:lint --round 2 < review.md
+```
+
+<!-- /usage -->
+
+The format is `prompts/review-rubric.md` → "Review output format". It enforces the mechanical half: the category headings in order, a verdict under each, the trace behind category 1's `No issues`, 2–3 assumptions, no banned Confidence floor answer, a `file:line` and severity on every finding, and no code fence. `--round 2` requires only the verification pass's three headings.
+
+Prints `ok` (exit 0), or the violations one per line plus one line naming the rubric's section (exit 1). Whether a finding is right stays with the reviewer.
 
 ### `josh delegate`
 

@@ -25,7 +25,9 @@ const NODE_COMPAT_RUNTIME = 'node@${{ matrix.node }}'
 const NODE_VERSION_STEP = 'Verify Node.js version'
 const PUBLISH_YML = '.github/workflows/publish.yml'
 const RUNTIME_WORKFLOWS_DIR = '.github/workflows'
-const PUBLISH_JOBS = ['publish-github', 'publish-npm', 'create-release']
+const PUBLISH_JOBS = ['pack', 'create-release']
+// joshuafolkken/kit#4633: the jobs holding the publish rights install nothing and run no `pnpm`.
+const CREDENTIALED_JOBS = ['publish-github', 'publish-npm']
 const INSTALL_COMMAND = 'pnpm install --frozen-lockfile --ignore-scripts'
 const SAFE_CHAIN_STEP = 'Setup safe-chain'
 const WHEN_INSTALLING = "inputs.install == 'true'"
@@ -36,6 +38,7 @@ const COREPACK_ENABLE = 'corepack enable'
 const COREPACK_PREPARE = 'corepack prepare'
 const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
+const CACHE_ACTION = 'actions/cache'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -127,13 +130,17 @@ describe('the setup-pnpm composite action', () => {
 	})
 
 	it('restores the pnpm store only when asked to', () => {
-		const store_steps = ACTION_STEPS.filter((step) => step.name?.includes('store'))
+		const setup = ACTION_STEPS.find((step) => is_pnpm_setup(step))
 
-		expect(store_steps).toHaveLength(2)
+		expect(setup?.with?.['cache']).toBe(`\${{ ${WHEN_INSTALLING} && inputs.cache == 'true' }}`)
+	})
 
-		for (const step of store_steps) {
-			expect(step.if).toBe(`${WHEN_INSTALLING} && inputs.cache == 'true'`)
-		}
+	// joshuafolkken/kit#5315: an actions/cache step restored the store only after pnpm/setup had
+	// downloaded the runtime into it, so the runtime was never restored.
+	it('leaves the store cache to pnpm/setup, which restores it before the runtime', () => {
+		const cache_steps = ACTION_STEPS.filter((step) => step.uses?.startsWith(CACHE_ACTION))
+
+		expect(cache_steps).toEqual([])
 	})
 })
 
@@ -159,6 +166,14 @@ describe.each(ACTION_CALLERS)('pnpm setup in $path', ({ path: workflow_path, job
 describe('the publish workflow', () => {
 	it.each(PUBLISH_JOBS)('installs behind safe-chain without the store cache in %s', (job_name) => {
 		expect(action_call(PUBLISH_YML, job_name)?.with).toEqual({ cache: 'false' })
+	})
+
+	it.each(CREDENTIALED_JOBS)('sets up no pnpm and runs no pnpm or tsx in %s', (job_name) => {
+		const steps = required_steps(PUBLISH_YML, job_name)
+		const commands = steps.map((step) => step.run ?? '').join('\n')
+
+		expect(action_call(PUBLISH_YML, job_name)).toBeUndefined()
+		expect(commands).not.toMatch(/\b(?:pnpm|tsx)\b/u)
 	})
 })
 

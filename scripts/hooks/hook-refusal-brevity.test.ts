@@ -3,6 +3,7 @@ import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { lane_background } from '#scripts/rules/lane-background'
+import { lane_direct_tool } from '#scripts/rules/lane-direct-tool'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { stop_rules } from '#scripts/rules/stop-rules'
 import { run_parent_cut_hook } from '#scripts/run/run-parent-cut-hook'
@@ -23,14 +24,15 @@ const TEXTS: ReadonlyArray<[string, string]> = [
 	['stop: filing offer', stop_rules.FILING_OFFER_REASON],
 	['stop: headless wait', stop_rules.HEADLESS_WAIT_REASON],
 	['stop: hold release', stop_rules.HOLD_RELEASE_REASON],
-	['stop: issue citation', stop_rules.ISSUE_CITATION_REASON],
 	['stop: lane index', stop_rules.LANE_INDEX_REASON],
 	['stop: notify', stop_rules.STOP_NOTIFY_REASON],
 	['stop: session language', stop_rules.build_language_reason('ja')],
 	['stop: lane background', lane_background.LANE_BACKGROUND_STOP_REASON],
+	['stop: lane agent', lane_background.LANE_AGENT_STOP_REASON],
 	['notice: lane background foreground', lane_background.FOREGROUND_NOTE],
 	['notice: pipefail rewrite', piped_verification.PIPEFAIL_NOTE],
 	['notice: issue-comments rewrite', issue_comments.COMMENTS_NOTE],
+	['notice: lane direct tool rewrite', lane_direct_tool.RESERVED_NOTE],
 	['duplicate read refusal', duplicate_reads.REASON],
 	['notice: duplicate read', duplicate_reads.NOTICE],
 	['parent cut', run_parent_cut_hook.PARENT_CUT_REASON],

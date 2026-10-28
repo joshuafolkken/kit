@@ -1,9 +1,11 @@
 import path from 'node:path'
+import { core_budget } from '#scripts/gate/core-budget'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { related_heavy_tests } from './related-heavy-tests'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
@@ -15,6 +17,9 @@ vi.mock('#scripts/git/changed-paths', () => ({
 		read_changed_since: vi.fn(),
 		read_held_at: vi.fn(),
 	},
+}))
+vi.mock('./related-heavy-tests', () => ({
+	related_heavy_tests: { exclude_flags: vi.fn(() => []) },
 }))
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: {
@@ -31,6 +36,10 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
 vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+// The claim walks no import graph here; what it claims is `test-related.claim.test.ts`.
+vi.mock('./test-pinned-reach', () => ({
+	test_pinned_reach: { reached_test_count: vi.fn() },
+}))
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
@@ -62,6 +71,7 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: MAP_COMMIT,
 	dirty: { [DIRTY_DOCUMENT]: 'digest-then' },
+	change: [DIRTY_DOCUMENT],
 	directories: [],
 	readers: { [DOCUMENT]: [CHANGED_SOURCE], [DIRTY_DOCUMENT]: [CHANGED_SOURCE] },
 }
@@ -83,6 +93,16 @@ function announcement(): string {
 	return mocked_run.mock.calls[0]?.[3] ?? ''
 }
 
+// No recorded read map, and the claim runs its body without touching the machine-wide ledger; what
+// it claims is `test-related.claim.test.ts`.
+function stub_machine_state(): void {
+	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	vi.spyOn(core_budget, 'is_covered').mockReturnValue(false)
+	vi.spyOn(core_budget, 'with_command_reservation').mockImplementation(
+		async (_weight, run) => await run(),
+	)
+}
+
 beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
@@ -93,7 +113,7 @@ beforeEach(() => {
 	mocked_running.mockReturnValue(true)
 	mocked_since.mockResolvedValue([])
 	mocked_held.mockResolvedValue([])
-	vi.spyOn(test_read_map, 'read_map').mockReturnValue(undefined)
+	stub_machine_state()
 })
 
 describe('test_related.run_related_tests — the green record', () => {
@@ -137,6 +157,16 @@ describe('test_related.run_related_tests', () => {
 		await test_related.run_related_tests([])
 
 		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+
+	// joshuafolkken/kit#5105: the heavy files the scope reaches only indirectly stay out of the run.
+	it('hands vitest the heavy-file exclusions after the narrowed files', async () => {
+		const flags = ['--exclude', 'tools/test/heavy.test.ts']
+
+		vi.mocked(related_heavy_tests.exclude_flags).mockReturnValueOnce(flags)
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run', ...flags])
 	})
 
 	it('reports the narrowing it applied, through the guard that decides there is a run', async () => {
@@ -214,7 +244,7 @@ describe('test_related.run_related_tests — explicit arguments against a map', 
 		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
 	})
 
-	it('joins the change since the map to the arguments, so a test added since it runs', async () => {
+	it('joins the change since the map to the arguments, so a test added since it naming one runs', async () => {
 		mocked_since.mockResolvedValue([ADDED_TEST])
 
 		await test_related.run_related_tests([DOCUMENT])
@@ -246,6 +276,7 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 
 	it('reads the change since the map’s commit rather than the branch change', async () => {
 		mocked_since.mockResolvedValue([DOCUMENT])
+		mocked_changed.mockResolvedValue([DOCUMENT])
 
 		await test_related.run_related_tests([])
 
@@ -272,10 +303,18 @@ describe('test_related.run_related_tests — the change a map answers for', () =
 	})
 
 	it('counts what already differed from the map’s tree as changed', async () => {
+		mocked_changed.mockResolvedValue([DIRTY_DOCUMENT])
+
 		await test_related.run_related_tests([])
 
 		expect(announcement()).toContain(CHANGED_SOURCE)
 		expect(vitest_arguments()).toEqual(['related', ABSOLUTE_SOURCE, '--run'])
+	})
+})
+
+describe('test_related.run_related_tests — a map whose commit cannot be resolved', () => {
+	beforeEach(() => {
+		vi.mocked(test_read_map.read_map).mockReturnValue(MAP)
 	})
 
 	it('drops the map and reads the branch change when its commit cannot be resolved', async () => {
@@ -305,6 +344,7 @@ describe('test_related.run_related_tests — a change no test reads', () => {
 		await expect(test_related.run_related_tests([])).resolves.toBe(0)
 
 		expect(mocked_run).not.toHaveBeenCalled()
+		expect(core_budget.with_command_reservation).not.toHaveBeenCalled()
 		expect(written_output()).toContain('running no tests')
 		expect(written_output()).toContain(UNREAD_DOCUMENT)
 	})

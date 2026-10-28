@@ -35,7 +35,7 @@ every regressed row, and the scout keeps a repeat sighting from filing twice.
 ledger** (drained by `pnpm josh observations:flush`). **File nothing when nothing passes.**
 
 **Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`): file
-with `pnpm josh issue:file`, which scouts first — an **open** candidate covering it means do not file, a
+with `pnpm josh issue:file`, which scouts — an **open** candidate covering it means do not file, a
 `(closed)` one means already merged. It also runs `epic:bundle` on each new Issue.
 
 ## `auto-ok`, and closing the step
@@ -44,7 +44,7 @@ with `pnpm josh issue:file`, which scouts first — an **open** candidate coveri
 `- 人の判断: 不要`, so `issue:file` applies the label (with the run label
 `prompts/collaboration-workflow/issue-template.md` requires). **`backlogrun-steps.md` → "What one
 invocation approves" is that judgement's single source.** Every brake still counts these filings: the
-ten-per-run ceiling, the WIP cap, `--max` and the 135,000-token session budget.
+ten-per-origin ceiling (with no origin, counted with the invocation's other no-origin filings), the WIP cap, `--max` and the `pnpm josh cost --cut` session budget.
 
 **Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the
 carry record so `run:step` prints `stop` from then on; the mark survives a session cut and is removed at

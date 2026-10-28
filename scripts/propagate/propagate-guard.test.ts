@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { ALIASES, COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { ALIASES } from '#scripts/josh/josh-aliases'
+import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { propagate } from './propagate'
 

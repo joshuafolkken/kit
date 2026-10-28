@@ -1,7 +1,9 @@
 import { time_bundle_call, type BundleFacts } from './time-bundle-call'
 import { time_bundles } from './time-bundles'
 import { time_call_identity } from './time-call-identity'
+import { time_search_call } from './time-search-call'
 import { time_spans, type Span } from './time-spans'
+import type { ToolCall } from './time-tool-call'
 import { time_transcript_line } from './time-transcript-line'
 
 // Whether the call about to go out should be refused because the run has stopped batching. What a
@@ -154,6 +156,16 @@ function is_reissued_refusal(spans: ReadonlyArray<Span>, call: GuardedCall): boo
 	)
 }
 
+// The closed history a refusal judges; empty where the call is not refusable or is a reissue, and an
+// empty history never reaches the limit.
+function refusable_spans(text: string, call: GuardedCall): ReadonlyArray<Span> {
+	if (!is_guarded_call(call)) return []
+
+	const { spans } = time_spans.parse_timeline(text)
+
+	return is_reissued_refusal(spans, call) ? [] : spans
+}
+
 // The lane-child notice passes `NOTICE_REFIRE_EVERY` to recur on the notice's cadence.
 function should_block(
 	text: string,
@@ -161,13 +173,37 @@ function should_block(
 	refused_at_ms: number,
 	refire_every: number = REFIRE_EVERY,
 ): boolean {
-	if (!is_guarded_call(call)) return false
+	return is_at_limit(refusable_spans(text, call), call, refused_at_ms, refire_every)
+}
 
-	const { spans } = time_spans.parse_timeline(text)
+function as_tool_call(call: GuardedCall): ToolCall {
+	return time_spans.to_tool_call(call.name, call.input, time_spans.NO_MESSAGE_ID)
+}
 
-	if (is_reissued_refusal(spans, call)) return false
+// Asked before the transcript is read, like `is_guarded_call`, for the search-chain refusal alone.
+function is_search_chain_call(call: GuardedCall): boolean {
+	return is_guarded_call(call) && time_search_call.is_search_chain_call(as_tool_call(call))
+}
 
-	return is_at_limit(spans, call, refused_at_ms, refire_every)
+// The turns that make the limit — the last closed ones and the call in hand — are all searches.
+function is_search_chain(spans: ReadonlyArray<Span>, call: GuardedCall): boolean {
+	const recent = time_bundles.open_sequence(spans).slice(-SEQUENCE_BEFORE_LIMIT)
+
+	return [...recent, as_tool_call(call)].every((turn) =>
+		time_search_call.is_search_chain_call(turn),
+	)
+}
+
+// The narrower refusal a lane child keeps (`search-batching` in `lane-guard-policy.ts`): only a chain
+// of searches issued one per turn, the largest share of the child's single-call pairs.
+function should_block_search_chain(
+	text: string,
+	call: GuardedCall,
+	refused_at_ms: number,
+): boolean {
+	const spans = refusable_spans(text, call)
+
+	return is_search_chain(spans, call) && is_at_limit(spans, call, refused_at_ms, REFIRE_EVERY)
 }
 
 // `notified_at_ms` is the notice's own record, so a notice never silences a later refusal.
@@ -279,9 +315,11 @@ const time_batch_guard = {
 	is_guarded_call,
 	is_notice_call,
 	is_read_only_call,
+	is_search_chain_call,
 	pairing_candidates,
 	recent_candidates,
 	should_block,
+	should_block_search_chain,
 	should_notify,
 }
 

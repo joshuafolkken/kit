@@ -19,8 +19,8 @@ import { shell_segments } from './shell-segments'
 //
 // **It refuses rather than rewrites, because a `PreToolUse` guard can only `allow` / `deny` a command,
 // never substitute a different one**. So the refusal hands back the next command: the lane is already on its own issue
-// branch, branched from a fresh default before it opened, and the latest default is brought in during the
-// gate by `pnpm josh main:merge` — so skip the step and keep implementing on the current branch.
+// branch, branched from a fresh default before it opened, and the latest default is brought in before the
+// gate by `josh ship`'s sync — so skip the step and keep implementing on the current branch.
 //
 // **The branch is judged against the lane's own, not the name `main`.** `already used by worktree` is a
 // property of any branch the primary work tree holds, not of the literal `main`, and the default branch
@@ -108,8 +108,8 @@ function is_switch_away_from_lane(
 const LANE_SWITCH_MAIN_REASON =
 	'⛔ lane child on `git switch main`: this session is a dispatched lane child, and switching to the ' +
 	'default branch here always fails (`already used by worktree`: the primary checkout holds it). Skip ' +
-	'this step and keep implementing on the current branch; `pnpm josh main:merge` brings the default ' +
-	'in during the gate. Refused on every occurrence (`backlogrun-lanes.md`, `backlogrun-child.md`).'
+	"this step and keep implementing on the current branch; `pnpm josh ship`'s sync brings the default " +
+	'in before its gate. Refused on every occurrence (`backlogrun-lanes.md`, `backlogrun-child.md`).'
 
 // The row itself, so `delivered-rules.ts` spreads one entry. `is_trigger` reads the input through
 // `on_bash_command` — the `Bash` tool-name gate every command row shares — and `decide` returns true so

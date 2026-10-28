@@ -8,10 +8,14 @@ import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { review_attest } from '#scripts/review/review-attest'
+import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
+import { run_cut_digest } from './run-cut-digest'
 
 // What the `josh run:cut` CLI suites share: the scratch repository, the spied git and lane reads, and
 // the per-test reset — so the setup-boundary suite runs on the same harness as the main suite rather
@@ -65,6 +69,16 @@ const is_reviewer = vi.spyOn(agent_session_role, 'is_reviewer').mockReturnValue(
 // The stream append a cut makes is spied so the suite writes no event to the real repository; what it
 // pins is that the append is made, and with the cut kind, so `run:step` advances past the boundary.
 const emit = vi.spyOn(run_event_stream_emit, 'emit')
+// The split notice's answer is read off the repository's own lane ledger; a case that got the notice
+// says so (joshuafolkken/kit#4695).
+const split_refusal = vi.spyOn(split_resolution, 'ledger_refusal')
+// The review round a cut must not drop is read off the repository's own attestation and ledger; no
+// round is attested unless a case says so (joshuafolkken/kit#4868).
+const is_attested_on = vi.spyOn(review_attest, 'is_attested_on')
+const record_check = vi.spyOn(review_record, 'check')
+// The digest is read off the session's real transcript; no case carries one unless it says so
+// once (joshuafolkken/kit#5040).
+const own_digest = vi.spyOn(run_cut_digest, 'own_digest').mockReturnValue(undefined)
 const info = vi.spyOn(console, 'info').mockReturnValue()
 
 const errors = vi.spyOn(console, 'error').mockReturnValue()
@@ -80,7 +94,8 @@ function printed_errors(): string {
 
 // **The relaunch starts the child at the effort of the phase it resumes into**, so
 // the expected profile is resolved for that phase — the default pre-gate cut lowers the worker to the
-// ship/bookkeeping effort, which is the branch every relaunch case here takes.
+// ship/bookkeeping effort (and `JOSH_WORKER_SHIP_MODEL`, when set), which is the branch every relaunch
+// case here takes.
 function worker_argv(invocation: string): Extract<AgentArgvResult, { kind: 'argv' }> {
 	const phase = run_cut.PRE_GATE_PHASE
 	const built = agent_argv.resume_argv(invocation, undefined, phase, LANE_DIRECTORY)
@@ -95,10 +110,21 @@ const HANDOFF = { instruction: 'go', completed: [], remaining: [], untouched: []
 // The same instruction as a `--handoff` file, which an implementation cut is refused without.
 const HANDOFF_PATH = path.join(scratch, 'handoff.json')
 const WITH_HANDOFF = ['--handoff', HANDOFF_PATH]
+// The same handoff carrying an attested round's unrecorded findings (joshuafolkken/kit#4868).
+const FINDINGS_HANDOFF_PATH = path.join(scratch, 'handoff-findings.json')
+const WITH_FINDINGS_HANDOFF = ['--handoff', FINDINGS_HANDOFF_PATH]
 
 // A declared cut already on disk, as a fresh process would find one at its entry.
 function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 	run_cut.begin_cut(target(), { issue: ISSUE, branch: BRANCH, phase, handoff: HANDOFF })
+}
+
+function write_handoffs(): void {
+	writeFileSync(HANDOFF_PATH, JSON.stringify(HANDOFF))
+	writeFileSync(
+		FINDINGS_HANDOFF_PATH,
+		JSON.stringify({ ...HANDOFF, findings: ['code:medium:scripts/a.ts — a finding'] }),
+	)
 }
 
 // Registers the suite's hooks and the spies no case reads, from each suite's top level. The scratch
@@ -106,7 +132,7 @@ function existing_cut(phase: string = run_cut.PRE_GATE_PHASE): void {
 function install(): void {
 	// The CLI version probe is the diagnostics' own test; here it would depend on the machine's CLI.
 	vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
-	writeFileSync(HANDOFF_PATH, JSON.stringify(HANDOFF))
+	write_handoffs()
 
 	beforeEach(() => {
 		vi.clearAllMocks()
@@ -119,6 +145,13 @@ function install(): void {
 		launch.mockReturnValue({ kind: 'launched', pid: LAUNCHED_PID })
 		session_verdict.mockReturnValue(CONTEXT_OVER)
 		emit.mockResolvedValue(undefined)
+	})
+
+	// No case got the split notice unless it says so.
+	beforeEach(() => {
+		split_refusal.mockResolvedValue(undefined)
+		is_attested_on.mockReturnValue(false)
+		record_check.mockResolvedValue({ status: 'not-required' })
 	})
 
 	afterAll(() => {
@@ -146,11 +179,16 @@ const run_cut_cli_fixture = {
 	is_reviewer,
 	launch,
 	session_verdict,
+	split_refusal,
+	is_attested_on,
+	record_check,
+	own_digest,
 	emit,
 	verdict,
 	printed_errors,
 	worker_argv,
 	WITH_HANDOFF,
+	WITH_FINDINGS_HANDOFF,
 	existing_cut,
 }
 

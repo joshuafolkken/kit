@@ -5,6 +5,7 @@ import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { check_cpu, type CheckCpu } from './check-cpu'
 import { core_budget, type Admission } from './core-budget'
 import { free_cores } from './free-cores'
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GatePlan } from './gate-plan'
 import type { CheckClaim, GateStep, GateStepResult } from './gate-report'
 import { build_gate_step, with_granted_workers } from './gate-steps'
@@ -61,6 +62,8 @@ function default_budget(): BudgetContext {
 interface ReservedStep {
 	step: GateStep
 	weight: number
+	// The check's own `reserved_cores`, the key `gate_plan.lightest_first` orders the pool's queue by.
+	reserved_cores: number
 	memory_mb: number
 	// The plan's `--maxWorkers` for the unit suite, the width the free memory bounds once it is admitted.
 	worker_cap: number | undefined
@@ -80,6 +83,7 @@ async function build_reserved_steps(
 		plan.checks.map(async (check) => ({
 			step: await build_gate_step(check, process.cwd(), plan),
 			weight: gate_plan.check_weight(check, plan, available_cores),
+			reserved_cores: check.reserved_cores,
 			memory_mb: gate_plan.check_memory(check, plan, available_cores),
 			worker_cap: plan.unit_worker_cap,
 			reused_at: reused.get(check.label),
@@ -119,7 +123,7 @@ async function admitted_step(
 	admission: Admission,
 	available_cores: number,
 ): Promise<GateStep> {
-	if (reserved.step.label !== gate_plan.UNIT_LABEL) return reserved.step
+	if (reserved.step.label !== gate_labels.UNIT_LABEL) return reserved.step
 
 	const { memory_workers } = await free_cores.read({ available_cores })
 	const asked = admission.granted ?? reserved.worker_cap
@@ -155,9 +159,28 @@ async function run_reserved_step(
 			budget: budget.available_cores,
 			memory_mb: reserved.memory_mb,
 			command: `gate ${reserved.step.label}`,
-			is_unit: reserved.step.label === gate_plan.UNIT_LABEL,
+			is_unit: reserved.step.label === gate_labels.UNIT_LABEL,
 		},
 	)
+}
+
+// The pool's queue in the order `resolve_concurrency` counted it (joshuafolkken/kit#4609), so the
+// checks its width admitted are the ones that start, and one over the share waits for a slot rather
+// than taking one ahead of a zero-weight check. Each result goes back to its check's declaration
+// position, so the printed sections keep their order.
+async function run_lightest_first(
+	reserved: ReadonlyArray<ReservedStep>,
+	concurrency: number,
+	run: (entry: ReservedStep) => Promise<GateStepResult>,
+): Promise<ReadonlyArray<GateStepResult>> {
+	const indexed = reserved.map((entry, index) => ({ entry, index }))
+	const queue = gate_plan.lightest_first(indexed, ({ entry }) => entry.reserved_cores)
+	const finished = await bounded_pool.bounded_map(queue, concurrency, async ({ entry, index }) => ({
+		index,
+		result: await run(entry),
+	}))
+
+	return finished.toSorted((left, right) => left.index - right.index).map(({ result }) => result)
 }
 
 // `bounded_pool` rather than a bare `Promise.all`, so the plan's `concurrency` is what decides how
@@ -181,7 +204,7 @@ async function run_gate_steps(
 	// sets the mark too, since its checks are covered by the outer gate's reservation.
 	return await core_budget.with_held_mark(
 		async () =>
-			await bounded_pool.bounded_map(
+			await run_lightest_first(
 				reserved,
 				plan.concurrency,
 				async (entry) => await run_reserved_step(entry, budget, cpu),

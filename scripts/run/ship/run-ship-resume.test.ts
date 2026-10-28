@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { gate_tree } from '#scripts/gate/gate-tree'
 import type { josh_command } from '#scripts/josh/josh-run'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
+import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 import type { ShipState } from './run-ship-stage'
 
@@ -46,7 +48,10 @@ vi.mock('./run-ship-scoped', async (import_original) => {
 		])
 	}
 
-	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair } }
+	// The commit stage's catch-up reads a green record here, so it re-gates only a tree it merged.
+	const is_gate_green = vi.fn<typeof real_scoped.is_gate_green>().mockResolvedValue(true)
+
+	return { run_ship_scoped: { ...actual.run_ship_scoped, scoped_gate, scoped_pair, is_gate_green } }
 })
 // The sync stage's merge of the default branch is pinned in `run-ship-sync.test.ts`; here it is
 // current, so no test ever merges into the checkout it runs in.
@@ -62,6 +67,9 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 }))
 // No lane overlaps (pinned in `run-ship-overlap.test.ts`), so no test lists this repository's work trees.
 vi.spyOn(run_ship_overlap, 'await_overlap').mockResolvedValue(undefined)
+// No `--unpinned-ok` recorded for the branch (`run-ship-recorded-fixture.ts`), so no `--review` ship
+// carries this checkout's own.
+run_ship_recorded_fixture.isolate()
 
 const { run_ship_cli } = await import('./run-ship-cli')
 const { run_ship_detach } = await import('./run-ship-detach')
@@ -113,6 +121,8 @@ beforeEach(() => {
 	probe.record_target.mockResolvedValue(current.target)
 	probe.read_state.mockResolvedValue(NOTHING)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	// Read through git, the tree is this checkout's change, which no case here asserts on (joshuafolkken/kit#4597).
+	vi.spyOn(gate_tree, 'read_gate_tree').mockResolvedValue({ files: {}, base: undefined })
 	// A gate run by a detached ship supervisor inherits its mark; left set, `run` would hand control back.
 	vi.stubEnv(run_ship_detach.SUPERVISED_KEY, undefined)
 })
@@ -128,18 +138,21 @@ afterAll(() => {
 // joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief used to
 // resume past the review, so the relaunched followup was refused again.
 describe('josh ship — a restart after a stale review', () => {
+	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('reviews a pushed ship again, then follows up', async () => {
+		const reviewed = [TITLE, '--review']
+
 		josh_run_mock
 			.mockResolvedValueOnce({ code: OK, out: '' })
 			.mockResolvedValueOnce({ code: OK, out: '' })
 			.mockResolvedValueOnce({ code: FAILED, out: 'the issue changed after the review' })
-		await run_ship_cli.run([TITLE, '--review'])
+		await run_ship_cli.run(reviewed)
 		josh_run_mock.mockClear()
 		probe.read_state.mockResolvedValueOnce({ ...SHIPPED, is_review_stale: true })
 		probe.read_state.mockResolvedValue(SHIPPED)
 
-		expect(await run_ship_cli.run([TITLE, '--review'])).toBe(OK)
-		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true)
+		expect(await run_ship_recorded_fixture.with_record(run_ship_cli.run, reviewed)).toBe(OK)
+		expect(review.review_stage).toHaveBeenLastCalledWith('2426', true, [])
 		expect(commands()).toStrictEqual([`followup ${TITLE}`, REPORT])
 	})
 
@@ -223,20 +236,27 @@ describe('josh ship — a restart with a record', () => {
 })
 
 describe('josh ship — a restart with no record', () => {
-	it('never commits twice: a committed tree resumes with the commit skipped', async () => {
+	// joshuafolkken/kit#4708: the sync stage commits locally before the gate, so a commit not yet
+	// pushed is not the gate's output — the gate runs again before the push.
+	it('never commits twice: a committed, unpushed tree is gated again, then pushed with the commit skipped', async () => {
 		probe.read_state.mockResolvedValue(COMMITTED)
 
 		await run_ship_cli.run([TITLE])
 
-		expect(commands()[0]).toBe(`git -y --skip-commit ${TITLE}`)
+		expect(commands().slice(0, 2)).toStrictEqual(['gate', `git -y --skip-commit ${TITLE}`])
 	})
 
-	it('never pushes twice: a pushed tree resumes with the commit and push skipped', async () => {
+	// joshuafolkken/kit#4907: a lane child's `run:review` pushes before the ship, so a pushed tree with
+	// no record is gated again too.
+	it('never pushes twice: a pushed tree is gated again, then resumes with the commit and push skipped', async () => {
 		probe.read_state.mockResolvedValue(SHIPPED)
 
 		await run_ship_cli.run([TITLE])
 
-		expect(commands()[0]).toBe(`git -y --skip-commit --skip-push ${TITLE}`)
+		expect(commands().slice(0, 2)).toStrictEqual([
+			'gate',
+			`git -y --skip-commit --skip-push ${TITLE}`,
+		])
 	})
 
 	it('never merges twice: a merged pull request resumes at the report', async () => {
@@ -269,7 +289,11 @@ describe('josh ship — an infrastructure retry of the commit', () => {
 			code: FAILED,
 			out: 'fatal: unable to access: Could not resolve host: github.com',
 		})
-		probe.read_state.mockResolvedValueOnce(NOTHING).mockResolvedValue(COMMITTED)
+		// Read at the start and again after the sync, then by the retry.
+		probe.read_state
+			.mockResolvedValueOnce(NOTHING)
+			.mockResolvedValueOnce(NOTHING)
+			.mockResolvedValue(COMMITTED)
 
 		expect(await run_ship_cli.run([TITLE])).toBe(OK)
 		expect(commands().slice(1, 3)).toStrictEqual([
@@ -319,6 +343,12 @@ describe('josh ship — the attempt each stage line carries', () => {
 	const resumed_only = 'ship-stage #2426 report done commit,followup,report'
 
 	it('lists only the stages a resumed ship started', async () => {
+		const { STAGE } = run_ship_stage
+
+		for (const stage of [STAGE.PREFLIGHT, STAGE.SYNC, STAGE.GATE]) {
+			run_ship_stage.mark_done(current.target, stage)
+		}
+
 		probe.read_state.mockResolvedValue(SHIPPED)
 
 		await run_ship_cli.run([TITLE])

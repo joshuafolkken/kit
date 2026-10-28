@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 import { execa } from 'execa'
+import { eslint_daemon_sources } from './eslint-daemon-sources'
 
 // One warm eslint per checkout, reached by every eslint run that is not the gate's whole tree: the
 // `PostToolUse` edit hook, `josh lint:related` and the pre-commit hook (joshuafolkken/kit#4358).
@@ -30,6 +32,9 @@ const DAEMON_RECORD = '.eslint_d'
 const FINGERPRINT_RECORD = '.eslint_d-toolchain'
 const RECORD_SEPARATOR = '\n'
 const NO_HEAD = 'no-head'
+// Every file the type program could resolve: tracked, staged by a merge in progress, or new.
+const LIST_FILES: ReadonlyArray<string> = ['ls-files', '--cached', '--others', '--exclude-standard']
+const DIGEST_ALGORITHM = 'sha256'
 
 // Where this file sits inside the kit package. `eslint_d` is kit's dependency rather than the
 // consumer's, and pnpm writes a `node_modules/.bin` shim only for a project's *direct* dependencies,
@@ -91,16 +96,29 @@ function eslint_arguments_of(
 	return pnpm_arguments.slice(PNPM_ESLINT_PREFIX_LENGTH)
 }
 
+function digest_of(text: string): string {
+	return createHash(DIGEST_ALGORITHM).update(text).digest('hex')
+}
+
 // **What a daemon is current for: the toolchain's content and the commit checked out.** The daemon's
 // type program keeps every source it read but did not lint, so a merge that changes those types leaves
 // typed rules failing on the old ones (joshuafolkken/kit#4443); every merge, checkout, reset, pull and
 // commit moves HEAD, the commands that move sources under the daemon without an edit the hook sees.
 // A content digest rather than a time: a copy or a checkout rewrites every mtime and leaves the
 // content alone, and an edit can keep its old mtime. Outside a repository there is no HEAD.
+// **The files the program can resolve, too**: a merge whose conflicts are being resolved brings main's
+// new modules in without moving HEAD, and a daemon that had built its program before they arrived
+// reported their types as unresolvable until it was stopped (joshuafolkken/kit#4701).
+// **And the content of every file that differs from HEAD**, each on a line of its own after the rest
+// (`eslint-daemon-sources.ts`): an edit the hook lints is read fresh and refreshes its own line, and a
+// shell edit it never saw restarts the daemon (joshuafolkken/kit#4867).
 function fingerprint(project_root: string): string {
 	const head = git_spawn_sync.read(['rev-parse', 'HEAD'], { cwd: project_root }) ?? NO_HEAD
+	const files = git_spawn_sync.read(LIST_FILES, { cwd: project_root }) ?? NO_HEAD
+	const inputs = `${toolchain_inputs.digest(project_root)}:${head}:${digest_of(files)}`
+	const sources = eslint_daemon_sources.snapshot(project_root)
 
-	return `${toolchain_inputs.digest(project_root)}:${head}`
+	return sources === '' ? inputs : `${inputs}${eslint_daemon_sources.LINE_SEPARATOR}${sources}`
 }
 
 // Where the eslint the daemon resolves keeps its record, or nothing without an installed eslint.
@@ -140,7 +158,7 @@ function record_text(daemon: string, current: string): string {
 // so a toolchain input that moved since it started leaves it linting against the old rules, and a
 // HEAD move leaves it typing against the old sources. A daemon this module did not record — another
 // tool started it, or the record is from an older one — is stale too: nothing says what it loaded.
-// The edit hook records the daemons it starts and restarts (`remember_started`); this catches the rest.
+// The edit hook records the daemons it starts and restarts (`remember_after_edit`); this catches the rest.
 function is_stale(record: DaemonRecord, current: string): boolean {
 	if (record.daemon === undefined) return false
 
@@ -169,10 +187,31 @@ function remember(project_root: string, current: string): void {
 // under the inputs as they are now, and a daemon's record changes with every start — so a record that
 // changed across the hook's commands names a daemon they started. Recording it keeps the next lint run
 // from stopping and cold-starting a daemon that is already current.
-function remember_started(project_root: string, before: DaemonRecord): void {
-	if (read_record(project_root).daemon === before.daemon) return
+// A daemon that kept running has read the edited file fresh and nothing else, so only that file's
+// line of a record that is current otherwise is refreshed.
+// A borrowed install's record belongs to the lending checkout, whose files these are not.
+function remember_read(project_root: string, record: DaemonRecord, relative: string): void {
+	const { daemon, recorded } = record
+	if (daemon === undefined || recorded === undefined || is_borrowed_install(project_root)) return
+	const prefix = record_text(daemon, '')
+	if (!recorded.startsWith(prefix)) return
+	const current = eslint_daemon_sources.snapshot(project_root)
 
-	remember(project_root, fingerprint(project_root))
+	remember(
+		project_root,
+		eslint_daemon_sources.refresh(recorded.slice(prefix.length), current, relative),
+	)
+}
+
+function remember_after_edit(
+	project_root: string,
+	before: DaemonRecord,
+	edited: string | undefined,
+): void {
+	const after = read_record(project_root)
+
+	if (after.daemon !== before.daemon) remember(project_root, fingerprint(project_root))
+	else if (edited !== undefined) remember_read(project_root, after, edited)
 }
 
 // `cwd` decides which eslint installation and which flat config answer, and `ESLINT_D_MISS=fail`
@@ -254,7 +293,7 @@ const eslint_daemon = {
 	is_stale,
 	read_record,
 	record_text,
-	remember_started,
+	remember_after_edit,
 	resolve_daemon_cli,
 	run,
 	run_or_cold,

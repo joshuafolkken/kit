@@ -10,16 +10,29 @@ import {
 // The keys that decide which open issue is offered first, defined once for
 // every ranking that asks: the `🗒 Next issues` display, the `auto-ok` pickup and `backlog:next`.
 //
-// In order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
-// `route:interrupt`), then how many other open issues wait on it. Below those, the caller's own order
-// stands — the sort is stable, so recency and the defect-rate adjustment survive as the last key.
+// First, an issue whose body declares it runs last (`issue_priority.is_last`) follows every
+// undeclared one, so a wide-reach upgrade queues behind the rest of its pool (joshuafolkken/kit#5310);
+// declared ones rank among themselves by the keys below.
+//
+// Then, in order: `priority:critical`, then `priority:high`, then a defect on the verification path (`bug` with `run:solo`, or
+// `route:interrupt`), then the minutes its cause lost (`issue_priority.lost_minutes`: the body's
+// cause-loss lines summed over its recurrences (joshuafolkken/kit#4928), else its causing-lane line,
+// so causes of one lane are told apart (joshuafolkken/kit#4861); `0` when neither is declared, so an
+// undeclared issue follows every declared one of its priority), then the minutes a week its declared
+// speed-up saves (`expected_effect_lint.weekly_minutes`, on the same minute scale; `0` when undeclared,
+// so a measured time-saver runs ahead of an unmeasured feature (joshuafolkken/kit#5302)), then how many
+// other open issues wait on it. Below those, the caller's own order stands — the sort is stable, so recency and the defect-rate
+// adjustment survive as the last key.
 //
 // **`run:solo` alone is not a key.** It means "runs alone", not "runs first": tidying that only touches
 // the verification path carries it too, and a low-priority one is not owed a place ahead of the queue.
 // Only a defect on that path is, because `backlogrun-lanes.md` holds a batch until it has merged.
 
 interface RankRow {
+	is_last: boolean
 	labels: ReadonlyArray<string>
+	lost_minutes: number
+	gain_minutes: number
 	dependents: number
 }
 
@@ -50,12 +63,16 @@ function is_verification_defect(labels: ReadonlyArray<string>): boolean {
 	return has_label_name(labels, BUG_LABEL) && has_label_name(labels, RUN_SOLO_LABEL)
 }
 
-// Negated so that the larger value sorts first under an ascending comparison.
+// Negated so that the larger value sorts first under an ascending comparison; `is_last` alone is not,
+// so a declared row sorts last.
 function keys_of(row: RankRow): ReadonlyArray<number> {
 	return [
+		flag(row.is_last),
 		-flag(is_critical(row.labels)),
 		-flag(is_priority(row.labels)),
 		-flag(is_verification_defect(row.labels)),
+		-row.lost_minutes,
+		-row.gain_minutes,
 		-row.dependents,
 	]
 }

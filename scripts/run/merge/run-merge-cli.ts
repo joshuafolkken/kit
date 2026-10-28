@@ -1,10 +1,11 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
+import { lane_baseline } from '#scripts/lane/lane-baseline'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_overrun } from '#scripts/lane/lane-overrun'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -16,6 +17,8 @@ import { run_merge_driver } from './run-merge-driver'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
+import { run_merge_usage_limit } from './run-merge-usage-limit'
+import { run_merge_withdrawn, type Collected } from './run-merge-withdrawn'
 
 // `josh run:merge <N>` — one composite command for a `backlogrun` merge event. The parent's context is
 // the largest and its per-turn cost the highest, so it calls this once at a child's return and reads
@@ -128,8 +131,8 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 }
 
 // `backlog:drive` has no context to cut, so its merge is never handed back `over`.
-function threshold_of(values: ParsedArguments['values']): number | undefined {
-	return values.driver === true ? undefined : CONTEXT_CUT_THRESHOLD
+function cut_check_of(values: ParsedArguments['values']): true | undefined {
+	return values.driver === true ? undefined : true
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
@@ -149,7 +152,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		child,
 		epic: valid_epic(parsed.values.epic),
 		repo: valid_repo(parsed.values.repo),
-		over: threshold_of(parsed.values),
+		over: cut_check_of(parsed.values),
 		owner,
 		output: parsed.values.output,
 	}
@@ -205,22 +208,32 @@ function report_count_refused(carry: RunCarry | undefined): MergeVerdict {
 	return emit(MERGE_TOKEN.BUSY, FAILURE_EXIT_CODE)
 }
 
-// A merged child counted and its lane closed, the merge put on the stream and in the ledger. Returns the
+async function is_on_record(text: string): Promise<boolean> {
+	const events = await run_event_stream_emit.invocation_or_all_events()
+
+	return events.some(
+		(event) => event.kind === run_event_stream.EVENT_KIND.MERGE && event.text === text,
+	)
+}
+
+// **Put on record once, dated to the merge's confirmation**: a pass that collects a child already on
+// record — `run:carry --end` after `run:merge` — writes neither again.
+async function put_merge_on_record(child: string, at: Date): Promise<void> {
+	const text = `${issue_cite.plain(child)} merged`
+
+	if (await is_on_record(text)) return
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.MERGE, text, at)
+	await lane_ledger_write.record_merge(Number(child), at)
+}
+
+// A merged child counted and its lane closed, the merge put on the stream and in the ledger ahead of the
+// lane close, dated to the ownership check rather than to the end of the sync (joshuafolkken/kit#4734). Returns the
 // carry when the ownership check refused it, `undefined` once recorded. `run:carry --end` records the
 // merges a run ended with through it too (`run-merge-collect.ts`). The lane's `ended` record is
 // `lane:close`'s alone: an `incomplete` close leaves the lane open on it (joshuafolkken/kit#4300).
 async function record_merged(ctx: MergeContext): Promise<RunCarry | undefined> {
-	const refused = await run_merge_steps.do_merged(ctx)
-
-	if (refused !== undefined) return refused
-
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.MERGE,
-		`${issue_cite.plain(ctx.child)} merged`,
-	)
-	await lane_ledger.record_merge(Number(ctx.child))
-
-	return undefined
+	return await run_merge_steps.do_merged(ctx, put_merge_on_record)
 }
 
 // A merge is the only outcome that asks the hand-off check, because it is the only one that returned
@@ -229,6 +242,9 @@ async function on_merged(ctx: MergeContext): Promise<MergeVerdict> {
 	const refused = await record_merged(ctx)
 
 	if (refused !== undefined) return report_count_refused(refused)
+
+	await lane_overrun.investigate(Number(ctx.child))
+	await lane_baseline.investigate(Number(ctx.child))
 
 	if (await run_merge_steps.is_over_budget(ctx.over)) {
 		return emit(MERGE_TOKEN.OVER, SUCCESS_EXIT_CODE)
@@ -308,6 +324,14 @@ async function on_unauthenticated(ctx: MergeContext): Promise<MergeVerdict> {
 	return emit(MERGE_TOKEN.ENVIRONMENT, SUCCESS_EXIT_CODE)
 }
 
+// A child a usage limit stopped: released uncounted, its reset recorded (`run-merge-usage-limit.ts`).
+async function on_usage_limit(ctx: MergeContext): Promise<MergeVerdict> {
+	await run_merge_steps.release_child(ctx.child)
+	await run_merge_usage_limit.record(ctx.child, ctx.resume_ms ?? Date.now())
+
+	return await offered(ctx)
+}
+
 // A child that ended its session with a cut no successor adopted: its successor is relaunched,
 // nothing is counted and nothing is parked, and `resumed` tells the parent to await the same lane
 // again rather than dispatch into it. A successor that could not be started — or a cut the
@@ -356,11 +380,27 @@ async function on_skipped(ctx: MergeContext): Promise<MergeVerdict> {
 	return await offered(ctx)
 }
 
-// A child a person withdrew with `lane:withdraw`: the withdrawal already stopped it, closed its lane
-// and put itself on the stream, leaving its issue open for the next run, so nothing is counted or
-// written here and its seat goes to the next child.
-async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
+// The seat of a child whose lane was collected goes to the next child — or a retry, where the
+// withdrawal could not read the child.
+async function on_collected(ctx: MergeContext, collected: Collected): Promise<MergeVerdict> {
+	if (collected.note !== undefined) console.error(collected.note)
+	if (collected.is_retry) return emit(MERGE_TOKEN.RETRY, FAILURE_EXIT_CODE)
+
 	return await offered(ctx)
+}
+
+// A child a person withdrew with `lane:withdraw`, or whose issue closed without a merge: nothing is
+// counted and no merge is put on record, and its lane is withdrawn unless a person already did
+// (`run-merge-withdrawn.ts`).
+async function on_withdrawn(ctx: MergeContext): Promise<MergeVerdict> {
+	return await on_collected(ctx, await run_merge_withdrawn.collect(ctx.child))
+}
+
+// A child that gave its lane back on its `lane:plan` (`lane-yield.ts`): its lane is closed the same way,
+// but the issue stays in the run — `backlog:drive` does not exclude a `yielded` child, and its kept
+// plan holds it back until the holder ends.
+async function on_yielded(ctx: MergeContext): Promise<MergeVerdict> {
+	return await on_collected(ctx, await run_merge_withdrawn.collect_yield(ctx.child))
 }
 
 // The child's own ending: it stopped before its commit for a person to look at, so nothing is counted
@@ -385,11 +425,13 @@ const HANDLERS: Readonly<Record<ChildOutcome, (ctx: MergeContext) => Promise<Mer
 	merged: on_merged,
 	outage: on_outage,
 	unauthenticated: on_unauthenticated,
+	'usage-limit': on_usage_limit,
 	parked: on_parked,
 	split: on_skipped,
 	unresolved: on_unresolved,
 	shipping: on_shipping,
 	withdrawn: on_withdrawn,
+	yielded: on_yielded,
 }
 
 // The whole merge event for one returned child: read its state, classify it, and run the handler.
@@ -404,9 +446,10 @@ async function merge_child(ctx: MergeContext): Promise<MergeResult> {
 	const signals = await run_merge_signals.read_signals(ctx, read)
 	const outcome = run_merge_signals.outcome_of(read, signals)
 
-	const { merged_pr, is_streak_exempt } = signals
+	const { merged_pr, is_streak_exempt, capped_note, resume_ms } = signals
+	const handled = { ...ctx, merged_pr, is_streak_exempt, capped_note, resume_ms }
 
-	return { outcome, ...(await HANDLERS[outcome]({ ...ctx, merged_pr, is_streak_exempt })) }
+	return { outcome, ...(await HANDLERS[outcome](handled)) }
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

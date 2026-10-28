@@ -54,9 +54,10 @@ function event(pos: number, kind: string): unknown {
 }
 
 type Context = Parameters<typeof run_merge_signals.read_signals>[0]
-type Read = Parameters<typeof run_merge_signals.read_signals>[1]
 
 async function signals_of(read: unknown): Promise<unknown> {
+	type Read = Parameters<typeof run_merge_signals.read_signals>[1]
+
 	return await run_merge_signals.read_signals(CONTEXT as Context, read as Read)
 }
 
@@ -100,6 +101,38 @@ describe('run_merge_signals — children a host restart killed', () => {
 
 	it('still counts a child that ended itself a failure', async () => {
 		expect(await failures_of(RESTARTED)).toBe(RESTARTED.length)
+	})
+})
+
+// joshuafolkken/kit#4765: a child re-dispatched up to the cap was parked as its ship's stop alone.
+describe('run_merge_signals — a child the re-dispatch cap stopped', () => {
+	const OUTAGES = Array.from({ length: run_merge.CONSECUTIVE_OUTAGE_LIMIT }, (_, index) =>
+		event(index, 'outage'),
+	)
+	const RELAUNCH_FAILED = {
+		...(event(OUTAGES.length, 'relaunch-failed') as object),
+		text: `#${CHILD} could not be relaunched: the broker refused it`,
+	}
+
+	it('reads a capped child as failed with the cap, the count and the last relaunch failure', async () => {
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue([...OUTAGES, RELAUNCH_FAILED])
+
+		const signals = (await signals_of(OPEN_READ)) as { is_outage: boolean; capped_note: string }
+
+		expect(signals.is_outage).toBe(false)
+		expect(signals.capped_note).toContain('re-dispatch cap (3) after 3 re-dispatches')
+		expect(signals.capped_note).toContain(RELAUNCH_FAILED.text)
+	})
+
+	it('leaves a child under the cap re-dispatchable with no cap line', async () => {
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue(OUTAGES.slice(1))
+
+		const signals = await signals_of(OPEN_READ)
+
+		expect(signals).toMatchObject({ is_outage: true })
+		expect(signals).not.toHaveProperty('capped_note')
 	})
 })
 
@@ -153,6 +186,35 @@ describe('run_merge_signals.read_signals — a closed withdrawn child', () => {
 		merged_mock.mockResolvedValue(undefined)
 
 		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: undefined })
+	})
+})
+
+// joshuafolkken/kit#4916: a CLOSED child no one withdrew is still withdrawn unless a merge closed it —
+// closed as not planned, or with no merged pull request.
+describe('run_merge_signals.read_signals — a closed child no one withdrew', () => {
+	it('reads a child closed without a merge as withdrawn', async () => {
+		expect(await signals_of(CLOSED_READ)).toMatchObject({ is_withdrawn: true })
+		expect(merged_mock).toHaveBeenCalledWith(CHILD)
+	})
+
+	it('reads a child a merge closed as not withdrawn', async () => {
+		merged_mock.mockResolvedValue(true)
+		const signals = await signals_of(CLOSED_READ)
+
+		expect(signals).toMatchObject({ is_withdrawn: false })
+		expect(run_merge_signals.outcome_of(CLOSED_READ, signals as never)).toBe('merged')
+	})
+
+	it('asks again about a closed child whose timeline could not be read', async () => {
+		merged_mock.mockResolvedValue(undefined)
+		const signals = await signals_of(CLOSED_READ)
+
+		expect(run_merge_signals.outcome_of(CLOSED_READ, signals as never)).toBe('unresolved')
+	})
+
+	it('reads no timeline for an OPEN child', async () => {
+		expect(await signals_of(OPEN_READ)).toMatchObject({ is_withdrawn: false })
+		expect(merged_mock).not.toHaveBeenCalled()
 	})
 })
 

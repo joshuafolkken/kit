@@ -43,6 +43,10 @@ const JSON_BODY = '{}'
 const CHANGED = '{ "changed": true }'
 const HEAD_BEFORE = 'aaaa'
 const HEAD_AFTER = 'bbbb'
+const LIST_FILES = ['ls-files', '--cached', '--others', '--exclude-standard']
+const NEW_MODULE = 'src/new-module.ts'
+const FILES_BEFORE = TARGET
+const FILES_AFTER = `${TARGET}\n${NEW_MODULE}`
 
 const project_root = mkdtempSync(path.join(tmpdir(), 'eslint-daemon-'))
 
@@ -64,6 +68,13 @@ function checkout(): void {
 	}
 
 	write_file(`${ESLINT_DIRECTORY}/.eslint_d`, DAEMON)
+}
+
+// git under one commit, listing `files` as the ones the type program can resolve.
+function answer_git(files: string): void {
+	mocked_git_read.mockImplementation((git_arguments) =>
+		git_arguments[0] === LIST_FILES[0] ? files : HEAD_BEFORE,
+	)
 }
 
 function recorded_text(): string {
@@ -148,6 +159,18 @@ describe('eslint_daemon.fingerprint', () => {
 		expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
 		expect(mocked_git_read).toHaveBeenCalledWith(['rev-parse', 'HEAD'], { cwd: project_root })
 	})
+
+	// joshuafolkken/kit#4701: a merge in progress brings new modules in without moving HEAD.
+	it('moves when a file is added under the same commit', () => {
+		checkout()
+		answer_git(FILES_BEFORE)
+		const before = eslint_daemon.fingerprint(project_root)
+
+		answer_git(FILES_AFTER)
+
+		expect(eslint_daemon.fingerprint(project_root)).not.toBe(before)
+		expect(mocked_git_read).toHaveBeenCalledWith(LIST_FILES, { cwd: project_root })
+	})
 })
 
 describe('eslint_daemon.is_stale', () => {
@@ -186,12 +209,12 @@ describe('eslint_daemon.read_record', () => {
 	})
 })
 
-describe('eslint_daemon.remember_started', () => {
+describe('eslint_daemon.remember_after_edit', () => {
 	it('records a daemon the edit hook started, so the next run keeps it', () => {
 		const before = eslint_daemon.read_record(project_root)
 
 		checkout()
-		eslint_daemon.remember_started(project_root, before)
+		eslint_daemon.remember_after_edit(project_root, before, TARGET)
 
 		const current = eslint_daemon.fingerprint(project_root)
 
@@ -200,18 +223,19 @@ describe('eslint_daemon.remember_started', () => {
 
 	it('leaves a daemon that ran before the edit hook unrecorded', () => {
 		checkout()
-		eslint_daemon.remember_started(project_root, eslint_daemon.read_record(project_root))
+		eslint_daemon.remember_after_edit(project_root, eslint_daemon.read_record(project_root), TARGET)
 
 		expect(eslint_daemon.read_record(project_root).recorded).toBeUndefined()
 	})
 })
 
 describe('eslint_daemon.run', () => {
+	// joshuafolkken/kit#5047: the bound reaches the process, so a daemon that never answers is killed.
 	it('forwards the eslint arguments to the daemon from the project root', async () => {
 		current_checkout()
 		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
 
-		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root })).toEqual({
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toEqual({
 			exit_code: 1,
 			stdout: 'report',
 			output: 'report',
@@ -219,7 +243,7 @@ describe('eslint_daemon.run', () => {
 		expect(mocked_execa).toHaveBeenCalledExactlyOnceWith(
 			process.execPath,
 			[CLI, '--quiet', TARGET],
-			expect.objectContaining({ cwd: project_root }),
+			expect.objectContaining({ cwd: project_root, timeout: 5 }),
 		)
 		expect(mocked_execa.mock.lastCall?.at(-1)).toMatchObject({ env: { ESLINT_D_MISS: 'fail' } })
 	})
@@ -262,6 +286,19 @@ describe('eslint_daemon.run — after a merge', () => {
 		mocked_git_read.mockReturnValue(HEAD_BEFORE)
 		current_checkout()
 		mocked_git_read.mockReturnValue(HEAD_AFTER)
+		mocked_execa.mockResolvedValue(answer(0, ''))
+
+		await eslint_daemon.run(PNPM_ESLINT, { project_root })
+
+		expect(mocked_execa.mock.calls[0]?.[1]).toEqual([CLI, 'stop'])
+		expect(mocked_execa.mock.calls[1]?.[1]).toEqual([CLI, '--quiet', TARGET])
+	})
+
+	// joshuafolkken/kit#4701: the daemon kept the failed lookup of a module the merge then brought in.
+	it('stops a daemon started before a new module and its import arrived, HEAD unmoved', async () => {
+		answer_git(FILES_BEFORE)
+		current_checkout()
+		answer_git(FILES_AFTER)
 		mocked_execa.mockResolvedValue(answer(0, ''))
 
 		await eslint_daemon.run(PNPM_ESLINT, { project_root })

@@ -16,6 +16,7 @@ const OFF_LANE_KINDS: ReadonlySet<string> = new Set([
 	KIND.PARK,
 	KIND.WITHDRAW,
 	KIND.OUTAGE,
+	KIND.USAGE_LIMIT,
 	KIND.SPLIT,
 	KIND.STOP,
 ])

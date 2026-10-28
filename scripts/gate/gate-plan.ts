@@ -1,7 +1,8 @@
 import { availableParallelism } from 'node:os'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { core_budget } from './core-budget'
+import { core_weights } from './core-weights'
+import { gate_labels } from './gate-labels'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four.
@@ -36,7 +37,7 @@ interface GateCheck {
 	// The unit suite reserves nothing: it sizes its own pool from the machine, so it is capped
 	// instead of reserved, and counting it here would reserve cores against itself.
 	reserved_cores: number
-	// The memory this check holds while it runs, `core_budget.MEMORY_MB`'s measured peak; none declared is
+	// The memory this check holds while it runs, `core_weights.MEMORY_MB`'s measured peak; none declared is
 	// none waited for. The unit suite's is per worker, so it is derived instead.
 	memory_mb?: number
 	// A check whose `josh` command is kit-only, so a consumer's gate leaves it out rather than running
@@ -46,21 +47,20 @@ interface GateCheck {
 	is_kit_only?: boolean
 }
 
-const LINT_LABEL = 'lint'
-const TYPE_CHECK_LABEL = 'check'
-const UNIT_LABEL = 'test:unit'
-const UNIT_TARGET = 'test:related'
-const BEHAVIOR_LABEL = 'behavior'
-const METRICS_LABEL = 'metrics'
-const EXPORTS_LABEL = 'exports'
-
-// The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
-// (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
-// reusing a record taken from such a run would hide them. Every other step's
-// warning-shaped output — a Vite config deprecation printed by `test:unit`, say — is not a per-tree
-// finding and repeats every run, so it must not withhold the record. `has_checker_warning` narrows
-// the withholding path down to these.
-const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LABEL]
+const {
+	BEHAVIOR_LABEL,
+	EXPORTS_LABEL,
+	KEEP_WHOLE_SUITE_FLAG,
+	LINT_LABEL,
+	LOCKFILE_LABEL,
+	METRICS_LABEL,
+	SPELL_CHECK_LABEL,
+	SPELL_CHECK_TARGET,
+	TYPE_CHECK_LABEL,
+	TYPE_CHECK_TARGET,
+	UNIT_LABEL,
+	UNIT_TARGET,
+} = gate_labels
 
 // The checks that do not fan out across every core, in the order their output is printed. They are
 // named apart from the unit suite because CI runs them on their own runner:
@@ -74,14 +74,14 @@ const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LA
 // `--no-unit` set stays "the whole gate minus the unit suite", and a CI runner — which has no recorded
 // transcripts — runs it as a trivial green rather than skipping it.
 //
-// **The three reserving weights are `core_budget.CORE_WEIGHTS`**, the same
+// **The three reserving weights are `core_weights.CORE_WEIGHTS`**, the same
 // numbers the `josh lint`, `josh check` and `josh cspell:dot` commands claim when run directly.
 //
 // **The two zero weights are measured, and they stay zero.** These are warm runs on the 11-core
 // machine. `behavior` took 0.6s of wall for 0.7s of CPU, which
 // is node starting up. `exports:unused` took 5.5s of wall for 9.0s of CPU, about 1.6 cores. Rounded
 // up, that would be two cores, but a reservation lasts the whole gate's plan, not the check's five
-// seconds. It would raise `RESERVED_CORES` from 6 to 8 and cut the solo unit cap from 5 workers to 3
+// seconds. It would raise `RESERVED_CORES` from 5 to 7 and cut the solo unit cap from 6 workers to 4
 // for the full length of the unit suite, to cover a burst that ends before lint does. Nothing has measured
 // that trade, so the measured shape stays.
 const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
@@ -91,20 +91,20 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		label: LINT_LABEL,
 		target: 'lint',
 		args: ['--changed'],
-		reserved_cores: core_budget.CORE_WEIGHTS.lint,
-		memory_mb: core_budget.MEMORY_MB.lint,
+		reserved_cores: core_weights.CORE_WEIGHTS.lint,
+		memory_mb: core_weights.MEMORY_MB.lint,
 	},
 	{
 		label: TYPE_CHECK_LABEL,
-		target: 'check',
-		reserved_cores: core_budget.CORE_WEIGHTS.type_check,
-		memory_mb: core_budget.MEMORY_MB.type_check,
+		target: TYPE_CHECK_TARGET,
+		reserved_cores: core_weights.CORE_WEIGHTS.type_check,
+		memory_mb: core_weights.MEMORY_MB.type_check,
 	},
 	{
-		label: 'cspell',
-		target: 'cspell:dot',
-		reserved_cores: core_budget.CORE_WEIGHTS.spell_check,
-		memory_mb: core_budget.MEMORY_MB.spell_check,
+		label: SPELL_CHECK_LABEL,
+		target: SPELL_CHECK_TARGET,
+		reserved_cores: core_weights.CORE_WEIGHTS.spell_check,
+		memory_mb: core_weights.MEMORY_MB.spell_check,
 	},
 	{ label: BEHAVIOR_LABEL, target: BEHAVIOR_LABEL, reserved_cores: 0 },
 	// **The unused-member check reserves no core**: it builds one TypeScript
@@ -121,13 +121,13 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 		target: METRICS_LABEL,
 		args: ['--no-startup'],
 		reserved_cores: 0,
-		memory_mb: core_budget.MEMORY_MB.eslint_scan,
+		memory_mb: core_weights.MEMORY_MB.metrics,
 		is_kit_only: true,
 	},
 	// The lockfile policy check is network-bound and usually instant: it verifies only when the
 	// lockfile or `pnpm-workspace.yaml` moved from the merge-base (joshuafolkken/kit#4090), so it
 	// reserves no core. Kit's own until a consumer's private-registry entries are known to verify.
-	{ label: 'lockfile', target: 'lockfile:policy', reserved_cores: 0, is_kit_only: true },
+	{ label: LOCKFILE_LABEL, target: 'lockfile:policy', reserved_cores: 0, is_kit_only: true },
 ]
 
 // The checks, in the order their output is printed — the static set, then the unit suite last (the
@@ -140,7 +140,7 @@ const STATIC_CHECKS: ReadonlyArray<GateCheck> = [
 // sharded suite regardless.
 const GATE_CHECKS: ReadonlyArray<GateCheck> = [
 	...STATIC_CHECKS,
-	{ label: UNIT_LABEL, target: UNIT_TARGET, reserved_cores: 0 },
+	{ label: UNIT_LABEL, target: UNIT_TARGET, args: [KEEP_WHOLE_SUITE_FLAG], reserved_cores: 0 },
 ]
 
 // **Selecting is not skipping, and the difference is where the unit suite runs rather than whether
@@ -166,7 +166,7 @@ function has_unit_check(checks: ReadonlyArray<GateCheck>): boolean {
 	return checks.some((check) => check.label === UNIT_LABEL)
 }
 
-// What the non-elastic checks hold between them: 2 + 2 + 2. Reduced over `STATIC_CHECKS`
+// What the non-elastic checks hold between them: 2 + 2 + 1. Reduced over `STATIC_CHECKS`
 // rather than over every check, because that is the set the sentence above names: `resolve_unit_worker_cap`
 // spends this as the cores the unit suite must leave to its siblings, so summing the unit check into
 // it would have the suite subtract its own reservation from its own budget the day that reservation
@@ -223,6 +223,15 @@ interface GatePlan {
 // the exact opposite of what this function is for. `bounded-pool.ts` closes the same hole for the
 // same reason. A count below one is nonsense too and is read as one run, which is the direction
 // that leaves behavior where it was rather than throttling a gate on a bad input.
+// The order the gate both counts and starts its checks in. `toSorted` is stable, so checks of one
+// weight keep their declaration order.
+function lightest_first<Item>(
+	items: ReadonlyArray<Item>,
+	reserved_cores_of: (item: Item) => number,
+): Array<Item> {
+	return items.toSorted((left, right) => reserved_cores_of(left) - reserved_cores_of(right))
+}
+
 function shared_cores(available_cores: number, concurrent_runs: number): number {
 	const runs = Number.isFinite(concurrent_runs)
 		? Math.max(unit_worker_share.SOLO_RUNS, concurrent_runs)
@@ -231,9 +240,9 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 	return Math.max(MIN_SHARED_CORES, Math.floor(available_cores / runs))
 }
 
-// Admit checks in declaration order while the running set's reserved cores still fit **this run's
+// Admit checks, lightest first, while the running set's reserved cores still fit **this run's
 // share** of the machine. On a machine running one gate that share is the machine, so this bites
-// only below six cores — the three reserving checks want six between them — and there it is the
+// only below five cores — the three reserving checks want five between them — and there it is the
 // difference between two checks sharing a core and four fighting over it.
 //
 // **Under concurrency it is the only lever there is, and that is a measurement rather than a
@@ -250,16 +259,23 @@ function shared_cores(available_cores: number, concurrent_runs: number): number 
 // the gate still reports every failure in one pass — `bounded_pool` queues what it does not start,
 // and no check ever rejects (see `run_gate_steps`). What changes is how many are in flight at
 // once, which is scheduling and never coverage.
+//
+// **The checks are counted lightest first, and `run_gate_steps` starts them in the same order**
+// (joshuafolkken/kit#4609). Counted in declaration order, the first check over the share ended the
+// count, so on CI's four cores lint and the type check filled it and every zero-weight check after
+// the spell check queued behind a check that was only waiting for cores. Lightest first, the `break`
+// is exact: once one check does not fit, no heavier one after it can.
 function resolve_concurrency(
 	available_cores: number,
 	concurrent_runs: number = unit_worker_share.SOLO_RUNS,
 	checks: ReadonlyArray<GateCheck> = GATE_CHECKS,
 ): number {
 	const share = shared_cores(available_cores, concurrent_runs)
+	const ordered = lightest_first(checks, (check) => check.reserved_cores)
 	let admitted = 0
 	let reserved = 0
 
-	for (const check of checks) {
+	for (const check of ordered) {
 		reserved += check.reserved_cores
 
 		if (reserved > share) break
@@ -283,8 +299,8 @@ function resolve_concurrency(
 //
 // **The shared branch drops `RESERVED_CORES`, knowingly, and it is not a strict improvement.** Each
 // concurrent gate still runs lint, the type check and the spell check beside its unit step, and the
-// share below does not subtract them: on 12 cores a solo gate takes 8 unit workers plus 3 siblings —
-// 11 processes for 12 cores — while two concurrent gates take 6 each plus 3 siblings each, which is 18.
+// share below does not subtract them: on 12 cores a solo gate takes 7 unit workers plus 3 siblings —
+// 10 processes for 12 cores — while two concurrent gates take 6 each plus 3 siblings each, which is 18.
 // The obvious correction, `⌊(cores − RESERVED_CORES × runs) ÷ runs⌋`, is **not** applied because
 // nothing has measured it: it hands two gates on an 11-core machine one worker apiece, against the
 // 11.7s-at-8-workers / 16.7s-at-4 curve the table above was built from, and trading a measured
@@ -323,8 +339,8 @@ function solo_unit_weight(available_cores: number): number {
 // once**: no second set of weights is introduced, so a change to the measured reservation moves the
 // admission with it.
 //
-// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 2) +
-// unit_cap(cores - 6)` is `cores` — which is what lets every check of a lone gate on a machine with room
+// **A solo gate's four weights sum to exactly the core count** — `reserved(2 + 2 + 1) +
+// unit_cap(cores - 5)` is `cores` — which is what lets every check of a lone gate on a machine with room
 // (its busy cores within what the ledger holds, `core-budget.ts`) be admitted at once,
 // its concurrency unchanged. A machine below the measured one leaves the unit suite uncapped and reads
 // its weight from the same identity, `cores - RESERVED_CORES` clamped at zero, so the sum is the core
@@ -336,7 +352,7 @@ function check_weight(check: GateCheck, plan: GatePlan, available_cores: number)
 }
 
 function unit_memory(workers: number): number {
-	return workers * core_budget.MEMORY_MB.unit_worker
+	return workers * core_weights.MEMORY_MB.unit_worker
 }
 
 // The memory a check holds: its declared figure, or for the unit suite one
@@ -347,24 +363,55 @@ function check_memory(check: GateCheck, plan: GatePlan, available_cores: number)
 	return unit_memory(check_weight(check, plan, available_cores))
 }
 
+// The workers a lone direct run opens below the gate's solo weight: vitest's own default, one per core
+// but one, bounded by the gate's solo workers on the measured machine. **A direct run has no siblings**,
+// so subtracting `RESERVED_CORES` for them sized a four-core CI runner to zero and its suite to one
+// worker (joshuafolkken/kit#4607); vitest's default is what that runner ran before the claim bounded it.
+// The bound keeps a mid-sized machine from claiming more than the measured one does.
+function direct_solo_workers(available_cores: number): number {
+	const vitest_default = available_cores - unit_worker_share.MAIN_PROCESS_CORES
+	const floor = Math.min(vitest_default, solo_unit_weight(MEASURED_CORES))
+
+	return Math.max(solo_unit_weight(available_cores), floor)
+}
+
 // The cores a unit run started directly reserves: the share it will pass to
-// vitest while other runs are live, and otherwise the gate's own solo unit weight. **Not the whole
-// machine**, though a lone vitest sizes its own pool: FIFO admission lets a claim of every core in only
+// vitest while other runs are live, and otherwise `direct_solo_workers`. **Not the whole
+// machine where there is room to leave**: FIFO admission lets a claim of every core in only
 // once the ledger is empty, so a one-file `josh test:related` would wait out every other lane's gate
-// and hold every later claim behind it. One weight for the suite however it is started. **Floored at one
-// worker**: on a machine the static checks fill, a four-core CI runner among them, the gate's solo
-// weight is zero because its siblings hold every core — a direct run has no siblings, and vitest still
-// occupies a core. **Plus vitest's own process** (joshuafolkken/kit#4362): the workers are the share,
-// and the claim holds the process that drives them on top (`unit_worker_share.cap_to_claim` takes it
-// back off).
+// and hold every later claim behind it — the solo bound stops below the core count from seven cores up.
+// One weight for the suite however it is started. **Plus vitest's own process** (joshuafolkken/kit#4362):
+// the workers are the share, and the claim holds the process that drives them on top
+// (`unit_worker_share.cap_to_claim` takes it back off).
 function direct_unit_weight(
 	available_cores: number = availableParallelism(),
 	live_runs: number = unit_worker_share.live_run_count(),
 ): number {
 	const workers =
-		unit_worker_share.current_share(available_cores, live_runs) ?? solo_unit_weight(available_cores)
+		unit_worker_share.current_share(available_cores, live_runs) ??
+		direct_solo_workers(available_cores)
 
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
+}
+
+// The related files one vitest worker clears in about 30 seconds: `tools/test/unit-durations.json`'s
+// median file takes 105 ms (2077 files), and 30 000 ÷ 105 ≈ 285 (joshuafolkken/kit#5135).
+const FILES_PER_WORKER = 285
+
+// The cores a narrowed `josh test:related` reserves once its scope is known: one worker for each
+// `FILES_PER_WORKER` related files, at least `MIN_WORKERS` and at most the share `direct_unit_weight`
+// gives the whole suite, plus vitest's own process. **A small scope no longer claims the whole width**,
+// so the other lanes' unit claims stop waiting behind a twenty-second run (joshuafolkken/kit#5135).
+function scoped_unit_weight(
+	files: number,
+	available_cores: number = availableParallelism(),
+	live_runs: number = unit_worker_share.live_run_count(),
+): number {
+	const { MAIN_PROCESS_CORES, MIN_WORKERS } = unit_worker_share
+	const share = direct_unit_weight(available_cores, live_runs) - MAIN_PROCESS_CORES
+	const wanted = Math.max(MIN_WORKERS, Math.ceil(files / FILES_PER_WORKER))
+
+	return Math.min(wanted, share) + MAIN_PROCESS_CORES
 }
 
 // What a unit run started directly holds: one worker's peak for each core `direct_unit_weight` gives
@@ -373,8 +420,9 @@ function direct_unit_memory(): number {
 	return unit_memory(direct_unit_weight())
 }
 
-// The claim every unit run started directly declares — `josh test:unit`, `josh test:related` and the
-// pre-push hook — declared once so the three cannot drift apart.
+// The claim every unit run started directly declares — `josh test:unit` and the pre-push hook —
+// declared once so the two cannot drift apart. `josh test:related` claims in its body instead, once
+// its scope is known (`scoped_unit_weight`).
 const DIRECT_UNIT_CLAIM = {
 	core_weight: direct_unit_weight,
 	memory_mb: direct_unit_memory,
@@ -468,28 +516,25 @@ function format_gate_plan(
 
 const gate_plan = {
 	DIRECT_UNIT_CLAIM,
-	EXPORTS_LABEL,
+	FILES_PER_WORKER,
 	GATE_CHECKS,
-	LINT_LABEL,
 	MEASURED_CORES,
-	METRICS_LABEL,
 	RESERVED_CORES,
 	STATIC_CHECKS,
-	TYPE_CHECK_LABEL,
-	UNIT_LABEL,
-	UNIT_TARGET,
-	WARNING_CHECKER_LABELS,
 	check_memory,
 	check_weight,
 	direct_unit_weight,
 	format_gate_plan,
 	format_machine,
 	has_unit_check,
+	lightest_first,
 	plan_of,
 	resolve_concurrency,
 	resolve_gate_plan,
 	resolve_unit_worker_cap,
+	scoped_unit_weight,
 	select_gate_checks,
+	unit_memory,
 }
 
 export type { GateCheck, GatePlan }

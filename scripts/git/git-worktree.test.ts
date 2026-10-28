@@ -110,6 +110,17 @@ describe('git_worktree worktree calls', () => {
 		expect(spawn_mock.state.last_arguments).toStrictEqual(['branch', '-D', LANE_BRANCH])
 	})
 
+	// joshuafolkken/kit#4653: the lane's own name on origin, so a bare push works before the branch exists.
+	it('points the lane branch at its own name on origin', async () => {
+		await git_worktree.set_upstream(LANE_BRANCH)
+
+		expect(spawn_mock.state.last_arguments).toStrictEqual([
+			'config',
+			`branch.${LANE_BRANCH}.merge`,
+			LANE_BRANCH_REF,
+		])
+	})
+
 	it('prunes the registrations whose directories are gone', async () => {
 		await git_worktree.worktree_prune()
 

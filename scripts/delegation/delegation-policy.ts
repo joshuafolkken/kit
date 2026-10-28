@@ -46,7 +46,7 @@ const INVESTIGATOR_AGENT = 'investigator'
 // them, so a run told the step up front is told the same step the refusal would name.
 const INVESTIGATION_LIMIT = `${String(INVESTIGATION_FILE_THRESHOLD)} files read and not edited, or ${String(INVESTIGATION_SEARCH_TURN_THRESHOLD)} search turns, since the last delegated unit`
 // Only the dispatch resets the count, so the step names no `josh delegate` call before it (#4345).
-const INVESTIGATION_STEP = `Dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer); it returns \`file:line\` citations, never the file text.`
+const INVESTIGATION_STEP = `Dispatch the \`${INVESTIGATOR_AGENT}\` agent (\`kit:${INVESTIGATOR_AGENT}\` in a consumer) with \`run_in_background: false\`; it returns \`file:line\` citations, never the file text.`
 
 // The enumeration. Short on purpose: every entry had to name a verifier, and most candidates could
 // not (below).
@@ -75,7 +75,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// chain at a small context, and the review round cap already composed the finding text, so what
 		// the unit is handed is mechanical: run the commands and act on their deterministic answers. This
 		// is not the batching guard's business — delegation only moves the chain to a cheaper context.
-		does: 'run the late-run follow-up filing chain in an isolated unit — issue:file (scout, lint, labels, epic:bundle), then epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
+		does: 'run the late-run follow-up filing chain in an isolated unit — issue:file (lint, labels, scout, epic:bundle), then epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
 		verifier:
 			"the parent reads the filed Issue from GitHub with `pnpm josh issue:state <new>`, not the unit's summary; a follow-up reported filed but not created is still absent, the way `epic-child`'s reported-done-but-not-merged child is still open. The finding text came from the parent and `issue:file`'s steps are deterministic, so the unit's work is the mechanical execution `issue:state` confirms",
 	},

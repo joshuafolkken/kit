@@ -1,4 +1,4 @@
-import { core_budget } from '#scripts/gate/core-budget'
+import { core_weights } from '#scripts/gate/core-weights'
 import type { CommandEntry } from './josh-command-types'
 import { BACKLOG_COMMANDS } from './josh-commands-backlog'
 import { DOCUMENT_COMMANDS } from './josh-commands-document'
@@ -82,7 +82,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '--cut',
-					note: 'compare billed input per request with the shared 135,000 context-cut threshold',
+					note: 'compare billed input per request with the context-cut threshold priced at the session model',
 				},
 				{ arguments: '--over <tokens>', note: 'compare with an explicit limit' },
 				{ arguments: `--cut ${PATH_DIR}`, note: 'Anthropic project or current OpenAI worktree' },
@@ -179,7 +179,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [PATH_DIR],
 					description:
-						"read another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.",
+						"read another project's lane transcripts, as `josh time` does. Run from a lane, it reads its main checkout's lanes.",
 				},
 			],
 		},
@@ -190,8 +190,8 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			"Aggregate a finished run's cost, review findings, observation ledger and events into one digest",
 		category: 'AI tools',
 		reference: ['', 'maintainer', ['none']],
-		core_weight: core_budget.CORE_WEIGHTS.retrospective,
-		memory_mb: core_budget.MEMORY_MB.retrospective,
+		core_weight: core_weights.CORE_WEIGHTS.retrospective,
+		memory_mb: core_weights.MEMORY_MB.retrospective,
 		// Kit-only: it reads kit's own development run — the transcript store, the review ledger and the
 		// run event stream — so it means nothing in a consumer project and is dropped from a consumer's
 		// help, through the same declaration `josh time` uses for the same reason.

@@ -95,6 +95,25 @@ function hold_reason(
 	return core_admission.is_too_narrow(key, reservations, granted) ? 'cpu' : undefined
 }
 
+// **Whether only load from outside the ledger holds the claim** (joshuafolkken/kit#4982): with that load
+// gone — its busy cores handed back and no run-queue overload — the claim would be admitted at a width
+// that is not too narrow. A claim the ledger or memory holds is not, and waits for its room to come back.
+function is_outside_held(
+	key: string,
+	reservations: ReadonlyArray<LedgerEntry>,
+	budget: MachineBudget,
+): boolean {
+	const unloaded = {
+		...budget,
+		cores: budget.cores + (budget.busy_excess ?? 0),
+		busy_excess: 0,
+		is_overloaded: false,
+	}
+	const granted = core_admission.narrowed_weight(key, reservations, unloaded.cores)
+
+	return hold_reason(key, reservations, unloaded, granted) === undefined
+}
+
 // The line a waiting command prints once, when its wait starts.
 function wait_line(command: string | undefined, reason: WaitReason): string {
 	return `⏳ ${command ?? 'a step'} waits for the core budget — ${REASON_TEXT[reason]}`
@@ -102,10 +121,13 @@ function wait_line(command: string | undefined, reason: WaitReason): string {
 
 // The lanes root a checkout belongs to: a lane's parent, or the root beside a main checkout. Two
 // checkouts of one repository share it; the ledger is machine-wide, so another repository's do not.
+// A Claude Code worktree under a checkout reads as that checkout (`lane_paths.checkout_of`).
 function lanes_root_of(checkout: string): string {
-	if (lane_paths.lane_issue_of(checkout) === undefined) return lane_paths.lane_root(checkout)
+	const resolved = lane_paths.checkout_of(path.resolve(checkout))
 
-	return path.dirname(path.resolve(checkout))
+	if (lane_paths.lane_issue_of(resolved) === undefined) return lane_paths.lane_root(resolved)
+
+	return path.dirname(resolved)
 }
 
 // Where a claim runs, read by the claimer under its own environment: `JOSH_LANE_ROOT` is a
@@ -152,6 +174,7 @@ function waits_of(
 const core_wait = {
 	WAIT_REASONS,
 	hold_reason,
+	is_outside_held,
 	wait_line,
 	wait_reason,
 	waits_of,

@@ -2,7 +2,7 @@
 
 The commands a person rarely types: the ones Claude Code hooks, git hooks, the issue-driven workflow runs (`fullrun`, `backlogrun`, …) and lanes call, plus the `maintainer` commands kit's own maintainers run. Where each command came from: `docs/maintainers/josh-commands-automation-rationale.md` → "Where each command came from".
 
-A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `tsx tools/document/generate-command-usage.ts` — edit the entry, not the span.
+A `<!-- usage: … -->` span is generated — its summary line from the command's registry `description` and the rest from its `usage` (both in `scripts/josh/josh-commands-*.ts`), by `pnpm josh command:derive` — edit the entry, not the span.
 
 ## Development
 
@@ -23,6 +23,22 @@ pnpm josh refactor:scan
 The candidates are those of `prompts/refactoring.md` §4.1–§4.3, as `verdict: clear` / `verdict: candidates`. Never fails.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh refactor:scan` in detail".
+
+### `josh rename`
+
+<!-- usage: rename -->
+
+Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree.
+
+```bash
+pnpm josh rename old_name new_name scripts/a.ts scripts/b.ts
+pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledger' '#scripts/lane/lane-ledger-write' scripts/gate/core-wait-record.ts   # the identifier and its module together
+```
+
+<!-- /usage -->
+
+Only bindings and module specifiers change; strings, comments, `obj.old` and property keys stay. Each file's count is printed, then the files are formatted as the edit hook would.
+A file with no replacement, missing, or not TypeScript or JavaScript is named, nothing is written, exit 1.
 
 ### `josh format:edited`
 
@@ -88,7 +104,7 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 
 Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/init/hook-launch.ts`):
 
-- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, else (Codex) `git rev-parse --show-toplevel`, so a hook run in a subdirectory finds its paths.
+- **`<project-root prefix>`** — `cd`s to `CLAUDE_PROJECT_DIR`, else (Codex) `git rev-parse --show-toplevel`, so a hook run in a subdirectory finds its paths. It exports the launch directory as `JOSH_HOOK_CWD`, from which the launcher moves into a Claude Code worktree (`.claude/worktrees/<name>`).
 - **The launcher** (`scripts/hooks/run-hook.sh <name>`) clears a git hook's location variables when git resolves without them, then runs the ready gate, falling back to `pnpm josh <command>`.
 - **The ready gate** (`tools/hooks/hook-bundle-ready.ts`) runs the bundle when its digest matches the source, and rebuilds it in-process when stale.
 - A consumer's command is rewritten to the installed launcher (`node_modules/@joshuafolkken/kit/scripts/hooks/run-hook.sh`), whose gate is a presence check on `dist/hooks/` (published bundles have no source to be stale against) and whose fallback is the `dist/josh.js` dispatcher.
@@ -96,7 +112,7 @@ Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/in
 #### The batching guard
 
 - The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
-- **Silent in a dispatched lane child** (`JOSH_LANE_CHILD`): the notice is `off` there (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
+- **In a dispatched lane child** (`JOSH_LANE_CHILD`): off, except a chain of single-call `grep` / `rg` / `find` / `fd` / read-only `sed` searches, which the `search-batching` row refuses unless the investigation guard refuses the same call (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
 - **Fires more than once per run**: again every `REFIRE_EVERY` further single-call turns (the notice every `NOTICE_REFIRE_EVERY`); a batched turn starts a fresh sequence.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
 
@@ -114,14 +130,15 @@ pnpm josh time:density --lanes 5   # the five most recent lanes
 **Options:**
 
 - `--lanes <n>` — average over a different count of recent qualifying lanes (default 10).
-- `--path <dir>` — read another project's lane transcripts, as `josh time` does. Run it from the main checkout — a lane reads only its own transcript.
+- `--path <dir>` — read another project's lane transcripts, as `josh time` does. Run from a lane, it reads its main checkout's lanes.
 
 <!-- /usage -->
 
 Kit-only.
 
 ```
-lanes=10 round_trips=634 tools/turn=1.13 batched=63/634
+lanes=10 round_trips=505 tools/turn=1.23 batched=79/505 independent=50 dependent=46
+independent by kind: Bash: grep=19, Bash: sed=9, Write=6, Bash: cat=5, Edit=4
 ```
 
 - `tools/turn` (floor 1.5) runs a little above the Issue's per-assistant-message frame (1.04), whose denominator also counts text-only turns. Use it as a behavior-change Issue's baseline for `josh measure:rerun`.
@@ -160,7 +177,7 @@ Delivers a trigger-delivered rule at the call that binds it, in place of a rule 
 
 - **Direct filing** — trigger is a hand-built filing (`gh issue create`, or a `title`-bearing POST to a path ending `/issues`); refused on every occurrence, pointed at [`josh issue:file`](josh-commands-backlog.md#josh-issuefile).
 - **Issue comments** — trigger reads an Issue body without them (`gh issue view <N>`, or a `GET` ending `…/issues/<N>`); hands over `gh issue view <N> --comments`.
-- **Piped verification** — trigger is a josh check (`gate`, `check`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
+- **Piped verification** — trigger is a check (`gate`, `check*`, `lint*`, `cspell*`, `test*`, `eval`, `overrides`, `ranges`) standing anywhere but the last pipeline segment.
 - **Early heartbeat** — trigger is a `Bash` call whose whole purpose is to wait; `pnpm josh run:progress --once` / `--wait` are exempt.
 - **The pre-gate cut row** — trigger is a `Bash` call running `pnpm josh gate` from a **lane** working tree that **has not yet taken its cut**; hands over `pnpm josh run:cut <N>` with what each of its six verdicts obliges. It exists because the step, carried as prose, fired **0 times in 6 lane children**. `--resume`, `--end` and `--json` do not count as taking the cut. Procedure: `.claude/skills/workflow-commands/pre-gate-cut.md`.
 - **The implementation-phase cut row** — an `Edit` / `Write` from a lane that has not taken its cut, once `pnpm josh cost --cut` is over the shared threshold; hands over `pnpm josh run:cut --impl <N> --handoff <path>` on every threshold crossing.
@@ -201,7 +218,7 @@ It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh script
 
 <!-- usage: stop:guard -->
 
-Claude Code Stop hook: send the hold notify, release the hold and print the issue citations itself; block on the rules that need the model (reads the Stop payload on stdin).
+Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin).
 
 ```bash
 pnpm josh stop:guard   # run by the Stop hook, the stop payload as JSON on stdin
@@ -245,6 +262,22 @@ pnpm josh e2e:retry-check
 Run by the distributed `ci.yml` between its E2E attempts.
 
 - Reads the preview server debug log (`WRANGLER_LOG_PATH`, default `e2e-web-server-logs`); matches only when `Error in ProxyController` **and** `Network connection lost.` are in the same file. Verdict goes to `$GITHUB_OUTPUT` as `crashed`; a missing/unreadable log means "no crash".
+
+### `josh test:reach`
+
+<!-- usage: test:reach -->
+
+Print how many test files each file's imports reach — the count test:related sizes its claim by — one '<count> <file>' line per file.
+
+```bash
+pnpm josh test:reach scripts/lane/lane-ledger.ts   # a reach count to measure before and after a change
+```
+
+<!-- /usage -->
+
+Run by a lane filing an overrun investigation, for the reach count its `## ベースライン` measures before and after a change.
+
+- A path is read from the repository root (where `pnpm josh` runs) or as an absolute path; one that names no file is refused rather than printed as `0`.
 
 ## Project
 
@@ -509,6 +542,8 @@ pnpm josh observations:flush
 
 It commits only the ledger lines (`.josh/observations/`) no run's own commit carried — lines written outside any run.
 
+It first carries the closed issues' comment rounds no lane carries into `<N>-comment-rounds.md`, in the same pull request.
+
 **Behavior:** refused off the default branch or beside any other change; prints `clean` when there is nothing to commit. `pnpm josh run:tail` runs it after a merge.
 
 Related: [`josh followup`](#josh-followup).
@@ -572,9 +607,11 @@ pnpm josh review:record --issue 2325 --interaction                              
 
 <!-- /usage -->
 
-The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings.
+The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
 
-**Behavior:** each positional is `<category>:<severity>:<file>`.
+**Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
+
+A ledger round carries the closed issues' comment rounds into its commit, except in a lane child, which leaves them to [`josh observations:flush`](#josh-observationsflush).
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 
@@ -714,7 +751,7 @@ pnpm josh ruleset:check --apply   # add the missing checks to the existing rule
 
 A distributed workflow's check gates nothing until the repository requires it. It reads the default branch's rules — rulesets first, classic branch protection when no ruleset requires a check — and compares them with the checks of the distributed workflows the repository has:
 
-- `.github/workflows/ci.yml` — `Checks`, `Detect E2E`, `E2E`, `Security Audit`
+- `.github/workflows/ci.yml` — `Checks`, `Detect E2E`, `E2E`, `Secret Scan`, `Security Audit`
 - `.github/workflows/sonar-qube.yml` — `SonarQube`
 - `.github/workflows/pr-classification.yml` — `Release classification`
 
@@ -829,6 +866,18 @@ pnpm josh latest:guard   # refuses inside a lane
 
 It fronts the `josh latest` chain.
 
+### `josh command:derive`
+
+<!-- usage: command:derive -->
+
+Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings.
+
+```bash
+pnpm josh command:derive   # after adding, renaming or describing a command
+```
+
+<!-- /usage -->
+
 ---
 
 ## Git hooks
@@ -873,7 +922,7 @@ pnpm josh secretlint-scan src/app.ts .env.example   # the staged paths
 
 <!-- /usage -->
 
-Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths, wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. A detected secret blocks the commit (exit code forwarded); without secretlint installed the wrapper prints a notice and exits `0`.
+Runs [secretlint](https://github.com/secretlint/secretlint) over the staged paths, wired into the pre-commit hook by `lefthook/base.yml` as `pnpm josh secretlint-scan {staged_files}`. A detected secret blocks the commit (exit code forwarded); without secretlint it prints a notice and exits `0` — `1` under `JOSH_SECRETLINT_REQUIRE=1` (CI).
 
 **Options:** always passes `--no-glob` so lefthook's literal paths (e.g. SvelteKit `(app)` / `[id]` directories) are not treated as glob patterns.
 
@@ -891,10 +940,11 @@ pnpm josh pre-commit-lint eslint src/app.ts
 
 <!-- /usage -->
 
-Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded.
+Wired into `lefthook/base.yml` as `pnpm josh pre-commit-lint <tool> {staged_files}`; the tool's exit code is forwarded. Files follow `--`, so an option-like name stays a file.
 
 - `cspell` and `eslint` write `.cspellcache.commit` and `.eslintcache.commit` (separate from the gate's caches).
 - `prettier` shares `.prettiercache` with `josh lint`, so a commit right after a green gate re-checks nothing.
+- `JOSH_PRE_COMMIT_LINT=off` skips all three; `josh ship` sets it for its local commit, whose tree the gate checks before the push.
 
 ### `josh pre-push-unit`
 
@@ -913,6 +963,8 @@ The result is reused when [`josh gate`](josh-commands.md#josh-gate) recorded tha
 ```bash
 JOSH_PRE_PUSH_FORCE=1 git push   # run the suite even on a tree recorded green
 ```
+
+With `JOSH_PRE_PUSH_RELATED=1`, a push the record does not cover runs `josh test:related` instead of the whole suite — `josh ship` sets it when it pushes its sync merge onto an open pull request ahead of the gate.
 
 **Output:** on reuse, prints that the tree is already green.
 
@@ -938,7 +990,9 @@ The budget is [`josh gate`](josh-commands.md#josh-gate)'s; the pre-push install 
 - Memory: `--memory`, else the wrapped tool's `MEMORY_MB` times its `--concurrency` / `--maxWorkers`, `sh -c` read too (`scripts/gate/command-memory.ts`); a command it does not know reserves none.
 - Claims a place before the command starts and waits while the budget is full, as a gate check does; the place is released when the command exits, and its exit code is forwarded.
 - A missing separator, a non-integer weight, a malformed `--memory`, or no command is a usage error (exit `1`).
-- A dispatched lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1` by any path, is refused by the `lane-direct-tool` row of `pnpm josh rule:list` and pointed here or at `josh lint:related` / `test:related` / `cspell:dot`; an interactive session outside a lane is not.
+- A lane child launching `eslint` / `vitest` / `cspell` / `tsc` directly (bare, `pnpm exec`, `npx`, `sh -c`), or eslint above `--concurrency 1`, meets the `lane-direct-tool` row of `pnpm josh rule:list`; an interactive session outside a lane does not.
+- The row rewrites a one-command line behind this command at the gate's weight, and refuses any other line, pointing at `josh lint:related` / `test:related` / `cspell:dot`.
+- The command runs in the directory it was typed in (pnpm's `INIT_CWD`), not the package root.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh reserved-run` in detail".
 
@@ -982,6 +1036,6 @@ pnpm josh repo:party                     # no argument: the session's own reposi
 
 <!-- /usage -->
 
-Prints `first-party` / `third-party` / `unknown` on stdout, the two owners compared on stderr. Same owner as the session repository → `first-party`; different → `third-party`; unreadable → `unknown`, never read as `third-party`.
+Prints `first-party` / `third-party` / `unknown` on stdout, the two owners compared on stderr. Same owner as the session → `first-party`; else `third-party`; unreadable → `unknown`. The session owner is pinned at session start (`session-owner-pin.ts`), else `origin`.
 
-The test `CLAUDE.md` → "Third-party repositories are Tier C" and `prompts/collaboration-workflow/upstream-interrupt.md` describe; the `third-party-write` row of `delivered-rules.ts` uses it to refuse a `gh api` write to a repository we do not own (a read passes).
+The `third-party-write` row of `delivered-rules.ts` refuses with it a `gh api` or `gh … -R`/`GH_REPO` write to a repo we do not own; it refuses any GraphQL mutation or expanded query regardless of repo.

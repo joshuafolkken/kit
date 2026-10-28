@@ -1,0 +1,271 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const josh_run_mock = vi.hoisted(() => vi.fn())
+const launch = vi.hoisted(() => vi.fn())
+const review_in_mock = vi.hoisted(() => vi.fn())
+const record_check_mock = vi.hoisted(() => vi.fn())
+const record_round_one_mock = vi.hoisted(() => vi.fn())
+const discard_mock = vi.hoisted(() => vi.fn())
+const movement_mock = vi.hoisted(() => vi.fn())
+const stopped_on_mock = vi.hoisted(() => vi.fn())
+const mark_stopped_mock = vi.hoisted(() => vi.fn())
+const interaction_status_mock = vi.hoisted(() => vi.fn(async (): Promise<unknown> => undefined))
+const stamps = vi.hoisted(() => ({
+	read_stamp_text: vi.fn(),
+	remove_stamp: vi.fn(),
+	stamp_path: vi.fn((prefix: string) => `stamps/${prefix}x`),
+	write_text_stamp: vi.fn(),
+}))
+
+vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
+vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: stamps }))
+vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: review_in_mock } }))
+vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
+vi.mock('#scripts/gate/gate-tree', () => ({
+	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
+}))
+vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: () => [] } }))
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of: () => false },
+}))
+vi.mock('#scripts/review/review-record', () => ({ review_record: { check: record_check_mock } }))
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: interaction_status_mock } }
+})
+vi.mock('#scripts/lane/lane-ledger-write', async (import_original) => {
+	const { lane_ledger_write } = await import_original<Record<'lane_ledger_write', object>>()
+
+	return {
+		lane_ledger_write: {
+			...lane_ledger_write,
+			record_round_one: record_round_one_mock,
+			record_round_two: vi.fn(),
+		},
+	}
+})
+vi.mock('#scripts/review/review-reviewed-tree', () => ({
+	review_reviewed_tree: {
+		discard: discard_mock,
+		MOVEMENT: { DELTA: 'delta', HELD: 'held', UNSETTLED: 'unsettled' },
+		is_stopped_on: stopped_on_mock,
+		mark_stopped: mark_stopped_mock,
+		standing_here: movement_mock,
+	},
+}))
+
+const { run_ship_review_steps } = await import('./run-ship-review-steps')
+
+// joshuafolkken/kit#4620: a round 1 recorded before the ship is reused while the tree holds still, and
+// each round 1 the ship acts on leaves its verdict in the lane ledger.
+
+const OK = 0
+const FAILED = 1
+const SKIPPED = { code: OK, is_skipped: true }
+const ISSUE = '4620'
+const OPEN = 'run:review --code-only'
+const RECORD = `review:record --issue ${ISSUE}`
+const REVIEWED = [OPEN, 'run:review --join', 'review:attest --check', RECORD]
+const HIGH = 'bug-risks:high:a.ts:4'
+const UNSETTLED = 'unsettled'
+
+type JoshRun = (argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>
+
+// Every command passes except `failing`; the open prints the level and the brief.
+function josh_exits(failing?: string): JoshRun {
+	return async (argv) => {
+		const line = argv.join(' ')
+
+		return { code: line === failing ? FAILED : OK, out: line === OPEN ? 'medium\nbrief' : '' }
+	}
+}
+
+function commands(): ReadonlyArray<string> {
+	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
+}
+
+function recorded_verdict(verdict: string): unknown {
+	return { issue: Number(ISSUE), verdict }
+}
+
+beforeEach(() => {
+	josh_run_mock.mockReset().mockImplementation(josh_exits())
+	launch.mockReset().mockResolvedValue({ kind: 'completed', pid: 1, exit_code: OK })
+	review_in_mock.mockReset().mockReturnValue({
+		kind: 'argv',
+		argv: { command: 'claude', args: [] },
+		profile: { provider: 'anthropic', role: 'reviewer', model: 'claude-opus-5-5', effort: 'high' },
+	})
+	record_check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+	record_round_one_mock.mockClear()
+	discard_mock.mockClear()
+	movement_mock.mockReset().mockResolvedValue({ movement: 'held' })
+	stopped_on_mock.mockReset().mockReturnValue(false)
+	mark_stopped_mock.mockClear()
+	stamps.read_stamp_text.mockReset().mockReturnValue('')
+})
+
+describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
+	// joshuafolkken/kit#3643: a round that ran no review says so, so the ship does not time it as one.
+	it('reuses a recorded round on an unmoved tree, running no review', async () => {
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
+		expect(commands()).toStrictEqual([])
+		expect(launch).not.toHaveBeenCalled()
+		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('reused'))
+	})
+
+	it('reviews again once a file moved where round 2 does not read, recording the clean verdict', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', OK)
+		expect(commands()).toStrictEqual(REVIEWED)
+		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('clean'))
+	})
+
+	// joshuafolkken/kit#4221: an `ok` record is no reuse once the review is stale — it read the issue
+	// before its update — so that case runs stale.
+	it.each(['missing', 'not-required', 'ok'])('runs the review on a %s record', async (status) => {
+		record_check_mock.mockResolvedValue({ status })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, status === 'ok')).toHaveProperty(
+			'code',
+			OK,
+		)
+		expect(commands()).toContain(OPEN)
+	})
+
+	it('discards the record on a stale issue without asking whether the tree moved', async () => {
+		await run_ship_review_steps.review_stage(ISSUE, true)
+
+		expect(discard_mock).toHaveBeenCalledOnce()
+		expect(movement_mock).not.toHaveBeenCalled()
+	})
+
+	it('records a blocking verdict and stops on it', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		stamps.read_stamp_text.mockReturnValue(`${HIGH}\n`)
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
+		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('blocking'))
+		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), true)
+	})
+})
+
+// joshuafolkken/kit#5296: the stage's result says why it was skipped or ran, for its event line.
+describe('run_ship_review_steps.review_stage — why round 1 was skipped or ran', () => {
+	const UNATTESTED = 'the round was not attested on this branch'
+
+	it('names the attested, held tree when it reuses round 1', async () => {
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject({
+			...SKIPPED,
+			reason: 'reused: round 1 attested on this branch, its tree held',
+		})
+	})
+
+	it("names round 2's delta when it reuses round 1 on a tree moved only where round 2 reads", async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty(
+			'reason',
+			"reused: round 1 attested on this branch, what moved since is round 2's delta",
+		)
+	})
+
+	it('runs round 1 and names the cause when the round was not attested on this branch', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED, cause: UNATTESTED })
+
+		const result = await run_ship_review_steps.review_stage(ISSUE, false)
+
+		expect(commands()).toStrictEqual(REVIEWED)
+		expect(result).toHaveProperty(
+			'reason',
+			`ran: --review with no reusable round 1 — ${UNATTESTED}`,
+		)
+		expect(result.is_skipped).toBeUndefined()
+	})
+
+	it('runs round 1 and names a missing record as the cause', async () => {
+		record_check_mock.mockResolvedValue({ status: 'missing' })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty(
+			'reason',
+			'ran: --review with no reusable round 1 — no review round is recorded for this issue',
+		)
+	})
+})
+
+// joshuafolkken/kit#4878: round 2 reads what moved from the round-1 brief's stamp after the commit.
+describe('run_ship_review_steps.review_stage — a tree moved since the record', () => {
+	it('reuses a recorded round once only files round 2 reads moved, running no scoped pair or reviewer', async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
+		expect(commands()).toStrictEqual([])
+		expect(launch).not.toHaveBeenCalled()
+		expect(record_round_one_mock).toHaveBeenCalledWith(recorded_verdict('reused'))
+	})
+
+	it('reviews round 1 again on a stale issue even when only settled files moved', async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
+
+		await run_ship_review_steps.review_stage(ISSUE, true)
+
+		expect(commands()).toStrictEqual(REVIEWED)
+	})
+})
+
+// joshuafolkken/kit#4781: a lane child that ran both reviewers in-session and recorded both leaves
+// the ship nothing to run (round 1 alone recorded: `run-ship-review-interaction.test.ts`).
+describe('run_ship_review_steps.review_stage — a recorded interaction review', () => {
+	afterEach(() => {
+		interaction_status_mock.mockResolvedValue(undefined)
+	})
+
+	it('reuses both records on an unmoved tree, running no review', async () => {
+		interaction_status_mock.mockResolvedValue('ok')
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
+		expect(commands()).toStrictEqual([])
+		expect(launch).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_review_steps.review_stage — a round whose record failed', () => {
+	// The relaunch re-runs it, so counting this one would count the round twice.
+	it('counts no verdict when review:record itself failed', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		josh_run_mock.mockImplementation(josh_exits(RECORD))
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty('code', FAILED)
+		expect(record_round_one_mock).not.toHaveBeenCalled()
+	})
+})
+
+describe('run_ship_review_steps.review_stage — after the ship stopped on a finding', () => {
+	it('clears the stop marker when round 1 passes', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+
+		await run_ship_review_steps.review_stage(ISSUE, false)
+
+		expect(mark_stopped_mock).toHaveBeenCalledWith(Number(ISSUE), false)
+	})
+
+	// joshuafolkken/kit#2964: the lane's fix moved the tree, and that fix delta is round 2's alone.
+	it('reuses a round the ship stopped on, on a tree the fix moved', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED })
+		stopped_on_mock.mockReturnValue(true)
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject(SKIPPED)
+		expect(commands()).toStrictEqual([])
+		expect(stopped_on_mock).toHaveBeenCalledWith(Number(ISSUE))
+	})
+
+	it('reviews again on a stale issue even after a stop', async () => {
+		stopped_on_mock.mockReturnValue(true)
+
+		await run_ship_review_steps.review_stage(ISSUE, true)
+
+		expect(commands()).toContain(OPEN)
+	})
+})

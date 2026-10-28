@@ -1,4 +1,4 @@
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { verification_inputs } from '#scripts/gate/verification-inputs'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
@@ -19,6 +19,7 @@ const IN_FLIGHT_PREFIX = 'josh-gate-running-'
 const ROUND_ONE_PREFIX = 'josh-review-round1-'
 const ROUND_ONE_CODE_PREFIX = 'josh-review-round1-code-'
 const BRIEFED_PREFIX = 'josh-review-briefed-'
+const REVIEWED_PREFIX = 'josh-review-recorded-'
 
 // The records that vouch for a check carry the fingerprint of its declared inputs
 // (`verification-inputs.ts`): the gate's every declared check, a scoped record its own.
@@ -40,15 +41,17 @@ const round_one_code_stamp: FileMapStampAccess = file_map_stamp.create(
 )
 // Retaken on every brief: the round-1 snapshot is not the tree a later review read.
 const briefed_stamp: FileMapStampAccess = file_map_stamp.create(BRIEFED_PREFIX, PROJECT_ROOT)
+// Retaken on every recorded round: the tree that round's verdict stands for, its fixes included.
+const reviewed_stamp: FileMapStampAccess = file_map_stamp.create(REVIEWED_PREFIX, PROJECT_ROOT)
 const lint_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	LINT_RELATED_PREFIX,
 	PROJECT_ROOT,
-	inputs_of([gate_plan.LINT_LABEL]),
+	inputs_of([gate_labels.LINT_LABEL]),
 )
 const test_related_stamp: FileMapStampAccess = file_map_stamp.create(
 	TEST_RELATED_PREFIX,
 	PROJECT_ROOT,
-	inputs_of([gate_plan.UNIT_LABEL]),
+	inputs_of([gate_labels.UNIT_LABEL]),
 )
 const e2e_stamp: FileMapStampAccess = file_map_stamp.create(E2E_PREFIX, PROJECT_ROOT)
 
@@ -88,6 +91,7 @@ const review_stamps = {
 	round_one_code_stamp,
 	ROUND_ONE_PREFIX,
 	round_one_stamp,
+	reviewed_stamp,
 	test_related_stamp,
 }
 

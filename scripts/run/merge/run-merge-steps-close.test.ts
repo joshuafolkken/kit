@@ -1,7 +1,6 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -23,7 +22,7 @@ const CONTEXT = {
 	child: '4300',
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 // No `.git` in it, so the merged path closes it without a stash.
@@ -53,7 +52,7 @@ describe('run_merge_steps.do_merged — an incomplete lane close', () => {
 			async ([command]) => await run_with(command),
 		)
 
-		await expect(run_merge_steps.do_merged(CONTEXT)).resolves.toBeUndefined()
+		await expect(run_merge_steps.do_merged(CONTEXT, vi.fn())).resolves.toBeUndefined()
 		expect(error).toHaveBeenCalledWith(REASON)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining('lane:close is incomplete'))
 	})

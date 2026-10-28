@@ -20,7 +20,7 @@ describe('secretlint_scan.run_scan', () => {
 
 		secretlint_scan.run_scan(BINARY, STAGED_FILES)
 
-		expect(execa_sync_mock).toHaveBeenLastCalledWith(BINARY, ['--no-glob', ...STAGED_FILES], {
+		expect(execa_sync_mock).toHaveBeenLastCalledWith(BINARY, ['--no-glob', '--', ...STAGED_FILES], {
 			stdio: 'inherit',
 			reject: false,
 		})

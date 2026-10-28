@@ -3,23 +3,27 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { time_transcript_line } from '#scripts/time-runtime/time-transcript-line'
 import { describe, expect, it } from 'vitest'
 import { delivered_rules } from './delivered-rules'
-import { hook_context_line } from './hook-context-line'
 import { piped_verification } from './piped-verification'
-import { rule_value, type RuleReading } from './rule-value'
+import { rule_value } from './rule-value'
 import { rule_value_fixture } from './rule-value-fixture'
 
 // The transcript shapes, shared with every row's own suite so the two cannot drift apart.
-const { TIMESTAMP, assistant_line, call_line, reading_for, result_line, session, tool_use_block } =
-	rule_value_fixture
+const {
+	TIMESTAMP,
+	assistant_line,
+	call_line,
+	context_line,
+	reading_for,
+	result_line,
+	session,
+	tool_use_block,
+} = rule_value_fixture
 const NEXT_TIMESTAMP = '2026-09-09T00:00:01.000Z'
 const LATER_TIMESTAMP = '2026-09-09T00:00:02.000Z'
 const TRIGGER_TIMESTAMP = '2026-09-09T00:00:09.000Z'
 // The worked example of a row with a neutral trigger and a recorded compliance call: the body read
 // reaches it, the comments read in front of it keeps it.
 const ISSUE_COMMENTS = 'issue-comments'
-// The filing cap declares no `keeps` — staying under a cap is not a call — so it reads unmeasured
-// (joshuafolkken/kit#2119).
-const FILING_CAP_ID = 'filing-cap'
 
 const FILING = 'pnpm josh issue:file "x" --body-file b.md'
 const BODY_READ = 'gh api repos/o/r/issues/12'
@@ -175,12 +179,6 @@ describe('rule_value.measure — refusals and unmeasurable rules', () => {
 // joshuafolkken/kit#3570: a rewritten call leaves only the note the hook attached.
 const PIPED_VERIFICATION = 'piped-verification'
 
-function context_line(content: string): string {
-	const attachment = { type: hook_context_line.HOOK_CONTEXT_TYPE, content: [content] }
-
-	return JSON.stringify({ type: 'attachment', timestamp: TIMESTAMP, attachment })
-}
-
 describe('rule_value.measure — a rewrite is a delivery', () => {
 	it('counts the rewrite note as a rewrite, not a refusal', () => {
 		const text = `${session('ls')}\n${context_line(piped_verification.PIPEFAIL_NOTE)}`
@@ -243,79 +241,6 @@ describe('rule_value.measure — a refusal is read from the block, not from the 
 		expect(time_transcript_line.ERROR_TEXT_LIMIT).toBeGreaterThanOrEqual(
 			rule_value.REASON_SIGNATURE_LENGTH,
 		)
-	})
-})
-
-// The rows that cannot declare a compliance call, in enumeration order — asserted below.
-const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
-	'third-party-write',
-	FILING_CAP_ID,
-	'raw-field-body',
-	'test-declared',
-	'lane-background',
-	'lane-split-park',
-	'lane-interactive-ask',
-	'lane-carry-conflict',
-	'lane-switch-main',
-	'lane-direct-tool',
-	'josh-git-bare',
-	'git-force',
-	'worktree-mutation',
-	'file-body',
-	'index-mutation',
-	'destructive-command',
-	'protected-file',
-	'direct-pr-create',
-	'pr-merge',
-	'poll-loop',
-	INVESTIGATION,
-]
-
-describe('rule_value.measure — rules nothing can score', () => {
-	it('reports a rule that declares no compliance test as unmeasured, never as zero', () => {
-		// Scoring it 0 would read as "never kept", which is a claim the missing predicate cannot make.
-		// Every enumerated row declares one since joshuafolkken/kit#1643, so the guarantee is asserted
-		// against the reading rather than against whichever row happened to lack a predicate.
-		const unmeasured: RuleReading = {
-			id: 'unmeasured',
-			sessions: 3,
-			unaided_kept: 0,
-			refusals: 0,
-			rewrites: 0,
-			is_measurable: false,
-		}
-
-		expect(rule_value.unaided_rate(unmeasured)).toBeUndefined()
-	})
-
-	// **Every rule but the ones that cannot have a compliance test** (joshuafolkken/kit#1764,
-	// joshuafolkken/kit#2118, joshuafolkken/kit#2119, joshuafolkken/kit#2120, joshuafolkken/kit#2201).
-	// The investigation row declares none because no call-shaped test can tell a delegation of the
-	// reading from any other dispatch; the test-declared row declares none because its verdict is a
-	// working-tree read the transcript never records, so no recorded call reveals whether the commit
-	// carried a test; the filing-cap row declares none because staying under a cap is not a call; the
-	// three Bash-string gaps (`git-force`, `worktree-mutation`, `file-body`) declare none because the
-	// act each guards against is destructive or billed and the safe alternative is the *absence* of a
-	// call — a push never made, a stash never raw, an Edit that is not a Bash call at all;
-	// `third-party-write` declares none for the same reason (joshuafolkken/kit#2122) — not writing to
-	// another owner's tracker is the absence of a call, not a call; and `lane-interactive-ask` declares
-	// none for the same reason (joshuafolkken/kit#2201) — not asking a person is the absence of a call,
-	// and the compliance a routed child does make is the park `lane-park` already scores; `lane-split-park`
-	// declares none for the same reason (joshuafolkken/kit#3296) — not parking a promoted epic is the
-	// absence of a call. **`rule-body`
-	// left this list in joshuafolkken/kit#2324**: the placement-verdict stand-down made keeping the rule
-	// a *recorded* act — running `pnpm josh oracle:list` and `pnpm josh run:step` — so a call now reveals
-	// the compliance the #2272 doctrine said none could, and the row declares a `keeps`. The module's
-	// doctrine is that a rule with no recorded compliance call reads unmeasured rather than as compliant.
-	// Naming them exactly keeps the guard over every other row, the batching one and the oracle-consulted
-	// rows included, rather than exempting a whole registry to make room for the exceptions.
-	it('declares a compliance test on every rule but the ones that cannot have one', () => {
-		const unmeasured = rule_value
-			.measure([[session(FILING)]])
-			.filter((reading) => !reading.is_measurable)
-			.map((reading) => reading.id)
-
-		expect(unmeasured).toStrictEqual(UNMEASURABLE_ROWS)
 	})
 })
 

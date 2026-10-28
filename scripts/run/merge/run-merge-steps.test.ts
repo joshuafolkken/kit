@@ -1,7 +1,6 @@
 import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -39,7 +38,7 @@ const CONTEXT = {
 	child: '2070',
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 const CHILD_LANE = { issue: CONTEXT.child, directory: `/w/.kit-lanes/${CONTEXT.child}` }
@@ -125,16 +124,6 @@ describe('run_merge_steps.do_outage — re-dispatchable, never parked', () => {
 	})
 })
 
-describe('run_merge_steps.is_over_budget — a loop no session owns', () => {
-	it('answers under without measuring when no threshold is given', async () => {
-		const subprocess = vi.spyOn(josh_command, 'josh_run')
-
-		expect(await run_merge_steps.is_over_budget(undefined)).toBe(false)
-		expect(subprocess).not.toHaveBeenCalled()
-		subprocess.mockRestore()
-	})
-})
-
 describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () => {
 	beforeEach(() => {
 		vi.spyOn(run_carry, 'repository_directory').mockResolvedValue('/stub')
@@ -142,7 +131,7 @@ describe('run_merge_steps — carry owner check (joshuafolkken/kit#2114)', () =>
 	})
 
 	it('do_merged: returns the carry and skips git ops when the record is handed off', async () => {
-		const result = await run_merge_steps.do_merged(CONTEXT)
+		const result = await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(result).toStrictEqual(HANDED_OFF_CARRY)
 	})
@@ -217,7 +206,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	it('stashes the work, records it on the issue, then closes the lane', async () => {
 		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(true)
 
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(spies.push).toHaveBeenCalledWith(MESSAGE, LANE_DIRECTORY)
 		expect(comment_mock).toHaveBeenCalledWith(CONTEXT.child, expect.stringContaining(MESSAGE))
@@ -227,7 +216,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 	it('closes a clean lane as before, with nothing stashed', async () => {
 		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
 
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(spies.push).not.toHaveBeenCalled()
 		expect(comment_mock).not.toHaveBeenCalled()
@@ -239,7 +228,7 @@ describe('run_merge_steps.do_merged — uncommitted work at lane close', () => {
 		spies.push.mockRejectedValue(new Error('stash failed'))
 		vi.spyOn(console, 'error').mockReturnValue()
 
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(did_close(spies)).toBe(false)
 	})
@@ -251,7 +240,7 @@ describe('run_merge_steps.do_merged — primary checkout sync', () => {
 
 		vi.spyOn(git_stash, 'has_changes').mockResolvedValue(false)
 
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(spies.josh_run.mock.calls.map(([args]) => args[0])).toEqual([
 			'main:sync',
@@ -281,7 +270,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 		const apply = stub_active_carry()
 
 		spies.josh_run.mockResolvedValueOnce(SYNC_FAILURE)
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(spies.josh_run.mock.calls.map(([args]) => args[0])).toEqual([
 			'main:sync',
@@ -295,7 +284,7 @@ describe('run_merge_steps.do_merged — a failed primary checkout sync (joshuafo
 		const apply = stub_active_carry()
 
 		spies.josh_run.mockResolvedValue(SYNC_FAILURE)
-		await expect(run_merge_steps.do_merged(CONTEXT)).rejects.toThrow(
+		await expect(run_merge_steps.do_merged(CONTEXT, vi.fn())).rejects.toThrow(
 			/^main:sync failed: fatal: cannot lock ref$/u,
 		)
 		expect(spies.josh_run).toHaveBeenCalledTimes(SYNC_ATTEMPTS)
@@ -314,7 +303,7 @@ describe('run_merge_steps.do_merged — a lane directory that is no work tree', 
 			targets: { directory: tmpdir(), branch: `${CONTEXT.child}-lane` },
 		})
 
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(status_read).not.toHaveBeenCalled()
 		expect(did_close(spies)).toBe(true)

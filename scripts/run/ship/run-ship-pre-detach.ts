@@ -1,20 +1,24 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { project_checks } from '#scripts/gate/project-checks'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { type_check_step } from '#scripts/gate/type-check-step'
 import type { JoshResult } from '#scripts/josh/josh-run'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffered-process'
 
 // The fast checks a detached `josh ship` runs in the agent's own turn, after the preflight (whatever it
-// answered) and before the hand-off:a type error in a file the related-only checks never touched, an export nothing reads,
+// answered) and before the hand-off: a type error in a file the related-only checks never touched, an export nothing reads,
 // an unknown word, or a guard test (a SKILL.md pointer, a byte budget, the command list, a source with
 // no colocated test, a bare issue citation) that only the full suite runs, would otherwise first
 // surface after the detach and cost a relaunched session. They answer in seconds, so the same session
-// fixes what they find and ships again.
+// fixes what they find and ships again. A `--review` ship adds `test:pinned`, which probes the hunks
+// its verdict cache does not hold (`run-ship-pre-detach-pinned.ts`).
 //
 // **Nothing moves out of the gate, and the gate reuses what these already answered**: a check that is
 // the gate's own check passed silently here is recorded with the gate's per-check record
@@ -33,7 +37,10 @@ import { buffered_process, type BufferedProcessResult } from '#scripts/lib/buffe
 // present run, and a consumer meets the static checks alone.
 //
 // In kit the metrics ratchet's totals join them: a feature grows a total almost every time, and here
-// the session that grew the total writes the reason itself rather than a relaunched one. The
+// the session that grew the total writes the reason itself rather than a relaunched one —
+// `josh lint:related` has already reported the growth in the loop (`metrics-totals.ts`), so this is
+// the stop for a growth that notice did not settle. A total the branch's approval already names is
+// re-recorded at its growth here rather than stopped (`--rerecord`, joshuafolkken/kit#4716). The
 // durations are left out: they read the gate ledger, stale before the detach, so they stay with the
 // supervised gate.
 
@@ -53,9 +60,10 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const SECTION_SEPARATOR = '\n\n'
 const PASSED = 'pre-detach checks passed'
-const METRICS_TOTALS_COMMAND: ReadonlyArray<string> = ['josh', 'metrics', '--totals-only']
+const UNPINNED = 'unpinned'
+const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
-	{ list: ['josh', 'exports:unused'], label: gate_plan.EXPORTS_LABEL },
+	{ list: ['josh', 'exports:unused'], label: gate_labels.EXPORTS_LABEL },
 	{ list: ['josh', 'cspell:dot'] },
 ]
 const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
@@ -63,13 +71,10 @@ const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
 	'scripts/claude',
 	'scripts/rules',
 	'scripts/josh/josh-command-map.test.ts',
-	'scripts/issue/session-cite-scan.test.ts',
-	'tools/test/untested-sources.test.ts',
+	...structural_checks.STRUCTURAL_GUARD_TARGETS,
 	'tools/test/pure-files.test.ts',
 ]
-// A present directory need not hold a test the project's Vitest includes — a consumer's own
-// `scripts/claude` of shell helpers, say — and a filter that matches nothing would stop every ship.
-const GUARD_TEST_COMMAND: ReadonlyArray<string> = ['josh', 'test:unit', '--passWithNoTests']
+const { GUARD_TEST_COMMAND, failure_prefix, failure_section } = structural_checks
 
 function present_targets(directory: string): ReadonlyArray<string> {
 	return GUARD_TEST_TARGETS.filter((target) => existsSync(path.join(directory, target)))
@@ -83,17 +88,16 @@ function guard_tests(directory: string): Array<PreDetachCheck> {
 
 // The same kit-only rule as the gate's `is_kit_only` step: a consumer's kit has no `josh metrics`.
 function kit_only(directory: string): Array<PreDetachCheck> {
-	return project_checks.is_kit_repository(directory) ? [{ list: METRICS_TOTALS_COMMAND }] : []
+	return project_checks.is_kit_repository(directory) ? [{ list: METRICS_RERECORD_COMMAND }] : []
 }
 
 async function command_lists(directory: string): Promise<Array<PreDetachCheck>> {
 	const type_check = await type_check_step.resolve_type_check_args(directory)
 
 	return [
-		{ list: type_check, label: gate_plan.TYPE_CHECK_LABEL },
+		{ list: type_check, label: gate_labels.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
 		...guard_tests(directory),
-		...kit_only(directory),
 	]
 }
 
@@ -120,38 +124,88 @@ function gate_results(runs: ReadonlyArray<PreDetachRun>): Array<GateStepResult> 
 		})
 }
 
-function verdict(results: ReadonlyArray<BufferedProcessResult>): JoshResult {
-	const failed = results.filter((result) => buffered_process.is_process_failed(result))
+function verdict(runs: ReadonlyArray<PreDetachRun>): JoshResult {
+	const failed = runs.filter(({ result }) => buffered_process.is_process_failed(result))
 
 	if (failed.length === 0) return { code: SUCCESS_EXIT_CODE, out: PASSED }
 
 	return {
 		code: FAILURE_EXIT_CODE,
-		out: failed.map((result) => result.output.trim()).join(SECTION_SEPARATOR),
+		out: failed
+			.map(({ check, result }) => failure_section(check.list, result))
+			.join(SECTION_SEPARATOR),
 	}
 }
 
+// The `test:pinned` check a `--review` ship adds (`run-ship-pre-detach-pinned.ts`); none is asked by default.
+type PinnedCheck = () => Promise<JoshResult>
+
+async function not_asked(): Promise<JoshResult> {
+	return { code: SUCCESS_EXIT_CODE, out: PASSED }
+}
+
+// The checks' answer, with the kinds a `stop` record names its red by: `pre-detach` for the static
+// checks, `unpinned` for `test:pinned`, so `lane:stats` tells an unpinned stop apart
+// (joshuafolkken/kit#5228).
+interface PreDetachResult extends JoshResult {
+	preconditions?: ReadonlyArray<string>
+}
+
+function joined(result: JoshResult, pinned: JoshResult): JoshResult {
+	if (pinned.code === SUCCESS_EXIT_CODE) return result
+	if (result.code === SUCCESS_EXIT_CODE) return pinned
+
+	return { code: FAILURE_EXIT_CODE, out: [result.out, pinned.out].join(SECTION_SEPARATOR) }
+}
+
+function red_kinds(result: JoshResult, pinned: JoshResult): ReadonlyArray<string> {
+	return [
+		...(result.code === SUCCESS_EXIT_CODE ? [] : [lane_ledger_write.PRE_DETACH_STAGE]),
+		...(pinned.code === SUCCESS_EXIT_CODE ? [] : [UNPINNED]),
+	]
+}
+
+// The pinned check's stop joins the others' rather than hiding them.
+function with_pinned(result: JoshResult, pinned: JoshResult): PreDetachResult {
+	const preconditions = red_kinds(result, pinned)
+	const answer = joined(result, pinned)
+
+	return preconditions.length === 0 ? answer : { ...answer, preconditions }
+}
+
 // All run at once, buffered, and every failure is reported, so one ship shows all there is to fix.
-// The tree is read before they start, so a record is written only for the tree they read.
+// The tree is read before they start, so a record is written only for the tree they read. **The
+// metrics totals run first, alone**: they may re-record the branch's approval file
+// (`metrics-command.ts`), and a file written under the others would move the tree and leave the gate
+// nothing to reuse (joshuafolkken/kit#4716).
 async function checks(
 	directory: string = process.cwd(),
 	records: CheckRecords = check_reuse.DEFAULT_RECORDS,
-): Promise<JoshResult> {
+	pinned: PinnedCheck = not_asked,
+): Promise<PreDetachResult> {
+	const metrics = await Promise.all(
+		kit_only(directory).map(async (check) => await run_in(directory, check)),
+	)
 	const [lists, tree] = await Promise.all([command_lists(directory), gate_tree.read_gate_tree()])
-	const runs = await Promise.all(lists.map(async (check) => await run_in(directory, check)))
+	const [runs, pinned_result] = await Promise.all([
+		Promise.all(lists.map(async (check) => await run_in(directory, check))),
+		pinned(),
+	])
 
 	await check_reuse.record_green_checks(gate_results(runs), tree, records)
 
-	return verdict(runs.map(({ result }) => result))
+	return with_pinned(verdict([...runs, ...metrics]), pinned_result)
 }
 
 const run_ship_pre_detach = {
 	GUARD_TEST_TARGETS,
-	METRICS_TOTALS_COMMAND,
+	METRICS_RERECORD_COMMAND,
 	PASSED,
 	STATIC_CHECKS,
+	UNPINNED,
 	checks,
+	failure_prefix,
 }
 
-export type { PreDetachCheck }
+export type { PinnedCheck, PreDetachCheck, PreDetachResult }
 export { run_ship_pre_detach }

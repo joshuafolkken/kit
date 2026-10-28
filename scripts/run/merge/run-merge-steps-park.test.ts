@@ -1,6 +1,5 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
@@ -49,7 +48,7 @@ const CONTEXT = {
 	child: CHILD,
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 const IN_PROGRESS = 'in-progress'
@@ -166,6 +165,28 @@ describe('run_merge_steps.do_failed — a child whose detached ship ended', () =
 			CHILD,
 			expect.stringContaining('- Why: the child’s session ended with its issue still open'),
 		)
+	})
+})
+
+// joshuafolkken/kit#4765: a child the per-child re-dispatch cap stopped names the cap in its park.
+describe('run_merge_steps.do_failed — a child the re-dispatch cap stopped', () => {
+	const SHIP_CAUSE = {
+		short: 'followup failed',
+		why: 'its detached ship stopped and was not fixed.',
+	}
+
+	it('leads the park with the re-dispatch cap line where the cap stopped the child', async () => {
+		const capped_note = 'it reached the re-dispatch cap (3) after 3 re-dispatches.'
+
+		ship_cause_mock.mockReturnValue(SHIP_CAUSE)
+
+		const result = await run_merge_steps.do_failed({ ...CONTEXT, capped_note })
+
+		expect(comment_mock).toHaveBeenCalledWith(
+			CHILD,
+			expect.stringContaining(`- Why: ${capped_note} ${SHIP_CAUSE.why}`),
+		)
+		expect(result.cause).toBe(SHIP_CAUSE.short)
 	})
 })
 
@@ -301,7 +322,7 @@ describe('run_merge_steps.do_failed — a child waiting on its declared samples'
 		const body = '## 背景\n\n- 種別: 不具合\n- 実施可能条件: #4313 のマージ後 10 マージ\n'
 
 		vi.spyOn(git_gh_command, 'issue_get_body').mockResolvedValue(body)
-		vi.spyOn(issue_sample_gate, 'prime').mockResolvedValue()
+		vi.spyOn(issue_sample_prime, 'prime').mockResolvedValue()
 		spy_carry(OWN_CARRY)
 
 		const result = await run_merge_steps.do_failed(CONTEXT)
@@ -347,7 +368,7 @@ describe('run_merge_steps.do_merged — a child merged while its issue stayed OP
 	})
 
 	it('closes the issue, naming the merged pull request and run:merge', async () => {
-		await run_merge_steps.do_merged({ ...CONTEXT, merged_pr: PR_URL })
+		await run_merge_steps.do_merged({ ...CONTEXT, merged_pr: PR_URL }, vi.fn())
 
 		expect(ensure_closed_mock).toHaveBeenCalledWith(
 			{ issue_number: CHILD, pr_url: PR_URL, closer: 'pnpm josh run:merge' },
@@ -356,13 +377,13 @@ describe('run_merge_steps.do_merged — a child merged while its issue stayed OP
 	})
 
 	it('closes nothing for a child GitHub already closed', async () => {
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(ensure_closed_mock).not.toHaveBeenCalled()
 	})
 
 	it('closes the epics a child closed outside followup completed', async () => {
-		await run_merge_steps.do_merged(CONTEXT)
+		await run_merge_steps.do_merged(CONTEXT, vi.fn())
 
 		expect(close_epics_mock).toHaveBeenCalledWith({ issue_number: CHILD, is_merged: true })
 	})

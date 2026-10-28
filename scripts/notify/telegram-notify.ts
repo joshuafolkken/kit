@@ -1,5 +1,6 @@
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { timed_fetch } from '#scripts/lib/timed-fetch'
+import { token_shape } from '#scripts/lib/token-shape'
 import { z } from 'zod'
 import { confirmation_options, type ConfirmationOptions } from './confirmation-options'
 import { notify_opt_in } from './notify-opt-in'
@@ -230,6 +231,14 @@ function build_text(input: TelegramSendInput): string {
 	return join_blocks({ ...input, body: `${head_of(input.body, kept)}${BODY_TRUNCATION_MARK}` })
 }
 
+// The text to send, refused when it holds a credential: the whole text is read, before the cut could
+// leave a head no shape matches.
+function outbound_text(input: TelegramSendInput): string {
+	token_shape.refuse(join_blocks(input), 'The Telegram message')
+
+	return build_text(input)
+}
+
 async function post_message(config: TelegramConfig, text: string): Promise<void> {
 	const url = `${TELEGRAM_API_BASE}/bot${config.bot_token}/sendMessage`
 	const response = await timed_fetch(url, {
@@ -271,7 +280,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 	}
 
 	const config = load_config()
-	const text = build_text(input)
+	const text = outbound_text(input)
 
 	try {
 		await post_message(config, text)
@@ -283,7 +292,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 }
 
 // **The tolerant form**, for a caller whose job is something other than the notification.
-// `followup` sends the completion message on its way to the merge, and a gateway timeout at
+// `followup` sends the completion message beside the merge, and a gateway timeout at
 // Telegram is not a reason to leave a reviewed, green pull request unmerged. So the failure is
 // reported and the run carries on.
 //
@@ -298,7 +307,7 @@ async function send(input: TelegramSendInput): Promise<void> {
 //
 // **Not routed through `git_followup_cleanup`**, which is that Issue's mechanism: it guards the
 // steps a merge has already earned and says "failed after the merge" in its own wording, while this
-// send happens *before* the merge. Borrowing it would print a sentence that is not true.
+// send never happens *after* the merge. Borrowing it would print a sentence that is not true.
 function report_send_failure(error: unknown, recovery: string | undefined): void {
 	console.error('')
 	console.error(`❗ ${describe_symptom(error)}`)

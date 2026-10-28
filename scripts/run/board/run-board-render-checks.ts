@@ -42,9 +42,10 @@ function coderabbit_part(state: CodeRabbitState): Array<string> {
 	return mark === undefined ? [] : [tinted(`${CODERABBIT_ICON} ${mark}`, CODERABBIT_COLORS[state])]
 }
 
-function checks_part(checks: PrChecks): string {
+// `link` makes the number a link to the pull request (joshuafolkken/kit#4625); `PR` stays plain.
+function checks_part(checks: PrChecks, link: (number: number) => string): string {
 	return [
-		`PR ${String(checks.pr)}`,
+		`PR ${link(checks.pr)}`,
 		...count_part(CHECK_ICONS.pass, checks.pass),
 		...count_part(CHECK_ICONS.pending, checks.pending),
 		...count_part(CHECK_ICONS.fail, checks.fail, 'red'),

@@ -23,6 +23,8 @@ const FIRST_LANE = 4288
 const SECOND_LANE = 4268
 const BLOCKER = 4100
 const FUTURE = '2999-01-01T00:00Z'
+const NOW_MS = Date.parse('2026-10-20T00:00:00.000Z')
+const SOON = '2026-10-21T00:00Z'
 const { WAIT_ICONS } = run_board_labels
 const BEHIND_SOLO: RowReason = { icon: WAIT_ICONS.solo_ahead, issues: [String(SOLO)] }
 
@@ -65,6 +67,7 @@ function reasons(
 		events: [],
 		free_lanes: 1,
 		is_stopped: false,
+		now_ms: NOW_MS,
 	}
 	const reason_of = run_board_reason.reader(read)
 
@@ -129,7 +132,14 @@ function held_reasons(
 	lanes: ReadonlyArray<number> = [HOLDER],
 ): Array<RowReason | undefined> {
 	const plan = { ...plan_of(children), labels: new Map([[HOLDER, holder_labels]]) }
-	const read = { plan, statuses: running(lanes), events: [], free_lanes: 1, is_stopped: false }
+	const read = {
+		plan,
+		statuses: running(lanes),
+		events: [],
+		free_lanes: 1,
+		is_stopped: false,
+		now_ms: NOW_MS,
+	}
 	const reason_of = run_board_reason.reader(read)
 
 	return children.map((item) => reason_of(item, waits))
@@ -175,6 +185,14 @@ describe('run_board_reason.reader on a run:solo issue not yet due', () => {
 		const [solo_reason, behind] = reasons([later_solo, child(BEHIND)], [FIRST_LANE])
 
 		expect(solo_reason?.icon).toBe(WAIT_ICONS.not_before)
+		expect(behind).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#4848: due by the wall clock, not by the board's, so only the board's clock keeps it out.
+	it('weighs its start time against the board’s clock, not the wall clock', () => {
+		const soon_solo = { ...solo(), body: `## 背景\n\n- 実施可能日: ${SOON}\n` }
+		const [, behind] = reasons([soon_solo, child(BEHIND)], [FIRST_LANE])
+
 		expect(behind).toBeUndefined()
 	})
 })

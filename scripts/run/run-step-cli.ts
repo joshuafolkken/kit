@@ -14,6 +14,7 @@ import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_cli } from './run-prep-cli'
 import { run_retrospective } from './run-retrospective'
 import { run_step, type ParentInput, type StepInput } from './run-step'
+import { run_step_lane_plan } from './run-step-lane-plan'
 import { run_step_section } from './run-step-section'
 
 // `josh run:step [<N>]` — print the run's next single action, followed by the section that governs it
@@ -165,11 +166,22 @@ async function run_parent(): Promise<number> {
 	return FAILURE_EXIT_CODE
 }
 
-function report({ input, ship_problems }: Gathered): number {
+// The action line, then — under `implement` — the `lane:plan` a lane child runs before its first edit.
+// Only `implement` reads it, so no other step pays for the plan comment's request.
+async function action_lines(input: StepInput, line: string): Promise<ReadonlyArray<string>> {
+	if (line !== run_step.IMPLEMENT) return [line]
+	const next = await run_step_lane_plan.line_for(input.issue_number, input.is_lane_child)
+
+	return next === undefined ? [line] : [line, next]
+}
+
+async function report({ input, ship_problems }: Gathered): Promise<number> {
 	const action = run_step.next_action(input)
 
-	console.info(action.line)
-	// On stderr, so stdout stays the action line and its rule: what `josh ship` would
+	const lines = await action_lines(input, action.line)
+
+	for (const line of lines) console.info(line)
+	// On stderr, so stdout stays the action lines and their rule: what `josh ship` would
 	// refuse on is said at every step, while it is still cheap to meet.
 	if (ship_problems.length > 0) console.error(run_prep.ship_body(ship_problems))
 
@@ -177,7 +189,7 @@ function report({ input, ship_problems }: Gathered): number {
 	// same failure, so a position missing its issue state is never read as a confident next step.
 	if (input.state === undefined) return FAILURE_EXIT_CODE
 
-	return run_step_section.print_for(action)
+	return run_step_section.print_for(action, input.is_lane_child)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -191,7 +203,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return report(await gather(issue_number))
+	return await report(await gather(issue_number))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

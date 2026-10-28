@@ -5,7 +5,8 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { main_merge_regenerate } from '#scripts/git/main-merge-regenerate'
 import { session_cite } from '#scripts/issue/session-cite'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
-import { lane_ledger, type OverlapRecord } from '#scripts/lane/lane-ledger'
+import type { OverlapRecord } from '#scripts/lane/lane-ledger-schema'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { poll } from '#scripts/lib/poll'
 
@@ -39,8 +40,12 @@ const NAME_ONLY_ARGUMENTS = [
 	'--no-relative',
 	'--no-renames',
 ]
+// Only the regenerated entries: a rewritten one resolves some conflicts and refuses the rest, so its
+// conflict is still waited on.
 const REGENERATED_PATHS: ReadonlySet<string> = new Set(
-	main_merge_regenerate.REGENERATED_FILES.map((entry) => entry.path),
+	main_merge_regenerate.RESOLVED_FILES.filter((entry) => 'command' in entry).map(
+		(entry) => entry.path,
+	),
 )
 
 interface OverlapOptions {
@@ -211,7 +216,7 @@ async function await_overlap(
 	const waited_ms = Date.now() - started
 	const record = { issue: Number(issue), lanes, paths: [...overlap.paths], waited_ms, is_cleared }
 
-	await lane_ledger.record_overlap(record, options.ledger)
+	await lane_ledger_write.record_overlap(record, options.ledger)
 
 	return record
 }

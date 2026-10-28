@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`COMMAND_MAP — reference metadata > keeps every canonical command and alias stable 1`] = `
+exports[`COMMAND_MAP — reference metadata > keeps every canonical command and alias stable > regenerate: pnpm josh command:derive 1`] = `
 {
   "aliases": {
     "a": "audit",
@@ -12,6 +12,8 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "by": "bytes",
     "c": "check",
     "ca": "cost:audit",
+    "cdv": "command:derive",
+    "cr": "check:related",
     "dr": "doctor",
     "eu": "exports:unused",
     "ev": "eval",
@@ -22,9 +24,12 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "gp": "pr",
     "i": "init",
     "l": "lint",
+    "lad": "lane:adopt",
+    "lbd": "lane:breakdown",
     "lc": "latest:corepack",
     "lli": "lane:limit",
     "ln": "lines",
+    "lnt": "lane:net",
     "lps": "lane:pause",
     "lr": "lint:related",
     "lrs": "lane:restart",
@@ -32,6 +37,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     "lsm": "lane:sample",
     "lst": "lane:stats",
     "lu": "latest:update",
+    "lva": "lane:value",
     "lwd": "lane:withdraw",
     "mm": "main:merge",
     "ms": "main:sync",
@@ -200,6 +206,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "check:related": [
+      "",
+      "developer",
+      [
+        "processes",
+      ],
+    ],
     "clone:scan": [
       "",
       "automation",
@@ -212,6 +225,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "automation",
       [
         "none",
+      ],
+    ],
+    "command:derive": [
+      "",
+      "maintainer",
+      [
+        "files",
       ],
     ],
     "cost": [
@@ -306,6 +326,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "effect:audit": [
+      "[--days <N>] [--draft <issue>]",
+      "automation",
+      [
+        "network",
+        "files",
+      ],
+    ],
     "epic": [
       "<title> <issue...> [--ordered]",
       "automation",
@@ -398,7 +426,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "gate": [
-      "[--verbose|--force|--no-unit]",
+      "[--verbose|--force|--no-unit|--static-group=<group>]",
       "developer",
       [
         "files",
@@ -452,7 +480,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:file": [
-      "<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]",
+      "<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]",
       "automation",
       [
         "network",
@@ -480,7 +508,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "issue:measured": [
-      "<issue> --evidence-file <path>",
+      "<issue> --evidence-file <path> [--unmet]",
       "automation",
       [
         "network",
@@ -489,6 +517,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "issue:plan": [
       "<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]",
+      "automation",
+      [
+        "network",
+      ],
+    ],
+    "issue:priority": [
+      "<issue>",
       "automation",
       [
         "network",
@@ -522,12 +557,29 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "lane:adopt": [
+      "<issue> | --all",
+      "developer",
+      [
+        "files",
+        "git",
+        "processes",
+        "network",
+      ],
+    ],
     "lane:await": [
       "<issue> [<issue>...] [--owner <pid>]",
       "automation",
       [
         "files",
         "processes",
+      ],
+    ],
+    "lane:breakdown": [
+      "<issue>",
+      "maintainer",
+      [
+        "none",
       ],
     ],
     "lane:close": [
@@ -568,6 +620,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "lane:net": [
+      "<issue>",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
     "lane:open": [
       "<issue> [options]",
       "automation",
@@ -588,6 +647,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "processes",
+      ],
+    ],
+    "lane:plan": [
+      "<issue> <path>... [--probe]",
+      "automation",
+      [
+        "files",
+        "network",
       ],
     ],
     "lane:prune": [
@@ -624,6 +691,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
     ],
     "lane:stats": [
       "--period <days> [--limit <lane-limit>]",
+      "maintainer",
+      [
+        "none",
+      ],
+    ],
+    "lane:value": [
+      "<metric> --since <instant>",
       "maintainer",
       [
         "none",
@@ -741,7 +815,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "metrics": [
-      "[--no-startup | --totals-only | --accept --reason "<why>"]",
+      "[--no-startup | --totals-only [--rerecord] | --accept --reason "<why>"]",
       "developer",
       [
         "files",
@@ -868,6 +942,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "network",
       ],
     ],
+    "prose:stale": [
+      "",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "ranges": [
       "",
       "developer",
@@ -927,6 +1008,14 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "none",
       ],
     ],
+    "rename": [
+      "<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>",
+      "automation",
+      [
+        "files",
+        "processes",
+      ],
+    ],
     "repo:party": [
       "[<owner/repo>]",
       "automation",
@@ -935,7 +1024,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "report:lint": [
-      "(reads stdin)",
+      "[--child-summary] (reads stdin)",
       "automation",
       [
         "none",
@@ -983,8 +1072,15 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "review:lint": [
+      "[--round <1|2>] (reads stdin)",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "review:record": [
-      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | --check [--interaction] --issue <N>",
+      "--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>",
       "automation",
       [
         "files",
@@ -992,10 +1088,10 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "review:round2": [
-      "[--round-1-closed] [--json]",
+      "[--record <N>] [--json]",
       "automation",
       [
-        "none",
+        "network",
       ],
     ],
     "review:stops": [
@@ -1003,6 +1099,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       "developer",
       [
         "none",
+      ],
+    ],
+    "review:submit": [
+      "[--interaction] < findings | [--interaction] --none",
+      "automation",
+      [
+        "files",
       ],
     ],
     "rule:list": [
@@ -1013,7 +1116,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "rule:value": [
-      "[--refresh]",
+      "[--fresh | --refresh]",
       "developer",
       [
         "files",
@@ -1155,11 +1258,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "run:review": [
-      "[--join]",
+      "[--code-only] [--unpinned-ok "<reason>"] | --join [--fixing] | --pinned | --push",
       "automation",
       [
         "processes",
         "files",
+        "git",
+        "network",
       ],
     ],
     "run:status": [
@@ -1224,11 +1329,19 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "ship": [
-      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
+      ""<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> | --notify-message-file <path>] | --log <N>",
       "automation",
       [
         "git",
         "network",
+      ],
+    ],
+    "ship:wait": [
+      "<N>",
+      "automation",
+      [
+        "files",
+        "processes",
       ],
     ],
     "sonar:hotspots": [
@@ -1319,11 +1432,18 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "test:pinned": [
-      "[--max <n>]",
+      "[--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned]",
       "developer",
       [
         "git",
         "processes",
+      ],
+    ],
+    "test:reach": [
+      "<files...>",
+      "automation",
+      [
+        "none",
       ],
     ],
     "test:red": [

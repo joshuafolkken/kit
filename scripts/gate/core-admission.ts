@@ -1,4 +1,5 @@
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { core_budget_timing } from './core-budget-timing'
 import type { LedgerLoad, MachineBudget } from './machine-capacity'
 
 // The ledger's admission arithmetic, kept apart from the markers `core-budget.ts` reads and writes so
@@ -16,6 +17,11 @@ const RAMP_UP_MS = 30_000
 // enough for the related checks an edit triggers together, short enough that a heavy claim waits only
 // for the claims already in flight.
 const BYPASS_WINDOW_MS = 30_000
+// How long after a heavier waiting claim a lighter one may still pass it: half the wait cap
+// (`core-budget-timing.ts`), so the heavier claim still has the cap's second half to find its room before
+// it starts narrowed or past the budget.
+const WAIT_CAP_SHARE = 0.5
+const HEAVIER_BYPASS_WINDOW_MS = core_budget_timing.WAIT_CAP_MS * WAIT_CAP_SHARE
 // A narrowed unit claim still runs one worker: zero would run no test and report the suite green.
 const MIN_GRANT = 1
 // A unit claim narrowed to less than its asked weight over this waits rather than starts (`is_too_narrow`).
@@ -128,15 +134,26 @@ function first_waiter_limit(budget: MachineBudget): LedgerLoad {
 	return { cores: budget.cores + (budget.busy_excess ?? 0), memory_mb: budget.memory_mb }
 }
 
+// Whether `own` may pass one waiter ahead: any waiter claimed within the window before it, and a heavier
+// one within the longer window (joshuafolkken/kit#4595) — a two-core `lint:related` queued for most of the
+// cap behind a unit claim of five cores that the running claims had no room for.
+function may_pass_waiter(own: LedgerReservation, waiter: LedgerReservation): boolean {
+	const since_ms = own.claimed_at - waiter.claimed_at
+
+	if (since_ms < BYPASS_WINDOW_MS) return true
+
+	return waiter.weight > own.weight && since_ms < HEAVIER_BYPASS_WINDOW_MS
+}
+
 // **A light claim passes a waiting one only within a window of that one's claim** (#4313). A claim that
 // fits the room the running claims leave runs instead of queueing behind a heavier claim that does not
-// fit it; a claim made more than the window after a waiter queues behind it, so a waiter is passed by a
-// bounded set of claims and is never starved.
+// fit it; a claim made more than the window after a waiter — the heavier window after a heavier one
+// (`may_pass_waiter`) — queues behind it, so a waiter is passed by a bounded set of claims and is never
+// starved.
 function may_pass({ own, ahead, running }: Placement, budget: MachineBudget): boolean {
-	const latest = own.reservation.claimed_at - BYPASS_WINDOW_MS
-	const is_recent = ahead.every((entry) => entry.reservation.claimed_at > latest)
+	const is_passable = ahead.every((entry) => may_pass_waiter(own.reservation, entry.reservation))
 
-	return is_recent && fits([...running, own], budget)
+	return is_passable && fits([...running, own], budget)
 }
 
 function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget): boolean {
@@ -252,7 +269,7 @@ function total_weight(reservations: ReadonlyArray<LedgerEntry>): number {
 	return sum_load(reservations).cores
 }
 
-// **The weight a unit claim admitted past the wait cap may take: the cores the admitted claims leave
+// **The weight a unit claim admitted past its wait (the cap, or outside load that does not ease) may take: the cores the admitted claims leave
 // free, never below one worker and never above what it asked for.** Admitting it at full width put the
 // ledger past the machine (joshuafolkken/kit#4235); a unit suite is the one tool whose width follows a
 // number, so it narrows instead. `undefined` for any other claim, and for one that fits as asked.
@@ -335,6 +352,7 @@ function describe_overflow(admission: Admission): string | undefined {
 
 const core_admission = {
 	BYPASS_WINDOW_MS,
+	HEAVIER_BYPASS_WINDOW_MS,
 	RAMP_UP_MS,
 	admitted_keys,
 	admitted_load,

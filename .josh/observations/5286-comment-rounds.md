@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/review/review-round-one-closure.ts:44 | 2026-10-28 | #5286
+- rf:tests | low | scripts/review/review-round-one-closure.test.ts:64 | 2026-10-28 | #5286

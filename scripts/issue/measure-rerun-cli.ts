@@ -1,65 +1,33 @@
 #!/usr/bin/env tsx
-import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { gh_author_association } from '#scripts/gh/gh-author-association'
-import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
-import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { error_text } from '#scripts/lib/error-message'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { z } from 'zod'
 import { baseline_measure, type Baseline } from './baseline-measure'
-import { session_cite } from './session-cite'
+import { trusted_measure } from './trusted-measure'
 
 // `josh measure:rerun <N>` — read a behavior-change Issue body after merge, re-run each baseline
 // command, and print the before/after pair. A value that did not move means
 // the premise the rule rested on is refuted, so a line is appended to the observation ledger — reusing
 // that append-only, same-key mechanism rather than a second one.
 //
-// **The baseline is shell, and the body is written by whoever filed the Issue**.
-// A baseline needs pipes and loops (`git log … | wc -l`, `for d in $(ls …)`), so an allow-list of
-// commands cannot make it safe; what can is who wrote it. The input is therefore the Issue number, not
-// a file, so the author's `author_association` arrives with the body from the same REST read, and only
-// a body written by someone with write access to the repository is run.
+// The baseline is shell, so only a body whose author can write to the repository is run
+// (`trusted-measure.ts`).
 
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
-const ISSUE_FIELDS = 'body,author_association,user'
-const UNKNOWN_ASSOCIATION = 'unknown'
 const USAGE = 'Usage: josh measure:rerun <issue-number>'
 const NO_BASELINE = 'no `command → value` baseline found in ## ベースライン — nothing to re-run'
 const DATE_END = 10
-// One baseline command's budget — the same minute `josh-harness.ts` gives one command it spawns. A
-// baseline is a count or a digest that answers in seconds, so a command still running after a minute
-// is stuck, and without a bound it would hold the whole re-measurement open with nothing printed.
-const MEASURE_TIMEOUT_MS = 60_000
-const issue_schema = z.object({
-	body: z.string().nullish(),
-	author_association: z.string().nullish(),
-	user: z.looseObject({ login: z.string() }).nullish(),
-})
-
-type IssueFields = z.infer<typeof issue_schema>
-type BodyRead = { kind: 'trusted'; body: string } | { kind: 'refused'; reason: string }
-
-// The command's stdout, trimmed to one value. A failing or timed-out command yields its message so the
-// pair still prints and the remaining baselines still run, rather than aborting the whole
-// re-measurement.
-function measure(command: string): string {
-	try {
-		return execSync(command, { encoding: 'utf8', timeout: MEASURE_TIMEOUT_MS }).trim()
-	} catch (error) {
-		return `(command failed: ${error_text.message_of(error)})`
-	}
-}
 
 interface Outcome {
 	pair: string
 	ledger_line: string | undefined
 }
 
+// A failing or timed-out command yields its message so the pair still prints and the remaining
+// baselines still run, rather than aborting the whole re-measurement.
 function rerun_one(baseline: Baseline, date: string): Outcome {
-	const after = measure(baseline.command)
+	const after = trusted_measure.text_of(trusted_measure.run_command(baseline.command))
 	const is_unchanged = baseline_measure.is_no_change(baseline.value, after)
 
 	return {
@@ -81,37 +49,6 @@ async function append_ledger(lines: ReadonlyArray<string>, now: Date): Promise<v
 
 function today(now: Date): string {
 	return now.toISOString().slice(0, DATE_END)
-}
-
-async function read_issue(issue_number: string): Promise<IssueFields | undefined> {
-	const json = await git_gh_issue_read.issue_view_json(issue_number, ISSUE_FIELDS)
-
-	return json === undefined ? undefined : parse_json_object_or_undefined(json, issue_schema)
-}
-
-function untrusted(issue_number: string, issue: IssueFields): BodyRead {
-	const association = issue.author_association ?? UNKNOWN_ASSOCIATION
-
-	return {
-		kind: 'refused',
-		reason: `refusing to run the baseline of ${session_cite.issue(issue_number)}: its author (${association}) is not ${gh_author_association.TRUSTED_LIST}`,
-	}
-}
-
-// The body, only when its author can write to the repository. A read that fails is refused as well:
-// an unknown author is not a trusted one.
-async function read_trusted_body(issue_number: string): Promise<BodyRead> {
-	const issue = await read_issue(issue_number)
-
-	if (issue === undefined) {
-		return { kind: 'refused', reason: `could not read issue ${session_cite.issue(issue_number)}` }
-	}
-
-	const author = { login: issue.user?.login, association: issue.author_association }
-
-	if (!(await gh_author_association.is_trusted(author))) return untrusted(issue_number, issue)
-
-	return { kind: 'trusted', body: issue.body ?? '' }
 }
 
 async function rerun(body: string, now: Date): Promise<number> {
@@ -141,7 +78,7 @@ async function run(issue_number: string | undefined, now: Date): Promise<number>
 		return FAILURE_EXIT_CODE
 	}
 
-	const read = await read_trusted_body(issue_number)
+	const read = await trusted_measure.read_trusted_body(issue_number)
 
 	if (read.kind === 'refused') {
 		console.error(read.reason)

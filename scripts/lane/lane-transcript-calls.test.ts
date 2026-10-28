@@ -5,6 +5,8 @@ import { lane_transcript_calls } from './lane-transcript-calls'
 // foreground call is timed by the gap between the two, and a backgrounded call is kept untimed.
 
 const SESSION = 'session-a'
+const LANE = '/projects/kit-lanes-1'
+const SOURCE = { session_id: SESSION, lane: LANE }
 const START = '2026-10-21T10:00:00.000Z'
 const END = '2026-10-21T10:00:07.500Z'
 const SEVEN_AND_A_HALF_SECONDS = 7500
@@ -26,13 +28,16 @@ describe('lane_transcript_calls.parse — timing', () => {
 		const command = 'pnpm josh lint:related'
 		const raw = [use_line('a', { command }), result_line('a', 'ok')]
 
-		expect(lane_transcript_calls.parse(SESSION, raw.join('\n'))).toStrictEqual([
+		expect(lane_transcript_calls.parse(SOURCE, raw.join('\n'))).toStrictEqual([
 			{
 				session_id: SESSION,
+				lane: LANE,
 				started_ms: Date.parse(START),
 				duration_ms: SEVEN_AND_A_HALF_SECONDS,
+				tool: 'Bash',
 				background: false,
 				command,
+				subagent: undefined,
 				output: 'ok',
 			},
 		])
@@ -41,17 +46,60 @@ describe('lane_transcript_calls.parse — timing', () => {
 	it('keeps a backgrounded call but leaves it untimed', () => {
 		const input = { command: 'pnpm josh gate', run_in_background: true }
 		const raw = [use_line('b', input), result_line('b', 'running in background')].join('\n')
-		const [call] = lane_transcript_calls.parse(SESSION, raw)
+		const [call] = lane_transcript_calls.parse(SOURCE, raw)
 
 		expect(call?.background).toBe(true)
 		expect(call?.duration_ms).toBeUndefined()
 	})
 
 	it('leaves a call whose result never arrived untimed', () => {
-		const [call] = lane_transcript_calls.parse(SESSION, use_line('c', { command: 'ls' }))
+		const [call] = lane_transcript_calls.parse(SOURCE, use_line('c', { command: 'ls' }))
 
 		expect(call?.duration_ms).toBeUndefined()
 		expect(call?.output).toBe('')
+	})
+})
+
+// joshuafolkken/kit#4630: `lane:value edit` times the edits apart from the shell calls.
+describe('lane_transcript_calls.parse — tool name', () => {
+	it('keeps the name of the tool each call used', () => {
+		const block = { type: 'tool_use', id: 'f', name: 'Edit', input: { file_path: 'a.ts' } }
+		const use = JSON.stringify({ timestamp: START, message: { content: [block] } })
+		const [call] = lane_transcript_calls.parse(SOURCE, [use, result_line('f', 'ok')].join('\n'))
+
+		expect(call?.tool).toBe('Edit')
+		expect(call?.duration_ms).toBe(SEVEN_AND_A_HALF_SECONDS)
+	})
+})
+
+function agent_call(name: string, input: Record<string, unknown>): string {
+	const block = { type: 'tool_use', id: 'g', name, input }
+
+	return JSON.stringify({ timestamp: START, message: { content: [block] } })
+}
+
+// joshuafolkken/kit#5297: the implement's subagent time splits by the agent each call dispatched.
+describe('lane_transcript_calls.parse — subagent', () => {
+	it('keeps the agent type and model an Agent or Task call names', () => {
+		const input = { subagent_type: 'investigator', model: 'sonnet', prompt: 'p' }
+		const [agent] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', input))
+		const [task] = lane_transcript_calls.parse(SOURCE, agent_call('Task', input))
+
+		expect(agent?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+		expect(task?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+	})
+
+	it('reads an Agent call naming no type as general-purpose, its model unnamed', () => {
+		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', { model: '' }))
+
+		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined })
+	})
+
+	it('gives a call of any other tool no subagent', () => {
+		const input = { subagent_type: 'investigator', command: 'ls' }
+		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Bash', input))
+
+		expect(call?.subagent).toBeUndefined()
 	})
 })
 
@@ -59,7 +107,7 @@ describe('lane_transcript_calls.parse — tolerance', () => {
 	it('joins the text parts of a block-list result', () => {
 		const parts = [{ type: 'text', text: 'one' }, { type: 'image' }, { type: 'text', text: 'two' }]
 		const raw = [use_line('d', {}), result_line('d', parts)].join('\n')
-		const [call] = lane_transcript_calls.parse(SESSION, raw)
+		const [call] = lane_transcript_calls.parse(SOURCE, raw)
 
 		expect(call?.output).toBe('one\n\ntwo')
 		expect(call?.command).toBeUndefined()
@@ -74,6 +122,6 @@ describe('lane_transcript_calls.parse — tolerance', () => {
 			result_line('e', 'listed'),
 		].join('\n')
 
-		expect(lane_transcript_calls.parse(SESSION, raw)).toHaveLength(1)
+		expect(lane_transcript_calls.parse(SOURCE, raw)).toHaveLength(1)
 	})
 })

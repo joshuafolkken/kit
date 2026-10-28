@@ -1,11 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	statSync,
+	writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
-import type { LaneInfo } from './lane-registry'
+import type { LaneInfo, lane_registry as LaneRegistryModule } from './lane-registry'
 
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
 // project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
@@ -23,33 +31,41 @@ vi.mock('#scripts/git/git-command', () => ({
 	},
 }))
 vi.mock('#scripts/git/git-worktree', () => ({
-	git_worktree: {
-		ls_remote_branch: vi.fn(),
-		worktree_add: vi.fn(),
-	},
+	git_worktree: { ls_remote_branch: vi.fn(), set_upstream: vi.fn(), worktree_add: vi.fn() },
 }))
 vi.mock('./lane-install', () => ({
 	lane_install: { install_dependencies: vi.fn() },
 }))
+vi.mock('#scripts/lint/eslint-warm', () => ({ eslint_warm: { start: vi.fn() } }))
 vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
-vi.mock('./lane-registry', () => ({
-	lane_registry: {
-		find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
-			lanes.find((lane) => lane.issue === issue),
-		list_lanes: vi.fn(),
-		main_repository_root: vi.fn(),
-		unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
-			lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
-		used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
-			lanes.flatMap((lane) => lane.seat ?? []),
-	},
-}))
+vi.mock('./lane-registry', async (import_original) => {
+	type LaneRegistry = typeof LaneRegistryModule
+
+	const { lane_registry: actual } = await import_original<{ lane_registry: LaneRegistry }>()
+
+	return {
+		lane_registry: {
+			find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
+				lanes.find((lane) => lane.issue === issue),
+			list_lanes: vi.fn(),
+			main_repository_root: vi.fn(),
+			unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
+				lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
+			used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
+				lanes.flatMap((lane) => lane.seat ?? []),
+			// Real, so the `.env` this module writes lands on disk with the mode it is given.
+			write_environment: actual.write_environment,
+			OWNER_ONLY_MODE: actual.OWNER_ONLY_MODE,
+		},
+	}
+})
 
 const { git_command } = await import('#scripts/git/git-command')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_install } = await import('./lane-install')
+const { eslint_warm } = await import('#scripts/lint/eslint-warm')
 const { lane_leftover } = await import('./lane-leftover')
 const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
@@ -63,6 +79,8 @@ const ROOT_SEED_LINE = 'PORT_SEED=5'
 const SEAT_1_LINE = 'JOSH_LANE_SEAT=1'
 const SEAT_2_LINE = 'JOSH_LANE_SEAT=2'
 const ROOT_ENV = [BOT_TOKEN, CHAT_ID, ROOT_SEED_LINE, ''].join('\n')
+// The permission bits are the mode below the file-type bits, `0o777` at most.
+const PERMISSION_RANGE = 0o1000
 const ISSUE = '1490'
 const OTHER_ISSUE = '1491'
 const START_POINT = 'refs/remotes/origin/main'
@@ -89,6 +107,10 @@ function root_environment_file(): string {
 
 function lane_environment_file(issue: string): string {
 	return readFileSync(path.join(LANE_ROOT, issue, '.env'), 'utf8')
+}
+
+function lane_environment_mode(issue: string): number {
+	return statSync(path.join(LANE_ROOT, issue, '.env')).mode % PERMISSION_RANGE
 }
 
 function seat_lock_path(seat: number): string {
@@ -157,6 +179,8 @@ describe('opening a lane', () => {
 			'1490-lane',
 			START_POINT,
 		)
+		// joshuafolkken/kit#4653: a Codex lane's sandbox cannot write the upstream its push would set.
+		expect(vi.mocked(git_worktree.set_upstream)).toHaveBeenCalledWith('1490-lane')
 	})
 
 	// The lane keeps the project's seed and adds only its seat, so the file shows the two apart and the
@@ -171,6 +195,13 @@ describe('opening a lane', () => {
 		expect(written).toContain(BOT_TOKEN)
 		expect(written).toContain(CHAT_ID)
 		expect(root_environment_file()).toBe(ROOT_ENV)
+	})
+
+	// joshuafolkken/kit#4634: the copy carries the root's Telegram token, so only its owner reads it.
+	it('writes the lane .env readable by its owner only', async () => {
+		await lane_open.open_lane(ISSUE)
+
+		expect(lane_environment_mode(ISSUE)).toBe(lane_registry.OWNER_ONLY_MODE)
 	})
 
 	it('takes the lowest seat no open lane holds', async () => {
@@ -261,13 +292,16 @@ describe('claiming a lane seat atomically', () => {
 describe('opening a lane — its dependencies', () => {
 	// The work tree is the container and this is its contents: without them the first `pnpm josh …`
 	// typed in the lane fails with `tsx: command not found` (joshuafolkken/kit#1554). It is asked for
-	// the lane's own directory, never the one `lane:open` was typed in.
-	it('installs the dependencies into the lane it just created', async () => {
+	// the lane's own directory, never the one `lane:open` was typed in. Its eslint daemon is warmed
+	// after it, so the child's first edit hook lints warm (joshuafolkken/kit#4720).
+	it('installs the dependencies into the lane it just created, then warms its eslint', async () => {
 		await lane_open.open_lane(ISSUE)
 
-		expect(vi.mocked(lane_install.install_dependencies)).toHaveBeenCalledWith(
-			path.join(LANE_ROOT, ISSUE),
-		)
+		const install = vi.mocked(lane_install.install_dependencies)
+
+		expect(install).toHaveBeenCalledWith(path.join(LANE_ROOT, ISSUE))
+		expect(eslint_warm.start).toHaveBeenCalledWith(path.join(LANE_ROOT, ISSUE))
+		expect(install).toHaveBeenCalledBefore(vi.mocked(eslint_warm.start))
 	})
 
 	// joshuafolkken/kit#3738: the install is the long part of an open, so it is a stage of its own.

@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { base_tree, type BaseTree } from './base-tree'
 import { git_fixture_workspace, type FixtureWorkspace } from './git-fixture-workspace'
 
@@ -14,6 +14,7 @@ const BASE_NOTE = 'base\n'
 const CHANGED_NOTE = 'changed\n'
 const PORCELAIN = '--porcelain'
 const FAILURE = 'the callback failed'
+const TERMINATED_EXIT_CODE = 143
 
 const fixture: { current?: FixtureWorkspace } = {}
 
@@ -100,5 +101,37 @@ describe('base_tree.with_tree — what it leaves behind', () => {
 		await expect(run).rejects.toThrow(FAILURE)
 		expect(await snapshot()).toBe(before)
 		expect(opened.map((tree) => existsSync(tree.parent))).toStrictEqual([false])
+	})
+})
+
+describe('base_tree.with_tree — a terminated run', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('removes the tree it holds and exits as SIGTERM would have', async () => {
+		const commit = await build_repository()
+		const exit = vi.spyOn(process, 'exit').mockImplementation(vi.fn() as never)
+
+		const is_left_after_signal = await base_tree.with_tree(PREFIX, commit, async ({ parent }) => {
+			process.emit('SIGTERM')
+
+			return existsSync(parent)
+		})
+
+		expect(is_left_after_signal).toBe(false)
+		expect(exit).toHaveBeenCalledWith(TERMINATED_EXIT_CODE)
+	})
+
+	it('leaves no SIGTERM listener once its trees are removed', async () => {
+		const commit = await build_repository()
+		const before = process.listenerCount('SIGTERM')
+
+		const during = await base_tree.with_tree(PREFIX, commit, async () =>
+			process.listenerCount('SIGTERM'),
+		)
+
+		expect(during).toBe(before + 1)
+		expect(process.listenerCount('SIGTERM')).toBe(before)
 	})
 })

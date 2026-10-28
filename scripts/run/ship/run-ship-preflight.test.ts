@@ -15,6 +15,7 @@ const issue_body_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>
 const scoped_mock = vi.hoisted(() => vi.fn())
 const classification_mock = vi.hoisted(() => vi.fn<() => Promise<void>>())
 const lock_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
+const planned_mock = vi.hoisted(() => vi.fn<() => Promise<Array<string>>>())
 const acceptance_mock = vi.hoisted(() =>
 	vi.fn<(issue: string, body: string | undefined) => Promise<string | undefined>>(),
 )
@@ -47,6 +48,9 @@ vi.mock('#scripts/review/removed-tests-check', () => ({
 }))
 vi.mock('./run-ship-scoped', () => ({ run_ship_scoped: { scoped_pair: scoped_mock } }))
 vi.mock('./run-ship-lock', () => ({ run_ship_lock: { lock_problems: lock_mock } }))
+vi.mock('./run-ship-planned', () => ({
+	run_ship_planned: { PRECONDITION: 'unplanned', problems: planned_mock },
+}))
 vi.mock('./run-ship-body-draft', () => ({
 	run_ship_body_draft: { existing: draft_mock, prepare: prepare_mock },
 }))
@@ -70,6 +74,7 @@ const CLASSIFICATION_UNMET = { kind: 'classification', problem: CLASSIFICATION }
 const UNMAPPED = '`ac-12345678` has no row'
 const REMOVED_UNDISPOSED = '`board > shades by lane` has no disposition'
 const LOCK_DRIFT = 'pnpm-lock.yaml does not match its inputs'
+const UNPLANNED = 'unplanned: scripts/gate/gate-plan.ts'
 const ISSUE = '3154'
 const EVIDENCE_BODY =
 	'## 実機証跡\n\n`pnpm josh ship --log 2946`\n\n```\nstopped at: === preflight ===\n```\n'
@@ -96,6 +101,7 @@ beforeEach(() => {
 	scoped_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	classification_mock.mockReset().mockResolvedValue()
 	lock_mock.mockReset().mockResolvedValue([])
+	planned_mock.mockReset().mockResolvedValue([])
 	acceptance_mock.mockReset().mockResolvedValue(undefined)
 	removed_mock.mockReset().mockResolvedValue(undefined)
 	issue_body_mock.mockReset().mockResolvedValue(undefined)
@@ -146,6 +152,19 @@ describe('run_ship_preflight.stage — the lock file', () => {
 
 		expect(result.code).toBe(FAILED)
 		expect(result.out).toContain(`  - ${LOCK_DRIFT}`)
+		expect(scoped_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5152: a code file the lane's plan never listed stops the ship before the gate.
+describe('run_ship_preflight.stage — the lane plan', () => {
+	it('stops before the scoped pair on an unplanned code file, naming it', async () => {
+		planned_mock.mockResolvedValue([UNPLANNED])
+
+		const result = await run_ship_preflight.stage(NO_BODY)
+
+		expect(result).toMatchObject({ code: FAILED, preconditions: ['unplanned'] })
+		expect(result.out).toContain(`  - ${UNPLANNED}`)
 		expect(scoped_mock).not.toHaveBeenCalled()
 	})
 })

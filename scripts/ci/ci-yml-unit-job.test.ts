@@ -1,4 +1,5 @@
 import { globSync } from 'node:fs'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_TARGETS } from '#scripts/gate/verification-gate'
 import { package_path } from '#scripts/init/init-paths'
@@ -82,7 +83,7 @@ describe('the unit suite has a job of its own', () => {
 // files — vitest would fail it — because the suite has far more files than shards.
 describe('the unit suite is sharded across runners', () => {
 	it('runs one job per shard and lets every shard finish when one fails', () => {
-		expect(shards()).toEqual([1, 2, 3, 4])
+		expect(shards()).toEqual([1, 2, 3, 4, 5, 6])
 		expect(runtime_job(UNIT_JOB)?.strategy?.['fail-fast']).toBe(false)
 	})
 
@@ -159,7 +160,10 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 // of quietly leaving CI — and so the claim survives a rename of any step.
 describe('the split covers every check the single job used to run', () => {
 	it('leaves the static checks and the unit suite adjacent, with nothing between them', () => {
-		const covered = [...gate_plan.STATIC_CHECKS.map((check) => check.target), gate_plan.UNIT_TARGET]
+		const covered = [
+			...gate_plan.STATIC_CHECKS.map((check) => check.target),
+			gate_labels.UNIT_TARGET,
+		]
 
 		expect(covered).toEqual([...GATE_TARGETS])
 	})

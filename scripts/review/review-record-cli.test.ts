@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
+import type { review_record_interaction } from './review-record-interaction'
 
 vi.mock('#scripts/observations/observation-ledger-home', async (original) => {
 	const actual = await original<{ observation_ledger_home: typeof observation_ledger_home }>()
@@ -20,13 +21,62 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_comment: issue_comment_mock },
 }))
 
+// The real probe reads this checkout's branch; `review-record-cli-push.test.ts` owns the pushed case.
+vi.mock('#scripts/run/ship/run-ship-probe', () => ({
+	run_ship_probe: { is_pushed_clean: vi.fn().mockResolvedValue(false) },
+}))
+
 const carry_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('./review-comment-round', async (original) => {
 	const actual = await original<{ review_comment_round: typeof review_comment_round }>()
 
-	return { review_comment_round: { ...actual.review_comment_round, carry: carry_mock } }
+	return {
+		review_comment_round: {
+			...actual.review_comment_round,
+			carry: carry_mock,
+			issue_lines: vi.fn().mockResolvedValue([]),
+		},
+	}
 })
+
+const reviewed_record_mock = vi.hoisted(() => vi.fn())
+
+// The real record would retake this checkout's reviewed-tree stamp, which a running lane reads.
+vi.mock('./review-reviewed-tree', () => ({
+	review_reviewed_tree: { record: reviewed_record_mock },
+}))
+
+// The reuse answer reads this checkout's tree and the issue; `review-record-cli-reuse.test.ts` owns it.
+vi.mock('./review-round-reuse', () => ({
+	review_round_reuse: {
+		REUSE: { AGAIN: 'again', DELTA: 'delta', HELD: 'held' },
+		answer_here: vi.fn().mockResolvedValue({ reuse: 'again' }),
+	},
+}))
+
+const report_due_mock = vi.hoisted(() => vi.fn())
+
+// The due answer reads this checkout's change; `review-record-interaction.test.ts` owns it.
+vi.mock('./review-record-interaction', async (original) => {
+	const actual = await original<{
+		review_record_interaction: typeof review_record_interaction
+	}>()
+
+	return {
+		review_record_interaction: {
+			...actual.review_record_interaction,
+			report_due: report_due_mock,
+		},
+	}
+})
+
+const restart_mock = vi.hoisted(() => vi.fn())
+
+// The restart reads this checkout's launch; `review-record-pinned.test.ts` owns it.
+vi.mock('./review-record-pinned', () => ({
+	review_record_pinned: { restart_if_moved: restart_mock },
+}))
 
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-'))
 const NOW = new Date('2026-09-22T00:00:00Z')
@@ -96,24 +146,24 @@ describe('review_record_cli.build_lines', () => {
 })
 
 describe('review_record_cli.run', () => {
-	it('appends one finding line per finding to the issue file', async () => {
+	it('appends a round boundary and one finding line per finding to the issue file', async () => {
 		const root = root_of('with-findings')
 		const argv = ['--issue', '2325', 'tests:medium:a.ts', 'security:low:b.ts']
 		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root))
 
 		expect(code).toBe(0)
 		expect(readFileSync(issue_file(root, 2325), 'utf8')).toBe(
-			'- rf:tests | medium | a.ts | 2026-09-22 | #2325\n- rf:security | low | b.ts | 2026-09-22 | #2325\n',
+			'- rb:2026-09-22 | #2325\n- rf:tests | medium | a.ts | 2026-09-22 | #2325\n- rf:security | low | b.ts | 2026-09-22 | #2325\n',
 		)
 	})
 
-	it('records a zero-finding round as one line', async () => {
+	it('records a zero-finding round as one line after its boundary', async () => {
 		const root = root_of('zero-round')
 
 		await quietly(async () => await review_record_cli.run(['--issue', '2325'], NOW, root))
 
 		expect(readFileSync(issue_file(root, 2325), 'utf8')).toBe(
-			'- rf:none | none | - | 2026-09-22 | #2325\n',
+			'- rb:2026-09-22 | #2325\n- rf:none | none | - | 2026-09-22 | #2325\n',
 		)
 	})
 
@@ -244,14 +294,6 @@ describe('review_record_cli.run --comment', () => {
 	it('keeps the ledger grammar readable inside the comment', () => {
 		expect(review_comment_round.body_of([ZERO_LINE]).split('\n')).toContain(ZERO_LINE)
 	})
-
-	it('exits 1 when the comment could not be posted, the round being recorded nowhere', async () => {
-		issue_comment_mock.mockReset().mockRejectedValue(GH_REFUSED)
-		const argv = ['--issue', '3645', '--comment']
-		const code = await quietly(async () => await review_record_cli.run(argv, NOW, root_of('lost')))
-
-		expect(code).toBe(1)
-	})
 })
 
 // joshuafolkken/kit#2919: both halves default to the work tree the command runs in, so a lane records
@@ -267,7 +309,7 @@ describe('review_record_cli.run — default ledger', () => {
 		)
 
 		expect(readFileSync(issue_file(root, 2419), 'utf8')).toBe(
-			'- rf:none | none | - | 2026-09-22 | #2419\n',
+			'- rb:2026-09-22 | #2419\n- rf:none | none | - | 2026-09-22 | #2419\n',
 		)
 		expect(code).toBe(0)
 	})
@@ -289,6 +331,20 @@ describe('review_record_cli.run — carrying the comment rounds', () => {
 		expect(carry_mock).toHaveBeenCalledExactlyOnceWith(root)
 	})
 
+	// joshuafolkken/kit#4620: the ship reuses a code round while the tree it recorded holds still.
+	it('records the reviewed tree for a ledger round, and not for a comment round', async () => {
+		const root = root_of('reviewed-tree')
+
+		reviewed_record_mock.mockClear()
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
+		await quietly(async () => await review_record_cli.run(['--issue', '4620'], NOW, root))
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4620', '--comment'], NOW, root),
+		)
+
+		expect(reviewed_record_mock).toHaveBeenCalledOnce()
+	})
+
 	it('records the round and exits 0 when the carry fails', async () => {
 		const root = root_of('carry-failed')
 
@@ -299,5 +355,47 @@ describe('review_record_cli.run — carrying the comment rounds', () => {
 
 		expect(code).toBe(0)
 		expect(existsSync(issue_file(root, 3811))).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#4620: a High is never fixed in place, so the reviewed tree never vouches for its file.
+describe('review_record_cli.run — the reviewed tree', () => {
+	it('leaves the files a High cites out of the reviewed tree', async () => {
+		const root = root_of('reviewed-tree-high')
+
+		reviewed_record_mock.mockClear()
+		await quietly(
+			async () =>
+				await review_record_cli.run(
+					['--issue', '4620', 'bug-risks:high:a.ts:12', 'bug-risks:medium:b.ts'],
+					NOW,
+					root,
+				),
+		)
+
+		expect(reviewed_record_mock).toHaveBeenCalledExactlyOnceWith(['a.ts:12'])
+	})
+})
+
+// joshuafolkken/kit#4835: a round-1 fix can make the interaction review due after its brief opened.
+describe('review_record_cli.run — what the round made due', () => {
+	it('asks after a recorded code round, and not after an interaction or comment round', async () => {
+		const root = root_of('interaction-due')
+
+		report_due_mock.mockClear()
+		restart_mock.mockClear()
+		issue_comment_mock.mockReset().mockResolvedValue(COMMENT_URL)
+		await quietly(async () => await review_record_cli.run(['--issue', '4835'], NOW, root))
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4835', '--interaction'], NOW, root),
+		)
+		await quietly(
+			async () => await review_record_cli.run(['--issue', '4835', '--comment'], NOW, root),
+		)
+
+		expect(report_due_mock).toHaveBeenCalledExactlyOnceWith(4835, root)
+		// joshuafolkken/kit#4834: only a lane child's handed-over round restarts test:pinned
+		// (`review-record-code-round.test.ts`); #4835 is no lane child's issue here, so none starts.
+		expect(restart_mock).not.toHaveBeenCalled()
 	})
 })

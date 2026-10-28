@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { execaSync } from 'execa'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { development_engines_verdict } from './development-engines-verdict'
 import { latest_corepack } from './latest-corepack'
 import {
 	AGED_PUBLISH,
@@ -13,6 +14,9 @@ import { build_package_manager_manifest } from './package-manager-manifest-fixtu
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
+vi.mock('./development-engines-verdict', () => ({
+	development_engines_verdict: { report: vi.fn() },
+}))
 
 const mocked_execa_sync = vi.mocked(execaSync)
 const mocked_read_file_sync = vi.mocked(readFileSync)
@@ -309,6 +313,17 @@ describe('latest_corepack.main alignment', () => {
 		latest_corepack.main()
 
 		expect(mocked_write_file_sync.mock.calls[1]).toEqual([PACKAGE_JSON, PACKAGE_JSON_ALIGNED])
+
+		vi.restoreAllMocks()
+	})
+
+	it('prints the devEngines verdict after the alignment', () => {
+		silence_console()
+		arrange_resolved_registry(1, PACKAGE_JSON_WITH_ENGINES)
+
+		latest_corepack.main()
+
+		expect(development_engines_verdict.report).toHaveBeenCalledOnce()
 
 		vi.restoreAllMocks()
 	})

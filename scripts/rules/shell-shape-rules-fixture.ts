@@ -12,17 +12,21 @@ const QUOTED: ShellShapeId = 'quoted-mention'
 const SUBSHELL: ShellShapeId = 'subshell'
 const SEMICOLON: ShellShapeId = 'semicolon-chain'
 const TIME_FLAG_GATE: ShellShapeId = 'time-flag-gate'
+const MULTILINE_FIELD: ShellShapeId = 'multiline-quoted-field'
 
 // Filings, comments, bodies and oracle consultations.
 const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
-	'third-party-write': [HEREDOC],
+	'third-party-write': [MULTILINE_FIELD, HEREDOC],
 	'direct-filing': [HEREDOC],
 	'direct-issue-comment': [HEREDOC],
-	'filing-cap': [HEREDOC],
+	'direct-issue-read': [HEREDOC],
 	'issue-comments': [],
 	'shell-body': [],
 	'raw-field-body': [QUOTED, HEREDOC],
+	'credential-body': [],
 	'file-body': [],
+	'file-rewrite': [],
+	'sed-in-place': [],
 	'rule-body': [],
 	[ORACLE_PKG_SCOUT]: [HEREDOC],
 }
@@ -35,10 +39,11 @@ const GUARD_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'run-tail': [HEREDOC],
 	'timed-rerun': ['hyperfine-quoted', 'time-flag-value', TIME_FLAG_GATE, HEREDOC],
 	'josh-git-bare': ['and-chain', HEREDOC],
-	'git-force': ['multiline-quoted-field', HEREDOC],
+	'git-force': [MULTILINE_FIELD, HEREDOC],
 	'worktree-mutation': [SUBSHELL, HEREDOC],
 	'index-mutation': ['and-chain', HEREDOC],
 	'destructive-command': [SUBSHELL, HEREDOC],
+	'repo-admin': [],
 	'protected-file': [HEREDOC],
 	'direct-pr-create': [SEMICOLON, HEREDOC],
 	'pr-merge': [SEMICOLON, HEREDOC],
@@ -61,10 +66,14 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'lane-park': ['command-substitution', HEREDOC],
 	'lane-interactive-ask': [],
 	'agent-model': [],
+	'investigator-foreground': [],
+	'reviewer-foreground': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
+	'round-one-check-related': [],
 	// The corpus heredoc is `cat`'s, which runs nothing; a shell's heredoc is pinned in its own test.
 	'lane-direct-tool': [],
+	'lane-spilled-read': [],
 	'implementation-cut': [],
 }
 

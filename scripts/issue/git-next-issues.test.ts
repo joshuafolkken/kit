@@ -93,6 +93,47 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 
 		expect(git_next_issues.order(issues)).toHaveLength(OVER_LIMIT_COUNT)
 	})
+
+	// joshuafolkken/kit#4859: the body's causing-lane minutes rank an older issue ahead.
+	it('puts the issue whose body declares a causing lane ahead of a newer one', () => {
+		const declared = {
+			...issue(1, CREATED_EARLIER),
+			body: '## 背景\n\n- 原因のレーン: 16 分（#4794）\n',
+		}
+
+		expect(prioritized_numbers([declared, issue(2, CREATED_LATER)])).toEqual([1, 2])
+	})
+
+	// joshuafolkken/kit#4861: causes of one lane are ranked by the minutes each lost.
+	it('puts the cause that lost more ahead among causes of one lane', () => {
+		const lane_body = '## 背景\n\n- 原因のレーン: 98 分（#4794）\n'
+		const small = { ...issue(1, CREATED_LATER), body: `${lane_body}- 原因の損失: 4 分\n` }
+		const large = { ...issue(2, CREATED_EARLIER), body: `${lane_body}- 原因の損失: 16 分\n` }
+
+		expect(prioritized_numbers([small, large])).toEqual([2, 1])
+	})
+})
+
+// joshuafolkken/kit#5302: the 2026-10-28 queue — one measured time-saver behind newer undeclared
+// issues of its priority — puts the time-saver first.
+describe('git_next_issues.prioritize - expected effect', () => {
+	it('puts the issue that declares an expected effect ahead of newer undeclared ones', () => {
+		const effect = '## 期待効果\n\n- 効く率: 週 23 回のうち 5 回\n- 1 回あたりの得: 約 250 秒\n'
+		const saver = { ...issue(1, CREATED_EARLIER), body: effect }
+		const issues = [saver, issue(2, CREATED_LATER), issue(3, CREATED_LATEST)]
+
+		expect(prioritized_numbers(issues)).toEqual([1, 3, 2])
+	})
+})
+
+// joshuafolkken/kit#5310: an upgrade declared to run last queues behind older undeclared issues.
+describe('git_next_issues.prioritize - run last', () => {
+	it('puts the issue that declares it runs last behind older undeclared ones', () => {
+		const upgrade = { ...issue(3, CREATED_LATEST), body: '## 背景\n\n- 実施順: 最後\n' }
+		const issues = [upgrade, issue(2, CREATED_LATER), issue(1, CREATED_EARLIER)]
+
+		expect(prioritized_numbers(issues)).toEqual([2, 1, 3])
+	})
 })
 
 describe('git_next_issues.prioritize - exclusions', () => {

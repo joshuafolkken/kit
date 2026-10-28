@@ -1,19 +1,23 @@
-import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { ALIASES } from '#scripts/josh/josh-aliases'
 import {
-	ALIASES,
 	CATEGORY_ORDER,
 	COMMAND_MAP,
 	type CommandCategory,
 	type CommandEntry,
 } from '#scripts/josh/josh-command-map'
+import { derived_artifacts } from './derived-artifacts'
 
 const CATALOG_FILE = fileURLToPath(new URL('../../docs/josh-command-catalog.md', import.meta.url))
+
+// The heading and a stale-catalog test failure both name it, so the failure says how to fix it (#4784)
+// — the one command that writes every artifact the command map derives (#4970).
+const REGENERATE_COMMAND = derived_artifacts.DERIVE_COMMAND
 
 const PREAMBLE = `# josh CLI — Command Catalog
 
 Auto-generated — do not edit.
-Run \`tsx tools/document/generate-catalog.ts\` to regenerate.
+Run \`${REGENERATE_COMMAND}\` to regenerate.
 
 `
 
@@ -73,8 +77,4 @@ function generate_catalog(): string {
 	return `${content.trimEnd()}\n`
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	writeFileSync(CATALOG_FILE, generate_catalog())
-}
-
-export { CATALOG_FILE, format_command_entry, generate_catalog }
+export { CATALOG_FILE, format_command_entry, generate_catalog, REGENERATE_COMMAND }

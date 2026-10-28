@@ -11,13 +11,13 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    budget allowed the run, and `run:release <N>` takes it back off.
 2. Read the Issue and its comments off `run:entry`'s `run:prep` report (`issue-comments.md`).
 3. **Record the agreed plan** with `pnpm josh issue:plan <N> --body-file <path>`, adding
-   `--title "<title>"` when the title is not in English or can be phrased more clearly (a blank body
-   takes the plan, otherwise it becomes a comment; its `### 影響を受ける既存の利用者` section is drafted
-   with `pnpm josh plan:consumers` — `kickoff.md` step 4).
+   `--title "<title>"` when the title is not in English or can be phrased more clearly (the plan goes
+   into the body when it is blank and its author has write access, otherwise into a comment; its
+   `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
 4. Run `pnpm josh ms`, then update dependencies only where the `run:prep` report answers
    `latest: required` — `latest-gate.md` is its single source, and on `required` load the
    `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it refuses
-   in a lane, and `pnpm josh main:merge` brings the latest default in during the gate. The parent runs
+   in a lane, and ship's sync brings the latest default in before its gate. The parent runs
    `pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
    `backlogrun-child.md` are the single sources.
 5. Implement. The `plan` event `run:board` draws 📝 from is written by code — by `run:entry` for a
@@ -48,8 +48,8 @@ in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its cons
 `pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
 skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
-runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due**, once
-round 1's fixes are in and before the commit. (10) Where the tree was edited after the first gate
+runs here). (9a) **Ask `pnpm josh review:round2 --record <N>` whether a second round is due**, once
+round 1 is fixed and recorded, before the commit. (10) Where the tree was edited after the first gate
 started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y "<title> #<N>"` — the pull request
 opens here, between the two rounds. (11a) Run the **second round** now beside the CI, where (9a)
 answered `required` (brief `pnpm josh review:brief --round 2`); a finding it fixes in place is pushed

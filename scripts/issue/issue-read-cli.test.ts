@@ -101,6 +101,42 @@ describe('issue_read_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#4663: `run:entry` gates an untrusted author's issue on what this read decided.
+describe('issue_read_cli.read_block — the trust it carries', () => {
+	it('reports an untrusted body and a trusted comment', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({
+			kind: 'ok',
+			trust: { is_body_trusted: false, has_trusted_comment: true },
+		})
+	})
+
+	// joshuafolkken/kit#4703: a listing nobody read answers nothing, so `run:entry` names the failed read.
+	it('leaves the trusted comment unanswered when the listing could not be read', async () => {
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(undefined)
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({ trust: { has_trusted_comment: undefined } })
+	})
+
+	it('reports no trusted comment when every comment was read and none is trusted', async () => {
+		const untrusted = [{ user: { login: 'stranger' }, author_association: 'NONE', body: 'x' }]
+
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(JSON.stringify(untrusted))
+
+		const block = await issue_read_cli.read_block(ISSUE)
+
+		expect(block).toMatchObject({ trust: { has_trusted_comment: false } })
+	})
+})
+
 describe('issue_read_cli.run — a number that produced nothing', () => {
 	it('names a number that resolves to nothing, and exits non-zero', async () => {
 		classified_mock.mockResolvedValue({ kind: 'missing' })

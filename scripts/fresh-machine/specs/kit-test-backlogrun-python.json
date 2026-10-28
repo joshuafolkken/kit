@@ -27,8 +27,8 @@
 		"tail -n 40 \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\" | cut -c1-400",
 		"grep -c 'requires approval' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
 		"grep -c 'run:carry --begin' \"$(sed -n 's/^backlogrun: started.*; log //p' \"$HOME/backlogrun.out\")\"",
-		"tail -n 40 /tmp/josh-lane-dispatch-*.log | cut -c1-400",
-		"cat /tmp/josh-lane-dispatch-*.log | grep -c 'requires approval'",
+		"tail -n 40 \"$(git rev-parse --path-format=absolute --git-common-dir)\"/josh/run-state/josh-lane-dispatch-*.log | cut -c1-400",
+		"cat \"$(git rev-parse --path-format=absolute --git-common-dir)\"/josh/run-state/josh-lane-dispatch-*.log | grep -c 'requires approval'",
 		"gh pr list --state all"
 	]
 }

@@ -12,6 +12,7 @@ import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_residents } from './lane-residents'
 import { lane_state } from './lane-state'
+import { lane_yield } from './lane-yield'
 
 // `josh lane:withdraw <N> --reason <text>` — a person takes a running lane child's issue out of the
 // current run: the child is stopped, its work stashed and the lane closed. **The Issue stays open** —
@@ -25,9 +26,15 @@ import { lane_state } from './lane-state'
 //
 // A tree that could not be stashed is left in place: closing the lane would delete the work, and the
 // person decides what to keep.
+//
+// **An issue closed on GitHub while its lane stayed open is withdrawn the same way**
+// (joshuafolkken/kit#4915): its child would otherwise keep working, be resumed by the next cut and
+// hold a lane. `lane-withdraw-closed.ts` sweeps those lanes each supervisor pass, and the event, the
+// stash note and the issue comment name the supervisor rather than a person. `run:merge` withdraws a
+// returned child whose issue closed without a merge the same way, named as itself
+// (`run-merge-withdrawn.ts`, joshuafolkken/kit#4916).
 
 const WITHDRAW_OCCASION = 'lane withdraw'
-const WITHDRAW_CAUSE = 'a person withdrew it with `lane:withdraw`'
 const CLOSED_STATE = 'CLOSED'
 const CLOSED_KIND = 'closed'
 const NO_LANE_KIND = 'no-lane'
@@ -35,13 +42,63 @@ const UNREADABLE_KIND = 'unreadable'
 
 type Unsaved = Extract<KeptWork, { kind: 'unsaved' }>
 
+// Who withdrew the lane: a person with `lane:withdraw`, the supervisor's sweep of closed issues,
+// `run:merge` collecting a child whose issue closed without a merge (joshuafolkken/kit#4916), or the
+// child's own `lane:plan` giving its lane back (`lane-yield.ts`, joshuafolkken/kit#4926).
+type Withdrawer = 'person' | 'supervisor' | 'merge' | 'yield'
+
+const OPEN_TAIL =
+	'Its lane child was stopped and the lane closed. The Issue stays open: this run does not resume it, and the next run offers it again.'
+// What `describe` says of an open issue's place in the run once its lane is withdrawn.
+const STAYS_OPEN = 'The Issue stays open: this run does not offer it again, the next run does.'
+
+// How each withdrawer is named on the event stream, in the stash note and on the issue.
+const WITHDRAWER_TEXT = {
+	person: {
+		name: 'a person',
+		cause: 'a person withdrew it with `lane:withdraw`',
+		closed_head:
+			'Its lane was withdrawn with `pnpm josh lane:withdraw` after the Issue was closed.',
+		open_head: 'Withdrawn from the current run by a person with `pnpm josh lane:withdraw`.',
+		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
+	},
+	supervisor: {
+		name: 'the run:wake supervisor',
+		cause: 'the `run:wake` supervisor withdrew it after its issue was closed',
+		closed_head: 'Its lane was withdrawn by the `run:wake` supervisor after the Issue was closed.',
+		open_head: 'Withdrawn from the current run by the `run:wake` supervisor.',
+		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
+	},
+	merge: {
+		name: 'the run:merge driver',
+		cause: '`run:merge` withdrew it after its issue was closed without a merge',
+		closed_head:
+			'Its lane was withdrawn by `pnpm josh run:merge` after the Issue was closed without a merge.',
+		open_head: 'Withdrawn from the current run by `pnpm josh run:merge`.',
+		open_tail: OPEN_TAIL,
+		stays: STAYS_OPEN,
+	},
+	yield: lane_yield.YIELD_TEXT,
+} as const satisfies Record<Withdrawer, Record<string, string>>
+
+interface Withdrawal {
+	reason: string
+	by: Withdrawer
+	is_closed: boolean
+}
+
 interface Withdrawn {
 	kind: 'withdrawn'
+	by: Withdrawer
 	// How many of the child's processes the withdrawal stopped — 0 for a child that had already ended.
 	reaped: number
 	stash: string | undefined
-	// Whether the comment saying the issue stays open reached it.
+	// Whether the comment saying so reached the issue.
 	is_noted: boolean
+	// The issue was already closed — withdrawn or finished on GitHub while its lane stayed open.
+	is_closed: boolean
 	lane: CloseKind
 	// What else the close ended from the checkout; `undefined` where it could not be read.
 	residents: ReadonlyArray<number> | undefined
@@ -51,51 +108,54 @@ type Refused =
 	{ kind: typeof CLOSED_KIND } | { kind: typeof NO_LANE_KIND } | { kind: typeof UNREADABLE_KIND }
 type WithdrawOutcome = Withdrawn | Unsaved | Refused
 
-function withdraw_comment(reason: string): string {
-	return [
-		'Withdrawn from the current run by a person with `pnpm josh lane:withdraw`.',
-		'Its lane child was stopped and the lane closed. The Issue stays open: this run does not resume it, and the next run offers it again.',
-		`- Why: ${reason}`,
-	].join('\n')
+function withdraw_comment({ reason, by, is_closed }: Withdrawal): string {
+	const head = is_closed ? WITHDRAWER_TEXT[by].closed_head : WITHDRAWER_TEXT[by].open_head
+	const tail = is_closed
+		? 'Its lane child was stopped and the lane closed, so it no longer holds a lane and is not resumed.'
+		: WITHDRAWER_TEXT[by].open_tail
+
+	return [head, tail, `- Why: ${reason}`].join('\n')
 }
 
-async function record_withdraw(issue: string, reason: string): Promise<void> {
+async function record_withdraw(issue: string, { reason, by }: Withdrawal): Promise<void> {
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.WITHDRAW,
-		`${issue_cite.plain(issue)} withdrawn by a person: ${reason}`,
+		`${issue_cite.plain(issue)} withdrawn by ${WITHDRAWER_TEXT[by].name}: ${reason}`,
 	)
 }
 
-// A closed issue has nothing to withdraw, and an unread one might be: neither writes anything.
-async function refusal_of(issue: string): Promise<Refused | undefined> {
+// Whether the issue is closed, or `undefined` when it could not be read — an unread issue writes nothing.
+async function read_is_closed(issue: string): Promise<boolean | undefined> {
 	const read = await issue_state_cli.read_issue(issue)
 
-	if (read.kind !== 'state') return { kind: UNREADABLE_KIND }
-	if (read.state.state.toUpperCase() === CLOSED_STATE) return { kind: CLOSED_KIND }
+	if (read.kind !== 'state') return undefined
 
-	return undefined
+	return read.state.state.toUpperCase() === CLOSED_STATE
 }
 
 async function note_issue(
 	issue: string,
-	reason: string,
+	withdrawal: Withdrawal,
 	stash: string | undefined,
 ): Promise<boolean> {
-	const is_noted = await git_gh_issue_write.issue_try_comment(issue, withdraw_comment(reason))
+	const is_noted = await git_gh_issue_write.issue_try_comment(issue, withdraw_comment(withdrawal))
 
-	if (stash !== undefined) await lane_preserve.announce(issue, stash, WITHDRAW_CAUSE)
+	if (stash !== undefined) {
+		await lane_preserve.announce(issue, stash, WITHDRAWER_TEXT[withdrawal.by].cause)
+	}
+
 	await run_label.unmark(issue)
 
 	return is_noted
 }
 
-async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawOutcome> {
-	await record_withdraw(lane.issue, reason)
+async function stop_and_close(lane: LaneInfo, withdrawal: Withdrawal): Promise<WithdrawOutcome> {
+	await record_withdraw(lane.issue, withdrawal)
 	const reaped = lane_reap.reap_child(lane).length
 	const saved = await lane_preserve.keep_work(lane.issue, lane.directory, WITHDRAW_OCCASION)
 
 	if (saved.kind === 'unsaved') return saved
-	const is_noted = await note_issue(lane.issue, reason, saved.stash)
+	const is_noted = await note_issue(lane.issue, withdrawal, saved.stash)
 	const closed = await lane_close.close_lane(lane.issue)
 
 	// After the close, so the record names the withdrawal rather than the close it ran. An `incomplete`
@@ -106,25 +166,34 @@ async function stop_and_close(lane: LaneInfo, reason: string): Promise<WithdrawO
 
 	return {
 		kind: 'withdrawn',
+		by: withdrawal.by,
 		reaped,
 		stash: saved.stash,
 		is_noted,
+		is_closed: withdrawal.is_closed,
 		lane: closed.kind,
 		residents: closed.residents,
 	}
 }
 
-/** Stop `#<N>`'s lane child, stash its work and close the lane, leaving the Issue open. */
-async function withdraw(issue: string, reason: string): Promise<WithdrawOutcome> {
+/**
+ * Stop `#<N>`'s lane child, stash its work and close the lane, leaving the Issue as it is. A closed
+ * issue is refused only when no lane is left for it (joshuafolkken/kit#4915).
+ */
+async function withdraw(
+	issue: string,
+	reason: string,
+	by: Withdrawer = 'person',
+): Promise<WithdrawOutcome> {
 	issue_number_shape.require_issue_number(issue)
-	const refusal = await refusal_of(issue)
+	const is_closed = await read_is_closed(issue)
 
-	if (refusal !== undefined) return refusal
+	if (is_closed === undefined) return { kind: UNREADABLE_KIND }
 	const lane = await lane_registry.find_open_lane(issue)
 
-	if (lane === undefined) return { kind: NO_LANE_KIND }
+	if (lane === undefined) return { kind: is_closed ? CLOSED_KIND : NO_LANE_KIND }
 
-	return await stop_and_close(lane, reason)
+	return await stop_and_close(lane, { reason, by, is_closed })
 }
 
 function stash_sentence(stash: string | undefined): string {
@@ -147,8 +216,11 @@ function withdrawn_text(outcome: Withdrawn, issue: string): string {
 	const head = `Withdrew ${cited}. ${stopped} ${stash_sentence(outcome.stash)}`
 	const lane = lane_suffix(outcome, cited)
 	const noted = outcome.is_noted ? '' : ' The comment saying so could not be posted.'
+	const issue_sentence = outcome.is_closed
+		? 'The Issue was already closed, so its lane no longer holds a place.'
+		: WITHDRAWER_TEXT[outcome.by].stays
 
-	return `${head} The Issue stays open: this run does not offer it again, the next run does.${noted}${lane}`
+	return `${head} ${issue_sentence}${noted}${lane}`
 }
 
 function unsaved_text(outcome: Unsaved, issue: string): string {
@@ -159,7 +231,7 @@ function refused_text(outcome: Refused, issue: string): string {
 	const cited = session_cite.issue(issue)
 
 	if (outcome.kind === CLOSED_KIND) {
-		return `${cited} is already closed, so there is nothing to withdraw.`
+		return `${cited} is already closed and no lane is open for it, so there is nothing to withdraw.`
 	}
 
 	if (outcome.kind === NO_LANE_KIND) {
@@ -177,7 +249,12 @@ function describe(outcome: WithdrawOutcome, issue: string): string {
 		: refused_text(outcome, issue)
 }
 
-const lane_withdraw = { describe, withdraw }
+// How every withdrawer is named in the `withdraw` event — the board reads the reason after it.
+const WITHDRAWER_NAMES: ReadonlyArray<string> = Object.values(WITHDRAWER_TEXT).map(
+	(text) => text.name,
+)
 
-export type { WithdrawOutcome }
+const lane_withdraw = { WITHDRAWER_NAMES, describe, withdraw }
+
+export type { Withdrawer, WithdrawOutcome }
 export { lane_withdraw }

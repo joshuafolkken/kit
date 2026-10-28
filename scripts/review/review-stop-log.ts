@@ -2,14 +2,16 @@ import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { json_value } from '#scripts/lib/json-value'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
 import { z } from 'zod'
 
 // The durable record of every review finding that stopped a `josh ship` — one JSON line per finding,
 // with its kind, the `<file>[:<line>]` it cites and its first sentence, read back by
-// `josh review:stops` (joshuafolkken/kit#4519). The lane ledger's stop line keeps only the kinds, and
+// `josh review:stops` (joshuafolkken/kit#4519). The findings a round did not stop on — a ship round's
+// fixes made in place, and a `review:record` round's findings written with a reason
+// (joshuafolkken/kit#4817) — are in it too, marked fixed, which `review:stops` leaves out. The lane ledger's stop line keeps only the kinds, and
 // the finding's text was only in the ship log in the temp root, which a reboot clears.
 //
 // **It lives in the git common directory**, beside the test-read map: every lane worktree of one clone
@@ -19,7 +21,6 @@ import { z } from 'zod'
 // **A test run writes nothing** unless it passes its own path, the lane ledger's rule: the writer sits on
 // the ship's stop path, which many suites exercise.
 
-const LOG_DIRECTORY = 'josh'
 const LOG_FILE = 'review-stops.jsonl'
 const LINE_SEPARATOR = '\n'
 
@@ -30,15 +31,19 @@ const stop_line_schema = z.object({
 	kind: z.string(),
 	location: z.string(),
 	sentence: z.string(),
+	fixed: z.boolean().optional(),
 })
 
 type StopLine = z.infer<typeof stop_line_schema>
 
-// One stopped review: the issue, the stage that stopped and the findings that decided it.
+// One stopped review: the issue, the stage that stopped and the findings that decided it. A round that
+// passed on fixes made in place is recorded too, marked `is_fixed`, so the lane's next review still sees
+// the constraint each fix met (joshuafolkken/kit#4780); `review:stops` leaves those lines out.
 interface ReviewStop {
 	issue: number
 	stage: string
 	findings: ReadonlyArray<StopFinding>
+	is_fixed?: boolean
 }
 
 function target(): string | undefined {
@@ -46,16 +51,25 @@ function target(): string | undefined {
 
 	const common = git_common_directory.repository()
 
-	return common === undefined ? undefined : path.join(common, LOG_DIRECTORY, LOG_FILE)
+	return common === undefined
+		? undefined
+		: path.join(common, git_common_directory.STATE_DIRECTORY, LOG_FILE)
 }
 
 function write(destination: string, stop: ReviewStop): void {
 	const at = new Date().toISOString()
+	const mark = stop.is_fixed === true ? { fixed: true } : {}
 
 	mkdirSync(path.dirname(destination), { recursive: true })
 
 	for (const finding of stop.findings) {
-		lane_ledger.append(destination, { at, issue: stop.issue, stage: stop.stage, ...finding })
+		lane_ledger_write.append(destination, {
+			at,
+			issue: stop.issue,
+			stage: stop.stage,
+			...finding,
+			...mark,
+		})
 	}
 }
 

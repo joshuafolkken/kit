@@ -1,3 +1,4 @@
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_index, type FetchedEpics } from '#scripts/epic/epic-index'
 import { epic_issue } from '#scripts/epic/epic-issue'
@@ -9,7 +10,7 @@ import { read_json_listing } from '#scripts/git/parse-json-array'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { AUTO_OK_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { session_cite } from '#scripts/issue/session-cite'
 
 // `josh auto-ok:next` — which issue outside the epic an unattended run picks up next.
@@ -211,9 +212,13 @@ async function fetch_opted_in(): Promise<OptedInRead> {
 
 	const read = json === undefined ? await classify_failed_read() : parse_listing(json, is_capped)
 
-	if (read.kind === 'read') await issue_sample_gate.prime(read.issues.map((issue) => issue.body))
+	if (read.kind !== 'read') return read
 
-	return read
+	const issues = await auto_ok_author.with_author_trust(read.issues)
+
+	await issue_sample_prime.prime(issues.map((issue) => issue.body))
+
+	return { ...read, issues }
 }
 
 // Whether every issue this one declares as a blocker has closed. `blockedBy` is the same native
@@ -330,6 +335,16 @@ async function fetch_tracking(count: number): Promise<TrackingRead> {
 // by the native `blockedBy` relations `is_unblocked` already refuses to run past.
 // `tracked` is the narrowed set `epic_index.withheld_children` builds, not
 // every tracked child; this function only applies it.
+// What the issue itself must hold: an author with write access (`auto-ok-author.ts`), every blocker
+// closed, and its declared start date reached.
+function is_ready(issue: OpenIssueData, now: number): boolean {
+	return (
+		auto_ok_author.is_author_trusted(issue) &&
+		is_unblocked(issue) &&
+		issue_not_before.is_due(issue.body, now)
+	)
+}
+
 function is_runnable(
 	issue: OpenIssueData,
 	tracked: ReadonlyMap<number, number>,
@@ -338,11 +353,7 @@ function is_runnable(
 ): boolean {
 	if (tracked.has(issue.number)) return false
 
-	return (
-		is_unblocked(issue) &&
-		!exclude.includes(issue.number) &&
-		issue_not_before.is_due(issue.body, now)
-	)
+	return !exclude.includes(issue.number) && is_ready(issue, now)
 }
 
 function pick_next(
@@ -359,7 +370,7 @@ function pick_next(
 function none_reason(count: number): string {
 	if (count === 0) return NONE_OPTED_IN_MESSAGE
 
-	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, blocked by an open issue, not due until its start time, or the one just merged.`
+	return `All ${String(count)} open \`${AUTO_OK_LABEL}\` issue(s) are excluded — tracked by an opted-in epic, an epic itself, already in progress, parked, filed by an author without write access (waiting on a person), blocked by an open issue, not due until its start time, or the one just merged.`
 }
 
 // Said only when the cap actually bit, and worded from the answer rather than before it: the one run

@@ -26,6 +26,7 @@ const { ensure_bundles, FAILED_NOTICE, launch, REBUILT_NOTICE } = hook_bundle_re
 const BUILD_TIMEOUT_MS = 60_000
 const BUILD_ERROR = 'Transform failed'
 const REFUSED = 2
+const PACKAGE_ROOT = path.join(import.meta.dirname, '..', '..')
 const PROBE_KEY = 'hook_bundle_ready_probe'
 const PROBE_HOOK = 'probe-hook'
 const PROBE_COMMAND = 'probe:hook'
@@ -141,9 +142,12 @@ describe('launch', () => {
 		vi.mocked(spawnSync).mockReturnValue(spawn_result(REFUSED))
 		await launch(probe_launch(), create_out_directory(), failing_rebuild)
 
-		expect(spawnSync).toHaveBeenCalledWith('pnpm', ['josh', PROBE_COMMAND, 'first', 'second'], {
-			stdio: 'inherit',
-		})
+		expect(spawnSync).toHaveBeenCalledWith(
+			path.join(PACKAGE_ROOT, 'node_modules', '.bin', 'tsx'),
+			[path.join(PACKAGE_ROOT, 'scripts', 'josh', 'josh.ts'), PROBE_COMMAND, 'first', 'second'],
+			{ stdio: 'inherit' },
+		)
+		expect(vi.mocked(spawnSync).mock.calls[0]?.[2]).not.toHaveProperty('cwd')
 		expect(process.exitCode).toBe(REFUSED)
 	})
 })

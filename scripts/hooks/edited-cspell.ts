@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { resolve_local_bin } from '#scripts/build/local-bin'
 import { HOOK_PROCESS_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { execa } from 'execa'
 
@@ -38,23 +39,34 @@ const CSPELL_EXTENSIONS: ReadonlySet<string> = new Set([
 // exit code is ignored: cspell exits non-zero precisely when it found words, which is the case this
 // exists for.
 const CSPELL_ARGS: ReadonlyArray<string> = [
-	'exec',
-	'cspell',
 	'lint',
 	'--words-only',
 	'--unique',
 	'--no-progress',
 	'--no-summary',
 ]
+const CSPELL_BIN = 'cspell'
 const PNPM = 'pnpm'
+// The text arrives on stdin under the edited file's own name, so the project config — its ignore
+// list, its language per extension, its overrides — applies exactly as it does to the path. Reading
+// stdin rather than the file is what lets the check run beside the formatters
+// (joshuafolkken/kit#4596): they rewrite the file while it runs, and a read caught mid-write would
+// report on a truncated file.
+const STDIN_SCHEME = 'stdin://'
+
+interface CspellRequest {
+	file_path: string
+	project_root: string
+	text: string
+}
+
+type CspellRunner = (request: CspellRequest) => Promise<string>
 
 const HEADER =
 	'The edit hook found words cspell does not know; fix them or add them to `cspell.config.yaml` now rather than at the gate:'
 // additionalContext rides back on the edit, so a runaway list is bounded the same way the lint half is.
 const MAX_DIAGNOSTIC_CHARS = 4000
 const TRUNCATION_NOTICE = '\n…(unknown words truncated)'
-
-type CspellRunner = (file_path: string, project_root: string) => Promise<string>
 
 // One question before a process starts: is this a file under the project that spell-checking has
 // anything to say about?
@@ -68,12 +80,24 @@ function is_checkable(file_path: string, project_root: string): boolean {
 	return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)
 }
 
+// The project's own shim, spawned directly: `pnpm exec` costs a second process start on every edit,
+// and this check was the largest step of the edit hook (joshuafolkken/kit#4596). `pnpm exec` stays as
+// the route for a project whose binaries live somewhere other than the root's `node_modules/.bin`.
+function cspell_command(project_root: string): ReadonlyArray<string> {
+	const shim = resolve_local_bin(project_root, CSPELL_BIN)
+
+	return existsSync(shim) ? [shim] : [PNPM, 'exec', CSPELL_BIN]
+}
+
 // The live runner. `reject: false` because a non-zero exit is the ordinary way cspell reports words,
 // and stderr is ignored so a config note never reaches the model as if it were an unknown word.
-async function run_cspell(file_path: string, project_root: string): Promise<string> {
-	const result = await execa(PNPM, [...CSPELL_ARGS, file_path], {
+async function run_cspell(request: CspellRequest): Promise<string> {
+	const [bin = PNPM, ...prefix] = cspell_command(request.project_root)
+	const target = `${STDIN_SCHEME}${path.resolve(request.file_path)}`
+	const result = await execa(bin, [...prefix, ...CSPELL_ARGS, target], {
 		reject: false,
-		cwd: project_root,
+		cwd: request.project_root,
+		input: request.text,
 		stdout: 'pipe',
 		stderr: 'ignore',
 		timeout: HOOK_PROCESS_TIMEOUT_MS,
@@ -104,22 +128,24 @@ function format_unknown_words(stdout: string): string | undefined {
 
 // Never turns a successful edit into a failure: a runner that throws — cspell missing, a timeout — is
 // swallowed and reported as nothing to say, exactly as the lint half swallows a formatter that could
-// not start.
+// not start. `text` is the file's content as the caller read it, so the check does not depend on when
+// it runs against the formatters.
 async function spelling_diagnostics(
 	file_path: string | undefined,
 	project_root: string,
+	text: string,
 	runner: CspellRunner = run_cspell,
 ): Promise<string | undefined> {
 	if (file_path === undefined || !is_checkable(file_path, project_root)) return undefined
 
 	try {
-		return format_unknown_words(await runner(file_path, project_root))
+		return format_unknown_words(await runner({ file_path, project_root, text }))
 	} catch {
 		return undefined
 	}
 }
 
-const edited_cspell = { format_unknown_words, spelling_diagnostics }
+const edited_cspell = { cspell_command, format_unknown_words, run_cspell, spelling_diagnostics }
 
-export type { CspellRunner }
+export type { CspellRequest, CspellRunner }
 export { edited_cspell, MAX_DIAGNOSTIC_CHARS }

@@ -20,8 +20,8 @@ const SEGMENT_PARTS = new RegExp(`(${SEGMENT_SEPARATOR.source})`, 'u')
 // question is which program a segment launches, and `true | git push -f` or `x & git push -f`
 // launches git all the same; a `--jq` fragment cut off by a `|` begins with no program word, so it
 // launches nothing they look for. A `&` that belongs to a redirection (`2>&1`, `&>file`, `<&3`) does
-// not cut.
-const COMMAND_SEPARATOR = /&&|\|\||;|\n|\|&?|(?<![<>])&(?!>)/u
+// not cut, nor does the `|` of the clobber redirect `>|`.
+const COMMAND_SEPARATOR = /&&|\|\||;|\n|(?<!>)\|&?|(?<![<>])&(?!>)/u
 
 /** The line's commands, trimmed. Empty segments are kept: a caller anchoring at `^` rejects them. */
 function segments_of(command: string): Array<string> {
@@ -52,6 +52,13 @@ function quote_aware_commands_of(command: string): Array<string> {
 	const stops = cuts.map((cut) => cut.begin)
 
 	return starts.map((start, index) => command.slice(start, stops[index] ?? command.length).trim())
+}
+
+const LINE_CONTINUATION = /\\\n/gu
+
+/** The line with each backslash-newline joined, so a continued call stays one command at a `\n` cut. */
+function joined_continuations(command: string): string {
+	return command.replaceAll(LINE_CONTINUATION, ' ')
 }
 
 /** The same cut, untrimmed and with each separator kept between its commands, so the parts join back to the line. */
@@ -91,6 +98,7 @@ const shell_segments = {
 	commands_of,
 	first_of,
 	is_josh_command,
+	joined_continuations,
 	parts_of,
 	quote_aware_commands_of,
 	segments_of,

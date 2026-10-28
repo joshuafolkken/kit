@@ -88,6 +88,36 @@ describe('run_board_read.read_local — the run’s record', () => {
 	})
 })
 
+// joshuafolkken/kit#3697: whether anything still drives the run is read beside it.
+describe('run_board_read.read_local — whether the run is stranded', () => {
+	it('reads whether the run is stranded from the run’s own records', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const is_stranded_at = vi.spyOn(run_stranded_detect, 'is_stranded_at').mockReturnValue(true)
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_stranded: true })
+		expect(is_stranded_at).toHaveBeenCalledWith(REPOSITORY, expect.any(Object))
+	})
+})
+
+// joshuafolkken/kit#4818: an overrun session outlives the run that launched it.
+describe('run_board_read.read_local — an overrun note after the run ended', () => {
+	it('reads it into the done rows, but not into the events', async () => {
+		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
+		const result = { ...AFTER, kind: 'note', text: '#3432 overrun: none: CI wait' }
+
+		vi.spyOn(run_event_stream, 'read_events').mockReturnValue([INSIDE, result])
+
+		const read = await run_board_read.read_local()
+
+		expect(read?.events).toStrictEqual([INSIDE])
+		expect(read?.found?.get(3432)?.overrun).toStrictEqual({
+			kind: 'ended',
+			issue: 3432,
+			result: 'none: CI wait',
+		})
+	})
+})
+
 describe('run_board_read.read_local', () => {
 	it('reads the ended run with its end, its scope and only the events inside it', async () => {
 		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
@@ -97,6 +127,7 @@ describe('run_board_read.read_local', () => {
 			ended_ms: Date.parse(ENDED_AT),
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
+			found: new Map(),
 			lanes: ['3432'],
 			...UNRECORDED,
 			is_stranded: false,
@@ -107,16 +138,8 @@ describe('run_board_read.read_local', () => {
 			...LANE_ROOM,
 			usual: new Map(),
 			is_memory_held: false,
+			usage_reset_ms: undefined,
 		})
-	})
-
-	// joshuafolkken/kit#3697: whether anything still drives the run is read beside it.
-	it('reads whether the run is stranded from the run’s own records', async () => {
-		arrange(NONE, { invocation: EPIC_RUN, started_at: STARTED_AT, ended_at: ENDED_AT })
-		const is_stranded_at = vi.spyOn(run_stranded_detect, 'is_stranded_at').mockReturnValue(true)
-
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ is_stranded: true })
-		expect(is_stranded_at).toHaveBeenCalledWith(REPOSITORY, expect.any(Object))
 	})
 
 	it('reads nothing when no run has started or ended here', async () => {

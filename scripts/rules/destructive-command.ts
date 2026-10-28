@@ -39,24 +39,16 @@ function is_recursive_forced_rm(segment: string): boolean {
 const GH_COMMAND = 'gh'
 const REPO_GROUP = 'repo'
 const REPO_REMOVALS: ReadonlySet<string> = new Set(['delete', 'archive'])
-const REPO_EDIT = 'edit'
-const VISIBILITY_FLAG = '--visibility'
 const PR_GROUP = 'pr'
 const PR_CLOSE = 'close'
 
-// `gh repo delete` / `archive`, and `gh repo edit --visibility …`.
-function is_destructive_repo_action(action: string, args: ReadonlyArray<string>): boolean {
-	if (REPO_REMOVALS.has(action)) return true
-
-	return action === REPO_EDIT && args.some((argument) => argument.startsWith(VISIBILITY_FLAG))
-}
-
+// `gh repo delete` / `archive`; a `gh repo edit` (`--visibility` included) is `repo-admin.ts`'s.
 function is_destructive_gh_command(args: ReadonlyArray<string>): boolean {
 	const [group, action = ''] = args
 
 	if (group === PR_GROUP) return action === PR_CLOSE
 
-	return group === REPO_GROUP && is_destructive_repo_action(action, args)
+	return group === REPO_GROUP && REPO_REMOVALS.has(action)
 }
 
 const DELETE_METHOD = 'DELETE'
@@ -97,7 +89,7 @@ function is_destructive_command(command: string): boolean {
 }
 
 const DESTRUCTIVE_COMMAND_REASON =
-	'⛔ destructive command: a recursive forced `rm`, a `gh repo delete` / `archive` / visibility edit, ' +
+	'⛔ destructive command: a recursive forced `rm`, a `gh repo delete` / `archive`, ' +
 	'`gh pr close` or a `gh api -X DELETE` cannot be undone, which is Tier C. Remove one path at a ' +
 	'time without `-f`, or ask the user to run it. It fires on every occurrence ' +
 	'(`prompts/collaboration-workflow/operating-rules.md`).'

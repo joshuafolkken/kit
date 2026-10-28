@@ -1,3 +1,4 @@
+import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_api_path } from '#scripts/gh/git-gh-api-path'
 import { git_gh_conditional } from '#scripts/gh/git-gh-conditional'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
@@ -30,10 +31,18 @@ const record_schema = z.object({
 	checked_at: z.string(),
 	etag: z.string().optional(),
 	pending: z.string().optional(),
+	// A body edit withheld from the run (`issue_watch_diff.withheld_notice`) — shown, never a hold.
+	notice: z.string().optional(),
 	shown: z.string().optional(),
 })
 
-const issue_schema = z.looseObject({ body: z.string().nullish(), state: z.string() })
+const issue_schema = z.looseObject({
+	body: z.string().nullish(),
+	state: z.string(),
+	...gh_author_association.author_fields_schema,
+})
+
+type IssueRead = z.infer<typeof issue_schema>
 
 type WatchRecord = z.infer<typeof record_schema>
 
@@ -71,17 +80,28 @@ interface FetchRequest {
 	timeout_ms?: number | undefined
 }
 
-async function read_snapshot(
+async function read_comments(
 	request: FetchRequest,
-	body: string,
-	etag: string | undefined,
-): Promise<Fetched> {
-	const comments = await issue_watch_diff.parse_comments(
+): Promise<WatchSnapshot['comments'] | undefined> {
+	return await issue_watch_diff.parse_comments(
 		await git_gh_issue_read.issue_list_comments(request.issue, request.timeout_ms),
 		request.timeout_ms,
 	)
+}
 
-	return comments === undefined ? UNREADABLE : { kind: 'read', snapshot: { body, comments }, etag }
+async function read_snapshot(
+	request: FetchRequest,
+	issue: IssueRead,
+	etag: string | undefined,
+): Promise<Fetched> {
+	const [comments, is_body_trusted] = await Promise.all([
+		read_comments(request),
+		gh_author_association.trust_of(gh_author_association.author_of(issue, request.timeout_ms)),
+	])
+
+	if (comments === undefined) return UNREADABLE
+
+	return { kind: 'read', snapshot: { body: issue.body ?? '', is_body_trusted, comments }, etag }
 }
 
 async function fetch_issue(request: FetchRequest): Promise<Fetched> {
@@ -98,7 +118,7 @@ async function fetch_issue(request: FetchRequest): Promise<Fetched> {
 	if (fields === undefined) return UNREADABLE
 	if (fields.state === CLOSED_STATE) return { kind: 'closed' }
 
-	return await read_snapshot(request, fields.body ?? '', read.etag)
+	return await read_snapshot(request, fields, read.etag)
 }
 
 // `acknowledged_at` is when a person's update was last taken in — the baseline's own read, or an
@@ -115,6 +135,20 @@ function fresh_record(
 	return { issue, ...baseline, acknowledged_at, checked_at, etag: fetched.etag }
 }
 
+// The previous `acknowledged_at` when a re-read of the same issue takes nothing in, so a `josh
+// run:entry` re-run keeps a review briefed before it valid; `undefined` (now) otherwise.
+function kept_acknowledgement(
+	previous: WatchRecord | undefined,
+	issue: string,
+	fetched: Extract<Fetched, { kind: 'read' }>,
+): string | undefined {
+	if (previous?.issue !== issue) return undefined
+
+	const diff = issue_watch_diff.unread_diff(previous, fetched.snapshot)
+
+	return diff === undefined ? previous.acknowledged_at : undefined
+}
+
 // Called by `josh run:entry` once it has printed the issue. `false` when the issue could not be read,
 // which leaves no record — a watch with no baseline would call the whole issue unread.
 async function record_baseline(
@@ -126,7 +160,9 @@ async function record_baseline(
 
 	if (fetched.kind !== 'read') return false
 
-	write_record(fresh_record(issue, fetched, now), root)
+	const acknowledged_at = kept_acknowledgement(read_record(root), issue, fetched)
+
+	write_record(fresh_record(issue, fetched, now, acknowledged_at), root)
 
 	return true
 }
@@ -145,8 +181,9 @@ function with_fetched(record: WatchRecord, fetched: Fetched, checked_at: string)
 	if (fetched.kind !== 'read') return { ...record, checked_at }
 
 	const pending = issue_watch_diff.unread_diff(record, fetched.snapshot)
+	const notice = issue_watch_diff.withheld_notice(record, fetched.snapshot)
 
-	return { ...record, checked_at, etag: fetched.etag, pending }
+	return { ...record, checked_at, etag: fetched.etag, pending, notice }
 }
 
 interface PollOptions {
@@ -191,9 +228,14 @@ async function poll(options: PollOptions, root?: string): Promise<WatchRecord | 
 	return await refresh(record, options, now, root)
 }
 
-// Marks a pending update shown, so the hook stops once per update rather than on every call.
+// What the hook shows: a pending update, else a withheld edit's notice.
+function news_of(record: WatchRecord): string | undefined {
+	return record.pending ?? record.notice
+}
+
+// Marks the news shown, so the hook stops once per update rather than on every call.
 function mark_shown(record: WatchRecord, root?: string): WatchRecord {
-	return write_record({ ...record, shown: record.pending }, root)
+	return write_record({ ...record, shown: news_of(record) }, root)
 }
 
 interface Acknowledged {
@@ -230,6 +272,7 @@ const issue_watch = {
 	clear,
 	clear_here,
 	mark_shown,
+	news_of,
 	poll,
 	read_record,
 	record_baseline,

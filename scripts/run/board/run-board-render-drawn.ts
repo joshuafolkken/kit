@@ -2,6 +2,7 @@ import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
+import { run_board_render_found } from './run-board-render-found'
 import type { LegendDrawn } from './run-board-render-legend'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_waits } from './run-board-render-waits'
@@ -22,6 +23,14 @@ function has_lanes(header: BoardHeader): boolean {
 	const { layout } = header
 
 	return layout !== undefined && run_board_layout.lanes_drawn(layout).length > 0
+}
+
+// A lane row draws 🧍 in its indent (joshuafolkken/kit#4625).
+function has_solo_lane(header: BoardHeader): boolean {
+	const { layout } = header
+	const lanes = layout === undefined ? [] : run_board_layout.lanes_drawn(layout)
+
+	return lanes.some((row) => row.is_solo === true)
 }
 
 // The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
@@ -59,6 +68,8 @@ function drawn_of(
 		named: named_of(header, icons),
 		checks: run_board_render_checks.legend_of(checks),
 		held: run_board_render_waits.legend_of(header),
+		solo: has_solo_lane(header),
+		overrun: rows.some((row) => run_board_render_found.is_still(row, header)),
 	}
 }
 

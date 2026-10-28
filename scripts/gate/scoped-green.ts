@@ -1,6 +1,6 @@
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { hook_decision } from '#scripts/josh/hook-decision'
-import { review_brief } from '#scripts/review/review-brief'
+import { run_record_path } from '#scripts/josh/run-record-path'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { gate_tree, type GateTree } from './gate-tree'
@@ -12,16 +12,20 @@ import { gate_tree, type GateTree } from './gate-tree'
 // tree neither check has read return their findings one round trip at a time; one call running both
 // checks first returns most of them at once.
 //
-// **It fixes when the checks run, never whether they run.** Nothing here skips a check or
+// **It fixes when the checks run, and only one writer decides whether.** Nothing here skips a check or
 // reinterprets its output, and `josh gate` still runs its four checks exactly as before. The one other
 // reader is the checks' own re-run, which narrows to what moved since this record (`since-green.ts`).
+// The one writer without a run behind it is `josh ship`'s scoped pair after a merge with the default
+// branch that shares nothing with the branch (`run-ship-synced-scope.ts`, joshuafolkken/kit#4985).
 //
 // **The judgement is the gate's own, not a second one.** "There is a record and nothing it covers has
-// moved" is `review_brief.matching_stamp` plus the base equality `gate_skip.reusable_green_gate`
+// moved" is `file_map_stamp.changed_since` plus the base equality `gate_skip.reusable_green_gate`
 // already compares and the inputs fingerprint each record carries (`verification-inputs.ts`), over the
-// same `FileMapStamp` shape written to the same kind of file. A second
-// definition of "this tree is unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where
-// two commands would start disagreeing about one working tree.
+// same `FileMapStamp` shape written to the same kind of file. A second definition of "this tree is
+// unchanged" is the clone `CLAUDE.md` prohibits, and it is exactly where two commands would start
+// disagreeing about one working tree. The one deliberate difference: this reader ignores josh's own
+// `.josh/` run records, while the gate's own reuse (`gate_skip` via `review_brief.matching_stamp`)
+// does not — safe, because the gate still lints and tests those records.
 //
 // **It refuses `josh review:brief`, and now the local `josh gate` too, but never CI's**.
 // The brief was the first refusal point because it is where `review:attest`
@@ -56,11 +60,13 @@ interface ScopedCheck {
 // The record paths, overridable so a test can plant one without overwriting the record a real run in
 // this checkout relies on — the same reason `gate_skip.reusable_green_gate` takes a `source`.
 // `is_unit_skipped` is overridable for the same reason, so a suite running in a checkout with vitest
-// can stand in for a project without one.
+// can stand in for a project without one. `is_lane_child` is the gate's answer for a dispatched lane
+// child, absent for every other caller.
 interface ScopedSources {
 	lint?: string
 	test?: string
 	is_unit_skipped?: boolean
+	is_lane_child?: boolean
 }
 
 // **`test:related` is required only where it can ever answer**. In a project
@@ -88,15 +94,26 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 		: [lint, test]
 }
 
+// **A record josh itself keeps under `.josh/` does not unseat a green record** (joshuafolkken/kit#4905):
+// `metrics --accept` and the ship's own approval re-record write there after the pair passed, and the
+// preflight re-ran both checks over nothing but that bookkeeping. The gate still lints and tests the
+// whole change, and a later scoped run reads such a file as moved since its record.
+
 // **An unreadable record reads as an absent one, and that is the safe direction.** `read` swallows a
 // malformed or foreign file and answers `undefined`, so the two cases are indistinguishable here —
 // and the consequence of treating one as the other is a single 14-second scoped run, against the
 // alternative of briefing a review on a tree nothing has checked.
-function describes_tree(check: ScopedCheck, tree: Record<string, string>, base: string): boolean {
-	const stamp = review_brief.matching_stamp(check.stamp.read(check.source), tree)
+function describes_tree(
+	check: ScopedCheck,
+	tree: Record<string, string>,
+	base: string,
+	is_overlooked: (relative: string) => boolean = run_record_path.is_run_record,
+): boolean {
+	const stamp = check.stamp.read(check.source)
 
 	return (
 		stamp !== undefined &&
+		file_map_stamp.changed_since(stamp, tree).every((relative) => is_overlooked(relative)) &&
 		file_map_stamp.describes_base(stamp, base) &&
 		check.stamp.describes_inputs(stamp)
 	)
@@ -151,23 +168,58 @@ function missing_scripts(
 	return stale_checks(tree, base, sources).map((check) => check.script)
 }
 
+// The scripts whose green record still describes this tree, which `check:related` need not run again
+// (joshuafolkken/kit#5156). A tree with no answer reuses nothing, never reading silence as green. A
+// moved `.josh/` record counts here: the gate is not behind `check:related` to lint and test it.
+function overlooks_nothing(): boolean {
+	return false
+}
+
+function green_scripts(
+	tree: Record<string, string>,
+	base: string | undefined,
+	sources: ScopedSources = {},
+): ReadonlyArray<string> {
+	if (!is_answerable(tree, base)) return []
+
+	return checks_of(sources)
+		.filter((check) => describes_tree(check, tree, base, overlooks_nothing))
+		.map((check) => check.script)
+}
+
 const REFUSAL_HEADLINE = '⛔ scoped checks not green on this tree'
 
 // **The way out travels with the refusal.** A message saying only "not verified" leaves the caller
 // holding the same question and no sanctioned answer, which is how the checks ended up after the
 // review in the first place. So the text names the one command that closes it, what it costs, and
-// that reissuing this call is the expected next move.
-function refusal(missing: ReadonlyArray<string>): string {
+// the expected next move: reissuing this call, or for a lane child's gate, handing over to ship.
+const REISSUE_STEP = 'and reissue this command.'
+
+// joshuafolkken/kit#4776: a lane child that reissued the gate here ran it in the foreground for three
+// minutes before `ship`, which runs its own gate beside the review, so that green was never used.
+const LANE_CHILD_STEP =
+	'then hand over to `pnpm josh ship --detach --review "<title> #<N>"` rather than reissuing the ' +
+	'gate — this is a dispatched lane child, and ship runs the gate beside the review ' +
+	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
+
+function refusal(missing: ReadonlyArray<string>, next_step: string): string {
 	return (
 		`${REFUSAL_HEADLINE}: ${missing.join(' and ')} ` +
 		'have not passed on the files this branch changed. The gate and review round 1 start together, ' +
 		'so a brief composed now describes a tree neither check has read — joshuafolkken/kit#1503 spent ' +
 		'282 seconds, 31% of the run, picking up one lint rule and one failing test at a time after its ' +
 		'review had already started. Run them in one call — ' +
-		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — and reissue this command. ` +
-		'The record fixes when the checks run and never whether they run: nothing is skipped or reused ' +
-		'because of it. `prompts/review.md` → "The scoped checks answer on the last edit".'
+		`\`${LINT_COMMAND} && ${TEST_COMMAND}\`, measured at 13.8 seconds — ${next_step} ` +
+		'The record fixes when the checks run: only a merge with the default branch sharing nothing ' +
+		"with this branch's change is recorded without a run. " +
+		'`.claude/skills/workflow-commands/chain-rule.md` → "Orchestration facts single-sourced here".'
 	)
+}
+
+// **Only the gate's pre-check sets `is_lane_child`**: a lane child refused at `josh run:review` reissues
+// it as chain-rule step 0 says, so `review:brief`'s callers keep the reissue wording.
+function next_step_of(sources: ScopedSources): string {
+	return sources.is_lane_child === true ? LANE_CHILD_STEP : REISSUE_STEP
 }
 
 function refusal_for(
@@ -177,7 +229,7 @@ function refusal_for(
 ): string | undefined {
 	const missing = missing_checks(tree, base, sources)
 
-	return missing.length === 0 ? undefined : refusal(missing)
+	return missing.length === 0 ? undefined : refusal(missing, next_step_of(sources))
 }
 
 // **A record is written only by a bare invocation, and any argument at all withholds it.** A path
@@ -254,6 +306,7 @@ const scoped_green = {
 	SWITCH_ENV_KEY,
 	TEST_COMMAND,
 	TEST_SCRIPT,
+	green_scripts,
 	is_recordable_scope,
 	is_unmoved,
 	missing_checks,

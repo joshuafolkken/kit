@@ -1,6 +1,7 @@
 import type { josh_command } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_recorded_fixture } from './run-ship-recorded-fixture'
 import type { run_ship_scoped as real_scoped } from './run-ship-scoped'
 
 const josh_run_mock = vi.hoisted(() => vi.fn<typeof josh_command.josh_run>())
@@ -18,11 +19,9 @@ const merge_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
 	run_ship_probe: {
-		read_state: vi.fn().mockResolvedValue({
-			is_committed: false,
-			is_pushed: false,
-			is_merged: false,
-		}),
+		read_state: vi
+			.fn()
+			.mockResolvedValue({ is_committed: false, is_pushed: false, is_merged: false }),
 		read_review_stale: vi.fn().mockResolvedValue(false),
 		record_target: vi.fn().mockResolvedValue(undefined),
 		repository_directory: repository_mock,
@@ -35,6 +34,8 @@ vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 vi.mock('./run-ship-preflight', () => ({ run_ship_preflight: { stage: preflight_mock } }))
 // The pre-detach checks' own branches are pinned in `run-ship-pre-detach.test.ts`; here they pass.
 vi.mock('./run-ship-pre-detach', () => ({ run_ship_pre_detach: { checks: pre_detach_mock } }))
+// The conflict probe (`run-ship-cli-conflict.test.ts`) finds none, so no test fetches the default branch.
+vi.mock('./run-ship-conflict-probe', () => ({ run_ship_conflict_probe: { probe: vi.fn() } }))
 vi.mock('./run-ship-scoped', async (import_original) => {
 	const actual = await import_original<{ run_ship_scoped: typeof real_scoped }>()
 	const scoped_pair = vi
@@ -80,8 +81,12 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 // No ship body draft unless a test hands one (the draft itself: `run-ship-body-draft.test.ts`).
 const with_draft_spy = vi.spyOn(run_ship_body_draft, 'with_draft')
 
+// No `--unpinned-ok` recorded for the branch (`run-ship-recorded-fixture.ts`), so no `--review` ship
+// carries this checkout's own.
+run_ship_recorded_fixture.isolate()
+
 const { run_ship_cli } = await import('./run-ship-cli')
-const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { run_ship_infra_retry } = await import('./run-ship-infra-retry')
 
 // joshuafolkken/kit#2428: the CLI side of the detached supervisor — `--detach` hands the region over and
@@ -98,6 +103,8 @@ const DRAFT = '/repo/.git/worktrees/2428/josh-ship-body-2428.md'
 const PREFLIGHT_REFUSAL = '1 pull-request precondition(s) unmet before the review and the gate:'
 const LIVE_EVIDENCE = 'live-evidence'
 const TYPE_ERROR = 'scripts/a.ts(3,7): error TS2322: Type string is not assignable'
+const INDEX_SIGNATURE_ERROR =
+	'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature'
 
 const info_lines: Array<string> = []
 
@@ -139,8 +146,11 @@ describe('run_ship_cli.run — the ship body draft', () => {
 })
 
 describe('run_ship_cli.run — --detach hands the region to a supervisor', () => {
+	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('launches the supervisor with the parsed request and runs no step itself', async () => {
-		expect(await run_ship_cli.run([TITLE, '--detach', '--review', '--cite', '2500'])).toBe(OK)
+		const argv = [TITLE, '--detach', '--review', '--cite', '2500']
+
+		expect(await run_ship_recorded_fixture.with_record(run_ship_cli.run, argv)).toBe(OK)
 		expect(detach_mock).toHaveBeenCalledWith(
 			expect.objectContaining({
 				title: TITLE,
@@ -152,6 +162,8 @@ describe('run_ship_cli.run — --detach hands the region to a supervisor', () =>
 		)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 		expect(info_lines).toEqual(['launched'])
+		// joshuafolkken/kit#4785: a `--review` ship hands the pre-detach checks its `test:pinned` check.
+		expect(pre_detach_mock.mock.calls[0]?.[2]).toBeTypeOf('function')
 	})
 
 	it('exits non-zero on a refused launch', async () => {
@@ -230,7 +242,7 @@ describe('run_ship_cli.run — every pre-detach failure in one pass', () => {
 
 	// joshuafolkken/kit#3789: the stop never reaches the supervisor, so the lane child records it itself.
 	it('records the preflight stop of a lane child to the lane ledger', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stop').mockResolvedValue()
 
 		is_lane_child_mock.mockReturnValue(true)
 		preflight_mock.mockResolvedValue({ code: FAILED, out: PREFLIGHT_REFUSAL })
@@ -254,20 +266,13 @@ describe('run_ship_cli.run — the preflight refusal beside red pre-detach check
 		pre_detach_mock.mockResolvedValue({ code: FAILED, out: TYPE_ERROR })
 	})
 
+	// What the stop records beside the refusal: `run-ship-cli-pre-detach-stop.test.ts`.
 	it('prints the refusal after the pre-detach failures', async () => {
 		await run_ship_cli.run([TITLE, '--detach'])
 		const report = info_lines.join('\n')
 
 		expect(report.indexOf(PREFLIGHT_REFUSAL)).toBeGreaterThan(report.indexOf(TYPE_ERROR))
 		expect(report.endsWith('stopped at: === preflight ===')).toBe(true)
-	})
-
-	it('records the red pre-detach checks beside the unmet preconditions', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stop').mockResolvedValue()
-
-		await run_ship_cli.run([TITLE, '--detach'])
-
-		expect(record.mock.calls[0]?.[0].preconditions).toStrictEqual([LIVE_EVIDENCE, 'pre-detach'])
 	})
 })
 
@@ -286,10 +291,7 @@ describe('run_ship_cli.run — the infrastructure retry', () => {
 // joshuafolkken/kit#3222: a type error or a red document test returns to the lane child too.
 describe('run_ship_cli.run — the type check and document tests run before the hand-off', () => {
 	it.each([
-		[
-			'a type error',
-			'scripts/a.test.ts(3,7): error TS4111: Property comes from an index signature',
-		],
+		['a type error', INDEX_SIGNATURE_ERROR],
 		['a red document test', 'FAIL scripts/document/entry-read-set.test.ts > names every document'],
 	])('does not detach and reports %s', async (_label, output) => {
 		is_lane_child_mock.mockReturnValue(true)
@@ -303,7 +305,7 @@ describe('run_ship_cli.run — the type check and document tests run before the 
 
 	it('detaches once both pass under an explicit --detach', async () => {
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(OK)
-		expect(pre_detach_mock).toHaveBeenCalledOnce()
+		expect(pre_detach_mock).toHaveBeenCalledWith()
 		expect(detach_mock).toHaveBeenCalledOnce()
 	})
 
@@ -348,10 +350,11 @@ describe('run_ship_cli.run — --cite is a follow-up citation like a trailing po
 })
 
 // joshuafolkken/kit#3234: the sync stage merged the default branch into the checkout the suite ran in.
+// joshuafolkken/kit#4825: the commit stage asks once more before the push.
 describe('run_ship_cli.run — a foreground ship merges the default branch through the stub', () => {
-	it('asks the stubbed merge once, before the commit, and reports it as current', async () => {
+	it('asks the stubbed merge at the sync and before the push, each reported as current', async () => {
 		expect(await run_ship_cli.run([TITLE])).toBe(OK)
-		expect(merge_mock).toHaveBeenCalledOnce()
+		expect(merge_mock).toHaveBeenCalledTimes(2)
 	})
 })
 

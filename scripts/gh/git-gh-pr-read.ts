@@ -1,7 +1,10 @@
+import { error_text } from '#scripts/lib/error-message'
 import { FULL_PAGE_QUERY, git_gh_api_path } from './git-gh-api-path'
+import { note_unreadable_comments } from './git-gh-comments-unreadable'
 import { git_gh_exec } from './git-gh-exec'
 import { git_gh_helpers } from './git-gh-helpers'
 import { git_gh_pr_rest, type RestPull } from './git-gh-pr-rest'
+import { git_gh_pr_too_large } from './git-gh-pr-too-large'
 import { to_gh_state } from './git-gh-rest-state'
 
 // Reading pull requests through REST, in the answers `gh pr view` gives.
@@ -61,10 +64,16 @@ function lookup_path(branch_name: string): string {
 	return `${git_gh_api_path.pulls_api_path()}?head=${head}&${LOOKUP_QUERY}`
 }
 
-async function fetch_pr_number(branch_name: string): Promise<number | undefined> {
+async function fetch_branch_pull(branch_name: string): Promise<RestPull | undefined> {
 	const json = await git_gh_exec.exec_gh_api({ path: lookup_path(branch_name) })
 
-	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))?.number
+	return git_gh_pr_rest.select_pull(git_gh_pr_rest.parse_rest_pulls(json))
+}
+
+async function fetch_pr_number(branch_name: string): Promise<number | undefined> {
+	const pull = await fetch_branch_pull(branch_name)
+
+	return pull?.number
 }
 
 // Why the resolution produced no number. `missing` is the lookup answering: the listing came back and
@@ -80,7 +89,7 @@ interface PullMergeState {
 	is_merged: boolean
 	merged_at: string | undefined
 	head_sha: string | undefined
-	// `josh ship` reads `DIRTY` here to re-merge a conflicting pull request.
+	// GitHub's merge state (`DIRTY` on a conflict).
 	merge_state_status: string | undefined
 }
 
@@ -100,8 +109,8 @@ const pending_pr_number_by_branch = new Map<string, Promise<PullNumberRead>>()
 // same `GET /pulls/{N}` each time. The promise is stored, so readers in one tick share the request as
 // well as its answer; a read that fails is dropped and re-tried, the rule the number memo holds.
 // **Every write to a pull request clears it** through `forget_pr_numbers`, and the two state readers
-// never read it: `pr_get_merge_state` answers where the pull request stands *now*, which `josh ship`
-// asks again after every merge it pushes, and `pr_view` decides whether `josh git -y` writes onto the
+// never read it: `pr_get_merge_state` answers where the pull request stands *now*, which `josh followup`
+// asks again after every merge `josh ship` pushes, and `pr_view` decides whether `josh git -y` writes onto the
 // pull request — after a commit and a push its preflight read would otherwise outlast.
 const pull_by_number = new Map<number, Promise<RestPull>>()
 
@@ -168,9 +177,12 @@ async function resolve_pr_number(branch_name: string): Promise<number | undefine
 }
 
 // One definition, because both callers that refuse to fold an unreadable lookup raise it —
-// `require_pr_number` and `pr_exists`.
+// `require_pr_number` and `pr_exists`. The cause's first line rides in the message: a reader that
+// prints only the message — the `josh git -y` preflight, a `josh ship` log — still says why.
 function to_unreadable_error(branch_name: string, cause: unknown): Error {
-	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name}`, { cause })
+	const [gist = ''] = error_text.message_of(cause).split('\n', 1)
+
+	return new Error(`${UNREADABLE_PULL_REQUEST_MESSAGE}: ${branch_name} (${gist})`, { cause })
 }
 
 // The number for a caller that has nothing to fold an absence into. The reads above answer their own
@@ -213,6 +225,36 @@ async function read_remembered_pull(pr_number: number): Promise<RestPull> {
 	}
 }
 
+// The listing row for a detail read GitHub refused as too large (`git-gh-pr-too-large.ts`). The row
+// carries neither `mergeable` nor `mergeable_state`, which every reader of them already takes as
+// "not known yet". Any other failure — and a listing that no longer names the number — stays the
+// detail read's own `unreadable`.
+async function read_listed_pull(
+	detail_error: unknown,
+	branch_name: string,
+	pr_number: number,
+): Promise<RestPull | undefined> {
+	if (!git_gh_pr_too_large.is_too_many_files(detail_error)) return undefined
+	const pull = await fetch_branch_pull(branch_name)
+
+	return pull?.number === pr_number ? pull : undefined
+}
+
+async function read_pull_or_listed(
+	branch_name: string,
+	pr_number: number,
+	read: (pr_number: number) => Promise<RestPull>,
+): Promise<RestPull> {
+	try {
+		return await read(pr_number)
+	} catch (error) {
+		const listed = await read_listed_pull(error, branch_name, pr_number)
+		if (listed === undefined) throw error
+
+		return listed
+	}
+}
+
 // One pull request named by its branch: the resolution, then the detail read that carries
 // `mergeable` and `mergeable_state`, which the lookup listing does not.
 async function read_pull_of_branch(
@@ -223,7 +265,10 @@ async function read_pull_of_branch(
 	if (number_read.kind !== 'read') return number_read
 
 	try {
-		return { kind: 'read', pull: await read(number_read.pr_number) }
+		return {
+			kind: 'read',
+			pull: await read_pull_or_listed(branch_name, number_read.pr_number, read),
+		}
 	} catch (error) {
 		return { kind: 'unreadable', cause: error }
 	}
@@ -301,25 +346,39 @@ async function pr_view(branch_name: string): Promise<string> {
 	return JSON.stringify(git_gh_pr_rest.to_pr_info(read.pull))
 }
 
+// gh's own reason for a lookup that never answered, or that the branch has no pull request at all.
+function unresolved_reason(read: Exclude<PullNumberRead, { kind: 'read' }>): string {
+	return read.kind === 'unreadable' ? error_text.message_of(read.cause) : NO_PULL_REQUEST_MESSAGE
+}
+
 // `undefined` when the listing could not be read — a failed request, or a PR whose number could not
 // be resolved. Not `'[]'`.
 //
 // The two are the same string to a caller, and the callers are the merge gate: a rate limit would
 // arrive as "no reviewer left a finding" and the PR merge with the gate never actually read.
 // The direction is what makes it worse than the epic auto-close's version of
-// the same misread — that one only failed to close something.
+// the same misread — that one only failed to close something. Either failure warns its reason
+// (`git-gh-comments-unreadable.ts`).
 async function read_comments(
 	branch_name: string,
 	to_path: (pr_number: string) => string,
 	to_json: (raw: string) => string,
 ): Promise<string | undefined> {
-	const pr_number = await resolve_pr_number(branch_name)
-	if (pr_number === undefined) return undefined
-	const path = `${to_path(String(pr_number))}${COMMENTS_QUERY}`
+	const read = await read_pr_number(branch_name)
+
+	if (read.kind !== 'read') {
+		note_unreadable_comments(branch_name, unresolved_reason(read))
+
+		return undefined
+	}
+
+	const path = `${to_path(String(read.pr_number))}${COMMENTS_QUERY}`
 
 	try {
 		return to_json(await git_gh_exec.exec_gh_api({ path, should_paginate: true }))
-	} catch {
+	} catch (error) {
+		note_unreadable_comments(branch_name, error_text.message_of(error))
+
 		return undefined
 	}
 }
@@ -362,7 +421,9 @@ export type { PullMergeState }
 export {
 	git_gh_pr_read,
 	forget_pr_numbers,
+	read_listed_pull,
 	read_pull,
+	read_pull_or_listed,
 	require_pr_number,
 	resolve_pr_number,
 	NO_PULL_REQUEST_MESSAGE,

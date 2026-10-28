@@ -25,6 +25,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	park: { ja: '保留', en: 'parked' },
 	split: { ja: '分割', en: 'split' },
 	outage: { ja: '障害', en: 'outage' },
+	'usage-limit': { ja: '利用上限', en: 'usage limit' },
 	cut: { ja: 'セッション交代', en: 'session cut' },
 	resume: { ja: '実装を再開', en: 'implementation resumed' },
 	restart: { ja: '止めて出し直し', en: 'restarted' },
@@ -40,6 +41,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	heartbeat: { ja: '生存確認', en: 'heartbeat' },
 	'ship-launch': { ja: '出荷を開始', en: 'ship launched' },
 	'ship-stop': { ja: '出荷が停止', en: 'ship stopped' },
+	'relaunch-failed': { ja: '再起動に失敗', en: 'relaunch failed' },
 	filed: { ja: '起票', en: 'filed' },
 	note: { ja: '意見', en: 'note' },
 	'lane-phase': { ja: 'レーンの段階', en: 'lane phase' },
@@ -50,6 +52,8 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'idle-notice': { ja: '待機の通知', en: 'idle notice' },
 	'lane-state': { ja: 'レーンの状態', en: 'lane state' },
 	'paused-notice': { ja: '一時停止の通知', en: 'paused notice' },
+	measured: { ja: '計測で完了', en: 'measured' },
+	sleep: { ja: 'ホストのスリープ', en: 'host sleep' },
 }
 
 const LABELS_BY_KIND: ReadonlyMap<string, KindLabel> = new Map(Object.entries(KIND_LABELS))

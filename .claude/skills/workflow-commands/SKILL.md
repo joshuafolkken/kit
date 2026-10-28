@@ -47,7 +47,7 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `run:prep` answers `latest: required` — before `josh latest:if-required` runs  |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`) — the gate overlaps the review, so the section is read before it |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`; a lane child reads "A lane child" alone) — the gate overlaps the review |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
@@ -75,7 +75,7 @@ from — read at that trigger, never restated here.
 | --- | --- | --- |
 | First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold`; `busy` / `unknown` stop | `working-tree-hold.md` |
 | `run:entry` prints its stage line | The command sets how far a run goes, the Issue where it starts; **`start: reached` redoes nothing** — stop (at `merged`, the next line answers) | `docs/how-to/run-issues.md` |
-| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (shared 135,000 threshold) |
+| Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (model-priced threshold) |
 | An entry typed with an `owner/repo#` prefix or a short `repo#` name | Resolve the target and its checkout; an explicit foreign owner stops the run | `target-repository.md` |
 | A `new` entry typed with an `into <target>` suffix | Insert the artifact into the named epic with `pnpm josh epic --add <E> <N>` | `into-target.md` |
 | Before any work starts (every entry) | The split assessment; the default is not to split — separability **and** a scope clearly over one gate must hold together; a `fullrun` / `halfrun` that finds a split files the epic and **stops** | `split-assessment.md` → "The question" |
@@ -85,12 +85,12 @@ from — read at that trigger, never restated here.
 | Before delegating any run step | `pnpm josh delegate <step>` decides eligibility, never you | `delegation.md` |
 | The pre-implementation reading reaches 3 unedited files | Delegate the unread investigation; a file this run will edit is read in the main line | `delegation.md` → "The pre-implementation reading" |
 | Immediately before implementation | Present the two-layer work summary (once per Issue); `kickoff` posts a plan instead | `prompts/collaboration-workflow/report-format.md` |
-| While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related`; `pnpm josh review:brief` refuses a brief on a tree the last two were not green on | `chain-rule.md` |
-| Implementation is done | Refactor → `pnpm josh main:merge` → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
+| While implementing | Re-run one check by name, not the whole gate — `pnpm josh lint:related`, `pnpm josh cspell:dot`, `pnpm josh test:related --touched` (full reach once the implementation is done); `pnpm josh review:brief` refuses a brief on a tree the last two were not green on | `chain-rule.md` |
+| Implementation is done | Refactor → `main:merge` (no lane child) → `pnpm josh gate` beside a subagent `/code-review`, joined before the commit → round cap → PR → merge | `chain-rule.md` → "Run the review-to-merge chain" |
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
 | E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `prrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
-| Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan first; read its duplicate and epic answers | `issue-scout.md` |
+| Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan; read its duplicate and epic answers | `issue-scout.md` |
 | Another Issue here must land first | A prerequisite is a dependency, not a park — file it, stash, record the dependency; `fullrun` / `halfrun` stop, `backlogrun` continues | `prerequisite.md` |
 | Something worth filing, none of the three | Unattended: file it (Tier A, first-party); else ask; a delegated child returns it to the parent instead | `observation-filing.md` |
 | A defect in kit's own verification turns up | It runs alone when all three conditions hold; a batch resumes once it merges | `backlogrun-lanes.md` → "A solo run" |
@@ -98,7 +98,7 @@ from — read at that trigger, never restated here.
 | `backlogrun`'s authorization | The whole `auto-ok` opted-in pool as well as its named items; `pnpm josh backlog:next` offers them | `backlogrun.md` |
 | `run:step` prints the retrospective step (a run drained its backlog and stopped, not a lane child) | Run what it prints once, file 0–2 improvements, then `pnpm josh run:carry --retrospective` | `retrospective.md` |
 | Any artifact prose (Issue bodies, comments, Telegram) | Session language (`JOSH_SESSION_LANG`, default `ja`); Issue/PR titles stay English | `prompts/collaboration-workflow/overview.md` |
-| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `CLAUDE.md` → "Mid-workflow stop notification" |
+| Any mid-workflow stop | `stop:guard` sends the `confirmation` Telegram; on its refusal, send it | `rule-delivery.md` → "stop-notify" |
 
 ## 3. What stays resident, and what is read from here
 

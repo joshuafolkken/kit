@@ -111,6 +111,14 @@ function cache_read_multiplier(price: ModelPrice): number {
 	return price.cache_read_multiplier ?? DEFAULT_CACHE_READ_MULTIPLIER
 }
 
+// The cache-read multiplier a model bills, by id. A model with no price row — an unpriced id, or no
+// model at all — reads at the standard rate.
+function cache_read_multiplier_of(model: string | undefined): number {
+	const price = model === undefined ? undefined : resolve_price(model)
+
+	return price === undefined ? DEFAULT_CACHE_READ_MULTIPLIER : cache_read_multiplier(price)
+}
+
 function estimate_cost(totals: UsageTotals, price: ModelPrice): number {
 	const weighted_input =
 		totals.input_tokens +
@@ -225,6 +233,7 @@ const cost_pricing = {
 	DEFAULT_CACHE_READ_MULTIPLIER,
 	LONG_PROMPT_THRESHOLD,
 	resolve_price,
+	cache_read_multiplier_of,
 	estimate_cost,
 	estimate_composition,
 	cost_by_model,

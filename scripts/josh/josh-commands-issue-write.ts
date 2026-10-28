@@ -107,12 +107,16 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		category: 'AI tools',
 		// Releasing the hold runs `run:hold`, which reaches the stop confirmation.
 		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
-		reference: [EVIDENCE_REFERENCE, 'automation', ['network', 'files']],
+		reference: [`${EVIDENCE_REFERENCE} [--unmet]`, 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{
 					arguments: '4452 --evidence-file .josh/tmp/measured.md',
 					note: 'comment, label, close, release — in that order',
+				},
+				{
+					arguments: '4452 --unmet --evidence-file .josh/tmp/measured.md',
+					note: 'the measurement fell short of the expected effect: measured:unmet as well',
 				},
 			],
 			flags: [
@@ -121,16 +125,21 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description:
 						'the result comment: per acceptance criterion, the measurement and the run it came from. An empty file is refused before anything is written.',
 				},
+				{
+					names: ['--unmet'],
+					description:
+						'the measurement fell short of the expected effect it checked; adds the measured:unmet label `josh effect:audit` reads',
+				},
 			],
 		},
 	},
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:
-			'File an Issue with every filing step: lint, Origin, fold, WIP cap, duplicate scout, labels, then epic:bundle',
+			'File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]',
+			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',
 			'automation',
 			['network'],
 		],
@@ -160,8 +169,13 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					description: 'duplicate candidates you read and judged distinct.',
 				},
 				{
+					names: ['--found-during <N>'],
+					description:
+						'the Issue whose work the filing came from, when it is not the lane or branch Issue. The filing cap counts per origin (step 2); step 7 never holds it as a candidate here. #N gets a deferral comment.',
+				},
+				{
 					names: ['--over-cap'],
-					description: 'the run is blocked by this filing; the cap lets it through.',
+					description: 'the run is blocked by this filing; the WIP cap lets it through.',
 				},
 				{
 					names: ['--no-auto-ok'],
@@ -171,6 +185,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--release'],
 					description:
 						"a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).",
+				},
+				{
+					names: ['--blocks-finder'],
+					description:
+						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.',
 				},
 			],
 		},

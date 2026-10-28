@@ -62,6 +62,13 @@ describe('issue_watch_gate.unread_refusal', () => {
 
 		await expect(issue_watch_gate.unread_refusal(ROOT)).resolves.toBeUndefined()
 	})
+
+	// joshuafolkken/kit#4633: an untrusted body edit is a notice, which holds no merge.
+	it('answers undefined for a withheld body edit', async () => {
+		stub_poll(record({ notice: 'withheld' }))
+
+		await expect(issue_watch_gate.unread_refusal(ROOT)).resolves.toBeUndefined()
+	})
 })
 
 describe('issue_watch_gate.review_refusal', () => {

@@ -1,3 +1,4 @@
+import { lane_investigation_switch } from '#scripts/lane/lane-investigation-switch'
 import type { ClosedIssue } from './run-board-closed'
 import type { EarlierLanes } from './run-board-earlier'
 import type { FrameBounds } from './run-board-fold'
@@ -6,7 +7,7 @@ import { run_board_github } from './run-board-github'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardPlan } from './run-board-layout'
-import { run_board_link } from './run-board-link'
+import { run_board_link, type Link } from './run-board-link'
 import { run_board_notes, type Titles } from './run-board-notes'
 import type { LocalRead } from './run-board-read'
 import { run_board_reason, type ReasonRead } from './run-board-reason'
@@ -93,15 +94,17 @@ function activity_here(local: LocalRead): RunActivity {
 
 type RoomRead = Pick<
 	ReasonRead,
-	'free_lanes' | 'occupied_count' | 'lane_limit' | 'is_memory_held' | 'gauges'
+	'free_lanes' | 'occupied_count' | 'lane_limit' | 'usage_reset_ms' | 'is_memory_held' | 'gauges'
 >
 
-// The room a waiting row is weighed against: the lanes under the limit, and the machine's memory.
+// The room a waiting row is weighed against: the lanes under the limit, the account's usage limit and
+// the machine's memory.
 function room_of(state: BoardState, local: LocalRead): RoomRead {
 	return {
 		free_lanes: local.free_lanes,
 		occupied_count: local.occupied_count,
 		lane_limit: local.lane_limit,
+		usage_reset_ms: local.usage_reset_ms,
 		is_memory_held: local.is_memory_held,
 		gauges: state.gauges,
 	}
@@ -131,7 +134,12 @@ function earlier_here(local: LocalRead): EarlierLanes {
 }
 
 // The plan laid under its statuses, each waiting row saying why it waits.
-function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): BoardLayout {
+function planned_layout(
+	state: BoardState,
+	plan: BoardPlan,
+	local: LocalRead,
+	now_ms: number,
+): BoardLayout {
 	const statuses = planned_statuses(state, plan, local)
 	const reason_of = run_board_reason.reader({
 		plan,
@@ -140,6 +148,7 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 		...room_of(state, local),
 		carry: local.carry,
 		is_stopped: activity_here(local).is_stopped,
+		now_ms,
 	})
 
 	return run_board_layout.layout_of(
@@ -152,8 +161,8 @@ function planned_layout(state: BoardState, plan: BoardPlan, local: LocalRead): B
 
 // The statuses scoped to the run's plan, a running child GitHub read closed settled.
 // Before the plan is read, the run's own children alone, named and settled as the snapshot left them.
-function layout_for(state: BoardState, local: LocalRead): BoardLayout {
-	if (state.plan !== undefined) return planned_layout(state, state.plan, local)
+function layout_for(state: BoardState, local: LocalRead, now_ms: number): BoardLayout {
+	if (state.plan !== undefined) return planned_layout(state, state.plan, local, now_ms)
 
 	const read = open_read_of(state, undefined)
 	const statuses = run_board_status.settle_closed(statuses_for(state, local), read)
@@ -168,10 +177,18 @@ interface Redraw {
 	now_ms: number
 }
 
-// What the header reads off the local read.
+// What the header reads off the local read, and the investigation switch off this machine's
+// environment, `.env` loaded as for `run:merge`.
 type LocalHeader = Pick<
 	BoardHeader,
-	'started_ms' | 'ended_ms' | 'activity' | 'operations' | 'usual' | 'lane_limit'
+	| 'started_ms'
+	| 'ended_ms'
+	| 'activity'
+	| 'operations'
+	| 'usual'
+	| 'lane_limit'
+	| 'found'
+	| 'is_investigation_on'
 >
 
 function local_header(local: LocalRead): LocalHeader {
@@ -182,6 +199,18 @@ function local_header(local: LocalRead): LocalHeader {
 		operations: local.operations,
 		usual: local.usual,
 		lane_limit: local.lane_limit,
+		found: local.found,
+		is_investigation_on: lane_investigation_switch.is_on(),
+	}
+}
+
+// The issue references and pull request numbers linked into `repo`, plain before a plan is read.
+type Links = Pick<BoardHeader, 'link' | 'pull_link'>
+
+function links_of(repo: string | undefined, link: Link): Links {
+	return {
+		link: run_board_link.linker(repo, link),
+		pull_link: run_board_link.pull_linker(repo, link),
 	}
 }
 
@@ -207,7 +236,7 @@ function header_of(
 		form: redraw.ports.form,
 		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,
-		link: run_board_link.linker(state.plan?.context.repo, redraw.ports.link),
+		...links_of(state.plan?.context.repo, redraw.ports.link),
 	}
 }
 
@@ -242,7 +271,7 @@ function draw(ports: BoardPorts, lines: ReadonlyArray<string>): void {
 // The first total the plan gives is the baseline every later arrival is counted against; the run's own
 // children before it are no total.
 function draw_run(state: BoardState, local: LocalRead, redraw: Redraw): BoardState {
-	const layout = layout_for(state, local)
+	const layout = layout_for(state, local, redraw.now_ms)
 	const first_total =
 		state.plan === undefined ? undefined : run_board_header.counts_of(layout).total
 	const settled = { ...state, baseline_total: state.baseline_total ?? first_total }

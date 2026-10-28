@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/backlog/backlog-rank.ts:32 | 2026-10-27 | #5107
+- rf:comments | low | scripts/backlog/backlog-gate-scope.ts:37 | 2026-10-27 | #5107

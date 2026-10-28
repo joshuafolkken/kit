@@ -1,20 +1,23 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
+import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { piped_verification } from './piped-verification'
+import { piped_verification_shapes } from './piped-verification-shapes'
 import { rule_value_cache } from './rule-value-cache'
 import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
 
 // A body read reaches the issue-comments trigger; the comments read in front of it is what keeping
-// the rule looks like, so this run reaches and keeps it. The filing reaches the filing cap, which
+// the rule looks like, so this run reaches and keeps it. The force push reaches `git-force`, which
 // declares no `keeps`, so it reads unmeasured.
 const COMMENTS_READ = 'gh api repos/o/r/issues/12/comments'
 const BODY_READ = 'gh api repos/o/r/issues/12'
-const FILING = 'pnpm josh issue:file "x" --body-file b.md'
-const FILING_CAP = 'filing-cap'
+const FORCE_PUSH = 'git push --force origin main'
+const GIT_FORCE = 'git-force'
 const ISSUE_COMMENTS = 'issue-comments'
 const TEMPORARY_PREFIX = 'rule-value-cli-'
 
@@ -34,7 +37,7 @@ describe('rule_value_cli.render — one row per rule, or the no-targets answer',
 
 	it('prints exactly one line per measured rule', () => {
 		const lines = rule_value_cli
-			.render([[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]])
+			.render([[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FORCE_PUSH)]])
 			.split('\n')
 
 		expect(lines).toHaveLength(delivered_rules.MEASURED_RULES.length)
@@ -42,7 +45,7 @@ describe('rule_value_cli.render — one row per rule, or the no-targets answer',
 })
 
 describe('rule_value_cli.row — the three readings a row can carry', () => {
-	const kept = [[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FILING)]]
+	const kept = [[rule_value_fixture.session(COMMENTS_READ, BODY_READ, FORCE_PUSH)]]
 
 	it('renders a reached, measurable rule as a percentage kept unaided', () => {
 		const reading = rule_value_fixture.reading_for(ISSUE_COMMENTS, kept)
@@ -51,7 +54,7 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 	})
 
 	it('renders a rule with no keeps predicate as unmeasured, never as 0%', () => {
-		const reading = rule_value_fixture.reading_for(FILING_CAP, kept)
+		const reading = rule_value_fixture.reading_for(GIT_FORCE, kept)
 
 		expect(rule_value_cli.row(reading)).toContain(rule_value_cli.UNMEASURED)
 		expect(rule_value_cli.row(reading)).not.toContain('%')
@@ -63,6 +66,33 @@ describe('rule_value_cli.row — the three readings a row can carry', () => {
 		])
 
 		expect(rule_value_cli.row(reading)).toContain(rule_value_cli.UNREACHED)
+	})
+})
+
+describe('rule_value_cli.render_parts — the candidates beside the table', () => {
+	it('carries no candidates when nothing measurable was found', () => {
+		expect(rule_value_cli.render_parts([])).toStrictEqual({ table: rule_value_cli.NO_TARGETS })
+	})
+
+	it('keeps the table one line per rule and puts the candidates apart from it', () => {
+		const parts = rule_value_cli.render_parts([[rule_value_fixture.session(COMMENTS_READ)]])
+
+		expect(parts.table.split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
+		expect(parts.candidates).toMatch(/^candidates:\n {2}retire .*\n {2}condense /u)
+	})
+
+	// joshuafolkken/kit#5266: the refusals of `piped-verification`, named by the filter that drew them.
+	it('ends the candidates with the piped-verification refusals counted by shape', () => {
+		const refusal = rule_value_fixture.answered_call(
+			'pnpm josh gate | head -5',
+			1,
+			piped_verification.PIPED_VERIFICATION_REASON,
+		)
+		const { candidates = '' } = rule_value_cli.render_parts([[refusal]])
+
+		expect(candidates.split('\n').at(-1)).toBe(
+			`${piped_verification_shapes.HEADING} head 1 · grep 0 · awk|sed|tee 0 · chain 0 · other 0`,
+		)
 	})
 })
 
@@ -149,11 +179,14 @@ describe('rule_value_cli.render — a lazy source reads as the materialized one'
 	it('renders the same table as the materialized runs it replaces', () => {
 		spy_readers()
 		const comments = fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1')
-		const body = fake_file(rule_value_fixture.session(BODY_READ, FILING), 'run1')
-		const lone = fake_file(rule_value_fixture.session(FILING), 'run2')
+		const body = fake_file(rule_value_fixture.session(BODY_READ, FORCE_PUSH), 'run1')
+		const lone = fake_file(rule_value_fixture.session(FORCE_PUSH), 'run2')
 		const materialized = [
-			[rule_value_fixture.session(COMMENTS_READ), rule_value_fixture.session(BODY_READ, FILING)],
-			[rule_value_fixture.session(FILING)],
+			[
+				rule_value_fixture.session(COMMENTS_READ),
+				rule_value_fixture.session(BODY_READ, FORCE_PUSH),
+			],
+			[rule_value_fixture.session(FORCE_PUSH)],
 		]
 
 		try {
@@ -208,6 +241,98 @@ describe('rule_value_cli.run_rule_value — --refresh fills the loop-head cache'
 			expect(rule_value_cli.run_rule_value([], cwd)).toBe(0)
 			expect(stdout).toHaveBeenCalledExactlyOnceWith(`${rule_value_cli.NO_TARGETS}\n`)
 			expect(existsSync(rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE))).toBe(false)
+		} finally {
+			vi.restoreAllMocks()
+			rmSync(cwd, { recursive: true, force: true })
+		}
+	})
+})
+
+const CACHED_TABLE = 'issue-comments  reached 3  100% unaided  refused 0'
+
+interface CachedRun {
+	is_measured: boolean
+	out: string
+}
+
+// A fresh directory holding a reading whose cache file was written `age_ms` ago.
+function directory_with_cache(age_ms: number): string {
+	const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+	const seconds = (Date.now() - age_ms) / MS_PER_SECOND
+
+	rule_value_cache.store(CACHED_TABLE, cwd)
+	utimesSync(rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE), seconds, seconds)
+
+	return cwd
+}
+
+// Run against that cache with the transcript listing spied, so a test reads whether it measured.
+function run_with_cache(argv: ReadonlyArray<string>, age_ms: number): CachedRun {
+	const cwd = directory_with_cache(age_ms)
+	const out = new Array<string>()
+	const listing = vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([])
+
+	vi.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+		out.push(String(chunk))
+
+		return true
+	})
+
+	try {
+		rule_value_cli.run_rule_value(argv, cwd)
+
+		return { is_measured: listing.mock.calls.length > 0, out: out.join('') }
+	} finally {
+		vi.restoreAllMocks()
+		rmSync(cwd, { recursive: true, force: true })
+	}
+}
+
+describe('rule_value_cli.run_rule_value — a fresh cached reading is printed without measuring', () => {
+	it('prints the cached table and when it was taken, without listing a transcript', () => {
+		const { is_measured, out } = run_with_cache([], 0)
+
+		expect(is_measured).toBe(false)
+		expect(out).toContain(CACHED_TABLE)
+		expect(out).toMatch(
+			new RegExp(String.raw`${rule_value_cli.CACHED_NOTE} \d{4}-\d{2}-\d{2}T`, 'u'),
+		)
+	})
+
+	it('measures when the cached reading is older than the refresh interval', () => {
+		const { is_measured, out } = run_with_cache([], rule_value_cache.REFRESH_MS)
+
+		expect(is_measured).toBe(true)
+		expect(out).toBe(`${rule_value_cli.NO_TARGETS}\n`)
+	})
+
+	it('measures regardless of a fresh cache under --fresh', () => {
+		const { is_measured, out } = run_with_cache(['--fresh'], 0)
+
+		expect(is_measured).toBe(true)
+		expect(out).not.toContain(rule_value_cli.CACHED_NOTE)
+	})
+})
+
+describe('rule_value_cli.run_rule_value — the candidates stay out of the cache', () => {
+	it('stores the table alone when a run was measured', () => {
+		const cwd = mkdtempSync(path.join(tmpdir(), TEMPORARY_PREFIX))
+
+		spy_readers()
+		vi.spyOn(cost_transcript, 'list_sessions_across').mockReturnValue([
+			fake_file(rule_value_fixture.session(COMMENTS_READ), 'run1'),
+		])
+
+		try {
+			rule_value_cli.run_rule_value(['--refresh'], cwd)
+
+			const cached = readFileSync(
+				rule_value_cache.cache_path(cwd, rule_value_cache.CACHE_FILE),
+				'utf8',
+			)
+
+			expect(cached).not.toContain('candidates:')
+			expect(cached.trimEnd().split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
 		} finally {
 			vi.restoreAllMocks()
 			rmSync(cwd, { recursive: true, force: true })

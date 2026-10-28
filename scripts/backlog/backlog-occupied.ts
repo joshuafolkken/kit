@@ -27,8 +27,8 @@ import type { LaneRecords } from '#scripts/lane/lane-state'
 // child ended at the hand-off, and while `josh followup` runs the supervisor only polls CI, CodeRabbit
 // and the merge, so the slot is free for the next launch while every merge check still runs. The wait is
 // unmarked while the followup stage merges and gates again (`run-ship-sync.ts`); a stop there counts
-// the lane again, and past the limit the supervisor waits for a place before it relaunches the child
-// (`run-ship-return.ts`). A named epic's offer discounts the same lanes (`epic-lane-offer.ts`).
+// the lane again, and more than one lane past the limit the supervisor waits for a place before it
+// relaunches the child (`run-ship-place.ts`). A named epic's offer discounts the same lanes (`epic-lane-offer.ts`).
 
 // The issues whose lane has no child working in it (`lane_spent.idle_lanes`).
 type IdleRead = (lanes: ReadonlyArray<LaneInfo>) => ReadonlyArray<string>

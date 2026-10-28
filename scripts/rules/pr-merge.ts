@@ -99,9 +99,9 @@ function is_pr_merge(command: string): boolean {
 const PR_MERGE_REASON =
 	'⛔ direct PR merge: `gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a ' +
 	'`mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file ' +
-	'merges outside the verified route, and a merge is Tier C. Merge with `pnpm josh followup` when the ' +
-	'run authorizes it; otherwise leave it to the user (`CLAUDE.md` → Git Rules). This rule fires on ' +
-	'every occurrence.'
+	'merges outside the verified route, and a merge is Tier C. Merge with `pnpm josh followup` if the ' +
+	'run authorizes it; otherwise leave it to the user (`operating-rules.md` → git-rules). This rule ' +
+	'fires on every occurrence.'
 
 const ROW = {
 	id: 'pr-merge',
@@ -110,7 +110,7 @@ const ROW = {
 	decide: (): boolean => true,
 	about: {
 		title: 'Direct PR merge',
-		topic: '`CLAUDE.md` → Git Rules',
+		topic: '`operating-rules.md` → "git-rules"',
 		fires:
 			'`gh pr merge`, a `gh api` / `curl` call to `…/pulls/<N>/merge`, a `mergePullRequest` / `enablePullRequestAutoMerge` mutation, or a GraphQL body read from a file. Every occurrence',
 		quiet:
@@ -118,6 +118,6 @@ const ROW = {
 	},
 }
 
-const pr_merge = { PR_MERGE_REASON, ROW, is_pr_merge }
+const pr_merge = { PR_MERGE_REASON, ROW, is_graphql_call, is_pr_merge }
 
 export { pr_merge }

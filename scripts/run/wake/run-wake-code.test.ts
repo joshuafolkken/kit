@@ -78,6 +78,50 @@ describe('run_wake_code.watch', () => {
 	})
 })
 
+// joshuafolkken/kit#4714: a supervisor whose broker refused a ship's request is suspected of old code.
+describe('run_wake_code.watch — a suspected supervisor', () => {
+	it('re-hashes an unmoved commit once suspected, stale on a changed closure', async () => {
+		const is_stale = await run_wake_code.watch(
+			scripted([HEAD_A], [CLOSURE_A, CLOSURE_B]),
+			() => true,
+		)
+
+		expect(await is_stale()).toBe(true)
+	})
+
+	it('is not stale when suspected but the closure is unchanged', async () => {
+		const source = scripted([HEAD_A], [CLOSURE_A])
+		const is_stale = await run_wake_code.watch(source, () => true)
+
+		expect(await is_stale()).toBe(false)
+		expect(source.closure).toHaveBeenCalledTimes(2)
+	})
+
+	it('is stale when suspected and its start left no baseline', async () => {
+		const is_stale = await run_wake_code.watch(
+			scripted([HEAD_A], [undefined, CLOSURE_A]),
+			() => true,
+		)
+
+		expect(await is_stale()).toBe(true)
+	})
+
+	it('keeps a suspicion for the next pass when its closure could not be hashed', async () => {
+		const suspicions = [true, false]
+		const source = scripted([HEAD_A], [CLOSURE_A, undefined, CLOSURE_B])
+		const is_stale = await run_wake_code.watch(source, () => suspicions.shift() ?? false)
+
+		expect([await is_stale(), await is_stale()]).toStrictEqual([false, true])
+	})
+
+	it('reads a move again at the next pass when its closure could not be hashed', async () => {
+		const source = scripted([HEAD_A, HEAD_B], [CLOSURE_A, undefined, CLOSURE_B])
+		const is_stale = await run_wake_code.watch(source)
+
+		expect([await is_stale(), await is_stale()]).toStrictEqual([false, true])
+	})
+})
+
 describe('run_wake_code.source_of — closure', () => {
 	it('keeps the hash when a file the entry does not import changes', async () => {
 		const root = write_project()

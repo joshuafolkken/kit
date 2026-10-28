@@ -34,6 +34,9 @@ const { block_ceiling } = document_byte_budget
 const { LANE_CHILD } = lane_child_read_set
 const { BACKLOGRUN } = backlogrun_parent_read_set
 const NOTHING = 0
+// The command that re-measures every entry total in seconds, named by the over-budget message so a
+// trim is checked without re-running the whole lint or gate.
+const RECHECK_COMMAND = 'pnpm josh bytes'
 
 interface EntryBudget {
 	entry: string
@@ -46,8 +49,8 @@ interface EntryBudget {
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 36_864 },
 	{ entry: 'fullrun', bytes: 53_248 },
-	{ entry: 'halfrun', bytes: 49_152 },
-	{ entry: 'prrun', bytes: 53_248 },
+	{ entry: 'halfrun', bytes: 45_056 },
+	{ entry: 'prrun', bytes: 57_344 },
 	{ entry: 'backlogrun', bytes: 81_920 },
 	{ entry: LANE_CHILD, bytes: 45_056 },
 ]
@@ -95,7 +98,7 @@ function over_budget_message(entry: string, current_bytes: number, recorded_byte
 	const next = block_ceiling(current_bytes).toString()
 	const raise_hint = `raise its recorded size to ${next} in scripts/document/entry-read-budget.ts so the reason shows in the PR diff`
 
-	return `entry ${entry} reads ${current_bytes.toString()} bytes, over its ${recorded_bytes.toString()}-byte ceiling. Trim what it reads, or ${raise_hint}.`
+	return `entry ${entry} reads ${current_bytes.toString()} bytes, over its ${recorded_bytes.toString()}-byte ceiling. Trim what it reads, or ${raise_hint}. Recheck with \`${RECHECK_COMMAND}\`.`
 }
 
 // The stale-ratchet message: a recorded ceiling more than a block above the entry's actual total was
@@ -113,6 +116,7 @@ function stale_budget_message(
 
 const entry_read_budget = {
 	ENTRY_READ_BUDGET,
+	RECHECK_COMMAND,
 	entry_total_bytes,
 	over_budget_message,
 	recorded_bytes_for,

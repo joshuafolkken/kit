@@ -46,15 +46,15 @@ The Codex project files are managed by kit. Sync overwrites both files, and rewr
 
 **`.claude/settings.json` is merged, not overwritten**: sync replaces kit's entries and keeps the ones your project added, so a shared hook or permission can live in the committed file.
 
-| Part of the file                        | What sync does                                                                                                                                                |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. Every other hook stays, after kit's.                                       |
-| `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed.           |
-| Other keys kit ships                    | Set to kit's value (`permissions.defaultMode`, for example). Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay. |
-| Keys kit does not ship                  | Left as they are.                                                                                                                                             |
+| Part of the file                        | What sync does                                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hooks`                                 | Replaces kit's hooks with the distributed ones and removes a hook kit has retired. Every other hook stays, after kit's.                             |
+| `permissions.allow`, `permissions.deny` | Keeps every kit entry present — a kit `deny` you removed comes back — and keeps your own entries after them. An entry kit has withdrawn is removed. |
+| Other keys kit ships                    | Set to kit's value. Inside an object such as `env` or `enabledPlugins`, kit's entries win and your own entries stay.                                |
+| Keys kit does not ship                  | Left as they are (`permissions.defaultMode`, for example).                                                                                          |
 
 - A hook is kit's when its command runs kit's hook launcher (`scripts/hooks/run-hook.sh`) or the installed `dist/josh.js`, or is exactly one of the six `pnpm josh <command>` hooks kit distributed before 2026-09-13 (`audit:provision`, `batch:guard`, `format:edited`, `investigation:guard`, `rule:guard`, `session:lang`).
-- A kit `deny` cannot be removed from the project file: the list guards the verification gate. If one is wrong for your project, open an issue on kit.
+- A kit `deny` cannot be removed from the project file: the list is part of the verification gate's guardrail. If one is wrong for your project, open an issue on kit.
 - An entry kit stops shipping inside an object (an `env` variable, an `enabledPlugins` entry) cannot be told from one you added, so it stays until you delete it. A withdrawn `allow` / `deny` entry is the exception: kit names it and sync removes it.
 - `josh sync --force` replaces the file with the distributed one, dropping your additions.
 - A file that is not a JSON object is replaced with the distributed one. The merge rewrites the file as plain JSON, so comments in it are not kept.
@@ -98,7 +98,7 @@ What else a consumer should know about the files above. Each item is the behavio
 - **kit's own copy of the file sets `"enableArtifact": false`; yours does not receive it.** To drop the Artifact tool from your own sessions, add the key to `.claude/settings.local.json` or `~/.claude/settings.json`. Rationale: `docs/maintainers/sync-rationale.md` → "The Artifact tool is switched off in kit only".
 - **`verify-ui` is the skill behind the UI verification gate.** It captures the affected routes through your toolkit's screenshot command (`josh-app shot`), and where none exists it says so and leaves the gate open. Rationale: `docs/maintainers/sync-rationale.md` → "The verify-ui skill".
 - **The `workflow-commands` and `dependency-update` skills hold the workflow procedures** the AI documents point to. A skill directory copy merges and never prunes: a file removed upstream stays until you delete it, and a file you add beside `SKILL.md` survives every sync. Rationale: `docs/maintainers/sync-rationale.md` → "Skills that hold what the AI documents used to inline".
-- **The same file wires the session hooks** — `audit:provision`, `session:lang`, `pretool:guard`, `format:edited` and `stop:guard` ([josh-commands.md](./josh-commands.md)). Switch a guard off with `JOSH_BATCH_GUARD=off`, `JOSH_INVESTIGATION_GUARD=off` or `JOSH_RULE_GUARD=off` in the environment or `.env`. Rationale: `docs/maintainers/sync-rationale.md` → "The hooks in .claude/settings.json".
+- **The same file wires the session hooks** — `audit:provision`, `session:lang`, `pretool:guard`, `format:edited` and `stop:guard` ([josh-commands.md](./josh-commands.md)). Switch a guard off with `JOSH_BATCH_GUARD=off`, `JOSH_INVESTIGATION_GUARD=off` or `JOSH_RULE_GUARD=off` at launch, never in `.env`. Rationale: `docs/maintainers/sync-rationale.md` → "The hooks in .claude/settings.json".
 
 ### `pnpm-workspace.yaml` (merged)
 

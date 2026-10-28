@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import node_path from 'node:path'
 import { package_file } from '#scripts/claude/skill-fixture'
 import { PLUGIN_SKILL_DIRECTORIES } from '#scripts/sync/plugin-skill-directories'
+import { command_reference_line_budget } from './command-reference-line-budget'
 import { document_scan } from './document-scan'
 
 // Where the rules live, for every marker suite that checks one is present.
@@ -43,15 +44,9 @@ const ENV_EXAMPLE = '.env.example'
 const MARKDOWN_EXTENSION = '.md'
 const PROMPT_ROOT = 'prompts'
 const DOCS_ROOT = 'docs'
-// The only files under `docs/` an agent is routed to read — the four command references; the rest of
-// `docs/` is reference a human browses, so the byte budget (`document/document-byte-budget.ts`)
-// covers these alone.
-const COMMAND_REFERENCE_DOCS: ReadonlyArray<string> = [
-	'docs/josh-commands.md',
-	'docs/josh-commands-automation.md',
-	'docs/josh-commands-run.md',
-	'docs/josh-commands-backlog.md',
-]
+// The four command references an agent is routed to read; `command-reference-line-budget.ts` owns
+// the list so shipped code can read it too.
+const { COMMAND_REFERENCE_DOCS } = command_reference_line_budget
 // The user-facing label and run-state page. It took the label sections out
 // of the backlog command reference, which an agent is routed to, so it stays under the same budget.
 const LABEL_REFERENCE_DOC = 'docs/labels-and-run-states.md'

@@ -2,6 +2,7 @@ import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_test_fixture, type ExecaResult } from './gate-test-fixture'
 import type { GateStep } from './verification-gate'
@@ -400,7 +401,7 @@ describe('run_verification_gate — how long each check took', () => {
 
 // joshuafolkken/kit#1258: the plan decides how many checks run at once and how wide the unit suite
 // fans out. `gate-plan.test.ts` owns the numbers; what is asserted here is that the gate obeys them.
-const JOSH = 'josh'
+const UNIT_COMMAND = ['josh', gate_labels.UNIT_TARGET, gate_labels.KEEP_WHOLE_SUITE_FLAG]
 const UNIT_CAP = 7
 const NARROWEST_CONCURRENCY = 1
 const CAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length, UNIT_CAP)
@@ -409,7 +410,7 @@ const UNCAPPED_PLAN: GatePlan = gate_plan.plan_of(GATE_STEPS.length)
 const SERIAL_PLAN: GatePlan = gate_plan.plan_of(NARROWEST_CONCURRENCY)
 
 function unit_step_args(steps: ReadonlyArray<GateStep>): ReadonlyArray<string> | undefined {
-	return steps.find((step) => step.label === gate_plan.UNIT_LABEL)?.command_args
+	return steps.find((step) => step.label === gate_labels.UNIT_LABEL)?.command_args
 }
 
 describe('the gate follows the plan', () => {
@@ -417,8 +418,7 @@ describe('the gate follows the plan', () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, CAPPED_PLAN)
 
 		expect(unit_step_args(steps)).toEqual([
-			JOSH,
-			gate_plan.UNIT_TARGET,
+			...UNIT_COMMAND,
 			`${verification_gate.UNIT_WORKER_FLAG}=${String(UNIT_CAP)}`,
 		])
 	})
@@ -427,17 +427,17 @@ describe('the gate follows the plan', () => {
 	// worker pool for the flag to mean anything to.
 	it('appends nothing to the checks the cap is not about', async () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, CAPPED_PLAN)
-		const others = steps.filter((step) => step.label !== gate_plan.UNIT_LABEL)
+		const others = steps.filter((step) => step.label !== gate_labels.UNIT_LABEL)
 
 		for (const step of others) {
 			expect(step.command_args).not.toContain(verification_gate.UNIT_WORKER_FLAG)
 		}
 	})
 
-	it('leaves the unit command bare when the plan caps nothing', async () => {
+	it('hands the unit command only the whole-suite flag when the plan caps nothing', async () => {
 		const steps = await verification_gate.build_gate_steps(PROJECT_ROOT, UNCAPPED_PLAN)
 
-		expect(unit_step_args(steps)).toEqual([JOSH, gate_plan.UNIT_TARGET])
+		expect(unit_step_args(steps)).toEqual(UNIT_COMMAND)
 	})
 
 	// The whole point of the gate is that one failure never hides the other three. Narrowing the

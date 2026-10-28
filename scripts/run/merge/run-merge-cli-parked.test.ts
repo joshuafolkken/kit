@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { run_merge_steps_fixture } from './run-merge-steps-fixture'
 
 // joshuafolkken/kit#3017: a child that parked itself has its `in-progress` dropped, as a failed child's
 // is — left on, it outlived the `needs-decision` a person lifted and held the backlog.
@@ -8,8 +9,15 @@ const release_mock = vi.hoisted(() => vi.fn())
 const record_merge_mock = vi.hoisted(() => vi.fn())
 const record_change_mock = vi.hoisted(() => vi.fn())
 const do_failed_mock = vi.hoisted(() => vi.fn())
+const do_merged_mock = vi.hoisted(() => vi.fn())
 const emit_mock = vi.hoisted(() => vi.fn())
 const events_mock = vi.hoisted(() => vi.fn())
+const restart_mock = vi.hoisted(() => vi.fn())
+const merge_state_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./run-merge-restart', () => ({
+	run_merge_restart: { is_host_restart: restart_mock },
+}))
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -22,16 +30,20 @@ vi.mock('#scripts/issue/issue-closing-pr', () => ({
 vi.mock('#scripts/issue/issue-merged', () => ({
 	issue_merged: {
 		read_merged: vi.fn().mockResolvedValue(false),
-		read_merge_state: vi.fn().mockResolvedValue(false),
+		read_merge_state: merge_state_mock,
 	},
 }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
-	run_event_stream_emit: { emit: emit_mock, current_events: events_mock },
+	run_event_stream_emit: {
+		emit: emit_mock,
+		current_events: events_mock,
+		invocation_or_all_events: events_mock,
+	},
 }))
 
-vi.mock('#scripts/lane/lane-ledger', () => ({
-	lane_ledger: { record_merge: record_merge_mock },
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_merge: record_merge_mock },
 }))
 
 vi.mock('#scripts/lane/lane-state', () => ({
@@ -43,7 +55,7 @@ vi.mock('./run-merge-steps', () => ({
 		ask_next: vi.fn().mockResolvedValue('2039'),
 		do_failed: do_failed_mock,
 		release_child: release_mock,
-		do_merged: vi.fn().mockResolvedValue(undefined),
+		do_merged: do_merged_mock,
 		has_resumable_cut: vi.fn().mockResolvedValue(false),
 		is_over_budget: vi.fn().mockResolvedValue(false),
 		refused_carry: vi.fn().mockResolvedValue(undefined),
@@ -76,8 +88,11 @@ beforeEach(() => {
 	record_merge_mock.mockReset().mockResolvedValue(undefined)
 	record_change_mock.mockReset().mockResolvedValue({ kind: 'skipped', reason: 'test' })
 	do_failed_mock.mockReset()
+	do_merged_mock.mockReset().mockImplementation(run_merge_steps_fixture.record_merged)
 	emit_mock.mockReset().mockResolvedValue(undefined)
 	events_mock.mockReset().mockResolvedValue([])
+	restart_mock.mockReset().mockResolvedValue(false)
+	merge_state_mock.mockReset().mockResolvedValue(true)
 })
 
 // joshuafolkken/kit#3908: a child a person withdrew is settled by `lane:withdraw`, so `run:merge` offers
@@ -96,6 +111,7 @@ describe('run_merge_cli.merge_child — a child a person withdrew', () => {
 	])('offers the next child for a withdrawn %s issue', async (_label, state) => {
 		read_issue_mock.mockResolvedValue(state)
 		events_mock.mockResolvedValue([WITHDRAW_EVENT])
+		merge_state_mock.mockResolvedValue(false)
 
 		const result = await run_merge_cli.merge_child(context())
 
@@ -144,6 +160,24 @@ describe('run_merge_cli.merge_child — a park that gave no cause', () => {
 	})
 })
 
+// joshuafolkken/kit#4765: the cap's line reaches the park only when merge_child hands it to do_failed.
+describe('run_merge_cli.merge_child — a child the re-dispatch cap stopped', () => {
+	it('hands the cap line to the failed step', async () => {
+		const outage = { at: '2026-10-24T00:00:00.000Z', kind: 'outage', text: `#${CHILD} outage` }
+
+		read_issue_mock.mockResolvedValue(open_with([IN_PROGRESS]))
+		restart_mock.mockResolvedValue(true)
+		events_mock.mockResolvedValue([1, 2, 3].map((pos) => ({ ...outage, pos })))
+		do_failed_mock.mockResolvedValue({ carry: undefined, is_parked: true, waits: [] })
+
+		await run_merge_cli.merge_child(context())
+
+		const [handed] = do_failed_mock.mock.lastCall as [{ capped_note?: string }]
+
+		expect(handed.capped_note).toContain('re-dispatch cap (3) after 3 re-dispatches')
+	})
+})
+
 describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 	it.each([NEEDS_DECISION, 'already-done'])(
 		'drops in-progress from a child parked with %s',
@@ -172,7 +206,10 @@ describe('run_merge_cli.merge_child — in-progress on a settled child', () => {
 
 		await run_merge_cli.merge_child(context())
 
-		expect(record_merge_mock).toHaveBeenCalledWith(Number(CHILD))
+		expect(record_merge_mock).toHaveBeenCalledWith(
+			Number(CHILD),
+			run_merge_steps_fixture.CONFIRMED_AT,
+		)
 	})
 
 	it('records nothing for a parked child', async () => {

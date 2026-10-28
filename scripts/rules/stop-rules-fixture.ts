@@ -20,6 +20,7 @@ const BASE: StopContext = {
 	lane_child: false,
 	background_pending: false,
 	agent_pending: false,
+	command_pending: false,
 	handed_off: false,
 	session_lang: 'en',
 	headless_agent: false,

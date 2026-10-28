@@ -33,11 +33,13 @@ describe('time_followup_stage.read_stages', () => {
 	// number — and the two prefixes differ by one character, which is exactly the collision a scan
 	// written by hand would miss.
 	it('ignores the total row the same block ends with', () => {
-		const text = block([{ name: git_followup_stages.STAGE.merge, duration_ms: SECOND_MS }])
+		const text = block([
+			{ name: git_followup_stages.STAGE.telegram_and_merge, duration_ms: SECOND_MS },
+		])
 
 		expect(text).toContain(git_followup_stages.STAGE_TOTAL_PREFIX)
 		expect(time_followup_stage.read_stages(text)).toEqual([
-			{ name: git_followup_stages.STAGE.merge, duration_ms: SECOND_MS },
+			{ name: git_followup_stages.STAGE.telegram_and_merge, duration_ms: SECOND_MS },
 		])
 	})
 })

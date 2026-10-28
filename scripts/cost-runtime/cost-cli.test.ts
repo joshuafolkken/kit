@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { codex_usage } from './codex-usage'
-import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
+import { context_cut_payback } from './context-cut-payback'
 import { cost_cli } from './cost-cli'
 import { cost_cli_fixture } from './cost-cli-fixture'
 import { cost_corpus } from './cost-corpus'
@@ -20,6 +20,10 @@ const OTHER_SESSION_ENV = { CLAUDE_CODE_SESSION_ID: 'a-different-session' }
 // transcript — the behavior a plain shell keeps (joshuafolkken/kit#2403).
 const ANTHROPIC_NO_ID_ENV = { CLAUDE_CODE_CHILD_SESSION: 'x' }
 const OPENAI_ENV = { CODEX_THREAD_ID: 'thread' }
+// A measurement that names no model is priced at the standard cache-read rate.
+const CONTEXT_CUT_THRESHOLD = context_cut_payback.break_even_context(undefined)
+const OPUS = 'claude-opus-5-5'
+const OPUS_THRESHOLD = context_cut_payback.break_even_context(OPUS)
 const BAD_FLAG = '--nonsense'
 const NO_TRANSCRIPTS = 'No transcripts found'
 const NO_NAMED_TRANSCRIPT = 'No transcript named'
@@ -43,8 +47,10 @@ describe('cost_cli.parse_options', () => {
 		expect(cost_cli.parse_options(['--over', '123456'])?.over).toBe(123_456)
 	})
 
-	it('reads the shared context-cut threshold', () => {
-		expect(cost_cli.parse_options(['--cut'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	// The cut threshold is the session's model's break-even, so it is left unpriced until the
+	// transcript is read.
+	it('reads the cut limit, unpriced until the session is measured', () => {
+		expect(cost_cli.parse_options(['--cut'])?.over).toBe('cut')
 	})
 
 	it('refuses two threshold sources', () => {
@@ -192,6 +198,22 @@ describe('cost_cli.run --cut provider source', () => {
 		expect(claude).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#5341: a cheaper cache read moves the break-even out, so a context over the
+	// standard-rate threshold is still under on Opus 5.5.
+	it.each([
+		[OPUS_THRESHOLD, 'under'],
+		[OPUS_THRESHOLD + 1, 'over'],
+	])('prices %i tokens against the newest request model as %s', (tokens, verdict) => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [tokens],
+			model: OPUS,
+		})
+
+		expect(OPUS_THRESHOLD).toBeGreaterThan(CONTEXT_CUT_THRESHOLD)
+		expect(cost_cli.run(['--cut'], CWD, OPENAI_ENV)).toBe(0)
+		expect(stdout().trim()).toBe(verdict)
+	})
+
 	it('keeps the Anthropic transcript path', () => {
 		write_session(SESSION_A, [usage_line('r1', MAIN, 10)])
 		const codex = vi.spyOn(codex_usage, 'measurement')
@@ -252,6 +274,19 @@ describe('cost_cli.session_figures', () => {
 			verdict: 'over',
 			cost: CONTEXT_CUT_THRESHOLD + 1,
 			threshold: CONTEXT_CUT_THRESHOLD,
+		})
+	})
+
+	it("quotes the newest request model's threshold", () => {
+		vi.spyOn(codex_usage, 'measurement').mockReturnValue({
+			billed_input_per_request: [CONTEXT_CUT_THRESHOLD + 1],
+			model: OPUS,
+		})
+
+		expect(cost_cli.session_figures(CWD, OPENAI_ENV)).toStrictEqual({
+			verdict: 'under',
+			cost: CONTEXT_CUT_THRESHOLD + 1,
+			threshold: OPUS_THRESHOLD,
 		})
 	})
 

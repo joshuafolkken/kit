@@ -4,8 +4,10 @@ import type { EpicNextResult } from '#scripts/epic/epic-report'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { open_issue_schema, type OpenIssueData } from '#scripts/git/git-schemas'
 import { read_json_listing } from '#scripts/git/parse-json-array'
-import { issue_sample_gate } from '#scripts/issue/issue-sample-gate'
-import { backlog_next, type OptedIn } from './backlog-next'
+import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
+import { backlog_gate_scope, type OptedIn } from './backlog-gate-scope'
+import { backlog_next } from './backlog-next'
 import type { PlanContext } from './backlog-plan'
 import type { GateScope } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
@@ -24,8 +26,8 @@ interface Plan {
 	// past the listing cap. Carrying the *whole* index here instead would move that misreport rather
 	// than remove it: the sentence would name an epic that is withholding nothing.
 	tracked: ReadonlyMap<number, number>
-	// The rows the offer's cap bounds and the paths each issue declares, so `--waves` cuts each
-	// wave where `backlog:next` does.
+	// The rows the offer's cap bounds and the paths each issue declares, so `--waves` separates each
+	// wave as `backlog:next` does — and the lane limit it cuts each wave at.
 	scope: GateScope
 }
 
@@ -40,6 +42,14 @@ interface OpenListing {
 interface PlanRead {
 	plan: Plan
 	listing: OpenListing
+}
+
+// The lane limit a wave is cut at, capped at the port seats as a launch is; `undefined` when the
+// limit cannot be read, so the plan stays drawable and says it is uncapped.
+async function read_wave_limit(): Promise<number | undefined> {
+	const choice = await lane_capacity.lane_limit()
+
+	return choice.kind === 'limit' ? lane_capacity.seated_limit(choice.limit) : undefined
 }
 
 // The same reads and the same classification `backlog:next` makes, through the same two functions.
@@ -61,7 +71,10 @@ async function classify(
 		repo: context.repo,
 		exclude,
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		scope: await backlog_next.gate_scope(context),
+		scope: {
+			...(await backlog_gate_scope.gate_scope(context)),
+			wave_limit: await read_wave_limit(),
+		},
 	}
 }
 
@@ -76,7 +89,7 @@ async function fetch_open(): Promise<OpenListing | undefined> {
 	const read = read_json_listing(json, open_issue_schema)
 
 	if (read.kind !== 'read') return undefined
-	await issue_sample_gate.prime(read.rows.map((row) => row.body))
+	await issue_sample_prime.prime(read.rows.map((row) => row.body))
 
 	return { rows: read.rows, is_capped }
 }

@@ -1,4 +1,5 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { review_attest } from '#scripts/review/review-attest'
 import { describe, expect, it } from 'vitest'
 import { run_ship_review } from './run-ship-review'
 
@@ -6,22 +7,24 @@ import { run_ship_review } from './run-ship-review'
 
 const { VERDICT } = run_ship_review
 const BRIEF = 'stamps/josh-ship-review-brief-x.md'
-const FINDINGS = 'stamps/josh-ship-review-findings-x.txt'
+const CODE_SLOT = review_attest.REVIEW_SLOT.CODE
+const SUBMIT = '`pnpm josh review:submit`'
 const LOW_ONLY = 'tests:low:a.ts'
 const MEDIUM_OPEN = 'bug-risks:medium:a.ts:3'
 const MEDIUM_FIXED = `fixed ${MEDIUM_OPEN}`
 const MEDIUM_KIND = 'bug-risks:medium'
 const MEDIUM_LOCATION = 'a.ts:3'
 const ISSUE = '3875'
+const SPECS = ['bug-risks:medium:b.ts']
 
 describe('run_ship_review.reviewer_prompt', () => {
-	it('is one launch-safe line naming the brief and the findings file', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
+	it('is one launch-safe line naming the brief and the submit command', () => {
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, CODE_SLOT, ISSUE)
 
 		expect(prompt).not.toMatch(/\n/u)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
 		expect(prompt).toContain(BRIEF)
-		expect(prompt).toContain(FINDINGS)
+		expect(prompt).toContain(SUBMIT)
 		expect(prompt).toContain('review:attest')
 	})
 })
@@ -72,10 +75,10 @@ describe('run_ship_review.read_verdict — findings fixed in place', () => {
 	const FIXED_MEDIUM = `${run_ship_review.FIXED_PREFIX}bug-risks:medium:b.ts:9`
 	const LOW_COMMENT = 'comments:low:a.ts'
 
-	it('reads a fixed Medium as fixed, recording it without the mark', () => {
+	it('reads a fixed Medium as fixed, keeping the mark as its disposition', () => {
 		expect(run_ship_review.read_verdict(`${LOW_COMMENT}\n${FIXED_MEDIUM}`)).toStrictEqual({
 			kind: VERDICT.FIXED,
-			specs: [LOW_COMMENT, 'bug-risks:medium:b.ts:9'],
+			specs: [LOW_COMMENT, FIXED_MEDIUM],
 			report: [LOW_COMMENT, FIXED_MEDIUM],
 		})
 	})
@@ -100,8 +103,6 @@ describe('run_ship_review.read_verdict — findings fixed in place', () => {
 })
 
 describe('run_ship_review — the two rounds route differently', () => {
-	const SPECS = ['bug-risks:medium:b.ts']
-
 	it.each([
 		[VERDICT.CLEAN, true],
 		[VERDICT.FIXED, true],
@@ -123,6 +124,44 @@ describe('run_ship_review — the two rounds route differently', () => {
 	})
 })
 
+// joshuafolkken/kit#4673: a fix of only the cited line left the same pattern for round 2 to stop on.
+describe('run_ship_review — every stop that hands findings back asks for the sweep', () => {
+	const BLOCKING = { kind: VERDICT.BLOCKING, specs: SPECS, report: SPECS }
+
+	it.each([
+		['round 1 blocking', run_ship_review.round_one_outcome(BLOCKING).note],
+		['round 1 fixes unverified', run_ship_review.UNVERIFIED_OUTCOME.note],
+		['round 2 blocking', run_ship_review.round_two_outcome(BLOCKING).note],
+	])('%s', (_name, note) => {
+		expect(note).toContain(run_ship_review.SWEEP_INSTRUCTION)
+	})
+
+	it('names the three ranges to search and the record to leave', () => {
+		const sweep = run_ship_review.SWEEP_INSTRUCTION
+
+		expect(sweep).toContain('the same file')
+		expect(sweep).toContain('callers of the same function')
+		expect(sweep).toContain('grep of the pattern')
+		expect(sweep).toContain('Issue fix comment')
+	})
+
+	it.each([
+		['reviewer', run_ship_review.reviewer_prompt],
+		['report', run_ship_review.report_prompt],
+		['verification', run_ship_review.verification_prompt],
+	])('the %s prompt asks a high or medium line for its other sites', (_name, prompt_of) => {
+		expect(prompt_of(BRIEF, CODE_SLOT, ISSUE)).toContain(run_ship_review.OTHER_SITES_CLAUSE)
+	})
+
+	it('leaves a passing round without the sweep', () => {
+		const clean = { kind: VERDICT.CLEAN, specs: [], report: [] }
+
+		expect(run_ship_review.round_one_outcome(clean).note).not.toContain(
+			run_ship_review.SWEEP_INSTRUCTION,
+		)
+	})
+})
+
 // joshuafolkken/kit#3159: a stopped ship's log carried only `<category>:<severity>:<file>`, so the
 // resumed lane child re-derived every finding from the code. The description now rides along.
 describe('run_ship_review.read_verdict — a finding carries its description', () => {
@@ -141,7 +180,7 @@ describe('run_ship_review.read_verdict — a finding carries its description', (
 
 		expect(run_ship_review.read_verdict(text)).toStrictEqual({
 			kind: VERDICT.FIXED,
-			specs: [MEDIUM_OPEN],
+			specs: [`${run_ship_review.FIXED_PREFIX}${MEDIUM_OPEN}`],
 			report: [text],
 		})
 	})
@@ -153,16 +192,16 @@ describe('run_ship_review.read_verdict — a finding carries its description', (
 	})
 
 	it.each([
-		run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE),
-		run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE),
+		run_ship_review.reviewer_prompt(BRIEF, CODE_SLOT, ISSUE),
+		run_ship_review.verification_prompt(BRIEF, CODE_SLOT, ISSUE),
 	])('asks each reviewer for the description after the spec', (prompt) => {
 		expect(prompt).toContain('<category>:<severity>:<file>[:<line>] — <one sentence')
 	})
 
 	// joshuafolkken/kit#3875: a body-only read of the Issue is refused by the issue-comments rule.
 	it.each([
-		run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE),
-		run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE),
+		run_ship_review.reviewer_prompt(BRIEF, CODE_SLOT, ISSUE),
+		run_ship_review.verification_prompt(BRIEF, CODE_SLOT, ISSUE),
 	])('tells each reviewer to read the Issue with its comments', (prompt) => {
 		expect(prompt).toContain(`pnpm josh issue:read ${ISSUE}`)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
@@ -273,7 +312,7 @@ describe('run_ship_review.blocking_details — each finding that stopped a revie
 
 describe('run_ship_review — the two prompts', () => {
 	it('lets round 1 fix a local Medium and asks it to mark what it fixed', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, CODE_SLOT, ISSUE)
 
 		expect(prompt).toContain('Apply a fix only for a Medium finding')
 		expect(prompt).toContain(`"${run_ship_review.FIXED_PREFIX}"`)
@@ -282,19 +321,52 @@ describe('run_ship_review — the two prompts', () => {
 
 	// joshuafolkken/kit#2500: a fix comes back already green on the scoped pair, or not at all.
 	it('asks round 1 to leave its fixes green on the scoped pair, or revert them', () => {
-		const prompt = run_ship_review.reviewer_prompt(BRIEF, FINDINGS, ISSUE)
+		const prompt = run_ship_review.reviewer_prompt(BRIEF, CODE_SLOT, ISSUE)
 
 		expect(prompt).toContain('pnpm josh lint:related && pnpm josh test:related')
 		expect(prompt).toContain('revert a fix you cannot get green')
 	})
 
 	it('keeps round 2 a launch-safe, read-only verification pass', () => {
-		const prompt = run_ship_review.verification_prompt(BRIEF, FINDINGS, ISSUE)
+		const prompt = run_ship_review.verification_prompt(BRIEF, CODE_SLOT, ISSUE)
 
 		expect(prompt).not.toMatch(/\n/u)
 		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
 		expect(prompt).toContain('round-2 verification pass')
 		expect(prompt).toContain('Do not edit any file.')
 		expect(prompt).not.toContain(run_ship_review.FIXED_PREFIX.trim())
+	})
+})
+
+// joshuafolkken/kit#4672: two reviewers fixing, verifying and reverting in one checkout at once race.
+describe('run_ship_review.slot_prompt — one reviewer edits the checkout', () => {
+	const { CODE, INTERACTION } = review_attest.REVIEW_SLOT
+	const BOTH = [CODE, INTERACTION]
+
+	it('keeps the round prompt for the code slot beside the interaction slot', () => {
+		const { reviewer_prompt, slot_prompt } = run_ship_review
+
+		expect(slot_prompt(reviewer_prompt, CODE, BOTH)).toBe(reviewer_prompt)
+	})
+
+	it('makes the interaction slot beside the code slot read only', () => {
+		const prompt_of = run_ship_review.slot_prompt(
+			run_ship_review.reviewer_prompt,
+			INTERACTION,
+			BOTH,
+		)
+		const prompt = prompt_of(BRIEF, CODE_SLOT, ISSUE)
+
+		expect(prompt).not.toMatch(/\n/u)
+		expect(agent_role_profile.is_safe_value(prompt)).toBe(true)
+		expect(prompt).toContain('Do not edit any file')
+		expect(prompt).not.toContain('Apply a fix')
+		expect(prompt).not.toContain(run_ship_review.FIXED_PREFIX.trim())
+	})
+
+	it('lets the interaction slot reviewed alone fix in place', () => {
+		const { reviewer_prompt, slot_prompt } = run_ship_review
+
+		expect(slot_prompt(reviewer_prompt, INTERACTION, [INTERACTION])).toBe(reviewer_prompt)
 	})
 })

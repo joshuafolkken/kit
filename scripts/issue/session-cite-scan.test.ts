@@ -47,19 +47,30 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['propagate/propagate-steps.ts', 1],
 	['review/review-finding-ledger.ts', 1],
 	['run/merge/run-merge-steps.ts', 1],
+	// The causing-lane line a refused filing prints to be pasted into the Issue body, whose shape
+	// `issue-priority.ts` reads with the bare `#N`.
+	['issue/issue-file-lane-hint.ts', 1],
 	// A person reads it on Telegram.
 	['notify/git-notify.ts', 1],
 	['backlog/backlog-drive-idle.ts', 1],
 	['backlog/backlog-drive-paused.ts', 1],
 	['run/merge/run-merge-auth.ts', 1],
+	// The untrusted-author stop's remedy: the Telegram `recommended`, and a report line the session
+	// reads through `session_cite.text`.
+	['run/entry/run-entry-trust.ts', 1],
 	// A program reads it back: the run event stream, a process pattern, a child prompt, a parse key.
 	['backlog/backlog-drive-adopt.ts', 1],
 	['backlog/backlog-drive-cli.ts', 1],
 	['backlog/backlog-drive-epic.ts', 1],
 	['backlog/backlog-drive-named-offer.ts', 1],
+	['backlog/backlog-measure-close.ts', 1],
 	['backlog/backlog-wait-cause.ts', 1],
+	['lane/lane-overrun.ts', 1],
+	['lane/lane-overrun-prompt.ts', 1],
 	['lane/lane-session-broker.ts', 1],
 	['lane/lane-withdraw.ts', 1],
+	['lane/lane-yield.ts', 1],
+	['run/merge/run-merge-usage-limit.ts', 1],
 	// The detached driver's stderr, which the supervisor tails into the hand-off; the read that would
 	// resolve the link is the one that just failed.
 	['backlog/backlog-drive-unread.ts', 1],
@@ -67,6 +78,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['backlog/backlog-plan.ts', 1],
 	['epic/epic-parse.ts', 1],
 	['issue/issue-file-cli.ts', 1],
+	['lane/lane-adopt-cli.ts', 1],
 	['lane/lane-child-invocation.ts', 7],
 	['lane/lane-dispatch.ts', 2],
 	['lane/lane-pause-cli.ts', 2],
@@ -79,11 +91,13 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/board/run-board-now.ts', 1],
 	['run/board/run-board-process-groups.ts', 1],
 	['run/board/run-board-render-notes.ts', 1],
-	['run/cut/run-cut-cli.ts', 2],
+	['run/cut/run-cut-cli.ts', 1],
 	['run/cut/run-cut-report.ts', 1],
+	['run/cut/run-cut-resume.ts', 1],
 	['run/entry/run-entry-stop.ts', 4],
 	['run/event/run-event-checks.ts', 1],
 	['run/event/run-event-filed.ts', 1],
+	['run/event/run-event-overrun.ts', 7],
 	['run/event/run-event-plan.ts', 1],
 	['run/event/run-event-scope.ts', 1],
 	['run/event/run-event-setup.ts', 3],
@@ -95,8 +109,12 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.
 	['run/pause/run-pause.ts', 5],
 	['run/ship/run-ship-detach.ts', 1],
+	// The handover note on the run event stream, which `run:board` attributes by its `#<N>`.
+	['run/ship/run-ship-handover.ts', 1],
 	// The ship-stop cap's Telegram warning.
 	['run/ship/run-ship-relaunch-cap.ts', 1],
+	// The `relaunch-failed` event `run:merge` reads.
+	['run/ship/run-ship-return.ts', 1],
 	// The reviewer child's prompt, which an agent reads.
 	['run/ship/run-ship-review.ts', 1],
 	['run/ship/run-ship-stage.ts', 1],
@@ -114,6 +132,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['epic/epic-triage.ts', 1],
 	['issue/defect-origin.ts', 2],
 	['issue/defect-report-format.ts', 1],
+	// The audit row `effect-audit-cli.ts` prints through `session_cite.text`, the token a follow-up's
+	// body is matched on, and the retirement-candidate draft written to a file.
+	['issue/effect-audit.ts', 1],
 	// The hand-off report body, which `run-report-cli.ts` links before printing and sending.
 	['run/run-report-handoff.ts', 1],
 	['run/run-stage.ts', 2],

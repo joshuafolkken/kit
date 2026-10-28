@@ -10,7 +10,7 @@ import { test_read_trace } from './test-read-trace'
 // map it cannot trust must read as no map at all, which runs the whole suite.
 
 vi.mock('#scripts/git/git-common-directory', () => ({
-	git_common_directory: { repository: vi.fn() },
+	git_common_directory: { STATE_DIRECTORY: 'josh', repository: vi.fn() },
 }))
 
 const mocked_common = vi.mocked(git_common_directory.repository)
@@ -18,7 +18,7 @@ const mocked_common = vi.mocked(git_common_directory.repository)
 const ROOT = path.resolve('/repo')
 const DOCUMENT = path.join('docs', 'a.md')
 const NESTED_DOCUMENT = path.join('docs', 'guide', 'b.md')
-const DEEP_DOCUMENT = path.join('.josh', 'observations', 'c.md')
+const DEEP_DOCUMENT = path.join('prompts', 'sub', 'c.md')
 const READER = 'reader.ts'
 const WALKER = 'walker.ts'
 const LISTER = 'lister.ts'
@@ -34,13 +34,8 @@ const MAP: ReadMap = {
 	version: test_read_map.MAP_VERSION,
 	commit: 'abc',
 	dirty: { [DIRTY]: DIGEST_THEN },
-	directories: [
-		'.josh',
-		path.dirname(DEEP_DOCUMENT),
-		'docs',
-		path.join('docs', 'guide'),
-		'prompts',
-	],
+	change: [DIRTY],
+	directories: [path.dirname(DEEP_DOCUMENT), 'docs', path.join('docs', 'guide'), 'prompts'],
 	readers: {
 		[DOCUMENT]: [READER],
 		[test_read_trace.read_key('docs', 'walk')]: [WALKER],
@@ -97,6 +92,7 @@ describe('test_read_map.parse_map', () => {
 		['no commit', JSON.stringify({ ...MAP, commit: undefined })],
 		['a dirty list without digests', JSON.stringify({ ...MAP, dirty: [DIRTY] })],
 		['a dirty digest that is not a string', JSON.stringify({ ...MAP, dirty: { [DIRTY]: 1 } })],
+		['no change list', JSON.stringify({ ...MAP, change: undefined })],
 	])('reads %s as no map', (_case, text) => {
 		expect(test_read_map.parse_map(text)).toBeUndefined()
 	})
@@ -184,8 +180,89 @@ describe('test_read_map.in_unread_directory', () => {
 		expect(test_read_map.in_unread_directory(MAP, path.join('docs', 'x.md'))).toBe(false)
 	})
 
-	it('rejects a directory the recorded tree did not hold', () => {
-		expect(test_read_map.in_unread_directory(MAP, path.join('scratch', 'x.md'))).toBe(false)
+	// joshuafolkken/kit#4597: a branch's `.josh/metrics-accepted/<N>.json` lands in a directory the
+	// release pruned from the recorded tree.
+	it('holds a file added to a directory new since the recording nothing inside was read from', () => {
+		expect(test_read_map.in_unread_directory(MAP, path.join('scratch', 'x.md'))).toBe(true)
+	})
+
+	it('rejects a directory new since the recording a test read a path inside', () => {
+		const map = { ...MAP, readers: { [path.join('scratch', 'y.md')]: [READER] } }
+
+		expect(test_read_map.in_unread_directory(map, path.join('scratch', 'x.md'))).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4734: a test reading the recording checkout's change through git read that lane's
+// own approval, so the next lane's approval beside it ran the whole suite. The approval is committed
+// on the recording branch, so `dirty` (the change since HEAD) does not hold it and `change` does. A
+// run record under `.josh/` now reaches only a read of itself (joshuafolkken/kit#5001), so the rule is
+// held here on a directory outside it.
+describe('test_read_map.in_unread_directory — a read of the recording tree’s change', () => {
+	const APPROVALS = path.join('docs', 'approvals')
+	const RECORDED_APPROVAL = path.join(APPROVALS, '4714.json')
+	const NEW_APPROVAL = path.join(APPROVALS, '4734.json')
+	const RECORDED: ReadMap = {
+		...MAP,
+		dirty: {},
+		change: [RECORDED_APPROVAL],
+		readers: { [RECORDED_APPROVAL]: [READER] },
+	}
+
+	it('holds a file added there', () => {
+		expect(test_read_map.in_unread_directory(RECORDED, NEW_APPROVAL)).toBe(true)
+	})
+
+	it('rejects it once a test also listed it', () => {
+		const listing = test_read_trace.read_key(APPROVALS, 'listing')
+		const map = { ...RECORDED, readers: { ...RECORDED.readers, [listing]: [LISTER] } }
+
+		expect(test_read_map.in_unread_directory(map, NEW_APPROVAL)).toBe(false)
+	})
+
+	it('rejects it once a test also read a file there the tree did not change', () => {
+		const held = path.join(APPROVALS, '4593.json')
+		const map = { ...RECORDED, readers: { ...RECORDED.readers, [held]: [READER] } }
+
+		expect(test_read_map.in_unread_directory(map, NEW_APPROVAL)).toBe(false)
+	})
+
+	it('still names the test that read the changed file as its reader', () => {
+		expect(test_read_map.readers_of(RECORDED, RECORDED_APPROVAL)).toEqual([READER])
+	})
+})
+
+// joshuafolkken/kit#5001: an observation or an accepted-metrics file a lane writes after its checks went
+// green ran every test that listed or walked the root or `.josh/`.
+describe('test_read_map — a run record under .josh/', () => {
+	const ACCEPTED = path.join('.josh', 'metrics-accepted')
+	const RECORD = path.join(ACCEPTED, '5001.json')
+	const SIBLING = path.join(ACCEPTED, '4986.json')
+	const WIDE: ReadMap = {
+		...MAP,
+		readers: {
+			[test_read_trace.read_key(ROOT_ENTRY, 'walk')]: [ROOT_WALKER],
+			[test_read_trace.read_key(ROOT_ENTRY, 'listing')]: [ROOT_LISTER],
+			[test_read_trace.read_key('.josh', 'walk')]: [WALKER],
+			[test_read_trace.read_key(path.dirname(RECORD), 'listing')]: [LISTER],
+			[SIBLING]: [READER],
+		},
+	}
+
+	it('reaches no test through a walk or a listing above it', () => {
+		expect(test_read_map.readers_of(WIDE, RECORD)).toEqual([])
+	})
+
+	it('reaches the test that read it by name', () => {
+		expect(test_read_map.readers_of(WIDE, SIBLING)).toEqual([READER])
+	})
+
+	it('lands where no test reads, whatever was listed or read beside it', () => {
+		expect(test_read_map.in_unread_directory(WIDE, RECORD)).toBe(true)
+	})
+
+	it('still reaches a file outside .josh/ through the walk of the root', () => {
+		expect(test_read_map.readers_of(WIDE, DOCUMENT)).toEqual([ROOT_WALKER])
 	})
 })
 

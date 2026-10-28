@@ -60,27 +60,21 @@ function offer(world_state: World, state: DriveState): OfferRead {
 	}
 }
 
-function merge(world_state: World, issue: string): void {
+function merge(world_state: World, issue: string): Awaited<ReturnType<LoopPorts['merge']>> {
 	world_state.calls.push(`merge ${issue}`)
 	world_state.backlog = world_state.backlog.filter((item) => item !== issue)
-	if (world_state.parked.has(issue)) return
+	const is_parked = world_state.parked.has(issue)
 
-	world_state.merged += 1
+	if (!is_parked) world_state.merged += 1
+
+	return { token: 'none', is_offer: true, outcome: is_parked ? 'parked' : 'merged' }
 }
 
 function ports(world_state: World): LoopPorts {
 	return {
 		is_finished: () => true,
 		adoptable: async () => [],
-		merge: async (issue) => {
-			merge(world_state, issue)
-
-			return {
-				token: 'none',
-				is_offer: true,
-				outcome: world_state.parked.has(issue) ? 'parked' : 'merged',
-			}
-		},
+		merge: async (issue) => merge(world_state, issue),
 		offer: async (state) => offer(world_state, state),
 		launch: async (issue) => {
 			world_state.calls.push(`launch ${issue}`)
@@ -92,6 +86,7 @@ function ports(world_state: World): LoopPorts {
 		has_lane: async () => false,
 		judgement_owed: async () => 0,
 		memory_held: async () => false,
+		usage_limited: async () => false,
 		hold: async () => undefined,
 		idle: async () => undefined,
 		paused: async () => undefined,

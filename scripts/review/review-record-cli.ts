@@ -1,16 +1,24 @@
-import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { review_comment_round } from './review-comment-round'
+import type { StopFinding } from '#scripts/run/ship/run-ship-review'
+import { review_comment_carry } from './review-comment-carry'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
+import { review_finding_text } from './review-finding-text'
 import { review_interaction } from './review-interaction'
+import { review_lane_handover } from './review-lane-handover'
 import { review_record, type RecordVerdict } from './review-record'
+import { review_record_code_round } from './review-record-code-round'
+import { review_record_comment } from './review-record-comment'
+import { review_record_interaction } from './review-record-interaction'
+import type { ReuseAnswer } from './review-round-reuse'
+import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
-// `/code-review` round's findings. It appends a `- rf:` line per finding to
+// `/code-review` round's findings. It appends a `- rb:` round boundary and a `- rf:` line per finding to
 // the issue's own file of the observation ledger, which the run's commit carries like any other
-// ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
+// ledger change. **A call with no findings is a zero-finding round, and it still writes one `- rf:` line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
 // **`--comment` records a round that ran after the pull request opened**: the same lines go to the
@@ -21,26 +29,50 @@ import { review_record, type RecordVerdict } from './review-record'
 //
 // `josh review:record --check --issue <N>` is the read half `pnpm josh followup` runs before it
 // merges: `ok` / `not-required` exit zero, `missing` exits non-zero so the
-// merge is refused until the round is recorded. It mirrors `josh review:attest --check`.
+// merge is refused until the round is recorded. It mirrors `josh review:attest --check`. A recorded
+// code round adds whether the ship reuses it (`review-round-reuse.ts`); the exit code does not change.
 //
 // **`--interaction` records and checks the interaction review's pass instead** (`review-interaction.ts`):
 // the same grammar under `- ri:`. It takes no `--comment` — the pass runs before the pull request, and
 // a pass kept only on the issue would leave the merge gate reading it as missing.
+//
+// **A finding written with its reason — `<spec> — <sentence>` — also lands in the durable stop log**,
+// marked fixed (joshuafolkken/kit#4817). The ledger keeps the spec alone, as it always has; the stop
+// log is the one record that keeps a finding's location and reason, so a lane's own round reaches the
+// next stop's fix and the next review (`review-prior-findings.ts`) the way a ship's round already does.
 
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh review:record --issue <N> [--comment | --interaction] [<category>:<severity>:<file> ...] | josh review:record --check [--interaction] --issue <N>'
+	'Usage: josh review:record --issue <N> [--comment | --interaction] [[<disposition> ]<category>:<severity>:<file>[ — <reason>] ...] | josh review:record --check [--interaction] --issue <N>'
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
+const DISPOSITION_HINT =
+	'  <disposition>: optional — fixed | false-positive | filed:#<M> | deferred:#<M>; josh review:round2 skips only when every High/Medium is fixed or false-positive'
+const REASON_HINT =
+	'  <reason>: optional, one sentence on what was wrong, kept for the lane’s next review and fix — pass each finding with its reason as one single-quoted argument'
+const RECORD_STAGE = 'review:record'
 const CHECK_USAGE = 'Usage: josh review:record --check [--interaction] --issue <N>'
 const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledger.'
+const REUSED_LINE =
+	'Reused: josh ship takes this round as its round 1 — the files this round covers hold still since the record. A default branch the ship’s sync merges in moves them only where it changed a file this round covers, and the ship then reviews round 1 again itself.'
+const DELTA_LINE =
+	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every file moved since the record is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
+
+// The condition that re-runs round 1, and the path that met it, named rather than listed among every
+// condition that could (joshuafolkken/kit#4941).
+function review_again_line(cause = 'the reuse question gave no reason'): string {
+	return `Not reused: josh ship reviews round 1 again — ${cause}. Run \`pnpm josh run:review\` and the round-1 \`/code-review\` here (chain-rule.md step 0).`
+}
+
+function reuse_line(answer: ReuseAnswer): string {
+	if (answer.reuse === 'again') return review_again_line(answer.cause)
+
+	return answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+}
+
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const INTERACTION_NOT_REQUIRED_LINE =
-	'No interaction review is due: the change touches no run tooling, or this checkout keeps no ledger.'
-const CARRIED_LINE =
-	'review-finding line(s) recorded on closed issues after their pull requests opened into the ledger.'
-const CARRY_FAILED_LINE =
-	'Could not carry the closed issues’ comment rounds into the ledger; the next round retries:'
+const LANE_CARRY_LINE =
+	'Not carrying the closed issues’ comment rounds: a lane child leaves them to `pnpm josh observations:flush`.'
 const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
@@ -83,15 +115,31 @@ function parse_finding(spec: string): Finding | undefined {
 	return to_finding(spec.slice(0, first), spec.slice(first + 1, second), spec.slice(second + 1))
 }
 
-function parse_findings(specs: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
+interface Positional {
+	finding: Finding
+	description: string
+}
+
+// A positional is `[<disposition> ]<spec>[ — <reason>]`; the disposition rides into the ledger line.
+function parse_positional(positional: string): Positional | undefined {
+	const { spec: marked, description } = review_finding_text.split_description(positional)
+	const { disposition, spec } = review_finding_ledger.split_disposition(marked)
+	const finding = parse_finding(spec)
+
+	if (finding === undefined) return undefined
+
+	return { finding: disposition === undefined ? finding : { ...finding, disposition }, description }
+}
+
+function parse_findings(positionals: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
 	const findings: Array<Finding> = []
 
-	for (const spec of specs) {
-		const finding = parse_finding(spec)
+	for (const positional of positionals) {
+		const parsed = parse_positional(positional)
 
-		if (finding === undefined) return undefined
+		if (parsed === undefined) return undefined
 
-		findings.push(finding)
+		findings.push(parsed.finding)
 	}
 
 	return findings
@@ -133,6 +181,8 @@ function usage_text(): string {
 		accepted_values('<category>', review_finding_ledger.CATEGORIES),
 		accepted_values('<severity>', review_finding_ledger.SEVERITIES),
 		FILE_HINT,
+		DISPOSITION_HINT,
+		REASON_HINT,
 	].join('\n')
 }
 
@@ -158,8 +208,23 @@ type CheckStatus = RecordVerdict['status']
 
 interface CheckMode {
 	status: (issue: number, root: string) => Promise<CheckStatus>
+	recorded: (issue: number) => Promise<string>
 	refusal: (issue: number) => string
 	not_required: string
+}
+
+// **A recorded code round also says whether `josh ship` reuses it** (joshuafolkken/kit#4763), from the
+// ship's own predicate, in the ship's three outcomes (joshuafolkken/kit#4878): reused as it stands,
+// reused with the moved files left to round 2, or reviewed again — so the lane runs it itself rather
+// than reading "recorded" as "done".
+async function code_recorded(issue: number): Promise<string> {
+	const answer = await review_lane_handover.answer_here(issue)
+
+	return [RECORDED_LINE, reuse_line(answer)].join('\n')
+}
+
+async function interaction_recorded(): Promise<string> {
+	return RECORDED_LINE
 }
 
 async function code_status(issue: number, root: string): Promise<CheckStatus> {
@@ -172,13 +237,15 @@ async function code_status(issue: number, root: string): Promise<CheckStatus> {
 const CHECK_MODES: Record<LineKind, CheckMode> = {
 	code: {
 		status: code_status,
+		recorded: code_recorded,
 		refusal: review_record.refusal_message,
 		not_required: NOT_REQUIRED_LINE,
 	},
 	interaction: {
 		status: review_interaction.status,
+		recorded: interaction_recorded,
 		refusal: review_interaction.refusal_message,
-		not_required: INTERACTION_NOT_REQUIRED_LINE,
+		not_required: review_record_interaction.NOT_REQUIRED_LINE,
 	},
 }
 
@@ -195,7 +262,7 @@ async function report_check(issue: number, mode: CheckMode, root: string): Promi
 		return FAILURE_EXIT_CODE
 	}
 
-	console.info(status === 'ok' ? RECORDED_LINE : mode.not_required)
+	console.info(status === 'ok' ? await mode.recorded(issue) : mode.not_required)
 
 	return 0
 }
@@ -212,52 +279,107 @@ async function run_check(parsed: Parsed, root: string): Promise<number> {
 	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
-// **A comment that could not be posted fails the record**: it is the round's only copy, so a
-// swallowed refusal would read as a recorded round that exists nowhere.
-async function post_comment(issue: number, lines: ReadonlyArray<string>): Promise<number> {
-	try {
-		const url = await git_gh_issue_write.issue_comment(
-			String(issue),
-			review_comment_round.body_of(lines),
-		)
-
-		console.info(`Recorded ${String(lines.length)} review-finding line(s) in ${url.trim()}.`)
-
-		return 0
-	} catch (error) {
-		console.error(error instanceof Error ? error.message : String(error))
-
-		return FAILURE_EXIT_CODE
-	}
-}
-
-// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`). **A carry
-// that fails never fails the record**: this round is recorded, and the comment rounds wait for the
-// next run's.
+// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`) — **except in a
+// lane child** (joshuafolkken/kit#5326): parallel lanes each wrote the same newly closed issue's file,
+// so their ships waited on each other's overlap and their merges with main conflicted on it.
+// `observations:flush` carries them for the lanes, on the default branch, in one pull request.
 async function carry_comment_rounds(root: string): Promise<void> {
-	try {
-		const count = await review_comment_round.carry(root)
+	if (lane_child_marker.is_child_of(root)) {
+		console.info(LANE_CARRY_LINE)
 
-		if (count > 0) console.info(`Carried ${String(count)} ${CARRIED_LINE}`)
-	} catch (error) {
-		console.warn(`${CARRY_FAILED_LINE} ${error instanceof Error ? error.message : String(error)}`)
+		return
 	}
+
+	await review_comment_carry.carry_reported(root)
 }
 
 // The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
-async function append_round(
-	issue: number,
-	lines: ReadonlyArray<string>,
-	root: string,
-): Promise<number> {
+interface AppendedRound {
+	issue: number
+	lines: ReadonlyArray<string>
+	root: string
+	kind: LineKind
+	findings: ReadonlyArray<Finding>
+	date: string
+}
+
+// A code round opens with its boundary line (`review-finding-ledger.ts`), not counted as a finding line.
+function ledger_lines({ issue, lines, kind, date }: AppendedRound): ReadonlyArray<string> {
+	if (kind === 'interaction') return lines
+
+	return [review_finding_ledger.round_line(date, issue), ...lines]
+}
+
+// A code round goes on to what its tree means for the ship (`review-record-code-round.ts`).
+async function append_round(round: AppendedRound): Promise<number> {
+	const { issue, lines, root, kind, findings } = round
 	const ledger_path = observation_ledger_home.issue_path(issue, root)
 
-	await observation_ledger_home.append(ledger_path, lines)
+	await observation_ledger_home.append(ledger_path, ledger_lines(round))
 	console.info(confirmation(lines.length, ledger_path))
 	await carry_comment_rounds(root)
 
+	if (kind === 'code') await review_record_code_round.follow(issue, root, findings)
+
 	return 0
+}
+
+// A code round recorded after the push goes to the issue unasked (`review-record-comment.ts`).
+async function write_round(
+	parsed: Parsed,
+	request: Request,
+	now: Date,
+	root: string,
+): Promise<number> {
+	const kind = kind_of(parsed)
+	const date = observation_ledger_home.ledger_date(now)
+	const lines = build_lines(request, date, kind)
+	const { issue, findings } = request
+
+	if (parsed.comment) return await review_record_comment.post(issue, lines)
+
+	if (kind === 'code' && (await review_record_comment.is_after_push())) {
+		return await review_record_comment.post_after_push({ issue, lines, root, findings })
+	}
+
+	return await append_round({
+		issue: request.issue,
+		lines,
+		root,
+		kind,
+		findings: request.findings,
+		date,
+	})
+}
+
+// The stop-log finding a positional carries, or `undefined` for one written without a reason.
+function reason_of(positional: string): StopFinding | undefined {
+	const parsed = parse_positional(positional)
+
+	if (parsed === undefined || parsed.description.length === 0) return undefined
+
+	const { finding, description } = parsed
+
+	return {
+		kind: `${finding.category}:${finding.severity}`,
+		location: finding.file,
+		sentence: review_finding_text.first_sentence(description),
+	}
+}
+
+function is_reason(finding: StopFinding | undefined): finding is StopFinding {
+	return finding !== undefined
+}
+
+// Recorded only once the round itself is, so the stop log never holds a round the ledger refused.
+function record_reasons(issue: number, positionals: ReadonlyArray<string>): void {
+	review_stop_log.record({
+		issue,
+		stage: RECORD_STAGE,
+		findings: positionals.map((positional) => reason_of(positional)).filter(is_reason),
+		is_fixed: true,
+	})
 }
 
 async function run_record(parsed: Parsed, now: Date, root: string): Promise<number> {
@@ -269,11 +391,11 @@ async function run_record(parsed: Parsed, now: Date, root: string): Promise<numb
 		return FAILURE_EXIT_CODE
 	}
 
-	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind_of(parsed))
+	const code = await write_round(parsed, request, now, root)
 
-	if (parsed.comment) return await post_comment(request.issue, lines)
+	if (code === 0) record_reasons(request.issue, parsed.positionals)
 
-	return await append_round(request.issue, lines, root)
+	return code
 }
 
 // **The default is the work tree the command runs in, a lane's inside a lane**.
@@ -301,6 +423,7 @@ const review_record_cli = {
 	accepted_values,
 	build_lines,
 	parse_finding,
+	parse_positional,
 	run,
 	usage_text,
 }

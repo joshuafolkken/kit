@@ -146,6 +146,30 @@ describe('run_event_stream.read_last — the degenerate read', () => {
 	})
 })
 
+const STOPPED_TEXT = '#7 ship stopped at gate'
+
+// joshuafolkken/kit#4765: the stop stays the position `run:step` answers.
+describe('run_event_stream.read_last — a failed relaunch', () => {
+	it('skips a failed relaunch so the ship stop stays the position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STOP, STOPPED_TEXT, AT)
+		run_event_stream.append(target, KIND.RELAUNCH_FAILED, '#7 could not be relaunched: x', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.SHIP_STOP)
+	})
+
+	// joshuafolkken/kit#5032: the sampler's sleep lands while a lane stands at its stop.
+	it('skips a host sleep so the ship stop stays the position', () => {
+		const target = fresh_target()
+
+		run_event_stream.append(target, KIND.SHIP_STOP, STOPPED_TEXT, AT)
+		run_event_stream.append(target, KIND.SLEEP, 'host slept 30.0 min', AT)
+
+		expect(run_event_stream.read_last(target)?.kind).toBe(KIND.SHIP_STOP)
+	})
+})
+
 // joshuafolkken/kit#2464: the stall episode ends at a dispatch, not at the next event of any kind.
 function events_of(kinds: ReadonlyArray<string>): ReadonlyArray<RunEvent> {
 	return kinds.map((kind, index) => ({ pos: index + 1, at: AT, kind, text: kind }))

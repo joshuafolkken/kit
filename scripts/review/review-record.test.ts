@@ -10,6 +10,7 @@ import { review_record } from './review-record'
 const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-check-'))
 const ISSUE = 2343
 const NONE_LINE = '- rf:none | none | - | 2026-09-22 | #2343\n'
+const OTHER_ISSUE_LINE = '- rf:tests | low | a.ts | 2026-09-22 | #1\n'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -18,6 +19,14 @@ afterEach(() => {
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
 })
+
+async function no_comment_lines(): Promise<ReadonlyArray<string>> {
+	return []
+}
+
+async function unread_comments(): Promise<ReadonlyArray<string>> {
+	throw new Error('Could not read the comments of #2343')
+}
 
 // A checkout whose ledger holds `content` in the given issue's file.
 function root_with(name: string, file_issue: number, content: string): string {
@@ -51,9 +60,12 @@ describe('review_record.check', () => {
 	})
 
 	it('is `missing` when the ledger carries no line for the issue', async () => {
-		const root = root_with('other-issue', 1, '- rf:tests | low | a.ts | 2026-09-22 | #1\n')
+		const root = root_with('other-issue', 1, OTHER_ISSUE_LINE)
 
-		expect(await review_record.check(ISSUE, root)).toEqual({ status: 'missing', issue: ISSUE })
+		expect(await review_record.check(ISSUE, root, no_comment_lines)).toEqual({
+			status: 'missing',
+			issue: ISSUE,
+		})
 	})
 
 	it('is `not-required` when the checkout keeps no ledger', async () => {
@@ -68,6 +80,27 @@ describe('review_record.check', () => {
 
 		expect(await review_record.check(ISSUE)).toEqual({ status: 'ok', issue: ISSUE })
 		expect(spy).toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4907: a round recorded after the push sits in an issue comment.
+describe('review_record.check — comment rounds', () => {
+	it('is `ok` when the round sits in the issue’s comment rounds instead', async () => {
+		const root = root_with('comment-round', 1, OTHER_ISSUE_LINE)
+
+		expect(await review_record.check(ISSUE, root, async () => [NONE_LINE.trim()])).toEqual({
+			status: 'ok',
+			issue: ISSUE,
+		})
+	})
+
+	it('is `missing` when the issue’s comments could not be read', async () => {
+		const root = root_with('unread-comments', 1, OTHER_ISSUE_LINE)
+
+		expect(await review_record.check(ISSUE, root, unread_comments)).toEqual({
+			status: 'missing',
+			issue: ISSUE,
+		})
 	})
 })
 

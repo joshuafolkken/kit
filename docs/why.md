@@ -34,7 +34,7 @@ And because kit is a package, `josh sync` brings every project up to the latest 
 
 #### What kit does
 
-**Dangerous operations are physically blocked by deny rules**: force push, branch deletion, index operations including `git add`, `git reset`, PR merges, `rm -rf`, `sudo`. Shared-state changes nobody asked for simply cannot run.
+**Deny rules refuse the habitual form of dangerous operations**: force push, branch deletion, index operations including `git add`, `git reset`, PR merges, `rm -rf`, `sudo`. They are a guardrail, not a sandbox — they match the start of a command, so another spelling gets through ([what that means for you](./init.md#claude-code-permission-mode)).
 
 On top of that, a workflow never starts unless you type its keyword. A conversational request like "clear the backlog" or "implement this" does not start one — and the agent is forbidden from asking "shall I run it?", because a yes to that question would be a back door. If you want it to run, you type the keyword.
 
@@ -261,7 +261,7 @@ If you read this far thinking "I built something like this in my own repository"
 
 Update kit and the sync command brings the project along. The same keyword works the same way in every project. (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
 
-For scale: there are 178 `josh` commands, and **118 of them are meant to be run by the agent**, not by a person. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+For scale: there are 193 `josh` commands, and **127 of them are meant to be run by the agent**, not by a person. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
 
 ## What to know up front
 

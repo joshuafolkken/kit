@@ -21,7 +21,8 @@ pnpm josh issue:fold-existing assessment.json --json > result.json
 jq -e '.verdict == "fold"' result.json
 jq '{body: .body}' result.json > patch.json
 gh api -X PATCH repos/{owner}/{repo}/issues/<N> --input patch.json
+pnpm josh issue:priority <N>
 pnpm josh issue:read <N>
 ```
 
-Re-read it and confirm the original requirements, the decisions recorded in comments, the added requirements and the verification all remain. A failed write or re-read means the fold is not complete. A fold never creates a new Issue. `separate` returns to the ordinary filing path, and `inspect` re-reads the missing information.
+A body edit applies no label: `pnpm josh issue:priority <N>` applies the body's floor (`issue-template.md` → F). Re-read it and confirm the original requirements, the decisions recorded in comments, the added requirements and the verification all remain. A failed write or re-read means the fold is not complete. A fold never creates a new Issue. `separate` returns to the ordinary filing path, and `inspect` re-reads the missing information.

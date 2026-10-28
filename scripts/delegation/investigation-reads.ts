@@ -2,16 +2,19 @@ import path from 'node:path'
 import { cost_blocks } from '#scripts/cost-runtime/cost-blocks'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { capped_print_part } from '#scripts/document/capped-print-part'
+import { changed_paths_sync } from '#scripts/git/changed-paths-sync'
 import { hook_decision, type GuardRun } from '#scripts/josh/hook-decision'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_bundle_call } from '#scripts/time-runtime/time-bundle-call'
+import { time_search_call } from '#scripts/time-runtime/time-search-call'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 import { delegation_policy } from './delegation-policy'
 
 // How many files a run has read and not edited since its last delegated unit, counted off the
 // transcript rather than left to the agent's memory, so the threshold fires again on a second
-// accumulation. A delegation clears the set; a read adds to it; an edit exempts its file.
+// accumulation. A delegation clears the set; a read adds to it; an edit exempts its file, as does
+// the branch's own change since its merge base, which an earlier session of the run wrote.
 
 const READ_TOOLS: ReadonlySet<string> = new Set(['Read'])
 // Both spellings of the subagent tool are in use: `Task` (published) and `Agent` (this harness).
@@ -32,12 +35,6 @@ const CONTENT_READ_LABELS: ReadonlySet<string> = new Set(
 	CONTENT_READ_COMMANDS.map((command) => time_shell.bash_label(command)),
 )
 
-// A search carries no file text but costs a turn, so searches count in turns: parallel ones count once.
-const SEARCH_COMMANDS: ReadonlyArray<string> = ['fd', 'find', 'grep', 'rg']
-const SEARCH_LABELS: ReadonlySet<string> = new Set(
-	SEARCH_COMMANDS.map((command) => time_shell.bash_label(command)),
-)
-
 const { INVESTIGATOR_AGENT } = delegation_policy
 
 // The deny reason is the only text that reaches the model, so it names the count, command and return shape.
@@ -55,7 +52,8 @@ interface ReadTally {
 	// The search-side `pending` / `pending_since`, reset by a delegation or a successful write.
 	searches: number
 	searches_since: number
-	// Files successfully edited in the window; a read of one stays in the main line, so it never counts.
+	// Files successfully edited in the window or changed on the branch; a read of one stays in the main
+	// line, so it never counts.
 	edited: ReadonlySet<string>
 }
 
@@ -187,10 +185,6 @@ interface Accumulation {
 	searches: Map<string, number>
 }
 
-function is_read_only_search(span: Span): boolean {
-	return SEARCH_LABELS.has(span.label) && span.is_bundleable && !span.may_write
-}
-
 // A span with no message id is a turn of its own, as in every other turn counter.
 function search_turn_key(searches: ReadonlyMap<string, number>, span: Span): string {
 	if (span.message_id !== time_spans.NO_MESSAGE_ID) return span.message_id
@@ -209,18 +203,26 @@ function apply_search(searches: Map<string, number>, span: Span): void {
 
 	const turn = search_turn_key(searches, span)
 
-	if (is_read_only_search(span) && !searches.has(turn)) searches.set(turn, span.ended_ms)
+	// A search carries no file text but costs a turn, so searches count in turns: parallel ones count once.
+	if (time_search_call.is_read_only_search(span) && !searches.has(turn)) {
+		searches.set(turn, span.ended_ms)
+	}
+}
+
+// A refused dispatch (`investigator-foreground`, `agent-model`) ran no unit, so it resets nothing.
+function is_delegation(span: Span): boolean {
+	return DELEGATION_TOOLS.has(span.label) && !is_failed_outcome(span)
 }
 
 function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<string>): void {
-	if (DELEGATION_TOOLS.has(span.label)) {
+	if (is_failed_outcome(span)) return
+
+	if (is_delegation(span)) {
 		accumulation.pending.clear()
 		accumulation.searches.clear()
 
 		return
 	}
-
-	if (is_failed_outcome(span)) return
 
 	apply_search(accumulation.searches, span)
 
@@ -232,7 +234,7 @@ function apply_span(accumulation: Accumulation, span: Span, edited: ReadonlySet<
 }
 
 function last_delegation_ms(spans: ReadonlyArray<Span>): number {
-	return delegation_instant(spans.findLast((span) => DELEGATION_TOOLS.has(span.label)))
+	return delegation_instant(spans.findLast((span) => is_delegation(span)))
 }
 
 // The window is the tail the hook read; the set clears at every delegation, so the tail suffices.
@@ -240,9 +242,15 @@ function pending_after(pending: ReadonlyMap<string, number>, since_ms: number): 
 	return [...pending.values()].filter((at_ms) => at_ms > since_ms).length
 }
 
-function tally_of(text: string, since_ms: number = hook_decision.NEVER_MS): ReadTally {
+// `branch_files` (repository-relative) are the branch's own change since its merge base: an earlier
+// session of this run wrote them, and a resumed session's transcript holds none of those writes.
+function tally_of(
+	text: string,
+	since_ms: number = hook_decision.NEVER_MS,
+	branch_files: ReadonlyArray<string> = [],
+): ReadTally {
 	const { spans, started_ms } = time_spans.parse_timeline(text)
-	const edited = edited_files(spans)
+	const edited = new Set([...edited_files(spans), ...subject_targets(branch_files)])
 	const accumulation: Accumulation = { pending: new Map(), searches: new Map() }
 
 	for (const span of spans) apply_span(accumulation, span, edited)
@@ -313,7 +321,9 @@ function is_read_only_command(call: GuardedCall, labels: ReadonlySet<string>): b
 
 // A search is refusable without a subject target: a bare-directory sweep is what this count is for.
 function is_search_call(call: GuardedCall): boolean {
-	return is_read_only_command(call, SEARCH_LABELS)
+	return time_search_call.is_read_only_search(
+		time_spans.to_tool_call(call.name, call.input, time_spans.NO_MESSAGE_ID),
+	)
 }
 
 // This guard counts reading, so a `Bash` line that also writes is never refused, and neither is a call
@@ -335,6 +345,20 @@ function is_growing_past_threshold(tally: ReadTally, call: GuardedCall): boolean
 	return projected_count(tally.pending, call, tally.edited) > tally.pending.length
 }
 
+function is_blocking(tally: ReadTally, call: GuardedCall, refused_at_ms: number): boolean {
+	return is_growing_past_threshold(tally, call) && is_rearmed(tally, refused_at_ms)
+}
+
+// The branch diff is a git read, so it is asked only of a call the transcript alone would refuse; more
+// edited files can only lower the counts, so a call that passes without it passes with it.
+function is_blocking_past_branch(text: string, call: GuardedCall, refused_at_ms: number): boolean {
+	if (!is_blocking(tally_of(text, refused_at_ms), call, refused_at_ms)) return false
+
+	const branch_files = changed_paths_sync.read_changed_paths()
+
+	return is_blocking(tally_of(text, refused_at_ms, branch_files), call, refused_at_ms)
+}
+
 function should_block(
 	text: string,
 	call: GuardedCall,
@@ -344,9 +368,7 @@ function should_block(
 	// A delegated unit is never refused: the remedy — send the reading to a unit — does not exist inside one.
 	if (!is_refusable_call(call) || is_unit_run(run)) return false
 
-	const tally = tally_of(text, refused_at_ms)
-
-	return is_growing_past_threshold(tally, call) && is_rearmed(tally, refused_at_ms)
+	return is_blocking_past_branch(text, call, refused_at_ms)
 }
 
 const investigation_reads = {

@@ -1,6 +1,7 @@
 import path from 'node:path'
+import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
-import { test_declared_logic } from './test-declared-logic'
+import { pure_files_entries } from './pure-files-entries'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { whole_suite_files } from './whole-suite-files'
 
@@ -14,10 +15,10 @@ import { whole_suite_files } from './whole-suite-files'
 // test-read map a whole-suite run records (`test-read-map.ts`). A changed document, config or
 // snapshot — which no module graph holds — reaches the modules that read it through that map alone. **Whatever neither can answer runs the whole suite**: no map, a
 // non-code file added since the recorded tree that no recorded test read, where a test read inside its
-// directory or the tree did not hold it, or a file every test
+// directory, or a file every test
 // depends on — each counted only when this change moved it (joshuafolkken/kit#4527). A non-code file the recorded tree already held and no test read is one no test reads
-// (joshuafolkken/kit#4073), and so is one added since to a directory the tree held and no test read
-// inside (joshuafolkken/kit#4303), so a change made only of those runs nothing. CI runs the whole suite
+// (joshuafolkken/kit#4073), and so is one added since to a directory no test read inside
+// (joshuafolkken/kit#4303, joshuafolkken/kit#4597), so a change made only of those runs nothing. CI runs the whole suite
 // regardless, so a read the recorder could not see — one a child process makes — is still caught
 // before the merge.
 //
@@ -53,7 +54,7 @@ const { WHOLE_SUITE_FILES } = whole_suite_files
 const { UNREADABLE_REASON } = changed_file_scope
 const NOTHING_RELATABLE_REASON = 'no changed file is one a test can import or read'
 const NO_MAP_REASON = 'no test-read map covers the changed non-code file'
-const UNMOVED_REASON = 'nothing moved since its last green run on this checkout'
+const { UNMOVED_REASON } = since_green
 const WHOLE_SUITE_SUFFIX = 'affects every test'
 const UNRECORDED_SUFFIX = 'is read by no recorded test'
 
@@ -97,13 +98,20 @@ interface ScopeRequest {
 	recorded: ReadonlySet<string>
 	is_present: (file_path: string) => boolean
 	// The part of `changed` that joined only because it differs from the map's tree — which another
-	// lane's branch records — not because this change moved it. A non-code file of it still adds the
-	// tests reading it, a source file only through `naming_moved`, but neither ever sends the run to
-	// the whole suite: this tree verified it already, or main's CI did (joshuafolkken/kit#4527).
+	// lane's branch records — not because this change moved it. Only a code file of it naming a moved
+	// file reaches vitest; the rest — its non-code files' readers among it — never runs a test nor sends
+	// the run to the whole suite: this tree verified it already, or main's CI did
+	// (joshuafolkken/kit#4527, joshuafolkken/kit#4896).
 	since_map?: ReadonlyArray<string>
-	// The source files of `since_map` that name a file this change moved — with its test files, the
-	// only ones of that part handed to vitest (joshuafolkken/kit#4532). See `is_code_input`.
+	// The code files of `since_map` that name a file this change moved — the only ones of that part
+	// handed to vitest (joshuafolkken/kit#4532). See `is_code_input`.
 	naming_moved?: ReadonlySet<string>
+	// The entries a change of `tools/test/pure-files.ts` moved, when it moved nothing else there — the
+	// list then reaches those test files rather than every test (`pure-files-entries.ts`).
+	pure_entries?: ReadonlyArray<string> | undefined
+	// The changed files every test imports, each with the test files importing it directly
+	// (`direct-importers.ts`) — the run narrows to those rather than the whole suite.
+	every_test_importers?: ReadonlyMap<string, ReadonlyArray<string>>
 }
 
 // What the decision narrows to: the files to hand vitest, and the changed files known to reach no
@@ -125,18 +133,17 @@ function is_moved(request: ScopeRequest, file: string): boolean {
 	return request.since_map?.includes(file) !== true
 }
 
-// **A source file only the map's tree differs by — another lane's change, or main's since — is handed
-// to vitest only when it names a file this change moved** (joshuafolkken/kit#4532). Leaving the rest
-// out is safe: an import of a moved module is reached from that module itself, since `vitest related`
-// walks every test file's graph rather than the map's; the one read neither the graph nor the map sees
-// is a file-system read added since the map's tree, and such a read names the file it reads. A test
-// file of that part always joins: the map holds no entry for it, it may reach a moved file through a
-// helper's read rather than its own, and it runs only itself. A read whose path is assembled from
-// fragments or listed from a directory is missed here and caught by CI's whole suite before the merge,
-// as a child process's read is.
+// **A code file only the map's tree differs by — another lane's change, or main's since, a test file
+// among them — is handed to vitest only when it names a file this change moved**
+// (joshuafolkken/kit#4532, joshuafolkken/kit#4896). Leaving the rest out is safe: an import of a moved
+// module is reached from that module itself, since `vitest related` walks every test file's graph
+// rather than the map's; the one read neither the graph nor the map sees is a file-system read added
+// since the map's tree, and such a read names the file it reads. A test file reaching a moved file
+// through a helper's read, or a read whose path is assembled from fragments or listed from a directory,
+// is missed here and caught by CI's whole suite before the merge, as a child process's read is.
 function is_code_input(request: ScopeRequest, file: string): boolean {
 	if (!is_relatable(file)) return false
-	if (is_moved(request, file) || test_declared_logic.is_test_file(file)) return true
+	if (is_moved(request, file)) return true
 
 	return request.naming_moved?.has(file) === true
 }
@@ -147,9 +154,9 @@ function all_scope(reason: string, triggers: ReadonlyArray<string> = [], root = 
 	return { mode: 'all', files: triggers.map((file) => path.join(root, file)), reason }
 }
 
-// A file no recorded test read narrows only when the recorded tree held it, or held its directory and
-// no recorded test read inside that: any other file added since is one the recorder never saw, so its
-// having no reader says nothing.
+// A file no recorded test read narrows only when the recorded tree held it, or no recorded test read
+// inside its directory: any other file added since is one the recorder never saw, so its having no
+// reader says nothing.
 function resolve_through_map(others: ReadonlyArray<string>, request: ScopeRequest): MapResolution {
 	const { map, recorded } = request
 
@@ -183,7 +190,7 @@ function code_readers(code: ReadonlyArray<string>, map: ReadMap | undefined): Ar
 function none_scope(unread: ReadonlyArray<string>, root: string): NoTestScope {
 	const files = unread.map((file) => path.join(root, file))
 
-	return { mode: 'none', files, reason: `${String(files.length)} changed file(s) no test reads` }
+	return { mode: 'none', files, reason: `${String(files.length)} changed file(s) reach no test` }
 }
 
 // Nothing to select is "no test" only when something settled it; an empty or vanished selection
@@ -202,28 +209,86 @@ function narrowed_scope(selection: Selection, request: ScopeRequest): RelatedSco
 	return { mode: 'related', files: present, reason: `${String(present.length)} related file(s)` }
 }
 
-// `undefined` and `[]` are deliberately different inputs. The first says the change could not be
-// read; the second says it was read and held nothing to relate.
-function resolve_scope(request: ScopeRequest): RelatedScope {
+// The part only the map's tree differs by that reached no test — settled as surely as an unread file,
+// so a tree holding nothing of this change's own runs no test rather than the whole suite.
+function left_out(request: ScopeRequest, code: ReadonlyArray<string>): Array<string> {
+	return (request.since_map ?? []).filter((file) => !code.includes(file))
+}
+
+// The change with an entries-only `pure-files.ts` taken out of it, and the test files it reaches in
+// its place — it would send `vitest related` to every test.
+function without_pure_entries(
+	changed: ReadonlyArray<string>,
+	entries: ReadonlyArray<string> | undefined,
+): Selection {
+	if (entries === undefined) return { files: [], unread: changed }
+
+	const rest = changed.filter((file) => file !== pure_files_entries.PURE_FILES_PATH)
+
+	return { files: pure_files_entries.tests_of(entries), unread: rest }
+}
+
+function is_narrowed(request: ScopeRequest, file: string): boolean {
+	return request.every_test_importers?.has(file) === true
+}
+
+// **A moved file every test imports reaches only the test files importing it directly**
+// (joshuafolkken/kit#5122): handed to vitest it would run the whole suite, which the gate's `test:unit`
+// and CI run once regardless. One no test imports directly reaches no test here.
+function direct_selection(request: ScopeRequest, changed: ReadonlyArray<string>): Selection {
+	const moved = changed.filter((file) => is_narrowed(request, file) && is_moved(request, file))
+	const tests = moved.map((file) => request.every_test_importers?.get(file) ?? [])
+
+	return { files: tests.flat(), unread: moved.filter((_file, index) => tests[index]?.length === 0) }
+}
+
+function whole_suite_triggers(
+	request: ScopeRequest,
+	changed: ReadonlyArray<string>,
+): Array<string> {
+	return changed.filter(
+		(file) => WHOLE_SUITE_FILES.has(file) && !is_narrowed(request, file) && is_moved(request, file),
+	)
+}
+
+function resolve_read(
+	request: ScopeRequest & { changed: ReadonlyArray<string> },
+	entry_tests: ReadonlyArray<string>,
+): RelatedScope {
 	const { changed, root } = request
-
-	if (changed === undefined) return all_scope(UNREADABLE_REASON)
-
-	const whole = changed.filter((file) => WHOLE_SUITE_FILES.has(file) && is_moved(request, file))
+	const whole = whole_suite_triggers(request, changed)
 
 	if (whole.length > 0) return all_scope(`${String(whole[0])} ${WHOLE_SUITE_SUFFIX}`, whole, root)
 
-	const code = changed.filter((file) => is_code_input(request, file))
+	const direct = direct_selection(request, changed)
+	const code = changed.filter((file) => !is_narrowed(request, file) && is_code_input(request, file))
 	const resolution = resolve_through_map(
-		changed.filter((file) => !is_relatable(file)),
+		changed.filter((file) => !is_relatable(file) && is_moved(request, file)),
 		request,
 	)
 
 	if ('reason' in resolution) return all_scope(resolution.reason, resolution.triggers, root)
 
-	const files = [...code, ...code_readers(code, request.map), ...resolution.files]
+	const files = [
+		...code,
+		...code_readers(code, request.map),
+		...resolution.files,
+		...entry_tests,
+		...direct.files,
+	]
+	const unread = [...resolution.unread, ...left_out(request, code), ...direct.unread]
 
-	return narrowed_scope({ files, unread: resolution.unread }, request)
+	return narrowed_scope({ files, unread }, request)
+}
+
+// `undefined` and `[]` are deliberately different inputs. The first says the change could not be
+// read; the second says it was read and held nothing to relate.
+function resolve_scope(request: ScopeRequest): RelatedScope {
+	if (request.changed === undefined) return all_scope(UNREADABLE_REASON)
+
+	const pure = without_pure_entries(request.changed, request.pure_entries)
+
+	return resolve_read({ ...request, changed: pure.unread }, pure.files)
 }
 
 function describe_scope(scope: RelatedScope, root: string): string {

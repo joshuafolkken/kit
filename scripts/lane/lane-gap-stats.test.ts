@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { lane_gap_stats } from './lane-gap-stats'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_stats } from './lane-stats'
+import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#4395. Each gap is timed from the moment a slot's next step could run until the step
 // that ran it, from the ledger and the run-event stream.
@@ -15,6 +16,7 @@ const OTHER = 4356
 const RELAUNCH = 'cut → resume'
 const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
+const YIELD = 'yield → redispatch'
 const MERGE = 'followup → merge'
 const CUT_TEXT = `#${String(ISSUE)} cut (implementation)`
 const OUTAGE_TEXT = `#${String(ISSUE)} outage (re-dispatchable)`
@@ -47,6 +49,14 @@ function followup(issue: number, seconds_before: number): LedgerEntry {
 
 function merge(issue: number, seconds_before: number): LedgerEntry {
 	return { kind: 'merge', at: seconds_before_now(seconds_before), issue }
+}
+
+function withdraw(issue: number, by: string, seconds_before: number): RunEvent {
+	return event('withdraw', `#${String(issue)} withdrawn by ${by}: overlaps`, seconds_before)
+}
+
+function dispatch(issue: number, seconds_before: number): LedgerEntry {
+	return { kind: 'dispatch', at: seconds_before_now(seconds_before), issue }
 }
 
 function row_of(
@@ -149,6 +159,24 @@ describe('lane_gap_stats.table -- park → offer', () => {
 	})
 })
 
+describe('lane_gap_stats.table -- yield → redispatch', () => {
+	// joshuafolkken/kit#5216: the #5171 yield waited for its holder's lane, no seat held.
+	it('times each yield until its own issue next dispatch', () => {
+		const events = [withdraw(ISSUE, lane_yield.YIELD_TEXT.name, 100)]
+		const entries = [dispatch(OTHER, 90), dispatch(ISSUE, 40)]
+
+		expect(row_of(entries, events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
+	})
+
+	it('leaves out a withdrawal that is not a yield', () => {
+		const events = [withdraw(ISSUE, 'a person', 100)]
+
+		expect(row_of([dispatch(ISSUE, 40)], events, YIELD)).toBe(
+			`| ${YIELD} | 0 | ${UNMEASURED} | 0 |`,
+		)
+	})
+})
+
 describe('lane_gap_stats.table -- followup → merge', () => {
 	it('times the last followup stage before the merge line of the same issue', () => {
 		const entries = [
@@ -171,7 +199,7 @@ describe('lane_gap_stats.table -- the period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(6)
+		expect(lines).toHaveLength(7)
 	})
 
 	it('leaves out a gap that started before the period', () => {

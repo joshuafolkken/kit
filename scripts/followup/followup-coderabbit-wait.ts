@@ -1,6 +1,6 @@
 import type { SnapshotObserver } from '#scripts/gh/git-pr-checks'
 import type { PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import type { CodeRabbitState } from '#scripts/run/event/run-event-checks'
 import { followup_checks_event } from './followup-checks-event'
 
@@ -57,26 +57,29 @@ function observer_of(wait: CodeRabbitWait): SnapshotObserver {
 	}
 }
 
-// Both observers on every poll — the board's event line and this timer.
-function both(first: SnapshotObserver, second: SnapshotObserver): SnapshotObserver {
-	return async function observe_both(snapshot: PrStateSnapshot): Promise<void> {
-		await first(snapshot)
-		await second(snapshot)
+// Every observer on every poll, started in order — the board's event line and the wait's timers.
+function all(...observers: ReadonlyArray<SnapshotObserver>): SnapshotObserver {
+	return async function observe_all(snapshot: PrStateSnapshot): Promise<void> {
+		await Promise.all(
+			observers.map(async (observer) => {
+				await observer(snapshot)
+			}),
+		)
 	}
 }
 
 async function record_part(stage: string, elapsed_ms: number): Promise<void> {
-	if (elapsed_ms > NO_TIME) await lane_ledger.record_stage({ stage, elapsed_ms })
+	if (elapsed_ms > NO_TIME) await lane_ledger_write.record_stage({ stage, elapsed_ms })
 }
 
 // **A run that never saw CodeRabbit waiting records nothing**, so a row's run count is how many
 // followups CodeRabbit held up, and its median is over those.
 async function record(wait: CodeRabbitWait): Promise<void> {
-	await record_part(lane_ledger.CODERABBIT_WAIT_STAGE, wait.wait_ms)
-	await record_part(lane_ledger.CODERABBIT_RATE_LIMIT_STAGE, wait.rate_limited_ms)
+	await record_part(lane_ledger_write.CODERABBIT_WAIT_STAGE, wait.wait_ms)
+	await record_part(lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE, wait.rate_limited_ms)
 }
 
-const followup_coderabbit_wait = { both, new_wait, observe, observer_of, record }
+const followup_coderabbit_wait = { all, new_wait, observe, observer_of, record }
 
 export type { CodeRabbitWait }
 export { followup_coderabbit_wait }

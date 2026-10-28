@@ -3,6 +3,7 @@ import type { BudgetWait } from '#scripts/gate/core-wait'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_estimate } from './run-board-estimate'
 import { run_board_fit } from './run-board-fit'
+import type { FoundOf } from './run-board-found'
 import { run_board_fresh } from './run-board-fresh'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardLayout, type BoardRow } from './run-board-layout'
@@ -92,6 +93,11 @@ interface BoardHeader {
 	usual?: UsualTimes | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
+	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
+	found?: FoundOf | undefined
+	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a merged row hides its minutes and investigation
+	// (joshuafolkken/kit#5132, joshuafolkken/kit#5194).
+	is_investigation_on: boolean
 	// The spinner's frame a running run and a running row turn, `undefined` where the output is not a
 	// terminal and they draw their still icons.
 	spinner: string | undefined
@@ -101,6 +107,8 @@ interface BoardHeader {
 	// An issue reference as the board draws it — `3450` or `owner/repo#12` — made a link where the
 	// terminal opens one.
 	link: (reference: string) => string
+	// A pull request's number, made a link to it where the terminal opens one (joshuafolkken/kit#4625).
+	pull_link: (number: number) => string
 }
 
 interface BoardCounts {

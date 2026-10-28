@@ -8,6 +8,7 @@ import {
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { AUTO_OK_LABEL, BUG_LABEL, EPIC_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { backlog_fixture } from './backlog-fixture'
 import { backlog_next } from './backlog-next'
@@ -23,6 +24,7 @@ const { issue, console_streams } = auto_ok_fixture
 const FIRST = 901
 const SOLO = 902
 const BLOCKED = 903
+const LANE_LIMIT = 3
 
 const streams = console_streams()
 const { stdout } = streams
@@ -54,7 +56,27 @@ beforeEach(() => {
 	vi.spyOn(console, 'info').mockImplementation(streams.info)
 	vi.spyOn(console, 'error').mockImplementation(streams.error)
 	vi.spyOn(console, 'warn').mockImplementation(streams.error)
+	vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'limit', limit: LANE_LIMIT })
 	streams.reset()
+})
+
+// joshuafolkken/kit#5300: the header says what bounds a wave's width — the lane limit, or nothing.
+describe('josh backlog:plan --waves — the width of a wave', () => {
+	it('says a wave is cut at the lane limit', async () => {
+		stub_backlog()
+		await backlog_plan_cli.run(['--waves'])
+
+		expect(stdout()).toContain(`${backlog_waves.width_line(LANE_LIMIT)}\n`)
+		expect(stdout()).toContain(`at most ${String(LANE_LIMIT)} standalone issues, the lane limit`)
+	})
+
+	it('says a wave is uncapped when the lane limit could not be read', async () => {
+		vi.spyOn(lane_capacity, 'lane_limit').mockResolvedValue({ kind: 'problem', problem: 'bad' })
+		stub_backlog()
+		await backlog_plan_cli.run(['--waves'])
+
+		expect(stdout()).toContain(`${backlog_waves.UNCAPPED_WIDTH}\n`)
+	})
 })
 
 describe('josh backlog:plan --waves', () => {

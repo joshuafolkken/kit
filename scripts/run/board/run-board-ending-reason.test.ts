@@ -37,12 +37,22 @@ describe('run_board_ending_reason.reason_of', () => {
 			reasons(KIND.WITHDRAW, [
 				'#13 withdrawn by a person: superseded by #20',
 				'#13 withdrawn by a person: ',
+				'#13 withdrawn by the run:wake supervisor: closed as not planned',
 				'#13 withdrawn',
 			]),
-		).toStrictEqual(['superseded by #20', undefined, undefined])
+		).toStrictEqual(['superseded by #20', undefined, 'closed as not planned', undefined])
 	})
 
 	it('reads no reason from an event that is neither a park nor a withdraw', () => {
 		expect(reasons(KIND.MERGE, ['#13 merged'])).toStrictEqual([undefined])
+	})
+})
+
+// joshuafolkken/kit#4916: `run:merge` withdraws a child whose issue closed without a merge.
+describe('run_board_ending_reason.reason_of — a run:merge withdrawal', () => {
+	it('reads the reason after the run:merge driver prefix', () => {
+		expect(
+			reasons(KIND.WITHDRAW, ['#13 withdrawn by the run:merge driver: closed without a merge']),
+		).toStrictEqual(['closed without a merge'])
 	})
 })

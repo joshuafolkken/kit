@@ -9,14 +9,17 @@ import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import { repository_labels } from '#scripts/repo/repository-labels'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { issue_file_cap } from './issue-file-cap'
 import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
+import { issue_file_interrupt } from './issue-file-interrupt'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 
-// joshuafolkken/kit#2808: `josh issue:file` runs every filing step in order, and each refusal stops
-// the filing before anything is sent. The network reads are stubbed at the namespaces the command
+// joshuafolkken/kit#2808: `josh issue:file` runs every filing step, and any refusal stops the filing
+// before anything is sent; joshuafolkken/kit#5191: the refusals the caller answers from the body and
+// the arguments are printed in one pass, each tier at once (#5333). The network reads are stubbed at the namespaces the command
 // calls, so what is asserted is the order and the request — never a real filing.
 
 const HERE = 'joshuafolkken/kit'
@@ -34,12 +37,12 @@ const FAILURE_EXIT_CODE = 1
 const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
 
 const SECTIONS = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
+const ESTIMATE = '- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）'
+const BACKGROUND = ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ESTIMATE]
 
 // A body the lint accepts, with `declarations` under its background.
 function body_of(...declarations: ReadonlyArray<string>): string {
-	return ['## 背景', '', '- 種別: 不具合', '- 原因: #4201', ...declarations, '', SECTIONS].join(
-		'\n',
-	)
+	return [...BACKGROUND, ...declarations, '', SECTIONS].join('\n')
 }
 
 const JUDGEMENT_NEEDED = '- 人の判断: 要（目視確認）'
@@ -74,6 +77,10 @@ const link_release = vi.spyOn(issue_release_cli, 'link')
 vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 const fold_clear = vi.spyOn(issue_file_fold, 'is_fold_clear').mockResolvedValue(true)
 
+vi.spyOn(issue_file_cap, 'is_cap_clear').mockResolvedValue(true)
+// The interrupt's blocked-by record is `issue-file-interrupt.test.ts`'s; here it writes nothing.
+vi.spyOn(issue_file_interrupt, 'block_finder').mockResolvedValue()
+
 // A listing of `count` open Issues, in the JSON shape `issue_list` answers with.
 function listing_of(count: number): { json: string; is_capped: boolean } {
 	const rows = Array.from({ length: count }, (_unused, index) => ({ number: index + 1 }))
@@ -89,9 +96,7 @@ function argv_of(body_path: string, ...extra: ReadonlyArray<string>): Array<stri
 }
 
 function create_body(): unknown {
-	const [request] = exec_gh_api.mock.calls[0] ?? []
-
-	return JSON.parse(request?.body ?? '{}')
+	return JSON.parse(exec_gh_api.mock.calls[0]?.[0].body ?? '{}')
 }
 
 beforeEach(() => {
@@ -197,10 +202,9 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 		)
 	})
 
-	it('refuses a body with no judgement declaration, before the count, the scout or the create', async () => {
+	it('refuses a body with no judgement declaration before the scout and the create', async () => {
 		expect(await issue_file_cli.run(argv_of(undeclared_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('`- 人の判断: 不要`')
-		expect(issue_list).not.toHaveBeenCalled()
 		expect(scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
@@ -208,11 +212,10 @@ describe('issue_file_cli.run — the auto-ok decision', () => {
 
 // joshuafolkken/kit#3313: an untriaged opted-in Issue withholds every lane's candidate.
 describe('issue_file_cli.run — the run label an auto-ok filing owes', () => {
-	it('refuses an auto-ok filing with no run label, before the count, the scout or the create', async () => {
+	it('refuses an auto-ok filing with no run label before counting, scouting or creating', async () => {
 		expect(await issue_file_cli.run(argv_of(judged_in_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('--label run:solo')
-		expect(issue_list).not.toHaveBeenCalled()
-		expect(scout).not.toHaveBeenCalled()
+		for (const step of [issue_list, scout]) expect(step).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
@@ -278,12 +281,13 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 		expect(issue_list).toHaveBeenCalledWith(expect.objectContaining({ repo: THERE }))
 	})
 
-	it('holds a filing past the cap with no exemption, before the scout or the create', async () => {
+	it('holds a filing past the cap with no exemption before the scout and the create', async () => {
 		issue_list.mockResolvedValue(OVER_CAP_LISTING)
 
 		expect(await issue_file_cli.run(argv_of(valid_path))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(OVER_CAP_FLAG)
-		for (const step of [scout, exec_gh_api]) expect(step).not.toHaveBeenCalled()
+		expect(scout).not.toHaveBeenCalled()
+		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
 	it.each([
@@ -307,7 +311,6 @@ describe('issue_file_cli.run — the WIP cap count', () => {
 describe('issue_file_cli.run — a refused filing sends nothing', () => {
 	it('refuses a body the lint rejects', async () => {
 		expect(await issue_file_cli.run(argv_of(invalid_path))).toBe(FAILURE_EXIT_CODE)
-		expect(scout).not.toHaveBeenCalled()
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
@@ -324,11 +327,16 @@ describe('issue_file_cli.run — a refused filing sends nothing', () => {
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
-	it('refuses a third-party target', async () => {
-		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', FOREIGN))).toBe(
-			FAILURE_EXIT_CODE,
-		)
-		expect(console.error).toHaveBeenCalledWith(issue_file_cli.THIRD_PARTY_MESSAGE)
+	// joshuafolkken/kit#4634: an owner that cannot be read is not known to be ours either, so the
+	// filing refuses it even though the `third-party-write` hook stays silent on `unknown`.
+	it.each([
+		{ target: FOREIGN, owner: OWNER, message: issue_file_cli.THIRD_PARTY_MESSAGE },
+		{ target: HERE, owner: undefined, message: issue_file_cli.UNKNOWN_PARTY_MESSAGE },
+	])('refuses $target when the session owner is $owner', async ({ target, owner, message }) => {
+		vi.spyOn(repo_party, 'current_owner').mockReturnValue(owner)
+
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', target))).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(message)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 		expect(ensure_labels).not.toHaveBeenCalled()
 	})

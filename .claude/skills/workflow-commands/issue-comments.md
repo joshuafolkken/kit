@@ -8,12 +8,17 @@ turn as whatever else the run needs:
 
 ```bash
 pnpm josh issue:read <N> [<N> ...]     # body and comments, one call per batch
-gh api repos/{owner}/{repo}/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
+gh api repos/<owner>/<repo>/issues/<N>/comments --jq '.[] | {user: .user.login, created_at, body}'
 ```
 
 **Type the first line**; it **says when a comment listing could not be read rather than showing no
-comments**. The `gh api` form is for a **cross-repository** read (the command takes no `--repo`). Never
-`gh issue view <N> --comments` — GraphQL-backed, `403` in a cloud session.
+comments**. The `gh api` form is **cross-repository only** (the command takes no `--repo`); a read
+of this repository's Issue, its comments or its timeline — `repos/{owner}/…` or the repository
+spelled out, and `gh issue view` — is refused (`pnpm josh rule:list` → `direct-issue-read`).
+
+An Issue whose author has no write access stops at `run:entry` until a person with write access
+plans it with `kickoff #N`; the run then follows that plan (`scripts/run/entry/run-entry-trust.ts`).
+A trust read that failed stops there too, naming the failed read.
 
 **This repository writes its agreements into comments and then reads only bodies.** **What the
 reading is for**: the scope boundary — work a comment moved elsewhere or added here; an auto-decision
@@ -83,4 +88,4 @@ and refuses every other body-only read; the Codex adapter refuses them all** (`p
 ## A person's update mid-run
 
 When the hook, `review:attest --check` or `followup` shows an Issue update, read it as above, fix what it
-changes, then `pnpm josh issue:ack <N>`. The watch: `docs/josh-commands-backlog.md` → "`josh issue:ack`".
+changes, then `pnpm josh issue:ack <N>`. A withheld-body notice (author without write access) needs no ack. The watch: `docs/josh-commands-backlog.md` → "`josh issue:ack`".

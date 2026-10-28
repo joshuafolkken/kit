@@ -1,7 +1,9 @@
-import { auto_ok_cli, type OptedInRead, type TrackingRead } from '#scripts/auto-ok/auto-ok-cli'
+import { auto_ok_author } from '#scripts/auto-ok/auto-ok-author'
+import { auto_ok_cli, type OptedInRead } from '#scripts/auto-ok/auto-ok-cli'
 import { repo_discovery } from '#scripts/discovery/repo-discovery'
 import { epic_bundle_gaps } from '#scripts/epic/epic-bundle-gaps'
 import { epic_busy } from '#scripts/epic/epic-busy'
+import type { Classification } from '#scripts/epic/epic-classify'
 import type { EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import { epic_next } from '#scripts/epic/epic-next'
@@ -15,12 +17,11 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
-import { lane_state } from '#scripts/lane/lane-state'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
-import { backlog_overlap } from './backlog-overlap'
+import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_pool } from './backlog-pool'
-import { backlog_rank, type GateScope } from './backlog-rank'
+import { backlog_rank } from './backlog-rank'
 import { backlog_wait_cause } from './backlog-wait-cause'
 
 // `josh backlog:next` — what the whole opted-in backlog may run next.
@@ -82,17 +83,6 @@ const VERDICT_TOKENS: Readonly<Record<BacklogVerdict, string>> = {
 	stop: 'stop',
 	triage: epic_triage.TRIAGE_VERDICT,
 	wait: 'wait',
-}
-
-type OptedIn = Extract<OptedInRead, { kind: 'read' }>
-type Tracking = Extract<TrackingRead, { kind: 'read' }>
-
-// Everything the answer is assembled from, read once and passed down rather than re-fetched.
-interface PoolContext {
-	opted_in: OptedIn
-	tracking: Tracking
-	repo: string
-	exclude: ReadonlyArray<number>
 }
 
 // One token per line on standard output: the runnable issue numbers of **this** repository, in the
@@ -193,14 +183,27 @@ function running_of(
 // The two halves as one result. The epic half is already classified by `epic:next`; the standalone
 // half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
 // child and nothing else says `run` exactly as one with a runnable standalone issue does.
-function combine(views: ReadonlyArray<EpicView>, context: PoolContext): EpicNextResult {
-	const graphs = views.map((view) => view.snapshot.children)
-	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
-	const from_epics = backlog_pool.drop_excluded(
-		backlog_pool.epic_classification(views),
+// `untrusted` is the epic children an author without write access filed (joshuafolkken/kit#4633).
+function epic_half(
+	views: ReadonlyArray<EpicView>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): Classification {
+	return backlog_pool.drop_excluded(
+		backlog_pool.epic_classification(views, untrusted),
 		context.exclude,
 		context.repo,
 	)
+}
+
+function combine(
+	views: ReadonlyArray<EpicView>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): EpicNextResult {
+	const graphs = views.map((view) => view.snapshot.children)
+	const standalone = backlog_pool.standalone_rows(context.opted_in.issues)
+	const from_epics = epic_half(views, context, untrusted)
 	const from_standalone = backlog_pool.classify_standalone(standalone, {
 		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
 		exclude: context.exclude,
@@ -245,10 +248,17 @@ function settled_views(
 //
 // The running set covers the standalone rows as well as every read graph, so an epic child waiting on
 // an opted-in standalone issue waits rather than stops.
-function views_from(reads: ReadonlyArray<EpicRead>, context: PoolContext): ReadonlyArray<EpicView> {
+function views_from(
+	reads: ReadonlyArray<EpicRead>,
+	context: PoolContext,
+	untrusted: ReadonlySet<string>,
+): ReadonlyArray<EpicView> {
 	if (reads.length === 0) return []
 
-	const graphs = reads.map((read) => read.snapshot.children)
+	const graphs = backlog_pool.trusted_graphs(
+		reads.map((read) => read.snapshot.children),
+		untrusted,
+	)
 
 	return settled_views(
 		reads,
@@ -277,11 +287,15 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
+	const untrusted = await auto_ok_author.untrusted_child_keys(
+		reads.flatMap((read) => read.snapshot.children),
+		context.repo,
+	)
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
 	// ranking goes last: its sort is stable, so the defect order survives as its final key.
 	const ordered = await backlog_defect_priority.prioritize(
-		combine(views_from(reads, context), context),
+		combine(views_from(reads, context, untrusted), context, untrusted),
 		context.repo,
 	)
 
@@ -318,29 +332,6 @@ function report_retry(context: PoolContext): number {
 	return SUCCESS_EXIT_CODE
 }
 
-// The rows the offer's cap bounds — the standalone half.
-function standalone_keys(context: PoolContext): ReadonlySet<string> {
-	return backlog_pool.standalone_keys(context.opted_in.issues, {
-		tracked: epic_index.withheld_children(context.tracking.index, context.opted_in.issues),
-		exclude: context.exclude,
-		repo: context.repo,
-	})
-}
-
-// The running lanes still carry the pickup label, so the opted-in listing holds their bodies too —
-// which is what lets a candidate be held back from a path a running lane already declares.
-// `backlog:plan --waves` reads the same scope, so its first wave is this offer. Their lane state
-// records name a paused holder in the wait it causes (joshuafolkken/kit#4270); they are local files.
-async function gate_scope(context: PoolContext): Promise<GateScope> {
-	const { issues } = context.opted_in
-
-	return {
-		standalone: standalone_keys(context),
-		declared: backlog_overlap.declared_of(issues),
-		lanes: await lane_state.read_states(issues.map((issue) => String(issue.number))),
-	}
-}
-
 // The `run:solo` gate is applied here rather than in `resolve`, because `backlog:plan` shares
 // `resolve` and a plan made before the run lists everything. The holders are
 // read only on a `run` answer — the one answer the gate can change. The cap follows the gate
@@ -356,7 +347,7 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 
 	if (notice !== undefined) console.error(notice)
 
-	const gated = backlog_rank.gate(result, read, repo, await gate_scope(context))
+	const gated = backlog_rank.gate(result, read, repo, await backlog_gate_scope.gate_scope(context))
 
 	if (gated.notice !== undefined) console.error(gated.notice)
 
@@ -470,10 +461,9 @@ const backlog_next = {
 	READ_FAILURES,
 	VERDICT_TOKENS,
 	resolve,
-	gate_scope,
 	context_of,
 	run,
 }
 
 export { backlog_next }
-export type { BacklogVerdict, OptedIn, PoolContext }
+export type { BacklogVerdict }

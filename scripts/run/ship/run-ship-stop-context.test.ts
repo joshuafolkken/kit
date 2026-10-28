@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const changed_mock = vi.hoisted(() => vi.fn())
 const repository_mock = vi.hoisted(() => vi.fn())
 const replace_mock = vi.hoisted(() => vi.fn())
+const read_log_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: changed_mock },
@@ -14,6 +15,7 @@ vi.mock('#scripts/josh/stamp-file', () => ({
 		replace_text_stamp: replace_mock,
 	},
 }))
+vi.mock('#scripts/review/review-stop-log', () => ({ review_stop_log: { read: read_log_mock } }))
 
 const { run_ship_stop_context } = await import('./run-ship-stop-context')
 const { agent_role_profile } = await import('#scripts/agent/agent-role-profile')
@@ -30,9 +32,25 @@ const RED = '\u{1B}[31m'
 const RESET = '\u{1B}[0m'
 const LINE_PADDING = 100
 const BUDGET = 1000
+// Room for the tail line, the heading and two padded earlier findings, not three.
+const PRIOR_BUDGET = 450
+const PRIOR_ENTRY = 'a.ts:3 — reads EPERM as dead. (bug-risks:medium, stopped in the review stage)'
+const STOP_FINDING = { kind: 'performance:medium', location: 'a.ts:3', sentence: 'a sync ps.' }
+const PRIOR_LINE = {
+	at: '2026-10-25T00:00:00.000Z',
+	issue: Number(ISSUE),
+	stage: 'review',
+	kind: 'bug-risks:medium',
+	location: 'a.ts:2',
+	sentence: 'reads EPERM as dead.',
+}
 
 function numbered(count: number, prefix: string): Array<string> {
 	return Array.from({ length: count }, (_, index) => `${prefix}${String(index + 1)}`)
+}
+
+function padded(label: string): string {
+	return `${label} ${'p'.repeat(LINE_PADDING)}`
 }
 
 function long_output(): Array<string> {
@@ -43,6 +61,7 @@ beforeEach(() => {
 	changed_mock.mockReset().mockResolvedValue([CHANGED_FILE])
 	repository_mock.mockReset().mockResolvedValue('/repo')
 	replace_mock.mockReset().mockImplementation((target: string) => target)
+	read_log_mock.mockReset().mockReturnValue([])
 })
 
 describe('run_ship_stop_context.build — the failed output', () => {
@@ -111,6 +130,27 @@ describe('run_ship_stop_context.build — the changed files', () => {
 	})
 })
 
+describe('run_ship_stop_context.build — the earlier findings', () => {
+	it('carries the earlier findings on the files the stop cites', async () => {
+		read_log_mock.mockReturnValue([PRIOR_LINE])
+		const context = await run_ship_stop_context.build(ISSUE, 'x', [STOP_FINDING])
+
+		expect(context.prior).toStrictEqual([expect.stringContaining('a.ts:2 — reads EPERM as dead.')])
+	})
+
+	it('leaves the field out, and the block as it was, when none applies', async () => {
+		read_log_mock.mockReturnValue([PRIOR_LINE])
+		const context = await run_ship_stop_context.build(ISSUE, 'x', [
+			{ ...STOP_FINDING, location: 'b.ts:1' },
+		])
+
+		expect(context).not.toHaveProperty('prior')
+		expect(run_ship_stop_context.describe(ISSUE, context)).toBe(
+			`The failed stage output:\nx\nChanged files on the branch: ${CHANGED_FILE}.`,
+		)
+	})
+})
+
 describe('run_ship_stop_context.describe', () => {
 	it('puts the excerpt and the changed files in the prompt block', () => {
 		const text = run_ship_stop_context.describe(ISSUE, {
@@ -122,6 +162,20 @@ describe('run_ship_stop_context.describe', () => {
 		expect(text).toBe(
 			`The failed stage output:\nFAIL scripts/a.test.ts\nChanged files on the branch: ${CHANGED_FILE} (and 2 more).`,
 		)
+	})
+
+	it('appends the earlier findings on the same files after the changed files', () => {
+		const text = run_ship_stop_context.describe(ISSUE, {
+			excerpt: ['bug-risks:medium:a.ts:3 — a sync ps per redraw.'],
+			changed: [CHANGED_FILE],
+			more_changed: 0,
+			prior: [PRIOR_ENTRY],
+		})
+
+		expect(text.split('\n').slice(-2)).toStrictEqual([
+			expect.stringContaining('confirm the fix still meets each'),
+			`- ${PRIOR_ENTRY}`,
+		])
 	})
 
 	it('carries only the changed files when the stage printed nothing', () => {
@@ -180,5 +234,17 @@ describe('run_ship_stop_context — fit for one argv element', () => {
 		expect(shown.at(-1)).toBe(lines.at(-1))
 		expect(text).toContain(`its last ${String(shown.length)} lines`)
 		expect(text).toContain(`lines 1-${String(lines.length - shown.length)} are in`)
+	})
+
+	it('drops the earlier findings oldest first once only the tail line is left', () => {
+		const prior = [padded('oldest'), padded('middle'), padded('newest')]
+		const context = { excerpt: ['tail'], changed: [], more_changed: 0, prior }
+		const text = run_ship_stop_context.describe(ISSUE, context, PRIOR_BUDGET)
+
+		expect(text.length).toBeLessThanOrEqual(PRIOR_BUDGET)
+		expect(text).toContain('tail')
+		expect(text).toContain('middle')
+		expect(text).toContain('newest')
+		expect(text).not.toContain('oldest')
 	})
 })

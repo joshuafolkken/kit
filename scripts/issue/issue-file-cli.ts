@@ -8,6 +8,7 @@ import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_list, MAX_SCANNED } from '#scripts/gh/git-gh-issue-list'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { github_issue_url } from '#scripts/gh/github-issue-url'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import type { PollOptions } from '#scripts/lib/poll'
 import { repository_labels } from '#scripts/repo/repository-labels'
@@ -15,37 +16,48 @@ import { run_event_filed } from '#scripts/run/event/run-event-filed'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_hold_member } from '#scripts/run/hold/run-hold-member'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { issue_auto_ok } from './issue-auto-ok'
 import { issue_cite } from './issue-cite'
 import { issue_file, type FileArguments } from './issue-file'
+import { issue_file_cap } from './issue-file-cap'
+import { issue_file_deferral } from './issue-file-deferral'
 import { issue_file_fold } from './issue-file-fold'
+import { issue_file_interrupt } from './issue-file-interrupt'
+import { issue_file_lane_hint } from './issue-file-lane-hint'
 import { issue_lint_cli } from './issue-lint-cli'
 import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
+import { issue_sample_required } from './issue-sample-required'
 import { issue_sample_source } from './issue-sample-source'
 import { issue_scout_cli } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
+import { size_estimate } from './size-estimate'
 
 // `josh issue:file "<title>" --body-file <path> [--route <route>] [--label <name>]…
-// [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]` — file an Issue
-// with every filing step run in order: the third-party refusal, the body
-// lint, the `## Origin` check for another repository, the `auto-ok` decision
-// with the run label it owes, the start condition read as a pull request, the fold question against
-// the run's earlier
-// filings, the WIP cap count, the
-// duplicate scout, the missing workflow labels created, the create call
-// carrying every label, the release link on `--release`, and `epic:bundle`.
+// [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
+// [--release] [--blocks-finder]` — file an Issue with every filing step run: the third-party refusal,
+// the filing cap per origin and the fold question against the run's earlier filings, each ending the
+// filing on its own; then, each tier printing every refusal of its own at once, the local checks —
+// the body lint, the size estimate against the split guide, the start condition a measurement
+// follow-up owes, the `## Origin` check for another repository, the `auto-ok` decision with the run
+// label it owes; once those pass, the start condition read as a pull request and the WIP cap count;
+// once those pass, the duplicate scout; then the missing workflow labels created, the create call
+// carrying every label, a blocking interrupt's finder recorded as blocked by it, the release link on
+// `--release`, and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--over-cap] [--no-auto-ok] [--release]'
+	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]'
 const UNKNOWN_REPO_MESSAGE =
 	'Could not read this repository from `git remote`, so the filing has no repository to compare against — check `gh auth status`.'
 const THIRD_PARTY_MESSAGE =
 	'✖ third-party target: a tracker we do not own is Tier C — draft the Issue for a person to post instead (`CLAUDE.md` → "Third-party repositories are Tier C").'
+const UNKNOWN_PARTY_MESSAGE =
+	'✖ unknown party: the owner of this session or of the target could not be read (`git remote` / `--repo`), so the target is not known to be ours — check `pnpm josh repo:party`.'
 // `GH_REPO` is the variable `gh` reads `{owner}/{repo}` from, so setting it points every listing the
 // scout and `epic:bundle` make at the target repository rather than at this checkout.
 const GH_REPO_VARIABLE = 'GH_REPO'
@@ -68,18 +80,22 @@ async function read_body(path: string): Promise<string | undefined> {
 	}
 }
 
-function is_third_party(target: string): boolean {
+// An owner that cannot be read is refused like a third party — stricter than the `third-party-write`
+// hook, which stays silent on `unknown`: a filing is admitted only when the target is known to be ours.
+function party_refusal(target: string): string | undefined {
 	const party = repo_party.classify(repo_party.current_owner(), repo_party.target_owner(target))
 
-	return party === repo_party.THIRD_PARTY
+	if (party === repo_party.FIRST_PARTY) return undefined
+
+	return party === repo_party.THIRD_PARTY ? THIRD_PARTY_MESSAGE : UNKNOWN_PARTY_MESSAGE
 }
 
-// Every refusal the filing can meet before a request is sent, in the order the steps run — `[]` when
-// the filing may go on to the scout.
+// Every refusal the body and the arguments carry, read locally — `[]` when the body is admitted.
 function refusals_of(filing: Filing): ReadonlyArray<string> {
-	if (is_third_party(filing.target)) return [THIRD_PARTY_MESSAGE]
 	const problems = [
 		...issue_lint_cli.problems(filing.body),
+		size_estimate.guide_problem(filing.body, filing.args.route),
+		issue_sample_required.problem(filing.body),
 		issue_auto_ok.declaration_problem(filing.body),
 		issue_priority.problem(filing.body, filing.args.labels),
 		issue_file.origin_problem(filing.body, filing.target, filing.current),
@@ -143,7 +159,8 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 
 	if (outcome === undefined) return false
 	console.info(outcome.report)
-	const open = issue_file.unacknowledged(outcome.candidates, filing.args.distinct)
+	const answered = issue_file.acknowledged(filing.args, filing.target, filing.current)
+	const open = issue_file.unacknowledged(outcome.candidates, answered)
 
 	if (open.length > 0) console.error(unacknowledged_message(open))
 
@@ -151,8 +168,8 @@ async function is_scout_clear(filing: Filing): Promise<boolean> {
 }
 
 // Every label the create call carries, or `undefined` when an `auto-ok` filing names neither run label.
-// Decided before the WIP count and the scout, so a refusal costs no listing. The decision reads the
-// labels the body's declarations add, so a declared breaking change is excluded like its label.
+// The decision reads the labels the body's declarations add, so a declared breaking change is excluded
+// like its label.
 function labels_of(filing: Filing): ReadonlyArray<string> | undefined {
 	const auto_ok = issue_auto_ok.decide({
 		is_opted_out: filing.args.is_auto_ok_opted_out,
@@ -229,33 +246,60 @@ async function place(url: string, target: string): Promise<void> {
 
 // Every filing lands on the run's event stream: this is the one filing path, so
 // one append here reaches `run:board` from every route. A filing outside a run lands too, unmarked as
-// the run's (`run_hold_member`), and the board counts only the marked ones; the append is best-effort,
-// as every emit is.
+// the run's (`run_hold_member`), and the board counts only the marked ones; a lane's overrun
+// investigation marks its own, which the board draws after 🔍; the append is best-effort, as every emit is.
+async function emit_filed(
+	reference: string,
+	filing: Filing,
+	labels: ReadonlyArray<string>,
+	found_during: string | undefined,
+): Promise<void> {
+	const kind = run_event_filed.kind_of(labels)
+	const is_run = await run_hold_member.is_run_member()
+	const is_overrun = lane_child_marker.is_overrun()
+	const { title } = filing.args
+	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run, is_overrun })
+
+	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+}
+
 async function record(url: string, filing: Filing, labels: ReadonlyArray<string>): Promise<void> {
 	const number = String(issue_number_of(url))
 	const reference = issue_cite.plain(
 		number,
 		issue_file_fold.reference_prefix(filing.target, filing.current),
 	)
-	const found_during = await issue_file_fold.finder()
-	const kind = run_event_filed.kind_of(labels)
-	const is_run = await run_hold_member.is_run_member()
-	const { title } = filing.args
-	const text = run_event_filed.text_of({ reference, kind, title, found_during, is_run })
+	const found_during = await issue_file_fold.finder(filing.args.found_during)
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.FILED, text)
+	await emit_filed(reference, filing, labels, found_during)
+	await issue_file_deferral.note_finder({
+		found_during: filing.args.found_during,
+		reference,
+		title: filing.args.title,
+		current: filing.current,
+	})
+	await split_resolution.record_child({ route: filing.args.route, found_during, child: reference })
+	await issue_file_interrupt.block_finder({
+		route: filing.args.route,
+		is_blocking_finder: filing.args.is_blocking_finder,
+		found_during,
+		blocker: issue_number_of(url),
+		is_here: issue_file.is_same_repository(filing.target, filing.current),
+	})
 }
 
-function is_admitted(filing: Filing): boolean {
+async function is_admitted(filing: Filing): Promise<boolean> {
 	const refusals = refusals_of(filing)
 
 	if (refusals.length === 0) return true
-	console.error(refusals.join('\n'))
+	const hint = await issue_file_lane_hint.lines_of(filing.args.found_during, filing.body)
+
+	console.error([...refusals, ...hint].join('\n'))
 
 	return false
 }
 
-// The start condition's citation read against GitHub — after the local refusals, before any listing.
+// The start condition's citation read against GitHub.
 async function is_source_clear(filing: Filing): Promise<boolean> {
 	const is_here = issue_file.is_same_repository(filing.target, filing.current)
 	const problem = await issue_sample_source.problem(
@@ -281,23 +325,46 @@ async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<numb
 	return SUCCESS_EXIT_CODE
 }
 
-// The holds that read the run and the backlog, in the order they cost: the fold reads the local event
-// stream and diff, the WIP count one listing, the scout a search.
-async function is_clear(filing: Filing): Promise<boolean> {
+// The holds that end the filing whatever the body says, read first: the filing cap reads the local
+// event stream, the fold the stream and diff.
+async function is_run_clear(filing: Filing): Promise<boolean> {
 	const prefix = issue_file_fold.reference_prefix(filing.target, filing.current)
 
-	if (!(await issue_file_fold.is_fold_clear(prefix, filing.args))) return false
+	return (
+		(await issue_file_cap.is_cap_clear(filing.args.found_during)) &&
+		(await issue_file_fold.is_fold_clear(prefix, filing.args))
+	)
+}
 
-	return (await is_wip_clear(filing)) && (await is_scout_clear(filing))
+// Every step the caller answers from the body and the arguments, cheapest first, each tier's refusals
+// printed at once and fixed in one reissue: the local checks (the body's own refusals and the run
+// label) before anything asks GitHub, then the start condition's citation and the WIP count, then the
+// duplicate scout's search, run only once nothing else refuses. The labels, or `undefined` when any refused.
+async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
+	const is_body_clear = await is_admitted(filing)
+	const labels = labels_of(filing)
+
+	if (!is_body_clear || labels === undefined) return undefined
+	const verdicts = [await is_source_clear(filing), await is_wip_clear(filing)]
+
+	if (!verdicts.every(Boolean)) return undefined
+
+	return (await is_scout_clear(filing)) ? labels : undefined
 }
 
 async function file(filing: Filing): Promise<number> {
-	if (!is_admitted(filing) || !(await is_source_clear(filing))) return FAILURE_EXIT_CODE
-	const labels = labels_of(filing)
+	const party_problem = party_refusal(filing.target)
 
-	if (labels === undefined || !(await is_clear(filing))) return FAILURE_EXIT_CODE
+	if (party_problem !== undefined) {
+		console.error(party_problem)
 
-	return await send(filing, labels)
+		return FAILURE_EXIT_CODE
+	}
+
+	if (!(await is_run_clear(filing))) return FAILURE_EXIT_CODE
+	const labels = await labels_in_one_pass(filing)
+
+	return labels === undefined ? FAILURE_EXIT_CODE : await send(filing, labels)
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {
@@ -336,7 +403,13 @@ async function main(argv: ReadonlyArray<string>): Promise<void> {
 	process.exitCode = await run(argv)
 }
 
-const issue_file_cli = { FRESH_ISSUE_POLL, THIRD_PARTY_MESSAGE, record, run }
+const issue_file_cli = {
+	FRESH_ISSUE_POLL,
+	THIRD_PARTY_MESSAGE,
+	UNKNOWN_PARTY_MESSAGE,
+	record,
+	run,
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 

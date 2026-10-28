@@ -1,14 +1,17 @@
 {
-	"version": "1.1784.0",
+	"version": "1.2116.0",
 	"name": "@joshuafolkken/kit",
-	"description": "Development toolkit for AI-assisted projects: formatting, AI assistant rules and a Git/GitHub Issue workflow for any repository, plus lint, type check, tests and hooks for Node projects",
+	"description": "Hand-off kit for Claude Code and Codex: backlogrun takes your GitHub Issues to tested, reviewed, merged PRs — in parallel and unattended — with the rules, hooks and checks that keep the agent on track",
 	"keywords": [
 		"ai",
+		"automation",
+		"backlogrun",
 		"claude-code",
 		"cli",
 		"codex",
 		"developer-tools",
 		"eslint",
+		"github-issues",
 		"prettier",
 		"toolkit",
 		"workflow"
@@ -19,7 +22,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
+	"packageManager": "pnpm@12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -76,7 +79,9 @@
 		"!**/__snapshots__",
 		"!**/*.golden.txt",
 		"!dist/hooks/.inputs-verified.json*",
-		"!dist/.hooks-staging-*"
+		"!dist/.hooks-staging-*",
+		"!dist/.commands-test-*",
+		"!dist/.dispatch-test-*"
 	],
 	"imports": {
 		"#eslint/*": "./eslint/*",
@@ -148,7 +153,7 @@
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.2.1",
-		"eslint-plugin-unicorn": "^78.0.0",
+		"eslint-plugin-unicorn": "^79.0.0",
 		"globals": "^17.12.0",
 		"prettier": "^3.9.9",
 		"prettier-plugin-svelte": "^4.1.1",
@@ -221,6 +226,7 @@
 		"@secretlint/secretlint-rule-preset-recommend": "^13.0.7",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.5",
+		"@types/run-parallel": "^1.1.2",
 		"@types/semver": "^7.8.0",
 		"cspell": "^10.4.0",
 		"esbuild": "^0.28.2",
@@ -230,7 +236,7 @@
 		"eslint-plugin-import-x": "^4.17.1",
 		"eslint-plugin-promise": "^7.3.0",
 		"eslint-plugin-sonarjs": "^4.2.2",
-		"eslint-plugin-unicorn": "^78.0.0",
+		"eslint-plugin-unicorn": "^79.0.0",
 		"eslint_d": "^15.0.3",
 		"fast-check": "^4.10.2",
 		"globals": "^17.13.0",
@@ -238,21 +244,22 @@
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.64.7",
+		"rollup": "^4.65.0",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
-		"typescript-eslint": "^8.71.2",
+		"typescript-eslint": "^8.72.0",
 		"vitest": "^5.0.5"
 	},
 	"dependencies": {
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
-		"execa": "^10.1.1",
+		"execa": "^10.2.1",
 		"flatted": "^3.4.4",
 		"js-yaml": "^5.5.0",
 		"jsonc-parser": "^3.3.1",
 		"ora": "^9.4.1",
+		"run-parallel": "^1.2.0",
 		"semver": "^7.8.5",
 		"string-width": "^8.3.0",
 		"terminal-link": "^5.0.0",
@@ -262,7 +269,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
+			"version": "12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61",
 			"onFail": "download"
 		}
 	}

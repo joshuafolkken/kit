@@ -7,7 +7,7 @@
 // the recorded ones** (`FALLBACK_MS` with no record at all), so a new file lands by the same rule on
 // every runner, and the shards still partition the suite exactly: each file is in exactly one.
 
-type Durations = Readonly<Record<string, number>>
+import type { Durations } from '#scripts/test/unit-durations'
 
 interface WeightedFile {
 	file: string
@@ -79,5 +79,6 @@ function shard_files(
 
 const duration_shard = { FALLBACK_MS, assign, median, shard_files }
 
-export type { Durations }
 export { duration_shard }
+
+export { type Durations } from '#scripts/test/unit-durations'

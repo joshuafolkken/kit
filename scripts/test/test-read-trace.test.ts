@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { test_read_trace } from './test-read-trace'
+import { test_read_trace, type CallFrame } from './test-read-trace'
 
 // joshuafolkken/kit#4065: what one recorded read says — the repository path read, and the module
 // that read it. A wrong answer here is a map entry that narrows a changed file to the wrong tests.
@@ -85,31 +85,47 @@ describe('test_read_trace.read_target', () => {
 	})
 })
 
+// A call site; an empty function name is a module's top-level code or an anonymous callback.
+function frame(script_name: string, function_name = ''): CallFrame {
+	return { script_name, function_name }
+}
+
+function reader_of(frames: ReadonlyArray<CallFrame>): string | undefined {
+	return test_read_trace.stack_reader({ root: ROOT, frames, recorder: RECORDER })
+}
+
+const INNER_FRAMES = [frame('node:fs', 'readFileSync'), frame(RECORDER, 'recorded')]
+
 describe('test_read_trace.stack_reader', () => {
 	// joshuafolkken/kit#4417: a shared helper between the test and `fs` answered as the reader, and
 	// `vitest related` widened every read through it to every test importing the helper.
 	it('answers the test, not the helper it read through, for a read a test makes', () => {
-		const scripts = ['node:fs', RECORDER, DEPENDENCY, READER, TEST_FILE]
+		const frames = [
+			...INNER_FRAMES,
+			frame(DEPENDENCY, 'walk'),
+			frame(READER, 'read_docs'),
+			frame(TEST_FILE),
+		]
 
-		expect(test_read_trace.stack_reader({ root: ROOT, scripts, recorder: RECORDER })).toBe(
-			path.relative(ROOT, TEST_FILE),
-		)
+		expect(reader_of(frames)).toBe(path.relative(ROOT, TEST_FILE))
 	})
 
 	it('answers the module whose evaluation made the read when no test is on the stack', () => {
-		const scripts = ['node:fs', RECORDER, HELPER, READER, DEPENDENCY]
+		const frames = [...INNER_FRAMES, frame(HELPER, 'read_file'), frame(READER), frame(DEPENDENCY)]
 
-		expect(test_read_trace.stack_reader({ root: ROOT, scripts, recorder: RECORDER })).toBe(
-			READER_RELATIVE,
-		)
+		expect(reader_of(frames)).toBe(READER_RELATIVE)
+	})
+
+	// joshuafolkken/kit#5033: `import-graph.ts` read after an `await`, so it was outermost and widened
+	// some 3,700 paths to every test importing it. The test running it is recorded beside instead.
+	it('answers nothing for a read a named function made after an await dropped its caller', () => {
+		const frames = [...INNER_FRAMES, frame(HELPER, 'read_file'), frame(READER, 'create')]
+
+		expect(reader_of(frames)).toBeUndefined()
 	})
 
 	it('answers nothing when no frame is a repository module', () => {
-		const scripts = ['node:fs', RECORDER, DEPENDENCY]
-
-		expect(
-			test_read_trace.stack_reader({ root: ROOT, scripts, recorder: RECORDER }),
-		).toBeUndefined()
+		expect(reader_of([...INNER_FRAMES, frame(DEPENDENCY)])).toBeUndefined()
 	})
 })
 

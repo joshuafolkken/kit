@@ -27,7 +27,8 @@ function reference(document: string, heading: string): SectionReference {
 }
 
 // The gate's chain governs both the implementation it follows and a stopped ship's report.
-const CHAIN = reference('chain-rule.md', 'Run the review-to-merge chain')
+const CHAIN_RULE = 'chain-rule.md'
+const CHAIN = reference(CHAIN_RULE, 'Run the review-to-merge chain')
 const PROGRESS = 'backlogrun-progress.md'
 
 // Keyed on a verdict token, or on the josh subcommand a command action runs. An action with no row —
@@ -47,6 +48,17 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	['run:carry', reference(PROGRESS, 'The hand-off')],
 ])
 
+// **A lane child reads its own step of the chain, never the whole of it** (joshuafolkken/kit#5016):
+// the chain's step 1 opens with `josh main:merge`, which a lane child leaves to ship's sync, and a
+// child handed the whole section ran it, moving the tree its scoped pair was green on. The step is
+// the chain's labelled step 0, cited where it stands, so it is written once; it ends at the sibling
+// item `1.`, so a blank line inside it would cut it short. A stopped ship's report reads it too.
+const LANE_CHILD_STEP = reference(CHAIN_RULE, 'A lane child')
+const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
+	[run_step.IMPLEMENT, LANE_CHILD_STEP],
+	['ship', LANE_CHILD_STEP],
+])
+
 function key_of(action: StepAction): string {
 	if (action.kind !== 'command') return action.line
 
@@ -55,27 +67,34 @@ function key_of(action: StepAction): string {
 	return subcommand
 }
 
-function section_for(key: string): SectionReference | undefined {
-	return GOVERNING_SECTIONS.get(key)
+function section_for(key: string, is_lane_child: boolean): SectionReference | undefined {
+	const lane_child_section = is_lane_child ? LANE_CHILD_SECTIONS.get(key) : undefined
+
+	return lane_child_section ?? GOVERNING_SECTIONS.get(key)
 }
 
 // Printed through `doc:section` itself, so the extent, the Bash-cap split and the refusal of an
 // unresolved heading are that command's, never a second copy of them.
-function print_section(key: string, root: string = process.cwd()): number {
-	const found = section_for(key)
+function print_section(key: string, root: string = process.cwd(), is_lane_child = false): number {
+	const found = section_for(key, is_lane_child)
 
 	if (found === undefined) return SUCCESS_EXIT_CODE
 
 	return document_section_cli.run([found.document, found.heading], root)
 }
 
-function print_for(action: StepAction, root: string = process.cwd()): number {
-	return print_section(key_of(action), root)
+function print_for(
+	action: StepAction,
+	is_lane_child = false,
+	root: string = process.cwd(),
+): number {
+	return print_section(key_of(action), root, is_lane_child)
 }
 
 const run_step_section = {
 	ENTRY,
 	GOVERNING_SECTIONS,
+	LANE_CHILD_SECTIONS,
 	key_of,
 	print_for,
 	print_section,

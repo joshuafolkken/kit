@@ -4,6 +4,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_pause, type LaneSignalled } from './lane-pause'
 import type { LaneProcesses } from './lane-reap'
 import { lane_registry } from './lane-registry'
@@ -14,7 +15,8 @@ import { lane_state } from './lane-state'
 // caller never takes a pause that stopped nothing as done — a detached resident signalled alone counts
 // as nothing. A lane whose detached processes could not be read exits non-zero too, since a resume
 // may have left one of them stopped. A lane whose child was signalled has the change written to its state record and to the
-// run's event stream, so who halted it is on record.
+// run's event stream, so who halted it is on record, and to the lane ledger, so `lane:stats` leaves the
+// stopped time out of the lane's implement sub-stages (joshuafolkken/kit#5168).
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -73,6 +75,7 @@ async function record(verb: Verb, issue: string): Promise<void> {
 	const command = `lane:${verb}`
 
 	await lane_state.record_change({ issue, state: VERBS[verb].state, command })
+	await lane_ledger_write.record_lane_state({ issue: Number(issue), state: VERBS[verb].state })
 	await run_event_stream_emit.emit(
 		run_event_stream.EVENT_KIND.LANE_STATE,
 		`${issue_cite.plain(issue)} ${VERBS[verb].done} by ${command}`,

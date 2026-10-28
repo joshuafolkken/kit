@@ -1,7 +1,7 @@
-import type { LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import type { MergeTokenRead } from '#scripts/run/merge/run-merge-token'
 import { backlog_budget } from './backlog-budget'
 import { backlog_drive, type DriveState, type LoopPorts, type OfferRead } from './backlog-drive'
+import type { DriveLaunch } from './backlog-drive-launch-pass'
 
 // The scripted ports every `backlog_drive` suite drives the loop through — one copy, so the suites
 // cannot drift on how a child finishes, a merge answers or an offer is queued.
@@ -38,15 +38,18 @@ interface Script {
 	// the next offer passed through; an unscripted child answers the offer's `NEXT_TOKEN`.
 	merges?: ReadonlyMap<string, string>
 	offered?: ReadonlyArray<string>
-	// Children `run:merge` handled as parked, withdrawn or failed rather than merged; every other reads as
-	// merged.
+	// Children `run:merge` handled as parked, withdrawn, yielded or failed rather than merged; every other
+	// reads as merged.
 	parked?: ReadonlyArray<string>
 	withdrawn?: ReadonlyArray<string>
+	yielded?: ReadonlyArray<string>
 	unmerged?: ReadonlyArray<string>
 	offers?: ReadonlyArray<OfferRead | undefined>
 	// Launches that failed after `lane:open` took a lane, and ones `lane:open` itself refused.
 	failed_launches?: ReadonlyArray<string>
 	unopened_launches?: ReadonlyArray<string>
+	// Issues their measurement declaration closed, so the launch took no lane.
+	measured_launches?: ReadonlyArray<string>
 	// The free-lane answers in order, the last repeating; unset reads as a pool with room to spare.
 	free_lanes?: ReadonlyArray<number>
 	// The limit-room answers in order, the last repeating; unset reads as the free-lane answers.
@@ -57,6 +60,8 @@ interface Script {
 	judgement_owed?: number
 	// The memory-hold answers in order, the last repeating; unset reads as memory to spare.
 	memory_held?: ReadonlyArray<boolean>
+	// The usage-limit answers in order, the last repeating; unset reads as no limit in force.
+	usage_limited?: ReadonlyArray<boolean>
 }
 
 function offer(verdict: string, issues: ReadonlyArray<string> = []): OfferRead {
@@ -77,6 +82,7 @@ function merge_outcome(script: Script, issue: string): MergeOutcome {
 	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
 		[script.parked, 'parked'],
 		[script.withdrawn, 'withdrawn'],
+		[script.yielded, 'yielded'],
 		[script.unmerged, 'failed'],
 	]
 
@@ -109,10 +115,15 @@ function child_ports(
 	}
 }
 
-function launch_outcome(script: Script, issue: string): LaunchOutcome['kind'] {
-	if (script.failed_launches?.includes(issue) === true) return 'failed'
+function launch_outcome(script: Script, issue: string): DriveLaunch {
+	const scripted: ReadonlyArray<[DriveLaunch, ReadonlyArray<string> | undefined]> = [
+		['measured', script.measured_launches],
+		['failed', script.failed_launches],
+		['unopened', script.unopened_launches],
+	]
+	const found = scripted.find(([, issues]) => issues?.includes(issue) === true)
 
-	return script.unopened_launches?.includes(issue) === true ? 'unopened' : 'launched'
+	return found?.[0] ?? 'launched'
 }
 
 // The dispatch-facing ports: offers answer from the script's queue, then `wait`.
@@ -155,13 +166,16 @@ function room_ports(script: Script): Pick<LoopPorts, 'free_lanes' | 'limit_room'
 	}
 }
 
-// The memory hold, answered from the script's queue, the last answer repeating.
-function memory_port(script: Script): Pick<LoopPorts, 'memory_held'> {
-	const memory = [...(script.memory_held ?? [false])]
+// One scripted answer queue, the last answer repeating.
+function queued(answers: ReadonlyArray<boolean> | undefined): () => Promise<boolean> {
+	const queue = [...(answers ?? [false])]
 
-	return {
-		memory_held: async () => (memory.length > 1 ? memory.shift() : memory[0]) ?? false,
-	}
+	return async () => (queue.length > 1 ? queue.shift() : queue[0]) ?? false
+}
+
+// The memory and usage-limit holds, answered from the script's queues.
+function memory_port(script: Script): Pick<LoopPorts, 'memory_held' | 'usage_limited'> {
+	return { memory_held: queued(script.memory_held), usage_limited: queued(script.usage_limited) }
 }
 
 // The loop-facing ports: a clock the sleeps advance, and the finish and state records.
@@ -235,6 +249,7 @@ function state(in_flight: ReadonlyArray<string> = []): DriveState {
 }
 
 const backlog_drive_fixture = {
+	ACTIVE,
 	CONFIG,
 	FIRST_CHILD,
 	OFFERED,

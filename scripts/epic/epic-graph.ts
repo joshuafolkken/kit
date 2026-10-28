@@ -1,3 +1,4 @@
+import type { AuthorFields } from '#scripts/gh/gh-author-association'
 import type { DependencyLink } from './epic-parse'
 import {
 	format_dependency_link,
@@ -23,13 +24,17 @@ import {
 // exist, `blocker_categories` dropped it, and the child ran as though nothing blocked it. It also
 // made `epic_cross_repo.resolve_cross_repo`'s cross-repository branch unreachable: every blocker
 // arrived carrying the blocked child's repository, so `blocker.repo === blocked.repo` always held.
-interface EpicChild {
+//
+// The author fields (`AuthorFields`) are read only by `backlog:next`, which offers a child only when
+// its author has write access (joshuafolkken/kit#4633); absent on rows built without a read.
+interface EpicChild extends AuthorFields {
 	number: number
 	repo: string
 	state: 'OPEN' | 'CLOSED'
 	labels: ReadonlyArray<string>
 	blocked_by: ReadonlyArray<IssueReference>
-	// Read only to hold a child until its declared start time; absent on rows built without a read.
+	// Read to hold a child until its declared start time and to rank it by its causing-lane minutes;
+	// absent on rows built without a read.
 	body?: string | undefined
 }
 

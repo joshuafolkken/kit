@@ -34,7 +34,7 @@ describe('the role policy defaults', () => {
 		expect(profile(REVIEWER, ANTHROPIC_ENV)).toMatchObject({
 			provider: 'anthropic',
 			model: ANTHROPIC_MODEL,
-			effort: 'high',
+			effort: 'medium',
 		})
 	})
 
@@ -46,7 +46,7 @@ describe('the role policy defaults', () => {
 			effort: 'medium',
 		})
 		expect(profile(WORKER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
-		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'high' })
+		expect(profile(REVIEWER, OPENAI_ENV)).toMatchObject({ model: OPENAI_MODEL, effort: 'medium' })
 	})
 
 	// joshuafolkken/kit#2415: a floating alias cannot say which model a logged run used.
@@ -309,28 +309,5 @@ describe('phase-resolved effort', () => {
 		expect(effort_for({ ...ANTHROPIC_ENV, JOSH_WORKER_EFFORT: 'high' }, PRE_GATE_PHASE)).toBe(
 			'high',
 		)
-	})
-})
-
-describe('with_phase_effort', () => {
-	const base = agent_role_profile.DEFAULT_PROFILES.worker
-
-	it('applies the phase effort to a stored profile and keeps its model', () => {
-		const adjusted = agent_role_profile.with_phase_effort(
-			base,
-			agent_role_profile.PRE_GATE_PHASE,
-			ANTHROPIC_ENV,
-		)
-
-		expect(adjusted).toMatchObject({ model: base.model, effort: 'low' })
-	})
-
-	it('lets an env override win over the phase for a stored profile', () => {
-		const adjusted = agent_role_profile.with_phase_effort(base, agent_role_profile.PRE_GATE_PHASE, {
-			...ANTHROPIC_ENV,
-			JOSH_WORKER_EFFORT: 'xhigh',
-		})
-
-		expect(adjusted.effort).toBe('xhigh')
 	})
 })

@@ -230,6 +230,59 @@ describe('lane_stop_stats.table — the unmet preconditions', () => {
 
 		expect(causes_of(entries, PREFLIGHT)).toBe('lock 1, check 1, unrecorded 1')
 	})
+
+	// joshuafolkken/kit#5228: a ship whose pre-detach `test:pinned` stopped names it `unpinned`.
+	it('counts a stop the pre-detach test:pinned check made under unpinned', () => {
+		const entries = [
+			{ ...stop(PREFLIGHT, 30), cause: 'check', preconditions: ['unpinned'] },
+			{ ...stop(PREFLIGHT, 20), cause: 'check', preconditions: ['pre-detach', 'unpinned'] },
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('unpinned 2, pre-detach 1')
+	})
+})
+
+// joshuafolkken/kit#5203: an `unplanned` stop after the same issue's `check:related` printed the answer
+// counts apart, so the stops the earlier notice did not prevent are a number.
+function notice(minutes_before: number, issue = ISSUE): LedgerEntry {
+	return {
+		kind: 'unplanned-notice',
+		at: minutes_before_now(minutes_before),
+		issue,
+		files: ['scripts/gate/gate-plan.ts'],
+	}
+}
+
+function unplanned_stop(minutes_before: number, issue = ISSUE): LedgerEntry {
+	return {
+		kind: 'stop',
+		at: minutes_before_now(minutes_before),
+		issue,
+		reason: PREFLIGHT,
+		preconditions: ['unplanned'],
+	}
+}
+
+describe('lane_stop_stats.table — an unplanned stop after the check:related notice', () => {
+	it('counts an unplanned stop after the notice as noticed, one before it or on another issue as not', () => {
+		const entries = [
+			notice(40),
+			unplanned_stop(30),
+			unplanned_stop(50),
+			unplanned_stop(20, OTHER_ISSUE),
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('unplanned 2, unplanned (noticed) 1')
+	})
+
+	it('leaves every other precondition of a noticed stop as it is', () => {
+		const entries = [
+			notice(40),
+			{ ...stop(PREFLIGHT, 30), preconditions: [LIVE_EVIDENCE, 'unplanned'] },
+		]
+
+		expect(causes_of(entries, PREFLIGHT)).toBe('live-evidence 1, unplanned (noticed) 1')
+	})
 })
 
 // joshuafolkken/kit#4426: a review stop counts under each kind of blocking finding it listed, so the

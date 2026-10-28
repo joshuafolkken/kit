@@ -5,7 +5,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { review_tree } from '#scripts/review/review-tree'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_reuse, type CheckRecords } from './check-reuse'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import type { GateTree } from './gate-tree'
 
@@ -16,7 +16,7 @@ import type { GateTree } from './gate-tree'
 const scratch = mkdtempSync(path.join(tmpdir(), 'check-reuse-test-'))
 const read_git = vi.spyOn(git_spawn, 'read')
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
-const { LINT_LABEL, TYPE_CHECK_LABEL } = gate_plan
+const { LINT_LABEL, TYPE_CHECK_LABEL } = gate_labels
 const CSPELL = 'cspell'
 const LABELS = [LINT_LABEL, TYPE_CHECK_LABEL, CSPELL]
 const SOURCE = 'scripts/a.ts'
@@ -158,6 +158,24 @@ describe('check_reuse — the inputs fingerprint', () => {
 
 		vi.stubEnv('TZ', 'Etc/GMT+12')
 
-		await expect(reused(records, RECORDED)).resolves.toStrictEqual([LINT_LABEL, TYPE_CHECK_LABEL])
+		await expect(reused(records, RECORDED)).resolves.toStrictEqual(LABELS)
+	})
+})
+
+// joshuafolkken/kit#5156: cspell reads every file, so `check:related` reuses its record only while
+// nothing moved.
+describe('check_reuse — cspell', () => {
+	it('reuses cspell over the tree it was recorded on', async () => {
+		const records = await recorded()
+
+		await expect(reused(records, RECORDED)).resolves.toContain(CSPELL)
+	})
+
+	it('reuses no cspell once any file moved, a document included', async () => {
+		const records = await recorded()
+
+		base_moved(SKILL_DOC)
+
+		await expect(reused(records)).resolves.not.toContain(CSPELL)
 	})
 })

@@ -10,9 +10,9 @@ const is_over_mock = vi.hoisted(() => vi.fn())
 const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
-const place_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: place_mock } }))
+// The lane-place wait is covered in `run-ship-return-waiter.test.ts`.
+vi.mock('./run-ship-place', () => ({ run_ship_place: { await_place: vi.fn() } }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { emit: emit_mock },
@@ -25,7 +25,12 @@ vi.mock('#scripts/lane/lane-registry', () => ({
 }))
 vi.mock('#scripts/lane/lane-relaunch', () => ({ lane_relaunch: { relaunch: relaunch_mock } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
-	lane_session_broker: { serving_session: serving_mock, request: request_mock },
+	lane_session_broker: {
+		serving_session: serving_mock,
+		request: request_mock,
+		is_unreadable: (answer: { reason?: string }): boolean =>
+			answer.reason?.includes('could not read the request') === true,
+	},
 }))
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: async (): Promise<Array<string>> => [CHANGED_FILE] },
@@ -33,7 +38,10 @@ vi.mock('#scripts/git/changed-paths', () => ({
 
 vi.mock('node:timers/promises', () => ({ setTimeout: async (): Promise<void> => undefined }))
 
-vi.mock('./run-ship-probe', () => ({ run_ship_probe: { read_review_stale: stale_mock } }))
+// No session waits on the ship here: `run-ship-return-waiter.test.ts` covers the one that does.
+vi.mock('./run-ship-probe', () => ({
+	run_ship_probe: { read_review_stale: stale_mock, repository_directory: vi.fn() },
+}))
 vi.mock('./run-ship-relaunch-cap', () => ({
 	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
 }))
@@ -59,6 +67,7 @@ const ARGS = {
 	cites: [],
 	is_review: true,
 	is_detach: true,
+	unpinned_ok: [],
 }
 const SERVER = 'server-1'
 const NEW_SERVER = 'server-2'
@@ -75,10 +84,6 @@ beforeEach(() => {
 	park_mock.mockReset().mockResolvedValue(true)
 	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-})
-
-beforeEach(() => {
-	place_mock.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_ship_return.return_control', () => {
@@ -116,12 +121,33 @@ describe('run_ship_return.return_control', () => {
 		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe('recorded')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 	})
+})
 
-	it('still records the stop when the relaunch could not start', async () => {
+// joshuafolkken/kit#4765: a relaunch that started nothing was written only to the ship log, and the dispatch
+// log's header — written before the spawn — made its mtime read the stop as answered.
+describe('run_ship_return.return_control when no relaunch started', () => {
+	const RELAUNCH_FAILED = 'relaunch-failed'
+
+	it('records the stop and the failed relaunch when the relaunch could not start', async () => {
 		relaunch_mock.mockReturnValue({ kind: 'failed', note: 'no claude' })
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
-		expect(emit_mock).toHaveBeenCalledTimes(1)
+		expect(emit_mock).toHaveBeenCalledTimes(2)
+		expect(emit_mock).toHaveBeenLastCalledWith(
+			RELAUNCH_FAILED,
+			`#${ISSUE} could not be relaunched: no claude`,
+		)
+	})
+
+	it('records the re-dispatch with the broker reason for run:merge', async () => {
+		serving_mock.mockReturnValue(SERVER)
+		request_mock.mockResolvedValue({ is_success: false, reason: 'the broker refused it' })
+		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
+
+		expect(emit_mock).toHaveBeenLastCalledWith(
+			RELAUNCH_FAILED,
+			`#${ISSUE} could not be relaunched: the driver re-dispatches the issue — the broker refused it`,
+		)
 	})
 })
 
@@ -140,28 +166,6 @@ describe('run_ship_return.return_control on a merge wait that needs judgement', 
 
 		expect(invocation).toContain(output)
 		expect(invocation.endsWith(`fullrun #${ISSUE}`)).toBe(true)
-	})
-})
-
-// joshuafolkken/kit#4466: the freed place may have gone to the next launch, so a followup stop waits for a
-// place before it relaunches, keeping its stop prompt rather than handing the issue to the driver.
-describe('run_ship_return.return_control on a merge wait past the lane limit', () => {
-	it('waits for a place for its lane before it relaunches the stop with its output', async () => {
-		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)).toBe(
-			'relaunched',
-		)
-		expect(place_mock).toHaveBeenCalledWith(LANE, 'followup')
-		expect(place_mock.mock.invocationCallOrder[0]).toBeLessThan(
-			relaunch_mock.mock.invocationCallOrder[0] ?? 0,
-		)
-		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(OUTPUT)
-	})
-
-	it('waits for no place past the ship-stop cap', async () => {
-		is_over_mock.mockResolvedValue(true)
-		await run_ship_return.return_control(ISSUE, 'followup', RESUME, OUTPUT)
-
-		expect(place_mock).not.toHaveBeenCalled()
 	})
 })
 
@@ -265,6 +269,7 @@ describe('run_ship_return.return_control past the ship-stop cap', () => {
 		is_over_mock.mockResolvedValue(true)
 
 		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()
@@ -303,6 +308,18 @@ describe('run_ship_return.return_control on a merge conflict', () => {
 			`#${ISSUE} conflict failed (conflict) — pnpm josh ship --log ${ISSUE}`,
 		)
 		expect(String(relaunch_mock.mock.calls[0]?.[1])).toContain(conflicted)
+	})
+
+	// joshuafolkken/kit#4707: a review-stage conflict counts against the mechanical cap.
+	it('asks the cap for the conflict, not the stage', async () => {
+		await run_ship_return.return_control(
+			ISSUE,
+			'review',
+			{ ...RESUME, conflicts: [conflicted] },
+			OUTPUT,
+		)
+
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'conflict')
 	})
 })
 

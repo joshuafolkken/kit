@@ -98,8 +98,12 @@ async function issue_comment(issue_number: string, body: string, repo?: string):
 // **after** the epic body already carries the record, so a refused comment costs that child's copy and
 // nothing else — an exception there would leave the caller unable to tell a landed insertion from one
 // that wrote nothing.
-async function issue_try_comment(issue_number: string, body: string): Promise<boolean> {
-	return await did_write_succeed(async () => await issue_comment(issue_number, body))
+async function issue_try_comment(
+	issue_number: string,
+	body: string,
+	repo?: string,
+): Promise<boolean> {
+	return await did_write_succeed(async () => await issue_comment(issue_number, body, repo))
 }
 
 // `gh issue close --comment` posted the comment and closed the issue in one call; REST splits them.
@@ -211,6 +215,8 @@ function issue_create_request(input: {
 			body: input.body,
 		}),
 		jq_filter: HTML_URL_FILTER,
+		// A 502 can follow an issue GitHub already opened, and a retry would open a second one.
+		should_retry: false,
 	}
 }
 

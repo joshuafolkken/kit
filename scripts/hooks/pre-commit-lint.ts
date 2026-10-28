@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { core_budget } from '#scripts/gate/core-budget'
+import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
+import { hook_decision } from '#scripts/josh/hook-decision'
 import {
 	CSPELL_COMMIT_CACHE_FLAGS,
 	ESLINT_COMMIT_CACHE_FILE,
@@ -51,8 +53,13 @@ const TOOL_BUDGETS: Readonly<Record<string, 'spell_check' | 'format' | 'eslint_s
 	eslint: 'eslint_scan',
 }
 
-const USAGE = `Usage: josh pre-commit-lint <${Object.keys(TOOL_ARGUMENTS).join('|')}> [files...]`
+const SUCCESS_EXIT_CODE = 0
 
+const USAGE = `Usage: josh pre-commit-lint <${Object.keys(TOOL_ARGUMENTS).join('|')}> [files...]`
+const END_OF_OPTIONS = '--'
+
+// The staged files follow `--`, so a file named `--plugin=x.mjs` is read as a file, never as an
+// option that loads code (joshuafolkken/kit#4634).
 function build_arguments(
 	tool: string,
 	staged_files: ReadonlyArray<string>,
@@ -60,7 +67,7 @@ function build_arguments(
 	const tool_arguments = TOOL_ARGUMENTS[tool]
 	if (tool_arguments === undefined) return undefined
 
-	return [...tool_arguments, ...staged_files]
+	return [...tool_arguments, END_OF_OPTIONS, ...staged_files]
 }
 
 // eslint goes through the lane's warm daemon when one is reachable (joshuafolkken/kit#4358): the same
@@ -92,6 +99,10 @@ async function run_reserved(tool: string, staged_files: ReadonlyArray<string>): 
 	return await run_tool(command_arguments)
 }
 
+function is_switched_on(): boolean {
+	return hook_decision.is_switch_enabled(pre_commit_lint_switch.SWITCH_ENV_KEY)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const [tool = '', ...staged_files] = argv
 	const budget = TOOL_BUDGETS[tool]
@@ -101,6 +112,8 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 		return USAGE_ERROR_EXIT_CODE
 	}
+
+	if (!is_switched_on()) return SUCCESS_EXIT_CODE
 
 	return await core_budget.with_command_reservation(
 		core_budget.CORE_WEIGHTS[budget],

@@ -1,5 +1,6 @@
 import { deferred_answer, type DeferredAnswer } from '#scripts/git/deferred-answer-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { followup_coderabbit_retrigger } from './followup-coderabbit-retrigger'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
@@ -21,8 +22,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 		pr_get_url: vi.fn(),
 		pr_get_body: vi.fn(),
 		pr_get_review_comments: vi.fn(),
+		pr_get_comments: vi.fn(),
 		pr_merge: vi.fn(),
 		pr_comment: vi.fn(),
+		is_head_moved: vi.fn(() => false),
 	},
 }))
 
@@ -63,11 +66,11 @@ vi.mock('#scripts/epic/epic-close', () => ({
 	epic_close: { close_completed_epics: vi.fn() },
 }))
 
-// The same rule as the auto-close above, applied to the path that suite missed. `notify_completion`
+// The same rule as the auto-close above, applied to the path that suite missed. `completion_sender`
 // asks this collaborator for the unreleased-merge line, and the real one resolves the tip by running
 // `git fetch origin main` — a live round trip, about 4 seconds per test on the machine it was found
 // on, once for every case here that calls `run`. This suite is a *timing* suite, so it was reporting
-// the network as the `telegram` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
+// the network as the `telegram-and-merge` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
 // the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
 // `tools/test/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
 // suite outright instead of quietly slowing it down.
@@ -85,7 +88,7 @@ vi.mock('./git-followup-pending', () => ({
 	},
 }))
 
-const { lane_ledger } = await import('#scripts/lane/lane-ledger')
+const { lane_ledger_write } = await import('#scripts/lane/lane-ledger-write')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
 const { git_pr_ai_review } = await import('#scripts/gh/git-pr-ai-review')
@@ -149,8 +152,7 @@ const MERGED_RUN_STAGES: ReadonlyArray<string> = [
 	STAGE.checks_wait,
 	STAGE.coderabbit_comments,
 	STAGE.ai_review_comments,
-	STAGE.telegram,
-	STAGE.merge,
+	STAGE.telegram_and_merge,
 	STAGE.completion_and_epic_close,
 ]
 
@@ -173,10 +175,11 @@ describe('git_pr_followup.run — the stage block on a run that finished', () =>
 		expect(printed_lines().some((line) => line.startsWith(STAGE_TOTAL_PREFIX))).toBe(true)
 	})
 
-	it('reports no merge stage on a run that merged nothing', async () => {
+	it('reports the send alone on a run that merged nothing', async () => {
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: false })
 
-		expect(printed_stages()).not.toContain(STAGE.merge)
+		expect(printed_stages()).toContain(STAGE.telegram)
+		expect(printed_stages()).not.toContain(STAGE.telegram_and_merge)
 	})
 })
 
@@ -184,17 +187,17 @@ describe('git_pr_followup.run — the stage block on a run that finished', () =>
 // review, so it goes to the lane ledger as well as to the console.
 describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
 	it('records the wait as its own stage', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
 		expect(record.mock.calls.map(([stage]) => stage.stage)).toStrictEqual([
-			lane_ledger.CI_WAIT_STAGE,
+			lane_ledger_write.CI_WAIT_STAGE,
 		])
 	})
 
 	it('records nothing for a run that failed before its wait finished', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 
 		vi.mocked(git_pr_checks.wait_for_pr_success).mockRejectedValue(new Error('checks failed'))
 
@@ -205,8 +208,9 @@ describe('git_pr_followup.run — the CI wait in the lane ledger', () => {
 
 // joshuafolkken/kit#4574: a wait that polled CodeRabbit rate-limited records its part beside it.
 describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () => {
+	// The `e2e` job pins #5295's wiring too: its settle reaches the `ci-wait` row with the issue.
 	it('records the CodeRabbit wait the polls saw beside the CI wait', async () => {
-		const record = vi.spyOn(lane_ledger, 'record_stage').mockResolvedValue()
+		const record = vi.spyOn(lane_ledger_write, 'record_stage').mockResolvedValue()
 		const rate_limited = { name: 'CodeRabbit', status: 'pass', description: 'Rate limited' }
 		const polled = {
 			rollup: [rate_limited],
@@ -218,8 +222,8 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 		vi.spyOn(performance, 'now').mockImplementation(() => (now_ms += 1000))
 		vi.mocked(git_pr_checks.wait_for_pr_success).mockImplementation(
 			async (_branch, _reads, _before, observe) => {
-				await observe?.(polled)
-				await observe?.(polled)
+				await observe?.({ ...polled, rollup: [rate_limited, { name: 'e2e', status: 'pending' }] })
+				await observe?.({ ...polled, rollup: [rate_limited, { name: 'e2e', status: 'pass' }] })
 
 				return { ...polled, head_sha: CHECKED_SHA }
 			},
@@ -228,10 +232,13 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
 		expect(record.mock.calls.map(([stage]) => stage.stage)).toStrictEqual([
-			lane_ledger.CI_WAIT_STAGE,
-			lane_ledger.CODERABBIT_WAIT_STAGE,
-			lane_ledger.CODERABBIT_RATE_LIMIT_STAGE,
+			lane_ledger_write.CI_WAIT_STAGE,
+			lane_ledger_write.CODERABBIT_WAIT_STAGE,
+			lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE,
 		])
+		expect(record.mock.calls[0]?.[0]).toMatchObject({ issue: 42, last_check: 'e2e' })
+		// No comments to read a window from, so the retrigger's stop note reaches the skip notes.
+		expect(printed_lines()).toContain(`⏭ ${followup_coderabbit_retrigger.UNREADABLE_NOTE}`)
 	})
 })
 
@@ -274,14 +281,11 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
-			BASE_INPUT.branch_name,
-			CHECKED_SHA,
-		)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(BASE_INPUT.branch_name, CHECKED_SHA)
 	})
 })
 
-// joshuafolkken/kit#1564: the completion notification is sent on the way to the merge, where a throw
+// joshuafolkken/kit#1564: the completion notification is sent beside the merge, where a throw
 // would leave a reviewed, green pull request unmerged. It goes through the tolerant send, which
 // reports the failure and answers `false`; the throwing form belongs to `pnpm josh notify`, whose
 // whole job is the notification.
@@ -313,6 +317,49 @@ describe('git_pr_followup.run — a notification that reached nobody', () => {
 			BASE_INPUT.branch_name,
 			CHECKED_SHA,
 		)
+	})
+})
+
+// #5080: the send and the merge go out together, and a refused merge waits for the send to finish.
+describe('git_pr_followup.run — the notification beside the merge', () => {
+	it('requests the merge while the notification is still being sent', async () => {
+		const events: Array<string> = []
+
+		vi.mocked(telegram_notify.send_or_report).mockImplementation(async () => {
+			await new Promise((resolve) => {
+				setTimeout(resolve, 0)
+			})
+			events.push('send-end')
+
+			return true
+		})
+		vi.mocked(git_gh_command.pr_merge).mockImplementation(async () => {
+			events.push('merge')
+		})
+
+		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
+
+		expect(events).toStrictEqual(['merge', 'send-end'])
+	})
+
+	it('finishes the send before a refused merge ends the run', async () => {
+		const merge_error = new Error('merge refused')
+		let is_sent = false
+
+		vi.mocked(telegram_notify.send_or_report).mockImplementation(async () => {
+			await new Promise((resolve) => {
+				setTimeout(resolve, 0)
+			})
+			is_sent = true
+
+			return true
+		})
+		vi.mocked(git_gh_command.pr_merge).mockRejectedValue(merge_error)
+
+		await expect(git_pr_followup.run({ ...BASE_INPUT, should_merge: true })).rejects.toBe(
+			merge_error,
+		)
+		expect(is_sent).toBe(true)
 	})
 })
 

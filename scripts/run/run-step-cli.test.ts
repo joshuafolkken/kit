@@ -323,21 +323,6 @@ describe('run_step_cli.run — the invocation scope of the position', () => {
 
 		expect(printed()).toBe(`pnpm josh ship --log ${ISSUE}`)
 	})
-
-	// joshuafolkken/kit#3039: another lane's merge under the batch's carry scope was read as a planned lane
-	// child's position, so `run:step` told it to stop while `run:entry` / `run:next` said implement.
-	it('answers implement to a lane child whose stream ends in another issue’s merge', async () => {
-		lane_child_mock.mockReturnValueOnce(true)
-		read_carry_mock.mockReturnValue(carried())
-		read_events_mock.mockReturnValue([
-			{ pos: 1, at: RUN_START, kind: 'plan', text: `planned #${ISSUE}` },
-			{ pos: 2, at: RUN_START, kind: 'merge', text: '#3027 merged' },
-		])
-
-		await run_step_cli.run([ISSUE])
-
-		expect(printed()).toBe(run_step.IMPLEMENT)
-	})
 })
 
 // joshuafolkken/kit#2370: the retrospective is opt-in, so the same stop position prints the

@@ -1,9 +1,10 @@
-import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { ENV_FILE_NAME } from '#ports'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { session_cite } from '#scripts/issue/session-cite'
 import { file_reader } from '#scripts/lib/read-file'
+import { eslint_warm } from '#scripts/lint/eslint-warm'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { lane_cache } from './lane-cache'
 import { lane_environment } from './lane-environment'
@@ -176,9 +177,12 @@ function guard_install(lane: LaneInfo, result: InstallResult): void {
 
 // **The install is said on the run's stream as it starts**: it is the long part of opening a lane, and
 // `run:board` draws it apart from the work tree being made. Best-effort, as every stage is.
+// **The eslint daemon is warmed once the install lands, unawaited**, so the child's first edit hook
+// lints warm rather than paying the daemon's start (joshuafolkken/kit#4720).
 async function fill(lane: LaneInfo): Promise<void> {
 	await run_event_setup.emit(run_event_setup.installing(lane.issue))
 	guard_install(lane, await lane_install.install_dependencies(lane.directory))
+	eslint_warm.start(lane.directory)
 }
 
 function build_plan(
@@ -200,6 +204,15 @@ function build_plan(
 		environment_content,
 		seat_lock: reservation.lock,
 	}
+}
+
+async function add_worktree(lane: LaneInfo): Promise<void> {
+	mkdirSync(path.dirname(lane.directory), { recursive: true })
+
+	const start_point = await lane_start_point.resolve_for_branch(lane.branch)
+
+	await git_worktree.worktree_add(lane.directory, lane.branch, start_point)
+	await git_worktree.set_upstream(lane.branch)
 }
 
 // The `.env` is written straight after the work tree exists, because the seed is the reason the
@@ -231,12 +244,8 @@ async function materialize(plan: LanePlan, source_root: string): Promise<void> {
 	// genuinely broken lane. The `finally` covers a failure before the `.env`
 	// is written, where nothing was created that should hold it.
 	try {
-		mkdirSync(path.dirname(plan.lane.directory), { recursive: true })
-
-		const start_point = await lane_start_point.resolve_for_branch(plan.lane.branch)
-
-		await git_worktree.worktree_add(plan.lane.directory, plan.lane.branch, start_point)
-		writeFileSync(path.join(plan.lane.directory, ENV_FILE_NAME), plan.environment_content)
+		await add_worktree(plan.lane)
+		lane_registry.write_environment(plan.lane.directory, plan.environment_content)
 		release_seat_lock(plan.seat_lock)
 		lane_cache.seed_caches(source_root, plan.lane.directory)
 		lane_cache.seed_hook_bundles(source_root, plan.lane.directory)

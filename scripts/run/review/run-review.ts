@@ -1,7 +1,7 @@
 // The pure decisions `josh run:review` makes, kept apart from the side effects the same way
 // `run-merge.ts` is kept apart from `run-merge-steps.ts`.
 //
-// `run:review` starts the gate in the background and prints the `/code-review` brief in one call, so a
+// `run:review` starts the gate in the background and writes the `/code-review` brief in one call, so a
 // lane child launches both from a single command and the two overlap rather than running one after the
 // other. Two facts have to be decided from what the stamps say, and both are decided here so a test can
 // pin them without a gate ever running:
@@ -29,20 +29,36 @@ function adopt_verdict(is_gate_green: boolean): AdoptVerdict {
 const GATE_GREEN = 'green'
 const GATE_RUNNING = 'running'
 const GATE_RED = 'red'
+const GATE_MOVED = 'moved'
 
-type GateState = typeof GATE_GREEN | typeof GATE_RUNNING | typeof GATE_RED
+type GateState = typeof GATE_GREEN | typeof GATE_RUNNING | typeof GATE_RED | typeof GATE_MOVED
 
-// The three states the join waits on, decided from two readings the steps take of the stamps a real
-// `josh gate` writes: a green stamp covering this tree, and the in-flight marker's writer still alive.
+// The four states the join waits on, decided from three readings the steps take of the stamps a real
+// `josh gate` writes: a green stamp covering this tree, the in-flight marker's writer still alive, and
+// a green stamp covering the tree this pair's gate started on.
 // Green wins over running, because a gate that has already recorded green is done however the marker
 // reads; a marker whose writer is gone with no green stamp is a gate that finished red or died, which
 // is the safe direction — the join reports red and the verdict is blocked.
-function gate_state(is_green: boolean, is_running: boolean): GateState {
+//
+// **A gate that finished green on a tree that has since moved is not red** (joshuafolkken/kit#4774): a
+// round-1 reviewer fixing in place moves the tree after the gate recorded green, so the stamp no longer
+// covers it. That is `moved` — still not adoptable, but the gate never failed, and the gate that
+// follows re-runs on the moved tree.
+function gate_state(is_green: boolean, is_running: boolean, is_moved = false): GateState {
 	if (is_green) return GATE_GREEN
 	if (is_running) return GATE_RUNNING
+	if (is_moved) return GATE_MOVED
 
 	return GATE_RED
 }
+
+// The `--join` exit code of a `moved` gate, read by `josh ship` (`run-ship-review-steps.ts`).
+const MOVED_EXIT_CODE = 2
+// The `--join` exit code of an unpinned change the background `test:pinned` found
+// (joshuafolkken/kit#4770). `josh ship` never drains it, whatever the reviewer fixed.
+const UNPINNED_EXIT_CODE = 3
+// `josh ship` opens the interaction brief itself, so its `run:review` opens code's alone.
+const CODE_ONLY_FLAG = '--code-only'
 
 function is_gate_settled(state: GateState): boolean {
 	return state !== GATE_RUNNING
@@ -100,9 +116,13 @@ function format_timing(timing: ReviewTiming): string {
 const run_review = {
 	ADOPT,
 	BLOCKED,
+	CODE_ONLY_FLAG,
 	GATE_GREEN,
+	GATE_MOVED,
 	GATE_RED,
 	GATE_RUNNING,
+	MOVED_EXIT_CODE,
+	UNPINNED_EXIT_CODE,
 	adopt_verdict,
 	format_timing,
 	gate_state,
@@ -115,4 +135,4 @@ export type { AdoptVerdict, GateState, ReviewTiming, TimingStart }
 // object their literal types widen to `string`, so a test passing `run_review.GATE_RED` to a
 // `GateState` parameter would not type-check — the same reason `run-liveness.ts` exports its verdicts
 // by name.
-export { GATE_GREEN, GATE_RED, GATE_RUNNING, run_review }
+export { GATE_GREEN, GATE_MOVED, GATE_RED, GATE_RUNNING, run_review }

@@ -67,7 +67,7 @@ unit, run the child in the parent's context and still ask the hand-off at every 
   number, and that it runs as `fullrun #<N>` under that authorization; the unit refuses a brief without
   it.
 - A child whose ship waits on its merge frees its lane — the next child launches beside it, and a
-  stop at `followup` relaunches the child once a place is free: `scripts/backlog/backlog-occupied.ts`.
+  stop at `followup` relaunches the child at most one lane past the limit: `run-ship-place.ts`.
 
 ### What the summary carries, and how long it may be
 
@@ -78,6 +78,8 @@ unit, run the child in the parent's context and still ask the hand-off at every 
   delegated child does not take this route"); decisions not yet logged; what was left undone, on whose
   authority.
 - **Cut**: the changed-file list, per-round review detail, restated rules.
+- Before the final message → `pnpm josh report:lint --child-summary < summary.md` (labels in the
+  session language).
 
 The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
 is unchanged.

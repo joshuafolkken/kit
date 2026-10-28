@@ -52,7 +52,10 @@ vi.mock('./lane-state', () => ({
 	lane_state: { record_change: vi.fn(), read_state: vi.fn(), record_stuck: vi.fn() },
 }))
 
+vi.mock('./lane-plan', () => ({ lane_plan: { release: vi.fn() } }))
+
 const { lane_state } = await import('./lane-state')
+const { lane_plan } = await import('./lane-plan')
 const { lane_spent } = await import('./lane-spent')
 const { git_command } = await import('#scripts/git/git-command')
 const { lane_reap } = await import('./lane-reap')
@@ -131,6 +134,16 @@ describe('closing a lane', () => {
 		expect(outcome.kind).toBe('closed')
 		expect(existsSync(lane.directory)).toBe(false)
 		expect(vi.mocked(git_worktree.branch_delete)).toHaveBeenCalledWith(LANE_BRANCH)
+	})
+
+	// joshuafolkken/kit#4864: the issue's next lane plans afresh rather than inheriting this one's plan —
+	// unless the lane yielded on it (joshuafolkken/kit#4926), which `lane_plan.release` decides.
+	it("releases the ended lane's recorded plan", async () => {
+		lanes_are([open_on_disk(ISSUE, SEED)])
+
+		await lane_close.close_lane(ISSUE)
+
+		expect(vi.mocked(lane_plan.release)).toHaveBeenCalledWith(Number(ISSUE), process.cwd())
 	})
 
 	// The state a crash between `worktree add` and the `.env` write leaves: the issue number still

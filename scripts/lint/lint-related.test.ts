@@ -1,11 +1,15 @@
 import path from 'node:path'
-import { document_byte_check } from '#scripts/document/document-byte-check'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { document_checks } from '#scripts/document/document-checks'
+import { unused_members_check } from '#scripts/exports/unused-members-check'
+import { gate_labels } from '#scripts/gate/gate-labels'
+import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
+import { structural_checks } from '#scripts/gate/structural-checks'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { ESLINT_RELATED_CACHE_FILE } from '#scripts/josh/josh-command-types'
+import { status_icons } from '#scripts/lib/status-icons'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
@@ -25,13 +29,26 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 // Mocked so no case reads this checkout's real green record; unset, it answers "read the whole branch".
 vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(), read_moved: vi.fn() },
+	since_green: { UNMOVED_REASON: 'nothing moved', describe: vi.fn(), read_moved: vi.fn() },
 }))
 // Mocked so the verdict is the mocked lint's alone, never this checkout's real document sizes — an
 // unrelated document over its ceiling mid-work failed the whole-tree fallback case here
-// (joshuafolkken/kit#3208). The ceilings themselves are `document-byte-check.test.ts`.
-vi.mock('#scripts/document/document-byte-check', () => ({
-	document_byte_check: { check_all: vi.fn(), check_files: vi.fn() },
+// (joshuafolkken/kit#3208). The ceilings are the suites of the checks `document-checks.ts` runs.
+vi.mock('#scripts/document/document-checks', () => ({
+	document_checks: { check_all: vi.fn(), check_files: vi.fn() },
+}))
+// Mocked so no case scans this checkout's real program; the scan is `unused-members-check.test.ts`.
+vi.mock('#scripts/exports/unused-members-check', () => ({
+	unused_members_check: { run_unused_members: vi.fn() },
+}))
+// Mocked so no case spawns this checkout's real guard tests; what they report is
+// `structural-checks.test.ts`.
+vi.mock('#scripts/gate/structural-checks', () => ({
+	structural_checks: { run_structural: vi.fn(async () => 0) },
+}))
+// Mocked so no case runs this checkout's real `josh metrics`; what it asks is `metrics-totals.test.ts`.
+vi.mock('#scripts/gate/metrics-totals', () => ({
+	metrics_totals: { growth_notice: vi.fn() },
 }))
 
 const mocked_root = vi.mocked(git_command.repository_root)
@@ -40,8 +57,11 @@ const mocked_scoped = vi.mocked(lint_parallel.run_lint_checks)
 const mocked_whole_tree = vi.mocked(lint_parallel.run_lint_parallel_checks)
 const mocked_record = vi.mocked(scoped_green.record_if_green)
 const mocked_before = vi.mocked(scoped_green.read_before)
-const mocked_byte_all = vi.mocked(document_byte_check.check_all)
-const mocked_byte_files = vi.mocked(document_byte_check.check_files)
+const mocked_byte_all = vi.mocked(document_checks.check_all)
+const mocked_byte_files = vi.mocked(document_checks.check_files)
+const mocked_notice = vi.mocked(metrics_totals.growth_notice)
+const mocked_unused = vi.mocked(unused_members_check.run_unused_members)
+const mocked_structural = vi.mocked(structural_checks.run_structural)
 
 // joshuafolkken/kit#1298: the narrowed run is only worth having if the fallbacks reach the whole
 // tree rather than checking nothing, so both branches are asserted by which runner they called.
@@ -65,8 +85,27 @@ function written_output(): string {
 		.join('')
 }
 
+function expect_recorded(exit_code: number): void {
+	expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
+		before: BEFORE_TREE,
+		exit_code,
+	})
+}
+
+// joshuafolkken/kit#5162: the verdict closes the run, naming the stage that failed.
+function last_line(): string | undefined {
+	return written_output().trimEnd().split('\n').at(-1)
+}
+
 function eslint_arguments(): ReadonlyArray<string> {
 	return mocked_scoped.mock.calls[0]?.[1] ?? []
+}
+
+// The checks a green lint goes on to, each green unless a case says otherwise.
+function green_checks_after_lint(): void {
+	mocked_byte_all.mockReturnValue(0)
+	mocked_byte_files.mockReturnValue(0)
+	mocked_unused.mockResolvedValue(0)
 }
 
 beforeEach(() => {
@@ -76,9 +115,46 @@ beforeEach(() => {
 	mocked_changed.mockResolvedValue([CHANGED_SOURCE])
 	mocked_scoped.mockResolvedValue(0)
 	mocked_whole_tree.mockResolvedValue(0)
-	mocked_before.mockResolvedValue(BEFORE_TREE)
-	mocked_byte_all.mockReturnValue(0)
-	mocked_byte_files.mockReturnValue(0)
+	// As the real one: any argument reads no tree (`scoped-green.test.ts`).
+	mocked_before.mockImplementation(async (argv) => (argv.length === 0 ? BEFORE_TREE : undefined))
+	green_checks_after_lint()
+	mocked_notice.mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#4594: a grown metrics total is reported in the loop rather than first at the
+// detached ship's pre-detach stop.
+describe('lint_related.run_related_lint — the metrics growth notice', () => {
+	const notice = 'josh metrics: 1 total(s) grew past the merge-base'
+
+	it('prints the growth notice beside the lint', async () => {
+		mocked_notice.mockResolvedValue(notice)
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_notice).toHaveBeenCalledWith(REPOSITORY_ROOT)
+		expect(written_output()).toContain(notice)
+	})
+
+	it('skips the whole-repository totals pass on a red lint', async () => {
+		mocked_scoped.mockResolvedValue(FAILED)
+
+		await lint_related.run_related_lint([])
+
+		expect(mocked_notice).not.toHaveBeenCalled()
+	})
+
+	it('skips the whole-repository totals pass on a run narrowed by file arguments', async () => {
+		await lint_related.run_related_lint([CHANGED_SOURCE])
+
+		expect(mocked_notice).not.toHaveBeenCalled()
+	})
+
+	it('keeps the lint exit code and its green record when a total grew', async () => {
+		mocked_notice.mockResolvedValue(notice)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
+		expect_recorded(0)
+	})
 })
 
 describe('lint_related.run_related_lint — the green record', () => {
@@ -93,10 +169,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 	it('hands the recorder that reading and this run’s verdict', async () => {
 		await lint_related.run_related_lint([])
 
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 
 	it('hands the recorder a failing verdict rather than deciding for it', async () => {
@@ -104,10 +177,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 
 		await lint_related.run_related_lint([])
 
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: FAILED,
-		})
+		expect_recorded(FAILED)
 	})
 
 	it('records the whole-tree fallback too, since it is a superset of the changed files', async () => {
@@ -116,10 +186,7 @@ describe('lint_related.run_related_lint — the green record', () => {
 		await lint_related.run_related_lint([])
 
 		expect(mocked_whole_tree).toHaveBeenCalled()
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: 0,
-		})
+		expect_recorded(0)
 	})
 })
 
@@ -144,6 +211,7 @@ describe('lint_related.run_related_lint', () => {
 		await lint_related.run_related_lint([])
 
 		expect(written_output()).toContain(CHANGED_SOURCE)
+		expect(last_line()).toBe(`${status_icons.PASS_ICON} josh lint:related passed`)
 	})
 
 	it('checks the whole tree when the changed files could not be read', async () => {
@@ -168,10 +236,12 @@ describe('lint_related.run_related_lint', () => {
 		mocked_scoped.mockResolvedValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: lint`)
 	})
 })
 
-describe('lint_related.run_related_lint — the document byte check', () => {
+describe('lint_related.run_related_lint — the document checks', () => {
+	// The unused member check (joshuafolkken/kit#4645) falls back with it, to the whole program.
 	it('checks every budgeted document when lint fell back to the whole tree', async () => {
 		mocked_changed.mockResolvedValue([])
 
@@ -179,6 +249,7 @@ describe('lint_related.run_related_lint — the document byte check', () => {
 
 		expect(mocked_byte_all).toHaveBeenCalledWith(REPOSITORY_ROOT)
 		expect(mocked_byte_files).not.toHaveBeenCalled()
+		expect(mocked_unused).toHaveBeenCalledWith(REPOSITORY_ROOT, undefined)
 	})
 
 	it('checks only the narrowed files when lint was narrowed', async () => {
@@ -197,14 +268,51 @@ describe('lint_related.run_related_lint — the document byte check', () => {
 		expect(mocked_byte_files).not.toHaveBeenCalled()
 	})
 
-	it('returns and records a byte-check failure after a green lint', async () => {
+	it('returns and records a byte-check failure after a green lint, skipping the unused member check', async () => {
 		mocked_byte_files.mockReturnValue(FAILED)
 
 		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
-		expect(mocked_record).toHaveBeenCalledWith(review_stamps.lint_related_stamp, {
-			before: BEFORE_TREE,
-			exit_code: FAILED,
-		})
+		expect(mocked_unused).not.toHaveBeenCalled()
+		expect_recorded(FAILED)
+	})
+})
+
+// joshuafolkken/kit#4645: an unused namespace member is reported in the loop rather than first at
+// the detached ship's pre-detach gate.
+describe('lint_related.run_related_lint — the unused namespace member check', () => {
+	it('narrows the check to the changed files when lint was narrowed', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(mocked_unused.mock.calls[0]?.[0]).toBe(REPOSITORY_ROOT)
+		expect(mocked_unused.mock.calls[0]?.[1]).toContain(ABSOLUTE_SOURCE)
+	})
+
+	it('returns an unused member it found as the run’s failure', async () => {
+		mocked_unused.mockResolvedValue(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(last_line()).toBe(`${status_icons.FAIL_ICON} josh lint:related failed: unused members`)
+	})
+})
+
+// joshuafolkken/kit#4643: the structural checks a ship stopped on, answered beside the lint.
+describe('lint_related.run_related_lint — the structural checks', () => {
+	it('runs them over the scope the lint read, before the lint finishes', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(mocked_structural.mock.calls[0]?.[0].files).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_structural.mock.calls[0]?.[1]).toBe(REPOSITORY_ROOT)
+		expect(mocked_structural.mock.invocationCallOrder[0]).toBeLessThan(
+			mocked_scoped.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('returns and records a structural failure after a green lint, skipping the byte check', async () => {
+		mocked_structural.mockResolvedValueOnce(FAILED)
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(FAILED)
+		expect(mocked_byte_files).not.toHaveBeenCalled()
+		expect_recorded(FAILED)
 	})
 })
 
@@ -243,14 +351,18 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		mocked_changed.mockResolvedValue([CHANGED_SOURCE, path.relative(REPOSITORY_ROOT, other_source)])
 	})
 
-	it('lints only the files moved since its own green record', async () => {
+	// joshuafolkken/kit#4655: the tree read for the record is the one handed over, so a bare run reads
+	// it once — `since-green.test.ts` pins that a handed tree is not read again.
+	it('lints only the files moved since its own green record, read on the record’s tree', async () => {
 		vi.mocked(since_green.read_moved).mockResolvedValue([CHANGED_SOURCE])
 
 		await lint_related.run_related_lint([])
 
 		expect(since_green.read_moved).toHaveBeenCalledWith(
 			review_stamps.lint_related_stamp,
-			gate_plan.LINT_LABEL,
+			gate_labels.LINT_LABEL,
+			undefined,
+			BEFORE_TREE,
 		)
 		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
 		expect(eslint_arguments()).not.toContain(other_source)
@@ -268,5 +380,38 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 		await lint_related.run_related_lint([CHANGED_SOURCE])
 
 		expect(since_green.read_moved).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#4593: a re-run with no edit since its green run re-linted the whole branch diff.
+describe('lint_related.run_related_lint — nothing moved since the last green run', () => {
+	it('returns green without starting a linter or the byte check', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue([])
+
+		await expect(lint_related.run_related_lint([])).resolves.toBe(0)
+		expect(mocked_scoped).not.toHaveBeenCalled()
+		expect(mocked_whole_tree).not.toHaveBeenCalled()
+		expect(mocked_byte_files).not.toHaveBeenCalled()
+		expect(written_output()).toContain(since_green.UNMOVED_REASON)
+	})
+
+	// A main sync can move the base while moving no path; a record left on the old base refuses the gate.
+	it('still hands the recorder its green verdict, so the record follows a moved base', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue([])
+
+		await lint_related.run_related_lint([])
+
+		expect_recorded(0)
+	})
+
+	// No record (a red run writes none, `scoped-green.test.ts`), other inputs, or a moved configuration
+	// all answer `undefined` (`since-green.test.ts`).
+	it('lints the branch change when the record cannot vouch for this tree', async () => {
+		vi.mocked(since_green.read_moved).mockResolvedValue(undefined)
+
+		await lint_related.run_related_lint([])
+
+		expect(eslint_arguments()).toContain(ABSOLUTE_SOURCE)
+		expect(mocked_record).toHaveBeenCalledOnce()
 	})
 })

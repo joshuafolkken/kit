@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
@@ -14,6 +15,7 @@ import { gate_plan, type GatePlan } from './gate-plan'
 import { gate_report, type GateStepResult } from './gate-report'
 import { gate_run_steps, type ReusedChecks } from './gate-run-steps'
 import { gate_skip } from './gate-skip'
+import { gate_static_group } from './gate-static-group'
 import { build_gate_step, build_gate_steps, UNIT_WORKER_FLAG } from './gate-steps'
 import { gate_tree, type GateTree } from './gate-tree'
 import { project_checks } from './project-checks'
@@ -168,15 +170,26 @@ async function run_marked_gate<T>(
 // **The free cores do not cap the plan** (joshuafolkken/kit#4167). The unit claim's admission narrows it
 // to the room the outside load leaves, read over its wait rather than once at the gate's start — a
 // width fixed off one busy instant held for the whole suite (`core_admission.is_too_narrow`).
-function announce_gate_plan(is_unit_included: boolean, available_cores: number): GatePlan {
+//
+// A `--static-group` narrows the resolved plan's checks and keeps its concurrency, which the full static
+// set sized: a cap above the narrowed count never binds.
+function announce_gate_plan(
+	is_unit_included: boolean,
+	available_cores: number,
+	static_group?: string,
+): GatePlan {
 	const concurrent_runs = unit_worker_share.live_run_count() + unit_worker_share.SOLO_RUNS
 	const is_kit_repository = project_checks.is_kit_repository(process.cwd())
-	const plan = gate_plan.resolve_gate_plan(
+	const resolved = gate_plan.resolve_gate_plan(
 		available_cores,
 		concurrent_runs,
 		is_unit_included,
 		is_kit_repository,
 	)
+	const plan = {
+		...resolved,
+		checks: gate_static_group.narrow_checks(resolved.checks, static_group),
+	}
 
 	process.stdout.write(`${gate_plan.format_gate_plan(plan, available_cores, concurrent_runs)}\n`)
 
@@ -195,6 +208,8 @@ interface GateOptions {
 	// Whether the unit suite is one of this gate's checks. Defaults to true everywhere; only
 	// `--no-unit` turns it off, for the CI job that runs the suite on a runner of its own.
 	is_unit_included?: boolean
+	// The one static group a CI matrix leg runs (`gate-static-group.ts`); set only with the unit suite off.
+	static_group?: string | undefined
 	stamp_path?: string
 	marker_path?: string
 	// The gate log's destination, a parameter for the same reason the two above are: this suite runs
@@ -253,7 +268,10 @@ function scoped_precheck_refusal(tree: GateTree, options: GateOptions): string |
 		return undefined
 	}
 
-	return scoped_green.refusal_for(tree.files, tree.base, options.scoped_sources)
+	return scoped_green.refusal_for(tree.files, tree.base, {
+		is_lane_child: lane_child_marker.is_child_of(process.cwd()),
+		...options.scoped_sources,
+	})
 }
 
 // **A partial gate records nothing green, and this is the same rule as the skip one layer out**.
@@ -318,7 +336,7 @@ async function run_checked_gate(
 	// Resolved at the gate's entry, before this gate sets `JOSH_UNIT_RUN_MARKED`, so a gate nested in the
 	// unit suite reads the flag as set and reserves nothing.
 	const budget = gate_run_steps.default_budget()
-	const plan = announce_gate_plan(is_unit_included, budget.available_cores)
+	const plan = announce_gate_plan(is_unit_included, budget.available_cores, options.static_group)
 	const reused = await checks_to_reuse(plan, tree, options)
 
 	// **The gate holds the unit-run marker for its whole run, not just its unit step.** The step that
@@ -406,31 +424,48 @@ const ACCEPTED_FLAGS: ReadonlyArray<string> = [VERBOSE_FLAG, gate_skip.FORCE_FLA
 
 // The flags are the caller's, the destinations are the run's, so the two are merged here rather than
 // letting an option override a flag the user typed.
+function unknown_arguments(extra_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
+	return extra_arguments.filter(
+		(argument) =>
+			!ACCEPTED_FLAGS.includes(argument) && gate_static_group.group_of(argument) === undefined,
+	)
+}
+
+// The shared refusal, plus the arguments it is actually about. Some flags are accepted, so the bare
+// "takes no extra arguments" would send a reader to drop the ones that work. The list is interpolated
+// rather than spelled out here, so adding a flag cannot leave this line stale.
+function write_refusal(unknown: ReadonlyArray<string>): void {
+	const groups = Object.keys(gate_static_group.STATIC_GROUPS).join('|')
+
+	process.stderr.write(
+		`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
+			`  refused: ${unknown.join(' ')}\n` +
+			`  accepted here: ${ACCEPTED_FLAGS.join(' ')} ${gate_static_group.STATIC_GROUP_FLAG_PREFIX}<${groups}>\n`,
+	)
+}
+
 async function run_gate_command(
 	extra_arguments: ReadonlyArray<string>,
 	options: GateOptions = {},
 ): Promise<number> {
-	const unknown = extra_arguments.filter((argument) => !ACCEPTED_FLAGS.includes(argument))
+	const unknown = unknown_arguments(extra_arguments)
 
 	if (unknown.length > 0) {
-		// The shared refusal, plus the arguments it is actually about. Some flags are accepted, so the
-		// bare "takes no extra arguments" would send a reader to drop the ones that work. The list is
-		// interpolated rather than spelled out here, so adding a flag cannot leave this line stale.
-		process.stderr.write(
-			`${composite_arguments.format_rejection(GATE_COMMAND, GATE_TARGETS)}\n` +
-				`  refused: ${unknown.join(' ')}\n` +
-				`  accepted here: ${ACCEPTED_FLAGS.join(' ')}\n`,
-		)
+		write_refusal(unknown)
 
 		return USAGE_ERROR_EXIT_CODE
 	}
+
+	// A static group is a part of the static set, so it implies `--no-unit` and every withholding that flag carries.
+	const static_group = gate_static_group.find_group(extra_arguments)
 
 	return await run_verification_gate({
 		is_scoped_enforced: true,
 		...options,
 		is_verbose: extra_arguments.includes(VERBOSE_FLAG),
 		is_forced: extra_arguments.includes(gate_skip.FORCE_FLAG),
-		is_unit_included: !extra_arguments.includes(NO_UNIT_FLAG),
+		is_unit_included: !extra_arguments.includes(NO_UNIT_FLAG) && static_group === undefined,
+		static_group,
 	})
 }
 
@@ -440,7 +475,7 @@ async function run_gate_command(
 // process end on its own, which it can, since every child has already exited by here.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run_gate_command(process.argv.slice(FIRST_ARGUMENT_INDEX), {
-		ledger_path: await lane_ledger.target(),
+		ledger_path: await lane_ledger_write.target(),
 		check_records: check_reuse.DEFAULT_RECORDS,
 	})
 }

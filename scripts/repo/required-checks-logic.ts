@@ -22,7 +22,10 @@ const REQUIRED_STATUS_CHECKS = 'required_status_checks'
 const NOT_FOUND_STATUS = 404
 
 const DISTRIBUTED_CHECKS: ReadonlyArray<WorkflowChecks> = [
-	{ workflow: CI_WORKFLOW, checks: ['Checks', 'Detect E2E', 'E2E', 'Security Audit'] },
+	{
+		workflow: CI_WORKFLOW,
+		checks: ['Checks', 'Detect E2E', 'E2E', 'Secret Scan', 'Security Audit'],
+	},
 	{ workflow: SONAR_WORKFLOW, checks: ['SonarQube'] },
 	{ workflow: CLASSIFICATION_WORKFLOW, checks: ['Release classification'] },
 ]

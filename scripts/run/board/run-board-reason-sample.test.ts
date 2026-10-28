@@ -12,6 +12,7 @@ import { run_board_reason } from './run-board-reason'
 const REPO = 'joshuafolkken/kit'
 const ROW = 4330
 const PR = 4313
+const NOW_MS = Date.parse('2026-10-20T00:00:00.000Z')
 const { WAIT_ICONS } = run_board_labels
 const BODY = `## 背景\n\n- 実施可能条件: #${String(PR)} のマージ後 10 マージ\n`
 
@@ -43,6 +44,7 @@ function reason(): RowReason | undefined {
 		events: [],
 		free_lanes: 1,
 		is_stopped: false,
+		now_ms: NOW_MS,
 	}
 
 	return run_board_reason.reader(read)(row(), [])
@@ -56,7 +58,8 @@ describe('run_board_reason.reader — a row waiting on its declared samples', ()
 	it('says the merges counted of those the body waits on', () => {
 		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({
 			kind: 'short',
-			pr: PR,
+			cited: PR,
+			via: 'pull',
 			counted: 3,
 			needed: 10,
 		})
@@ -64,8 +67,8 @@ describe('run_board_reason.reader — a row waiting on its declared samples', ()
 		expect(reason()).toStrictEqual({ icon: WAIT_ICONS.not_before, value: '3/10' })
 	})
 
-	it('names the pull request while it has not merged', () => {
-		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({ kind: 'unmerged', pr: PR })
+	it.each(['pull', 'issue'] as const)('names the cited %s while it has not merged', (via) => {
+		vi.spyOn(issue_sample_gate, 'wait_of').mockReturnValue({ kind: 'unmerged', cited: PR, via })
 
 		expect(reason()).toStrictEqual({ icon: WAIT_ICONS.not_before, issues: [String(PR)] })
 	})

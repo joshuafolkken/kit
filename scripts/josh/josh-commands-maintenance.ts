@@ -85,6 +85,21 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '', note: 'verify when the lockfile or its policy moved' }],
 		},
 	},
+	'command:derive': {
+		script: 'tools/document/command-derive.ts',
+		description:
+			'Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings',
+		category: 'Maintenance',
+		reference: ['', 'maintainer', ['files']],
+		// Kit-only: the pages it writes are kit's own documentation, and the script lives under the
+		// undistributed `tools/`.
+		is_kit_only: true,
+		// The command-map snapshot runs through one single-file vitest run.
+		core_weight: 1,
+		usage: {
+			examples: [{ arguments: '', note: 'after adding, renaming or describing a command' }],
+		},
+	},
 	'audit:provision': {
 		script: 'scripts/security/security-audit-provision-main.ts',
 		description: 'Install the pinned osv-scanner when the audit cannot find one (no-op if present)',

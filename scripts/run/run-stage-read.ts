@@ -1,4 +1,4 @@
-import { has_label_name, PLANNED_LABEL } from '#scripts/issue/issue-labels'
+import { issue_state } from '#scripts/issue/issue-state'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { run_halfrun_resume } from './run-halfrun-resume'
 import { run_prrun_resume, type PrrunToken } from './run-prrun-resume'
@@ -21,10 +21,6 @@ interface StageRead {
 
 function is_closed(read: StateRead): boolean {
 	return read.kind === 'state' && read.state.state === CLOSED
-}
-
-function is_planned(read: StateRead): boolean {
-	return read.kind === 'state' && has_label_name(read.state.labels, PLANNED_LABEL)
 }
 
 // The two stops are one hold record, so at most one is present; the `prrun` one is asked only when the
@@ -50,7 +46,7 @@ async function read_stage(issue: string): Promise<StageRead> {
 		is_closed: is_closed(issue_read),
 		is_prrun_stopped: stop.prrun_token !== undefined,
 		is_halfrun_stopped: stop.is_halfrun_stopped,
-		is_planned: is_planned(issue_read),
+		is_planned: issue_state.is_planned(issue_read),
 	})
 
 	return { state, prrun_token: stop.prrun_token }

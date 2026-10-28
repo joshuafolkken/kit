@@ -62,6 +62,7 @@ function rows(extra: Partial<ReasonRead> = {}): Array<Array<string | number | un
 		free_lanes: 1,
 		carry: CARRY,
 		is_stopped: false,
+		now_ms: Date.parse(OPENING_AT),
 		...extra,
 	})
 

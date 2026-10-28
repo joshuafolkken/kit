@@ -56,6 +56,7 @@ function problems(body: string): ReadonlyArray<string> {
 		bug_classification_problem(body),
 		label_conflict(body),
 		defect_origin_line.problem(body),
+		defect_origin_line.reproduction_problem(body),
 	]
 
 	return found.filter((problem) => problem !== undefined)

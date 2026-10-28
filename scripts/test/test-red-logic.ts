@@ -1,3 +1,4 @@
+import node_path from 'node:path'
 import { issue_bug_label } from '#scripts/issue/issue-bug-label'
 import { json_value } from '#scripts/lib/json-value'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
@@ -11,7 +12,15 @@ import { test_declared_logic } from './test-declared-logic'
 // that test catches anything — the added and changed tests run against the merge-base, and at least one
 // of them has to fail there.
 
-type RedVerdict = 'red' | 'green' | 'no-test' | 'test-only'
+type RedVerdict = 'red' | 'green' | 'no-test' | 'stopped' | 'test-only'
+
+// One run's verdict and the test files that failed in it. `ran` is the number of test files the run
+// ran, absent on a verdict read back from a cache (joshuafolkken/kit#5078).
+interface RedProbe {
+	verdict: RedVerdict
+	failed: ReadonlyArray<string>
+	ran?: number
+}
 
 // The declaration a bug-fix Issue carries under its background heading, in the same slot as the
 // behavior-change declaration (`behavior-change-lint.ts`). Read from the declaration, never inferred,
@@ -55,23 +64,53 @@ function ran_file_count(report: string): number {
 	return json_value.parse_with(report, REPORT_SCHEMA)?.testResults.length ?? 0
 }
 
-// `no-test` when nothing ran; otherwise a failing run is `red` — the test caught the pre-fix tree — and
-// a passing one is `green`.
+// The test files a run failed in, as `josh test:pinned` stores them beside a `red` verdict
+// (joshuafolkken/kit#4790). Vitest names each by its absolute path, under the tree's own path or its real
+// one — a macOS temporary directory sits behind `/var` → `/private/var` — so each is read relative to the
+// first of `roots` it sits under. An unreadable report fails none.
+const RESULT_SCHEMA = z.object({ name: z.string(), status: z.string() })
+const RESULTS_SCHEMA = z.object({ testResults: z.array(RESULT_SCHEMA) })
+const FAILED_STATUS = 'failed'
+const PARENT_PREFIX = '..'
+
+function is_inside(name: string): boolean {
+	return !name.startsWith(PARENT_PREFIX) && !node_path.isAbsolute(name)
+}
+
+function relative_in(roots: ReadonlyArray<string>, file: string): Array<string> {
+	const relatives = roots.map((root) => node_path.relative(root, file))
+
+	return relatives.filter((name) => is_inside(name)).slice(0, 1)
+}
+
+function failed_files(report: string, roots: ReadonlyArray<string>): Array<string> {
+	const results = json_value.parse_with(report, RESULTS_SCHEMA)?.testResults ?? []
+
+	return results
+		.filter((result) => result.status === FAILED_STATUS)
+		.flatMap((result) => relative_in(roots, result.name))
+}
+
+// `no-test` when nothing ran and vitest passed with no tests; `stopped` when nothing ran and it failed
+// anyway — its config could not load, so no test was ever asked (joshuafolkken/kit#5043). Otherwise a
+// failing run is `red` — the test caught the pre-fix tree — and a passing one is `green`.
 function verdict_for(test_count: number, is_failed: boolean): RedVerdict {
-	if (test_count === 0) return 'no-test'
+	if (test_count === 0) return is_failed ? 'stopped' : 'no-test'
 
 	return is_failed ? 'red' : 'green'
 }
 
 // Only `green` on a declared bug fix is refused. `no-test` is already `josh test:declared`'s refusal
-// when a runtime file changed, a declared fix that touched only docs has nothing to reproduce, and a
-// `test-only` fix runs the same code on the merge-base as on HEAD.
+// when a runtime file changed, a declared fix that touched only docs has nothing to reproduce, a
+// `stopped` run asked no test, so it is neither red evidence nor green, and a `test-only` fix runs the
+// same code on the merge-base as on HEAD.
 function is_refused(body: string, verdict: RedVerdict): boolean {
 	return verdict === 'green' && is_bug_fix(body)
 }
 
 const test_red_logic = {
 	BUG_DECLARATION_LINE,
+	failed_files,
 	is_bug_fix,
 	is_refused,
 	is_test_only,
@@ -80,5 +119,5 @@ const test_red_logic = {
 	verdict_for,
 }
 
-export type { RedVerdict }
+export type { RedProbe, RedVerdict }
 export { test_red_logic }

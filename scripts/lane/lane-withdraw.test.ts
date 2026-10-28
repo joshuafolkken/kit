@@ -25,6 +25,8 @@ const DIRECTORY = path.join(os.tmpdir(), 'josh-test-lanes', `${ISSUE}-lane`)
 const STASH = `${ISSUE}: uncommitted work at lane withdraw`
 const PID = 4242
 const LOCK_ERROR = 'index.lock exists'
+const STAYS_OPEN = 'stays open'
+const WITHDRAW_COMMAND = 'lane:withdraw'
 
 const LANE: LaneInfo = {
 	issue: ISSUE,
@@ -109,9 +111,11 @@ describe('lane_withdraw.withdraw — the order of the steps', () => {
 		expect(order).toStrictEqual(order.toSorted((left, right) => left - right))
 		expect(outcome).toStrictEqual({
 			kind: 'withdrawn',
+			by: 'person',
 			reaped: 1,
 			stash: undefined,
 			is_noted: true,
+			is_closed: false,
 			lane: 'closed',
 			residents: [],
 		})
@@ -141,7 +145,7 @@ describe('lane_withdraw.withdraw — the issue stays open', () => {
 	it('says on the issue and in the report that the next run offers it again', async () => {
 		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining('stays open'))
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining(STAYS_OPEN))
 		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.stringContaining('next run'))
 		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('The Issue stays open')
 	})
@@ -194,7 +198,7 @@ describe('lane_withdraw.withdraw — the lane state record', () => {
 		expect(record_change).toHaveBeenCalledExactlyOnceWith({
 			issue: ISSUE,
 			state: 'ended',
-			command: 'lane:withdraw',
+			command: WITHDRAW_COMMAND,
 		})
 		expect(first_call(record_change)).toBeGreaterThan(first_call(close_lane))
 	})
@@ -210,13 +214,87 @@ describe('lane_withdraw.withdraw — the lane state record', () => {
 	})
 })
 
-describe('lane_withdraw.withdraw — refusals write nothing', () => {
-	it('refuses a closed issue', async () => {
+// joshuafolkken/kit#4915: an issue closed on GitHub while its lane stayed open still has a lane to close.
+describe('lane_withdraw.withdraw — a closed issue with a lane still open', () => {
+	it('stops the child, keeps the work and closes the lane', async () => {
 		read_issue.mockResolvedValue(state_read('closed'))
+		changes_probe.mockResolvedValue(true)
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
 
-		expect(await lane_withdraw.withdraw(ISSUE, REASON)).toStrictEqual({ kind: 'closed' })
-		expect(find_open_lane).not.toHaveBeenCalled()
+		expect(outcome).toMatchObject({ kind: 'withdrawn', is_closed: true, stash: STASH })
+		expect(reap_child).toHaveBeenCalledWith(LANE)
+		expect(push).toHaveBeenCalledWith(STASH, DIRECTORY)
+		expect(close_lane).toHaveBeenCalledWith(ISSUE)
+		expect(record_change).toHaveBeenCalledWith(expect.objectContaining({ state: 'ended' }))
+	})
+
+	it('does not say the issue stays open', async () => {
+		read_issue.mockResolvedValue(state_read('CLOSED'))
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.not.stringContaining(STAYS_OPEN))
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('already closed')
+		expect(gh_api).not.toHaveBeenCalled()
+	})
+
+	it('names the supervisor, not a person, when its sweep withdraws the lane', async () => {
+		read_issue.mockResolvedValue(state_read('CLOSED'))
+		changes_probe.mockResolvedValue(true)
+		await lane_withdraw.withdraw(ISSUE, REASON, 'supervisor')
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.WITHDRAW,
+			`#${ISSUE} withdrawn by the run:wake supervisor: ${REASON}`,
+		)
+		expect(try_comment).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining('`run:wake` supervisor'),
+		)
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.not.stringContaining(WITHDRAW_COMMAND))
+		expect(announce).toHaveBeenCalledWith(ISSUE, STASH, expect.stringContaining('supervisor'))
+	})
+})
+
+// joshuafolkken/kit#4916: `run:merge` withdraws a returned child whose issue closed without a merge.
+describe('lane_withdraw.withdraw — by run:merge', () => {
+	it('names run:merge when it withdraws a lane closed without a merge', async () => {
+		read_issue.mockResolvedValue(state_read('CLOSED'))
+		changes_probe.mockResolvedValue(true)
+		await lane_withdraw.withdraw(ISSUE, REASON, 'merge')
+
+		expect(emit).toHaveBeenCalledWith(
+			run_event_stream.EVENT_KIND.WITHDRAW,
+			`#${ISSUE} withdrawn by the run:merge driver: ${REASON}`,
+		)
+		expect(try_comment).toHaveBeenCalledWith(
+			ISSUE,
+			expect.stringContaining('withdrawn by `pnpm josh run:merge` after the Issue was closed'),
+		)
+		expect(try_comment).toHaveBeenCalledWith(ISSUE, expect.not.stringContaining(WITHDRAW_COMMAND))
+	})
+})
+
+// joshuafolkken/kit#4926: a lane given back stays in the run, so its report does not say this run
+// drops it.
+describe('lane_withdraw.withdraw — a yielded lane', () => {
+	it('says the issue is offered again in this run once the holding lane ends', async () => {
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON, 'yield')
+		const text = lane_withdraw.describe(outcome, ISSUE)
+
+		expect(text).toContain('offered again once the holding lane ends')
+		expect(text).not.toContain('this run does not offer it again')
+	})
+})
+
+describe('lane_withdraw.withdraw — refusals write nothing', () => {
+	it('refuses a closed issue with no lane open', async () => {
+		read_issue.mockResolvedValue(state_read('closed'))
+		find_open_lane.mockResolvedValue(undefined)
+		const outcome = await lane_withdraw.withdraw(ISSUE, REASON)
+
+		expect(outcome).toStrictEqual({ kind: 'closed' })
 		expect_nothing_written()
+		expect(lane_withdraw.describe(outcome, ISSUE)).toContain('no lane is open')
 	})
 
 	it('refuses when no lane is open', async () => {

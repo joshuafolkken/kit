@@ -1,8 +1,8 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
+import { concise_reply } from './concise-reply'
 import { filing_offer } from './filing-offer'
-import { issue_citation } from './issue-citation'
 import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
 import { stop_decision, type StopDecision } from './stop-decision'
@@ -22,7 +22,7 @@ import { stop_decision, type StopDecision } from './stop-decision'
 // `pretool-guard` is one — not a second copy of the plumbing.
 //
 // **A rule whose answer is fixed acts; only a rule that needs judgement refuses** (joshuafolkken/kit#3919).
-// The stop notification, the hold release and the citation lines are each one mechanical operation the
+// The stop notification and the hold release are each one mechanical operation the
 // hook can run itself, so they come back as `actions` and the stop goes through: a refusal is a whole
 // model turn spent re-reading the context to run a command the hook already knew. `stop-actions.ts`
 // runs them, and only an action that fails falls back to its refusal. The rest — the reply's language,
@@ -34,7 +34,7 @@ const SWITCH_ENV_KEY = 'JOSH_STOP_GUARD'
 const BLOCK_DECISION = 'block'
 
 // Only the fields the stop rules read. `last_assistant_message` is the turn's session-facing text —
-// Claude Code hands it directly so the transcript's async lag is never in the citation path.
+// Claude Code hands it directly so the transcript's async lag is never in the rules' path.
 const stop_payload_schema = z.object({
 	transcript_path: z.string().min(1),
 	stop_hook_active: z.boolean().nullish(),
@@ -64,8 +64,8 @@ interface StopContext {
 	notified: boolean
 	// The turn's session-facing reply text.
 	message: string
-	// The person's last prompt — a `#N` it already carried is quoted, not cited.
-	prompt: string
+	// The person's last prompt on the tail — `undefined` when none is on it (`last_prompt.person_prompt`).
+	prompt: string | undefined
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
 	stop_hook_active: boolean
@@ -74,7 +74,7 @@ interface StopContext {
 	// the cut holding the tree by design and hands off to a fresh process (`pre-gate-cut.md`), so that
 	// turn-end is an automatic continuation, not the person-waiting pause the block rules are for.
 	cut_pending: boolean
-	// An Issue filing no guard refused is on this run's transcript tail — `filing_cap`'s count.
+	// An Issue filing no guard refused is on this run's transcript tail — `turn_filings`' count.
 	filed: boolean
 	// The owner of the repository the session runs in, or `undefined` when it cannot be read.
 	session_owner: string | undefined
@@ -91,6 +91,9 @@ interface StopContext {
 	// A backgrounded subagent this run launched has not finished — `lane_background.pending_agent_ids`.
 	// Apart from `background_pending`, since only a subagent is sure to end.
 	agent_pending: boolean
+	// A backgrounded command this run launched has not finished — `lane_background.pending_command_ids`.
+	// Apart from `agent_pending`, since the two are waited on differently.
+	command_pending: boolean
 	// This lane child handed its region to a running detached ship — `lane_handoff.is_handed_off`.
 	// The supervisor notifies on its own outcome, so nobody waits on this stop.
 	handed_off: boolean
@@ -108,7 +111,6 @@ interface StopContext {
 type StopAction =
 	| { kind: 'notify'; issue: string; message: string; decision: StopDecision }
 	| { kind: 'release'; issue: string }
-	| { kind: 'cite'; references: ReadonlyArray<string> }
 
 // `reason` refuses the stop; otherwise `actions` run, and `blocks_on_failure` says whether a failed one
 // falls back to its refusal — never past the loop-breaker.
@@ -128,8 +130,8 @@ const STOP_NOTIFY_REASON =
 	'⛔ mid-workflow stop notification: this working tree is still held by a run and no `confirmation` ' +
 	'Telegram was sent this turn. Send ' +
 	'`pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$\'<reason>\' ' +
-	'--recommended "<choice>" --alternative "<choice>"` (`CLAUDE.md` → "Mid-workflow stop ' +
-	'notification"), then confirm in one line that it was sent — do not repeat your previous reply.'
+	'--recommended "<choice>" --alternative "<choice>"` (`rule-delivery.md` → "stop-notify"), ' +
+	'then confirm in one line that it was sent — do not repeat your previous reply.'
 
 // **A clean tree that still holds is a tree the next run will trample.** `working-tree-hold.md`: a stop that
 // leaves the tree clean releases the hold; a `halfrun` pre-commit stop and a `needs-human-review` stop
@@ -140,28 +142,6 @@ const HOLD_RELEASE_REASON =
 	'place. Release it with `pnpm josh run:release <N>` (bare for a `new` entry; ' +
 	'`working-tree-hold.md`), then confirm in one line that it was released — do not repeat your ' +
 	'previous reply.'
-
-// **The fallback when the hook could not print the citation lines itself**. The bare `#N` is already
-// on screen and the hook cannot unsay it, so the reason does the one thing that helps the *next* reply:
-// it names the numbers it detected and hands over the exact `issue:cite` call that prints the
-// paste-ready lines, then asks for the corrected citation lines alone — not the whole reply reissued.
-// Reprinting the whole reply is what made the correction read as a duplicate;
-// the bare copy already scrolled past stays, and the fix follows it as a short correction. The rule
-// itself is not restated — it is resident in `CLAUDE.md` — only pointed at.
-const ISSUE_CITATION_REASON =
-	'Session-facing output cites an Issue as a number-link so the reader can click through and see ' +
-	'which repository it is (`CLAUDE.md`, `prompts/collaboration-workflow/issue-citation.md`).'
-
-function build_citation_reason(references: ReadonlyArray<string>): string {
-	const numbers = references.join(', ')
-	const command = `pnpm josh issue:cite ${issue_citation.cite_arguments(references).join(' ')}`
-
-	return (
-		`⛔ issue citation: your reply names an Issue as a bare \`#N\` (${numbers}). Run \`${command}\` ` +
-		`to print the paste-ready citation lines, then print the corrected citation lines alone — do not ` +
-		`repeat your previous reply. ${ISSUE_CITATION_REASON}`
-	)
-}
 
 // **An offer to file in an unattended run is a Tier A filing deferred to nobody**.
 // The judgement is already made, so the reason hands over the filing chain rather than a question; the
@@ -249,6 +229,13 @@ function language_reason(context: StopContext): string | undefined {
 	return build_language_reason(context.session_lang)
 }
 
+// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`.
+function concise_reason(context: StopContext): string | undefined {
+	if (!concise_reply.is_over(context.message, context.prompt)) return undefined
+
+	return concise_reply.build_reason(context.message)
+}
+
 // The sessions no person answers: one kit launched under `claude -p` (a lane child, a woken session), a
 // dispatched lane child, or the `backlogrun` parent the user handed the backlog to.
 function is_unattended(context: StopContext): boolean {
@@ -295,24 +282,16 @@ function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
-// The bare references the citation lines are printed for. **A headless agent's reply has no reader**:
-// its text lands in a stream-json log, so correcting its citations or its language costs a turn and
-// reaches nobody. The artifacts a person does read — a Telegram, an Issue, a pull request — are held
-// to the same rules by their own guards, not here.
-function bare_references(context: StopContext): ReadonlyArray<string> {
-	if (context.headless_agent) return []
-
-	return issue_citation.unquoted_references(context.message, context.prompt)
-}
-
-// The two rules that read the reply and need the model, the filing offer first. A drifted reply
+// The rules that read the reply and need the model: the filing offer, then the language, then the
+// length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
+// correcting its language costs a turn and reaches nobody. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
 	if (context.headless_agent) return undefined
 
-	return language_reason(context)
+	return language_reason(context) ?? concise_reason(context)
 }
 
 // Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.
@@ -342,11 +321,19 @@ function needs_background_wait(context: StopContext): boolean {
 	return context.lane_child && context.background_pending
 }
 
+// **Only subagents left take their own wait**: their notice comes in when a tool call ends, while a
+// command is waited on through the detached ship.
+function background_wait_reason(context: StopContext): string {
+	if (context.command_pending) return lane_background.LANE_BACKGROUND_STOP_REASON
+
+	return lane_background.LANE_AGENT_STOP_REASON
+}
+
 // The two lane rules that mean the run is not pausing at all — ahead of every action, since the notify
 // would announce a pause the run has no reason to take.
 function lane_reason(context: StopContext): string | undefined {
 	if (needs_index_route(context)) return LANE_INDEX_REASON
-	if (needs_background_wait(context)) return lane_background.LANE_BACKGROUND_STOP_REASON
+	if (needs_background_wait(context)) return background_wait_reason(context)
 
 	return undefined
 }
@@ -382,14 +369,6 @@ function hold_actions(context: StopContext): Array<StopAction> {
 	return needs_release(context) ? [...notify, { kind: 'release', issue }] : notify
 }
 
-// The actions in the order they run: the notify ahead of the release that ends the hold it reports.
-function stop_actions(context: StopContext): ReadonlyArray<StopAction> {
-	const references = bare_references(context)
-	const cite: Array<StopAction> = references.length > 0 ? [{ kind: 'cite', references }] : []
-
-	return [...hold_actions(context), ...cite]
-}
-
 // First-wins across the refusals. `stop_hook_active` is the loop-breaker, so a run that already got one
 // continuation this prompt may stop; the lane rules go first, then the filing offer, then the language.
 //
@@ -418,7 +397,7 @@ function stop_outcome(context: StopContext): StopOutcome {
 	const reason = block_reason(context)
 	if (!runs_actions(context, reason)) return { ...NO_OUTCOME, reason }
 
-	const actions = stop_actions(context)
+	const actions = hold_actions(context)
 	if (actions.length === 0) return NO_OUTCOME
 
 	return { reason, actions, blocks_on_failure: !context.stop_hook_active }
@@ -426,10 +405,7 @@ function stop_outcome(context: StopContext): StopOutcome {
 
 // The refusal an action falls back to when the hook could not run it.
 function fallback_reason(action: StopAction): string {
-	if (action.kind === 'notify') return STOP_NOTIFY_REASON
-	if (action.kind === 'release') return HOLD_RELEASE_REASON
-
-	return build_citation_reason(action.references)
+	return action.kind === 'notify' ? STOP_NOTIFY_REASON : HOLD_RELEASE_REASON
 }
 
 // The documented shape a `Stop` hook blocks with: `reason` is fed back to Claude, which then continues
@@ -460,7 +436,6 @@ const stop_rules = {
 	HEADLESS_REFUSAL_CAP,
 	HEADLESS_WAIT_REASON,
 	HOLD_RELEASE_REASON,
-	ISSUE_CITATION_REASON,
 	LANE_INDEX_REASON,
 	NO_OUTCOME,
 	STOP_NOTIFY_REASON,

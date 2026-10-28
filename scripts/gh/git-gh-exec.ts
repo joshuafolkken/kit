@@ -1,9 +1,11 @@
 import { has_timed_out } from '#scripts/git/git-execa-error'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { error_text } from '#scripts/lib/error-message'
+import { token_shape } from '#scripts/lib/token-shape'
 import { execa, execaSync } from 'execa'
 import { check_gh_installed } from './git-gh-check'
 import { gh_failure } from './git-gh-failure'
+import { gh_retry } from './git-gh-retry'
 
 const BODY_FROM_STDIN = '-'
 
@@ -258,6 +260,7 @@ const INPUT_FLAG = '--input'
 const PAGINATE_FLAG = '--paginate'
 const SLURP_FLAG = '--slurp'
 const JQ_FLAG = '--jq'
+const ALLOW_ESCAPES_FLAG = '--allow-escape-sequences'
 
 // One REST request through `gh api`. `path` is the only required field: a read names nothing else,
 // because `gh api` sends GET when neither `--method` nor a request body is given. **A `body` alone
@@ -292,16 +295,32 @@ interface GhApiRequest {
 	// The checkout gh runs in, which is what `{owner}/{repo}` in `path` resolves against. Absent means
 	// the process's own directory.
 	cwd?: string
+	// `false` for a write that must not be sent twice: a transient failure may follow a write that
+	// already landed, and nothing reads it back (`git-gh-retry.ts`). Absent means retried.
+	should_retry?: boolean
+	// `true` for a plain-text body that carries terminal colors, such as an Actions job log: gh refuses
+	// to print one off a terminal without `--allow-escape-sequences`.
+	should_allow_escapes?: boolean
 }
 
 function optional_flag(flag: string, value?: string): Array<string> {
 	return value === undefined ? [] : [flag, value]
 }
 
+// Every Issue and pull-request body kit writes travels through the two entries below, so a credential
+// pasted into one is refused here, once, before it reaches a public tracker. The writers pass the body
+// JSON-encoded, so it is scanned decoded.
+function refuse_credential_body(request: GhApiRequest): void {
+	if (request.body !== undefined) {
+		token_shape.refuse(token_shape.decoded(request.body), `The gh api ${request.path} body`)
+	}
+}
+
 function to_gh_api_args(request: GhApiRequest): Array<string> {
 	const body_args = request.body === undefined ? [] : [INPUT_FLAG, BODY_FROM_STDIN]
 	const paginate_args = request.should_paginate === true ? [PAGINATE_FLAG] : []
 	const slurp_args = request.should_slurp === true ? [SLURP_FLAG] : []
+	const escape_args = request.should_allow_escapes === true ? [ALLOW_ESCAPES_FLAG] : []
 
 	return [
 		'api',
@@ -310,6 +329,7 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 		...body_args,
 		...paginate_args,
 		...slurp_args,
+		...escape_args,
 		...optional_flag(JQ_FLAG, request.jq_filter),
 	]
 }
@@ -320,8 +340,9 @@ function to_gh_api_args(request: GhApiRequest): Array<string> {
 // `read_gh_api_sync` below.
 //
 // Failure handling funnels through `to_gh_error` on both paths below, so a failed request throws
-// with gh's stderr summary *and* the JSON error body it wrote to stdout.
-async function exec_gh_api(request: GhApiRequest): Promise<string> {
+// with gh's stderr summary *and* the JSON error body it wrote to stdout. A transient failure — a 5xx
+// or no answer at all — is asked again a bounded number of times first (`git-gh-retry.ts`).
+async function send_gh_api(request: GhApiRequest): Promise<string> {
 	const args = to_gh_api_args(request)
 
 	if (request.body === undefined) {
@@ -334,6 +355,14 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 		timeout_ms: request.timeout_ms,
 		cwd: request.cwd,
 	})
+}
+
+async function exec_gh_api(request: GhApiRequest): Promise<string> {
+	refuse_credential_body(request)
+
+	if (request.should_retry === false) return await send_gh_api(request)
+
+	return await gh_retry.with_retry(async () => await send_gh_api(request))
 }
 
 // The synchronous twin of `exec_gh_api`, for a caller that cannot await. `josh propagate` runs each
@@ -357,6 +386,7 @@ async function exec_gh_api(request: GhApiRequest): Promise<string> {
 // the spawn's own failure and is reported like any other, which is what the direct spawn this
 // replaced already did.
 function exec_gh_api_sync(request: GhApiRequest): string {
+	refuse_credential_body(request)
 	const body_option = request.body === undefined ? {} : { input: request.body }
 	const options = { ...body_option, ...to_spawn_options(request.timeout_ms, request.cwd) }
 

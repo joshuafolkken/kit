@@ -1,7 +1,7 @@
 import { loadavg } from 'node:os'
 import { machine_capacity } from '#scripts/gate/machine-capacity'
 import { lane_await } from './lane-await'
-import type { LoadEntry } from './lane-ledger'
+import type { LoadEntry } from './lane-ledger-schema'
 import { lane_process_load } from './lane-process-load'
 import { lane_registry, type LaneInfo } from './lane-registry'
 

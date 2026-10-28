@@ -30,6 +30,7 @@ const EDITED_DIGEST = 'digest-after'
 const FAILED_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const NO_ARGUMENTS: ReadonlyArray<string> = []
+const SHIP_HANDOVER = 'pnpm josh ship --detach --review'
 
 function tree_of(digest: string = DIGEST): Record<string, string> {
 	return { [CHANGED_FILE]: digest }
@@ -198,6 +199,27 @@ describe('missing_scripts', () => {
 	})
 })
 
+// joshuafolkken/kit#5156: `check:related` skips the scripts whose record still describes the tree.
+describe('green_scripts', () => {
+	it('names only the script whose record describes this tree', () => {
+		const planted = sources()
+
+		plant(planted.lint, DIGEST, BASE)
+
+		expect(scoped_green.green_scripts(tree_of(), BASE, planted)).toStrictEqual([
+			scoped_green.LINT_SCRIPT,
+		])
+	})
+
+	it('names no script once the file moved since the records', () => {
+		expect(scoped_green.green_scripts(tree_of(EDITED_DIGEST), BASE, plant_both())).toStrictEqual([])
+	})
+
+	it('names no script when the base could not be resolved, never reading silence as green', () => {
+		expect(scoped_green.green_scripts(tree_of(), undefined, plant_both())).toStrictEqual([])
+	})
+})
+
 describe('refusal_for', () => {
 	it('answers undefined once both records describe this tree', () => {
 		expect(scoped_green.refusal_for(tree_of(), BASE, plant_both())).toBeUndefined()
@@ -208,6 +230,25 @@ describe('refusal_for', () => {
 
 		expect(refusal).toContain(scoped_green.REFUSAL_HEADLINE)
 		expect(refusal).toContain(`${scoped_green.LINT_COMMAND} && ${scoped_green.TEST_COMMAND}`)
+	})
+
+	// The review:brief callers pass no `is_lane_child`, so a lane child refused there reissues it too.
+	it('tells a caller that names no lane child to reissue the command', () => {
+		const refusal = scoped_green.refusal_for(tree_of(), BASE, sources())
+
+		expect(refusal).toContain('and reissue this command.')
+		expect(refusal).not.toContain(SHIP_HANDOVER)
+	})
+
+	// joshuafolkken/kit#4776: a lane child that reissued the gate ran it in the foreground before ship.
+	it('hands a lane child over to ship rather than to the gate again', () => {
+		const refusal = scoped_green.refusal_for(tree_of(), BASE, {
+			...sources(),
+			is_lane_child: true,
+		})
+
+		expect(refusal).toContain(SHIP_HANDOVER)
+		expect(refusal).not.toContain('reissue this command')
 	})
 })
 

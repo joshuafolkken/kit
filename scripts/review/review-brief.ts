@@ -1,6 +1,7 @@
 import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { removed_tests } from './removed-tests'
+import { review_brief_paths } from './review-brief-paths'
 import { review_checkout, type ReviewCheckout } from './review-checkout'
 import { review_diff_parts, type DiffParts } from './review-diff-parts'
 import { review_interaction } from './review-interaction'
@@ -22,6 +23,9 @@ import { review_untouched_readers, type ReadersRead } from './review-untouched-r
 
 const TEST_COMMAND_LINE =
 	'- The unit suite is `pnpm josh test:unit`. Do not reach for `npx vitest`; it is not how this project runs them.'
+// The self-check's question 2 ("Prose matches the code", `prompts/review.md`) as one command.
+const PROSE_STALE_LINE =
+	'- Self-check 2, prose matches the code: `pnpm josh prose:stale` lists each removed name, command, constant or heading docs, prompts or comments still name.'
 
 // **The checkout block, and why the target below names a path instead of assuming one**.
 // `/code-review` is forked by the harness and inherits the session's
@@ -196,12 +200,7 @@ function gate_line(
 	return NOT_VERIFIED_LINE
 }
 
-// Absolute, for the same reason the round-1 target carries `-C`: git prints repository-root-relative
-// paths, and a forked agent sitting in another checkout resolves them against that one — where the
-// same relative path names a different file, or none.
-function format_paths(root: string, paths: ReadonlyArray<string>): string {
-	return paths.map((relative) => `  ${root}/${relative}`).join('\n')
-}
+const { format_paths, high_fix_lines } = review_brief_paths
 
 // **An empty target has two readings, and only one of them is "nothing changed"**.
 // Since the delta is intersected with the change, round 1's fixes can be
@@ -414,6 +413,9 @@ interface BriefInput {
 	// The tree a finished, clean review of this branch was briefed on, so round 1 is a resume.
 	// Absent, round 1 reads the whole change.
 	resumed_from?: FileMapStamp | undefined
+	// The files a recorded High cites (`review_reviewed_tree.high_cited`), named in round 2 as the
+	// High's fix. Absent or empty, no line.
+	high_cited?: ReadonlyArray<string> | undefined
 	// The change written as parts under the Bash output cap. Absent when the
 	// write failed, and the target line alone then names the change.
 	diff?: { parts: DiffParts; cap: number } | undefined
@@ -440,7 +442,10 @@ function round_one_target(input: BriefInput): string {
 function target_block(input: BriefInput): string {
 	if (input.round < SECOND_ROUND) return round_one_target(input)
 
-	return round_two_block(input.stamps.round_one, input.tree, input.checkout.root, input.base)
+	const { root } = input.checkout
+	const block = round_two_block(input.stamps.round_one, input.tree, root, input.base)
+
+	return [block, ...high_fix_lines(root, input.high_cited)].join('\n')
 }
 
 // **Only beside a whole-change target**: each part is a path's diff against
@@ -487,6 +492,7 @@ function compose(input: BriefInput): string {
 		'',
 		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
+		PROSE_STALE_LINE,
 		'',
 		target,
 		...diff_block(input, target),
@@ -509,6 +515,7 @@ const review_brief = {
 	matching_stamp,
 	no_snapshot_line,
 	NOTHING_LEFT_LINE,
+	PROSE_STALE_LINE,
 	rubric_line,
 	RUBRIC_RELATIVE_PATH,
 	ROUND_TWO_HEADING,

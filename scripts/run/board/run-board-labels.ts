@@ -62,6 +62,7 @@ const WORDS = {
 	named: 'named order',
 	held: 'held by triage',
 	headroom: 'memory headroom',
+	usage_limit: 'usage limit',
 	untriaged: 'untriaged',
 	solo: 'runs alone',
 	solo_ahead: 'behind solo',
@@ -95,6 +96,7 @@ const WORDS = {
 	park: 'park',
 	note: 'note',
 	found_during: ' (found during {n})',
+	overrun: 'overrun investigation',
 	// What the run is doing now, where no stage of its own says it.
 	watching: 'watching',
 	pool_empty: 'pool empty',
@@ -188,6 +190,10 @@ const NOTES_ICON = '📌'
 // A plan row the run filed leads its title with it, in place of a findings line naming it again
 // (joshuafolkken/kit#4099).
 const FILED_RUN_MARK = '✚'
+// A merged row whose overrun investigation is running ends on it where no spinner turns
+// (joshuafolkken/kit#4772), and leads its result once it ended (joshuafolkken/kit#4818): the
+// investigate phase's own icon, for the same work.
+const OVERRUN_MARK = PHASE_ICONS.investigate
 const NOTE_ICONS: Readonly<Record<BoardNote['kind'], string>> = {
 	filed: '🆕',
 	park: STATE_ICONS.parked,
@@ -252,8 +258,10 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 // running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
 // judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
 // held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
-// every row icon. The rest are the board's own, shared rather than copied.
+// every row icon, and 🪫 the account's Claude usage limit until it resets (#4796). The rest are the
+// board's own, shared rather than copied.
 const WAIT_ICONS = {
+	usage_limit: '🪫',
 	path: '📂',
 	named: '📋',
 	held: '✋',
@@ -280,6 +288,7 @@ const WAIT_WORDS: ReadonlyArray<readonly [icon: string, word: keyof Words]> = [
 	[WAIT_ICONS.solo, 'solo'],
 	[WAIT_ICONS.solo_ahead, 'solo_ahead'],
 	[WAIT_ICONS.solo_running, 'solo_running'],
+	[WAIT_ICONS.usage_limit, 'usage_limit'],
 	[WAIT_ICONS.memory, 'headroom'],
 	[WAIT_ICONS.untriaged, 'untriaged'],
 	[WAIT_ICONS.blocker, 'waits'],
@@ -366,6 +375,7 @@ const run_board_labels = {
 	NOTES_ICON,
 	NOTE_ICONS,
 	NOW_ICONS,
+	OVERRUN_MARK,
 	PHASE_ICONS,
 	PHASE_WORDS,
 	SPINNER_INTERVAL_MS,

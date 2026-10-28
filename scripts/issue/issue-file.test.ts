@@ -12,9 +12,11 @@ const THERE = 'joshuafolkken/app-kit'
 const ENHANCEMENT_BODY = '## 背景\n\n- 種別: 非不具合\n- 目的: 機能追加\n'
 const DUPLICATE_A = 2801
 const DUPLICATE_B = 2795
+const WITH_ORIGIN = { distinct: [DUPLICATE_A], found_during: String(DUPLICATE_B) }
 const BODY_FLAG = '--body-file'
 const ROUTE_FLAG = '--route'
 const DISTINCT_FLAG = '--distinct'
+const FOUND_DURING_FLAG = '--found-during'
 const EPIC = 'epic'
 const TIER_A = 'route:tier-a'
 const FILED = [TITLE, BODY_FLAG, BODY_FILE]
@@ -28,9 +30,11 @@ function args_of(overrides: Partial<FileArguments> = {}): FileArguments {
 		labels: [],
 		repo: undefined,
 		distinct: [],
+		found_during: undefined,
 		is_over_cap: false,
 		is_auto_ok_opted_out: false,
 		is_release: false,
+		is_blocking_finder: false,
 		...overrides,
 	}
 }
@@ -63,12 +67,34 @@ describe('issue_file.parse — the arguments a filing owes', () => {
 		expect(issue_file.parse([...FILED, '--release'])).toStrictEqual(args_of({ is_release: true }))
 	})
 
+	it('reads --blocks-finder', () => {
+		const parsed = issue_file.parse([...FILED, '--blocks-finder'])
+
+		expect(parsed).toStrictEqual(args_of({ is_blocking_finder: true }))
+	})
+
 	it.each([
 		['no body file', [TITLE]],
 		['no title', [BODY_FLAG, BODY_FILE]],
 		['an unknown route', [...FILED, ROUTE_FLAG, 'x']],
 		['a malformed distinct', [...FILED, DISTINCT_FLAG, 'x']],
 		['an unknown flag', [...FILED, '--nope']],
+	])(REFUSES, (_label, argv) => {
+		expect(issue_file.parse(argv)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4750: the origin the filing cap counts against.
+describe('issue_file.parse — the originating work item', () => {
+	it.each(['3423', '#3423'])('reads --found-during %s as the issue number', (value) => {
+		const parsed = issue_file.parse([...FILED, FOUND_DURING_FLAG, value])
+
+		expect(parsed).toStrictEqual(args_of({ found_during: '3423' }))
+	})
+
+	it.each([
+		['a malformed found-during', [...FILED, FOUND_DURING_FLAG, 'x']],
+		['a found-during naming two issues', [...FILED, FOUND_DURING_FLAG, '1,2']],
 	])(REFUSES, (_label, argv) => {
 		expect(issue_file.parse(argv)).toBeUndefined()
 	})
@@ -199,5 +225,24 @@ describe('issue_file.unacknowledged — the candidates still holding the filing'
 
 	it('holds nothing once every candidate is declared separate', () => {
 		expect(issue_file.unacknowledged([DUPLICATE_A], [DUPLICATE_A])).toStrictEqual([])
+	})
+})
+
+describe('issue_file.acknowledged — the candidates a filing has answered', () => {
+	it('answers only the --distinct numbers when no origin is named', () => {
+		expect(
+			issue_file.acknowledged({ distinct: [DUPLICATE_A], found_during: undefined }, HERE, HERE),
+		).toStrictEqual([DUPLICATE_A])
+	})
+
+	it('answers the --found-during origin too, which is never its own duplicate', () => {
+		expect(issue_file.acknowledged(WITH_ORIGIN, HERE, HERE)).toStrictEqual([
+			DUPLICATE_A,
+			DUPLICATE_B,
+		])
+	})
+
+	it('leaves the same number in another repository to the scout, an unrelated Issue there', () => {
+		expect(issue_file.acknowledged(WITH_ORIGIN, THERE, HERE)).toStrictEqual([DUPLICATE_A])
 	})
 })

@@ -12,9 +12,9 @@ Review policy: the level, the round count, and what happens to a finding after t
 ## When to run
 
 When: `CLAUDE.md` → "Pre-commit Self-Review"; inside a workflow, round 1 runs before the commit and
-round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Pass the review subagent the
-`reviewer` profile's model and effort that `pnpm josh review:brief` prints; never substitute the review
-level for effort.
+round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Launch the `reviewer` agent
+type (round 2: `reviewer-verification`), never nested, with the model `pnpm josh review:brief` prints.
+Before the reviewer returns its findings → `pnpm josh review:lint` (`.claude/agents/reviewer.md`).
 
 Re-run after fixes until **no high or medium findings remain or the round cap below is reached** (the
 first review counts), whichever comes first. Round 2 is a verification pass over the fixes
@@ -24,17 +24,19 @@ first review counts), whichever comes first. Round 2 is a verification pass over
 
 ## Before round 1 — the implementer's self-check
 
-Answer these nine over your own diff before the scoped pair that precedes round 1, and fix what an
+Answer these ten over your own diff before the scoped pair that precedes round 1 — question 1 once
+`pnpm josh run:review --join` prints its lines after the review, or, under `--join --fixing` or a
+check `--join` restarted on a moved tree, the ship's pre-detach — and fix what an
 answer turns up (about four in five of 100 sampled High/Medium findings that stopped lane reviews
 fell under one; `pnpm josh lane:stats` counts the kinds that still stop). The review, its severity
 tests and the round cap are unchanged.
 
-1. **Tests pin the change** — for each condition, branch or call added or changed, name the test that
-   turns red when it is deleted or inverted, and check its fixture reaches that branch (no assert on a
-   string the code never draws, no comparison against a literal copy).
+1. **Tests pin the change** — read the `unpinned` and `unchecked` lines `pnpm josh run:review --join`
+   prints from `pnpm josh test:pinned` (each unchecked place is listed in its `full output:` log) (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
+   never draws, no comparison against a literal copy).
 2. **Prose matches the code** — grep docs, prompts and comments for the old wording of every behavior,
-   constant, command and heading you changed, moved or removed, `"the table above"` and rewritten
-   sentences included.
+   constant, command and heading you changed, moved or removed (`pnpm josh prose:stale` finds the
+   removed ones), `"the table above"` and rewritten sentences included.
 3. **Failure is not a negative answer** — every timeout, non-zero exit or `gh` failure on a touched
    path returns something a caller can tell apart from `false`, `undefined` or "nothing found".
 4. **Every caller moved with it** — grep every reference to a changed function, list or command, and
@@ -54,6 +56,10 @@ tests and the round cap are unchanged.
    comment makes about another component's behavior (what a stage does, who enforces a limit, which
    repository it runs in), open that component's code and confirm it; then name each context the
    change runs in — kit and a consumer, and a predecessor that died midway leaving its record behind.
+10. **Commands your prose tells a reader to run are run** — for every command a refusal, hint or
+    document you added or changed tells a reader to run, run it as written from a cwd other than the
+    root, with an absolute path, a relative path and an empty input, and check each result — in a
+    scratch copy (`mktemp -d`) when it writes, deletes, files or pushes, never on the lane's files.
 
 The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
 merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".
@@ -78,12 +84,12 @@ pnpm josh review:brief --level-only --staged   # the staged diff
 
 ## Interaction review
 
-After round 1 and its record, `pnpm josh review:brief --interaction` answers whether the change takes
-the interaction review and prints its brief; hand it to a reviewer subagent, dispose of the findings
+`pnpm josh run:review` writes its brief to a file beside round 1's where it is due, printing both paths; one still owed after round 1
+takes `pnpm josh review:brief --interaction`. Hand it to a reviewer subagent, dispose of the findings
 by the three-way disposition below, and record the pass with
 `pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]`.
 
-`pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself.
+`pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself, beside round 1, and stops once on the findings of both.
 
 ## Review round cap (2 rounds)
 
@@ -103,27 +109,28 @@ the child rather than buying a further round.
 ### When round 2 is skipped entirely, and when it is not
 
 ```bash
-pnpm josh review:round2 --round-1-closed   # → required | skip ; the reason on stderr
+pnpm josh review:round2 --record <N>   # → required | skip ; the reason on stderr
 ```
 
-Ask once round 1's fixes are in, before the commit. Pass `--round-1-closed` only when every round-1
-High/Medium closed — fixed in this working tree or verified false positive — and none was filed or
-deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot included), the answer is
-`required`.
+Ask once round 1's fixes are in and the round is recorded with each finding's disposition
+(`pnpm josh review:record`'s usage), before the commit. Round 1 is closed only when the ledger shows
+every round-1 High/Medium as `fixed` or `false-positive`. Anything else, including a missing round-1
+snapshot, answers `required`.
 
 `skip` has exactly two arms, and the reason line names which fired:
 
 - **A** — the fix delta is empty.
 - **B** — every path in the fix delta is inert by the review-level classification above:
-  `docs/**/*.md`, the root `README.md`, under `prompts/`, or a `.ts` / `.js` / `.svelte` file outside
+  `docs/**/*.md`, the root `README.md`, under `prompts/`, a metrics approval under
+  `.josh/metrics-accepted/`, or a `.ts` / `.js` / `.svelte` file outside
   `.claude/` changed only in comments (a lint, type-check, coverage or bundler directive comment counts
   as code).
 
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
 code line, or a source file whose comment-free text cannot be read.
 
-Record a skipped round on the Issue with a comment under `## Round 2 skipped`, naming which arm fired
-and quoting the command's reason line verbatim.
+`--record <N>` records a skipped round on the Issue itself: a comment under `## Round 2 skipped`
+naming which arm fired and quoting the reason line verbatim, written once however often it is asked.
 
 ### Three-way disposition after the cap
 
@@ -161,9 +168,11 @@ Branch 2 only:
   a `fold`; the first filing asks nothing.
 
   1. Before the current Issue closes, file it tagged `route:review-cap`:
-     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap`. It lints
+     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap --found-during <N>`
+     (`--found-during` leaves the deferral note on the current Issue the ship reviewer reads). It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
-     (`docs/josh-commands-backlog.md` → `josh issue:file`). `epic:bundle` reads open issues only, so
+     (`docs/josh-commands-backlog.md` → `josh issue:file`). A security finding declares its
+     `- セキュリティ:` line (`issue-template.md` → H). `epic:bundle` reads open issues only, so
      after the parent closes it answers `none` permanently.
   2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
      hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing

@@ -48,16 +48,7 @@ function fresh_root(): string {
 }
 
 afterEach(() => {
-	for (const root of roots.splice(0)) {
-		const pointer = review_attest.read_pointer(root)
-
-		rmSync(review_attest.pointer_path(root), { force: true })
-
-		if (pointer === undefined) continue
-
-		rmSync(review_attest.expect_path(pointer.nonce), { force: true })
-		rmSync(review_attest.attest_path(pointer.nonce), { force: true })
-	}
+	for (const root of roots.splice(0)) review_attest.clear(root)
 })
 
 // The status of a fresh contract in `root`, so each case states the one thing it is about.
@@ -92,6 +83,29 @@ describe('review_attest — an unattested review is a refusal, never a pass', ()
 		['head', { ...LANE, head: SESSION.head }],
 	])('answers mismatch when the %s differs', (_field, actual) => {
 		expect(status_after(actual, fresh_root())).toBe(MISMATCH)
+	})
+})
+
+// joshuafolkken/kit#4620: the resumed brief narrows only from a review attested on this branch.
+describe('review_attest.is_attested_on', () => {
+	it('answers true for a brief attested on the same branch', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+
+		expect(review_attest.is_attested_on(LANE, root)).toBe(true)
+	})
+
+	it('answers false for a brief attested on another branch', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+
+		expect(review_attest.is_attested_on(SESSION, root)).toBe(false)
+	})
+
+	it('answers false where no brief was recorded', () => {
+		expect(review_attest.is_attested_on(LANE, fresh_root())).toBe(false)
 	})
 })
 
@@ -168,6 +182,65 @@ describe('review_attest.attest — the fork is told at the moment it would have 
 
 		expect(review_attest.attest(unknown, LANE).status).toBe(MISSING)
 		expect(review_attest.read_attestation(unknown)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#4672: `/code-review` and the interaction review are briefed side by side, so
+// each slot keeps its own pointer and `check` asks both on their own nonces.
+describe('review_attest — one contract per review slot', () => {
+	const { INTERACTION } = review_attest.REVIEW_SLOT
+
+	it('keeps the code nonce live when the interaction brief is minted after it', () => {
+		const root = fresh_root()
+		const code = review_attest.record_target(LANE, root)
+		const interaction = review_attest.record_target(LANE, root, INTERACTION)
+
+		expect(review_attest.attest(code, LANE).status).toBe('ok')
+		expect(review_attest.attest(interaction, LANE).status).toBe('ok')
+		expect(review_attest.check(Date.now(), root).status).toBe('ok')
+	})
+
+	it('answers missing while the interaction review alone is unattested', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+		review_attest.record_target(LANE, root, INTERACTION)
+
+		expect(review_attest.check(Date.now(), root).status).toBe(MISSING)
+	})
+
+	it('answers mismatch on the interaction slot whatever the code slot says', () => {
+		const root = fresh_root()
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+		review_attest.attest(review_attest.record_target(LANE, root, INTERACTION), SESSION)
+
+		expect(review_attest.check(Date.now(), root).status).toBe(MISMATCH)
+	})
+
+	it('clears every slot', () => {
+		const root = fresh_root()
+		const interaction = review_attest.record_target(LANE, root, INTERACTION)
+
+		review_attest.clear(root)
+
+		expect(review_attest.read_pointer(root, INTERACTION)).toBeUndefined()
+		expect(review_attest.read_expectation(interaction)).toBeUndefined()
+	})
+})
+
+describe('review_attest — a code brief opens a new round', () => {
+	const { INTERACTION } = review_attest.REVIEW_SLOT
+
+	it('closes an unattested interaction contract when the next code brief is minted', () => {
+		const root = fresh_root()
+		const interaction = review_attest.record_target(LANE, root, INTERACTION)
+
+		review_attest.attest(review_attest.record_target(LANE, root), LANE)
+
+		expect(review_attest.read_pointer(root, INTERACTION)).toBeUndefined()
+		expect(review_attest.read_expectation(interaction)).toBeUndefined()
+		expect(review_attest.check(Date.now(), root).status).toBe('ok')
 	})
 })
 

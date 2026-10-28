@@ -14,6 +14,10 @@ import { z } from 'zod'
 // in the main line. Pinned end to end through the one hook process, on a real transcript. A separate
 // suite from `pretool-guard.test.ts`, which is at its length limit.
 
+vi.mock('#scripts/hooks/lane-plan-guard', () => ({
+	lane_plan_guard: { reason: vi.fn().mockReturnValue(undefined) },
+}))
+
 vi.mock('#scripts/run/run-watcher-hook', () => ({
 	run_watcher_hook: { watcher_hook_reason: vi.fn().mockResolvedValue(undefined) },
 }))

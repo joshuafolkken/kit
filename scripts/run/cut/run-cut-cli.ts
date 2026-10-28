@@ -4,19 +4,22 @@ import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { session_cite } from '#scripts/issue/session-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { openai_lane_supervisor } from '#scripts/lane/openai-lane-supervisor'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
-import { run_cut, type RunCut } from './run-cut'
+import { split_resolution } from '#scripts/split/split-resolution'
+import { run_cut } from './run-cut'
 import { run_cut_args, type Request } from './run-cut-args'
 import { run_cut_decline } from './run-cut-decline'
+import { run_cut_digest } from './run-cut-digest'
 import { run_cut_handoff } from './run-cut-handoff'
 import { run_cut_ready } from './run-cut-ready'
 import { run_cut_report } from './run-cut-report'
+import { run_cut_resume } from './run-cut-resume'
+import { run_cut_review } from './run-cut-review'
 
 // `josh run:cut` — the record that lets a lane child end its process before the gate and a fresh one
 // resume from it. `run:cut <N>` writes the record and relaunches a fresh
@@ -40,15 +43,13 @@ const {
 	FAILED_VERDICT,
 	FAILURE_EXIT_CODE,
 	FRESH_VERDICT,
-	HANDED_OFF_VERDICT,
 	HANDOFF_MISSING_NOTE,
 	HANDOFF_OVERFLOW_NOTE,
-	INCOMPLETE_VERDICT,
 	NOT_A_LANE_VERDICT,
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	STALE_VERDICT,
+	SPLIT_UNRESOLVED_VERDICT,
 	SUCCESS_EXIT_CODE,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
@@ -57,27 +58,33 @@ const {
 	report_bad_handoff,
 	report_busy,
 	report_fault,
-	report_handed_off,
 	report_held_cut,
-	report_incomplete,
-	report_over,
+	report_missing_supervisor,
 	report_relaunched_cut,
 	report_reviewer,
-	report_stale,
+	report_split_unresolved,
 	report_under_threshold,
 	report_unknown,
-	report_unreadable,
 } = run_cut_report
 
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
-// `cost_cli.session_verdict` prices the newest request against `CONTEXT_CUT_THRESHOLD`, so no second
+// `cost_cli.session_verdict` prices the newest request against the `--cut` break-even, so no second
 // threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
 // the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.
-function skips_pre_gate_cut(phase: string): boolean {
-	if (phase !== run_cut.PRE_GATE_PHASE) return false
+//
+// **A noticed Issue answers the split notice first** (joshuafolkken/kit#4695): the pre-gate cut is the
+// boundary the notice names, so a lane that neither split nor recorded why is refused whether or not
+// the cut itself would be taken. Returns the answer given without cutting, or `undefined`.
+async function pre_gate_answer(issue: string, phase: string): Promise<number | undefined> {
+	if (phase !== run_cut.PRE_GATE_PHASE) return undefined
+	const split_note = await split_resolution.ledger_refusal(Number(issue))
+
+	if (split_note !== undefined) return report_split_unresolved(split_note)
 
 	return cost_cli.session_verdict() === cost_verdict.UNDER_VERDICT
+		? report_under_threshold()
+		: undefined
 }
 
 // The exclusive create lost, so a cut is already in flight for this tree — the double-cut guard. The
@@ -103,18 +110,11 @@ function report_relaunch_failure(target: string, note: string): number {
 	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
 }
 
-function report_missing_supervisor(issue: string): number {
-	console.error(
-		`The OpenAI supervisor for ${session_cite.issue(issue)} is not live, so this nested process was not cut and can continue. Re-dispatch the lane to recover the supervisor.`,
-	)
-
-	return report(FAILED_VERDICT, FAILURE_EXIT_CODE)
-}
-
 // **The relaunched child is started at the effort of the phase it is resuming into**.
 // A pre-gate resume drives the gate, commit, PR and merge — the mechanical
 // ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
-// phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it.
+// phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it,
+// and a pre-gate resume moves to `JOSH_WORKER_SHIP_MODEL` when that is set.
 function relaunch(target: string, lane: LaneInfo, phase: string): number {
 	const notes: Array<string> = []
 	const result = lane_relaunch.resume(lane, phase, (note) => {
@@ -177,14 +177,18 @@ async function write_cut(target: string, request: CutRequest): Promise<number | 
 	const loaded = run_cut_handoff.load_handoff(request.handoff_path, run_cut.MAX_HANDOFF_BYTES)
 	if (loaded.kind === 'bad') return report_bad_handoff(loaded.note)
 
-	const spec = {
+	const base = {
 		issue: request.issue,
 		branch: request.branch,
 		phase: request.phase,
 		handoff: loaded.handoff,
 	}
+	// The checkout, not `target`: the record lives in the temp root, and the transcript is filed by checkout.
+	const checkout = await run_cut.worktree_directory()
+	const spec = run_cut.with_digest(base, () => run_cut_digest.own_digest(checkout))
 
-	const spec_note = spec_refusal(spec)
+	const spec_note =
+		spec_refusal(spec) ?? (await run_cut_review.unrecorded_refusal(request, loaded.handoff))
 
 	if (spec_note !== undefined) return report_bad_handoff(spec_note)
 	if (run_cut.begin_cut(target, spec) === undefined) return report_cut_exists(target)
@@ -247,117 +251,14 @@ async function cut(
 		return await declined({ issue, phase }, state, refuse_unready(state))
 	}
 
-	if (skips_pre_gate_cut(phase)) return report_under_threshold()
+	const answered = await pre_gate_answer(issue, phase)
+
+	if (answered !== undefined) return answered
 
 	clear_expired(target)
 	if (!has_matching_supervisor(lane, issue)) return report_missing_supervisor(issue)
 
 	return await finish_cut(target, lane, { issue, branch: state.branch, phase, handoff_path })
-}
-
-// **The adoption is the resume-uniqueness guarantee**: it removes and creates exclusively, so of two
-// racing resumes only one wins the create and the loser is answered `busy`.
-// An implementation cut resumes back into implementation; a pre-gate one into the gate. The resuming
-// child is told which by the verdict rather than reconstructing it from the record.
-function resume_verdict_for(cut_record: RunCut): string {
-	return run_cut.resumes_into_implementation(cut_record.phase)
-		? RESUME_IMPL_VERDICT
-		: RESUME_VERDICT
-}
-
-// **An implementation resume removes the record; a pre-gate one marks it handed off**.
-// The cuts have different multiplicities sharing one record: the pre-gate cut fires once per lane, so
-// its record must survive to answer a second resume `handed-off`; the implementation cut is guarded by the run's
-// event stream rather than the cut record, so its record is cleared on resume — a lingering record
-// would keep the pre-gate guard, which reads `carried_cut_sync`, silent for the rest of the run. A double
-// cut stays impossible either way: `begin_cut`'s exclusive create is what prevents it.
-function take_over(target: string, cut_record: RunCut): RunCut | undefined {
-	if (!run_cut.resumes_into_implementation(cut_record.phase)) {
-		return run_cut.adopt_cut(target, cut_record)
-	}
-
-	run_cut.end_cut(target)
-
-	return cut_record
-}
-
-// The carried instruction and work state, printed to standard error so the resumed session continues
-// on what the run was told to do rather than on the tree alone. The record is cleared
-// on adoption, so this is where it reaches the fresh process.
-function announce_handoff(cut_record: RunCut): void {
-	if (cut_record.handoff !== undefined) {
-		console.error(run_cut_handoff.describe_handoff(cut_record.handoff))
-	}
-}
-
-// **An implementation resume appends a `resume` event**. It clears the record
-// the `cut` event stood for, so the stream is what moves `run:step` back to implementation; a pre-gate
-// resume keeps its record and appends nothing. Best-effort, as the cut's own append is.
-async function emit_resume_event(issue: string, verdict: string): Promise<void> {
-	if (verdict !== RESUME_IMPL_VERDICT) return
-
-	await run_event_stream_emit.emit(
-		run_event_stream.EVENT_KIND.RESUME,
-		`${issue_cite.plain(issue)} resumed`,
-	)
-}
-
-async function adopt(target: string, cut_record: RunCut): Promise<number> {
-	const taken = take_over(target, cut_record)
-
-	if (taken === undefined) return report_busy(cut_record)
-
-	announce_handoff(cut_record)
-
-	const verdict = resume_verdict_for(cut_record)
-
-	await emit_resume_event(cut_record.issue, verdict)
-
-	return report(verdict, SUCCESS_EXIT_CODE)
-}
-
-// A relaunched lane child and a fresh session both measure `under`, so only the session that took an
-// implementation cut resumes over the threshold; unmeasurable is not refused.
-function is_over_threshold_resume(cut_record: RunCut): boolean {
-	if (!run_cut.resumes_into_implementation(cut_record.phase)) return false
-
-	return cost_cli.session_verdict() === cost_verdict.OVER_VERDICT
-}
-
-async function verify_and_adopt(
-	target: string,
-	cut_record: RunCut,
-	issue: string,
-): Promise<number> {
-	const state = await run_cut.current_state()
-	const verdict = run_cut.classify_resume(cut_record, {
-		issue,
-		current_branch: state.branch,
-		is_dirty: state.is_dirty,
-		is_held: state.is_held,
-	})
-
-	if (verdict === HANDED_OFF_VERDICT) return report_handed_off(cut_record)
-
-	if (verdict === 'stale') return report_stale(cut_record)
-
-	if (verdict === INCOMPLETE_VERDICT) return report_incomplete(cut_record)
-
-	if (is_over_threshold_resume(cut_record)) return report_over()
-
-	return await adopt(target, cut_record)
-}
-
-async function resume(target: string, issue: string): Promise<number> {
-	const read = run_cut.read_cut(target)
-
-	if (read.kind === 'none') return report(FRESH_VERDICT, SUCCESS_EXIT_CODE)
-
-	if (read.kind === 'unreadable') return report_unreadable()
-
-	if (read.kind === 'expired') return report_stale(read.cut)
-
-	return await verify_and_adopt(target, read.cut, issue)
 }
 
 function read_json(target: string): number {
@@ -395,7 +296,7 @@ async function take_cut(target: string, request: CutCommand): Promise<number> {
 async function act(target: string, request: Request): Promise<number> {
 	if (request.kind === 'cut') return await take_cut(target, request)
 
-	if (request.kind === 'resume') return await resume(target, request.issue)
+	if (request.kind === 'resume') return await run_cut_resume.resume(target, request.issue)
 
 	if (request.kind === 'read') return read_json(target)
 
@@ -447,12 +348,11 @@ const run_cut_cli = {
 	ENDED_VERDICT,
 	FAILED_VERDICT,
 	FRESH_VERDICT,
-	HANDED_OFF_VERDICT,
 	NOT_A_LANE_VERDICT,
 	OVER_VERDICT,
 	RESUME_IMPL_VERDICT,
 	RESUME_VERDICT,
-	STALE_VERDICT,
+	SPLIT_UNRESOLVED_VERDICT,
 	UNDER_THRESHOLD_VERDICT,
 	UNREADY_VERDICT,
 	run,

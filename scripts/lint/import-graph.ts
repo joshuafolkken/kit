@@ -2,6 +2,7 @@ import path from 'node:path'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
+import { type_only_imports } from './type-only-imports'
 
 // What a file's lint verdict reads besides the file itself: every file its imports reach, followed
 // through the project's own files and stopped at a package's. A type-aware rule's verdict on a file
@@ -34,6 +35,7 @@ interface GraphContext extends Resolver {
 	resolution_cache: ts.ModuleResolutionCache
 	ambient: ReadonlyArray<Dependency>
 	dependencies: Map<string, ReadonlyArray<Dependency>>
+	runtime_dependencies: Map<string, ReadonlyArray<Dependency>>
 	content_hashes: Map<string, string>
 }
 
@@ -44,8 +46,19 @@ interface ProjectConfig {
 }
 
 interface ImportGraph {
+	closure: (file: string) => ReadonlyArray<string>
 	closure_hash: (file: string) => string
+	imports: (file: string, content?: string) => ReadonlyArray<string>
+	importers: (files: ReadonlyArray<string>, universe: ReadonlyArray<string>) => ReadonlySet<string>
+	runtime_importers: (
+		files: ReadonlyArray<string>,
+		universe: ReadonlyArray<string>,
+	) => ReadonlySet<string>
+	strings: (file: string) => ReadonlyArray<string>
 }
+
+// A file's direct dependencies along one kind of edge.
+type Edges = (context: GraphContext, file: string) => ReadonlyArray<Dependency>
 
 // `typescript` is an optional peer: a project without it has no type-aware rule to go stale.
 async function load_typescript(): Promise<TypeScript | undefined> {
@@ -138,12 +151,12 @@ function resolve_type(resolver: Resolver, name: string, file: string): Dependenc
 	return as_dependency(resolved?.resolvedFileName, resolved?.isExternalLibraryImport)
 }
 
-function references_of(context: GraphContext, file: string): Array<Dependency | undefined> {
-	const processed = context.typescript.preProcessFile(
-		file_reader.read_if_readable(file) ?? '',
-		true,
-		true,
-	)
+function references_of(
+	context: GraphContext,
+	file: string,
+	content: string,
+): Array<Dependency | undefined> {
+	const processed = context.typescript.preProcessFile(content, true, true)
 
 	return [
 		...processed.importedFiles.map((reference) =>
@@ -159,9 +172,27 @@ function references_of(context: GraphContext, file: string): Array<Dependency | 
 function direct_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
 	const known = context.dependencies.get(file)
 	if (known !== undefined) return known
-	const found = references_of(context, file).filter((dependency) => dependency !== undefined)
+	const found = references_of(context, file, file_reader.read_if_readable(file) ?? '').filter(
+		(dependency) => dependency !== undefined,
+	)
 
 	context.dependencies.set(file, found)
+
+	return found
+}
+
+// The direct dependencies the test runner follows: the imports left once the transpiler drops the
+// type-only declarations, and no `/// <reference>` (joshuafolkken/kit#5368).
+function runtime_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
+	const known = context.runtime_dependencies.get(file)
+	if (known !== undefined) return known
+	const content = file_reader.read_if_readable(file) ?? ''
+	const found = type_only_imports
+		.runtime_specifiers(context.typescript, file, content)
+		.map((specifier) => resolve_module(context, specifier, file))
+		.filter((dependency) => dependency !== undefined)
+
+	context.runtime_dependencies.set(file, found)
 
 	return found
 }
@@ -253,6 +284,105 @@ function closure_hash(context: GraphContext, file: string): string {
 	return input_fingerprint.of_entries(tokens)
 }
 
+// The project's own files `closure_hash` reads for `file`, a package's left out.
+function closure(context: GraphContext, file: string): Array<string> {
+	return [...reachable(context, file).values()]
+		.filter((dependency) => !dependency.external)
+		.map((dependency) => dependency.file)
+}
+
+// The text of each string literal `file` holds, a template's spans included: where a file names one it
+// starts rather than imports — the CLI a test spawns.
+function strings(typescript: TypeScript, file: string): Array<string> {
+	const content = file_reader.read_if_readable(file) ?? ''
+	const source = typescript.createSourceFile(file, content, typescript.ScriptTarget.Latest)
+	const found: Array<string> = []
+
+	function visit(node: ts.Node): void {
+		if (typescript.isStringLiteralLike(node) || typescript.isTemplateLiteralToken(node)) {
+			found.push(node.text)
+		}
+
+		typescript.forEachChild(node, visit)
+	}
+
+	visit(source)
+
+	return found
+}
+
+// The project's own files `file` imports directly; a package's are left out. `content` reads another
+// text of the file in its place — its version at another revision — resolved from where it sits now.
+function imports(context: GraphContext, file: string, content?: string): Array<string> {
+	const dependencies =
+		content === undefined
+			? direct_dependencies(context, file)
+			: references_of(context, file, content).filter((dependency) => dependency !== undefined)
+
+	return dependencies
+		.filter((dependency) => !dependency.external)
+		.map((dependency) => dependency.file)
+}
+
+function append(map: Map<string, Array<string>>, key: string, value: string): void {
+	const known = map.get(key)
+
+	if (known === undefined) map.set(key, [value])
+	else known.push(value)
+}
+
+function reverse_edges(
+	context: GraphContext,
+	universe: ReadonlyArray<string>,
+	edges: Edges,
+): Map<string, Array<string>> {
+	const reverse = new Map<string, Array<string>>()
+
+	for (const file of universe) {
+		for (const dependency of edges(context, file)) {
+			append(reverse, dependency.file, file)
+		}
+	}
+
+	return reverse
+}
+
+// Every file of `universe` whose `edges` reach one of `files`, the files themselves included. Over every
+// import, the only files that can name what they export, however many re-exports and aliases stand
+// between; over the runtime imports, the graph the test runner walks, where a file read only through
+// `import type` reaches no test past it (joshuafolkken/kit#5368).
+function importers(
+	context: GraphContext,
+	files: ReadonlyArray<string>,
+	universe: ReadonlyArray<string>,
+	edges: Edges,
+): ReadonlySet<string> {
+	const reverse = reverse_edges(context, universe, edges)
+	const reached = new Set(files)
+	const pending = [...files]
+
+	for (let current = pending.pop(); current !== undefined; current = pending.pop()) {
+		const next = (reverse.get(current) ?? []).filter((file) => !reached.has(file))
+
+		for (const file of next) reached.add(file)
+		pending.push(...next)
+	}
+
+	return reached
+}
+
+function graph_of(context: GraphContext): ImportGraph {
+	return {
+		closure: (file) => closure(context, file),
+		closure_hash: (file) => closure_hash(context, file),
+		imports: (file, content) => imports(context, file, content),
+		importers: (files, universe) => importers(context, files, universe, direct_dependencies),
+		runtime_importers: (files, universe) =>
+			importers(context, files, universe, runtime_dependencies),
+		strings: (file) => strings(context.typescript, file),
+	}
+}
+
 // Undefined where nothing type-aware can run: no `typescript`, or no `tsconfig.json` at the root.
 async function create(root: string): Promise<ImportGraph | undefined> {
 	const typescript = await load_typescript()
@@ -260,17 +390,17 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 	const parsed = parsed_config(typescript, root)
 	if (parsed === undefined) return undefined
 	const { options } = parsed
-	const context: GraphContext = {
+
+	return graph_of({
 		root,
 		typescript,
 		options,
 		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, options),
 		ambient: ambient_of({ typescript, options }, root, parsed),
 		dependencies: new Map(),
+		runtime_dependencies: new Map(),
 		content_hashes: new Map(),
-	}
-
-	return { closure_hash: (file) => closure_hash(context, file) }
+	})
 }
 
 const import_graph = { create }

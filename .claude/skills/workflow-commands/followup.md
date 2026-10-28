@@ -22,14 +22,16 @@ request already merged by hand** (a `prrun` stop) runs only the post-merge tail;
 Issue is not posted twice, so re-running is safe. Keep the default Issue target. Ignore a finding only
 after verifying it is inapplicable; rate-limit text is not a finding.
 
-**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** Wait out the stated
-window, post `@coderabbitai review` on the pull request, and rerun `followup`. Bypassing is Tier C — on
-explicit user instruction only, when the window is impractically long or the retrigger is rate-limited
-again.
+**A red rate-limited CodeRabbit check is cleared by a retrigger, not a bypass.** `followup` waits
+out the window (≤30 min) and posts `@coderabbitai review` once per pull request. On its
+no-retrigger note, do that and rerun `followup`. Bypassing a second rate limit is Tier C.
 
 A pre-merge failure stops the run; an unverifiable AI finding or CI failure needing input sends a
 `confirmation` Telegram. A post-merge cleanup failure is named and does not undo the merge; run the
 named recovery without rerunning `followup`. The printed result is authoritative.
+
+A CI job red only on tests outside the change → `followup` reruns it once, after ship's main merge
+when main moved a failed test (`scripts/followup/followup-main-move.ts`).
 
 After the merge `run:tail` returns to the default branch — `ship` runs it; after a bare `followup`, run
 `pnpm josh run:tail <N>`. In a lane the parent uses `pnpm josh lane:close <N>`. Never delete the branch unless requested. The sections below are read when the output needs reading.
@@ -56,7 +58,7 @@ Invoking `fullrun` is itself the explicit authorization to merge.
   reflexively: a SHA pin flagged "not matching the tag" is checked with `gh api
   repos/<owner>/<repo>/commits/<tag> --jq '.sha'`, and the bypass cites that command.
 - **The merge is `followup`'s, not yours** — `.claude/settings.json` refuses `gh pr merge` and its
-  `gh api` spellings (`CLAUDE.md` → "Git Rules"). Do **not** pass `--delete-branch` unless asked.
+  `gh api` spellings (`operating-rules.md` → "git-rules"). Do **not** pass `--delete-branch` unless asked.
 - **A failed merge** (branch protection, a conflict) is reported and stops the run — never retried with
   other flags. To skip the merge, use `kickoff` or say "do not merge" in the same turn and pass
   `--no-merge`.

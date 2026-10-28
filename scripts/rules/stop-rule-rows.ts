@@ -13,7 +13,7 @@ const ROWS: ReadonlyArray<StopRule> = [
 		id: 'stop-notify',
 		about: {
 			title: 'Stop notification',
-			topic: '`CLAUDE.md` → "Mid-workflow stop notification"',
+			topic: '`rule-delivery.md` → "stop-notify"',
 			entry: STOP_GUARD,
 			fires:
 				'a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails',
@@ -30,18 +30,6 @@ const ROWS: ReadonlyArray<StopRule> = [
 				'a stop on a clean tree with the `run:hold` record still in place. Releases the hold itself; blocks only when that fails',
 			quiet:
 				'a dirty tree (a `halfrun` stop before the commit, a `needs-human-review` stop) or already released',
-		},
-	},
-	{
-		id: 'issue-citation',
-		about: {
-			title: 'Issue citation format',
-			topic: '`prompts/collaboration-workflow/issue-citation.md`',
-			entry: STOP_GUARD,
-			fires:
-				'a bare `#N` in the prose of the last reply. Prints the citation lines itself; blocks only when a number cannot be cited',
-			quiet:
-				'link form, inside code or a quote, `#N` right after `PR`, or a GitHub-facing artifact',
 		},
 	},
 	{

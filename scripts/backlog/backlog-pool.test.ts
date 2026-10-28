@@ -112,6 +112,15 @@ describe('backlog_pool.classify_standalone — the rows a person has to resolve'
 		expect(backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable).toEqual([])
 	})
 
+	// joshuafolkken/kit#4633: only a person can vouch for a body whose author lacks write access.
+	it('puts a row whose author lacks write access on the person side, unoffered', () => {
+		const issues = [{ ...opted_in(ROW_NUMBER, []), author_trusted: false }]
+		const pool = backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT)
+
+		expect(pool.human.map((child) => child.number)).toEqual([ROW_NUMBER])
+		expect(pool.runnable).toEqual([])
+	})
+
 	it('still offers a row carrying neither label', () => {
 		const issues = [opted_in(ROW_NUMBER, [])]
 		const offered = backlog_pool.classify_standalone(issues, STANDALONE_CONTEXT).runnable

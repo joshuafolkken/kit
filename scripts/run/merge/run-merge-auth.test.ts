@@ -20,7 +20,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
 vi.mock('#scripts/issue/issue-closing-pr')
-vi.mock('#scripts/lane/lane-ledger')
+vi.mock('#scripts/lane/lane-ledger-write')
 vi.mock('./run-merge-ship')
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
@@ -34,6 +34,7 @@ vi.mock('#scripts/run/run-ending', async () => {
 			ended_mid_turn: mid_turn_mock,
 			read_exit: (): unknown => agent_exit_record.read_exit_record(transcript_mock()),
 			read_transcript: transcript_mock,
+			written_at: vi.fn(),
 		},
 	}
 })

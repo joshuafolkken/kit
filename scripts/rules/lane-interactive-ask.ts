@@ -1,6 +1,7 @@
 import { interactive_ask } from '#scripts/agent/interactive-ask'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { stop_rules } from './stop-rules'
 
 // A dispatched lane child's interactive ask is refused and routed to the park procedure, delivered at
 // the call it binds on.
@@ -55,12 +56,14 @@ const ROW = {
 	is_trigger: is_interactive_ask,
 	reason: LANE_INTERACTIVE_ASK_REASON,
 	decide: (): boolean => true,
+	// A reply asking a person for the git index is the same ask, delivered by the Stop hook.
+	stop_reasons: [stop_rules.LANE_INDEX_REASON],
 	about: {
 		title: 'Lane child interactive ask',
 		topic:
 			'`.claude/skills/workflow-commands/pre-gate-cut.md` → "The interactive ask is refused one call earlier"',
 		fires:
-			"a dispatched lane child's `AskUserQuestion`; it hands over the park procedure. Every occurrence",
+			"a dispatched lane child's `AskUserQuestion`; it hands over the park procedure; the Stop hook also blocks a reply asking a person for the git index. Every occurrence",
 		quiet: 'not a lane child, or not an interactive tool',
 	},
 }

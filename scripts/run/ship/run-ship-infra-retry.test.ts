@@ -1,3 +1,8 @@
+import {
+	RETRY_PENDING_KEY,
+	RETRY_PENDING_VALUE,
+	UNREADABLE_COMMENTS_STOP,
+} from '#scripts/gh/git-gh-comments-unreadable'
 import { describe, expect, it, vi } from 'vitest'
 import type { ShipSection } from './run-ship'
 import { run_ship_infra_retry, type RetryHooks } from './run-ship-infra-retry'
@@ -74,6 +79,48 @@ describe('run_ship_infra_retry.retried', () => {
 
 		await retried('review', attempt, hooks())
 		expect(attempt).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#5012: one comment read that failed stopped the ship as a check and relaunched the
+// lane, though a second read passed.
+describe('run_ship_infra_retry.retried — an unreadable comment listing', () => {
+	const REASON = 'gh api timed out after 30s'
+	const STOPPED = `⚠️ ${UNREADABLE_COMMENTS_STOP}`
+	const UNREADABLE: ShipSection = {
+		header: HEADER,
+		body: `${STOPPED}\n⚠ pull request comments could not be read for 4983-lane: ${REASON}`,
+		out: STOPPED,
+		code: 1,
+	}
+
+	it('re-runs a followup whose comment read failed once, and passes', async () => {
+		const attempt = attempts(UNREADABLE, GREEN)
+
+		await expect(retried('followup', attempt, hooks())).resolves.toBe(GREEN)
+		expect(attempt).toHaveBeenCalledTimes(2)
+	})
+
+	it('marks a retry pending on every attempt but the final one', async () => {
+		const pending: Array<string | undefined> = []
+		const queue = [UNREADABLE, UNREADABLE, UNREADABLE]
+		const attempt = vi.fn(async () => {
+			pending.push(process.env[RETRY_PENDING_KEY])
+
+			return queue.shift() ?? GREEN
+		})
+
+		await retried('followup', attempt, hooks())
+		expect(pending).toStrictEqual([RETRY_PENDING_VALUE, RETRY_PENDING_VALUE, undefined])
+		expect(process.env[RETRY_PENDING_KEY]).toBeUndefined()
+	})
+
+	it('stops with gh reason once the read keeps failing', async () => {
+		const attempt = attempts(UNREADABLE, UNREADABLE, UNREADABLE, GREEN)
+		const section = await retried('followup', attempt, hooks())
+
+		expect(section.body).toContain(REASON)
+		expect(attempt).toHaveBeenCalledTimes(MAX_INFRA_RETRIES + 1)
 	})
 })
 

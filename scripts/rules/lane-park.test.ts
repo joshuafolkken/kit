@@ -289,10 +289,16 @@ describe('LANE_PARK_REASON', () => {
 		// The other stops that already carry their label, so the child is not sent to add a second one.
 		['needs-human-review'],
 		['already-done'],
-		// The pointer, and the reissue sentence every delivery needs.
+		// The pointer, and that the park ends the stop with no notify after it.
 		['.claude/skills/workflow-commands/pre-gate-cut.md'],
 		['once per run'],
+		['no notify'],
 	])('carries %j', (marker) => {
 		expect(delivered_rules.LANE_PARK_REASON).toContain(marker)
+	})
+
+	// joshuafolkken/kit#5147: the `Stop` hook sends a notify still owed, so the park is the whole stop.
+	it('does not ask for the notify again after the park', () => {
+		expect(delivered_rules.LANE_PARK_REASON).not.toContain('Reissue this notify')
 	})
 })

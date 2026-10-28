@@ -99,20 +99,28 @@ function commit_status_api_path(commit_sha: string, repo?: string): string {
 
 // The rules that apply to one branch, from every ruleset that targets it — readable without the
 // admin access the classic branch protection endpoint needs.
+// Ref names are encoded as one segment: a `?` or `#` would otherwise end the path, and GitHub reads
+// an encoded `/` back as part of the branch name.
 function branch_rules_api_path(branch_name: string, repo?: string): string {
-	return `${repo_api_path(repo)}/rules/branches/${branch_name}`
+	return `${repo_api_path(repo)}/rules/branches/${encodeURIComponent(branch_name)}`
+}
+
+// The status checks classic branch protection requires — the half of the required checks rulesets
+// do not carry.
+function branch_protection_checks_api_path(branch_name: string, repo?: string): string {
+	return `${repo_api_path(repo)}/branches/${encodeURIComponent(branch_name)}/protection/required_status_checks`
 }
 
 // A single tag reference. REST answers 404 when the tag does not exist, which is the whole of the
 // question the release command's tag watch asks.
 function tag_reference_api_path(tag: string, repo?: string): string {
-	return `${repo_api_path(repo)}/git/ref/tags/${tag}`
+	return `${repo_api_path(repo)}/git/ref/tags/${encodeURIComponent(tag)}`
 }
 
 // The GitHub Release published for one tag. REST answers 404 until `publish.yml`'s `create-release`
 // job has run, which is what the release command's progress watch asks.
 function release_by_tag_api_path(tag: string, repo?: string): string {
-	return `${repo_api_path(repo)}/releases/tags/${tag}`
+	return `${repo_api_path(repo)}/releases/tags/${encodeURIComponent(tag)}`
 }
 
 const git_gh_api_path = {
@@ -134,6 +142,7 @@ const git_gh_api_path = {
 	commit_check_runs_api_path,
 	commit_status_api_path,
 	branch_rules_api_path,
+	branch_protection_checks_api_path,
 }
 
 export { git_gh_api_path, FULL_PAGE_QUERY }

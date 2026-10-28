@@ -14,8 +14,8 @@ describe('chain-rule.md names the review agent type', () => {
 		expect(review_agent_type.names_known_type()).toBe(true)
 	})
 
-	it('names general-purpose, the type that carries every tool', () => {
-		expect(review_agent_type.named_agent_type()).toBe('general-purpose')
+	it('names reviewer, the type that carries no Skill or Agent tool to nest a second review', () => {
+		expect(review_agent_type.named_agent_type()).toBe('reviewer')
 	})
 })
 

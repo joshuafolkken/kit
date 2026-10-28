@@ -1,6 +1,12 @@
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { z } from 'zod'
-import { has_any_label, NEEDS_HUMAN_REVIEW_LABEL } from './issue-labels'
+import {
+	has_any_label,
+	has_label_name,
+	NEEDS_HUMAN_REVIEW_LABEL,
+	PLANNED_LABEL,
+} from './issue-labels'
+import type { StateRead } from './issue-state-cli'
 
 // The answer `josh issue:state` prints, kept apart from the reading and the printing so the shape of
 // the report is decided by one pure function.
@@ -93,7 +99,13 @@ function format_attributed_issue_state(issue_number: string, state: IssueState):
 	return `${ISSUE_LABEL}${issue_number}\n${format_issue_state(state)}`
 }
 
+// Whether a read issue carries `run:planned` — asked by `run:stage` and by `run:entry`'s trust gate.
+function is_planned(read: StateRead): boolean {
+	return read.kind === 'state' && has_label_name(read.state.labels, PLANNED_LABEL)
+}
+
 const issue_state = {
+	is_planned,
 	NO_LABELS,
 	parse_issue_state,
 	format_issue_state,

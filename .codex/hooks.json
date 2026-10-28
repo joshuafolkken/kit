@@ -6,7 +6,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh audit-provision --session-start",
 						"timeout": 180
 					}
 				]
@@ -17,7 +17,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh session-lang",
 						"timeout": 10
 					}
 				]
@@ -29,7 +29,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter pretool",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter pretool",
 						"timeout": 20
 					}
 				]
@@ -41,7 +41,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter posttool",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh codex-hook-adapter posttool",
 						"timeout": 90
 					}
 				]
@@ -53,7 +53,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": "project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
+						"command": "export JOSH_HOOK_CWD=\"$PWD\" && project_root=\"${CLAUDE_PROJECT_DIR:-$( (unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR GIT_DIR GIT_INDEX_FILE GIT_NAMESPACE GIT_OBJECT_DIRECTORY GIT_WORK_TREE; git rev-parse --show-toplevel 2>/dev/null) || git rev-parse --show-toplevel)}\" && cd \"$project_root\" && sh scripts/hooks/run-hook.sh stop-guard",
 						"timeout": 20
 					}
 				]

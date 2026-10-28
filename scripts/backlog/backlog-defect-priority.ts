@@ -15,7 +15,7 @@ const UNMEASURED_MESSAGE =
 const KIND_RANK: Readonly<Record<IssueKind, number>> = { defect: 0, other: 1, mechanism: 2 }
 
 function above_message(measured: DefectRate): string {
-	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so defects are offered first and new mechanisms last.`
+	return `The defect rate ${defect_rate.rate_text(measured)} is above its baseline ${String(defect_rate.BASELINE_RATE)}, so among issues the ranking keys tie, defects are offered first and new mechanisms last.`
 }
 
 // The body the listing already carried, else one read for it (joshuafolkken/kit#4550). An unreadable

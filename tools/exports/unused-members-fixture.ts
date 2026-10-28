@@ -65,7 +65,14 @@ const PROGRAM_OPTIONS: ts.CompilerOptions = {
 	lib: [`lib.${LIB}.d.ts`],
 }
 
-const unused_members_fixture = { create_project, with_reader, LIBRARY, PROGRAM_OPTIONS, READ_KEPT }
+const unused_members_fixture = {
+	create_project,
+	with_reader,
+	IMPORT_LIBRARY,
+	LIBRARY,
+	PROGRAM_OPTIONS,
+	READ_KEPT,
+}
 
 export type { FixtureFile }
 export { unused_members_fixture }

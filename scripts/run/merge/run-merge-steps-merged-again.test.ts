@@ -1,7 +1,6 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
@@ -9,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // joshuafolkken/kit#3442: a parent that counted a closed child by hand (`run:carry --merged`) and then
 // ran `run:merge` for it must not count the merge twice — the run is owed only the merge event, which
-// `run:merge` writes after `do_merged`. The carry record is real, so the duplicate guard in
+// `run:merge` writes through `do_merged`'s recorder. The carry record is real, so the duplicate guard in
 // `run-carry-change.ts` is exercised through the merge step rather than restated.
 
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
@@ -32,7 +31,7 @@ const CONTEXT = {
 	child: String(CHILD),
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 
@@ -73,7 +72,7 @@ describe('run_merge_steps.do_merged — a child already counted by hand', () => 
 	it('leaves the merged count and issue list unchanged', async () => {
 		const target = write_carry()
 
-		expect(await run_merge_steps.do_merged(CONTEXT)).toBeUndefined()
+		expect(await run_merge_steps.do_merged(CONTEXT, vi.fn())).toBeUndefined()
 
 		const read = run_carry.read_carry(target)
 

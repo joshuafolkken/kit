@@ -1,3 +1,4 @@
+import { lane_yield } from '#scripts/lane/lane-yield'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
@@ -9,6 +10,7 @@ const SETTLED_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.SPLIT,
 	run_event_stream.EVENT_KIND.WITHDRAW,
 	run_event_stream.EVENT_KIND.OUTAGE,
+	run_event_stream.EVENT_KIND.USAGE_LIMIT,
 ])
 const DONE_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
@@ -37,8 +39,11 @@ function active_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<string> {
 	return active
 }
 
+// A yield is not among them: it gave its lane back without settling the issue (`lane-yield.ts`).
 function settled_issues(events: ReadonlyArray<RunEvent>): ReadonlySet<number> {
-	const settled = events.filter((event) => DONE_KINDS.has(event.kind))
+	const settled = events.filter(
+		(event) => DONE_KINDS.has(event.kind) && !lane_yield.is_yield(event),
+	)
 
 	return new Set(
 		settled
@@ -56,11 +61,14 @@ function issues_of_kind(events: ReadonlyArray<RunEvent>, kind: string): Readonly
 }
 
 // The issues a person withdrew from this run and nobody launched again: the withdrawal leaves the issue
-// open for the next run, so this one keeps it out of the offer (joshuafolkken/kit#4365).
+// open for the next run, so this one keeps it out of the offer (joshuafolkken/kit#4365). A lane that
+// yielded stays in the run: its retained plan holds it back until the holder ends (`lane-yield.ts`).
 function withdrawn_issues(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
 	const named = issues_of_kind(events, run_event_stream.EVENT_KIND.WITHDRAW)
 
-	return named.filter((issue) => run_event_scope.is_withdrawn(events, issue))
+	return named.filter(
+		(issue) => run_event_scope.is_withdrawn(events, issue) && !lane_yield.is_yielded(events, issue),
+	)
 }
 
 // The offer's exclusion as the stream records it: the merged and withdrawn children and the ones still

@@ -21,7 +21,7 @@ import { launch_priority } from '#scripts/run/launch-priority'
 
 const NO_PID_NOTE = 'the process started without a pid'
 const UNSAFE_NOTE =
-	'the wake command or its arguments contain characters that are not safe to execute'
+	'the wake command or its arguments are empty, over length, or contain characters that are not safe to execute'
 
 // Provider-specific commands and flags are composed before this boundary. This module accepts only
 // an argv vector and never infers policy from it; role/model/effort arrive separately as log metadata.

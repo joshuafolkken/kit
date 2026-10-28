@@ -32,8 +32,21 @@ describe('run_ship_stage.is_done — the gate', () => {
 		expect(run_ship_stage.is_done(STAGE.GATE, ALL, NOTHING)).toBe(false)
 	})
 
-	it('is passed over once its output, a commit, exists', () => {
-		expect(run_ship_stage.is_done(STAGE.GATE, NONE, COMMITTED)).toBe(true)
+	it('is passed over once its output, a pushed commit, exists', () => {
+		expect(run_ship_stage.is_done(STAGE.GATE, ALL, SHIPPED)).toBe(true)
+	})
+
+	// joshuafolkken/kit#4907: a lane child's `run:review` pushed before the ship ran any stage.
+	it('runs over a commit the lane pushed, with no record of its own', () => {
+		for (const stage of [STAGE.PREFLIGHT, STAGE.SYNC, STAGE.REVIEW, STAGE.GATE]) {
+			expect(run_ship_stage.is_done(stage, NONE, SHIPPED)).toBe(false)
+		}
+	})
+
+	// joshuafolkken/kit#4708: the sync stage's local commit precedes the gate, so it is not its output.
+	it('runs again over a commit not yet pushed', () => {
+		expect(run_ship_stage.is_done(STAGE.GATE, ALL, COMMITTED)).toBe(false)
+		expect(run_ship_stage.is_done(STAGE.SYNC, ALL, COMMITTED)).toBe(false)
 	})
 
 	it('is passed over once the pull request merged', () => {
@@ -48,7 +61,7 @@ describe('run_ship_stage.is_done — the preflight', () => {
 	})
 
 	it('is passed over once a commit exists', () => {
-		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, NONE, COMMITTED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.PREFLIGHT, ALL, COMMITTED)).toBe(true)
 	})
 })
 
@@ -295,6 +308,36 @@ describe('run_ship_stage.started_of — the attempt a line carries (joshuafolkke
 	})
 })
 
+// joshuafolkken/kit#5296: why a stage ran or was skipped follows the words, which read as before.
+describe('run_ship_stage.with_reason — why a stage ran or was skipped', () => {
+	const { PHASE } = run_ship_stage
+	const REASON = 'reused: round 1 attested on this branch, its tree held'
+
+	it('reads the words and the reason back off a line with a started list', () => {
+		const words = run_ship_stage.event_text('7', STAGE.REVIEW, PHASE.SKIPPED, [STAGE.REVIEW])
+		const text = run_ship_stage.with_reason(words, REASON)
+
+		expect(text).toBe(`#7 review skipped review | ${REASON}`)
+		expect(run_ship_stage.words_of(text)).toStrictEqual({ stage: 'review', phase: 'skipped' })
+		expect(run_ship_stage.started_of(text)).toStrictEqual(['review'])
+		expect(run_ship_stage.reason_of(text)).toBe(REASON)
+	})
+
+	it('reads no started list off a three-word line with a reason', () => {
+		const text = run_ship_stage.with_reason('#7 review done', 'ran: --review — why')
+
+		expect(run_ship_stage.started_of(text)).toBeUndefined()
+		expect(run_ship_stage.words_of(text).phase).toBe('done')
+	})
+
+	it('leaves a line with no reason as it was, and reads no reason off it', () => {
+		const text = '#7 gate done'
+
+		expect(run_ship_stage.with_reason(text, undefined)).toBe(text)
+		expect(run_ship_stage.reason_of(text)).toBeUndefined()
+	})
+})
+
 describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)', () => {
 	it('runs on a fresh tree with no record', () => {
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, NOTHING)).toBe(false)
@@ -304,9 +347,10 @@ describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, new Set([STAGE.REVIEW]), NOTHING)).toBe(false)
 	})
 
-	it('is passed over once a commit or a merge exists', () => {
-		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, COMMITTED)).toBe(true)
+	it('is passed over once a pushed commit or a merge exists, never on a commit alone', () => {
+		expect(run_ship_stage.is_done(STAGE.REVIEW, ALL, SHIPPED)).toBe(true)
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, MERGED)).toBe(true)
+		expect(run_ship_stage.is_done(STAGE.REVIEW, ALL, COMMITTED)).toBe(false)
 	})
 
 	it('runs again on a committed tree once the issue changed after its brief (joshuafolkken/kit#4221)', () => {

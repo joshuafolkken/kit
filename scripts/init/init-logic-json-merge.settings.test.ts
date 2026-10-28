@@ -9,6 +9,9 @@ const CSS_GLOB = '*.css'
 const TAILWIND_VALUE = 'tailwindcss'
 const TSCONFIG_GLOB = '**/tsconfig/*.json'
 const JSONC_VALUE = 'jsonc'
+const WATCHER_EXCLUDE_KEY = 'files.watcherExclude'
+const CONSUMER_EXCLUDE_GLOB = '**/tmp/**'
+const JOSH_EXCLUDE_GLOB = '**/.git/josh/**'
 
 // #691: a key the consumer already owns used to freeze out every later kit addition inside it.
 // Object-valued settings are registries of independent entries, so kit's missing entries are merged
@@ -48,6 +51,24 @@ describe('init_logic_json_merge.merge_json_object — owned object keys', () => 
 		expect(
 			init_logic_json_merge.merge_json_object(content, { [VALIDATE_KEY]: ['typescript'] }),
 		).toBe(content)
+	})
+})
+
+// #5141: a consumer's own watcher exclude survives while kit's josh run-record entry is added.
+describe('init_logic_json_merge.merge_json_object — watcher excludes', () => {
+	it('adds kit watcher excludes beside a consumer exclude', () => {
+		const content = `{"${WATCHER_EXCLUDE_KEY}":{"${CONSUMER_EXCLUDE_GLOB}":true}}`
+
+		const result = JSON.parse(
+			init_logic_json_merge.merge_json_object(content, {
+				[WATCHER_EXCLUDE_KEY]: { [JOSH_EXCLUDE_GLOB]: true },
+			}),
+		) as Record<string, Record<string, boolean>>
+
+		expect(result[WATCHER_EXCLUDE_KEY]).toStrictEqual({
+			[CONSUMER_EXCLUDE_GLOB]: true,
+			[JOSH_EXCLUDE_GLOB]: true,
+		})
 	})
 })
 

@@ -5,6 +5,7 @@ const launch = vi.hoisted(() => vi.fn())
 const review_in_mock = vi.hoisted(() => vi.fn())
 const is_child_mock = vi.hoisted(() => vi.fn())
 const read_stamp_text = vi.hoisted(() => vi.fn())
+const interaction_status = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
@@ -26,12 +27,17 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
-// Never `missing`, so these cases run no interaction review (joshuafolkken/kit#4276).
-vi.mock('#scripts/review/review-interaction', () => ({
-	review_interaction: { status: async () => undefined },
-}))
+// Never `missing` unless a case says so, so the rest run no interaction review (joshuafolkken/kit#4276).
+vi.mock('#scripts/review/review-interaction', async (import_original) => {
+	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
+
+	return { review_interaction: { ...review_interaction, status: interaction_status } }
+})
 vi.mock('#scripts/review/review-record', () => ({
 	review_record: { check: vi.fn(async () => ({ status: 'missing' })) },
+}))
+vi.mock('#scripts/lane/lane-ledger-write', () => ({
+	lane_ledger_write: { record_round_one: vi.fn() },
 }))
 
 const { run_ship_review_steps } = await import('./run-ship-review-steps')
@@ -44,7 +50,7 @@ const broker_serving = vi.spyOn(lane_session_broker, 'is_serving')
 const OK = 0
 const FAILED = 1
 const ISSUE = '2427'
-const OPEN = 'run:review'
+const OPEN = 'run:review --code-only'
 const ARGV = { command: 'claude', args: ['-p', 'prompt'] }
 const ROUND_ONE = { kind: 'review', round: '1' }
 const UNSERVED = 'no broker serves this lane'
@@ -87,6 +93,7 @@ beforeEach(() => {
 	read_stamp_text.mockReset().mockReturnValue('')
 	broker_request.mockReset().mockResolvedValue({ is_success: false, reason: UNSERVED })
 	broker_serving.mockReset().mockReturnValue(false)
+	interaction_status.mockReset().mockResolvedValue(undefined)
 })
 
 describe('run_ship_review_steps.review_stage — isolated OpenAI lane', () => {
@@ -156,6 +163,20 @@ describe('run_ship_review_steps.review_stage — Claude lane child', () => {
 		expect(await stage_code()).toBe(OK)
 		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, ROUND_ONE)
 		expect(launch).not.toHaveBeenCalled()
+	})
+
+	// joshuafolkken/kit#4672: one request carries both slots, so the broker runs them side by side.
+	it('asks the broker for both reviewers in one request when the interaction review is due', async () => {
+		broker_serving.mockReturnValue(true)
+		broker_request.mockResolvedValue({ is_success: true })
+		interaction_status.mockResolvedValueOnce('missing')
+
+		expect(await stage_code()).toBe(OK)
+		expect(broker_request).toHaveBeenCalledOnce()
+		expect(broker_request).toHaveBeenCalledWith(expect.any(String), ISSUE, {
+			...ROUND_ONE,
+			slots: ['code', 'interaction'],
+		})
 	})
 
 	it('launches the reviewer itself when no broker serves the lane', async () => {

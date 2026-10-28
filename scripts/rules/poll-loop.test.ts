@@ -15,6 +15,8 @@ const WC_POLL = 'until [ "$(wc -l < out.txt)" -ge 40 ]; do sleep 30; done'
 // A bare clock timer — `early-heartbeat`'s territory, never this rule's — named once so the
 // disjointness assertion reads it the same both times.
 const BARE_SLEEP = 'sleep 1200'
+// The counted wait a lane child armed over a backgrounded reviewer (joshuafolkken/kit#4800).
+const SEQ_SLEEP = 'for i in $(seq 1 30); do sleep 10; done'
 
 describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 	it.each([
@@ -46,7 +48,6 @@ describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 		// exclusion holds unless an `until` *header* is present (joshuafolkken/kit#2371, review round 2).
 		'while read line; do grep until out.txt; sleep 1; done < in.txt',
 		'sleep 30',
-		'for i in $(seq 1 5); do build; done',
 		// A `while` that counts rather than probes is ordinary work, not a wait (joshuafolkken/kit#2421).
 		'i=0; while [ "$i" -lt 5 ]; do build; i=$((i+1)); done',
 		// The word in an argument is not a loop header — only a command position is (review round 1).
@@ -60,11 +61,67 @@ describe('poll_loop.is_poll_loop — refuses the output-file wait loop', () => {
 	})
 })
 
+// joshuafolkken/kit#4800: a counted `for` that sleeps waits on the clock with nothing to work through,
+// with or without a probe in its body; a `for` over a real list is ordinary work, sleep or not.
+describe('poll_loop.is_poll_loop — a counted for loop that sleeps', () => {
+	it.each([
+		SEQ_SLEEP,
+		'for i in $(seq 1 55); do s=$(stat -f %z out.txt); echo "size=$s"; sleep 10; done',
+		'for i in {1..30}; do sleep 10; done',
+		'for ((i = 0; i < 30; i++)); do sleep 10; done',
+	])('refuses the counted wait %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(true)
+	})
+
+	it.each([
+		'for i in $(seq 1 5); do build; done',
+		'for f in *.ts; do pnpm josh lint "$f"; done',
+		'for f in a.txt b.txt; do cat "$f"; sleep 1; done',
+		'pnpm josh issue:comment 1 --body "for i in $(seq 1 30); do sleep 10; done"',
+		// A `sleep` outside the counted loop's body is not its wait (review round 1).
+		'sleep 5; for i in $(seq 1 3); do echo "$i"; done',
+		'for i in $(seq 1 3); do echo "$i"; done; sleep 5',
+		'formula in {1..3} x; sleep 2',
+	])('passes the list loop %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5115: a sleep chain before a read of a task's output or a process is the poll
+// unrolled; a short settle wait and a read with no sleep are ordinary work.
+const TAIL_CHAIN = 'sleep 20; sleep 20; sleep 20; tail -c 1500 /tmp/tasks/x.output'
+const PS_CHAIN = 'sleep 20; ps -p 123 -o etime='
+
+describe('poll_loop.is_poll_loop — a sleep chain before a read', () => {
+	it.each([
+		TAIL_CHAIN,
+		PS_CHAIN,
+		'sleep 20; ps -p 123 >/dev/null && echo running || cat /tmp/tasks/x.output',
+		'sleep 30 && tail -5 /tmp/tasks/x.output 2>&1 | grep -c done',
+		'sleep 1m; stat -f %z /tmp/tasks/x.output',
+	])('refuses the unrolled poll %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(true)
+	})
+
+	it.each([
+		'sleep 3; tail -5 /tmp/x.log',
+		'tail -c 1500 /tmp/tasks/x.output',
+		'sleep 20; pnpm josh ship:wait 5115',
+		'sleep 20; tail -5 /tmp/x.log; pnpm build',
+		// The sleep after the read is not a wait for it (review round 1).
+		'tail -5 /tmp/x.log; sleep 20',
+		'gh issue comment 1 --body "sleep 20; tail -c 1500 x.output"',
+	])('passes the settle wait or plain read %j', (command) => {
+		expect(poll_loop.is_poll_loop(command)).toBe(false)
+	})
+})
+
 // **Disjoint from `early-heartbeat` by construction, asserted rather than assumed.** That rule stands
-// down on any loop keyword, and this one fires only on a loop — so neither reproduce shape is a wait
+// down on any loop keyword and refuses only an all-sleep call, and this one fires only on a loop or
+// on a sleep chain with a read after it — so no refused shape here is a wait
 // timer, and a bare `sleep` this rule leaves alone is exactly what that rule takes.
 describe('poll_loop and early_heartbeat claim disjoint commands', () => {
-	it.each([GREP_POLL, WC_POLL])(
+	it.each([GREP_POLL, WC_POLL, SEQ_SLEEP, TAIL_CHAIN, PS_CHAIN])(
 		'a poll loop is not an early-heartbeat wait timer: %j',
 		(command) => {
 			expect(early_heartbeat.is_wait_timer(command)).toBe(false)
@@ -82,8 +139,12 @@ describe('poll_loop.POLL_LOOP_REASON', () => {
 		'output poll loop',
 		'run_in_background',
 		'its exit re-invokes you',
+		'counted `for`',
+		'a `sleep` chain before a read',
+		'pnpm josh run:liveness',
+		'a background `Agent` is waited on by its completion notification',
 		'background-commands.md',
-		'fires on every occurrence',
+		'Fires on every occurrence',
 	])('carries %j', (marker) => {
 		expect(poll_loop.POLL_LOOP_REASON).toContain(marker)
 	})

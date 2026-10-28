@@ -1,10 +1,9 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
+import { context_cut_payback } from '#scripts/cost-runtime/context-cut-payback'
 import type { CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
-import { figure_format } from '#scripts/lib/figure-format'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_headless } from './run-headless'
@@ -33,6 +32,8 @@ function carry(overrides: Partial<RunCarry> = {}): RunCarry {
 function state(record: RunCarry | undefined, verdict: CostVerdict): ParentCutState {
 	return { carry: async (): Promise<RunCarry | undefined> => record, verdict: () => verdict }
 }
+
+const CONTEXT_CUT_THRESHOLD = context_cut_payback.break_even_context(undefined)
 
 // A driving parent priced through the real verdict on a per-request billed-input sequence.
 function priced_on(billed: ReadonlyArray<number>): ParentCutState {
@@ -191,9 +192,10 @@ describe('run_parent_cut_hook.PARENT_CUT_REASON', () => {
 		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('backlogrun-progress.md')
 	})
 
-	it('builds the threshold from the shared constant rather than spelling it', () => {
-		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain(
-			figure_format.format_tokens(CONTEXT_CUT_THRESHOLD),
-		)
+	// joshuafolkken/kit#5341: the threshold is priced at the session's model, so the reason names the
+	// command that prices it rather than one number.
+	it('names the threshold by its command rather than spelling a number', () => {
+		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('`pnpm josh cost --cut` threshold')
+		expect(run_parent_cut_hook.PARENT_CUT_REASON).not.toMatch(/\d{3},\d{3}/u)
 	})
 })

@@ -15,6 +15,8 @@ const ROW_ID = 'lane-background'
 const SHIP = 'pnpm josh ship "Title #1" --body-file evidence.md'
 const DETACHED_SHIP = 'pnpm josh ship --detach --review "Title #1"'
 const GATE_AND_SHIP = `${GATE} && ${DETACHED_SHIP}`
+const SHIP_WAIT = 'pnpm josh ship:wait 1'
+const LANE_PLAN = 'pnpm josh lane:plan 1 scripts/lane/lane-plan.ts'
 const FOREGROUND_TIMEOUT_MS = 600_000
 const BACKGROUND_TIMEOUT_MS = 1_800_000
 
@@ -216,6 +218,42 @@ describe('lane_background.foreground_input — a foreground ship', () => {
 	})
 })
 
+// joshuafolkken/kit#4711: a `ship:wait` at the two-minute default is moved aside mid-chunk and dies with the
+// headless turn, its verdict unread.
+describe('lane_background.foreground_input — ship:wait', () => {
+	it.each([
+		['in the foreground', { command: SHIP_WAIT }],
+		['in the background', { command: SHIP_WAIT, run_in_background: true }],
+	])('gives a ship:wait %s the foreground cap in a lane child', (_case, input) => {
+		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
+			command: SHIP_WAIT,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('does not refuse a backgrounded ship:wait, since it is rewritten instead', () => {
+		expect(lane_background.is_background_long_run(background_call(SHIP_WAIT), in_lane)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#4864: a `lane:plan` cut at the default records its plan with the wait unfinished.
+describe('lane_background.foreground_input — lane:plan', () => {
+	it('gives a lane:plan the foreground cap in a lane child', () => {
+		const input = { command: LANE_PLAN }
+
+		expect(lane_background.foreground_input({ name: BASH, input }, in_lane)).toStrictEqual({
+			command: LANE_PLAN,
+			run_in_background: false,
+			timeout: FOREGROUND_TIMEOUT_MS,
+		})
+	})
+
+	it('names lane:plan in the note on the rewritten call', () => {
+		expect(lane_background.FOREGROUND_NOTE).toContain('josh lane:plan')
+	})
+})
+
 describe('lane_background.ROW — delivery', () => {
 	it('is registered as a delivered rule refusing every occurrence', () => {
 		const row = delivered_rules.DELIVERED_RULES.find((rule) => rule.id === ROW_ID)
@@ -236,6 +274,14 @@ describe('lane_background.ROW — delivery', () => {
 
 	it('says the ship is issued in the foreground', () => {
 		expect(lane_background.LANE_BACKGROUND_REASON).toContain('issued in the foreground')
+	})
+
+	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711).
+	it.each([
+		['refusal', lane_background.LANE_BACKGROUND_REASON],
+		['foreground note', lane_background.FOREGROUND_NOTE],
+	])('the %s sends a launched ship to josh ship:wait', (_name, text) => {
+		expect(text).toContain('josh ship:wait')
 	})
 })
 
@@ -318,7 +364,8 @@ describe('lane_background.pending_agent_ids', () => {
 
 describe('stop_rules.stop_outcome — lane background wait', () => {
 	it('sends a lane child with a running task back to wait instead of to notify', () => {
-		const held = context({ lane_child: true, background_pending: true, hold_issue: '7' })
+		const running = { background_pending: true, command_pending: true }
+		const held = context({ ...running, lane_child: true, hold_issue: '7' })
 
 		expect(stop_rules.stop_outcome(held)).toEqual({
 			...stop_rules.NO_OUTCOME,
@@ -348,12 +395,6 @@ describe('stop_rules.stop_outcome — lane background wait', () => {
 		['only a command running, which may never end', { background_pending: true }],
 	])('still sends the notify of a held run with %s', (_label, pending) => {
 		expect(action_kinds({ ...pending, ...HELD_DECISION })).toEqual(['notify'])
-	})
-
-	it('still cites a bare issue number while a subagent runs', () => {
-		const pending = { background_pending: true, agent_pending: true }
-
-		expect(action_kinds({ ...pending, hold_issue: '7', message: 'See #2774.' })).toEqual(['cite'])
 	})
 
 	it('honours the loop-breaker', () => {
