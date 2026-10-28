@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { process_identity } from '#scripts/josh/process-identity'
 import type { ProcessOwner } from '#scripts/josh/process-owner'
-import { lane_ledger } from '#scripts/lane/lane-ledger'
+import { lane_ledger, type LedgerEntry } from '#scripts/lane/lane-ledger'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
@@ -27,6 +28,7 @@ const CHECK_CPU_MS = 6812.4
 const CHECK_CPU_ROUNDED = 6812
 const OWN: ProcessOwner = process_identity.own_fields()
 const FOREIGN: ProcessOwner = { pid: process.pid + 1, process_start: 'another lane' }
+const LANE_ISSUE = 5319
 
 function reads(...busy_cores: ReadonlyArray<number | undefined>): void {
 	for (const busy of busy_cores) {
@@ -112,6 +114,36 @@ describe('gate_ledger — the external load a gate ran beside', () => {
 
 		expect(read_machine).not.toHaveBeenCalled()
 		expect(live_reservations).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5319: so `josh lane:breakdown` puts the checks under the lane's ship gate.
+function issues_in(ledger_path: string): Array<number | undefined> {
+	return lane_ledger
+		.read_entries(ledger_path)
+		.map((entry: LedgerEntry) => (entry.kind === 'gate' ? entry.issue : NaN))
+}
+
+describe('gate_ledger — the lane a gate ran in', () => {
+	it('records the lane on a timed and on a reused line', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(LANE_ISSUE)
+		const ledger_path = path.join(scratch, 'issue.jsonl')
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [], OUTCOME)
+		await gate_ledger.record_reused(ledger_path, OUTCOME.elapsed_ms)
+
+		expect(issues_in(ledger_path)).toStrictEqual([LANE_ISSUE, LANE_ISSUE])
+	})
+
+	it('records no lane outside a lane', async () => {
+		reads(QUIET_BUSY, QUIET_BUSY)
+		vi.spyOn(lane_paths, 'issue_here').mockReturnValue(undefined)
+		const ledger_path = path.join(scratch, 'no-issue.jsonl')
+
+		await gate_ledger.record(await gate_ledger.start(ledger_path), [], OUTCOME)
+
+		expect(issues_in(ledger_path)).toStrictEqual([undefined])
 	})
 })
 

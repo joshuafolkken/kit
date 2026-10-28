@@ -133,6 +133,19 @@ describe('lane_issue_of inside a Claude Code worktree', () => {
 	})
 })
 
+// joshuafolkken/kit#5319: a ledger row written inside a lane carries the lane as a number.
+describe('issue_here', () => {
+	it('reads the lane a directory sits in as a number', () => {
+		const directory = lane_paths.lane_directory(lane_paths.lane_root(REPOSITORY_ROOT, {}), ISSUE)
+
+		expect(lane_paths.issue_here(directory, {})).toBe(Number(ISSUE))
+	})
+
+	it('says nothing outside a lane', () => {
+		expect(lane_paths.issue_here(REPOSITORY_ROOT, {})).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#3370: the stray sweep acts only on the names the lane machinery writes.
 describe('which names in a lanes root belong to the lane machinery', () => {
 	it.each([[ISSUE], ['.1665-lanes'], ['.app-kit-lanes']])('claims %j', (name) => {
