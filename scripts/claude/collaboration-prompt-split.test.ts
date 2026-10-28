@@ -301,3 +301,21 @@ describe('concise-prose states the rule and follows it', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#5328: the chat-reply rule names its order, its limit's source and its exemptions.
+describe('concise-reply states the order, the limit source and the exemptions', () => {
+	const section =
+		read_repo_file(`${WORKFLOW_PROMPT_DIRECTORY}/principles.md`)
+			.split('\n## ')
+			.find((part) => part.startsWith('concise-reply')) ?? ''
+
+	it.each([
+		'結論（1〜2 文）→ 表か箇条書き 1 つ → 次の一手',
+		'`PROSE_LIMIT`',
+		'詳しく',
+		'固定出力',
+		'成果物',
+	])('states %j', (marker) => {
+		expect(section).toContain(marker)
+	})
+})

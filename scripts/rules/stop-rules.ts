@@ -1,6 +1,7 @@
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
 import { z } from 'zod'
+import { concise_reply } from './concise-reply'
 import { filing_offer } from './filing-offer'
 import { lane_background } from './lane-background'
 import { reply_language } from './reply-language'
@@ -63,6 +64,8 @@ interface StopContext {
 	notified: boolean
 	// The turn's session-facing reply text.
 	message: string
+	// The person's last prompt on the tail — `undefined` when none is on it (`last_prompt.person_prompt`).
+	prompt: string | undefined
 	// This stop already forced a continuation earlier in the prompt — the loop-breaker Claude Code
 	// documents, so a run that will not comply is not blocked forever.
 	stop_hook_active: boolean
@@ -226,6 +229,13 @@ function language_reason(context: StopContext): string | undefined {
 	return build_language_reason(context.session_lang)
 }
 
+// **A reply's narrative over the limit is sent back once to be shortened** — `concise-reply.ts`.
+function concise_reason(context: StopContext): string | undefined {
+	if (!concise_reply.is_over(context.message, context.prompt)) return undefined
+
+	return concise_reply.build_reason(context.message)
+}
+
 // The sessions no person answers: one kit launched under `claude -p` (a lane child, a woken session), a
 // dispatched lane child, or the `backlogrun` parent the user handed the backlog to.
 function is_unattended(context: StopContext): boolean {
@@ -272,16 +282,16 @@ function needs_release(context: StopContext): boolean {
 	return is_held_idle(context) && context.tree_clean && !context.prrun_stopped
 }
 
-// The two rules that read the reply and need the model, the filing offer first. **A headless agent's
-// reply has no reader**: its text lands in a stream-json log, so correcting its language costs a turn
-// and reaches nobody. A drifted reply
+// The rules that read the reply and need the model: the filing offer, then the language, then the
+// length. **A headless agent's reply has no reader**: its text lands in a stream-json log, so
+// correcting its language costs a turn and reaches nobody. A drifted reply
 // refused for another reason is not rewritten, but the drift still ends: `block_envelope` appends the
 // session-language note to every refusal, so the turn it continues is written in the session language.
 function reply_reason(context: StopContext): string | undefined {
 	if (needs_filing(context)) return FILING_OFFER_REASON
 	if (context.headless_agent) return undefined
 
-	return language_reason(context)
+	return language_reason(context) ?? concise_reason(context)
 }
 
 // Sent back once; past the loop-breaker the run has said nothing is awaited, and nothing is sent.

@@ -56,6 +56,13 @@ The "冗長さ" goal in quality-priority covers duplication only, so no rule sai
 recurring patterns — a packed paragraph, history in the body, heavy bold, restatement and meta
 sentences — each became one bullet of the rule.
 
+## Why concise-reply exists
+
+concise-prose covers what is written to files, not the chat reply. Replies reporting two filings ran
+to about 1,100 characters — a table and four paragraphs — where the owner wanted the conclusion, the
+points and the next step (joshuafolkken/kit#5328). A local memory note only reached the session that
+loaded it and never a consumer, so `stop:guard` measures the reply instead.
+
 ## Why a remedy for defects never halts evolution
 
 Asked about the number of defects, the agent proposed pausing new optimizations as the root fix

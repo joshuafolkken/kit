@@ -12,6 +12,11 @@ describe('firing_point.classify', () => {
 		expect(firing_point.classify(name)).toBe('delivered')
 	})
 
+	// joshuafolkken/kit#5328: `stop:guard` delivers on the Stop hook.
+	it('matches the Stop hook', () => {
+		expect(firing_point.classify('Stop')).toBe('delivered')
+	})
+
 	it('reports a real but undeliverable tool as a mismatch', () => {
 		expect(firing_point.classify('WebFetch')).toBe('not-delivered')
 	})

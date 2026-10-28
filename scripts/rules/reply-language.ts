@@ -1,3 +1,5 @@
+import { reply_prose } from './reply-prose'
+
 // Whether a reply is written in the session language. The session-language
 // line reaches a turn only through `UserPromptSubmit`, so a turn opened by a background completion or a
 // Stop hook refusal answered in whatever language it was just shown, and kept answering in it.
@@ -31,14 +33,6 @@ const MATCH_SHARE_FLOOR = 0.5
 // unless no line of the reply is longer.
 const MIN_VOTING_LETTERS = 8
 
-const CODE_PATTERNS: ReadonlyArray<RegExp> = [
-	/```[\s\S]*?(?:```|$)/gu,
-	/`[^`\n]*`/gu,
-	/\]\([^)\s]*\)/gu,
-	/https?:\/\/\S+/gu,
-]
-// A run of printable ASCII; one holding a slash is a bare path the reply printed outside backticks.
-const ASCII_RUN_PATTERN = /[!-~]+/gu
 const LETTER_PATTERN = /\p{L}/gu
 // A letter of another script — `Common` and `Inherited` letters (`µ`) belong to no language of their own.
 const NON_LATIN_LETTER_PATTERN = /(?![\p{Script=Latn}\p{Script=Common}\p{Script=Inherited}])\p{L}/u
@@ -61,14 +55,6 @@ function letter_pattern(script: string): RegExp | undefined {
 	} catch {
 		return undefined
 	}
-}
-
-function prose_of(message: string): string {
-	let text = message
-
-	for (const pattern of CODE_PATTERNS) text = text.replaceAll(pattern, ' ')
-
-	return text.replaceAll(ASCII_RUN_PATTERN, (run) => (run.includes('/') ? ' ' : run))
 }
 
 function letter_count(text: string): number {
@@ -105,7 +91,7 @@ function is_mismatch(message: string, lang: string): boolean {
 	const pattern = letter_pattern(script)
 	if (pattern === undefined) return false
 
-	const prose = prose_of(message)
+	const prose = reply_prose.prose_of(message)
 	if (letter_count(prose) < MIN_PROSE_LETTERS) return false
 
 	return matches_share(prose, script, pattern) < MATCH_SHARE_FLOOR

@@ -82,3 +82,29 @@ describe('last_prompt.turn_prompt and pause_start', () => {
 		expect(last_prompt.pause_start(ASSISTANT_LINE)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#5328: the concise-reply exemption reads what the person asked, past the harness.
+describe('last_prompt.person_prompt — the person’s last prompt on the tail', () => {
+	it('reads the person’s prompt past a skill body the harness wrote after it', () => {
+		const tail = [
+			prompt_line(PASTED_PROMPT),
+			prompt_line([{ type: 'text', text: 'skill #5' }], { isMeta: true }),
+			TOOL_RESULT_LINE,
+		]
+
+		expect(last_prompt.person_prompt(tail.join('\n'))).toBe(PASTED_PROMPT)
+	})
+
+	it('reads the person’s prompt past a task notification', () => {
+		const tail = [
+			prompt_line(PASTED_PROMPT),
+			prompt_line('done', { origin: { kind: NOTIFICATION } }),
+		]
+
+		expect(last_prompt.person_prompt(tail.join('\n'))).toBe(PASTED_PROMPT)
+	})
+
+	it('reads nothing on a tail with no prompt of the person’s', () => {
+		expect(last_prompt.person_prompt(ASSISTANT_LINE)).toBeUndefined()
+	})
+})
