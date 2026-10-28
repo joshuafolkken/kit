@@ -30,6 +30,7 @@ const body_path = path.join(work, 'conditioned.md')
 
 const origin_path = path.join(work, 'origin.md')
 const JUDGEMENT_NOT_NEEDED = '- 人の判断: 不要'
+const MEASURE_DECLARATION = '- 計測宣言: `pnpm josh lane:net 5168` <= 40'
 const BODY = [
 	'## 背景',
 	'',
@@ -38,6 +39,7 @@ const BODY = [
 	JUDGEMENT_NOT_NEEDED,
 	'- 規模見積もり: 約 1 ファイル / 10 行（テスト除く）',
 	`- 実施可能条件: #${String(CITED)} のマージ後 30 マージ`,
+	MEASURE_DECLARATION,
 	'',
 	'## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n',
 ].join('\n')
@@ -62,7 +64,7 @@ const CLOSING_CONDITION = `- 実施可能条件: #${String(CITED)} を閉じる 
 
 writeFileSync(
 	closing_path,
-	[...MEASUREMENT_BACKGROUND, CLOSING_CONDITION, MEASUREMENT_REST].join('\n'),
+	[...MEASUREMENT_BACKGROUND, CLOSING_CONDITION, MEASURE_DECLARATION, MEASUREMENT_REST].join('\n'),
 )
 writeFileSync(measurement_path, MEASUREMENT_BODY)
 writeFileSync(body_path, BODY)
@@ -71,6 +73,10 @@ writeFileSync(origin_path, `${BODY}\n## Origin\n\n${HERE}#2808\n`)
 function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return ['A title', '--body-file', body_file, ...extra]
 }
+
+// joshuafolkken/kit#5333: the citation is read only once the local checks pass, so a filing that
+// reaches it carries the run label its `auto-ok` owes.
+const RUN_LABEL = ['--label', 'run:lane']
 
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const scout = vi.spyOn(issue_scout_cli, 'scout')
@@ -106,13 +112,15 @@ describe('issue_file_cli.run — a measurement follow-up with no start condition
 
 describe('issue_file_cli.run — a start condition citing an issue', () => {
 	it('refuses the filing, citing the pull request that closed the issue', async () => {
-		expect(await issue_file_cli.run(argv_of(body_path))).toBe(FAILURE_EXIT_CODE)
+		expect(await issue_file_cli.run(argv_of(body_path, ...RUN_LABEL))).toBe(FAILURE_EXIT_CODE)
 		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain(`#${String(CLOSING)}`)
 		expect(exec_gh_api).toHaveBeenCalledTimes(1)
 	})
 
 	it('reads the number in the target repository', async () => {
-		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE))).toBe(FAILURE_EXIT_CODE)
+		expect(await issue_file_cli.run(argv_of(origin_path, '--repo', THERE, ...RUN_LABEL))).toBe(
+			FAILURE_EXIT_CODE,
+		)
 		expect(exec_gh_api).toHaveBeenCalledWith({
 			path: git_gh_api_path.issue_api_path(String(CITED), THERE),
 		})
@@ -123,7 +131,7 @@ describe('issue_file_cli.run — a start condition citing an issue', () => {
 // issue exists — `josh ship` wants the deferral row first — by citing the issue's closing pull request.
 describe('issue_file_cli.run — a measurement follow-up citing the closing pull request of an issue', () => {
 	it('passes the start condition checks unread and reaches the scout', async () => {
-		await issue_file_cli.run(argv_of(closing_path, '--label', 'run:lane'))
+		await issue_file_cli.run(argv_of(closing_path, ...RUN_LABEL))
 
 		expect(vi.mocked(console.error).mock.calls.join('\n')).not.toContain('実施可能条件')
 		expect(scout).toHaveBeenCalledTimes(1)

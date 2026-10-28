@@ -38,10 +38,10 @@ import { size_estimate } from './size-estimate'
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
 // [--release] [--blocks-finder]` — file an Issue with every filing step run: the third-party refusal,
 // the filing cap per origin and the fold question against the run's earlier filings, each ending the
-// filing on its own; then, in one pass that prints every refusal before any is acted on, the body lint,
-// the size estimate against the split guide, the start condition a measurement follow-up owes, the
-// `## Origin` check for another repository, the start condition read as a pull request, the `auto-ok`
-// decision with the run label it owes, the WIP cap count and the duplicate scout; then the missing
+// filing on its own; then, each tier printing every refusal of its own at once, the local checks — the body lint, the size estimate against the split guide, the start condition a measurement
+// follow-up owes, the `## Origin` check for another repository, the `auto-ok` decision with the run
+// label it owes; once those pass, the start condition read as a pull request and the WIP cap count;
+// once those pass, the duplicate scout; then the missing
 // workflow labels created, the create call
 // carrying every label, a blocking interrupt's finder recorded as blocked by it, the release link on
 // `--release`, and `epic:bundle`.
@@ -336,22 +336,20 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 	)
 }
 
-// Every step the caller answers from the body and the arguments, run in one pass so each refusal is
-// printed at once and fixed in one reissue: the body's own refusals, the start condition's citation,
-// the run label, the WIP count and the duplicate candidates. The labels, or `undefined` when any refused.
+// Every step the caller answers from the body and the arguments, cheapest first, each tier's refusals
+// printed at once and fixed in one reissue: the local checks (the body's own refusals and the run
+// label) before anything asks GitHub, then the start condition's citation and the WIP count, then the
+// duplicate scout's search, run only once nothing else refuses. The labels, or `undefined` when any refused.
 async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const is_body_clear = await is_admitted(filing)
-	const is_cited = await is_source_clear(filing)
 	const labels = labels_of(filing)
-	const verdicts = [
-		is_body_clear,
-		is_cited,
-		labels !== undefined,
-		await is_wip_clear(filing),
-		await is_scout_clear(filing),
-	]
 
-	return verdicts.every(Boolean) ? labels : undefined
+	if (!is_body_clear || labels === undefined) return undefined
+	const verdicts = [await is_source_clear(filing), await is_wip_clear(filing)]
+
+	if (!verdicts.every(Boolean)) return undefined
+
+	return (await is_scout_clear(filing)) ? labels : undefined
 }
 
 async function file(filing: Filing): Promise<number> {
