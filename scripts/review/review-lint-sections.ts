@@ -1,3 +1,5 @@
+import { document_section } from '#scripts/document/document-section'
+
 // The parsing half of `review:lint`: a review's markdown split into its `###` sections, and a
 // section's list items grouped with their indented continuation lines. The checks live in
 // `review-lint.ts` and `review-lint-findings.ts`; nothing here judges what it reads.
@@ -25,12 +27,18 @@ function heading_name(line: string): string {
 		.trim()
 }
 
-// Lines before the first heading belong to no section and are not read.
+// Lines before the first heading belong to no section and are not read; a `###` line inside a code
+// fence is quoted text, not a heading.
 function parse_sections(review: string): ReadonlyArray<ReviewSection> {
+	const lines = review.split('\n')
+	const fenced = document_section.fenced_flags(lines)
+	const heading_flags = lines.map(
+		(line, index) => fenced[index] !== true && line.startsWith(HEADING_PREFIX),
+	)
 	const sections: Array<{ heading: string; lines: Array<string> }> = []
 
-	for (const line of review.split('\n')) {
-		if (line.startsWith(HEADING_PREFIX)) sections.push({ heading: heading_name(line), lines: [] })
+	for (const [index, line] of lines.entries()) {
+		if (heading_flags[index] === true) sections.push({ heading: heading_name(line), lines: [] })
 		else sections.at(-1)?.lines.push(line)
 	}
 

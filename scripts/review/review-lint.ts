@@ -43,7 +43,8 @@ const NO_ISSUES = /\bNo issues\b/u
 const TRACE = /Traced .+ → .+ — (?:confirmed|flagged) because \S/u
 const MIN_ASSUMPTIONS = 2
 const MAX_ASSUMPTIONS = 3
-const BANNED_FLOOR = /^(?:Nothing|No concerns)\b/iu
+// The banned answers stand alone; a sentence that only opens with "Nothing" names something.
+const BANNED_FLOOR = /^(?:Nothing|No concerns)\.?$/iu
 const TARGET_MISMATCH = 'REVIEW TARGET MISMATCH'
 const RUBRIC = 'prompts/review-rubric.md'
 const ROUND_ONE_SECTION = 'Review output format'

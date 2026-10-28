@@ -5,7 +5,7 @@ import { review_brief_cli } from './review-brief-cli'
 import { review_lint } from './review-lint'
 
 // `josh review:lint` — read a review's markdown from stdin and print `ok`, or the rubric's format
-// violations one per line, exiting non-zero so the reviewer runs it before `review:submit`.
+// violations one per line, exiting non-zero so the reviewer runs it before returning its findings.
 // `--round 2` checks the verification pass's shape instead of the full template.
 
 const SUCCESS_EXIT_CODE = 0

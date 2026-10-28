@@ -16,8 +16,8 @@ const LOW_MARKER = '(low)'
 const NO_FAILURE_SCENARIO = 'no failure scenario —'
 const PRIOR_SEVERITY = /\(was (?:high|medium|low)\)/u
 const RESOLUTION = /\bresolved\b/u
-// An item that is a trace or a `No issues` proof is the category's verdict, not a finding.
-const VERDICT_ITEM = /^(?:Traced |No issues)/u
+// An item that is a trace, a `No issues` proof or an empty section's `None` is the verdict, not a finding.
+const VERDICT_ITEM = /^(?:Traced\b|No issues|None\b)/u
 
 function cites_file_line(block: string): boolean {
 	return FILE_LINE.test(block)
@@ -27,8 +27,9 @@ function states_severity(block: string): boolean {
 	return SEVERITY.test(block)
 }
 
+// The finding's own severity is its first one; a `(low)` later in its prose is not a severity.
 function low_has_scenario_line(block: string): boolean {
-	return !block.includes(LOW_MARKER) || block.includes(NO_FAILURE_SCENARIO)
+	return SEVERITY.exec(block)?.[0] !== LOW_MARKER || block.includes(NO_FAILURE_SCENARIO)
 }
 
 function states_prior_severity(block: string): boolean {

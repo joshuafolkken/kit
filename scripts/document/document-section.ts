@@ -262,6 +262,7 @@ function read_optional(file_path: string): string | undefined {
 
 const document_section = {
 	candidates,
+	fenced_flags,
 	headings,
 	read_optional,
 	section,

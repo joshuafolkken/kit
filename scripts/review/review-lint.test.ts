@@ -165,6 +165,22 @@ describe('review_lint.lint_review — round 1 findings', () => {
 	it('reports a low finding with no "no failure scenario —" line', () => {
 		expect(reports({ comments: [LOW_FINDING] }, LOW_WITHOUT_SCENARIO)).toBe(true)
 	})
+
+	it('reads only the first severity, so a high finding that mentions "(low)" needs no scenario', () => {
+		const finding = '- `src/foo.ts:42` (high) — a (low) risk check is inverted — negate it'
+
+		expect(lint(round_one({ bug: [finding] }))).toEqual([])
+	})
+
+	it('accepts a "- None" item as an empty category, not a finding', () => {
+		expect(lint(round_one({ tests: ['- None — every branch has a case.'] }))).toEqual([])
+	})
+
+	it('accepts a confidence floor that only opens with "Nothing"', () => {
+		const floor = ['Nothing in the parser worries me more than CRLF input.']
+
+		expect(lint(round_one({ floor }))).toEqual([])
+	})
 })
 
 describe('review_lint.lint_review — round 2', () => {
@@ -194,6 +210,10 @@ describe('review_lint.lint_review — round 2', () => {
 
 		expect(has_violation(violations, '"(was <severity>)"')).toBe(true)
 		expect(has_violation(violations, '"resolved" or "not resolved"')).toBe(true)
+	})
+
+	it('accepts an empty fix delta written as "- None"', () => {
+		expect(lint(conforming.replace(HIGH_FINDING, '- None'), ROUND_TWO)).toEqual([])
 	})
 
 	it('checks a new finding in the fix delta like a round-1 finding', () => {
