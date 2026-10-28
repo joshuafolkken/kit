@@ -16,6 +16,7 @@ const OLD_LINE = '-'
 const OLD_FILE_HEADER = '--- '
 const NEW_LINE = '+'
 const FILE_HEADER_MARK = '+++ '
+const OLD_FILE_PATH = '--- a/'
 const LINE_BREAK = '\n'
 const GREEN_REASON = 'reverting it left every related test green'
 const NO_TEST_REASON = 'no related test ran with it reverted'
@@ -136,9 +137,11 @@ function record_line(hunk: Hunk | undefined, line: string): void {
 }
 
 // Each file section starts unnamed, so a `+++` line this does not read (a quoted path with a space)
-// leaves its hunks on no file rather than on the previous one.
+// leaves its hunks on no file rather than on the previous one. A deleted file (`+++ /dev/null`) keeps
+// the name its `--- a/` line gave it.
 function file_after(file: string, line: string): string {
 	if (line.startsWith(FILE_HEADER)) return line.slice(FILE_HEADER.length)
+	if (line.startsWith(OLD_FILE_PATH)) return line.slice(OLD_FILE_PATH.length)
 
 	return line.startsWith(SECTION_HEADER) ? '' : file
 }
@@ -151,14 +154,20 @@ function step(walk: DiffWalk, line: string): void {
 	else walk.hunks.push(hunk)
 }
 
-// One `-U0` diff into its hunks, in diff order. A revert puts the old lines back over the working file's
-// `new_count` lines at `new_start`.
-function parse_hunks(diff: string): Array<Hunk> {
+// One `-U0` diff (`a/` and `b/` prefixes) into every file's hunks, in diff order — also read by
+// `prose-stale-cli.ts` for the lines a diff removed and added.
+function all_hunks(diff: string): Array<Hunk> {
 	const walk: DiffWalk = { file: '', hunks: [] }
 
 	for (const line of diff.split(LINE_BREAK)) step(walk, line)
 
-	return walk.hunks.filter((hunk) => is_target(hunk.file))
+	return walk.hunks
+}
+
+// The hunks a revert probes. A revert puts the old lines back over the working file's `new_count` lines
+// at `new_start`.
+function parse_hunks(diff: string): Array<Hunk> {
+	return all_hunks(diff).filter((hunk) => is_target(hunk.file))
 }
 
 // A pure deletion's `new_start` names the line before the gap, so the old lines go in after it.
@@ -304,6 +313,7 @@ function report_text(parts: ReportParts, note = ''): string {
 }
 
 const test_pinned_logic = {
+	all_hunks,
 	DEFAULT_MAX_HUNKS,
 	by_reach,
 	format,
