@@ -15,7 +15,6 @@ const mocked_find_bin = vi.mocked(local_bin_module.find_local_bin_upwards)
 const mocked_execa = vi.mocked(execa_module.execa)
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-type ExecaImplementation = Parameters<typeof mocked_execa.mockImplementation>[0]
 
 const START_DIRECTORY = '/project/src/lib'
 const APP_KIT_USAGE =
@@ -37,6 +36,8 @@ function fake_output(output: string): ExecaResult {
 // `bin_names` are the toolkits whose shim the upward walk finds; every other name resolves to
 // nothing, which is what a globally installed toolkit looks like from here.
 function mock_installed(bin_names: ReadonlyArray<string>, usage: string): void {
+	type ExecaImplementation = Parameters<typeof mocked_execa.mockImplementation>[0]
+
 	mocked_find_bin.mockImplementation((_start: string, bin_name: string) =>
 		bin_names.includes(bin_name) ? `/project/node_modules/.bin/${bin_name}` : undefined,
 	)
