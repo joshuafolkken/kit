@@ -48,12 +48,43 @@ runs:
         test -n "$version"
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
+    # The runtime is cached here, in pnpm's own store, rather than taken from setup-node's tool
+    # cache: setup-node stays the one place the default Node version is written. pnpm/setup installs
+    # the runtime into the store under `dest` before the store cache below restores, so a download
+    # that crawled at 100 KB/s timed the job out at 10 minutes (joshuafolkken/kit#5315). This cache
+    # is restored ahead of pnpm/setup and saved right after it, while the store holds the runtime
+    # alone; its key carries the resolved version, so `node@26` moves to a new patch release once.
+    - name: Fetch cached Node runtime
+      id: runtime-cache
+      if: inputs.runtime != '' && inputs.cache == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/setup-pnpm/store
+        key: ${{ runner.os }}-pnpm-runtime-${{ inputs.runtime }}-
+        restore-keys: ${{ runner.os }}-pnpm-runtime-${{ inputs.runtime }}-
+
     - name: Setup pnpm
       uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
       with:
         version: ${{ steps.pnpm-version.outputs.version }}
         runtime: ${{ inputs.runtime }}
+        dest: ~/setup-pnpm
         install: false
+
+    - name: Resolve Node runtime cache key
+      id: runtime-key
+      if: steps.runtime-cache.outcome == 'success'
+      shell: bash
+      env:
+        RUNTIME: ${{ inputs.runtime }}
+      run: echo "key=$RUNNER_OS-pnpm-runtime-$RUNTIME-$(node --version)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Node runtime
+      if: steps.runtime-key.outputs.key != '' && steps.runtime-key.outputs.key != steps.runtime-cache.outputs.cache-matched-key
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/setup-pnpm/store
+        key: ${{ steps.runtime-key.outputs.key }}
 
     - name: Resolve pnpm store path
       if: inputs.install == 'true' && inputs.cache == 'true'
