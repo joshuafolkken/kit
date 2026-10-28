@@ -1,6 +1,6 @@
 // Enforce the comment rule of prompts/coding-standards.md → 基本方針: a comment states why, so the
 // history of how the code got here ("Previously, …", "used to …") and measured values with a unit
-// ("about 16,000 tokens", "1.9 s") are reported — git history and the Issue hold both. An Issue
+// ("about 16,000 tokens", "1.9 seconds") are reported — git history and the Issue hold both. An Issue
 // citation such as `joshuafolkken/kit#5282` is allowed: it is where the why is recorded. The two
 // checks are separate rules so a repository can switch each on once its own comments are clean.
 
@@ -8,16 +8,19 @@
 // sentence-opening "Previously," narrates the past.
 const HISTORY_PATTERNS = [/\bpreviously,/iu, /\bformerly\b/iu, /\bused to\b/iu, /以前は/u]
 
-// "is used to" describes a purpose, not a history, so it is removed before the history check.
-const PURPOSE_PATTERN = /\b(?:is|are|be|been|being|was|were|get|gets|got|getting) used to\b/giu
+// "is used to" and a comment opening with "Used to" describe a purpose, not a history, so they are
+// removed before the history check.
+const PURPOSE_PATTERN =
+	/(?:^\s*|\b(?:is|are|be|been|being|was|were|get|gets|got|getting|only|also|not|just) )used to\b/giu
 
-// A number with a time, size or token unit. The look-behind keeps `#1234` and the tail of a longer
-// number or identifier from matching.
+// A number with a time, size or token unit, `12k tokens` and `10-second` included. The look-behind
+// keeps `#1234` and the tail of a longer number or identifier from matching. A bare `s` is left out:
+// it would read `1990s` and `502s` as durations.
 const MEASUREMENT_PATTERNS = [
-	/(?<![#\w.,])\d[\d.,]*\s?(?:ms|s|secs?|mins?)(?!\w)/u,
-	/(?<![#\w.,])\d[\d.,]*\s?(?:seconds?|minutes?|hours?)(?!\w)/u,
-	/(?<![#\w.,])\d[\d.,]*\s?(?:[KMG]i?B|kB|bytes?)(?!\w)/u,
-	/(?<![#\w.,])\d[\d.,]*\s?tokens?(?!\w)/u,
+	/(?<![#\w.,])\d[\d.,]*[\s-]?(?:ms|secs?|mins?)(?!\w)/u,
+	/(?<![#\w.,])\d[\d.,]*[\s-]?(?:seconds?|minutes?|hours?)(?!\w)/u,
+	/(?<![#\w.,])\d[\d.,]*[\s-]?(?:[KMG]i?B|kB|bytes?)(?!\w)/u,
+	/(?<![#\w.,])\d[\d.,]*[kKM]?[\s-]?tokens?(?!\w)/u,
 ]
 
 /**

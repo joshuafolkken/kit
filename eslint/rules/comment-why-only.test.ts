@@ -45,6 +45,9 @@ describe('no-history-comment', () => {
 	it.each([
 		'// The key is used to look up the cached result.',
 		'// Readers get used to the order, so it stays stable.',
+		'// Used to build the cache key.',
+		'// Only used to look up the lane.',
+		'// It is not used to sort.',
 		'// A previously parked lane resumes here.',
 		ISSUE_CITATION_COMMENT,
 	])('allows %s', (comment) => {
@@ -60,7 +63,9 @@ describe('no-history-comment', () => {
 
 describe('no-measurement-comment', () => {
 	it.each([
-		'// The warm run takes 1.9 s.',
+		'// The warm run takes 1.9 seconds.',
+		'// That costs ~12k tokens.',
+		'// It waits out a 10-second budget.',
 		'// That costs about 16,000 tokens per turn.',
 		'// The ledger grows by 64 MB a second.',
 		'// A cold start takes 120ms.',
@@ -74,6 +79,8 @@ describe('no-measurement-comment', () => {
 		'// Keep the last 3 entries.',
 		'// Retry on HTTP 502.',
 		'// Step 2 sets the flag.',
+		'// Formats from the 1990s parse here.',
+		'// HTTP 502s are retried.',
 	])('allows %s', (comment) => {
 		expect(measurement_count(comment)).toBe(0)
 	})
