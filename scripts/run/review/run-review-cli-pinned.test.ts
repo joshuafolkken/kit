@@ -1,4 +1,5 @@
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
@@ -56,6 +57,19 @@ describe('run with --unpinned-ok', () => {
 	})
 })
 
+// joshuafolkken/kit#5293: a lane child waited 601 s here though the ship's pre-detach joins the check.
+describe('run --pinned in a lane child', () => {
+	it('returns 0 at once, naming the ship as the join, without waiting', async () => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+		const out = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+		const wait = vi.spyOn(run_review_pinned_steps, 'wait_alone').mockResolvedValue(undefined)
+
+		expect(await run_review_cli.run(['--pinned'])).toBe(0)
+		expect(out).toHaveBeenCalledWith(expect.stringContaining("ship's pre-detach joins"))
+		expect(wait).not.toHaveBeenCalled()
+	})
+})
+
 // joshuafolkken/kit#4834: `review:record` starts the check again on a tree a round-1 fix moved, and
 // `--pinned` reads its answer alone, after the pair's join has already closed.
 describe('run --pinned', () => {
@@ -64,6 +78,7 @@ describe('run --pinned', () => {
 	const PINNED = ['--pinned']
 
 	beforeEach(() => {
+		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 		vi.spyOn(process.stderr, 'write').mockReturnValue(true)
 		vi.spyOn(run_review_pinned_steps, 'launched_reason').mockReturnValue(undefined)
 		vi.spyOn(run_review_steps, 'wait_for_gate_finish')

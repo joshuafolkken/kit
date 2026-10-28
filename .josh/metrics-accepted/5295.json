@@ -1,0 +1,7 @@
+{
+	"reason": "Record the followup CI wait's critical path (last check, per-check times) and show it in lane:stats and lane:breakdown (#5295)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 125
+	}
+}
