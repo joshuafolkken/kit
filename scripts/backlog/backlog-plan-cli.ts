@@ -6,6 +6,7 @@ import { backlog_named } from './backlog-named'
 import { backlog_next } from './backlog-next'
 import { backlog_plan, type NamedPlan } from './backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from './backlog-plan-read'
+import { backlog_rank } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
 import { backlog_waves } from './backlog-waves'
 
@@ -105,7 +106,9 @@ function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
 	const scope = { repo: plan.repo, exclude: plan.exclude, tracked: plan.tracked }
 	const rows = backlog_scope.out_of_scope(listing.rows, plan.result, scope)
 
-	console.info(backlog_plan.format_plan(plan.result, rows, context, view.named))
+	const ordered = backlog_rank.offer_order(plan.result, plan.repo, plan.scope.yielded)
+
+	console.info(backlog_plan.format_plan(ordered, rows, context, view.named))
 }
 
 async function report(plan: Plan, view: PlanView): Promise<number> {
