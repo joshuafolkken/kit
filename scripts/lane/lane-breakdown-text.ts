@@ -25,8 +25,15 @@ function part_text(part: Stage): string {
 	return `${part.name} ${lane_breakdown.minutes_text(part.ms)}`
 }
 
+// A kind's minutes, and the backgrounded subagent calls it counted at no time.
+function kind_text(kind: Stage, untimed: ImplementDetail['untimed']): string {
+	const count = untimed.get(kind.name) ?? 0
+
+	return count > 0 ? `${part_text(kind)} + ${String(count)} backgrounded, untimed` : part_text(kind)
+}
+
 function detail_text(detail: ImplementDetail): string {
-	const kinds = detail.kinds.map((kind) => part_text(kind))
+	const kinds = detail.kinds.map((kind) => kind_text(kind, detail.untimed))
 	const count = String(detail.background)
 	const background =
 		detail.background > 0 ? [`${count} backgrounded calls, their waits in editing & thinking`] : []
