@@ -1,0 +1,7 @@
+{
+	"reason": "lib/poll gains poll_for and wait_for, with tests fixing both shapes; the lane polling loops move onto them",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 25
+	}
+}

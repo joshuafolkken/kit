@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import {
 	PROCESS_ALIVE,
@@ -290,14 +291,10 @@ async function wait_for_any(
 	const config = resolve_options(options)
 	const states = await make_states(issues, config.is_settled)
 
-	for (;;) {
-		const completed = check_any(states, config.now(), config)
-
-		if (completed !== undefined) return completed
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await config.sleep(config.poll_ms)
-	}
+	return await poll.wait_for(() => check_any(states, config.now(), config), {
+		interval_ms: config.poll_ms,
+		sleeper: config.sleep,
+	})
 }
 
 const lane_await = {

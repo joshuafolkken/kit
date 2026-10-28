@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { agent_argv } from '#scripts/agent/agent-argv'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
 import { process_identity } from '#scripts/josh/process-identity'
+import { poll } from '#scripts/lib/poll'
 import { run_cut, type RunCut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { lane_child_invocation } from './lane-child-invocation'
@@ -142,10 +143,10 @@ async function wait_for_inherited_child(
 	child_pid: number,
 	child_process_start: string | undefined,
 ): Promise<void> {
-	while (process_identity.is_same_process(child_pid, child_process_start) !== false) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await new Promise((resolve) => setTimeout(resolve, CHILD_POLL_MS))
-	}
+	await poll.wait_for(
+		() => process_identity.is_same_process(child_pid, child_process_start) === false || undefined,
+		{ interval_ms: CHILD_POLL_MS },
+	)
 }
 
 async function recovered_resume(lane: LaneInfo, nonce: string): Promise<boolean | undefined> {
