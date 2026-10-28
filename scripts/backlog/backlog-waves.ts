@@ -24,7 +24,7 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 // **No rule is written twice.** The first wave is `backlog_rank.select` — rank, `run:solo` gate,
 // overlap separation, cap —
 // over the very candidates `backlog:next` resolves, asked of an idle repository — so it is what
-// `backlog:next` prints when nothing is running. Each later wave marks the earlier waves closed and re-classifies the same pool
+// `backlog:next` prints when nothing is running, cut at the lane limit rather than the printed count. Each later wave marks the earlier waves closed and re-classifies the same pool
 // through `epic_classify.classify_children` with the resolver `epic:next` sorted it with the first
 // time — `epic_cross_repo.resolve_cross_repo`, so a blocker in another repository still waits for its
 // release rather than counting as done on close — then puts the runnable set through
@@ -33,9 +33,13 @@ import { backlog_rank, type GateScope } from './backlog-rank'
 const IDLE: BusyRead = { kind: 'idle' }
 const CLOSED = 'CLOSED'
 const EMPTY_SCOPE: GateScope = { standalone: new Set(), declared: new Map() }
+// A wave is as wide as the lanes that run it, not `backlog:next`'s `DISPLAY_LIMIT` — that printed
+// count pushed an issue whose blocker closed in wave k past wave k+1 (joshuafolkken/kit#5300).
+const UNCAPPED = Infinity
 
 const HEADING_ASSUMPTION =
 	'Assumes every issue in a wave merges before the next wave starts. Issues a run already has are left out and count as merged first, and only issues of this repository are planned.'
+const UNCAPPED_WIDTH = 'A wave is not capped: the lane limit could not be read.'
 const UNREACHED_HEADING = 'Not reached — each names what it is waiting on:'
 const PARALLEL_NOTE = '(parallel)'
 const NEEDS_DECISION_NOTE = `waiting on a person (\`${NEEDS_DECISION_LABEL}\`)`
@@ -84,8 +88,10 @@ function offer(
 	pool: WavePool,
 ): ReadonlyArray<EpicChild> {
 	const { repo, scope } = pool
+	const limit = scope.wave_limit ?? UNCAPPED
 
-	return backlog_rank.select({ candidates, pool: children, read: IDLE, repo, ...scope }).offered
+	return backlog_rank.select({ candidates, pool: children, read: IDLE, repo, ...scope, limit })
+		.offered
 }
 
 // Ranked against the whole result, exactly as `backlog:next` ranks it, so the two agree.
@@ -175,6 +181,12 @@ function unreached_lines(plan: WavePlan, context: PlanContext): Array<string> {
 	)
 }
 
+function width_line(wave_limit: number | undefined): string {
+	if (wave_limit === undefined) return UNCAPPED_WIDTH
+
+	return `A wave holds at most ${String(wave_limit)} standalone issues, the lane limit; an epic's children are not counted.`
+}
+
 function format_waves(
 	result: EpicNextResult,
 	context: PlanContext,
@@ -188,6 +200,7 @@ function format_waves(
 	return [
 		`Backlog waves — ${context.repo}`,
 		HEADING_ASSUMPTION,
+		width_line(scope.wave_limit),
 		'',
 		...(waves.length === 0 ? [backlog_plan.NOTHING] : waves),
 		'',
@@ -200,9 +213,11 @@ const backlog_waves = {
 	NEEDS_DECISION_NOTE,
 	PARALLEL_NOTE,
 	run_stalled_note,
+	UNCAPPED_WIDTH,
 	UNREACHED_HEADING,
 	build,
 	format_waves,
+	width_line,
 }
 
 export { backlog_waves }

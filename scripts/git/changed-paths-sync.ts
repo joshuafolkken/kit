@@ -5,8 +5,9 @@ import { git_spawn_sync, type GitSyncOptions } from './git-spawn-sync'
 
 // The synchronous counterpart of `changed_paths.read_changed_paths(false)` — the branch diff since
 // the merge base plus the untracked files — for a `PreToolUse` hook, which cannot await. It spawns the
-// argument lists `git-diff-reads.ts` spawns, so the two readings agree on what "changed" is. Any
-// failure is the empty list.
+// argument lists `git-diff-reads.ts` spawns, so the two readings agree on what "changed" is — except
+// while a merge of the default branch is in progress, which the asynchronous reading measures through
+// and this one does not yet (joshuafolkken/kit#5309). Any failure is the empty list.
 
 // With an explicit `cwd`, the git location variables are cleared so that directory is what git
 // answers for, as in `git_spawn_sync.origin_url`.

@@ -33,7 +33,7 @@ const INTERACTION_HEADING = '## Interaction review'
 const WHOLE_CHANGE = 'Target: the whole change'
 
 function stub_change(paths: ReadonlyArray<string>): void {
-	vi.spyOn(change_base, 'resolved').mockResolvedValue(COMMIT)
+	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(COMMIT)
 	vi.spyOn(changed_paths, 'read_changed_paths').mockResolvedValue([...paths])
 	vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue(
 		Object.fromEntries(paths.map((file) => [file, 'digest'])),

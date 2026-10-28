@@ -29,6 +29,7 @@ function rank(
 	const dependents = dependents_of(pool)
 
 	return issue_rank.rank(children, (child) => ({
+		is_last: issue_priority.is_last(child.body),
 		labels: child.labels,
 		lost_minutes: issue_priority.lost_minutes(child.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(child.body),

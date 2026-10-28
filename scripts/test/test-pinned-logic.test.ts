@@ -236,6 +236,13 @@ describe('test_pinned_logic.report_text', () => {
 		expect(printed(EMPTY_REPORT)).toBe('unpinned 0 · unchecked 0\n')
 	})
 
+	// joshuafolkken/kit#5292
+	it('prints how many probes the direct importers decided and how many escalated', () => {
+		const report = { ...EMPTY_REPORT, staged: { direct: 3, escalated: 1 } }
+
+		expect(printed(report)).toBe('unpinned 0 · unchecked 0 · direct 3 · escalated 1\n')
+	})
+
 	it('counts a hunk a --first-unpinned run stopped before as unchecked', () => {
 		const report = { ...EMPTY_REPORT, cut: [hunk({ file: 'a.ts', new_start: 3 })] }
 

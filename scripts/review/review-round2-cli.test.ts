@@ -1,8 +1,11 @@
+import { change_base } from '#scripts/git/change-base'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
 import { review_reviewed_tree } from './review-reviewed-tree'
+import { review_round2 } from './review-round2'
 import { review_round2_cli } from './review-round2-cli'
 import { review_stamps } from './review-stamps'
+import { review_tree } from './review-tree'
 
 // joshuafolkken/kit#1433. The parser is where a `skip` could be bought by accident, so it is the
 // half with a suite of its own: the assertion flag has to be typed exactly, and anything else is a
@@ -90,8 +93,28 @@ describe('review_round2_cli.read_comment_only', () => {
 })
 
 describe('review_round2_cli.run', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
 	it('exits non-zero on an unreadable invocation', async () => {
 		expect(await review_round2_cli.run(['--nope'])).toBe(1)
+	})
+
+	// joshuafolkken/kit#5307: the changed tree is read through a merge in progress, so the base it is
+	// compared from has to be as well, or a re-merged default branch hides behind an unmoved base.
+	it('decides from the base read through a merge in progress', async () => {
+		vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
+		vi.spyOn(review_tree, 'read_changed_tree').mockResolvedValue({})
+		vi.spyOn(review_stamps.round_one_stamp, 'read').mockReturnValue(undefined)
+		vi.spyOn(review_stamps.round_one_code_stamp, 'read').mockReturnValue(undefined)
+		vi.spyOn(console, 'log').mockReturnValue()
+		vi.spyOn(console, 'error').mockReturnValue()
+		const decide = vi.spyOn(review_round2, 'decide')
+
+		await review_round2_cli.run([])
+
+		expect(decide).toHaveBeenCalledWith(expect.objectContaining({ base: BASE }))
 	})
 })
 
