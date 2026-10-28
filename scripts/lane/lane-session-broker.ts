@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { atomic_write } from '#scripts/lib/atomic-write'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
@@ -176,21 +176,23 @@ async function serve(
 	response: string,
 	state: { is_running: boolean; current: BrokerResponse },
 ): Promise<void> {
-	let last_nonce = ''
+	const served = { nonce: '' }
 	const target = request_path(lane.directory, lane.issue)
 
-	while (state.is_running) {
+	// Requests are served one at a time, in arrival order: a pass ends only once its request is answered.
+	async function serve_pass(): Promise<true | undefined> {
+		if (!state.is_running) return true
 		const received = read_record(target, envelope_schema)
 
-		if (received?.session === session && received.nonce !== last_nonce) {
-			last_nonce = received.nonce
-			// eslint-disable-next-line no-await-in-loop -- requests are served one at a time, in arrival order
+		if (received?.session === session && received.nonce !== served.nonce) {
+			served.nonce = received.nonce
 			await process_request(lane, response, received, state)
 		}
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_MS)
+		return undefined
 	}
+
+	await poll.wait_for(serve_pass, { interval_ms: POLL_MS })
 }
 
 // The server record is written before the response, so a ship that finds the response finds it too.
@@ -315,15 +317,15 @@ async function wait_response(
 	const limit_minutes = REQUEST_LIMIT_MINUTES[kind]
 	const deadline = Date.now() + limit_minutes * MINUTE_MS
 
-	while (Date.now() < deadline) {
-		const verdict = response_verdict(target, session, nonce)
-		if (verdict !== undefined) return verdict
+	function verdict_by_deadline(): BrokerAnswer | undefined {
+		if (Date.now() >= deadline) {
+			return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
+		}
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_MS)
+		return response_verdict(target, session, nonce)
 	}
 
-	return failure(`the broker gave no answer within ${String(limit_minutes)} minutes`)
+	return await poll.wait_for(verdict_by_deadline, { interval_ms: POLL_MS })
 }
 
 function live_response(target: string): BrokerResponse | undefined {

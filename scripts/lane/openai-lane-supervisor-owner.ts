@@ -4,6 +4,7 @@ import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
 import { openai_lane_supervisor_decision } from './openai-lane-supervisor-decision'
 
@@ -66,14 +67,10 @@ function active(lane_directory: string): SupervisorOwner | undefined {
 }
 
 async function wait_for_active(lane_directory: string): Promise<SupervisorOwner | undefined> {
-	for (let attempt = 0; attempt < CLAIM_POLL_LIMIT; attempt += 1) {
-		const owner = active(lane_directory)
-		if (owner !== undefined) return owner
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await new Promise((resolve) => setTimeout(resolve, CLAIM_POLL_MS))
-	}
-
-	return undefined
+	return await poll.poll_for(() => active(lane_directory), {
+		attempts: CLAIM_POLL_LIMIT,
+		interval_ms: CLAIM_POLL_MS,
+	})
 }
 
 // The hard link snapshots the exact owner inode. Several contenders may snapshot one stale owner,

@@ -1,5 +1,6 @@
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
 
 const DECISION_PREFIX = 'josh-openai-lane-supervisor-decision-'
@@ -40,15 +41,12 @@ function cancel(lane_directory: string, nonce: string): boolean {
 }
 
 async function is_approved(lane_directory: string, nonce: string): Promise<boolean> {
-	for (let attempt = 0; attempt < APPROVAL_POLL_LIMIT; attempt += 1) {
-		const decision = read(lane_directory, nonce)?.decision
-		if (decision !== undefined) return decision === 'approved'
+	const decision = await poll.poll_for(() => read(lane_directory, nonce)?.decision, {
+		attempts: APPROVAL_POLL_LIMIT,
+		interval_ms: APPROVAL_POLL_MS,
+	})
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await new Promise((resolve) => setTimeout(resolve, APPROVAL_POLL_MS))
-	}
-
-	return false
+	return decision === 'approved'
 }
 
 function remove(lane_directory: string, nonce: string): void {
