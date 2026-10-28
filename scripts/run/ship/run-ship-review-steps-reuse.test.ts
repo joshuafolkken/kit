@@ -152,6 +152,49 @@ describe('run_ship_review_steps.review_stage — a recorded round 1', () => {
 	})
 })
 
+// joshuafolkken/kit#5296: the stage's result says why it was skipped or ran, for its event line.
+describe('run_ship_review_steps.review_stage — why round 1 was skipped or ran', () => {
+	const UNATTESTED = 'the round was not attested on this branch'
+
+	it('names the attested, held tree when it reuses round 1', async () => {
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toMatchObject({
+			...SKIPPED,
+			reason: 'reused: round 1 attested on this branch, its tree held',
+		})
+	})
+
+	it("names round 2's delta when it reuses round 1 on a tree moved only where round 2 reads", async () => {
+		movement_mock.mockResolvedValue({ movement: 'delta' })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty(
+			'reason',
+			"reused: round 1 attested on this branch, what moved since is round 2's delta",
+		)
+	})
+
+	it('runs round 1 and names the cause when the round was not attested on this branch', async () => {
+		movement_mock.mockResolvedValue({ movement: UNSETTLED, cause: UNATTESTED })
+
+		const result = await run_ship_review_steps.review_stage(ISSUE, false)
+
+		expect(commands()).toStrictEqual(REVIEWED)
+		expect(result).toHaveProperty(
+			'reason',
+			`ran: --review with no reusable round 1 — ${UNATTESTED}`,
+		)
+		expect(result.is_skipped).toBeUndefined()
+	})
+
+	it('runs round 1 and names a missing record as the cause', async () => {
+		record_check_mock.mockResolvedValue({ status: 'missing' })
+
+		expect(await run_ship_review_steps.review_stage(ISSUE, false)).toHaveProperty(
+			'reason',
+			'ran: --review with no reusable round 1 — no review round is recorded for this issue',
+		)
+	})
+})
+
 // joshuafolkken/kit#4878: round 2 reads what moved from the round-1 brief's stamp after the commit.
 describe('run_ship_review_steps.review_stage — a tree moved since the record', () => {
 	it('reuses a recorded round once only files round 2 reads moved, running no scoped pair or reviewer', async () => {
