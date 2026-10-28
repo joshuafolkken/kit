@@ -105,9 +105,9 @@ function observation_of(failures: ReadonlyArray<UnrelatedFailure>): ObservationE
 // happens during the CI wait, after `prepare_merge` committed the ledger, so an appended line would
 // either be lost with the lane or need a push of its own that restarts CI. `review-comment-round.ts`
 // carries it into the ledger once the issue closes; the count is still read off this tree's ledger.
-async function post(failures: ReadonlyArray<UnrelatedFailure>, issue: number): Promise<string> {
+async function post(entry: ObservationEntry, issue: number): Promise<string> {
 	const assessment = await observation_record.assess({
-		entry: observation_of(failures),
+		entry,
 		checkout: observation_ledger_home.ledger_root(),
 		now: new Date(),
 	})
@@ -122,14 +122,9 @@ async function post(failures: ReadonlyArray<UnrelatedFailure>, issue: number): P
 	return assessment.verdict
 }
 
-// A post that fails is reported and does not stop the rerun it describes; a branch naming no issue has
+// A post that fails is reported and does not stop the step it describes; a branch naming no issue has
 // nowhere to post.
-async function record(
-	failures: ReadonlyArray<UnrelatedFailure>,
-	issue: number | undefined,
-): Promise<void> {
-	if (failures.length === 0) return
-
+async function record_entry(entry: ObservationEntry, issue: number | undefined): Promise<void> {
 	if (issue === undefined) {
 		console.info(`⚠️ ${UNNAMED_ISSUE}`)
 
@@ -137,16 +132,26 @@ async function record(
 	}
 
 	try {
-		console.info(`📝 Recorded the failed tests outside the change: ${await post(failures, issue)}`)
+		console.info(`📝 Recorded the failed tests outside the change: ${await post(entry, issue)}`)
 	} catch (error) {
 		console.info(`⚠️ Could not record the failed tests outside the change: ${String(error)}`)
 	}
+}
+
+async function record(
+	failures: ReadonlyArray<UnrelatedFailure>,
+	issue: number | undefined,
+): Promise<void> {
+	if (failures.length === 0) return
+
+	await record_entry(observation_of(failures), issue)
 }
 
 const followup_failed_tests = {
 	observation_of,
 	read_failed_tests,
 	record,
+	record_entry,
 	subjects_of,
 	verdict_of,
 }

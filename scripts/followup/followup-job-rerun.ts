@@ -15,6 +15,7 @@ import {
 	type TestVerdict,
 } from './followup-failed-tests'
 import { followup_job_needs, type NeedsGraph } from './followup-job-needs'
+import { followup_main_move } from './followup-main-move'
 
 // A GitHub Actions job whose every step succeeded can still end `cancelled` or `timed_out`: the runner
 // stops reporting after the last step and the job's `timeout-minutes` cuts it off (joshuafolkken/kit#4813,
@@ -265,13 +266,29 @@ async function rerun(branch_name: string, entries: ReadonlyArray<Judged>): Promi
 	return names
 }
 
-// **Returns the names of the jobs it reran**, empty when there was none to rerun. A read or a rerun
-// that fails is reported and answers empty: the rerun is a recovery, so the original failure stands.
+// A failed test main has since changed is merged before any rerun (`followup-main-move.ts`).
+async function should_merge_first(
+	branch_name: string,
+	entries: ReadonlyArray<Judged>,
+): Promise<boolean> {
+	const files = entries.flatMap(({ tests }) => tests?.files ?? [])
+
+	return await followup_main_move.should_merge_first(
+		files,
+		git_branch.issue_from_branch(branch_name),
+	)
+}
+
+// **Returns the names of the jobs it reran**, empty when there was none to rerun or main has to be
+// merged first. A read or a rerun that fails is reported and answers empty: the rerun is a recovery,
+// so the original failure stands.
 async function rerun_failed_jobs(branch_name: string): Promise<Array<string>> {
 	try {
 		const entries = await find_rerun_jobs(branch_name)
 
-		return entries.length === 0 ? [] : await rerun(branch_name, entries)
+		if (entries.length === 0 || (await should_merge_first(branch_name, entries))) return []
+
+		return await rerun(branch_name, entries)
 	} catch (error) {
 		console.info(`⚠️ CI job rerun failed: ${git_gh_helpers.get_error_message_with_stderr(error)}`)
 

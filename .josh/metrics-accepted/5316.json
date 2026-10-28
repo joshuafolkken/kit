@@ -1,0 +1,8 @@
+{
+	"reason": "#5316 adds the main-merge-before-rerun module and its test fixture, plus a followup.md pointer line",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 163,
+		"ai_cost.on_demand_bytes": 176
+	}
+}
