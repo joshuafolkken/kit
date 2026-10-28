@@ -44,13 +44,32 @@ describe('sed_in_place.is_unsafe_sed — refuses', () => {
 	})
 })
 
+describe('sed_in_place.is_unsafe_sed — refuses a non-plain s command', () => {
+	it('refuses an s flag other than g, which changes what or where sed writes', () => {
+		expect([
+			sed_in_place.is_unsafe_sed("sed -i '' 's/old_value/new_value/I' a.ts", ONCE),
+			sed_in_place.is_unsafe_sed("sed -i '' 's/old_value/new_value/w out' a.ts", ONCE),
+		]).toStrictEqual([true, true])
+	})
+
+	it('refuses an extended regex, where the plain-text count is not what sed matches', () => {
+		expect([
+			sed_in_place.is_unsafe_sed("sed -E -i '' 's/old_value/new_value/' a.ts", ONCE),
+			sed_in_place.is_unsafe_sed("sed -Ei '' 's/old_value/new_value/' a.ts", ONCE),
+			sed_in_place.is_unsafe_sed("sed --regexp-extended -i 's/old_value/new_value/' a.ts", ONCE),
+		]).toStrictEqual([true, true, true])
+	})
+})
+
 describe('sed_in_place.is_unsafe_sed — stays silent', () => {
 	it('lets a plain pattern matching once through, BSD and GNU spellings', () => {
 		expect([
 			sed_in_place.is_unsafe_sed(PLAIN_BSD, ONCE),
 			sed_in_place.is_unsafe_sed("sed -i 's/old_value/new_value/' a.ts", ONCE),
 			sed_in_place.is_unsafe_sed("sed -i -e 's|old_value|new_value|' a.ts", ONCE),
-		]).toStrictEqual([false, false, false])
+			sed_in_place.is_unsafe_sed("sed -i '' 's/old_value/new_value/g' a.ts", ONCE),
+			sed_in_place.is_unsafe_sed("sed -ni '' 's/old_value/new_value/' a.ts", ONCE),
+		]).toStrictEqual([false, false, false, false, false])
 	})
 
 	it('lets a sed that is not in place through', () => {

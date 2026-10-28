@@ -1,9 +1,9 @@
 {
-	"reason": "#5284 adds the file-rewrite and sed-in-place guard rows plus the shared edit-tool helper; file-edits.md names the guard in two sentences",
+	"reason": "#5284 adds the file-rewrite and sed-in-place guard rows plus the shared edit-tool helper; the sed row also refuses s flags other than g and -E",
 	"date": "2026-10-28",
 	"growth": {
-		"scripts.code_lines": 228,
+		"scripts.code_lines": 242,
 		"rules.lines": 2,
-		"ai_cost.on_demand_bytes": 192
+		"ai_cost.on_demand_bytes": 167
 	}
 }

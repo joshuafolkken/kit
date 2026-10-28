@@ -17,7 +17,15 @@ const SED = 'sed'
 // `-i`, `-i.bak`, `-Ei`: a short cluster carrying the in-place switch; `--in-place[=suffix]` long.
 const IN_PLACE_SHORT = /^-[A-Za-z]*i/u
 const IN_PLACE_LONG = /^--in-place(?:=|$)/u
-const BARE_IN_PLACE = '-i'
+// A short cluster ending in the in-place switch: BSD reads its suffix from the next word.
+const IN_PLACE_CLUSTER = /^-[A-Za-z]*i$/u
+// `-E`, `-r`, `--regexp-extended`: the pattern is read as an extended regex, where `+ ? ( ) { } |`
+// are meta characters too, so a plain-text count no longer says what sed matches.
+const EXTENDED_SHORT = /^-[A-Za-z]*[Er]/u
+const EXTENDED_LONG = '--regexp-extended'
+// The `s` flags that keep the match plain text: none, or `g` (each line holds one match at most when
+// the count is one). `I`, `w file`, a number and the rest change what or where sed writes.
+const PLAIN_FLAGS: ReadonlySet<string> = new Set(['', 'g'])
 const SCRIPT_FLAG = '-e'
 const FLAG_PREFIX = '-'
 const SURROUNDING_QUOTES = /^(['"])(.*)\1$/su
@@ -43,7 +51,7 @@ function is_in_place_flag(word: string): boolean {
 
 // The words after the in-place flags: BSD's `-i ''` carries its suffix as the next (empty) word.
 function without_suffix(words: ReadonlyArray<string>): Array<string> {
-	const index = words.indexOf(BARE_IN_PLACE)
+	const index = words.findIndex((word) => IN_PLACE_CLUSTER.test(word))
 
 	if (index === -1 || words[index + 1] !== '') return [...words]
 
@@ -84,18 +92,35 @@ function substitute_parts(script: string): Array<string> | undefined {
 	return parts.length === SUBSTITUTE_PARTS ? parts : undefined
 }
 
-// `file-edits.md` condition 2 reads both sides: no meta character in the pattern or the replacement.
-function is_plain([pattern = '', replacement = '']: ReadonlyArray<string>): boolean {
-	return pattern !== '' && !META_CHARACTER.test(pattern) && !META_CHARACTER.test(replacement)
+// `file-edits.md` condition 2 reads both sides: no meta character in the pattern or the replacement,
+// and no flag that turns the plain-text match into something else.
+function has_plain_flags(parts: ReadonlyArray<string>): boolean {
+	return PLAIN_FLAGS.has(parts.at(-1) ?? '')
 }
 
-// The pattern of a single `s` command with no meta character; `undefined` for anything else.
-function plain_pattern(scripts: ReadonlyArray<string>): string | undefined {
-	const [script] = scripts
+function is_plain(parts: ReadonlyArray<string>): boolean {
+	const [pattern = '', replacement = ''] = parts
 
-	if (script === undefined || scripts.length !== 1) return undefined
+	return pattern !== '' && has_plain_flags(parts) && !META_CHARACTER.test(pattern + replacement)
+}
 
-	const parts = substitute_parts(script)
+function is_extended(words: ReadonlyArray<string>): boolean {
+	return words.some((word) => word === EXTENDED_LONG || EXTENDED_SHORT.test(word))
+}
+
+// The one script of a basic-regex in-place `sed`; `undefined` for several, none, or `-E`.
+function single_script(words: ReadonlyArray<string>): string | undefined {
+	if (is_extended(words)) return undefined
+
+	const { scripts } = sed_call(words)
+
+	return scripts.length === 1 ? scripts[0] : undefined
+}
+
+// The pattern of a single plain `s` command; `undefined` for anything else.
+function plain_pattern(words: ReadonlyArray<string>): string | undefined {
+	const script = single_script(words)
+	const parts = script === undefined ? undefined : substitute_parts(script)
 
 	return parts !== undefined && is_plain(parts) ? parts[0] : undefined
 }
@@ -112,8 +137,8 @@ function is_unsafe_segment(segment: string, read: ReadFile): boolean {
 
 	if (words === undefined) return false
 
-	const { scripts, files } = sed_call(words)
-	const pattern = plain_pattern(scripts)
+	const { files } = sed_call(words)
+	const pattern = plain_pattern(words)
 
 	if (pattern === undefined || files.length === 0) return true
 
@@ -135,13 +160,13 @@ function keeps_plain_sed(command: string): boolean {
 	return shell_segments.segments_of(command).some((segment) => {
 		const words = sed_words(segment)
 
-		return words !== undefined && plain_pattern(sed_call(words).scripts) !== undefined
+		return words !== undefined && plain_pattern(words) !== undefined
 	})
 }
 
 const SED_IN_PLACE_REASON =
 	'⛔ unsafe `sed -i`: its pattern or replacement carries a meta character (`/ & \\ . * [ ] ^ $`), ' +
-	'it is not one `s` command, or it does not match exactly once in each target file, so it can rewrite a line you did ' +
+	'it is not one plain `s` command (a flag other than `g`, or `-E`), or it does not match exactly once in each target file, so it can rewrite a line you did ' +
 	'not mean to. Change the region with the Edit tool. This rule fires on every occurrence ' +
 	'(`prompts/collaboration-workflow/file-edits.md`).'
 
