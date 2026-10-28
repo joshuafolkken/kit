@@ -30,9 +30,11 @@ async function read_changed_files(): Promise<Record<string, string>> {
 }
 
 // The resolver lives in `git/change-base.ts`, because the review brief
-// needs exactly this reading and a second copy of it is the clone `CLAUDE.md` prohibits.
+// needs exactly this reading and a second copy of it is the clone `CLAUDE.md` prohibits. It is read
+// through a merge in progress, as the file map is (joshuafolkken/kit#5307): a map measured from the
+// later base beside `HEAD`'s older one would let a re-merged default branch reuse a stale record.
 async function read_base(): Promise<string | undefined> {
-	return await change_base.resolved()
+	return await change_base.resolved_through_merge()
 }
 
 // The two readings are independent, so they are started together rather than one after the other.

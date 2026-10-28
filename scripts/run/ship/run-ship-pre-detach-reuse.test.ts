@@ -31,7 +31,7 @@ const { run_ship_pre_detach } = await import('./run-ship-pre-detach')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'pre-detach-reuse-'))
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
-const read_base = vi.spyOn(change_base, 'resolved')
+const read_base = vi.spyOn(change_base, 'resolved_through_merge')
 const read_git = vi.spyOn(git_spawn, 'read')
 const { EXPORTS_LABEL, TYPE_CHECK_LABEL } = gate_plan
 const LABELS = [TYPE_CHECK_LABEL, EXPORTS_LABEL, 'cspell']

@@ -1,3 +1,4 @@
+import { change_base } from './change-base'
 import { git_command } from './git-command'
 
 // The set of changed paths a mechanical, path-driven decision is made from.
@@ -12,13 +13,27 @@ function to_paths(raw: string): Array<string> {
 		.filter((line) => line !== '')
 }
 
+// joshuafolkken/kit#5307: **the tracked half is measured from the tree's base, through a merge in
+// progress** (`change_base.resolved_through_merge`). A merge of the default branch stopped on a
+// conflict holds the default branch's files in the tree while `HEAD` is still the commit before it,
+// so the diff from `HEAD`'s merge-base read everything the merge brought in as this branch's own — and
+// the ship's `unplanned` precondition refused the re-detach it had itself told the lane to make. A
+// base that cannot be resolved reads as before.
+async function tracked_names(): Promise<string> {
+	const base = await change_base.resolved_through_merge()
+
+	if (base === undefined) return await git_command.diff_main_names()
+
+	return await git_command.diff_names_since(base)
+}
+
 // The branch diff **plus** the untracked files. `git diff` lists neither, so a change that adds a
 // new module and edits one inert file looked like an inert-only change and was handed `low`. The
 // staged form needs no such addition: a file staged for addition is already in the cached diff.
 async function read_changed_paths(is_staged: boolean): Promise<Array<string>> {
 	if (is_staged) return to_paths(await git_command.diff_cached_names())
 
-	const tracked = to_paths(await git_command.diff_main_names())
+	const tracked = to_paths(await tracked_names())
 	const untracked = to_paths(await git_command.untracked_names())
 
 	return [...tracked, ...untracked]

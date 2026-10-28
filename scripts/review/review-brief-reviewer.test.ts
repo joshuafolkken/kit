@@ -17,7 +17,7 @@ import { review_tree } from './review-tree'
 // in for the rest of the brief: reaching it shows a non-reviewer session got past the reviewer check.
 
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { refusal_for: vi.fn() } }))
-vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved: vi.fn() } }))
+vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { change_base: vi.fn() } }))
 vi.mock('./review-tree', () => ({ review_tree: { read_changed_tree: vi.fn() } }))
@@ -35,7 +35,9 @@ beforeEach(() => {
 	vi.clearAllMocks()
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
-	vi.mocked(change_base.resolved).mockResolvedValue('a22b347965292713d70daff6e2b948dc7009a265')
+	vi.mocked(change_base.resolved_through_merge).mockResolvedValue(
+		'a22b347965292713d70daff6e2b948dc7009a265',
+	)
 	vi.mocked(changed_paths.read_changed_paths).mockResolvedValue([CHANGED_FILE])
 	vi.mocked(review_tree.read_changed_tree).mockResolvedValue({ [CHANGED_FILE]: 'digest' })
 	vi.mocked(scoped_green.refusal_for).mockReturnValue(SCOPED_REFUSAL)

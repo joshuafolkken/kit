@@ -22,13 +22,13 @@ import { review_tree } from './review-tree'
 // unchanged by this issue, and `review-round1-snapshot.test.ts` is where it is pinned.
 
 vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { refusal_for: vi.fn() } }))
-vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved: vi.fn() } }))
+vi.mock('#scripts/git/change-base', () => ({ change_base: { resolved_through_merge: vi.fn() } }))
 vi.mock('#scripts/git/changed-paths', () => ({ changed_paths: { read_changed_paths: vi.fn() } }))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { change_base: vi.fn() } }))
 vi.mock('./review-tree', () => ({ review_tree: { read_changed_tree: vi.fn() } }))
 
 const mocked_refusal = vi.mocked(scoped_green.refusal_for)
-const mocked_base = vi.mocked(change_base.resolved)
+const mocked_base = vi.mocked(change_base.resolved_through_merge)
 const mocked_paths = vi.mocked(changed_paths.read_changed_paths)
 const mocked_tree = vi.mocked(review_tree.read_changed_tree)
 
