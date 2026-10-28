@@ -3,8 +3,9 @@ import { git_pr_checks } from '#scripts/gh/git-pr-checks'
 import { git_command } from '#scripts/git/git-command'
 import { main_sync } from '#scripts/git/main-sync'
 import { error_text } from '#scripts/lib/error-message'
+import { review_comment_carry } from '#scripts/review/review-comment-carry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LEGACY_OBSERVATION_LEDGER_PATHS } from './observation-ledger'
+import { LEGACY_OBSERVATION_LEDGER_PATHS, OBSERVATION_LEDGER_DIRECTORY } from './observation-ledger'
 import { observation_ledger_prepare } from './observation-ledger-prepare'
 import { observations_flush } from './observations-flush'
 import {
@@ -18,6 +19,7 @@ import {
 } from './observations-flush-fixture'
 
 const LEGACY_OBSERVATION_LEDGER_PATH = LEGACY_OBSERVATION_LEDGER_PATHS[0] ?? ''
+const CARRIED_FILE = `${OBSERVATION_LEDGER_DIRECTORY}/5267-comment-rounds.md`
 
 // This file drives `observations_flush.flush()` against a mocked git — the whole command, both the
 // success path (joshuafolkken/kit#1795) and the rollbacks (joshuafolkken/kit#1785). `git_command` and
@@ -74,6 +76,10 @@ vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
 // (joshuafolkken/kit#4069).
 vi.mock('./observation-ledger-prepare', () => ({
 	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
+}))
+// The carry reads GitHub and writes the ledger, so it is mocked like the preparation.
+vi.mock('#scripts/review/review-comment-carry', () => ({
+	review_comment_carry: { carry_reported: vi.fn(async () => undefined) },
 }))
 
 const HOOK_REJECTION = 'cspell found an unknown word'
@@ -184,6 +190,37 @@ describe('observations_flush — the success path command sequence', () => {
 			[LEGACY_OBSERVATION_LEDGER_PATH],
 			[OBSERVATION_LEDGER_PATH],
 		])
+	})
+})
+
+// joshuafolkken/kit#5326: a lane child leaves the closed issues' comment rounds to this flush.
+describe('observations_flush — the comment-round carry', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		on_default_branch()
+	})
+
+	it('carries the comment rounds and commits their file on a tree that was clean before', async () => {
+		vi.mocked(git_command.status).mockResolvedValueOnce('').mockResolvedValue(`?? ${CARRIED_FILE}`)
+
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(review_comment_carry.carry_reported).toHaveBeenCalledWith(process.cwd())
+		expect(vi.mocked(git_command.add_path).mock.calls).toEqual([[CARRIED_FILE]])
+		expect(git_gh_command.pr_create).toHaveBeenCalledOnce()
+	})
+
+	// A carry ahead of the fast-forward could write a file main gained upstream, untracked, and git
+	// would then refuse the fast-forward.
+	it('carries only after the default branch is fast-forwarded', async () => {
+		vi.mocked(git_command.commit_count_beyond).mockResolvedValue(1)
+		vi.mocked(git_command.merge_fast_forward).mockResolvedValue('')
+
+		await observations_flush.flush(new Date(MORNING_INSTANT))
+
+		expect(first_call_order(git_command.merge_fast_forward)).toBeLessThan(
+			first_call_order(review_comment_carry.carry_reported),
+		)
 	})
 })
 

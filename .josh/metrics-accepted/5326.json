@@ -1,0 +1,8 @@
+{
+	"reason": "#5326 observation-ledger.md names observations:flush as the lane child's carry path",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 23,
+		"ai_cost.on_demand_bytes": 77
+	}
+}

@@ -56,6 +56,10 @@ vi.mock('#scripts/git/main-sync', () => ({ main_sync: { run: vi.fn() } }))
 vi.mock('./observation-ledger-prepare', () => ({
 	observation_ledger_prepare: { prepare: vi.fn(async () => []) },
 }))
+// The comment-round carry reads GitHub and writes the ledger (joshuafolkken/kit#5326).
+vi.mock('#scripts/review/review-comment-carry', () => ({
+	review_comment_carry: { carry_reported: vi.fn(async () => undefined) },
+}))
 
 const NO_COMMITS = 0
 const PUSHED_SHA = 'c0ffee1'

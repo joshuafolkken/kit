@@ -14,12 +14,13 @@ import { review_finding_ledger } from './review-finding-ledger'
 // a ledger line written then would be pushed onto the open pull request and restart its CI — and so
 // nothing that reads the ledger (`review:findings`, the retrospective) ever saw it.
 //
-// **The next run that records a round carries it.** Once an issue is closed no round is added to it,
+// **The next run outside a lane that records a round carries it, or the next flush.** Once an issue is closed no round is added to it,
 // so `review:record` copies each closed issue's comment rounds not yet carried into
 // `<issue>-comment-rounds.md` in the ledger, and the lines ride that run's own commit: the ledger stays
 // the one place a reader looks, and no push restarts any CI. **The file is the carried mark** — an
-// issue whose file exists is never read again, and two lanes carrying one issue write the same file,
-// so their pull requests merge to the same lines.
+// issue whose file exists is never read again. **A lane child carries none** (joshuafolkken/kit#5326):
+// parallel lanes each wrote the same file and waited and conflicted on it, so `observations:flush`
+// carries for them on the default branch (`review-comment-carry.ts`).
 //
 // **An observation-ledger line written while the pull request is open rides the same carry**
 // (joshuafolkken/kit#5197): `followup` reruns a CI job red only outside the change during its CI wait,
