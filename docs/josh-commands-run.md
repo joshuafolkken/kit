@@ -1047,6 +1047,9 @@ A subagent call counts under the agent it dispatched (`subagent: reviewer`), a b
 
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
+Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
+`between ship stages` lists the child's Bash there by kind. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
+
 ### `josh lane:plan`
 
 <!-- usage: lane:plan -->

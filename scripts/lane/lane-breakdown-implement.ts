@@ -129,6 +129,17 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 	}
 }
 
+// The Bash calls started inside `spans`, by the implementation's kinds — the fixes, re-ships and checks
+// a lane child ran between two ship stages (joshuafolkken/kit#5294).
+function bash_kinds(calls: ReadonlyArray<ToolCall>, spans: ReadonlyArray<LaneSpan>): Array<Stage> {
+	const placed = placed_of(
+		calls.filter((call) => call.tool === BASH_TOOL),
+		spans,
+	)
+
+	return lane_breakdown.ranked(placed.flatMap(([call, span]) => timed_part(call, span)))
+}
+
 // The lane's own transcript directories — `<lane root slug>-<issue>` under `~/.claude/projects`.
 function transcript_directories(issue: number): ReadonlyArray<string> {
 	const main_cwd = cost_transcript.session_cwd(process.cwd())
@@ -140,10 +151,11 @@ function transcript_directories(issue: number): ReadonlyArray<string> {
 		.filter((directory) => directory.endsWith(suffix))
 }
 
-// The tool calls of `issue`'s lane sessions still written to once its implementation began.
+// The tool calls of `issue`'s lane sessions still written to once its implementation began, up to the
+// end of its last ship stage.
 function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
 	const [first] = breakdown.implement
-	const last = breakdown.implement.at(-1)
+	const last = breakdown.ship.at(-1) ?? breakdown.implement.at(-1)
 
 	if (first === undefined || last === undefined) return []
 
@@ -152,7 +164,7 @@ function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
 	return lane_transcript_stats.read_calls(transcript_directories(issue), window)
 }
 
-const lane_breakdown_implement = { of, read, transcript_directories }
+const lane_breakdown_implement = { bash_kinds, of, read, transcript_directories }
 
 export { lane_breakdown_implement }
 export type { ImplementDetail }

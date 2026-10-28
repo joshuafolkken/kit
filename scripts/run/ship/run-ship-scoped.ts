@@ -3,6 +3,7 @@ import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_synced_scope } from './run-ship-synced-scope'
 
 // The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
@@ -41,7 +42,7 @@ async function rerecorded_tree(): Promise<GateTree> {
 // instead of a stop and a relaunched session. A check that genuinely fails still stops the ship, its
 // output forwarded to the ship log. A pair stale only because a merge with the default branch moved the
 // base runs nothing when the merge shares nothing with the branch (`run-ship-synced-scope.ts`).
-async function scoped_pair(): Promise<JoshResult> {
+async function settled_pair(): Promise<JoshResult> {
 	const tree = await rerecorded_tree()
 	const scripts = scoped_green.missing_scripts(tree.files, tree.base)
 	const settled = await run_ship_synced_scope.settle(tree, scripts)
@@ -59,13 +60,22 @@ async function scoped_pair(): Promise<JoshResult> {
 	)
 }
 
+// Timed as one lap in whichever ship stage asked for it (`run-ship-lap.ts`).
+async function scoped_pair(): Promise<JoshResult> {
+	return await run_ship_lap.timed(run_ship_lap.STEP.SCOPED_PAIR, settled_pair)
+}
+
+async function gate(): Promise<JoshResult> {
+	return await run_ship_lap.timed(
+		run_ship_lap.STEP.GATE,
+		async () => await josh_command.josh_run(['gate'], should_forward_stderr),
+	)
+}
+
 // The scoped pair and then `josh gate` — the gate stage, and the commit stage's and the followup's gate
 // over a merged tree before their push, so each leaves the record the pre-push hook reuses.
 async function scoped_gate(): Promise<JoshResult> {
-	return await run_phases([
-		scoped_pair,
-		async () => await josh_command.josh_run(['gate'], should_forward_stderr),
-	])
+	return await run_phases([scoped_pair, gate])
 }
 
 // Whether `josh gate` would only reuse this tree's green record: the gate's own reuse test rather than

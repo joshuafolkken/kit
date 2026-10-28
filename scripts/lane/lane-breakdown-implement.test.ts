@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import type { ToolCall } from './lane-transcript-calls'
+import { lane_transcript_stats } from './lane-transcript-stats'
 
 // joshuafolkken/kit#4995: #4970's 51-minute implementation was one span, so which command took its
 // time was unknown. Its tool calls split it by kind; what no call spent is the edits and the thinking.
@@ -24,6 +25,7 @@ const BREAKDOWN: Breakdown = {
 	waits: [],
 	implement: [{ from_ms: IMPLEMENT_FROM, to_ms: IMPLEMENT_TO }],
 	pre_detach: [],
+	ship: [],
 }
 
 interface CallShape {
@@ -195,5 +197,21 @@ describe('lane_breakdown_implement.of — subagent types', () => {
 			['subagent: investigator', 3],
 			['subagent: reviewer-verification', 2],
 		])
+	})
+})
+
+// joshuafolkken/kit#5294: the ship's laps run past the implementation, so the calls read reach its end.
+describe('lane_breakdown_implement.read — window', () => {
+	it('reads the calls up to the end of the last ship stage', () => {
+		const spy = vi.spyOn(lane_transcript_stats, 'read_calls').mockReturnValue([])
+		const ship = [{ stage: 'ship report', from_ms: 70 * MINUTE_MS, to_ms: 80 * MINUTE_MS }]
+
+		lane_breakdown_implement.read(4970, { ...BREAKDOWN, ship })
+
+		expect(spy.mock.calls[0]?.[1]).toStrictEqual({
+			since_ms: IMPLEMENT_FROM,
+			until_ms: 80 * MINUTE_MS,
+		})
+		spy.mockRestore()
 	})
 })
