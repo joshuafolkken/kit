@@ -61,8 +61,8 @@ and a resolution review reads a different subject.
 `prompts/review.md` → "When round 2 is skipped entirely, and when it is not". Both `skip` arms are
 states in which round 1's fix code needs no review: **A** — the fix delta is empty, round 1's findings
 closed without an edit; **B** — the fix leaves what executes unchanged. **Neither arm weakens the
-standard.** A round-1 High/Medium that did not close is not a closed finding, so `--round-1-closed` is
-not passable; the cap is still two rounds; and a confirmed High still blocks the merge.
+standard.** A round-1 High/Medium that did not close is not a closed finding, so the ledger's disposition
+for it is neither `fixed` nor `false-positive` and round 1 does not read as closed; the cap is still two rounds; and a confirmed High still blocks the merge.
 
 Arm B first covered only the review level's inert set. joshuafolkken/kit#3787 widened it, on the
 requester's decision of 2026-10-15, to `docs/**/*.md`, the root `README.md`, `prompts/**` and comment-only

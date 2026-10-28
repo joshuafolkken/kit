@@ -230,7 +230,7 @@ the `conflict` row of the same period.
 Under the stop table, `lane:stats` prints one row per round-2 verdict and reason code, most frequent
 first, with how many decisions fell there. A period with no decision prints a `none` row.
 
-`josh ship` reads `review:round2 --round-1-closed --json` and records the verdict and its `code` as a
+`josh ship` reads `review:round2 --record <N> --json` and records the verdict and its `code` as a
 `round-two` entry before acting on it. The codes are one per branch of `review-round2.ts`: `open-finding`,
 `no-snapshot`, `base-moved`, `empty`, `inert` and `live`.
 

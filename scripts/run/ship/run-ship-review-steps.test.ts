@@ -62,7 +62,7 @@ const HIGH = 'bug-risks:high:a.ts:4'
 const MEDIUM = 'bug-risks:medium:a.ts:7'
 const MEDIUM_UNFIXED = 'tests:medium:b.ts'
 const LOW = 'tests:low:a.ts'
-const DECIDE = 'review:round2 --round-1-closed --json'
+const DECIDE = `review:round2 --record ${ISSUE} --json`
 const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
@@ -211,7 +211,7 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 		answer_with(JOIN)
 
 		expect(await stage()).toHaveProperty('code', OK)
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${MEDIUM}`])
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, `${RECORD} ${FIXED_MEDIUM}`])
 	})
 
 	// joshuafolkken/kit#4774: the join's own code says the tree moved after a green gate.
@@ -285,7 +285,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
 
 		expect(await stage()).toHaveProperty('code', OK)
-		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${MEDIUM}`])
+		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${FIXED_MEDIUM}`])
 	})
 
 	it('records a fix the pair turned down as unfixed, then stops', async () => {

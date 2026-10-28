@@ -156,7 +156,8 @@ const KIND = run_event_stream.EVENT_KIND
 const OFFER_BACKLOG = 'pnpm josh backlog:next'
 const EVENT_ACTIONS: Record<string, (issue_number: string) => StepAction> = {
 	[KIND.PR_OPENED]: () => command('pnpm josh followup'),
-	[KIND.REVIEW_ROUND]: () => command('pnpm josh review:round2'),
+	[KIND.REVIEW_ROUND]: (issue_number) =>
+		command(`pnpm josh review:round2 --record ${issue_number}`),
 	[KIND.MERGE]: merge_command,
 	[KIND.OUTAGE]: merge_command,
 	[KIND.PARK]: () => command(OFFER_BACKLOG),
