@@ -13,6 +13,9 @@ import { build_package_manager_manifest } from './package-manager-manifest-fixtu
 
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
+vi.mock('./development-engines-verdict', () => ({
+	development_engines_verdict: { report: vi.fn() },
+}))
 
 // #3361: a failed pnpm bump used to be swallowed as a skip (exit 0), so `josh latest` recorded
 // the run as fresh and the pin never moved. Every failure path now exits non-zero with the
