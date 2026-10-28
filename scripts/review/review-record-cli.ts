@@ -18,7 +18,7 @@ import { review_stop_log } from './review-stop-log'
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
 // `/code-review` round's findings. It appends a `- rb:` round boundary and a `- rf:` line per finding to
 // the issue's own file of the observation ledger, which the run's commit carries like any other
-// ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
+// ledger change. **A call with no findings is a zero-finding round, and it still writes one `- rf:` line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
 // **`--comment` records a round that ran after the pull request opened**: the same lines go to the
