@@ -1,11 +1,28 @@
-import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { z } from 'zod'
+import {
+	agent_provider,
+	type AgentEnvironment,
+	type AgentProvider,
+	type Rejected,
+} from './agent-provider'
 import { agent_safe_text } from './agent-safe-text'
 
-const EMPTY_LENGTH = 0
+const {
+	ANTHROPIC_PROVIDER,
+	CODEX_SESSION_KEY,
+	HANDED_PROVIDER_KEY,
+	OPENAI_PROVIDER,
+	PROVIDER_SCHEMA,
+	default_notice,
+	handoff_environment,
+	has_completion_callback,
+	rejection,
+	resolve_provider,
+	trimmed,
+	warn_of_default,
+} = agent_provider
 
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
-const PROVIDER_SCHEMA = z.enum(['anthropic', 'openai'])
 const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
 // The run phases effort may vary by. They are the cut boundaries a lane child
 // resumes across — `run-cut.ts` imports these names for its own cut record, so the phase a run passes
@@ -20,21 +37,24 @@ const PROFILE_SCHEMA = z.object({
 })
 
 type AgentRole = z.infer<typeof ROLE_SCHEMA>
-type AgentProvider = z.infer<typeof PROVIDER_SCHEMA>
 type AgentEffort = z.infer<typeof EFFORT_SCHEMA>
 type AgentPhase = z.infer<typeof PHASE_SCHEMA>
 type AgentProfile = z.infer<typeof PROFILE_SCHEMA>
-type AgentEnvironment = Readonly<Record<string, string | undefined>>
-type ProfileResult = { kind: 'profile'; profile: AgentProfile } | { kind: 'rejected'; note: string }
-type Rejected = Extract<ProfileResult, { kind: 'rejected' }>
+type ProfileResult = Rejected | { kind: 'profile'; profile: AgentProfile }
 type EffortResult = Rejected | { kind: 'effort'; effort: AgentEffort }
-type ProviderResult = Rejected | { kind: 'provider'; provider: AgentProvider; is_default?: true }
 type OverrideField = 'model' | 'effort'
 
 interface Override {
 	key: string
 	value: string | undefined
 }
+
+interface PhaseModel {
+	key: string
+	value: string
+}
+
+type PhaseTable<Value> = Readonly<Partial<Record<AgentRole, Partial<Record<AgentPhase, Value>>>>>
 
 // What a resolution is keyed on beyond the role: the run phase (effort) and the review round (profile).
 interface AgentStage {
@@ -47,15 +67,12 @@ const WORKER: AgentRole = 'worker'
 const REVIEWER: AgentRole = 'reviewer'
 const IMPLEMENTATION_PHASE: AgentPhase = 'implementation'
 const PRE_GATE_PHASE: AgentPhase = 'pre-gate'
-const ANTHROPIC_PROVIDER: AgentProvider = 'anthropic'
-const OPENAI_PROVIDER: AgentProvider = 'openai'
 // **Pinned model ids, never a floating alias**. An alias such as `opus` moves
 // whenever the CLI moves it, so a run log could not say which model produced it and a model migration
 // could not be measured apart from everything else. A new lane records the id it resolved; a lane
-// created before a migration keeps the model it recorded (`with_phase_effort` leaves it untouched).
+// created before a migration keeps the model it recorded (`with_phase` moves it only by a phase key).
 const OPENAI_MODEL = 'gpt-6.1-sol'
 const ANTHROPIC_MODEL = 'claude-opus-5-5'
-const CODEX_SESSION_KEY = 'CODEX_THREAD_ID'
 
 // **Round 1 reviews at `medium`** (joshuafolkken/kit#5106): it ended clean on 88% of diffs while its
 // `high` run sat on the lane's critical path; the verification pass below keeps `high`.
@@ -107,9 +124,15 @@ const VERIFICATION_KEYS = {
 // the worker here. The investigation phase — highest output density — is left for a later merge, once
 // the delegation half of this Issue has moved its reading out.
 const SHIP_EFFORT: AgentEffort = 'low'
-type PhaseEffortTable = Partial<Record<AgentRole, Partial<Record<AgentPhase, AgentEffort>>>>
-const PHASE_EFFORT: Readonly<PhaseEffortTable> = {
+const PHASE_EFFORT: PhaseTable<AgentEffort> = {
 	worker: { [PRE_GATE_PHASE]: SHIP_EFFORT },
+}
+
+// **The ship phase may run on a model of its own** (joshuafolkken/kit#5343), read from its key ahead of
+// the role's and applied on the same cut relaunch as `SHIP_EFFORT`. Unset, the phase keeps the role's
+// model, so the default is unchanged.
+const PHASE_MODEL_KEYS: PhaseTable<string> = {
+	worker: { [PRE_GATE_PHASE]: 'JOSH_WORKER_SHIP_MODEL' },
 }
 
 const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> = {
@@ -121,12 +144,6 @@ const ENV_KEYS: Readonly<Record<AgentRole, { model: string; effort: string }>> =
 const LEGACY_WORKER_KEYS = { model: 'JOSH_LANE_MODEL', effort: 'JOSH_LANE_EFFORT' }
 
 const { MAX_VALUE_LENGTH, is_safe_prompt, is_safe_value, printable } = agent_safe_text
-
-function trimmed(value: string | undefined): string | undefined {
-	const result = value?.trim()
-
-	return result === undefined || result.length === EMPTY_LENGTH ? undefined : result
-}
 
 function is_verification(role: AgentRole, round: number | undefined): boolean {
 	return role === REVIEWER && round !== undefined && round > FIRST_REVIEW_ROUND
@@ -159,19 +176,44 @@ function override_value(
 		: { key, value: trimmed(environment[key]) }
 }
 
+// A role's entry in a phase table; `undefined` for a phase-less or unrecognized phase, or no entry.
+function phase_entry<Value>(
+	table: PhaseTable<Value>,
+	role: AgentRole,
+	phase: string | undefined,
+): Value | undefined {
+	const parsed = PHASE_SCHEMA.safeParse(phase)
+
+	return parsed.success ? table[role]?.[parsed.data] : undefined
+}
+
+// The phase's own model key when it is set; `undefined` for a phase with no key, an unset key, or an
+// OpenAI session, whose model is never read from env.
+function phase_model(
+	role: AgentRole,
+	provider: AgentProvider,
+	phase: string | undefined,
+	environment: AgentEnvironment,
+): PhaseModel | undefined {
+	const key = provider === OPENAI_PROVIDER ? undefined : phase_entry(PHASE_MODEL_KEYS, role, phase)
+	if (key === undefined) return undefined
+	const value = trimmed(environment[key])
+
+	return value === undefined ? undefined : { key, value }
+}
+
 function model_override(
 	role: AgentRole,
 	environment: AgentEnvironment,
 	provider: AgentProvider,
-	round: number | undefined,
+	stage: AgentStage,
 ): Override {
+	const phased = phase_model(role, provider, stage.phase, environment)
+	if (phased !== undefined) return phased
+
 	return provider === OPENAI_PROVIDER
 		? { key: ENV_KEYS[role].model, value: undefined }
-		: override_value(role, 'model', environment, round)
-}
-
-function rejection(key: string, value: string, expected: string): Rejected {
-	return { kind: 'rejected', note: `${key}=${value} ${expected}, so the agent was not started` }
+		: override_value(role, 'model', environment, stage.round)
 }
 
 function resolved_effort(override: Override, fallback: AgentEffort): EffortResult {
@@ -180,93 +222,6 @@ function resolved_effort(override: Override, fallback: AgentEffort): EffortResul
 	return parsed.success
 		? { kind: 'effort', effort: parsed.data }
 		: rejection(override.key, override.value ?? '', 'is not an allowed effort')
-}
-
-function has_session(environment: AgentEnvironment, keys: ReadonlyArray<string>): boolean {
-	return keys.some((key) => trimmed(environment[key]) !== undefined)
-}
-
-const CONFLICTING_SESSIONS: Rejected = {
-	kind: 'rejected',
-	note: 'both Codex and Claude Code sessions were detected',
-}
-
-// The provider a detached launcher hands a process that is not itself an agent session.
-// `detached_launch` strips the parent-session keys — the very keys the
-// detection below reads — so a `josh ship --detach --review` supervisor could never resolve its reviewer.
-// **It is a fallback, read only when no session is detected**: the mark is inherited by everything the
-// supervisor starts, and a real session's own keys must keep deciding for that session.
-const HANDED_PROVIDER_KEY = 'JOSH_AGENT_PROVIDER'
-
-// **Nothing named a provider, so Claude Code is the default** — a person typing `josh lane:launch` in a
-// plain terminal has no session and no mark. Only silence defaults: two detected sessions and a mark
-// naming no allowed provider still refuse. `is_default` lets a launch say so, and lets `josh cost` keep
-// reading "no session of its own" rather than pricing another session's transcript.
-const DEFAULT_PROVIDER: ProviderResult = {
-	kind: 'provider',
-	provider: ANTHROPIC_PROVIDER,
-	is_default: true,
-}
-const DEFAULT_NOTICE = ` No agent session or ${HANDED_PROVIDER_KEY} was found, so the provider defaulted to ${ANTHROPIC_PROVIDER} (Claude Code).`
-
-function handed_provider(environment: AgentEnvironment): ProviderResult {
-	const value = trimmed(environment[HANDED_PROVIDER_KEY])
-	if (value === undefined) return DEFAULT_PROVIDER
-	const parsed = PROVIDER_SCHEMA.safeParse(value)
-
-	return parsed.success
-		? { kind: 'provider', provider: parsed.data }
-		: rejection(HANDED_PROVIDER_KEY, value, 'is not an allowed provider')
-}
-
-// The session this process runs in, read from its own keys: `undefined` when none is detected.
-function detected_provider(environment: AgentEnvironment): ProviderResult | undefined {
-	const has_codex = has_session(environment, [CODEX_SESSION_KEY])
-	const has_claude = has_session(environment, agent_session_environment.PARENT_SESSION_KEYS)
-
-	if (has_codex === has_claude) return has_codex ? CONFLICTING_SESSIONS : undefined
-
-	return { kind: 'provider', provider: has_codex ? OPENAI_PROVIDER : ANTHROPIC_PROVIDER }
-}
-
-function resolve_provider(environment: AgentEnvironment = process.env): ProviderResult {
-	return detected_provider(environment) ?? handed_provider(environment)
-}
-
-// The sentence a launch appends when it ran on the default, so falling back is never silent; empty when
-// a session or a mark decided.
-function default_notice(environment: AgentEnvironment = process.env): string {
-	const selected = resolve_provider(environment)
-
-	return selected.kind === 'provider' && selected.is_default === true ? DEFAULT_NOTICE : ''
-}
-
-// The same sentence on stderr, for a launcher whose own line is a verdict or a brief another process
-// reads: `run:wake --start`, `review:brief` and `ship --detach` default exactly as a dispatch does.
-function warn_of_default(environment: AgentEnvironment = process.env): void {
-	const notice = default_notice(environment).trim()
-
-	if (notice !== '') console.error(notice)
-}
-
-// Whether this session is woken when a background command it started completes.
-// Claude Code re-invokes the session at the completion; a Codex session is not
-// re-invoked, so a parent there can only wait by polling, each poll a model call over its whole context.
-// Only a resolved Codex session answers no — a defaulted or conflicting one keeps the callback.
-function has_completion_callback(environment: AgentEnvironment = process.env): boolean {
-	const selected = resolve_provider(environment)
-
-	return selected.kind !== 'provider' || selected.provider !== OPENAI_PROVIDER
-}
-
-// The mark a detached launch sets on its child: the provider this session resolved, the default
-// included, or nothing when it was refused — the child then fails the same way this session would have.
-function handoff_environment(
-	environment: AgentEnvironment = process.env,
-): Readonly<Record<string, string>> {
-	const selected = resolve_provider(environment)
-
-	return selected.kind === 'provider' ? { [HANDED_PROVIDER_KEY]: selected.provider } : {}
 }
 
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
@@ -285,10 +240,7 @@ function phase_effort(
 	phase: string | undefined,
 	fallback: AgentEffort,
 ): AgentEffort {
-	const parsed = PHASE_SCHEMA.safeParse(phase)
-	if (!parsed.success) return fallback
-
-	return PHASE_EFFORT[role]?.[parsed.data] ?? fallback
+	return phase_entry(PHASE_EFFORT, role, phase) ?? fallback
 }
 
 // The effort a stored profile takes in a phase: an env override wins, then the phase value, then the
@@ -304,14 +256,18 @@ function overridden_effort(
 	return parsed.success ? parsed.data : phase_effort(profile.role, phase, profile.effort)
 }
 
-// A stored profile with its effort resolved for the phase the run is entering, its model and provider
-// left as they were.
-function with_phase_effort(
+// A stored profile resolved for the phase the run is entering: its effort, and its model only where the
+// phase's own model key is set — the role's model key never moves a lane off the model it recorded.
+function with_phase(
 	profile: AgentProfile,
 	phase: string,
 	environment: AgentEnvironment = process.env,
-): AgentProfile {
-	return { ...profile, effort: overridden_effort(profile, phase, environment) }
+): ProfileResult {
+	const effort = overridden_effort(profile, phase, environment)
+	const model = phase_model(profile.role, profile.provider, phase, environment)
+	if (model === undefined) return { kind: 'profile', profile: { ...profile, effort } }
+
+	return validate({ ...profile, model: model.value, effort }, model.key)
 }
 
 function stage_defaults(
@@ -332,7 +288,7 @@ function resolve_stage(
 	const selected = resolve_provider(environment)
 	if (selected.kind === 'rejected') return selected
 	const defaults = stage_defaults(selected.provider, role, stage.round)
-	const model = model_override(role, environment, selected.provider, stage.round)
+	const model = model_override(role, environment, selected.provider, stage)
 	const effort = override_value(role, 'effort', environment, stage.round)
 	const resolved = resolved_effort(effort, phase_effort(role, stage.phase, defaults.effort))
 
@@ -403,16 +359,10 @@ const agent_role_profile = {
 	resolve_provider,
 	resolve_review,
 	warn_of_default,
-	with_phase_effort,
+	with_phase,
 }
 
-export type {
-	AgentEffort,
-	AgentEnvironment,
-	AgentPhase,
-	AgentProfile,
-	AgentProvider,
-	AgentRole,
-	ProfileResult,
-}
+export type { AgentEffort, AgentPhase, AgentProfile, AgentRole, ProfileResult }
 export { agent_role_profile }
+
+export { type AgentEnvironment, type AgentProvider } from './agent-provider'

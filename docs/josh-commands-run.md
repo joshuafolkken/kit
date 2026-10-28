@@ -1271,7 +1271,9 @@ pnpm josh time --split-at 2026-10-16T21:33:19Z   # the same tree compared by rol
 
 **Kit-only** — hidden from a consumer's `josh --help` and refused there with guidance; run it from the kit repository. Its CLI and run-state support live under the undistributed `tools/time/`, while the runtime analysis the hooks, guards and `josh cost --over` rely on stays distributed under `scripts/time-runtime/`.
 
-**Output:** a header, a by-role breakdown and a per-session list, led by a run-state block when the run is unfinished. An unmeasured figure prints `not measured`.
+**Output:** a header, a by-role breakdown, a worker-by-phase block and a per-session list, led by a run-state block when the run is unfinished. An unmeasured figure prints `not measured`.
+
+The worker-by-phase block (`worker_phases` in `--json`) splits the lane children into `implement` and `ship`, each with its session count, request count and cost. A lane session whose `run:cut --resume` answered `resume` is `ship`; every other lane session is `implement`. A run without a lane child prints no block.
 
 **Output / exit codes:** an absent or untimed transcript exits non-zero and says where it looked.
 

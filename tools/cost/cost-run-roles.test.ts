@@ -38,6 +38,7 @@ function node(session_id: string, role: RunRole, output: number | undefined): Ru
 		baseline_tokens: 100,
 		is_readable: output !== undefined,
 		took_cut: false,
+		is_ship: false,
 	}
 }
 

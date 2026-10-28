@@ -3,6 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { figure_format } from '#scripts/lib/figure-format'
 import { cost_run_issues, type IssueTotals } from './cost-run-issues'
 import type { RunNode } from './cost-run-nodes'
+import { cost_run_phase, type PhaseTotals } from './cost-run-phase'
 import { cost_run_roles, type RoleTotals, type SessionRow } from './cost-run-roles'
 import { cost_run_split, type RunSplit } from './cost-run-split'
 import { cost_run_tree } from './cost-run-tree'
@@ -38,6 +39,8 @@ interface RunCostReport {
 	// The sessions summed per Issue, with whether the implementation cut ended any of them — the
 	// comparison a batch is judged by. Carried in `--json` only.
 	issues: ReadonlyArray<IssueTotals>
+	// The lane children's requests and dollars by the phase each session worked in.
+	worker_phases: ReadonlyArray<PhaseTotals>
 	// The tree split at `--split-at`, by role on each side, or `undefined` when no instant was named.
 	split: RunSplit | undefined
 }
@@ -70,6 +73,7 @@ function build(
 		roles: roles.roles,
 		sessions: roles.sessions,
 		issues: cost_run_issues.build(roles.sessions),
+		worker_phases: cost_run_phase.build(nodes),
 		split: split_at_ms === undefined ? undefined : cost_run_split.build(nodes, split_at_ms),
 	}
 }
@@ -130,7 +134,14 @@ function session_lines(report: RunCostReport): Array<string> {
 // the lines it is handed sit above it.
 function format_report(report: RunCostReport, lead: ReadonlyArray<string> = []): string {
 	const split = report.split === undefined ? [] : cost_run_split.format_lines(report.split)
-	const body = [...header_lines(report), ...role_lines(report), ...split, ...session_lines(report)]
+	const phases = cost_run_phase.format_lines(report.worker_phases)
+	const body = [
+		...header_lines(report),
+		...role_lines(report),
+		...phases,
+		...split,
+		...session_lines(report),
+	]
 
 	return (lead.length === 0 ? body : [...lead, '', ...body]).join('\n')
 }

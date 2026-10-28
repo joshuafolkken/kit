@@ -311,26 +311,3 @@ describe('phase-resolved effort', () => {
 		)
 	})
 })
-
-describe('with_phase_effort', () => {
-	const base = agent_role_profile.DEFAULT_PROFILES.worker
-
-	it('applies the phase effort to a stored profile and keeps its model', () => {
-		const adjusted = agent_role_profile.with_phase_effort(
-			base,
-			agent_role_profile.PRE_GATE_PHASE,
-			ANTHROPIC_ENV,
-		)
-
-		expect(adjusted).toMatchObject({ model: base.model, effort: 'low' })
-	})
-
-	it('lets an env override win over the phase for a stored profile', () => {
-		const adjusted = agent_role_profile.with_phase_effort(base, agent_role_profile.PRE_GATE_PHASE, {
-			...ANTHROPIC_ENV,
-			JOSH_WORKER_EFFORT: 'xhigh',
-		})
-
-		expect(adjusted.effort).toBe('xhigh')
-	})
-})

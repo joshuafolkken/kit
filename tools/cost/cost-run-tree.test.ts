@@ -1,8 +1,10 @@
 import type { SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import type { UsageRecord, UsageTotals } from '#scripts/cost-runtime/cost-usage'
 import { describe, expect, it } from 'vitest'
-import type { NodeContext } from './cost-run-nodes'
+import type { LaneMarks, NodeContext } from './cost-run-nodes'
 import { cost_run_tree } from './cost-run-tree'
+
+const NO_MARKS: LaneMarks = { took_cut: false, is_ship: false }
 
 const EMPTY: UsageTotals = {
 	input_tokens: 0,
@@ -38,7 +40,7 @@ function context(
 	return {
 		facts: (id) => ({ records: [rec(starts.get(id) ?? 0)], baseline_tokens: 0, is_readable: true }),
 		lane_issue: (file) => lanes.get(file.session_id),
-		took_cut: () => false,
+		lane_marks: () => NO_MARKS,
 	}
 }
 
@@ -151,7 +153,7 @@ function written(
 			is_readable: true,
 		}),
 		lane_issue: (file) => lanes.get(file.session_id),
-		took_cut: () => false,
+		lane_marks: () => NO_MARKS,
 	}
 }
 
