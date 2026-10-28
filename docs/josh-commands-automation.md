@@ -542,6 +542,8 @@ pnpm josh observations:flush
 
 It commits only the ledger lines (`.josh/observations/`) no run's own commit carried — lines written outside any run.
 
+It first carries the closed issues' comment rounds no lane carries into `<N>-comment-rounds.md`, in the same pull request.
+
 **Behavior:** refused off the default branch or beside any other change; prints `clean` when there is nothing to commit. `pnpm josh run:tail` runs it after a merge.
 
 Related: [`josh followup`](#josh-followup).
@@ -608,6 +610,8 @@ pnpm josh review:record --issue 2325 --interaction                              
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
+
+A ledger round carries the closed issues' comment rounds into its commit, except in a lane child, which leaves them to [`josh observations:flush`](#josh-observationsflush).
 
 **`--check --issue <N>` is the merge gate** [`josh followup`](#josh-followup) runs: a `- rf:` line for the issue is `ok`, its absence is `missing`, no ledger `not-required`.
 

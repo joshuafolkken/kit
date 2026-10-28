@@ -232,6 +232,23 @@ describe('review_comment_round.carry — what it throws on', () => {
 	})
 })
 
+// joshuafolkken/kit#5326: a flush discards the carried files a stopped flush left uncommitted.
+describe('review_comment_round.is_carried_file', () => {
+	it('answers a carried file by its name, from its ledger path or its git status path', () => {
+		expect(
+			review_comment_round.is_carried_file(review_comment_round.carried_path(ISSUE, 'x')),
+		).toBe(true)
+		expect(review_comment_round.is_carried_file('.josh/observations/5267-comment-rounds.md')).toBe(
+			true,
+		)
+	})
+
+	it('answers no for any other ledger file', () => {
+		expect(review_comment_round.is_carried_file('.josh/observations/5267.md')).toBe(false)
+		expect(review_comment_round.is_carried_file('.josh/observations/2026-10-28.md')).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#4907: the merge gate's attest check reads an open issue's rounds the same way.
 describe('review_comment_round.issue_lines', () => {
 	it('reads the comment-round lines of one issue', async () => {

@@ -47,9 +47,11 @@ const PUSH_FAILED_NOTE =
 // that reused a green record — so its few seconds are not timed as a run of it. `preconditions` names
 // the kinds of the preconditions a stopped preflight found unmet (`run-ship-preflight.ts`). `cause` is the
 // one a stopped stage tagged its stop with — a review round, or a red gate over a merged tree
-// (`run-ship-stop-cause.ts`).
+// (`run-ship-stop-cause.ts`). `reason` says why the stage ran or was skipped, written on its event line
+// (`run-ship-review-reason.ts`).
 interface StepResult extends JoshResult {
 	is_skipped?: boolean
+	reason?: string
 	conflicts?: ReadonlyArray<string>
 	preconditions?: ReadonlyArray<string>
 	cause?: Cause

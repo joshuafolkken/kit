@@ -48,6 +48,8 @@ interface Breakdown {
 	// Each ship stage's spans and the spans between them, waits left in — the windows its laps and the
 	// fixes between stages are read in (joshuafolkken/kit#5294).
 	ship: ReadonlyArray<Segment>
+	// Why each ship stage last ran or was skipped, where its event line said (joshuafolkken/kit#5296).
+	reasons?: ReadonlyMap<string, string>
 }
 
 interface Segment extends LaneSpan {
@@ -83,12 +85,35 @@ function is_inside(at_ms: number, span: LaneSpan): boolean {
 	return at_ms >= span.from_ms && at_ms < span.to_ms
 }
 
+function is_lane_event(event: RunEvent, issue: number, span: LaneSpan): boolean {
+	return lane_stop_stats.issue_of(event) === issue && is_inside(Date.parse(event.at), span)
+}
+
 function marker_of(event: RunEvent, issue: number, span: LaneSpan): ReadonlyArray<Marker> {
 	const stage = stage_of(event)
 	const at_ms = Date.parse(event.at)
-	const is_lane = lane_stop_stats.issue_of(event) === issue && is_inside(at_ms, span)
 
-	return stage !== undefined && is_lane ? [{ at_ms, stage }] : []
+	return stage !== undefined && is_lane_event(event, issue, span) ? [{ at_ms, stage }] : []
+}
+
+function reason_of(event: RunEvent, issue: number, span: LaneSpan): Array<[string, string]> {
+	if (event.kind !== EVENT_KIND.SHIP_STAGE || !is_lane_event(event, issue, span)) return []
+
+	const reason = run_ship_stage.reason_of(event.text)
+	const stage = `${SHIP_LEAD}${run_ship_stage.words_of(event.text).stage}`
+
+	return reason === undefined ? [] : [[stage, reason]]
+}
+
+// The newest reason each ship stage's event line gave, by the stage's name.
+function reasons_of(
+	events: ReadonlyArray<RunEvent>,
+	issue: number,
+	span: LaneSpan,
+): Map<string, string> {
+	const ordered = events.toSorted((left, right) => Date.parse(left.at) - Date.parse(right.at))
+
+	return new Map(ordered.flatMap((event) => reason_of(event, issue, span)))
 }
 
 function segments_of(
@@ -181,6 +206,7 @@ function of(
 		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
 		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),
 		ship: segments.filter((segment) => is_ship(segment)),
+		reasons: reasons_of(events, issue, span),
 	}
 }
 

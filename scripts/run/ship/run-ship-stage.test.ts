@@ -308,6 +308,36 @@ describe('run_ship_stage.started_of — the attempt a line carries (joshuafolkke
 	})
 })
 
+// joshuafolkken/kit#5296: why a stage ran or was skipped follows the words, which read as before.
+describe('run_ship_stage.with_reason — why a stage ran or was skipped', () => {
+	const { PHASE } = run_ship_stage
+	const REASON = 'reused: round 1 attested on this branch, its tree held'
+
+	it('reads the words and the reason back off a line with a started list', () => {
+		const words = run_ship_stage.event_text('7', STAGE.REVIEW, PHASE.SKIPPED, [STAGE.REVIEW])
+		const text = run_ship_stage.with_reason(words, REASON)
+
+		expect(text).toBe(`#7 review skipped review | ${REASON}`)
+		expect(run_ship_stage.words_of(text)).toStrictEqual({ stage: 'review', phase: 'skipped' })
+		expect(run_ship_stage.started_of(text)).toStrictEqual(['review'])
+		expect(run_ship_stage.reason_of(text)).toBe(REASON)
+	})
+
+	it('reads no started list off a three-word line with a reason', () => {
+		const text = run_ship_stage.with_reason('#7 review done', 'ran: --review — why')
+
+		expect(run_ship_stage.started_of(text)).toBeUndefined()
+		expect(run_ship_stage.words_of(text).phase).toBe('done')
+	})
+
+	it('leaves a line with no reason as it was, and reads no reason off it', () => {
+		const text = '#7 gate done'
+
+		expect(run_ship_stage.with_reason(text, undefined)).toBe(text)
+		expect(run_ship_stage.reason_of(text)).toBeUndefined()
+	})
+})
+
 describe('run_ship_stage.is_done — the --review round (joshuafolkken/kit#2427)', () => {
 	it('runs on a fresh tree with no record', () => {
 		expect(run_ship_stage.is_done(STAGE.REVIEW, NONE, NOTHING)).toBe(false)

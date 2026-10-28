@@ -1,8 +1,9 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
-import { review_comment_round } from './review-comment-round'
+import { review_comment_carry } from './review-comment-carry'
 import { review_finding_ledger, type Finding, type LineKind } from './review-finding-ledger'
 import { review_finding_text } from './review-finding-text'
 import { review_interaction } from './review-interaction'
@@ -68,10 +69,8 @@ function reuse_line(answer: ReuseAnswer): string {
 
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const CARRIED_LINE =
-	'review-finding line(s) recorded on closed issues after their pull requests opened into the ledger.'
-const CARRY_FAILED_LINE =
-	'Could not carry the closed issues’ comment rounds into the ledger; the next round retries:'
+const LANE_CARRY_LINE =
+	'Not carrying the closed issues’ comment rounds: a lane child leaves them to `pnpm josh observations:flush`.'
 const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
@@ -261,17 +260,18 @@ async function run_check(parsed: Parsed, root: string): Promise<number> {
 	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
-// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`). **A carry
-// that fails never fails the record**: this round is recorded, and the comment rounds wait for the
-// next run's.
+// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`) — **except in a
+// lane child** (joshuafolkken/kit#5326): parallel lanes each wrote the same newly closed issue's file,
+// so their ships waited on each other's overlap and their merges with main conflicted on it.
+// `observations:flush` carries them for the lanes, on the default branch, in one pull request.
 async function carry_comment_rounds(root: string): Promise<void> {
-	try {
-		const count = await review_comment_round.carry(root)
+	if (lane_child_marker.is_child_of(root)) {
+		console.info(LANE_CARRY_LINE)
 
-		if (count > 0) console.info(`Carried ${String(count)} ${CARRIED_LINE}`)
-	} catch (error) {
-		console.warn(`${CARRY_FAILED_LINE} ${error instanceof Error ? error.message : String(error)}`)
+		return
 	}
+
+	await review_comment_carry.carry_reported(root)
 }
 
 // The round lands in its own issue's file, so two lanes recording at once
