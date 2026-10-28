@@ -126,6 +126,16 @@ describe('git_next_issues.prioritize - expected effect', () => {
 	})
 })
 
+// joshuafolkken/kit#5310: an upgrade declared to run last queues behind older undeclared issues.
+describe('git_next_issues.prioritize - run last', () => {
+	it('puts the issue that declares it runs last behind older undeclared ones', () => {
+		const upgrade = { ...issue(3, CREATED_LATEST), body: '## 背景\n\n- 実施順: 最後\n' }
+		const issues = [upgrade, issue(2, CREATED_LATER), issue(1, CREATED_EARLIER)]
+
+		expect(prioritized_numbers(issues)).toEqual([2, 1, 3])
+	})
+})
+
 describe('git_next_issues.prioritize - exclusions', () => {
 	// An epic tracks a batch and is never run directly (`queue` receives child issues only), and an
 	// in-progress issue is already claimed. The mixed casing covers repos whose label predates the

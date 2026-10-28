@@ -65,6 +65,7 @@ function order(
 	const dependents = issue_rank.count_dependents(candidates.map((issue) => dependency_row(issue)))
 
 	return issue_rank.rank(candidates, (issue) => ({
+		is_last: issue_priority.is_last(issue.body),
 		labels: (issue.labels ?? []).map((label) => label.name),
 		lost_minutes: issue_priority.lost_minutes(issue.body),
 		gain_minutes: expected_effect_lint.weekly_minutes(issue.body),
