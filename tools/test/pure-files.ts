@@ -12,6 +12,7 @@ const PURE_FILES: ReadonlyArray<string> = [
 	'eslint/quality-limits-document.test.ts',
 	'eslint/refactor-scan-prompt-sync.test.ts',
 	'eslint/rules/code-quality.test.ts',
+	'eslint/rules/comment-why-only.test.ts',
 	'eslint/rules/english-only-prose.test.ts',
 	'eslint/rules/namespace-object-export.test.ts',
 	'eslint/rules/naming-convention.test.ts',
