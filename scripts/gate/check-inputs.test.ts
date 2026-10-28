@@ -2,12 +2,12 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { test_related } from '#scripts/test/test-related'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_inputs } from './check-inputs'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 
 // joshuafolkken/kit#3903: each scoped check names the paths it reads, over-approximating — a path in
 // doubt is an input, and a check with no scope always runs.
 
-const { EXPORTS_LABEL, LINT_LABEL, METRICS_LABEL, TYPE_CHECK_LABEL } = gate_plan
+const { EXPORTS_LABEL, LINT_LABEL, METRICS_LABEL, TYPE_CHECK_LABEL } = gate_labels
 const SKILL_DOC = '.claude/skills/x/SKILL.md'
 const SOURCE = 'scripts/gate/check-inputs.ts'
 const LOCK_FILE = 'pnpm-lock.yaml'
@@ -82,7 +82,7 @@ describe('check_inputs.touches_inputs for metrics', () => {
 
 // joshuafolkken/kit#4314: the unit step's inputs are what `josh test:related` would run tests for.
 describe('check_inputs.touches_inputs for the unit step', () => {
-	const { UNIT_LABEL } = gate_plan
+	const { UNIT_LABEL } = gate_labels
 
 	afterEach(() => {
 		vi.restoreAllMocks()

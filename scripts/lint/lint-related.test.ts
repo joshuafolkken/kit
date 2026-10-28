@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
@@ -360,7 +360,7 @@ describe('lint_related.run_related_lint — since the last green run', () => {
 
 		expect(since_green.read_moved).toHaveBeenCalledWith(
 			review_stamps.lint_related_stamp,
-			gate_plan.LINT_LABEL,
+			gate_labels.LINT_LABEL,
 			undefined,
 			BEFORE_TREE,
 		)

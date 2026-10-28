@@ -1,4 +1,4 @@
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import type { MovedParts } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -41,12 +41,12 @@ interface SyncedCheck {
 const CHECKS: ReadonlyArray<SyncedCheck> = [
 	{
 		script: scoped_green.LINT_SCRIPT,
-		label: gate_plan.LINT_LABEL,
+		label: gate_labels.LINT_LABEL,
 		stamp: review_stamps.lint_related_stamp,
 	},
 	{
 		script: scoped_green.TEST_SCRIPT,
-		label: gate_plan.UNIT_LABEL,
+		label: gate_labels.UNIT_LABEL,
 		stamp: review_stamps.test_related_stamp,
 	},
 ]

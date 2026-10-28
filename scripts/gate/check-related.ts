@@ -10,8 +10,8 @@ import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import { check_related_section, type CheckResult } from './check-related-section'
 import { check_related_unplanned } from './check-related-unplanned'
+import { gate_labels } from './gate-labels'
 import { gate_log } from './gate-log'
-import { gate_plan } from './gate-plan'
 import { metrics_totals } from './metrics-totals'
 import { verification_tail } from './verification-tail'
 
@@ -28,7 +28,7 @@ const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
 	'test:related',
-	gate_plan.TYPE_CHECK_TARGET,
+	gate_labels.TYPE_CHECK_TARGET,
 	'cspell:dot',
 ]
 const REUSED = 'reused'

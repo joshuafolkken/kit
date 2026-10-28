@@ -5,8 +5,8 @@ import { status_icons } from '#scripts/lib/status-icons'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { NOT_USED_MARKER, NOTHING_TO_CHECK_MARKER } from '#scripts/test/skip-marker'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
+import { gate_labels } from './gate-labels'
 import { gate_log } from './gate-log'
-import { gate_plan } from './gate-plan'
 import { verification_tail } from './verification-tail'
 
 // The gate's console reporting, split out of `verification-gate.ts` so that file stays under its line
@@ -99,7 +99,7 @@ function checker_lines(result: GateStepResult): ReadonlyArray<string> {
 }
 
 function has_checker_warning(result: GateStepResult): boolean {
-	if (!gate_plan.WARNING_CHECKER_LABELS.includes(result.label)) return false
+	if (!gate_labels.WARNING_CHECKER_LABELS.includes(result.label)) return false
 
 	return checker_lines(result).some((line) =>
 		WARNING_MARKERS.some((marker) => line.includes(marker)),

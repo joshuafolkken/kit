@@ -9,8 +9,8 @@ import { lane_paths } from '#scripts/lane/lane-paths'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { core_budget, type LiveReservation } from './core-budget'
+import { gate_labels } from './gate-labels'
 import { gate_ledger } from './gate-ledger'
-import { gate_plan } from './gate-plan'
 import { machine_capacity } from './machine-capacity'
 
 // joshuafolkken/kit#3501: a gate records the load it ran beside, read where none of its own checks
@@ -203,7 +203,7 @@ describe('gate_ledger — the reuses and the fallbacks', () => {
 		const scope = { mode: 'all' as const, files: [], reason: related_scope.UNREADABLE_REASON }
 		const output = related_scope.describe_scope(scope, scratch)
 		const unit = {
-			label: gate_plan.UNIT_LABEL,
+			label: gate_labels.UNIT_LABEL,
 			command: 'josh test:related',
 			exit_code: 0,
 			output,
@@ -215,7 +215,7 @@ describe('gate_ledger — the reuses and the fallbacks', () => {
 		const [entry] = lane_ledger.read_entries(ledger_path)
 
 		expect(entry?.kind === 'gate' ? entry.checks : undefined).toMatchObject([
-			{ label: gate_plan.UNIT_LABEL, fallback: 'unreadable' },
+			{ label: gate_labels.UNIT_LABEL, fallback: 'unreadable' },
 		])
 	})
 
@@ -288,7 +288,7 @@ describe('gate_ledger — the unit leg no-op', () => {
 		const ledger_path = path.join(scratch, 'unmoved.jsonl')
 		const scope = { mode: 'none' as const, files: [], reason: related_scope.UNMOVED_REASON }
 		const output = related_scope.describe_scope(scope, scratch)
-		const unit = { label: gate_plan.UNIT_LABEL, command: '', exit_code: 0, output, elapsed_ms: 9 }
+		const unit = { label: gate_labels.UNIT_LABEL, command: '', exit_code: 0, output, elapsed_ms: 9 }
 
 		await gate_ledger.record(await gate_ledger.start(ledger_path), [unit], OUTCOME)
 

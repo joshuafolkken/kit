@@ -1,4 +1,5 @@
 import { globSync } from 'node:fs'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_plan } from '#scripts/gate/gate-plan'
 import { GATE_TARGETS } from '#scripts/gate/verification-gate'
 import { package_path } from '#scripts/init/init-paths'
@@ -159,7 +160,10 @@ describe('the aggregate job is what the branch ruleset still requires', () => {
 // of quietly leaving CI — and so the claim survives a rename of any step.
 describe('the split covers every check the single job used to run', () => {
 	it('leaves the static checks and the unit suite adjacent, with nothing between them', () => {
-		const covered = [...gate_plan.STATIC_CHECKS.map((check) => check.target), gate_plan.UNIT_TARGET]
+		const covered = [
+			...gate_plan.STATIC_CHECKS.map((check) => check.target),
+			gate_labels.UNIT_TARGET,
+		]
 
 		expect(covered).toEqual([...GATE_TARGETS])
 	})

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { check_reuse, type CheckRecords } from '#scripts/gate/check-reuse'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateStepResult } from '#scripts/gate/gate-report'
 import { gate_tree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
@@ -63,7 +63,7 @@ const PASSED = 'pre-detach checks passed'
 const UNPINNED = 'unpinned'
 const { METRICS_RERECORD_COMMAND } = metrics_totals
 const STATIC_CHECKS: ReadonlyArray<PreDetachCheck> = [
-	{ list: ['josh', 'exports:unused'], label: gate_plan.EXPORTS_LABEL },
+	{ list: ['josh', 'exports:unused'], label: gate_labels.EXPORTS_LABEL },
 	{ list: ['josh', 'cspell:dot'] },
 ]
 const GUARD_TEST_TARGETS: ReadonlyArray<string> = [
@@ -95,7 +95,7 @@ async function command_lists(directory: string): Promise<Array<PreDetachCheck>> 
 	const type_check = await type_check_step.resolve_type_check_args(directory)
 
 	return [
-		{ list: type_check, label: gate_plan.TYPE_CHECK_LABEL },
+		{ list: type_check, label: gate_labels.TYPE_CHECK_LABEL },
 		...STATIC_CHECKS,
 		...guard_tests(directory),
 	]

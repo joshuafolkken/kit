@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { document_checks } from '#scripts/document/document-checks'
 import { unused_members_check } from '#scripts/exports/unused-members-check'
-import { gate_plan } from '#scripts/gate/gate-plan'
+import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
@@ -118,7 +118,7 @@ async function read_since_green(
 
 	return await since_green.read_moved(
 		review_stamps.lint_related_stamp,
-		gate_plan.LINT_LABEL,
+		gate_labels.LINT_LABEL,
 		undefined,
 		before,
 	)
