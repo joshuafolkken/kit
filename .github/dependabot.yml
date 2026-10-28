@@ -22,7 +22,6 @@ updates:
     groups:
       publish-actions:
         patterns:
-          - 'actions/cache'
           - 'actions/checkout'
           - 'actions/download-artifact'
           - 'actions/setup-node'

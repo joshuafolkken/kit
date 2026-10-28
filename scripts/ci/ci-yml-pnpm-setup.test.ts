@@ -38,6 +38,7 @@ const COREPACK_ENABLE = 'corepack enable'
 const COREPACK_PREPARE = 'corepack prepare'
 const TROUBLESHOOTING_MD = 'docs/troubleshooting.md'
 const ACTION_STEPS = ci_yml_fixture.load_action(ci_yml_fixture.SETUP_PNPM_ACTION).runs.steps
+const CACHE_ACTION = 'actions/cache'
 // The jobs that prepare pnpm, all through the composite action: kit's own workflows, and the
 // distributed template, which calls the action `josh sync` writes beside it (joshuafolkken/kit#3095).
 const ACTION_CALLERS = [
@@ -129,13 +130,17 @@ describe('the setup-pnpm composite action', () => {
 	})
 
 	it('restores the pnpm store only when asked to', () => {
-		const store_steps = ACTION_STEPS.filter((step) => step.name?.includes('store'))
+		const setup = ACTION_STEPS.find((step) => is_pnpm_setup(step))
 
-		expect(store_steps).toHaveLength(2)
+		expect(setup?.with?.['cache']).toBe(`\${{ ${WHEN_INSTALLING} && inputs.cache == 'true' }}`)
+	})
 
-		for (const step of store_steps) {
-			expect(step.if).toBe(`${WHEN_INSTALLING} && inputs.cache == 'true'`)
-		}
+	// joshuafolkken/kit#5315: an actions/cache step restored the store only after pnpm/setup had
+	// downloaded the runtime into it, so the runtime was never restored.
+	it('leaves the store cache to pnpm/setup, which restores it before the runtime', () => {
+		const cache_steps = ACTION_STEPS.filter((step) => step.uses?.startsWith(CACHE_ACTION))
+
+		expect(cache_steps).toEqual([])
 	})
 })
 

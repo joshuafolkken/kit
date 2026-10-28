@@ -48,26 +48,19 @@ runs:
         test -n "$version"
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
+    # The store is cached by pnpm/setup itself, keyed on the lockfile and the requested runtime and
+    # restored before the runtime is installed. A separate actions/cache step restored the store
+    # only after pnpm/setup had installed the runtime, so the job's runtime came from the registry
+    # every run, and a download that crawled at 100 KB/s timed the job out at 10 minutes
+    # (joshuafolkken/kit#5315). Caching it in pnpm's store, rather than taking Node from setup-node's
+    # tool cache, keeps setup-node the one place the default Node version is written.
     - name: Setup pnpm
       uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
       with:
         version: ${{ steps.pnpm-version.outputs.version }}
         runtime: ${{ inputs.runtime }}
+        cache: ${{ inputs.install == 'true' && inputs.cache == 'true' }}
         install: false
-
-    - name: Resolve pnpm store path
-      if: inputs.install == 'true' && inputs.cache == 'true'
-      shell: bash
-      run: echo "PNPM_STORE_PATH=$(pnpm store path)" >> "$GITHUB_ENV"
-
-    - name: Setup pnpm store cache
-      if: inputs.install == 'true' && inputs.cache == 'true'
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ${{ env.PNPM_STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
 
     # The safe-chain release and the SHA-256 of that release's install-safe-chain.sh. The installer
     # puts the safe-chain binary under ~/.safe-chain/bin and adds it to PATH beside the shims;
