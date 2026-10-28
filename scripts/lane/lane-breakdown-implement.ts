@@ -1,23 +1,24 @@
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import type { LaneSpan } from './lane-net-time'
-import type { ToolCall } from './lane-transcript-calls'
+import type { Subagent, ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
 // The implementation stage of a lane's breakdown (joshuafolkken/kit#4995) split by what its tool calls
 // spent, read off the lane's transcripts: the main josh commands, the subagents, the reads and the rest
 // of Bash, and what no call spent — the edits and the thinking. A backgrounded call has no duration
 // (`lane-transcript-calls.ts`), so the wait on its result falls in the remainder; only its count shows.
+//
+// **The subagents split by the agent dispatched** — `subagent: investigator`, `subagent: reviewer`, …
+// — and a backgrounded subagent call still names its kind, at no time, with its count beside it
+// (joshuafolkken/kit#5297).
 
 const REMAINDER = 'editing & thinking'
 const OTHER_BASH = 'other bash'
 const BASH_TOOL = 'Bash'
-const SUBAGENT = 'subagent'
 const READ = 'read'
 
 const TOOL_KINDS: ReadonlyMap<string, string> = new Map([
-	['Agent', SUBAGENT],
-	['Task', SUBAGENT],
 	['Read', READ],
 	['Grep', READ],
 	['Glob', READ],
@@ -36,15 +37,22 @@ interface ImplementDetail {
 	kinds: ReadonlyArray<Stage>
 	// The calls backgrounded inside the implementation.
 	background: number
+	// Each subagent kind's backgrounded calls, counted at no time.
+	untimed: ReadonlyMap<string, number>
 }
 
 function command_kind(command: string): string {
 	return COMMAND_KINDS.find(([pattern]) => pattern.test(command))?.[1] ?? OTHER_BASH
 }
 
+function subagent_kind(subagent: Subagent): string {
+	return `subagent: ${subagent.type}`
+}
+
 // The kind a call counts under, `undefined` for one that falls in the remainder (an edit included).
 function kind_of(call: ToolCall): string | undefined {
 	if (call.tool === BASH_TOOL) return command_kind(call.command ?? '')
+	if (call.subagent !== undefined) return subagent_kind(call.subagent)
 
 	return TOOL_KINDS.get(call.tool ?? '')
 }
@@ -53,15 +61,29 @@ interface TimedPart extends Stage {
 	from_ms: number
 }
 
-// A call's own milliseconds, cut at the end of the span it started in.
+function is_untimed_subagent(call: ToolCall): boolean {
+	return call.background && call.subagent !== undefined
+}
+
+// A call's own milliseconds, cut at the end of the span it started in; a backgrounded subagent call's none.
 function timed_part(call: ToolCall, span: LaneSpan): ReadonlyArray<TimedPart> {
 	const name = kind_of(call)
 
-	if (name === undefined || call.duration_ms === undefined) return []
+	if (name === undefined) return []
 
-	const ms = Math.min(call.duration_ms, span.to_ms - call.started_ms)
+	const ms = Math.min(call.duration_ms ?? 0, span.to_ms - call.started_ms)
+	const is_counted = call.duration_ms !== undefined || is_untimed_subagent(call)
 
-	return [{ name, ms, from_ms: call.started_ms }]
+	return is_counted ? [{ name, ms, from_ms: call.started_ms }] : []
+}
+
+function untimed_of(placed: ReadonlyArray<readonly [ToolCall, LaneSpan]>): Map<string, number> {
+	const counts = new Map<string, number>()
+	const kinds = placed.filter(([call]) => is_untimed_subagent(call)).map(([call]) => kind_of(call))
+
+	for (const kind of kinds) if (kind !== undefined) counts.set(kind, (counts.get(kind) ?? 0) + 1)
+
+	return counts
 }
 
 // What neither a timed call nor a wait covers of the implementation's spans, each millisecond once.
@@ -100,6 +122,7 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 	return {
 		kinds: lane_breakdown.ranked([...parts, remainder]),
 		background: placed.filter(([call]) => call.background).length,
+		untimed: untimed_of(placed),
 	}
 }
 

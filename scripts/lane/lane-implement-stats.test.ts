@@ -25,6 +25,7 @@ function call(start: number, fields: Partial<ToolCall>): ToolCall {
 		tool: 'Bash',
 		background: false,
 		command: undefined,
+		subagent: undefined,
 		output: '',
 		...fields,
 	}
@@ -129,8 +130,24 @@ describe('lane_implement_stats.table', () => {
 		const other_lane = LANE_CALLS.map((entry) => ({ ...entry, lane: `${LANE}-other` }))
 		const table = lane_implement_stats.table([...LANE_CALLS, ...other_lane], WINDOW, NO_PAUSE)
 
-		expect(table).toContain('| implement sub-stage | lanes | median (min) | max (min) |')
+		expect(table).toContain(
+			'| implement sub-stage | lanes | median (min) | max (min) | backgrounded |',
+		)
 		expect(table.split('\n')).toHaveLength(lane_implement_stats.SUB_STAGES.length + 2)
-		expect(table).toMatch(/\| review-fix \| 2 \| 4(?:\.0)? \|/u)
+		expect(table).toMatch(/^\| review-fix \| 2 \| 4(?:\.0)? \| \S+ \| {2}\|$/mu)
+	})
+
+	// joshuafolkken/kit#5297: which delegation took the implement's subagent time was unreadable.
+	it('adds a row per subagent type after the sub-stages, over the lanes that dispatched it', () => {
+		const reviewer = { type: 'reviewer', model: 'opus' }
+		const calls = [
+			call(0, { tool: 'Agent', subagent: reviewer, duration_ms: 4 * MINUTE_MS }),
+			call(5, { tool: 'Agent', subagent: reviewer, background: true, duration_ms: undefined }),
+			call(6, { command: SHIP }),
+		]
+		const lines = lane_implement_stats.table(calls, WINDOW, NO_PAUSE).split('\n')
+
+		expect(lines).toHaveLength(lane_implement_stats.SUB_STAGES.length + 3)
+		expect(lines.at(-1)).toMatch(/^\| subagent: reviewer \| 1 \| 4(?:\.0)? \| 4(?:\.0)? \| 1 \|$/u)
 	})
 })
