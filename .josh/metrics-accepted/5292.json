@@ -1,0 +1,7 @@
+{
+	"reason": "#5292 stages test:pinned probes of wide-reach files through their direct importers (new test-pinned-stage.ts module plus its wiring)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 87
+	}
+}

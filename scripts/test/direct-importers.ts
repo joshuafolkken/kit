@@ -146,25 +146,33 @@ function is_every_test_import(root: string, argument: string): boolean {
 	return whole_suite_files.EVERY_TEST_IMPORTS.has(path.relative(root, path.resolve(argument)))
 }
 
-// For each of `files` every test imports, the test files importing it directly. A file no test imports
-// directly maps to none; any other file is left out, for vitest to walk its graph.
-async function every_test_importers(
+// For each of `files`, the test files in the work tree at `root` importing it directly; a file no test
+// imports directly maps to none.
+async function importers_of(
 	root: string,
 	files: ReadonlyArray<string>,
 ): Promise<Map<string, Array<string>>> {
-	const every = every_test_imports_of(files)
-
-	if (every.length === 0) return new Map()
+	if (files.length === 0) return new Map()
 
 	const tests = await test_files(root)
 	const reader = source_reader(root)
 
-	return new Map(every.map((file) => [file, importers_among(file, tests, reader)]))
+	return new Map(files.map((file) => [file, importers_among(file, tests, reader)]))
+}
+
+// `importers_of` for the `files` every test imports; any other file is left out, for vitest to walk
+// its graph.
+async function every_test_importers(
+	root: string,
+	files: ReadonlyArray<string>,
+): Promise<Map<string, Array<string>>> {
+	return await importers_of(root, every_test_imports_of(files))
 }
 
 const direct_importers = {
 	every_test_importers,
 	every_test_imports_of,
+	importers_of,
 	is_every_test_import,
 	module_key,
 	names_any,

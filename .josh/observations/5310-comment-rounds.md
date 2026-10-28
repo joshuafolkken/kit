@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/issue/issue-priority.ts:249 | 2026-10-28 | #5310
