@@ -18,6 +18,9 @@ import { build_package_manager_manifest } from './package-manager-manifest-fixtu
 // dual-declaration warning on every invocation. main() now aligns on every path.
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
+vi.mock('./development-engines-verdict', () => ({
+	development_engines_verdict: { report: vi.fn() },
+}))
 
 const mocked_execa_sync = vi.mocked(execaSync)
 const mocked_read_file_sync = vi.mocked(readFileSync)

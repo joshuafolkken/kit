@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { file_reader } from '#scripts/lib/read-file'
 import { overrides_snapshot_schema } from '#scripts/lib/schemas'
+import { development_engines_verdict } from '#scripts/version/development-engines-verdict'
 import { overrides_files } from './overrides-files'
 import { overrides_check, type OverridesDiff } from './overrides-logic'
 
@@ -71,6 +72,13 @@ function run_overrides_check(should_save: boolean): void {
 	console.info(`✔ overrides unchanged (${summary}).`)
 }
 
+// The `devEngines` verdict rides on every check, whatever the overrides answer, so it is printed
+// before the overrides comparison can exit.
+function run_check(should_save: boolean): void {
+	development_engines_verdict.report()
+	run_overrides_check(should_save)
+}
+
 // A line nobody can read is refused before the snapshot is read or written: a misspelled `--save` that
 // fell through would compare against the record the caller meant to replace.
 function refuse_usage(): never {
@@ -83,7 +91,7 @@ function main(argv: ReadonlyArray<string>): void {
 	const values = cli_flags.values_of(argv, OPTIONS)
 
 	if (values === undefined) refuse_usage()
-	run_overrides_check(values.save)
+	run_check(values.save)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main(process.argv.slice(ARGV_OFFSET))

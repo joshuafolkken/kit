@@ -53,6 +53,12 @@ function resolve_alignment_target(parsed: AlignmentManifest): string | undefined
 	return target
 }
 
+// The pin `devEngines.packageManager.version` should carry, read off a whole manifest — undefined
+// when it already carries it or there is nothing to align.
+function find_alignment_target(content: string): string | undefined {
+	return resolve_alignment_target(alignment_read_schema.parse(JSON.parse(content)))
+}
+
 // Surgically set `devEngines.packageManager.version` to `target`, preserving the
 // rest of the file byte-for-byte. Returns the content unchanged when there is no
 // `devEngines.packageManager` block to update.
@@ -85,8 +91,7 @@ function set_development_engines_version(content: string, target: string): strin
 // build metadata, which range checks ignore, so corepack and pnpm both still
 // resolve the pin as `11.18.0`.
 function align_development_engines_version(content: string): string {
-	const parsed = alignment_read_schema.parse(JSON.parse(content))
-	const target = resolve_alignment_target(parsed)
+	const target = find_alignment_target(content)
 	if (target === undefined) return content
 
 	return set_development_engines_version(content, target)
@@ -105,6 +110,7 @@ function upgrade_development_engines_on_fail(content: string): string {
 
 const package_manager_version = {
 	extract_pnpm_pin,
+	find_alignment_target,
 	align_development_engines_version,
 	set_development_engines_version,
 	upgrade_development_engines_on_fail,

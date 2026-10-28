@@ -34,16 +34,15 @@ over-bumped entry: restore it immediately, investigate, and report — never kee
 
 ## 3. `devEngines` — the one expected change
 
-**Exception — the `josh latest` lockstep pnpm bump is expected, NOT a violation.** **KEEP** a
-`devEngines.packageManager.version` change **if and only if** it equals everything after `pnpm@` in
-the new `packageManager` pin — **byte-identical, `+sha512…` Corepack integrity suffix included**
-(`scripts/version/latest-corepack.ts` → `sync_development_engines`). Reverting it would re-introduce
-the mismatch.
+**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first, and
+`josh latest` prints it after its pnpm bump — `HEAD`'s `package.json` against the working tree
+(`scripts/version/development-engines-verdict.ts`). Quote it:
 
-**Restore + ask** when `devEngines` changed any other way: the version no longer matches
-`packageManager` (a dropped or truncated suffix counts), its structure changed (`name` / `onFail` /
-fields), or something other than `josh latest` touched it. One structural change is expected and
-kept: `josh sync` moving `devEngines.packageManager.onFail` from `"error"` to `"download"`.
+- `devEngines: unchanged` / `devEngines: kept` — keep. `kept` is the lockstep pnpm bump (the version
+  byte-identical to the `packageManager` pin, `+sha512…` suffix included) or `josh sync` moving
+  `onFail` from `"error"` to `"download"`.
+- `devEngines: restore (<reason>)` — restore + ask. Also restore when something other than
+  `josh latest` / `josh sync` touched it.
 
 ## 4. When the bump breaks something — fix forward
 

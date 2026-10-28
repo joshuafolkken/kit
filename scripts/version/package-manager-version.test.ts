@@ -112,3 +112,17 @@ describe('package_manager_version.align_development_engines_version — no-ops',
 		expect(align(without_development_engines)).toBe(without_development_engines)
 	})
 })
+
+describe('package_manager_version.find_alignment_target', () => {
+	it('returns the whole pin when devEngines carries another version', () => {
+		expect(
+			package_manager_version.find_alignment_target(build_manifest(PM_PIN, BARE_VERSION)),
+		).toBe(HASHED_VERSION)
+	})
+
+	it('returns undefined when devEngines already carries the pin', () => {
+		expect(
+			package_manager_version.find_alignment_target(build_manifest(PM_PIN, HASHED_VERSION)),
+		).toBeUndefined()
+	})
+})
