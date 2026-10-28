@@ -100,8 +100,9 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	// The commit the tree below is a diff against, so the snapshot can be refused when it was taken
 	// against a different one — and the resolved commit rather than `git_command.change_base`, whose
-	// fallback is a ref name that moves and would compare equal to itself.
-	const base = await change_base.resolved()
+	// fallback is a ref name that moves and would compare equal to itself. Read through a merge in
+	// progress, as the changed tree below is.
+	const base = await change_base.resolved_through_merge()
 	// No paths argument: `read_changed_tree` reads them itself, from the one definition of "changed"
 	// `josh review:level` and `josh review:brief` all decide from. Passing our own reading would be a
 	// second definition, which is the drift that module exists to prevent.
