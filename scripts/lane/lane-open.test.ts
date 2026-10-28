@@ -15,8 +15,6 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_paths } from './lane-paths'
 import type { LaneInfo, lane_registry as LaneRegistryModule } from './lane-registry'
 
-type LaneRegistry = typeof LaneRegistryModule
-
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
 // project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
 // the assertions are about what this module asks git for and what it writes beside it, not about git
@@ -43,6 +41,8 @@ vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
 vi.mock('./lane-registry', async (import_original) => {
+	type LaneRegistry = typeof LaneRegistryModule
+
 	const { lane_registry: actual } = await import_original<{ lane_registry: LaneRegistry }>()
 
 	return {

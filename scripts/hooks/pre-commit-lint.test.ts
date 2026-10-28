@@ -26,8 +26,6 @@ const { eslint_cache_dependencies } = await import('#scripts/lint/eslint-cache-d
 const mocked_guard = vi.mocked(eslint_cache_dependencies.guard)
 const { pre_commit_lint } = await import('./pre-commit-lint')
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const STAGED = ['src/a.ts', 'docs/b.md']
 
 function built(tool: string): ReadonlyArray<string> {
@@ -84,6 +82,8 @@ describe('pre_commit_lint.build_arguments', () => {
 
 describe('pre_commit_lint.run', () => {
 	it('returns the tool exit code', async () => {
+		type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
+
 		mocked_execa.mockResolvedValueOnce({ exitCode: 1 } as unknown as ExecaResult)
 
 		expect(await pre_commit_lint.run(['prettier', ...STAGED])).toBe(1)

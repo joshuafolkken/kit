@@ -324,9 +324,10 @@ function scored_kind(findings: ReadonlyArray<Finding>): ScoredVerdict['kind'] {
 }
 
 // Absent means the reviewer never finished; a line outside the grammar means its verdict cannot be
-// recorded — both stop the ship rather than read as clean. The specs are recorded without the `fixed`
-// mark: a fixed finding was still a finding of that round. The report keeps each line whole — mark and
-// description — for the stage output a resumed lane child reads.
+// recorded — both stop the ship rather than read as clean. A fixed finding is recorded with its
+// `fixed` mark, the disposition `review:record` keeps in the ledger and `review:round2` reads round 1's
+// closure from (joshuafolkken/kit#5286). The report keeps each line whole — mark and description — for
+// the stage output a resumed lane child reads.
 function read_verdict(text: string | undefined): ReviewVerdict {
 	if (text === undefined) return { kind: VERDICT.INVALID, note: MISSING_NOTE }
 
@@ -339,9 +340,21 @@ function read_verdict(text: string | undefined): ReviewVerdict {
 
 	return {
 		kind: scored_kind(findings),
-		specs: findings.map((finding) => finding.spec),
+		specs: findings.map((finding) =>
+			finding.is_fixed ? `${FIXED_PREFIX}${finding.spec}` : finding.spec,
+		),
 		report: findings.map((finding) => finding.line),
 	}
+}
+
+// The specs `review:record` is given: a stopped round's `fixed` marks are dropped, since a fix the scoped
+// pair turned down, or one beside a finding still blocking, has not closed what it marks.
+function recorded_specs(verdict: ScoredVerdict, outcome: RoundOutcome): ReadonlyArray<string> {
+	if (outcome.is_passing) return verdict.specs
+
+	return verdict.specs.map((spec) =>
+		spec.startsWith(FIXED_PREFIX) ? spec.slice(FIXED_PREFIX.length) : spec,
+	)
 }
 
 // Round 1 passes clean or with every blocking finding fixed in place; round 2 follows the commit.
@@ -388,6 +401,7 @@ const run_ship_review = {
 	is_clean_round_one,
 	passing_fixes,
 	read_verdict,
+	recorded_specs,
 	report_prompt,
 	reviewer_prompt,
 	round_one_opening,

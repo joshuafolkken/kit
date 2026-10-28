@@ -18,8 +18,6 @@ const { eslint_daemon } = await import('./eslint-daemon')
 // linted, so a shell edit to it — one the edit hook never sees — has to restart the daemon, and an edit
 // the hook linted must not.
 
-type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
-
 const CLI = '/kit/node_modules/eslint_d/bin/eslint_d.js'
 const IMPORTER = 'src/importer.ts'
 const IMPORTED = 'src/imported.ts'
@@ -133,6 +131,8 @@ describe('eslint_daemon — the edit hook refreshing the fingerprint', () => {
 	})
 
 	it('stops the daemon before linting the importer after an edit the hook never saw', async () => {
+		type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
+
 		current_checkout()
 		write_file(IMPORTED, EXPORTS_AFTER)
 		mocked_execa.mockResolvedValue({ exitCode: 0, stdout: '', all: '' } as unknown as ExecaResult)

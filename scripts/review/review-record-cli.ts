@@ -43,8 +43,10 @@ import { review_stop_log } from './review-stop-log'
 
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh review:record --issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | josh review:record --check [--interaction] --issue <N>'
+	'Usage: josh review:record --issue <N> [--comment | --interaction] [[<disposition> ]<category>:<severity>:<file>[ — <reason>] ...] | josh review:record --check [--interaction] --issue <N>'
 const FILE_HINT = '  <file>: the cited path, optionally with :line'
+const DISPOSITION_HINT =
+	'  <disposition>: optional — fixed | false-positive | filed:#<M> | deferred:#<M>; josh review:round2 skips only when every High/Medium is fixed or false-positive'
 const REASON_HINT =
 	'  <reason>: optional, one sentence on what was wrong, kept for the lane’s next review and fix — pass each finding with its reason as one single-quoted argument'
 const RECORD_STAGE = 'review:record'
@@ -113,15 +115,31 @@ function parse_finding(spec: string): Finding | undefined {
 	return to_finding(spec.slice(0, first), spec.slice(first + 1, second), spec.slice(second + 1))
 }
 
-function parse_findings(specs: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
+interface Positional {
+	finding: Finding
+	description: string
+}
+
+// A positional is `[<disposition> ]<spec>[ — <reason>]`; the disposition rides into the ledger line.
+function parse_positional(positional: string): Positional | undefined {
+	const { spec: marked, description } = review_finding_text.split_description(positional)
+	const { disposition, spec } = review_finding_ledger.split_disposition(marked)
+	const finding = parse_finding(spec)
+
+	if (finding === undefined) return undefined
+
+	return { finding: disposition === undefined ? finding : { ...finding, disposition }, description }
+}
+
+function parse_findings(positionals: ReadonlyArray<string>): ReadonlyArray<Finding> | undefined {
 	const findings: Array<Finding> = []
 
-	for (const spec of specs) {
-		const finding = parse_finding(review_finding_text.split_description(spec).spec)
+	for (const positional of positionals) {
+		const parsed = parse_positional(positional)
 
-		if (finding === undefined) return undefined
+		if (parsed === undefined) return undefined
 
-		findings.push(finding)
+		findings.push(parsed.finding)
 	}
 
 	return findings
@@ -163,6 +181,7 @@ function usage_text(): string {
 		accepted_values('<category>', review_finding_ledger.CATEGORIES),
 		accepted_values('<severity>', review_finding_ledger.SEVERITIES),
 		FILE_HINT,
+		DISPOSITION_HINT,
 		REASON_HINT,
 	].join('\n')
 }
@@ -331,10 +350,11 @@ async function write_round(
 
 // The stop-log finding a positional carries, or `undefined` for one written without a reason.
 function reason_of(positional: string): StopFinding | undefined {
-	const { spec, description } = review_finding_text.split_description(positional)
-	const finding = parse_finding(spec)
+	const parsed = parse_positional(positional)
 
-	if (finding === undefined || description.length === 0) return undefined
+	if (parsed === undefined || parsed.description.length === 0) return undefined
+
+	const { finding, description } = parsed
 
 	return {
 		kind: `${finding.category}:${finding.severity}`,
@@ -398,6 +418,7 @@ const review_record_cli = {
 	accepted_values,
 	build_lines,
 	parse_finding,
+	parse_positional,
 	run,
 	usage_text,
 }
