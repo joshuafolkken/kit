@@ -1318,6 +1318,8 @@ pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
 
 It prints the total, the merged pull requests and the cost per merge (omitted when GitHub cannot be read), then one table each by session kind, tool category and guard. A row that grew past `REGRESSION_THRESHOLD` (`tools/cost-audit/cost-audit.ts`) is marked `regression`, and the closing line lists them. `josh retrospective` carries its one-line summary.
 
+Under the cost per merge, `lane-child density` gives the lane children's tool calls per request and their share of single-call requests, beside the period before.
+
 It exits `0` on a report, and `1` with the usage on a bad `--period`.
 
 ### `josh eval`

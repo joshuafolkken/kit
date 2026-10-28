@@ -1,0 +1,8 @@
+{
+	"reason": "kit#5342 adds the lane-child search-chain refusal (time-search-call leaf, search-batching row, investigation step-aside) and the cost:audit lane density line, with its rationale paragraph",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 157,
+		"prose.long_paragraphs": 1
+	}
+}

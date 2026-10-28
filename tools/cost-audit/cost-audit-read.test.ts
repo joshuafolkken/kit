@@ -28,6 +28,12 @@ describe('cost_audit_read.session_of — one transcript read into a session', ()
 		expect(read.categories.get('r1')).toStrictEqual(['code search', 'edit'])
 		expect(read.categories.has('r2')).toBe(false)
 	})
+
+	// The lane-child density line reads only sessions marked here (kit#5342).
+	it('marks a session read from a lane transcript as a lane child', () => {
+		expect(read.is_lane).toBe(false)
+		expect(cost_audit_read.session_of(text, false, true).is_lane).toBe(true)
+	})
 })
 
 describe('cost_audit_read.dedupe_across — a request is counted once across sessions', () => {

@@ -6,9 +6,12 @@ function row(key: string, current: number, previous: number, is_regression = fal
 	return { key, current, previous, is_regression }
 }
 
+const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
+
 function audit_with(overrides: Partial<Audit> = {}): Audit {
 	return {
 		days: 7,
+		lane_density: { current: NO_DENSITY, previous: NO_DENSITY },
 		total: row('total', 12, 10),
 		merges: undefined,
 		per_merge: undefined,
@@ -19,7 +22,26 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 	}
 }
 
-describe('cost_audit_format.report_lines — the printed report', () => {
+describe('cost_audit_format.report_lines — the lane-child density line', () => {
+	it('prints the lane children calls per request and single-call share beside the previous period', () => {
+		const lane_density = {
+			current: { requests: 4, calls: 8, single: 1 },
+			previous: { requests: 100, calls: 145, single: 79 },
+		}
+
+		expect(cost_audit_format.report_lines(audit_with({ lane_density }))).toContain(
+			'  lane-child density: 2.00 calls/request, 25.0% single-call (prev 1.45 calls/request, 79.0% single-call)',
+		)
+	})
+
+	it('prints a zero density, not a division by zero, where no lane child called a tool', () => {
+		expect(cost_audit_format.report_lines(audit_with())).toContain(
+			'  lane-child density: 0.00 calls/request, 0.0% single-call (prev 0.00 calls/request, 0.0% single-call)',
+		)
+	})
+})
+
+describe('cost_audit_format.report_lines — the cost rows', () => {
 	it('prints each row with its change against the previous period', () => {
 		const lines = cost_audit_format.report_lines(audit_with({ kinds: [row('fullrun', 9, 12)] }))
 
