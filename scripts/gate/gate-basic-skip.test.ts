@@ -1,6 +1,7 @@
 import { buffered_process } from '#scripts/lib/buffered-process'
 import { test_unit_guard } from '#scripts/test/test-unit-guard'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { gate_labels } from './gate-labels'
 import { gate_plan } from './gate-plan'
 import { project_checks } from './project-checks'
 import { verification_gate } from './verification-gate'
@@ -41,7 +42,9 @@ describe('basic gate execution', () => {
 describe('basic gate checks with no target', () => {
 	it('marks the default type-check step as skipped for a basic project', async () => {
 		const reason = vi.spyOn(project_checks, 'type_check_skip_reason').mockReturnValue(NO_TYPE_FILES)
-		const check = gate_plan.GATE_CHECKS.find((entry) => entry.label === gate_plan.TYPE_CHECK_LABEL)
+		const check = gate_plan.GATE_CHECKS.find(
+			(entry) => entry.label === gate_labels.TYPE_CHECK_LABEL,
+		)
 		if (check === undefined) throw new Error('The gate has no type-check step')
 
 		const step = await verification_gate.build_gate_step(check, '/project')

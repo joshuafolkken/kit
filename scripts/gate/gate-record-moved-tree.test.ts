@@ -1,7 +1,7 @@
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import { gate_test_fixture } from './gate-test-fixture'
 import { verification_gate, type GateStepResult } from './verification-gate'
 
@@ -32,9 +32,9 @@ function green(label: string): GateStepResult {
 }
 
 const GREEN_GATE: ReadonlyArray<GateStepResult> = [
-	green(gate_plan.LINT_LABEL),
-	green(gate_plan.METRICS_LABEL),
-	green(gate_plan.UNIT_LABEL),
+	green(gate_labels.LINT_LABEL),
+	green(gate_labels.METRICS_LABEL),
+	green(gate_labels.UNIT_LABEL),
 ]
 
 async function record_after(after: Record<string, string>): Promise<void> {

@@ -5,7 +5,7 @@ import { git_spawn } from '#scripts/git/git-spawn'
 import { review_tree } from '#scripts/review/review-tree'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_reuse, type CheckRecords } from './check-reuse'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import type { GateTree } from './gate-tree'
 
@@ -16,7 +16,7 @@ import type { GateTree } from './gate-tree'
 const scratch = mkdtempSync(path.join(tmpdir(), 'check-reuse-test-'))
 const read_git = vi.spyOn(git_spawn, 'read')
 const read_tree = vi.spyOn(review_tree, 'read_changed_tree')
-const { LINT_LABEL, TYPE_CHECK_LABEL } = gate_plan
+const { LINT_LABEL, TYPE_CHECK_LABEL } = gate_labels
 const CSPELL = 'cspell'
 const LABELS = [LINT_LABEL, TYPE_CHECK_LABEL, CSPELL]
 const SOURCE = 'scripts/a.ts'

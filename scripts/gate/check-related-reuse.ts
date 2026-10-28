@@ -1,6 +1,6 @@
 import type { CheckResult } from './check-related'
 import { check_reuse, type CheckRecords } from './check-reuse'
-import { gate_plan } from './gate-plan'
+import { gate_labels } from './gate-labels'
 import type { GateStepResult } from './gate-report'
 import { gate_tree, type GateTree } from './gate-tree'
 import { scoped_green } from './scoped-green'
@@ -13,8 +13,8 @@ import { scoped_green } from './scoped-green'
 // failed check writes no record, so it runs again.
 
 const GATE_LABELS: ReadonlyMap<string, string> = new Map([
-	[gate_plan.TYPE_CHECK_TARGET, gate_plan.TYPE_CHECK_LABEL],
-	[gate_plan.SPELL_CHECK_TARGET, gate_plan.SPELL_CHECK_LABEL],
+	[gate_labels.TYPE_CHECK_TARGET, gate_labels.TYPE_CHECK_LABEL],
+	[gate_labels.SPELL_CHECK_TARGET, gate_labels.SPELL_CHECK_LABEL],
 ])
 
 const UNREAD_TREE: GateTree = { files: {}, base: undefined }

@@ -75,7 +75,7 @@ const DELEGATABLE_STEPS: ReadonlyArray<DelegatableStep> = [
 		// chain at a small context, and the review round cap already composed the finding text, so what
 		// the unit is handed is mechanical: run the commands and act on their deterministic answers. This
 		// is not the batching guard's business — delegation only moves the chain to a cheaper context.
-		does: 'run the late-run follow-up filing chain in an isolated unit — issue:file (scout, lint, labels, epic:bundle), then epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
+		does: 'run the late-run follow-up filing chain in an isolated unit — issue:file (lint, labels, scout, epic:bundle), then epic --add — given the finding text the parent already composed, and return the new Issue number and the epic:bundle answer',
 		verifier:
 			"the parent reads the filed Issue from GitHub with `pnpm josh issue:state <new>`, not the unit's summary; a follow-up reported filed but not created is still absent, the way `epic-child`'s reported-done-but-not-merged child is still open. The finding text came from the parent and `issue:file`'s steps are deterministic, so the unit's work is the mechanical execution `issue:state` confirms",
 	},

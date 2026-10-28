@@ -2,10 +2,11 @@ import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { describe, expect, it } from 'vitest'
 import { core_budget } from './core-budget'
+import { gate_labels } from './gate-labels'
 import { gate_plan, type GateCheck } from './gate-plan'
 
 function unit_check(): GateCheck {
-	const unit = gate_plan.GATE_CHECKS.find((check) => check.label === gate_plan.UNIT_LABEL)
+	const unit = gate_plan.GATE_CHECKS.find((check) => check.label === gate_labels.UNIT_LABEL)
 	if (!unit) throw new Error('unit check missing from GATE_CHECKS')
 
 	return unit
@@ -109,8 +110,8 @@ describe('gate_plan.resolve_concurrency — lightest first', () => {
 
 		expect(ordered.map((check) => check.label).slice(-ALL_RESERVING)).toEqual([
 			'cspell',
-			gate_plan.LINT_LABEL,
-			gate_plan.TYPE_CHECK_LABEL,
+			gate_labels.LINT_LABEL,
+			gate_labels.TYPE_CHECK_LABEL,
 		])
 	})
 })
@@ -398,7 +399,7 @@ describe('gate_plan the checks a gate runs', () => {
 
 	// joshuafolkken/kit#4085: the lint reads the branch's changed files, not the whole tree.
 	it('lints the changed files', () => {
-		const lint = gate_plan.GATE_CHECKS.find((check) => check.label === gate_plan.LINT_LABEL)
+		const lint = gate_plan.GATE_CHECKS.find((check) => check.label === gate_labels.LINT_LABEL)
 
 		expect(lint?.args).toStrictEqual(['--changed'])
 	})

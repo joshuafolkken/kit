@@ -136,7 +136,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:file': {
 		script: 'scripts/issue/issue-file-cli.ts',
 		description:
-			'File an Issue with every filing step: filing cap, fold, then lint, Origin, start condition, auto-ok label, WIP cap and duplicate scout in one pass, labels, then epic:bundle',
+			'File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
 			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',

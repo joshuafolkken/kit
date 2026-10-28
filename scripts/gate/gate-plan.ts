@@ -2,6 +2,7 @@ import { availableParallelism } from 'node:os'
 import { josh_verdict } from '#scripts/josh/josh-verdict'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { core_weights } from './core-weights'
+import { gate_labels } from './gate-labels'
 
 // How many of the gate's checks run at once, and how wide the one elastic check may fan out —
 // both derived from the machine rather than fixed at four.
@@ -46,29 +47,20 @@ interface GateCheck {
 	is_kit_only?: boolean
 }
 
-const LINT_LABEL = 'lint'
-const TYPE_CHECK_LABEL = 'check'
-// The `josh` command the gate's type check runs, shared with `check:related` so the scoped check runs the same one.
-const TYPE_CHECK_TARGET = 'check'
-const SPELL_CHECK_LABEL = 'cspell'
-const SPELL_CHECK_TARGET = 'cspell:dot'
-const UNIT_LABEL = 'test:unit'
-const UNIT_TARGET = 'test:related'
-// **The gate's unit leg runs the whole suite for a changed file every test imports**
-// (joshuafolkken/kit#5122), which every other `josh test:related` narrows to its direct importers.
-const KEEP_WHOLE_SUITE_FLAG = '--keep-whole-suite'
-const BEHAVIOR_LABEL = 'behavior'
-const METRICS_LABEL = 'metrics'
-const EXPORTS_LABEL = 'exports'
-const LOCKFILE_LABEL = 'lockfile'
-
-// The checks whose warnings must survive the green record: eslint (the `lint` step) and svelte-check
-// (the `check` step) both exit 0 while reporting per-tree warnings a developer needs to see again, so
-// reusing a record taken from such a run would hide them. Every other step's
-// warning-shaped output — a Vite config deprecation printed by `test:unit`, say — is not a per-tree
-// finding and repeats every run, so it must not withhold the record. `has_checker_warning` narrows
-// the withholding path down to these.
-const WARNING_CHECKER_LABELS: ReadonlyArray<string> = [LINT_LABEL, TYPE_CHECK_LABEL]
+const {
+	BEHAVIOR_LABEL,
+	EXPORTS_LABEL,
+	KEEP_WHOLE_SUITE_FLAG,
+	LINT_LABEL,
+	LOCKFILE_LABEL,
+	METRICS_LABEL,
+	SPELL_CHECK_LABEL,
+	SPELL_CHECK_TARGET,
+	TYPE_CHECK_LABEL,
+	TYPE_CHECK_TARGET,
+	UNIT_LABEL,
+	UNIT_TARGET,
+} = gate_labels
 
 // The checks that do not fan out across every core, in the order their output is printed. They are
 // named apart from the unit suite because CI runs them on their own runner:
@@ -523,25 +515,12 @@ function format_gate_plan(
 }
 
 const gate_plan = {
-	BEHAVIOR_LABEL,
 	DIRECT_UNIT_CLAIM,
-	EXPORTS_LABEL,
 	FILES_PER_WORKER,
 	GATE_CHECKS,
-	KEEP_WHOLE_SUITE_FLAG,
-	LINT_LABEL,
-	LOCKFILE_LABEL,
 	MEASURED_CORES,
-	METRICS_LABEL,
 	RESERVED_CORES,
-	SPELL_CHECK_LABEL,
-	SPELL_CHECK_TARGET,
 	STATIC_CHECKS,
-	TYPE_CHECK_LABEL,
-	TYPE_CHECK_TARGET,
-	UNIT_LABEL,
-	UNIT_TARGET,
-	WARNING_CHECKER_LABELS,
 	check_memory,
 	check_weight,
 	direct_unit_weight,
