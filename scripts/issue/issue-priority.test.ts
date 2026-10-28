@@ -12,6 +12,8 @@ const URGENT_REDUCTION = '- 優先度: 緊急（短縮 10%）'
 const PARK_PREFIX = '- 原因の park:'
 const MALFORMED_LANE = '- 原因のレーン: 64 分（4695）'
 const DECLARATION_REFUSAL = 'declare at most one priority'
+const LAST_LINE = '- 実施順: 最後'
+const NORMAL_DECLARATION = '- 優先度: 通常'
 
 function body(declaration: string, extra = ''): string {
 	return `## 背景\n\n- 種別: 非不具合\n${extra}${declaration}\n\n## 期待効果\n\n`
@@ -37,7 +39,7 @@ describe('issue_priority.declared_level', () => {
 	it.each([
 		['- 優先度: 緊急（条件 1）', 'critical'],
 		['- 優先度: 高（持ち主の期限）', 'high'],
-		['- 優先度: 通常', 'normal'],
+		[NORMAL_DECLARATION, 'normal'],
 		['', 'normal'],
 	])('reads %j as %s', (declaration, level) => {
 		expect(issue_priority.declared_level(body(declaration))).toBe(level)
@@ -113,6 +115,48 @@ describe('issue_priority.problem', () => {
 
 	it('does not judge the body when a priority label was typed', () => {
 		expect(issue_priority.problem(body('- 優先度: 高'), [PRIORITY_CRITICAL_LABEL])).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5310: a body that queues itself last, and the refusal when it also raises itself.
+describe('issue_priority.is_last', () => {
+	it.each([
+		[LAST_LINE, true],
+		['- 実施順: 最初', false],
+		['', false],
+	])('reads %j as run last: %s', (declaration, expected) => {
+		expect(issue_priority.is_last(body(declaration))).toBe(expected)
+	})
+
+	it('reads no declaration outside the background section', () => {
+		expect(issue_priority.is_last(`${body('')}${LAST_LINE}\n`)).toBe(false)
+	})
+})
+
+describe('issue_priority.order_problem', () => {
+	it.each([[URGENT_CONDITION_2], [HIGH_WITH_DEADLINE]])('refuses last beside %j', (declaration) => {
+		expect(issue_priority.order_problem(body(declaration, `${LAST_LINE}\n`))).toContain(LAST_LINE)
+	})
+
+	it.each([
+		['- セキュリティ: gate の迂回\n'],
+		[`${PARK_PREFIX} #4695\n`],
+		['- 原因の損失: 32 分\n'],
+	])('refuses last beside the high floor %j sets', (floor_line) => {
+		expect(issue_priority.order_problem(body('', `${floor_line}${LAST_LINE}\n`))).toContain(
+			LAST_LINE,
+		)
+	})
+
+	it('refuses last beside a typed priority label, and not a typed one alone', () => {
+		expect(issue_priority.problem(body(LAST_LINE), [PRIORITY_HIGH_LABEL])).toContain(LAST_LINE)
+		expect(issue_priority.problem(body(''), [PRIORITY_HIGH_LABEL])).toBeUndefined()
+	})
+
+	it('accepts last alone and beside a normal declaration', () => {
+		expect(issue_priority.order_problem(body(LAST_LINE))).toBeUndefined()
+		expect(issue_priority.problem(body(LAST_LINE), [])).toBeUndefined()
+		expect(issue_priority.order_problem(body(NORMAL_DECLARATION, `${LAST_LINE}\n`))).toBeUndefined()
 	})
 })
 

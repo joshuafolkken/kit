@@ -37,4 +37,11 @@ describe('epic_rank.rank', () => {
 
 		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([3, 1, 2])
 	})
+
+	// joshuafolkken/kit#5310: the body's run-last declaration reaches the ranking.
+	it('puts the child that declares it runs last behind undeclared ones', () => {
+		const children = [child(1, '## 背景\n\n- 実施順: 最後\n'), child(2), child(3)]
+
+		expect(epic_rank.rank(children, children).map((entry) => entry.number)).toStrictEqual([2, 3, 1])
+	})
 })

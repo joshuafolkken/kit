@@ -777,7 +777,7 @@ pnpm josh backlog:plan --waves          # the run order, wave by wave
 
 <!-- /usage -->
 
-It uses `backlog:next`'s own classification, kept separate because that command's stdout is bare tokens a loop branches on.
+It uses `backlog:next`'s own classification, kept separate because that command's stdout is bare tokens a loop branches on. A wave holds at most the lane limit's standalone issues, not `backlog:next`'s five, and none is cut when the limit cannot be read; the header says which.
 
 ```text
 Wave 1  #2770 [run:solo]
