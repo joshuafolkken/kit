@@ -1,0 +1,9 @@
+{
+	"reason": "#5310 adds the run-last declaration: one rank key, its reader and lint refusal, and one template row",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 26,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 611
+	}
+}

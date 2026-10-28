@@ -17,7 +17,11 @@ interface Row extends RankRow {
 }
 
 function row(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
-	return { name, labels, lost_minutes: 0, gain_minutes: 0, dependents }
+	return { name, is_last: false, labels, lost_minutes: 0, gain_minutes: 0, dependents }
+}
+
+function last(name: string, labels: ReadonlyArray<string> = [], dependents = 0): Row {
+	return { ...row(name, labels, dependents), is_last: true }
 }
 
 function lost(name: string, lost_minutes: number, labels: ReadonlyArray<string> = []): Row {
@@ -181,6 +185,37 @@ describe('issue_rank.rank weekly gain', () => {
 		const rows = [gained(BIG_SAVER, BIG_GAIN_MINUTES), row(URGENT, [PRIORITY_HIGH_LABEL])]
 
 		expect(names_of(rows)).toStrictEqual([URGENT, BIG_SAVER])
+	})
+})
+
+// joshuafolkken/kit#5310: an issue declared to run last follows every undeclared one, whatever its
+// other keys, and declared ones rank among themselves by those keys.
+describe('issue_rank.rank declared last', () => {
+	const UPGRADE = 'upgrade'
+	const UPGRADE_URGENT = 'upgrade-urgent'
+	const UPGRADE_WAITED_ON = 'upgrade-waited-on'
+
+	it('puts a declared issue behind every undeclared one', () => {
+		const rows = [last(UPGRADE, [], MANY), row(PLAIN), gained('saver', 1), row(PLAIN_SECOND)]
+
+		expect(names_of(rows)).toStrictEqual(['saver', PLAIN, PLAIN_SECOND, UPGRADE])
+	})
+
+	it('puts a declared priority:high issue behind an undeclared plain one', () => {
+		expect(names_of([last(UPGRADE_URGENT, [PRIORITY_HIGH_LABEL]), row(PLAIN)])).toStrictEqual([
+			PLAIN,
+			UPGRADE_URGENT,
+		])
+	})
+
+	it('orders declared issues among themselves by the existing keys', () => {
+		const rows = [
+			last(UPGRADE),
+			last(UPGRADE_WAITED_ON, [], MANY),
+			last(UPGRADE_URGENT, [PRIORITY_HIGH_LABEL]),
+		]
+
+		expect(names_of(rows)).toStrictEqual([UPGRADE_URGENT, UPGRADE_WAITED_ON, UPGRADE])
 	})
 })
 

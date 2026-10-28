@@ -45,7 +45,11 @@ const LOSS_HIGH_MINUTES = 30
 const SECURITY_PREFIX = '- セキュリティ:'
 const PARK_PREFIX = '- 原因の park:'
 const PARK_LINE = /^- 原因の park: #[1-9]\d*$/u
+// Queues the Issue behind every undeclared one of its pool (joshuafolkken/kit#5310).
+const ORDER_PREFIX = '- 実施順:'
+const LAST_LINE = '- 実施順: 最後'
 const LEVELS: ReadonlyArray<PriorityLevel> = ['normal', 'high', 'critical']
+const RAISED_LEVELS: ReadonlySet<PriorityLevel> = new Set(['high', 'critical'])
 const LABELS: Readonly<Record<PriorityLevel, string | undefined>> = {
 	critical: PRIORITY_CRITICAL_LABEL,
 	high: PRIORITY_HIGH_LABEL,
@@ -60,6 +64,8 @@ const CAUSE_PROBLEM = `state a cause's lost minutes under \`${BACKGROUND_HEADING
 const SECURITY_PROBLEM = `state a security finding under \`${BACKGROUND_HEADING}\` as \`${SECURITY_PREFIX} <迂回される gate・ガード・権限>\` (\`issue-template.md\`)`
 
 const PARK_PROBLEM = `state a caused park under \`${BACKGROUND_HEADING}\` as \`${PARK_PREFIX} #<N>\` — the Issue the defect parked or whose run it stopped (\`issue-template.md\`)`
+
+const LAST_PROBLEM = `\`${LAST_LINE}\` queues this Issue last, and an urgent or high priority runs it first — keep one of the two (\`issue-template.md\`)`
 
 const HIGH_DECLARATION = '高（セキュリティ … / 原因の park … / 原因の損失 …）'
 
@@ -224,9 +230,23 @@ function floor_problem(body: string, level: PriorityLevel): string | undefined {
 	return `${floor_reason(body)} ranks this Issue \`${floor}\`, above its declared \`${level}\` — declare \`- 優先度: ${HIGH_DECLARATION}\`, or drop the declaration to file at the floor (\`issue-template.md\`)`
 }
 
-// Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list.
+// Whether the body declares `LAST_LINE`; any other value is no declaration.
+function is_last(body = ''): boolean {
+	return background_lines(body, ORDER_PREFIX).includes(LAST_LINE)
+}
+
+// The refusal for a body that queues itself last and is filed urgent or high as well, by its
+// declaration or its floor, or `undefined`. `josh issue:lint` reads it, so `josh issue:file` does too.
+function order_problem(body: string): string | undefined {
+	return is_last(body) && RAISED_LEVELS.has(filed_level(body) ?? 'normal')
+		? LAST_PROBLEM
+		: undefined
+}
+
+// Why the filing is refused for its priority, or `undefined`. `typed` is the `--label` list; a typed
+// label is refused only beside a run-last line, as the body's own raise is `order_problem`'s.
 function problem(body: string, typed: ReadonlyArray<string>): string | undefined {
-	if (is_typed(typed)) return undefined
+	if (is_typed(typed)) return is_last(body) ? LAST_PROBLEM : undefined
 	const level = filed_level(body)
 
 	if (level === undefined) return DECLARATION_PROBLEM
@@ -249,9 +269,11 @@ const issue_priority = {
 	LOSS_HIGH_MINUTES,
 	declared_level,
 	floor_of,
+	is_last,
 	is_typed,
 	lane_minutes,
 	lost_minutes,
+	order_problem,
 	problem,
 	with_label,
 }
