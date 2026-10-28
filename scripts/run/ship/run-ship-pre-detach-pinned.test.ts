@@ -36,7 +36,13 @@ vi.mock('#scripts/test/test-pinned', () => ({ test_pinned: { held_report: held_m
 vi.mock('#scripts/run/review/run-review-pinned-join', () => ({
 	run_review_pinned_join: { answer_on_tree: on_tree_mock },
 }))
-
+// A cut answer's probe of the rest launches nothing here (`*-pinned-remaining.test.ts`).
+vi.mock('#scripts/run/review/run-review-pinned-steps', () => ({
+	run_review_pinned_steps: { clear: vi.fn(), launch_remaining: () => ({ kind: 'failed' }) },
+}))
+vi.mock('#scripts/run/review/run-review-pinned-tree', () => ({
+	run_review_pinned_tree: { key: async () => undefined },
+}))
 vi.mock('#scripts/lib/buffered-process', () => ({
 	buffered_process: { run_buffered_process: run_mock },
 }))
@@ -169,15 +175,7 @@ describe('run_ship_pre_detach_pinned.pinned_check on the tree run:review checked
 
 		expect(run_mock.mock.calls[0]?.[0]).not.toContain(FIRST_UNPINNED)
 	})
-
-	it('stops on a cut answer without a reason, running nothing more', async () => {
-		on_tree_mock.mockResolvedValue({ ...UNPINNED, is_cut: true })
-
-		const result = await check([])
-
-		expect(result.code).toBe(FAILED)
-		expect(run_mock).not.toHaveBeenCalled()
-	})
+	// A cut answer without a reason stops, running no probe here: `*-pinned-remaining.test.ts`.
 })
 
 describe('run_ship_pre_detach_pinned.pinned_check', () => {
