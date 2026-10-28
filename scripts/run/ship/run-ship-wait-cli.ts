@@ -1,3 +1,4 @@
+#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'

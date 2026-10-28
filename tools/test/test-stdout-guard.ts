@@ -38,9 +38,7 @@ function restore_streams(saved: SavedWrites): void {
 }
 
 // The teardown is returned from `beforeEach` rather than kept in a module binding, so two tests never
-// share one saved pair and nothing here writes to a top-level variable from inside a hook. The hook
-// registration is the setup file's whole purpose, so its top-level effect is deliberate.
-// eslint-disable-next-line unicorn/no-top-level-side-effects
+// share one saved pair and nothing here writes to a top-level variable from inside a hook.
 beforeEach(() => {
 	const saved = silence_streams()
 

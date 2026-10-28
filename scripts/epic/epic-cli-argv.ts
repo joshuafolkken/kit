@@ -33,9 +33,9 @@ interface FormFlags {
 	value_flags?: ReadonlyArray<string>
 }
 
-type OptionEntry = [string, ParseArgsOptionsConfig[string]]
-
 function options_of(form: FormFlags): ParseArgsOptionsConfig {
+	type OptionEntry = [string, ParseArgsOptionsConfig[string]]
+
 	const entries: Array<OptionEntry> = [
 		...form.switches.map((flag): OptionEntry => [cli_flags.option_name(flag), SWITCH_OPTION]),
 		...(form.value_flags ?? []).map((flag): OptionEntry => [

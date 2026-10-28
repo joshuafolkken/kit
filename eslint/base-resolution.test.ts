@@ -35,8 +35,6 @@ const linter = new ESLint({ cwd: REPO_ROOT })
 // ever passing as an empty result again.
 const untyped_linter = new ESLint({ cwd: REPO_ROOT, overrideConfig: ts.configs.disableTypeChecked })
 
-type RuleMap = Record<string, unknown>
-
 // Severity of a rule as ESLint itself resolves it for a given file. The block-shape assertions in
 // `base.test.ts` prove the tests override carries the entries; this proves the entries actually
 // win, and that no other block — scoped or unscoped — disables the rules on the source surface.
@@ -48,6 +46,8 @@ const INIT_DECLARATIONS_RULE = 'init-declarations'
 const FLOATING_POINT_EQUALITY_RULE = 'sonarjs/no-floating-point-equality'
 
 async function resolve_rule_entry(file_path: string, rule_name: string): Promise<unknown> {
+	type RuleMap = Record<string, unknown>
+
 	const config = await linter.calculateConfigForFile(file_path)
 
 	return (config.rules as RuleMap)[rule_name]
@@ -388,5 +388,42 @@ describe('create_base_config — an autofix reaches a fixed point (issue #1783)'
 		await expect(resolve_options(SOURCE_FILE, TYPED_DOT_NOTATION_RULE)).resolves.toMatchObject({
 			allowPattern: CONSTANT_NAME_PATTERN,
 		})
+	})
+})
+
+// joshuafolkken/kit#5275: unicorn 79's two new reds are met in the code, never switched off. The
+// side-effect rule skips a file whose first line is a shebang, which is why a CLI entry that sets
+// `process.exitCode` at the top level carries `#!/usr/bin/env tsx` like every other one.
+const SMALLER_SCOPE_RULE = 'unicorn/prefer-smaller-scope'
+const TOP_LEVEL_SIDE_EFFECTS_RULE = 'unicorn/no-top-level-side-effects'
+const CLI_PROBE_FILE = 'scripts/probe-cli.ts'
+const CLI_ENTRY_SOURCE = `const probe_cli = { run }
+
+if (process.argv[1] === 'probe') process.exitCode = 0
+
+export { probe_cli }
+`
+
+async function side_effect_reports(source: string): Promise<number> {
+	const [result] = await untyped_linter.lintText(source, { filePath: CLI_PROBE_FILE })
+	const messages = result?.messages ?? []
+
+	expect_no_fatal(messages)
+
+	return messages.filter((message) => message.ruleId === TOP_LEVEL_SIDE_EFFECTS_RULE).length
+}
+
+describe('create_base_config — unicorn 79 rules (issue #5275)', () => {
+	it('keeps both new rules at error for a source file', async () => {
+		await expect(resolve_severity(SOURCE_FILE, SMALLER_SCOPE_RULE)).resolves.toBe(ERROR)
+		await expect(resolve_severity(SOURCE_FILE, TOP_LEVEL_SIDE_EFFECTS_RULE)).resolves.toBe(ERROR)
+	})
+
+	it('reports a top-level exitCode write in an exported module without a shebang', async () => {
+		await expect(side_effect_reports(CLI_ENTRY_SOURCE)).resolves.toBe(1)
+	})
+
+	it('leaves the same CLI entry alone once it carries a shebang', async () => {
+		await expect(side_effect_reports(`#!/usr/bin/env tsx\n${CLI_ENTRY_SOURCE}`)).resolves.toBe(0)
 	})
 })
