@@ -94,6 +94,7 @@ async function is_reusable_here(issue: number): Promise<boolean> {
 
 const review_round_reuse = {
 	REUSE,
+	answer,
 	answer_here,
 	is_reusable,
 	is_reusable_here,

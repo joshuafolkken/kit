@@ -115,15 +115,31 @@ async function run_step(step: Step, args: ShipArguments, state: ShipState): Prom
 	})
 }
 
+// One stage's line on the event stream, with why it ran or was skipped where the stage said.
+interface StageMark {
+	stage: Stage
+	phase: Phase
+	reason?: string | undefined
+}
+
 async function emit_phase(
 	args: ShipArguments,
 	context: ShipContext,
-	stage: Stage,
-	phase: Phase,
+	mark: StageMark,
 ): Promise<void> {
-	const text = run_ship_stage.event_text(args.number, stage, phase, context.started)
+	const text = run_ship_stage.event_text(args.number, mark.stage, mark.phase, context.started)
 
-	await run_event_stream_emit.emit(run_event_stream.EVENT_KIND.SHIP_STAGE, text)
+	await run_event_stream_emit.emit(
+		run_event_stream.EVENT_KIND.SHIP_STAGE,
+		run_ship_stage.with_reason(text, mark.reason),
+	)
+}
+
+// A green stage that found nothing to do ends `skipped` rather than `done` (joshuafolkken/kit#5296).
+function settled_phase(section: ShipSection): Phase {
+	if (section.code !== SUCCESS_EXIT_CODE) return PHASE.FAILED
+
+	return section.is_skipped === true ? PHASE.SKIPPED : PHASE.DONE
 }
 
 // The record is written best-effort, as the event stream is: a record that could not be written costs
@@ -142,13 +158,13 @@ async function settle(
 	step: Step,
 	args: ShipArguments,
 	context: ShipContext,
-	code: number,
+	section: ShipSection,
 ): Promise<void> {
-	const is_green = code === SUCCESS_EXIT_CODE
+	const phase = settled_phase(section)
 
-	await emit_phase(args, context, step.stage, is_green ? PHASE.DONE : PHASE.FAILED)
+	await emit_phase(args, context, { stage: step.stage, phase, reason: section.reason })
 
-	if (!is_green) return
+	if (phase === PHASE.FAILED) return
 
 	record(context.target, (path) => {
 		run_ship_stage.mark_done(path, step.stage)
@@ -168,7 +184,7 @@ async function run_stage(
 	context: ShipContext,
 ): Promise<ShipSection> {
 	if (run_ship_stage.is_done(step.stage, context.done, context.state, args.body.length > 0)) {
-		await emit_phase(args, context, step.stage, PHASE.SKIPPED)
+		await emit_phase(args, context, { stage: step.stage, phase: PHASE.SKIPPED })
 
 		return { header: step.header, body: run_ship.SKIPPED_BODY, code: SUCCESS_EXIT_CODE }
 	}
@@ -177,10 +193,10 @@ async function run_stage(
 	record(context.target, (path) => {
 		run_ship_stage.mark_started(path, step.stage)
 	})
-	await emit_phase(args, context, step.stage, PHASE.START)
+	await emit_phase(args, context, { stage: step.stage, phase: PHASE.START })
 	const section = await run_step(step, args, context.state)
 
-	await settle(step, args, context, section.code)
+	await settle(step, args, context, section)
 	// The sync commits locally and a review may fix the tree, so the stages after either read the state
 	// anew — the commit stage then pushes the sync's commit rather than making it again.
 	if (REREAD_AFTER.has(step.stage)) set_state(context, await run_ship_probe.read_state())
