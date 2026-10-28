@@ -984,6 +984,23 @@ Answers `ok`, `missing` (a refusal), `mismatch` or `not-required`; an attestatio
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh review:attest` in detail".
 
+### `josh review:lint`
+
+<!-- usage: review:lint -->
+
+Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass.
+
+```bash
+pnpm josh review:lint < review.md
+pnpm josh review:lint --round 2 < review.md
+```
+
+<!-- /usage -->
+
+The format is `prompts/review-rubric.md` → "Review output format". It enforces the mechanical half: the category headings in order, a verdict under each, the trace behind category 1's `No issues`, 2–3 assumptions, no banned Confidence floor answer, a `file:line` and severity on every finding, and no code fence. `--round 2` requires only the verification pass's three headings.
+
+Prints `ok` (exit 0), or the violations one per line plus one line naming the rubric's section (exit 1). Whether a finding is right stays with the reviewer.
+
 ### `josh delegate`
 
 <!-- usage: delegate -->
