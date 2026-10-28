@@ -2,6 +2,7 @@ import path from 'node:path'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
+import { type_only_imports } from './type-only-imports'
 
 // What a file's lint verdict reads besides the file itself: every file its imports reach, followed
 // through the project's own files and stopped at a package's. A type-aware rule's verdict on a file
@@ -34,6 +35,7 @@ interface GraphContext extends Resolver {
 	resolution_cache: ts.ModuleResolutionCache
 	ambient: ReadonlyArray<Dependency>
 	dependencies: Map<string, ReadonlyArray<Dependency>>
+	runtime_dependencies: Map<string, ReadonlyArray<Dependency>>
 	content_hashes: Map<string, string>
 }
 
@@ -168,6 +170,22 @@ function direct_dependencies(context: GraphContext, file: string): ReadonlyArray
 	)
 
 	context.dependencies.set(file, found)
+
+	return found
+}
+
+// The direct dependencies the test runner follows: the imports left once the transpiler drops the
+// type-only declarations, and no `/// <reference>` (joshuafolkken/kit#5368).
+function runtime_dependencies(context: GraphContext, file: string): ReadonlyArray<Dependency> {
+	const known = context.runtime_dependencies.get(file)
+	if (known !== undefined) return known
+	const content = file_reader.read_if_readable(file) ?? ''
+	const found = type_only_imports
+		.runtime_specifiers(context.typescript, file, content)
+		.map((specifier) => resolve_module(context, specifier, file))
+		.filter((dependency) => dependency !== undefined)
+
+	context.runtime_dependencies.set(file, found)
 
 	return found
 }
@@ -313,7 +331,7 @@ function reverse_edges(
 	const reverse = new Map<string, Array<string>>()
 
 	for (const file of universe) {
-		for (const dependency of direct_dependencies(context, file)) {
+		for (const dependency of runtime_dependencies(context, file)) {
 			append(reverse, dependency.file, file)
 		}
 	}
@@ -321,8 +339,8 @@ function reverse_edges(
 	return reverse
 }
 
-// Every file of `universe` whose imports reach one of `files`, the files themselves included — the
-// only files that can name what they export, however many re-exports and aliases stand between.
+// Every file of `universe` whose runtime imports reach one of `files`, the files themselves included —
+// the graph the test runner walks, so a file read only through `import type` reaches no test past it.
 function importers(
 	context: GraphContext,
 	files: ReadonlyArray<string>,
@@ -356,6 +374,7 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, options),
 		ambient: ambient_of({ typescript, options }, root, parsed),
 		dependencies: new Map(),
+		runtime_dependencies: new Map(),
 		content_hashes: new Map(),
 	}
 
