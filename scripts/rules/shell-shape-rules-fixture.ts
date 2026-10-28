@@ -25,6 +25,8 @@ const FILING_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'raw-field-body': [QUOTED, HEREDOC],
 	'credential-body': [],
 	'file-body': [],
+	'file-rewrite': [],
+	'sed-in-place': [],
 	'rule-body': [],
 	[ORACLE_PKG_SCOUT]: [HEREDOC],
 }

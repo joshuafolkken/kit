@@ -10,7 +10,7 @@ import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
 import { direct_issue_read } from './direct-issue-read'
 import { early_heartbeat } from './early-heartbeat'
-import { file_body } from './file-body'
+import { file_edit_rows } from './file-edit-rows'
 import { git_force } from './git-force'
 import { implementation_cut } from './implementation-cut'
 import { investigator_foreground } from './investigator-foreground'
@@ -244,12 +244,15 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// pins that no two rows claim one command.
 	git_force.ROW,
 	worktree_guard.ROW,
-	file_body.ROW,
+	...file_edit_rows.SHELL_ROWS,
 	...permission_guards.ROWS,
 	poll_loop.ROW,
 	// Before `rule-body`, its one overlap: the cut is the right first act, and `rule-body` delivers on
 	// the reissue in the fresh process.
 	implementation_cut.ROW,
+	// Before `rule-body`, its one overlap (a whole-file `Write` of a rule document): the right tool is
+	// chosen before the placement questions are asked of its text.
+	file_edit_rows.REWRITE_ROW,
 	rule_body_guard.ROW,
 	...oracle_consulted.ROWS,
 ]
@@ -383,7 +386,7 @@ function is_enabled(): boolean {
 const delivered_rules = {
 	DELIVERED_RULES,
 	EARLY_HEARTBEAT_REASON: early_heartbeat.EARLY_HEARTBEAT_REASON,
-	FILE_BODY_REASON: file_body.FILE_BODY_REASON,
+	FILE_BODY_REASON: file_edit_rows.FILE_BODY_REASON,
 	DIRECT_FILING_REASON: direct_filing.DIRECT_FILING_REASON,
 	GIT_FORCE_REASON: git_force.GIT_FORCE_REASON,
 	ISSUE_COMMENTS_REASON: issue_comments.ISSUE_COMMENTS_REASON,
