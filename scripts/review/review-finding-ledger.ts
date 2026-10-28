@@ -18,6 +18,11 @@ const FIELD_COUNT = 5
 const DISPOSED_FIELD_COUNT = FIELD_COUNT + 1
 const ISSUE_FIELD_INDEX = FIELD_COUNT - 1
 const SEVERITY_FIELD_INDEX = 1
+// **A code round written to the issue's file opens with a boundary line** (joshuafolkken/kit#5359):
+// the ledger is append-only, so a stopped round's unfixed lines stay, and `josh review:round2` reads
+// only the lines after the issue's last boundary. Its own prefix keeps it out of every `- rf:` reader.
+const ROUND_PREFIX = '- rb:'
+const ROUND_ISSUE_FIELD_INDEX = 1
 
 // The nine review-rubric categories, as slugs (`prompts/review-rubric.md` → "Review categories"). A
 // finding's category must be one of these so the aggregate stays countable rather than free text.
@@ -223,6 +228,29 @@ function issue_dispositions(content: string, issue: number): ReadonlyArray<Dispo
 		}))
 }
 
+function round_line(date: string, issue: number): string {
+	return `${ROUND_PREFIX}${[date, issue_field(issue)].join(FIELD_SEPARATOR)}`
+}
+
+function is_round_line(line: string, target: string): boolean {
+	const trimmed = line.trimStart()
+
+	if (!trimmed.startsWith(ROUND_PREFIX)) return false
+
+	const fields = trimmed.slice(ROUND_PREFIX.length).split(FIELD_SEPARATOR)
+
+	return fields[ROUND_ISSUE_FIELD_INDEX] === target
+}
+
+// The content after the issue's last round boundary — the whole content when it has none, as a ledger
+// written before the boundary existed does.
+function latest_round(content: string, issue: number): string {
+	const target = issue_field(issue)
+	const lines = content.split('\n')
+
+	return lines.slice(lines.findLastIndex((line) => is_round_line(line, target)) + 1).join('\n')
+}
+
 // **A `none` zero-round line counts as recorded, exactly like a real finding line does.** The gate
 // asks whether the round was recorded, not whether it found anything — reading the issue field, which
 // a zero-finding line carries too, is what keeps a clean round's single line from reading as "nobody
@@ -246,6 +274,8 @@ const review_finding_ledger = {
 	is_severity,
 	is_valid_file,
 	issue_dispositions,
+	latest_round,
+	round_line,
 	SEVERITIES,
 	split_disposition,
 	zero_round_count,

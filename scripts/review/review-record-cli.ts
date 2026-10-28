@@ -16,9 +16,9 @@ import type { ReuseAnswer } from './review-round-reuse'
 import { review_stop_log } from './review-stop-log'
 
 // `josh review:record --issue <N> [<category>:<severity>:<file> ...]` — the one write path for a
-// `/code-review` round's findings. It appends a `- rf:` line per finding to
+// `/code-review` round's findings. It appends a `- rb:` round boundary and a `- rf:` line per finding to
 // the issue's own file of the observation ledger, which the run's commit carries like any other
-// ledger change. **A call with no findings is a zero-finding round, and it still writes one line** — so the
+// ledger change. **A call with no findings is a zero-finding round, and it still writes one `- rf:` line** — so the
 // round that found nothing is recorded rather than mistaken for a round nobody reviewed.
 //
 // **`--comment` records a round that ran after the pull request opened**: the same lines go to the
@@ -301,19 +301,22 @@ interface AppendedRound {
 	root: string
 	kind: LineKind
 	findings: ReadonlyArray<Finding>
+	date: string
+}
+
+// A code round opens with its boundary line (`review-finding-ledger.ts`), not counted as a finding line.
+function ledger_lines({ issue, lines, kind, date }: AppendedRound): ReadonlyArray<string> {
+	if (kind === 'interaction') return lines
+
+	return [review_finding_ledger.round_line(date, issue), ...lines]
 }
 
 // A code round goes on to what its tree means for the ship (`review-record-code-round.ts`).
-async function append_round({
-	issue,
-	lines,
-	root,
-	kind,
-	findings,
-}: AppendedRound): Promise<number> {
+async function append_round(round: AppendedRound): Promise<number> {
+	const { issue, lines, root, kind, findings } = round
 	const ledger_path = observation_ledger_home.issue_path(issue, root)
 
-	await observation_ledger_home.append(ledger_path, lines)
+	await observation_ledger_home.append(ledger_path, ledger_lines(round))
 	console.info(confirmation(lines.length, ledger_path))
 	await carry_comment_rounds(root)
 
@@ -330,7 +333,8 @@ async function write_round(
 	root: string,
 ): Promise<number> {
 	const kind = kind_of(parsed)
-	const lines = build_lines(request, observation_ledger_home.ledger_date(now), kind)
+	const date = observation_ledger_home.ledger_date(now)
+	const lines = build_lines(request, date, kind)
 	const { issue, findings } = request
 
 	if (parsed.comment) return await review_record_comment.post(issue, lines)
@@ -345,6 +349,7 @@ async function write_round(
 		root,
 		kind,
 		findings: request.findings,
+		date,
 	})
 }
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { review_finding_ledger } from './review-finding-ledger'
 import { review_round_one_closure } from './review-round-one-closure'
 
 // joshuafolkken/kit#5286: round 1's closure, read from the issue's own ledger lines.
@@ -58,6 +59,26 @@ describe('review_round_one_closure.of_content', () => {
 
 	it('ignores another issue’s open finding', () => {
 		expect(closure_of(line('medium', 'fixed'), line('medium', undefined, 1)).is_closed).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5359: only the issue's latest code round is read.
+describe('review_round_one_closure.of_content — the latest round', () => {
+	const boundary = review_finding_ledger.round_line(DATE, ISSUE)
+	const zero_round = `- rf:none | none | - | ${DATE} | #${String(ISSUE)}`
+
+	it('reads a clean re-run after an earlier round’s unfixed Medium as closed', () => {
+		expect(closure_of(boundary, line('medium'), boundary, zero_round).is_closed).toBe(true)
+	})
+
+	it('reads a Medium the latest round left open as open', () => {
+		expect(closure_of(boundary, zero_round, boundary, line('medium')).is_closed).toBe(false)
+	})
+
+	it('ignores another issue’s boundary', () => {
+		const other = review_finding_ledger.round_line(DATE, 1)
+
+		expect(closure_of(line('medium'), other, zero_round).is_closed).toBe(false)
 	})
 })
 

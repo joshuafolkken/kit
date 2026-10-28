@@ -130,3 +130,39 @@ describe('review_finding_ledger — the interaction kind', () => {
 		expect(review_finding_ledger.category_counts(line)).toEqual([])
 	})
 })
+
+// joshuafolkken/kit#5359: a code round's boundary line, and the latest round read after it.
+describe('review_finding_ledger — the round boundary', () => {
+	const boundary = review_finding_ledger.round_line(DATE, ISSUE)
+	const stale = review_finding_ledger.finding_line(
+		{ category: 'tests', severity: 'medium', file: FILE },
+		DATE,
+		ISSUE,
+	)
+	const clean = review_finding_ledger.zero_round_line(DATE, ISSUE)
+
+	it('writes the boundary as a `- rb:` line', () => {
+		expect(boundary).toBe('- rb:2026-09-22 | #2325')
+	})
+
+	it('reads only the lines after the issue’s last boundary', () => {
+		const content = [boundary, stale, boundary, clean].join('\n')
+
+		expect(review_finding_ledger.latest_round(content, ISSUE)).toBe(clean)
+	})
+
+	it('reads the whole content when the issue has no boundary', () => {
+		const content = [stale, review_finding_ledger.round_line(DATE, 1), clean].join('\n')
+
+		expect(review_finding_ledger.latest_round(content, ISSUE)).toBe(content)
+	})
+
+	it('leaves category_counts and has_issue_record unchanged', () => {
+		const content = [boundary, stale].join('\n')
+
+		expect(review_finding_ledger.category_counts(content)).toEqual([
+			{ category: 'tests', count: 1 },
+		])
+		expect(review_finding_ledger.has_issue_record(boundary, ISSUE)).toBe(false)
+	})
+})

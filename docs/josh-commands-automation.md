@@ -607,7 +607,7 @@ pnpm josh review:record --issue 2325 --interaction                              
 
 <!-- /usage -->
 
-The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings.
+The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 

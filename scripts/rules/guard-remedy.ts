@@ -46,6 +46,8 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'lane-background': rewrite(), // a lane child's `ship` run in the foreground (`pretool-guard.ts`)
 	'reviewer-foreground': rewrite(), // a lane child's `reviewer` given `run_in_background: false`
 	'file-body': judgment(ANOTHER_TOOL), // Edit or Write
+	'file-rewrite': judgment(ANOTHER_TOOL), // Edit
+	'sed-in-place': judgment(ANOTHER_TOOL), // Edit
 	'shell-body': judgment(
 		"which part of the body the shell was meant to expand is the author's, not the hook's",
 	),
