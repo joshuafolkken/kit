@@ -31,6 +31,8 @@
 
 **パイプラインの終了コードは最後のコマンドのものである。** `pnpm josh gate 2>&1 | tail -40` は赤いゲートを成功として返す。**これは `josh gate` の欠陥ではない。** **既定はパイプなしで実行する。** 避けられないなら `set -o pipefail` を前置する。どの形でも、印字された判定行を読む。`piped-verification` 行（`rule-delivery.md`）が強制する。
 
+境界は判定が残るかどうか: 入力を最後まで読むフィルタ（`tail` ／ `grep` ／ `cut` ／ `sort` ／ `uniq` ／ `wc` ／ `tee`、`exit` も外部コマンドも `<`・`>`・`&`（比較を含む）も使わない `awk`、`p`・`d`・`s///` だけの `sed`）だけのパイプは `;` 鎖の中でも `pipefail` 付きに書き換えて通り、`head`・先頭一致で止まる `grep`・`2>/dev/null` などのリダイレクトを伴う形は拒否される（`scripts/rules/piped-verification.ts`）。
+
 対象は結果が合否を意味するコマンドだけ — `gate` ／ `check*` ／ `lint*` ／ `cspell*` ／ `test*` ／ `eval`。**`git log | head` や `gh issue list | head` は対象外であり、意図的にそうしている。** `latest:scope` ／ `review:brief` も、判定ではなく答えを印字するので `$(...)` で受けてよい。
 
 ## 検査

@@ -46,6 +46,28 @@ function result_line(content: string, timestamp: string = TIMESTAMP): string {
 	})
 }
 
+// A call and the errored result that answers it, paired by the call's id (joshuafolkken/kit#5266).
+function answered_call(command: string, index: number, content: string): string {
+	const call = assistant_line(
+		[tool_use_block(command, index)],
+		TIMESTAMP,
+		time_transcript_line.NO_MESSAGE_ID,
+	)
+	const result = {
+		type: 'tool_result',
+		tool_use_id: `toolu_${String(index)}`,
+		content,
+		is_error: true,
+	}
+	const answer = JSON.stringify({
+		type: 'user',
+		timestamp: TIMESTAMP,
+		message: { content: [result] },
+	})
+
+	return `${call}\n${answer}`
+}
+
 // The user turn the harness writes back where a Stop hook blocked the turn's end (joshuafolkken/kit#4978).
 function stop_line(reason: string, timestamp: string = TIMESTAMP): string {
 	return JSON.stringify({
@@ -80,6 +102,7 @@ function reading_for(id: string, runs: ReadonlyArray<ReadonlyArray<string>>): Ru
 const rule_value_fixture = {
 	TIMESTAMP,
 	reading_for,
+	answered_call,
 	assistant_line,
 	call_line,
 	context_line,

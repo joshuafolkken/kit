@@ -98,6 +98,13 @@ function pipelines_of(command: string): Array<Array<string>> {
 		.map((segment) => segment.split('|').map((piece) => piece.trim()))
 }
 
+// The filters behind each check on the line — what a refusal is named by (`piped-verification-shapes.ts`).
+function check_filters(command: string): Array<string> {
+	return pipelines_of(command).flatMap(([head = '', ...filters]) =>
+		is_verification_command(head) ? filters : [],
+	)
+}
+
 function command_pieces(command: string): Array<string> {
 	return pipelines_of(command).flat()
 }
@@ -126,7 +133,12 @@ function keeps_verdict_intact(command: string): boolean {
 // `grep` stopping at its first match — closes the pipe on a check still writing, and under `pipefail` the
 // check's SIGPIPE turns a passing run into exit 141; `head` also cuts the verdict line josh prints last.
 // `cut`, `sort`, `uniq` and `wc` read to the end as well, and a `grep … | cut -c1-250` narrowing was the
-// commonest masking still refused after #3875 (joshuafolkken/kit#3920).
+// commonest masking still refused after #3875 (joshuafolkken/kit#3920). `tee` passes every line on, and an
+// `awk` or `sed` script reads to the end where it can neither exit nor reach past the pipe — read on the
+// typed piece, since the script is quoted: an `awk` program with no `exit`, `nextfile`, `system`, `getline` or `|`,
+// and a `sed` script of `p`, `d` and `s///` alone (joshuafolkken/kit#5266). A quoted `<`, `>` or `&`
+// still refuses below: inside `awk` a `>` may be `print > "f"`, which no reading here tells from a
+// comparison.
 //
 // **Each masked check is wrapped on its own, and the rest of the line runs as typed.** Most of the
 // refusals left after #3570 were a check chained beside other work — `vitest …; pnpm josh lint:related
@@ -144,9 +156,18 @@ function keeps_verdict_intact(command: string): boolean {
 const PIPEFAIL_OPEN = '(set -o pipefail; '
 const PIPEFAIL_CLOSE = ')'
 const COMMENT_START = /(?:^|\s)#/u
-const FULL_READING_FILTER = /^(?:tail|grep|cut|sort|uniq|wc)\b/u
+const FULL_READING_FILTER = /^(?:tail|grep|cut|sort|uniq|wc|tee)(?=\s|$)/u
 const EARLY_EXIT_GREP =
 	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
+const AWK_PROGRAM = /^awk\s+(?:-F\s*\S+\s+)?'[^']*'$/u
+const AWK_EARLY_EXIT = /\b(?:exit|nextfile|system|getline)\b|\|/u
+const SED_TEXT = String.raw`(?:[^/\\']|\\.)*`
+const SED_ADDRESS = String.raw`(?:\d+|\$|/${SED_TEXT}/)`
+const SED_COMMAND = String.raw`(?:${SED_ADDRESS}(?:,${SED_ADDRESS})?)?!?(?:p|d|s/${SED_TEXT}/${SED_TEXT}/[gip\d]*)`
+const SED_PROGRAM = new RegExp(
+	String.raw`^sed\s+(?:-[nEr]+\s+)*'${SED_COMMAND}(?:;\s*${SED_COMMAND})*'$`,
+	'u',
+)
 
 const ALLOWED_OPERATORS = /2>&1|&&/gu
 const SIDE_EFFECT_SYNTAX = /[&<>`]|\$\(/u
@@ -157,14 +178,40 @@ const PIPEFAIL_NOTE =
 	"`(set -o pipefail; …)` to carry the check's status, and the rest of the line ran as typed. Read " +
 	'the printed verdict, never the exit code alone — `prompts/collaboration-workflow/output-bounds.md`.'
 
-function reads_to_the_end(piece: string): boolean {
-	return FULL_READING_FILTER.test(piece) && !EARLY_EXIT_GREP.test(piece)
+function is_full_reading_script(typed: string): boolean {
+	if (AWK_PROGRAM.test(typed)) return !AWK_EARLY_EXIT.test(typed)
+
+	return SED_PROGRAM.test(typed)
 }
 
-function is_filtered_check(pipeline: Array<string>): boolean {
-	const [head = '', ...filters] = pipeline
+// A filter's name and flags are read on the blanked piece, its quoted script on the typed one.
+function reads_to_the_end(piece: string, typed: string): boolean {
+	if (FULL_READING_FILTER.test(piece)) return !EARLY_EXIT_GREP.test(piece)
 
-	return is_verification_command(head) && filters.every((piece) => reads_to_the_end(piece))
+	return is_full_reading_script(typed)
+}
+
+// The typed text at the offsets of the blanked pieces, each `gap` characters apart — the blanked line
+// keeps every offset, so a cut found there is the same cut in the typed one.
+function typed_slices(raw: string, pieces: ReadonlyArray<string>, gap: number): Array<string> {
+	const offset = { at: 0 }
+
+	return pieces.map((piece) => {
+		const typed = raw.slice(offset.at, offset.at + piece.length)
+
+		offset.at += piece.length + gap
+
+		return typed
+	})
+}
+
+function is_filtered_check(pieces: ReadonlyArray<string>, typed: ReadonlyArray<string>): boolean {
+	const [head = '', ...filters] = pieces.map((piece) => piece.trim())
+
+	return (
+		is_verification_command(head) &&
+		filters.every((piece, index) => reads_to_the_end(piece, typed[index + 1]?.trim() ?? ''))
+	)
 }
 
 function has_side_effect_syntax(command: string): boolean {
@@ -174,9 +221,13 @@ function has_side_effect_syntax(command: string): boolean {
 // The side-effect syntax is read on the typed part, since a double-quoted `$(cmd)` still runs; the pipe
 // cut and the grouping are read on the blanked one, since a quoted `|` or `(` is text.
 function is_rewritable_part(raw: string, judged: string): boolean {
-	const pipeline = judged.split('|').map((piece) => piece.trim())
+	const pieces = judged.split('|')
 
-	return !has_side_effect_syntax(raw) && !GROUP_SYNTAX.test(judged) && is_filtered_check(pipeline)
+	return (
+		!has_side_effect_syntax(raw) &&
+		!GROUP_SYNTAX.test(judged) &&
+		is_filtered_check(pieces, typed_slices(raw, pieces, 1))
+	)
 }
 
 // Where the part's code ends: an unquoted `#` opens a comment, which would swallow the closing `)`.
@@ -211,14 +262,10 @@ function pipefail_command(command: string): string | undefined {
 
 	if (judged === undefined || !is_masked_verification(command)) return undefined
 
-	const offset = { at: 0 }
-	const parts = shell_segments.parts_of(judged).map((part) => {
-		const raw = command.slice(offset.at, offset.at + part.length)
-
-		offset.at += part.length
-
-		return rewritten_part(raw, part)
-	})
+	const pieces = shell_segments.parts_of(judged)
+	const parts = typed_slices(command, pieces, 0).map((raw, index) =>
+		rewritten_part(raw, pieces[index] ?? ''),
+	)
 
 	const rewritten = parts.includes(undefined) ? undefined : parts.join('')
 
@@ -237,9 +284,11 @@ function pipefail_input(call: GuardedCall): Record<string, unknown> | undefined 
 }
 
 const piped_verification = {
+	EARLY_EXIT_GREP,
 	PIPED_VERIFICATION_REASON,
 	PIPEFAIL_NOTE,
 	VERIFICATION_COMMANDS,
+	check_filters,
 	is_masked_verification,
 	keeps_verdict_intact,
 	pipefail_input,

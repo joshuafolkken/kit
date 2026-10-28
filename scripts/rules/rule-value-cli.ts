@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-transcript'
 import { delivered_rules } from './delivered-rules'
+import { piped_verification_shapes, type ShapeCounts } from './piped-verification-shapes'
 import { rule_value, type RuleReading } from './rule-value'
 import { rule_value_cache, type FreshReading } from './rule-value-cache'
 import { rule_value_candidates } from './rule-value-candidates'
@@ -73,8 +74,10 @@ function gather_runs(cwd: string = process.cwd()): Generator<Array<string>> {
 	return runs_of(group_by_run(files).values())
 }
 
+// The `piped-verification` refusals are named by shape in the same pass, so the corpus is read once.
 interface Tally {
 	runs: number
+	shapes: ShapeCounts
 }
 
 function* counted(
@@ -83,6 +86,7 @@ function* counted(
 ): Generator<ReadonlyArray<string>> {
 	for (const texts of runs) {
 		tally.runs += 1
+		for (const text of texts) piped_verification_shapes.count(text, tally.shapes)
 		yield texts
 	}
 }
@@ -122,16 +126,17 @@ interface Rendered {
 // The runs are counted as `measure` consumes them, since a lazy source cannot be asked its length
 // up front.
 function render_parts(runs: Iterable<ReadonlyArray<string>>): Rendered {
-	const tally: Tally = { runs: 0 }
+	const tally: Tally = { runs: 0, shapes: new Map() }
 	const readings = rule_value.measure(counted(runs, tally))
 
 	if (tally.runs === 0) return { table: NO_TARGETS }
 
 	const judged = rule_value_candidates.judge(readings, tally.runs)
+	const shapes = piped_verification_shapes.render(tally.shapes)
 
 	return {
 		table: readings.map((reading) => row(reading)).join('\n'),
-		candidates: rule_value_candidates.render(judged, tally.runs),
+		candidates: `${rule_value_candidates.render(judged, tally.runs)}\n${shapes}`,
 	}
 }
 

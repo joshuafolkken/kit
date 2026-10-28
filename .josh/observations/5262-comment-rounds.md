@@ -1,0 +1,4 @@
+- rf:bug-risks | low | scripts/run/review/run-review-pinned-steps.ts:153 | 2026-10-27 | #5262
+- rf:bug-risks | low | scripts/run/review/run-review-pinned-steps.ts:243 | 2026-10-27 | #5262
+- rf:project-conventions | low | scripts/run/ship/run-ship-pre-detach-pinned.ts:46 | 2026-10-27 | #5262
+- rf:assumptions | low | scripts/test/test-pinned-ledger.ts:68 | 2026-10-27 | #5262
