@@ -4,7 +4,9 @@
 
 - **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
   foreground `followup` → `run:tail`). The calls below serve a due second round.
-- Background `pnpm josh gate` beside the review; join it before commit.
+- Background `pnpm josh gate` beside the review; join it before commit. Also `lint:related` /
+  `test:related` / `check:related` / `metrics` with work to overlap: a wait past the 5-min cache TTL
+  rewrites the context.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - `pnpm josh followup` stays in the foreground (`followup.md`).
@@ -15,8 +17,6 @@
   below is the full mapping); keep `josh ms`, state checks, next-child selection, lane closing and the
   session-cost check after the merge.
 - A lane child's hand-off or pre-gate cut is the sole turn boundary before the push (`chain-rule.md`).
-
-Use harness detachment so completion returns to the run. Foreground timeouts stay within the cap.
 
 ## How the wait ends — the task's exit, never a regex over its output
 

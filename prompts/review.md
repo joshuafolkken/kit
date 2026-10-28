@@ -34,8 +34,8 @@ tests and the round cap are unchanged.
    prints from `pnpm josh test:pinned` (each unchecked place is listed in its `full output:` log) (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
    never draws, no comparison against a literal copy).
 2. **Prose matches the code** — grep docs, prompts and comments for the old wording of every behavior,
-   constant, command and heading you changed, moved or removed, `"the table above"` and rewritten
-   sentences included.
+   constant, command and heading you changed, moved or removed (`pnpm josh prose:stale` finds the
+   removed ones), `"the table above"` and rewritten sentences included.
 3. **Failure is not a negative answer** — every timeout, non-zero exit or `gh` failure on a touched
    path returns something a caller can tell apart from `false`, `undefined` or "nothing found".
 4. **Every caller moved with it** — grep every reference to a changed function, list or command, and

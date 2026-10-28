@@ -105,6 +105,14 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 	})
 })
 
+describe('run_ship_wait_cli.CHUNK_MS — the wait is the keep-alive (#5344)', () => {
+	it('ends a chunk inside the five-minute prompt-cache TTL, so the next wait reads the cache back', () => {
+		const prompt_cache_ttl_ms = 300_000
+
+		expect(run_ship_wait_cli.CHUNK_MS).toBeLessThan(prompt_cache_ttl_ms)
+	})
+})
+
 describe('run_ship_wait_cli.wait_for — a commit in progress', () => {
 	it('keeps waiting while the attempt has started its commit but not finished it', async () => {
 		done_mock.mockReturnValue(new Set(['review', 'gate']))

@@ -86,6 +86,22 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The self-check's "Prose matches the code" as a search: each word the diff removed that prose still names.
+	'prose:stale': {
+		script: 'scripts/review/prose-stale-cli.ts',
+		description:
+			'List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name',
+		category: 'AI tools',
+		reference: ['', 'automation', ['none']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)',
+				},
+			],
+		},
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',

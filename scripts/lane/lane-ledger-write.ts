@@ -53,6 +53,9 @@ const CI_WAIT_STAGE = 'ci-wait'
 // alone (joshuafolkken/kit#4574).
 const CODERABBIT_WAIT_STAGE = 'coderabbit-wait'
 const CODERABBIT_RATE_LIMIT_STAGE = 'coderabbit-rate-limit'
+// The rate-limit window `followup` waited out before posting its one `@coderabbitai review`
+// (joshuafolkken/kit#5289).
+const CODERABBIT_RETRIGGER_STAGE = 'coderabbit-retriggered'
 // A detached `josh ship`'s fast checks in the agent's own turn — not a resumable ship stage, since the
 // supervised gate runs them again (joshuafolkken/kit#4382).
 const PRE_DETACH_STAGE = 'pre-detach'
@@ -218,6 +221,7 @@ async function record_unplanned_notice(
 const lane_ledger_write = {
 	CI_WAIT_STAGE,
 	CODERABBIT_RATE_LIMIT_STAGE,
+	CODERABBIT_RETRIGGER_STAGE,
 	CODERABBIT_WAIT_STAGE,
 	KIND,
 	LINE_SEPARATOR,

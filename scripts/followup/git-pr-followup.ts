@@ -14,6 +14,7 @@ import {
 } from '#scripts/notify/telegram-notify'
 import { followup_checks_event } from './followup-checks-event'
 import { followup_ci_path } from './followup-ci-path'
+import { followup_coderabbit_retrigger, type Settled } from './followup-coderabbit-retrigger'
 import { followup_coderabbit_wait } from './followup-coderabbit-wait'
 import { git_followup_merged } from './git-followup-merged'
 import { git_followup_pending } from './git-followup-pending'
@@ -267,6 +268,29 @@ function wait_for_green_of(
 	}
 }
 
+// **The `checks-wait` lap ends at the first green**, so the `ci-wait` row holds the checks alone; a
+// rate-limited CodeRabbit retriggered after it is a lap of its own (joshuafolkken/kit#5289).
+async function wait_for_review_green(
+	input: FollowupInput,
+	context: TelegramContext,
+	issue_number: string | undefined,
+	log: StageLog,
+): Promise<Settled<PrStateSnapshot>> {
+	const wait_for_green = wait_for_green_of(input, context, issue_number, log)
+	const checked = await wait_for_green()
+
+	lap(log, STAGE.checks_wait)
+	const settled = await followup_coderabbit_retrigger.settle(
+		checked,
+		wait_for_green,
+		input.branch_name,
+		log.coderabbit,
+	)
+	if (settled.is_retriggered) lap(log, STAGE.coderabbit_retrigger)
+
+	return settled
+}
+
 async function run_review_checks(
 	input: FollowupInput,
 	context: TelegramContext,
@@ -279,10 +303,8 @@ async function run_review_checks(
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
-	const snapshot = await wait_for_green_of(input, context, issue_number, log)()
-
-	lap(log, STAGE.checks_wait)
-	const check_notes = read_coderabbit_skip_notes(snapshot)
+	const { snapshot, notes } = await wait_for_review_green(input, context, issue_number, log)
+	const check_notes = [...notes, ...read_coderabbit_skip_notes(snapshot)]
 
 	log_skip_notes(check_notes)
 	const scan_notes = await run_comment_scans(input, context, log)

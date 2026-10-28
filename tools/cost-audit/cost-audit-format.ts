@@ -1,6 +1,7 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import type { Audit, AuditRow } from './cost-audit'
 import { cost_audit_density, type Density } from './cost-audit-density'
+import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
 // summary line `josh retrospective` carries so a run's digest shows the trend it ran in.
@@ -63,6 +64,27 @@ function density_line(audit: Audit): string {
 	return `  lane-child density: ${density_text(current)} (prev ${density_text(previous)})`
 }
 
+function rewrite_figures(count: RewriteCount): string {
+	return `${String(count.count)} (${figure_format.format_usd(count.usd)})`
+}
+
+function rewrite_line(label: string, current: RewriteCount, previous: RewriteCount): string {
+	return `  ${label}: ${rewrite_figures(current)} (prev ${rewrite_figures(previous)})`
+}
+
+// The full cache rewrites, set beside the period before so a change to the waits shows as a count.
+function rewrite_lines(audit: Audit): Array<string> {
+	const { current, previous } = audit.rewrites
+	const floor = String(cost_audit_rewrite.REWRITE_FLOOR_TOKENS)
+
+	return [
+		'',
+		`Full cache rewrites (cache write over ${floor} tokens, the earlier context not read back)`,
+		rewrite_line('after a wait of 5 min or more', current.after_wait, previous.after_wait),
+		rewrite_line('within 5 min', current.within_ttl, previous.within_ttl),
+	]
+}
+
 function section_lines(section: AuditSection): Array<string> {
 	const body = section.rows.length === 0 ? ['  none'] : section.rows.map((row) => row_line(row))
 
@@ -96,6 +118,7 @@ function report_lines(audit: Audit): Array<string> {
 		...merge_lines(audit),
 		density_line(audit),
 		...sections_of(audit).flatMap((section) => section_lines(section)),
+		...rewrite_lines(audit),
 		'',
 		`Regressions: ${regression_text(audit)}`,
 	]

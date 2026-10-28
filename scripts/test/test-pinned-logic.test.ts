@@ -92,6 +92,28 @@ describe('test_pinned_logic.parse_hunks', () => {
 	})
 })
 
+describe('test_pinned_logic.all_hunks', () => {
+	it('keeps the hunks of test files and files vitest cannot relate', () => {
+		const files = test_pinned_logic.all_hunks(SKIPPED_DIFF).map((entry) => entry.file)
+
+		expect(files).toEqual(['scripts/run/driver.test.ts', 'docs/guide.md'])
+	})
+
+	it('names a deleted file by its `--- a/` path', () => {
+		const deleted = [
+			'diff --git a/docs/gone.md b/docs/gone.md',
+			'--- a/docs/gone.md',
+			'+++ /dev/null',
+			'@@ -1 +0,0 @@',
+			'-# Gone',
+		].join('\n')
+
+		expect(test_pinned_logic.all_hunks(deleted)).toEqual([
+			{ file: 'docs/gone.md', new_start: 0, new_count: 0, old_lines: ['# Gone'], new_lines: [] },
+		])
+	})
+})
+
 describe('test_pinned_logic.revert', () => {
 	const content = 'a\nb\nc\nd\n'
 

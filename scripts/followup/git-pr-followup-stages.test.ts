@@ -1,5 +1,6 @@
 import { deferred_answer, type DeferredAnswer } from '#scripts/git/deferred-answer-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { followup_coderabbit_retrigger } from './followup-coderabbit-retrigger'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
@@ -21,6 +22,7 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 		pr_get_url: vi.fn(),
 		pr_get_body: vi.fn(),
 		pr_get_review_comments: vi.fn(),
+		pr_get_comments: vi.fn(),
 		pr_merge: vi.fn(),
 		pr_comment: vi.fn(),
 		is_head_moved: vi.fn(() => false),
@@ -235,6 +237,8 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 			lane_ledger_write.CODERABBIT_RATE_LIMIT_STAGE,
 		])
 		expect(record.mock.calls[0]?.[0]).toMatchObject({ issue: 42, last_check: 'e2e' })
+		// No comments to read a window from, so the retrigger's stop note reaches the skip notes.
+		expect(printed_lines()).toContain(`⏭ ${followup_coderabbit_retrigger.UNREADABLE_NOTE}`)
 	})
 })
 
@@ -277,10 +281,7 @@ describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 
 		await git_pr_followup.run({ ...BASE_INPUT, should_merge: true })
 
-		expect(vi.mocked(git_gh_command.pr_merge)).toHaveBeenCalledWith(
-			BASE_INPUT.branch_name,
-			CHECKED_SHA,
-		)
+		expect(git_gh_command.pr_merge).toHaveBeenCalledWith(BASE_INPUT.branch_name, CHECKED_SHA)
 	})
 })
 
