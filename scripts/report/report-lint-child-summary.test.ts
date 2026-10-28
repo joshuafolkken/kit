@@ -8,6 +8,7 @@ import { report_lint_child_summary } from './report-lint-child-summary'
 const JA = report_labels.JAPANESE_LABELS
 const EN = report_labels.ENGLISH_LABELS
 const MAX = report_labels.CHILD_SUMMARY_MAX_LINES
+const MISSING_RESULT = '✖ missing label: 結果'
 
 function lint(summary: string): ReadonlyArray<string> {
 	return report_lint_child_summary.lint_child_summary(summary, JA)
@@ -63,7 +64,7 @@ describe('report_lint_child_summary.lint_child_summary — violations', () => {
 		expect(lint('- nothing labelled here')).toEqual([
 			'✖ missing label: 原因',
 			'✖ missing label: 対応',
-			'✖ missing label: 結果',
+			MISSING_RESULT,
 		])
 	})
 
@@ -74,6 +75,22 @@ describe('report_lint_child_summary.lint_child_summary — violations', () => {
 		)
 
 		expect(violations).toEqual(['✖ missing label: Cause'])
+	})
+
+	it('does not count a label found mid-line', () => {
+		const violations = lint(
+			'- **原因**: x\n- **対応**: y\n- テスト結果: green\n- this Result is not a label',
+		)
+
+		expect(violations).toEqual([MISSING_RESULT])
+	})
+})
+
+describe('report_lint_child_summary.lint_child_summary — a changed-file list', () => {
+	it('flags two path-only bullets in a row', () => {
+		expect(lint(`${CONFORMING_SUMMARY}\n1. a/b.ts\n2. c.md`)).toEqual([
+			'✖ changed-file list (2 path-only items) — GitHub carries it: 1. a/b.ts',
+		])
 	})
 
 	it('flags a run of path-only bullets as a changed-file list', () => {

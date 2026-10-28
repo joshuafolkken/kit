@@ -50,6 +50,9 @@ describe('report_lint_cli.run — --child-summary', () => {
 	})
 
 	it('refuses an empty input in either mode', () => {
-		expect(capture(' \n', [FLAG]).code).toBe(1)
+		const { code, output } = capture(' \n', [FLAG])
+
+		expect(code).toBe(1)
+		expect(output).toContain('✖ nothing on stdin — pipe the summary in')
 	})
 })

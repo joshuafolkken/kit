@@ -1,6 +1,5 @@
 import { report_format_reference } from './report-format-reference'
 import { report_labels, type ReportLabels } from './report-labels'
-import { report_lint } from './report-lint'
 
 // A lane child's closing summary carries only what GitHub does not, in a bounded length
 // (`backlogrun-child.md` → "What the summary carries, and how long it may be"). This checks the half a
@@ -13,9 +12,19 @@ const LIST_ITEM_PREFIX = /^\s*(?:\d+\.|[-*])\s+/u
 const PATH_CHARACTERS = /^[\w.@/-]+$/u
 const FILE_EXTENSION = /\.[a-z]+$/iu
 const BACKTICK = '`'
+// A label opens its line — after an optional list marker and bold marker — so a longer word ending
+// in the label, or `Fix the parser` inside a sentence, does not stand in for a missing label.
+const LABEL_LEAD = /^\s*(?:(?:\d+\.|[-*])\s+)?(?:\*\*)?/u
+const LETTER_PATTERN = /^\p{L}/u
 
 function content_lines(summary: string): ReadonlyArray<string> {
 	return summary.split('\n').filter((line) => line.trim().length > 0)
+}
+
+function opens_with_label(line: string, label: string): boolean {
+	const rest = line.replace(LABEL_LEAD, '')
+
+	return rest.startsWith(label) && !LETTER_PATTERN.test(rest.slice(label.length))
 }
 
 // A bullet whose whole text, backticks aside, is one path — a slash segment or a file name.
@@ -45,9 +54,12 @@ function length_violation(lines: ReadonlyArray<string>): ReadonlyArray<string> {
 	return [`✖ ${String(lines.length)} lines — the summary holds at most ${String(max)}`]
 }
 
-function label_violations(summary: string, labels: ReportLabels): ReadonlyArray<string> {
+function label_violations(
+	lines: ReadonlyArray<string>,
+	labels: ReportLabels,
+): ReadonlyArray<string> {
 	return [labels.cause, labels.fix, labels.result]
-		.filter((label) => !report_lint.has_label(summary, label))
+		.filter((label) => lines.every((line) => !opens_with_label(line, label)))
 		.map((label) => `✖ missing label: ${label}`)
 }
 
@@ -67,7 +79,7 @@ function lint_child_summary(
 
 	return [
 		...length_violation(lines),
-		...label_violations(summary, labels),
+		...label_violations(lines, labels),
 		...file_list_violations(lines),
 	]
 }
