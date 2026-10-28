@@ -8,10 +8,14 @@
 // sentence-opening "Previously," narrates the past.
 const HISTORY_PATTERNS = [/\bpreviously,/iu, /\bformerly\b/iu, /\bused to\b/iu, /以前は/u]
 
-// "is used to" and a comment opening with "Used to" describe a purpose, not a history, so they are
-// removed before the history check.
+// "is used to" and a sentence opening with "Used to" describe a purpose, not a history, so they are
+// removed before the history check. A sentence opens at a line start (after a block comment's `*`)
+// or after `.`, `!`, `?` or `:`; the capital `U` keeps a lowercase "used to" that wraps onto the
+// next line of a sentence a history.
 const PURPOSE_PATTERN =
-	/(?:^\s*|\b(?:is|are|be|been|being|was|were|get|gets|got|getting|only|also|not|just) )used to\b/giu
+	/\b(?:is|are|be|been|being|was|were|get|gets|got|getting|only|also|not|just) used to\b/giu
+const SENTENCE_BOUNDARY = /(?<=[.!?:\n])/u
+const OPENING_PURPOSE_PATTERN = /^[\s*]*Used to\b/u
 
 // A number with a time, size or token unit, `12k tokens` and `10-second` included. The look-behind
 // keeps `#1234` and the tail of a longer number or identifier from matching. A bare `s` is left out:
@@ -28,7 +32,11 @@ const MEASUREMENT_PATTERNS = [
  * @returns {boolean}
  */
 function has_history(text) {
-	const stripped = text.replaceAll(PURPOSE_PATTERN, '')
+	const stripped = text
+		.split(SENTENCE_BOUNDARY)
+		.map((sentence) => sentence.replace(OPENING_PURPOSE_PATTERN, ''))
+		.join('')
+		.replaceAll(PURPOSE_PATTERN, '')
 
 	return HISTORY_PATTERNS.some((pattern) => pattern.test(stripped))
 }

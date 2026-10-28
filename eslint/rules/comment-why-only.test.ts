@@ -38,6 +38,7 @@ describe('no-history-comment', () => {
 		'// The budget used to be the core count.',
 		'/* The resolvers formerly sat under `import/resolver`. */',
 		'// 以前は全件を直列で検査していた',
+		'/*\n * The gate\n * used to wait.\n */',
 	])('flags %s', (comment) => {
 		expect(history_count(comment)).toBe(1)
 	})
@@ -46,6 +47,8 @@ describe('no-history-comment', () => {
 		'// The key is used to look up the cached result.',
 		'// Readers get used to the order, so it stays stable.',
 		'// Used to build the cache key.',
+		'// The key is per lane. Used to locate the record.',
+		'/*\n * The key is per lane.\n * Used to locate the record.\n */',
 		'// Only used to look up the lane.',
 		'// It is not used to sort.',
 		'// A previously parked lane resumes here.',
