@@ -42,7 +42,7 @@ const OFFER_ANSWERS: ReadonlySet<string> = new Set([
 ])
 
 // Only an implementation cut appends a `resume` when it is adopted; a pre-gate resume appends nothing,
-// so its cut would read as never ended (`run-cut-cli.ts` → `emit_resume_event`).
+// so its cut would read as never ended (`run-cut-resume.ts` → `emit_resume_event`).
 function implementation_cuts(events: ReadonlyArray<RunEvent>): Array<RunEvent> {
 	return events.filter((event) => event.text.endsWith(IMPLEMENTATION_CUT))
 }

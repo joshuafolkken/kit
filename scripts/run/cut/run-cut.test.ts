@@ -335,7 +335,7 @@ describe('the synchronous read the pre-gate guard makes', () => {
 
 describe('the resume grouping — which phase resumes into implementation', () => {
 	// The implementation cut resumes into more implementation; the pre-gate cut resumes into the gate.
-	// The grouping is named once so `run-cut-cli.ts` cannot disagree with it. The retired setup phase
+	// The grouping is named once so `run-cut-resume.ts` cannot disagree with it. The retired setup phase
 	// (joshuafolkken/kit#2489) no longer resumes into implementation.
 	it('resumes implementation alone into implementation', () => {
 		expect(run_cut.resumes_into_implementation(run_cut.IMPLEMENTATION_PHASE)).toBe(true)

@@ -9,8 +9,8 @@ import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_stranded_detect, type WatchedRun } from '#scripts/run/run-stranded-detect'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { run_wake_cli } from './run-wake-cli'
 import type { WakeContext } from './run-wake-describe'
+import { run_wake_finish } from './run-wake-finish'
 
 // joshuafolkken/kit#3242. The Telegram limit cuts a long body from the tail, so the line that says
 // where the log is must come before the failure note, or the cut takes it.
@@ -30,10 +30,32 @@ const CONTEXT: WakeContext = {
 	worktree: '/stub/repo',
 }
 
-describe('run_wake_cli.warning_body', () => {
+// joshuafolkken/kit#1746. `backlogrun.md` promises that a failure is visible rather than silent, and
+// only one of the reasons a supervisor can stop on was wired to the notification — so a run left
+// asleep by an unreadable carry record reached nobody at all.
+describe('run_wake_finish.stop_body — which stops reach a person', () => {
+	it('warns on the stops that leave a carried run with nobody watching it', () => {
+		expect(run_wake_finish.stop_body('failed')).toBeDefined()
+		expect(run_wake_finish.stop_body('unreadable')).toBeDefined()
+	})
+
+	// The run finished, or a person stopped the supervisor themselves. A warning channel that fires on
+	// those is one that stops being read.
+	it('stays silent where nothing went wrong', () => {
+		expect(run_wake_finish.stop_body('ended')).toBeUndefined()
+		expect(run_wake_finish.stop_body('stopped')).toBeUndefined()
+		expect(run_wake_finish.stop_body('reload')).toBeUndefined()
+	})
+})
+
+describe('run_wake_finish.warning_body', () => {
 	it('keeps the log hint when the Telegram limit cuts a long failure note', () => {
 		const note = `error spawn git ENOENT\n${'stderr line\n'.repeat(LONG_NOTE_REPEAT)}`
-		const body = run_wake_cli.warning_body({ reason: 'failed', note }, 'The wake failed.', CONTEXT)
+		const body = run_wake_finish.warning_body(
+			{ reason: 'failed', note },
+			'The wake failed.',
+			CONTEXT,
+		)
 		const text = build_text({
 			task_type: 'warning',
 			repo_name: 'kit',
@@ -48,7 +70,7 @@ describe('run_wake_cli.warning_body', () => {
 	})
 
 	it('leaves out a missing note', () => {
-		const body = run_wake_cli.warning_body(
+		const body = run_wake_finish.warning_body(
 			{ reason: 'unreadable', note: undefined },
 			'Unreadable.',
 			CONTEXT,
@@ -71,10 +93,10 @@ function stub_strand(is_left_stranded: boolean): void {
 
 function silence(): void {
 	vi.spyOn(console, 'error').mockReturnValue()
-	vi.spyOn(console, 'log').mockReturnValue()
+	vi.spyOn(console, 'info').mockReturnValue()
 }
 
-describe('run_wake_cli.record_failure', () => {
+describe('run_wake_finish.record_failure', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
 	})
@@ -82,7 +104,7 @@ describe('run_wake_cli.record_failure', () => {
 	it('leaves a stranded event carrying the driver’s own error on a failed stop', async () => {
 		stub_strand(true)
 
-		await run_wake_cli.record_failure(FAILED_STOP, WATCHED, true)
+		await run_wake_finish.record_failure(FAILED_STOP, WATCHED, true)
 
 		expect(run_stranded_detect.is_left_stranded).toHaveBeenCalledWith(WATCHED)
 		expect(run_event_stream_emit.emit).toHaveBeenCalledExactlyOnceWith(
@@ -94,7 +116,7 @@ describe('run_wake_cli.record_failure', () => {
 	it('leaves no event on a stop that is not a failure', async () => {
 		stub_strand(true)
 
-		await run_wake_cli.record_failure({ reason: 'unreadable', note: undefined }, WATCHED, true)
+		await run_wake_finish.record_failure({ reason: 'unreadable', note: undefined }, WATCHED, true)
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
@@ -103,7 +125,7 @@ describe('run_wake_cli.record_failure', () => {
 	it('leaves no event when the failed stop does not leave the run stranded', async () => {
 		stub_strand(false)
 
-		await run_wake_cli.record_failure(FAILED_STOP, WATCHED, true)
+		await run_wake_finish.record_failure(FAILED_STOP, WATCHED, true)
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
@@ -112,7 +134,7 @@ describe('run_wake_cli.record_failure', () => {
 	it('leaves no event when the warning reached nobody', async () => {
 		stub_strand(true)
 
-		await run_wake_cli.record_failure(FAILED_STOP, WATCHED, false)
+		await run_wake_finish.record_failure(FAILED_STOP, WATCHED, false)
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
@@ -120,7 +142,7 @@ describe('run_wake_cli.record_failure', () => {
 
 // The states a failed supervisor actually meets, read through the real judgement and real records: the
 // driver adopted the record for this very process, or the record stopped reading altogether.
-const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-cli-warning-test-'))
+const scratch = mkdtempSync(path.join(tmpdir(), 'run-wake-finish-test-'))
 
 function watched_in(name: string): WatchedRun {
 	return {
@@ -140,7 +162,7 @@ function own_carry(): RunCarry {
 	}
 }
 
-describe('run_wake_cli.record_failure — the records a failed supervisor leaves', () => {
+describe('run_wake_finish.record_failure — the records a failed supervisor leaves', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
 	})
@@ -155,7 +177,7 @@ describe('run_wake_cli.record_failure — the records a failed supervisor leaves
 		vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 		stamp_file.write_stamp(watched.carry_target, own_carry())
 
-		await run_wake_cli.record_failure(FAILED_STOP, watched, true)
+		await run_wake_finish.record_failure(FAILED_STOP, watched, true)
 
 		expect(run_event_stream_emit.emit).toHaveBeenCalledOnce()
 	})
@@ -163,7 +185,7 @@ describe('run_wake_cli.record_failure — the records a failed supervisor leaves
 	it('leaves the event when the record no longer reads and no `--end` closed the run', async () => {
 		vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 
-		await run_wake_cli.record_failure(FAILED_STOP, watched_in('unread'), true)
+		await run_wake_finish.record_failure(FAILED_STOP, watched_in('unread'), true)
 
 		expect(run_event_stream_emit.emit).toHaveBeenCalledOnce()
 	})
@@ -174,13 +196,13 @@ describe('run_wake_cli.record_failure — the records a failed supervisor leaves
 		vi.spyOn(run_event_stream_emit, 'emit').mockResolvedValue()
 		run_carry_ended.record_ended(watched.ended_target, { kind: 'carried', carry: own_carry() })
 
-		await run_wake_cli.record_failure(FAILED_STOP, watched, true)
+		await run_wake_finish.record_failure(FAILED_STOP, watched, true)
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
 })
 
-describe('run_wake_cli.finish', () => {
+describe('run_wake_finish.finish', () => {
 	afterEach(() => {
 		vi.restoreAllMocks()
 	})
@@ -191,9 +213,10 @@ describe('run_wake_cli.finish', () => {
 
 		vi.spyOn(telegram_notify, 'warn').mockResolvedValue(true)
 
-		const code = await run_wake_cli.finish(FAILED_STOP, CONTEXT, STARTED_AT)
+		const code = await run_wake_finish.finish(FAILED_STOP, CONTEXT, STARTED_AT)
 
 		expect(code).toBe(1)
+		expect(console.info).toHaveBeenCalledWith('failed')
 		expect(run_event_stream_emit.emit).toHaveBeenCalledOnce()
 	})
 
@@ -203,7 +226,7 @@ describe('run_wake_cli.finish', () => {
 
 		vi.spyOn(telegram_notify, 'warn').mockResolvedValue(false)
 
-		await run_wake_cli.finish(FAILED_STOP, CONTEXT, STARTED_AT)
+		await run_wake_finish.finish(FAILED_STOP, CONTEXT, STARTED_AT)
 
 		expect(run_event_stream_emit.emit).not.toHaveBeenCalled()
 	})
