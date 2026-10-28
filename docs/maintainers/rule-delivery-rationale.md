@@ -103,7 +103,7 @@ The implementation reuse and verdict details taken out of the procedure's list.
   beside nothing but `echo` / `:` / `date`
 - **The idle run tail** — a call carrying `run_in_background` is not the trigger
 - **The implementation-phase cut** — the cost is measured with the same statistics and the same
-  `CONTEXT_CUT_THRESHOLD` as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
+  model-priced threshold as `pnpm josh cost --cut`, and an unmeasurable cost fires on the safe side
   through `!== UNDER`. It fires every time the threshold is crossed (`decide`,
   joshuafolkken/kit#2385), and it lets the
   immediate reissue of the same edit through, so `busy` / `failed` do not spin
@@ -299,6 +299,9 @@ lists the old opening in its row's `former_reasons`. The history the texts used 
   against a 1.40 target, as every advisory attempt before it (joshuafolkken/kit#1304, #1329, #1337,
   #1390). A `PreToolUse` hook cannot see the turn it is in; the lever that moved the density is a
   composite command (`read:files` / `edit:files`, joshuafolkken/kit#2202, #2311).
+- `search-batching` → `refuse`. Search chains (`grep` / `sed` one per turn) were the largest share of
+  lane-child single-call pairs, about 10,600 in 14 days (joshuafolkken/kit#5342); a refusal re-fires
+  every third single-call search turn and stands aside where the investigation guard refuses the call.
 - `duplicate-read` → `notice`. Unchanged re-reads are measured in lane children above all
   (joshuafolkken/kit#2298 baseline: 8.0 per lane run), so `off` would neuter it where the count lives.
 - `rule` → `refuse`. A cut carried as prose fired 0 times (joshuafolkken/kit#1864,

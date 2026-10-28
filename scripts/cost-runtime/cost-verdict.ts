@@ -9,9 +9,12 @@ const UNDER_VERDICT = 'under'
 
 // What `--over` reads of a session: the billed input each request paid, oldest first. The sequence
 // is carried rather than a single sum because the hand-off prices the newest request alone
-// — a sum could not answer what the session's current context costs.
+// — a sum could not answer what the session's current context costs. `model` is the newest request's
+// model, which prices the cut threshold (`context-cut-payback.ts`); a provider that records none
+// leaves it absent and is read at the standard cache rate.
 interface OverMeasurement {
 	billed_input_per_request: ReadonlyArray<number>
+	model?: string | undefined
 }
 
 // What a turn costs is decided by the accumulated preamble, not by what the turn does, so the

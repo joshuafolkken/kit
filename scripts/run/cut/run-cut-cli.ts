@@ -75,7 +75,7 @@ const {
 } = run_cut_report
 
 // **The pre-gate cut is conditional on the same statistic the implementation-phase cut reads**.
-// `cost_cli.session_verdict` prices the newest request against `CONTEXT_CUT_THRESHOLD`, so no second
+// `cost_cli.session_verdict` prices the newest request against the `--cut` break-even, so no second
 // threshold is introduced — an `under` session skips the cut, and an unmeasurable one still cuts as
 // the safety net. Only the pre-gate phase is checked here; the implementation-phase caller gates its own
 // `--impl` cut on `pnpm josh cost --cut` before it is ever issued.

@@ -19,55 +19,57 @@ import { cost_pricing } from './cost-pricing'
 const POST_CUT_CONTEXT = 60_000
 
 // The requests a resumed session is expected to still run — the horizon the break-even is measured
-// against. A cut only pays if enough requests remain to recoup the preamble rewrite; even the shortest
-// resume (into the gate, commit, PR and merge) runs on the order of ten. Ten is the conservative
-// horizon: it keeps the shared threshold near the empirically validated 150_000 (this lands at
-// 135_000, inside the simulated 100k–200k band) while pricing the decision from the cost model. It is the knob a before/after lane measurement tunes.
-const EXPECTED_REMAINING_REQUESTS = 10
+// against. A cut only pays if enough requests remain to recoup the preamble rewrite. Measured, not
+// chosen: the lane children resumed after a cut over the 14 days to 2026-10-28 ran a median of 23
+// requests per resumed session (748 sessions; p25 11, p90 68 — #5341). The median, not the mean, so a
+// few long resumes do not pull every cut earlier.
+const EXPECTED_REMAINING_REQUESTS = 23
 
 // The price of a dropped token relative to a rewritten one, from `cost-pricing.ts`. A cache read bills
-// `DEFAULT_CACHE_READ_MULTIPLIER` of base input and a 5-minute cache write `CACHE_WRITE_5M_MULTIPLIER`,
-// so a preamble rewrite costs this many per-request cache reads. The base input rate is common to both
-// and cancels, which is why only the ratio appears.
-//
-// **The standard cache-read rate, deliberately, not the running model's.** Opus 5.5 reads cache at
-// 0.05x and Fable 5.1 at 0.025x, which would move the threshold from 135,000 to 210,000 and 360,000 —
-// outside the 100k–200k band the cut was validated in. That changes when a cut fires, a decision that
-// needs a lane measurement of its own rather than arriving as a side effect of a corrected price list.
-function write_over_read(): number {
-	return cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.DEFAULT_CACHE_READ_MULTIPLIER
+// the running model's cache-read multiplier of base input and a 5-minute cache write
+// `CACHE_WRITE_5M_MULTIPLIER`, so a preamble rewrite costs this many per-request cache reads. The base
+// input rate is common to both and cancels, which is why only the ratio appears. A model that reads
+// cache cheaper (Opus 5.5 at 0.05x, Fable 5.1 at 0.025x) saves less per dropped token, so its cut
+// breaks even later; an unpriced model reads at the standard rate.
+function write_over_read(model: string | undefined): number {
+	return cost_pricing.CACHE_WRITE_5M_MULTIPLIER / cost_pricing.cache_read_multiplier_of(model)
 }
 
-// The current per-request context at which a cut breaks even over exactly `remaining` requests. The
-// shared cut threshold is this evaluated at `EXPECTED_REMAINING_REQUESTS`; rounded to an integer so the
+// The current per-request context at which a cut breaks even for `model` over exactly `remaining`
+// requests. The cut threshold `pnpm josh cost --cut` applies is this evaluated at
+// `EXPECTED_REMAINING_REQUESTS` for the session's newest request's model; rounded to an integer so the
 // `>` comparison against a per-request billed-input count has no floating-point seam.
-function break_even_context(remaining: number = EXPECTED_REMAINING_REQUESTS): number {
+function break_even_context(
+	model: string | undefined,
+	remaining: number = EXPECTED_REMAINING_REQUESTS,
+): number {
 	if (remaining <= 0) return Infinity
 
-	return Math.round(POST_CUT_CONTEXT * (1 + write_over_read() / remaining))
+	return Math.round(POST_CUT_CONTEXT * (1 + write_over_read(model) / remaining))
 }
 
 // The requests a cut must save over before it recoups its own preamble rewrite, at a given current
 // per-request context. Decreasing in context: the more a request currently pays, the fewer resumed
 // requests are needed to earn the cut back. Exposed as the diagnostic the break-even is read in —
-// `break_even_requests(current) < remaining` is the same decision as `pays_back`.
-function break_even_requests(current_context: number): number {
+// `break_even_requests(current, model) < remaining` is the same decision as `pays_back`.
+function break_even_requests(current_context: number, model: string | undefined): number {
 	const saved_per_request = current_context - POST_CUT_CONTEXT
 
 	if (saved_per_request <= 0) return Infinity
 
-	return (POST_CUT_CONTEXT * write_over_read()) / saved_per_request
+	return (POST_CUT_CONTEXT * write_over_read(model)) / saved_per_request
 }
 
 // Whether cutting now pays back: the current per-request context has grown past the break-even point
 // for the expected remaining requests. Compared against the rounded `break_even_context` with `>`, so
-// it agrees to the token with `cost_verdict.classify` reading the derived `CONTEXT_CUT_THRESHOLD` — the
-// same one decision, whether a caller holds the threshold or asks this function.
+// it agrees to the token with `cost_verdict.classify` reading the same threshold — the same one
+// decision, whether a caller holds the threshold or asks this function.
 function pays_back(
 	current_context: number,
+	model: string | undefined,
 	remaining: number = EXPECTED_REMAINING_REQUESTS,
 ): boolean {
-	return current_context > break_even_context(remaining)
+	return current_context > break_even_context(model, remaining)
 }
 
 const context_cut_payback = {

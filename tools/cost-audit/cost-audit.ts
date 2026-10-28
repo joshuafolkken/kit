@@ -1,6 +1,7 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
 import { guard_friction } from '#tools/retrospective/guard-friction'
+import { cost_audit_density, type Density } from './cost-audit-density'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_tool } from './cost-audit-tool'
@@ -39,8 +40,14 @@ interface AuditRow {
 	is_regression: boolean
 }
 
+interface LaneDensity {
+	current: Density
+	previous: Density
+}
+
 interface Audit {
 	days: number
+	lane_density: LaneDensity
 	total: AuditRow
 	merges: MergeCounts | undefined
 	per_merge: AuditRow | undefined
@@ -161,6 +168,10 @@ function audit(input: AuditInput): Audit {
 
 	return {
 		days: input.days,
+		lane_density: {
+			current: cost_audit_density.density_of(inside(input.sessions, current_window)),
+			previous: cost_audit_density.density_of(inside(input.sessions, previous_window)),
+		},
 		total: row('total', current.total, previous.total),
 		merges: input.merges,
 		per_merge: per_merge(current, previous, input.merges),
@@ -181,5 +192,5 @@ function since_ms(days: number, now_ms: number): number {
 
 const cost_audit = { DEFAULT_PERIOD_DAYS, audit, since_ms, windows_of }
 
-export type { Audit, AuditRow, AuditWindow, MergeCounts }
+export type { Audit, AuditRow, AuditWindow, LaneDensity, MergeCounts }
 export { cost_audit }

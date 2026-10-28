@@ -191,7 +191,8 @@ dependent, so it does not stop them. The mechanism is `docs/josh-commands-automa
 - **Only the read-only `pnpm josh …` allow-list (`READ_JOSH_SUBCOMMANDS`) is bundleable** — a writing
   or sending subcommand and a chained line (`&&` / `|` / `>`) fall to the ordinary judgement
 - **A tool-less turn, and a lane child whose guard is `off`** — the round-trip measurement and the
-  composite commands cover them. In a lane child nothing stops an alternating `Read` → `Edit` sequence,
+  composite commands cover them; the lane child's one refusal left is a chain of single-call searches
+  (the `search-batching` row, joshuafolkken/kit#5342). In a lane child nothing stops an alternating `Read` → `Edit` sequence,
   which is why the composite commands were added (joshuafolkken/kit#2202, `edit:files`
   joshuafolkken/kit#2366); since joshuafolkken/kit#2311 the guard's notice hands over the
   `read:files` / `edit:files` call that folds the singles it fired on (the plan body is still the

@@ -43,6 +43,11 @@ function transcript(...groups: Array<Array<string>>): string {
 	return groups.flat().join('\n')
 }
 
+// A shell call, the shape the search-chain cases issue (kit#5342).
+function bash_call(command: string): GuardedCall {
+	return { name: 'Bash', input: { command } }
+}
+
 export {
 	CHAINED_SED_CALL,
 	DELEGATION_TOOL,
@@ -62,5 +67,6 @@ export {
 	WRITE_CALL,
 	WRITE_LABEL,
 	WRITE_TOOL,
+	bash_call,
 	transcript,
 }

@@ -66,9 +66,10 @@ interface MergeContext extends Pick<
 	child: string
 	epic: string | undefined
 	repo: string | undefined
-	// The hand-off threshold, or `undefined` where no AI session owns the loop — the supervisor's
-	// `backlog:drive` has no context to cut, so a merge there is never handed back as `over`.
-	over: number | undefined
+	// `true` where the merge asks the session's `pnpm josh cost --cut` verdict, or `undefined` where no
+	// AI session owns the loop — the supervisor's `backlog:drive` has no context to cut, so a merge
+	// there is never handed back as `over`.
+	over: true | undefined
 	owner: CarryOwner
 	// The child's transcript output path, when the caller passed `--output`. Read to tell an API-outage
 	// ending apart from a genuine child failure; absent leaves outage detection off, so the child is
@@ -481,11 +482,12 @@ async function resume_cut(child: string): Promise<boolean> {
 }
 
 // The hand-off check, asked at a merge alone. A subprocess that cannot measure exits non-zero, which
-// is read as `over` — "could not measure" is never "still cheap". No threshold is no session to measure.
-async function is_over_budget(over: number | undefined): Promise<boolean> {
+// is read as `over` — "could not measure" is never "still cheap". No check is no session to measure.
+// `--cut`, not a number: the threshold is priced at the session's own model.
+async function is_over_budget(over: true | undefined): Promise<boolean> {
 	if (over === undefined) return false
 
-	const result = await josh(['cost', '--over', String(over)])
+	const result = await josh(['cost', '--cut'])
 
 	return result.code !== 0 || result.out === OVER
 }

@@ -99,8 +99,16 @@ hand-picked number with the arithmetic behind it. A cut costs one preamble rewri
 ~60,000 tokens) and saves the dropped context's cache read on every later request, so it turns on a
 rate, not a ceiling: `scripts/cost-runtime/context-cut-payback.ts` computes the per-request context at
 which a cut pays back over the expected remaining requests, from the cache multipliers in
-`cost-pricing.ts` (no second price list). At a 10-request horizon that is 135,000, inside #2374's band;
-the horizon is the knob a before/after lane measurement tunes.
+`cost-pricing.ts` (no second price list). At a 10-request horizon and the standard 0.1x read rate that
+was 135,000, inside #2374's band; the horizon is the knob a before/after lane measurement tunes.
+
+**The rate is the session's model.** joshuafolkken/kit#5341 found the fixed 135,000 priced every model at
+the standard 0.1x cache read, so Opus 5.5 (0.05x) cut where a cut does not yet pay back. The break-even
+now reads `cache_read_multiplier_of` for the newest record's model (unpriced or absent → 0.1x), and the
+horizon is the measured p50 of 23 requests per resumed lane session (748 sessions, 14 days to
+2026-10-28; p25 11, p90 68): ~125,000 for Opus 5.5, ~93,000 at the standard rate — #2374's band
+predates the measured horizon, so the standard-rate figure is not checked against it. No fixed figure is
+right for every run, so every reader names `pnpm josh cost --cut`, which prints the current one.
 
 **The resume side is priced.** Until joshuafolkken/kit#2312 the pre-gate cut was unconditional, and its
 case recorded only the gain — the context reduction it carries (~130k → ~60k per request). A cut

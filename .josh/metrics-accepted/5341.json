@@ -1,0 +1,10 @@
+{
+	"reason": "#5341 prices the context-cut threshold at the session model: model parameter threaded through payback/cost-cli, and a rationale paragraph recording the measured 23-request horizon",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 20,
+		"ai_cost.on_demand_bytes": 30,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}

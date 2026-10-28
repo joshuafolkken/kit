@@ -1,11 +1,13 @@
-import { run_cut } from '#scripts/run/cut/run-cut'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { context_cut_payback } from './context-cut-payback'
-import { CONTEXT_CUT_THRESHOLD } from './context-cut-threshold'
 import { cost_usage, type UsageRecord, type UsageTotals } from './cost-usage'
 import { cost_verdict, type OverMeasurement } from './cost-verdict'
 
 const OPUS = 'claude-opus-5'
+// The threshold the 2026-10-05 requests below were measured against: the standard-rate break-even over
+// the ten-request horizon of the time.
+const HORIZON_OF_THE_TIME = 10
+const CONTEXT_CUT_THRESHOLD = context_cut_payback.break_even_context(OPUS, HORIZON_OF_THE_TIME)
 const FAILURE_EXIT_CODE = 1
 const SHORT_LOW = 100
 const SHORT_HIGH = 300
@@ -157,17 +159,10 @@ describe('cost_verdict.classify', () => {
 // child cuts, at or below it it keeps implementing, and the shared threshold is single-sourced so
 // the scheduler and worker cannot drift.
 describe("cost_verdict.report_over at the lane child's implementation threshold", () => {
-	// joshuafolkken/kit#2406 replaced the hand-picked ceiling with the break-even context: at
-	// POST_CUT_CONTEXT 60_000 and a 10-request horizon that is 135_000, and it is derived from the
-	// payback model rather than restated, so this pins the derivation, not a second literal.
-	const EXPECTED_CONTEXT_CUT_THRESHOLD = 135_000
-	const threshold = CONTEXT_CUT_THRESHOLD
-
-	it('uses the break-even context as the shared threshold', () => {
-		expect(CONTEXT_CUT_THRESHOLD).toBe(EXPECTED_CONTEXT_CUT_THRESHOLD)
-		expect(CONTEXT_CUT_THRESHOLD).toBe(context_cut_payback.break_even_context())
-		expect(run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD).toBe(CONTEXT_CUT_THRESHOLD)
-	})
+	// joshuafolkken/kit#2406 replaced the hand-picked ceiling with the break-even context, and
+	// joshuafolkken/kit#5341 priced it at the session's model; the figures are pinned in
+	// `context-cut-payback.test.ts`.
+	const threshold = context_cut_payback.break_even_context(OPUS)
 
 	it.each([
 		[cost_verdict.UNDER_VERDICT, threshold - 1],
