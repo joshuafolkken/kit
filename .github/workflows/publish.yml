@@ -41,7 +41,7 @@ jobs:
       - name: Read registry latest
         id: registry-latest
         run: |
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
+          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org)
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/setup-pnpm
@@ -101,12 +101,13 @@ jobs:
       # run publishing in between does not stop this one; a newer one stops the job before it
       # publishes, and re-running all jobs chooses again. `sort -V` ranks a prerelease above its
       # release, which can only stop a valid run, never let a stale one through. `backfill` needs no
-      # check: a later `latest` is never lower than the one `pack` read. The user config is skipped
-      # so the scoped GitHub Packages registry setup-node wrote does not redirect the lookup.
+      # check: a later `latest` is never lower than the one `pack` read. The lookup runs in an empty
+      # directory with the user config skipped: setup-node writes its scoped GitHub Packages registry to
+      # `$RUNNER_TEMP/.npmrc`, which npm reads as the project config from there (joshuafolkken/kit#5376).
       - name: Confirm npm latest is not newer
         if: needs.pack.outputs.tag == 'latest'
         run: |
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
+          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
           if ! printf '%s\n%s\n' "$latest" "$VERSION" | sort -V -C; then
             echo "::error::npm latest moved to $latest, above $VERSION, after pack chose the tag; re-run all jobs"
             exit 1
@@ -152,7 +153,7 @@ jobs:
       - name: Confirm npm latest is not newer
         if: needs.pack.outputs.tag == 'latest'
         run: |
-          latest=$(cd "$RUNNER_TEMP" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
+          latest=$(cd "$(mktemp -d)" && npm view @joshuafolkken/kit dist-tags.latest --registry https://registry.npmjs.org --userconfig /dev/null)
           if ! printf '%s\n%s\n' "$latest" "$VERSION" | sort -V -C; then
             echo "::error::npm latest moved to $latest, above $VERSION, after pack chose the tag; re-run all jobs"
             exit 1

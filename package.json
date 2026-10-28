@@ -22,7 +22,7 @@
 		"type": "git",
 		"url": "git+https://github.com/joshuafolkken/kit.git"
 	},
-	"packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
+	"packageManager": "pnpm@12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61",
 	"engines": {
 		"node": "^22.19.0 || ^24.0.0 || >=26.0.0"
 	},
@@ -244,7 +244,7 @@
 		"prettier": "^3.9.10",
 		"prettier-plugin-svelte": "^4.1.1",
 		"prettier-plugin-tailwindcss": "^0.8.1",
-		"rollup": "^4.64.12",
+		"rollup": "^4.65.0",
 		"rollup-plugin-dts": "^6.5.1",
 		"secretlint": "^13.0.7",
 		"typescript": "^6.0.3",
@@ -254,7 +254,7 @@
 	"dependencies": {
 		"cli-spinners": "^3.4.0",
 		"csv-parse": "^7.0.3",
-		"execa": "^10.2.0",
+		"execa": "^10.2.1",
 		"flatted": "^3.4.4",
 		"js-yaml": "^5.5.0",
 		"jsonc-parser": "^3.3.1",
@@ -269,7 +269,7 @@
 	"devEngines": {
 		"packageManager": {
 			"name": "pnpm",
-			"version": "12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
+			"version": "12.15.0+sha512.b3951d6d6ff4a9f13dc7cf56cd28d2b8eb37dbcc9c68e52e1e1191873ea9f82a017287ab50baadc5ccc494f036c67c0e47eb13608c2fa36f47711b61ea128e61",
 			"onFail": "download"
 		}
 	}

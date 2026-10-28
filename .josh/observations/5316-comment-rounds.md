@@ -1,0 +1,2 @@
+- rf:tests | low | scripts/followup/followup-job-rerun.test.ts:173 | 2026-10-28 | #5316
+- rf:comments | low | .claude/skills/workflow-commands/followup.md:34 | 2026-10-28 | #5316

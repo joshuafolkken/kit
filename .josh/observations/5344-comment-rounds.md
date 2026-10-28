@@ -1,0 +1,5 @@
+- rf:bug-risks | low | tools/cost-audit/cost-audit-rewrite.ts:37 | 2026-10-28 | #5344
+- rf:comments | low | tools/cost-audit/cost-audit-rewrite.ts:56 | 2026-10-28 | #5344
+- rf:comments | low | tools/cost-audit/cost-audit-format.ts:66 | 2026-10-28 | #5344
+- rf:tests | low | tools/cost-audit/cost-audit.ts:170 | 2026-10-28 | #5344
+- rf:project-conventions | low | .claude/skills/workflow-commands/background-commands.md:19 | 2026-10-28 | #5344

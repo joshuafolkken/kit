@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/version/development-engines-verdict.ts:91 | 2026-10-28 | #5288

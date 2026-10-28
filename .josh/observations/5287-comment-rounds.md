@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/review/prose-stale-cli.ts:29 | 2026-10-28 | #5287
+- rf:bug-risks | low | scripts/test/test-pinned-logic.ts:154 | 2026-10-28 | #5287
