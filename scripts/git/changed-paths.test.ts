@@ -1,14 +1,24 @@
 import { describe, expect, it, vi } from 'vitest'
 
 const diff_main_names = vi.fn()
+const diff_names_since = vi.fn()
 const diff_cached_names = vi.fn()
 const untracked_names = vi.fn()
 const tree_names_at = vi.fn()
+const resolved_through_merge = vi.fn()
 
+vi.mock('./change-base', () => ({
+	change_base: {
+		resolved_through_merge: async (): Promise<string | undefined> =>
+			(await resolved_through_merge()) as string | undefined,
+	},
+}))
 vi.mock('./git-command', () => ({
 	git_command: {
 		diff_cached_names: async (): Promise<string> => (await diff_cached_names()) as string,
 		diff_main_names: async (): Promise<string> => (await diff_main_names()) as string,
+		diff_names_since: async (...parameters: Array<unknown>): Promise<string> =>
+			(await diff_names_since(...parameters)) as string,
 		tree_names_at: async (...parameters: Array<unknown>): Promise<string> =>
 			(await tree_names_at(...parameters)) as string,
 		untracked_names: async (): Promise<string> => (await untracked_names()) as string,
@@ -19,6 +29,7 @@ const { changed_paths } = await import('./changed-paths')
 
 const UNTRACKED = 'new.ts'
 const TRACKED = 'tracked.ts'
+const LATER_BASE = 'later-base'
 
 describe('changed_paths.to_paths', () => {
 	it('drops blank lines and surrounding whitespace', () => {
@@ -41,6 +52,17 @@ describe('changed_paths.read_changed_paths', () => {
 			TRACKED,
 			UNTRACKED,
 		])
+	})
+
+	// joshuafolkken/kit#5307: through a merge in progress the tree's base is the later one, so the
+	// default branch's files the merge brought in are not read as this branch's.
+	it('reads the tracked diff from the base through a merge in progress', async () => {
+		resolved_through_merge.mockResolvedValueOnce(LATER_BASE)
+		diff_names_since.mockResolvedValue(TRACKED)
+		untracked_names.mockResolvedValue('')
+
+		await expect(changed_paths.read_changed_paths(false)).resolves.toStrictEqual([TRACKED])
+		expect(diff_names_since).toHaveBeenCalledWith(LATER_BASE)
 	})
 
 	// A file staged for addition is already in the cached diff, so the staged form must not add them
