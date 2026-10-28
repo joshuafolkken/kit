@@ -436,10 +436,11 @@ The result reads the follow-ups' labels: `届かなかった` when one carries `
 
 <!-- usage: report:lint -->
 
-Check a two-layer work summary on stdin against its mechanical format rules.
+Check a two-layer work summary, or with --child-summary a lane child's summary, on stdin against its mechanical format rules.
 
 ```bash
 pnpm josh report:lint < summary.md
+pnpm josh report:lint --child-summary < summary.md
 ```
 
 <!-- /usage -->
@@ -447,6 +448,8 @@ pnpm josh report:lint < summary.md
 The format is `CLAUDE.md` Step 0, in `prompts/collaboration-workflow/report-format.md`. It enforces the mechanical half: labels present, no overview line over its character ceiling, no code fence around the summary, no file path or CLI flag in the overview.
 
 Prints `ok` (exit 0), or the violations one per line plus one line naming the template's section in `report-format.md` (exit 1). The writer judges whether the overview names a concrete subject. The labels follow `JOSH_SESSION_LANG` (`ja`, else English), from the table `josh report:template` prints.
+
+`--child-summary` checks a lane child's closing summary instead: its line bound over non-blank lines, the cause / fix / result labels in the session language, and no changed-file list (two or more consecutive path-only bullets). A failure's last line names the section that shapes it.
 
 ### `josh report:template`
 
@@ -785,7 +788,7 @@ Wave 2  #2765 [run:solo]
 Wave 3  #2774 #2766 #2769   (parallel)
 ```
 
-Sections: **Ready now** (runnable children grouped by repository; a `run:solo` row is marked `[run:solo]`, one with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
+Sections: **Ready now** (runnable children grouped by repository, in the order the offer walks them — an issue that yielded its lane first, then the rank — so each wave keeps this order; a `run:solo` row is marked `[run:solo]`, one with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
 **Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each naming its label), **Out of scope** (every open issue the backlog will not run, with the reason).
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".

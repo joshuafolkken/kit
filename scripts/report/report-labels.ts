@@ -141,6 +141,11 @@ const ENGLISH_LABELS: ReportLabels = {
 	handoff: ENGLISH_HANDOFF_LABELS,
 }
 
+// A lane child's summary holds at most this many non-blank lines — the bound
+// `backlogrun-child.md` → "What the summary carries, and how long it may be" states and
+// `report:lint --child-summary` checks, beside the `cause` / `fix` / `result` labels above.
+const CHILD_SUMMARY_MAX_LINES = 25
+
 function labels_for(lang: string): ReportLabels {
 	return session_language.is_japanese(lang) ? JAPANESE_LABELS : ENGLISH_LABELS
 }
@@ -149,7 +154,13 @@ function session_labels(): ReportLabels {
 	return labels_for(session_language.resolve_session_lang().lang)
 }
 
-const report_labels = { ENGLISH_LABELS, JAPANESE_LABELS, labels_for, session_labels }
+const report_labels = {
+	CHILD_SUMMARY_MAX_LINES,
+	ENGLISH_LABELS,
+	JAPANESE_LABELS,
+	labels_for,
+	session_labels,
+}
 
 export type { HandoffLabels, ReportLabels }
 export { report_labels }

@@ -30,19 +30,28 @@ function everything_in(result: EpicNextResult): ReadonlyArray<EpicChild> {
 // The ranking is `epic_rank.rank`, shared with a named epic's lanes.
 const { rank } = epic_rank
 
-// This repository's candidates re-ranked inside the result, so `backlog:plan` prints the order the
-// offer is decided in.
-function rank_result(result: EpicNextResult, repo: string): EpicNextResult {
+// This repository's candidates put in `order` inside the result; another repository's are left as
+// they came.
+function reorder_repo(
+	result: EpicNextResult,
+	repo: string,
+	order: (children: ReadonlyArray<EpicChild>) => ReadonlyArray<EpicChild>,
+): EpicNextResult {
 	if (result.verdict !== 'run') return result
-
-	const pool = everything_in(result)
 
 	return {
 		...result,
 		candidates: result.candidates.map((bundle) =>
-			bundle.repo === repo ? { ...bundle, children: rank(bundle.children, pool) } : bundle,
+			bundle.repo === repo ? { ...bundle, children: order(bundle.children) } : bundle,
 		),
 	}
+}
+
+// The rank `select` starts from; `offer_order` adds the yielded-first step for `backlog:plan`.
+function rank_result(result: EpicNextResult, repo: string): EpicNextResult {
+	const pool = everything_in(result)
+
+	return reorder_repo(result, repo, (children) => rank(children, pool))
 }
 
 // The standalone rows past the cap, in offer order.
@@ -111,6 +120,16 @@ function yielded_first(
 	]
 }
 
+// A ranked result in the order `select` walks it — a yielded issue ahead of the rank — so
+// `backlog:plan`'s "Ready now" reads in the order each wave is offered in (joshuafolkken/kit#5299).
+function offer_order(
+	result: EpicNextResult,
+	repo: string,
+	yielded: ReadonlySet<string> = new Set(),
+): EpicNextResult {
+	return reorder_repo(result, repo, (children) => yielded_first(children, yielded))
+}
+
 // The overlap separation runs before the cap, for the reason the gate does: the cap only ever
 // removes what would otherwise be offered.
 function select(input: OfferInput): SoloSelection {
@@ -145,7 +164,7 @@ function gate(result: EpicNextResult, read: BusyRead, repo: string, scope: GateS
 	)
 }
 
-const backlog_rank = { everything_in, gate, rank_result, select }
+const backlog_rank = { everything_in, gate, offer_order, rank_result, select }
 
 export { backlog_rank }
 export type { GateScope, OfferInput }

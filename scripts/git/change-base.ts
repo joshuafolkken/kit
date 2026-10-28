@@ -1,4 +1,5 @@
 import { git_command } from './git-command'
+import { git_diff_reads } from './git-diff-reads'
 import { git_spawn } from './git-spawn'
 
 // **The change base as a commit, or nothing — never a ref name**.
@@ -22,29 +23,22 @@ async function resolved(): Promise<string | undefined> {
 	}
 }
 
-const MERGE_BASE_COMMAND = 'merge-base'
-const MERGE_HEAD = 'MERGE_HEAD'
-const LINE_BREAK = '\n'
-
 // Where the side a merge in progress brings in left the default branch — `undefined` where no merge
 // is in progress, which is every ordinary run.
 async function incoming_base(): Promise<string | undefined> {
 	try {
 		const reference = await git_command.default_branch_reference()
 
-		return await git_spawn.read([MERGE_BASE_COMMAND, reference, MERGE_HEAD])
+		return await git_spawn.read([...git_diff_reads.incoming_base_arguments(reference)])
 	} catch {
 		return undefined
 	}
 }
 
-// `--independent` drops every commit another one listed reaches, so of two commits on the default
-// branch's history it keeps the later.
 async function later_of(base: string, incoming: string): Promise<string> {
-	const kept = await git_spawn.read([MERGE_BASE_COMMAND, '--independent', base, incoming])
-	const [later = base] = kept.split(LINE_BREAK)
+	const kept = await git_spawn.read([...git_diff_reads.later_base_arguments(base, incoming)])
 
-	return later
+	return git_diff_reads.later_base_of(kept, base)
 }
 
 // **The base of the tree, not of `HEAD`, while a merge is in progress.** A merge of the default

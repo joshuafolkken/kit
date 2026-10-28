@@ -48,6 +48,20 @@ async function build_lane(): Promise<void> {
 	await write(UNTRACKED_FILE, 'new\n')
 }
 
+// joshuafolkken/kit#5309: a merge of the default branch stopped on a conflict, so `HEAD` is still the
+// lane's commit while the default branch's own file already sits in the tree.
+async function stop_merge_on_conflict(): Promise<void> {
+	await commit_file(BASE_FILE, 'base\n')
+	await git(fixture.root, ['switch', '-c', LANE_BRANCH])
+	await commit_file(COMMITTED_FILE, 'lane\n')
+	await commit_file(BASE_FILE, 'lane\n')
+	await git(fixture.root, ['switch', 'main'])
+	await commit_file(BASE_FILE, 'main\n')
+	await commit_file(MAIN_ONLY_FILE, 'main\n')
+	await git(fixture.root, ['switch', LANE_BRANCH])
+	await expect(git(fixture.root, ['merge', 'main'])).rejects.toThrow(/CONFLICT/u)
+}
+
 beforeEach(async () => {
 	const opened = git_fixture_workspace.open_workspace(WORKSPACE_PREFIX)
 
@@ -74,6 +88,18 @@ describe('read_changed_paths', () => {
 			expect(new Set(changed)).toStrictEqual(
 				new Set([COMMITTED_FILE, UNCOMMITTED_FILE, UNTRACKED_FILE]),
 			)
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'measures through a merge in progress, so a file only the default branch brought in is not listed',
+		async () => {
+			await stop_merge_on_conflict()
+
+			const changed = changed_paths_sync.read_changed_paths(fixture.root)
+
+			expect(new Set(changed)).toStrictEqual(new Set([COMMITTED_FILE, BASE_FILE]))
 		},
 		TIMEOUT_MS,
 	)

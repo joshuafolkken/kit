@@ -1,0 +1,8 @@
+{
+	"reason": "report:lint --child-summary: a new lint mode, its CLI test and the one-line pointer in backlogrun-child.md (#5290)",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 99,
+		"ai_cost.on_demand_bytes": 120
+	}
+}

@@ -37,3 +37,14 @@ describe('report_format_reference.pointer', () => {
 		expect(report_format_reference.pointer('Some heading')).toContain('"Some heading"')
 	})
 })
+
+describe('report_format_reference.child_summary_pointer', () => {
+	it('resolves to a real section in the backlogrun child document', () => {
+		const text = report_format_reference.child_summary_pointer()
+
+		expect(text).toContain(
+			`${report_format_reference.CHILD_SUMMARY_PATH} → "${report_format_reference.CHILD_SUMMARY_HEADING}"`,
+		)
+		expect(section_reference_resolution.broken_section_references(text)).toEqual([])
+	})
+})

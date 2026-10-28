@@ -1017,7 +1017,7 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
       ],
     ],
     "report:lint": [
-      "(reads stdin)",
+      "[--child-summary] (reads stdin)",
       "automation",
       [
         "none",
