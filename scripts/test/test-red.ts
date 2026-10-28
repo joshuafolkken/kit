@@ -93,7 +93,7 @@ async function verdict_on(base: string, files: ReadonlyArray<string>): Promise<R
 // `no-test` — there is no pre-fix tree to run against, and a guard fails open. A change whose every path
 // is a test file is `test-only` without a run: the merge-base runs the same code as HEAD.
 async function run(): Promise<RedRun> {
-	const base = await change_base.resolved()
+	const base = await change_base.resolved_through_merge()
 	const paths = await changed_paths.read_changed_paths(false)
 	const files = changed_tests(paths)
 
