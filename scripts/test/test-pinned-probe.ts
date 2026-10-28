@@ -7,6 +7,7 @@ import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic
 import { test_pinned_ledger, type PinnedOrigin, type ProbeTime } from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
+import { test_pinned_stage, type Staged, type StagePlan } from './test-pinned-stage'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -19,83 +20,100 @@ import { unit_worker_share } from './unit-worker-share'
 //
 // A hunk with a `recheck` runs only those tests — the ones added or edited since its stored `green` or
 // `no-test` verdict, or the ones its stored `red` failed in (`test-pinned-cache-logic.ts`); a `red`
-// recheck they no longer fail falls back to every reaching test.
+// recheck they no longer fail falls back to a fresh probe, which runs in stages where the file's reach
+// is wide (`test-pinned-stage.ts`).
 
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
 const NO_TEST: RedProbe = { verdict: 'no-test', failed: [], ran: 0 }
 
-// One hunk to probe, with the index of its verdict among the caller's hunks.
+// One hunk to probe, with the index of its verdict among the caller's hunks and how many test files
+// its file reaches, where a graph counted them.
 interface Probe {
 	hunk: Hunk
 	index: number
 	recheck?: Recheck | undefined
+	reach?: number | undefined
 }
 
 type OnVerdict = (index: number, verdict: RedProbe) => Promise<void>
 
-// A hunk's related tests in the tree at `root`, narrowed by `josh test:related`'s rule
-// (joshuafolkken/kit#5122): a file every test imports reaches the test files importing it directly, not
-// the whole suite, and the heavy files a hunk reaches only indirectly are left out. `undefined` when the
-// hunk reaches no test.
-async function related_selection(
-	root: string,
-	file: string,
-): Promise<ReadonlyArray<string> | undefined> {
-	const importers = await direct_importers.every_test_importers(root, [file])
-	const files = importers.get(file) ?? [file]
+async function direct_of(root: string, file: string): Promise<Array<string>> {
+	const importers = await direct_importers.importers_of(root, [file])
 
+	return importers.get(file) ?? []
+}
+
+// What a fresh probe of the hunk runs in the tree at `root` (`test-pinned-stage.ts`). A file every
+// test imports stays the special case of joshuafolkken/kit#5122: its direct importers alone, never
+// escalated, since its reach is the whole suite — and `vitest related` handed it runs the whole suite.
+async function plan_of(root: string, probe: Probe): Promise<StagePlan> {
+	const { file } = probe.hunk
+
+	if (direct_importers.every_test_imports_of([file]).length > 0) {
+		return { reach: await direct_of(root, file) }
+	}
+
+	if (probe.reach === undefined) return { reach: [file] }
+
+	return test_pinned_stage.plan_over(file, await direct_of(root, file), probe.reach)
+}
+
+// The tests `files` reach in the tree at `root`, the heavy files reached only indirectly left out
+// (`josh test:related`'s rule). `undefined` when there are none.
+function selection_over(
+	root: string,
+	files: ReadonlyArray<string>,
+	workers: number,
+): Array<string> | undefined {
 	if (files.length === 0) return undefined
 
 	// vitest is handed the paths relative to the tree it runs in, as the exclusion reads them.
 	const scope: RelatedScope = { mode: 'related', files, reason: '' }
 	const placed: RelatedScope = { ...scope, files: files.map((test) => path.join(root, test)) }
+	const flags = related_heavy_tests.exclude_flags(placed, root)
 
-	return related_scope.vitest_arguments(scope, related_heavy_tests.exclude_flags(placed, root))
+	return [
+		...related_scope.vitest_arguments(scope, flags),
+		...unit_worker_share.worker_arguments([], workers),
+	]
 }
 
+function recheck_selection(recheck: Recheck, workers: number): Array<string> {
+	return ['run', ...recheck.recheck, ...unit_worker_share.worker_arguments([], workers)]
+}
+
+// The probe's first run: its recheck, or the first stage of its plan.
 async function selection_of(
 	root: string,
 	probe: Probe,
 	workers: number,
 ): Promise<Array<string> | undefined> {
-	const tests =
-		probe.recheck === undefined
-			? await related_selection(root, probe.hunk.file)
-			: ['run', ...probe.recheck.recheck]
+	if (probe.recheck !== undefined) return recheck_selection(probe.recheck, workers)
+	const plan = await plan_of(root, probe)
 
-	if (tests === undefined) return undefined
-
-	return [...tests, ...unit_worker_share.worker_arguments([], workers)]
+	return selection_over(root, plan.direct ?? plan.reach, workers)
 }
 
 // The run with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
 // tests would also see this revert.
-async function reverted_run(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
-	const selection = await selection_of(tree.tree, probe, workers)
-
+async function reverted_run(
+	tree: BaseTree,
+	hunk: Hunk,
+	selection: ReadonlyArray<string> | undefined,
+): Promise<RedProbe> {
 	if (selection === undefined) return NO_TEST
 
-	const target = path.join(tree.tree, probe.hunk.file)
+	const target = path.join(tree.tree, hunk.file)
 	const content = await readFile(target, 'utf8')
 
-	await writeFile(target, test_pinned_logic.revert(content, probe.hunk))
+	await writeFile(target, test_pinned_logic.revert(content, hunk))
 
 	try {
 		return await test_red.probe_in(tree, selection)
 	} finally {
 		await writeFile(target, content)
 	}
-}
-
-// The hunk's verdict: its recheck's answer, or a run over every reaching test where it answers none.
-async function verdict_of(tree: BaseTree, probe: Probe, workers: number): Promise<RedProbe> {
-	const run = await reverted_run(tree, probe, workers)
-	if (probe.recheck === undefined) return run
-
-	const answer = test_pinned_cache_logic.rechecked(probe.recheck, run)
-
-	return answer ?? (await reverted_run(tree, { ...probe, recheck: undefined }, workers))
 }
 
 // Set once a probe is unpinned in a `--first-unpinned` run (joshuafolkken/kit#5153): no lane starts
@@ -105,12 +123,36 @@ interface Halt {
 }
 
 // What every lane of one run shares: its workers per tree, the caller's hand-off, the probes' times,
-// and the halt a `--first-unpinned` run carries.
+// how many probes ran in stages, and the halt a `--first-unpinned` run carries.
 interface Lane {
 	workers: number
 	on_verdict: OnVerdict
 	times: Array<ProbeTime>
+	staged: Staged
 	halt?: Halt | undefined
+}
+
+// The hunk's verdict over every stage of its plan.
+async function fresh_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
+	const plan = await plan_of(tree.tree, probe)
+
+	async function run(files: ReadonlyArray<string>): Promise<RedProbe> {
+		return await reverted_run(tree, probe.hunk, selection_over(tree.tree, files, lane.workers))
+	}
+
+	return await test_pinned_stage.staged_verdict(plan, run, lane.staged)
+}
+
+// The hunk's verdict: its recheck's answer, or a fresh probe where it answers none.
+async function verdict_of(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
+	if (probe.recheck === undefined) return await fresh_verdict(tree, probe, lane)
+	const selection = recheck_selection(probe.recheck, lane.workers)
+	const run = await reverted_run(tree, probe.hunk, selection)
+
+	return (
+		test_pinned_cache_logic.rechecked(probe.recheck, run) ??
+		(await fresh_verdict(tree, probe, lane))
+	)
 }
 
 function halt_on(lane: Lane, verdict: RedProbe): void {
@@ -119,7 +161,7 @@ function halt_on(lane: Lane, verdict: RedProbe): void {
 
 async function timed_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<RedProbe> {
 	const started = Date.now()
-	const verdict = await verdict_of(tree, probe, lane.workers)
+	const verdict = await verdict_of(tree, probe, lane)
 
 	lane.times.push(test_pinned_ledger.time_of(probe.hunk, verdict, Date.now() - started))
 
@@ -178,28 +220,35 @@ interface CheckOptions {
 	origin?: PinnedOrigin | undefined
 }
 
+// The verdicts reached, in the probes' order, and how many of the probes ran in stages.
+interface Checked {
+	verdicts: Array<RedProbe>
+	staged: Staged
+}
+
 // The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
-// The run's ledger row counts the `held` hunks beside the probed ones' times. The verdicts reached, in
-// the probes' order — under `is_first_unpinned`, the ones started before the first unpinned verdict.
+// The run's ledger row counts the `held` hunks beside the probed ones' times. Under
+// `is_first_unpinned`, the verdicts are the ones started before the first unpinned verdict.
 async function checked_on(
 	paths: ReadonlyArray<string>,
 	probes: ReadonlyArray<Probe>,
 	on_verdict: OnVerdict,
 	options: CheckOptions = {},
-): Promise<Array<RedProbe>> {
+): Promise<Checked> {
 	const started = Date.now()
 	const times: Array<ProbeTime> = []
+	const staged = test_pinned_stage.none()
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
-	const verdicts = await pooled(paths, probes, { on_verdict, times, halt })
+	const verdicts = await pooled(paths, probes, { on_verdict, times, staged, halt })
 
 	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0, origin: options.origin }
 
 	await test_pinned_ledger.record(skipped, times, Date.now() - started)
 
-	return verdicts
+	return { verdicts, staged }
 }
 
 const test_pinned_probe = { checked_on, selection_of }
 
-export type { CheckOptions, Probe }
+export type { CheckOptions, Checked, Probe }
 export { test_pinned_probe }

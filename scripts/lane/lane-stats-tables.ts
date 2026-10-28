@@ -11,6 +11,7 @@ import { lane_paused_spans } from './lane-paused-spans'
 import { lane_process_stats } from './lane-process-stats'
 import { lane_round_one_stats } from './lane-round-one-stats'
 import { lane_round_two_stats } from './lane-round-two-stats'
+import { lane_ship_lap_stats } from './lane-ship-lap-stats'
 import { lane_split_stats } from './lane-split-stats'
 import { lane_stage_stats } from './lane-stage-stats'
 import type { StatsWindow } from './lane-stats'
@@ -32,6 +33,7 @@ interface PeriodRecords {
 function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindow): Array<string> {
 	return [
 		lane_stage_stats.table(entries, window),
+		lane_ship_lap_stats.table(entries, window),
 		lane_ci_path_stats.table(entries, window),
 		lane_implement_stats.table(calls, window, lane_paused_spans.by_lane(entries)),
 		lane_stop_stats.table(entries, window, events),

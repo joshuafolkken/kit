@@ -96,6 +96,13 @@ describe('direct_importers.every_test_importers', () => {
 		expect(importers.get(EVERY_TEST_MODULE)).toEqual([RELATIVE_IMPORTER, ALIASED_IMPORTER])
 	})
 
+	// joshuafolkken/kit#5292: `importers_of` reads any file, not only the ones every test imports.
+	it('maps any file to the test files importing it directly through importers_of', async () => {
+		const importers = await direct_importers.importers_of(fixture.workspace, [OTHER_MODULE])
+
+		expect(importers.get(OTHER_MODULE)).toEqual([OTHER_TEST])
+	})
+
 	it('maps one only a non-test file imports to no test file', async () => {
 		const importers = await direct_importers.every_test_importers(fixture.workspace, [
 			UNIMPORTED_MODULE,

@@ -7,6 +7,7 @@ import { test_pinned_fixture } from './test-pinned-fixture'
 import { test_pinned_ledger } from './test-pinned-ledger'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
+import { test_pinned_stage } from './test-pinned-stage'
 import { test_red } from './test-red'
 
 // joshuafolkken/kit#4936: each probe's verdict is stored as soon as it is reached, so a run stopped
@@ -228,6 +229,28 @@ describe('test_pinned.run where a recheck cannot answer', () => {
 
 			expect(await run_locations()).toEqual([UNPINNED_HUNK])
 			expect(selections_of(runs)).toEqual([['related', DRIVER_FILE]])
+		},
+		RUN_TIMEOUT,
+	)
+})
+
+// joshuafolkken/kit#5292: a wide file's probes run in stages, and the report counts each one.
+describe('test_pinned.run over a file whose reach is wide', () => {
+	it(
+		'keeps the verdicts and tallies every staged probe into the report',
+		async () => {
+			await build_with_graph()
+			vi.spyOn(test_pinned_stage, 'plan_over').mockImplementation((file, direct) => ({
+				direct,
+				reach: [file],
+			}))
+			const report = await test_pinned.run(test_pinned_logic.DEFAULT_MAX_HUNKS)
+			const staged = report.staged ?? test_pinned_stage.none()
+
+			expect(report.unpinned.map((hunk) => test_pinned_logic.location(hunk))).toEqual([
+				UNPINNED_HUNK,
+			])
+			expect(staged.escalated).toBeGreaterThan(0)
 		},
 		RUN_TIMEOUT,
 	)

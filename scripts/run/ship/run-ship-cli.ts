@@ -12,6 +12,7 @@ import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
+import { run_ship_lap } from './run-ship-lap'
 import type { PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
@@ -90,7 +91,11 @@ async function record_timed(step: Step, issue: string, elapsed_ms: number): Prom
 
 async function run_once(step: Step, args: ShipArguments, state: ShipState): Promise<ShipSection> {
 	const started_ms = performance.now()
-	const result = await step.run(args, state)
+	const result = await run_ship_lap.within(
+		args.number,
+		step.stage,
+		async () => await step.run(args, state),
+	)
 	const elapsed_ms = performance.now() - started_ms
 
 	if (result.is_skipped !== true) await record_timed(step, args.number, elapsed_ms)

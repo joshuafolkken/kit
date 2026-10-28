@@ -17,6 +17,7 @@ import {
 } from './test-pinned-logic'
 import { test_pinned_probe, type CheckOptions, type Probe } from './test-pinned-probe'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
+import type { Staged } from './test-pinned-stage'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
 
@@ -55,6 +56,12 @@ interface ProbeRun {
 	cache: LoadedCache
 	keys: ReadonlyArray<string>
 	options: RunOptions
+}
+
+// Each hunk's verdict, and how many of the fresh probes ran in stages.
+interface Verdicts {
+	verdicts: Array<RedProbe | undefined>
+	staged: Staged
 }
 
 const NO_OUTCOME: HunkOutcome = { unpinned: [], stopped: [] }
@@ -100,13 +107,15 @@ function probes_of(hunks: ReadonlyArray<Hunk>, known: ReadonlyArray<Known>): Arr
 }
 
 // The probes in the order they run: the fewest tests reached first (`test_pinned_logic.by_reach`),
-// each file's count read once; a file with no graph to read counts as 0.
+// each file's count read once and carried on its probes, which a wide one runs in stages by
+// (`test-pinned-stage.ts`); a file with no graph to read counts as 0.
 async function by_reach(probes: ReadonlyArray<Probe>, reach: Reach): Promise<Array<Probe>> {
 	const files = test_pinned_cache_logic.distinct(probes.map((probe) => probe.hunk.file))
 	const related = await Promise.all(files.map(async (file) => await reach.related(file)))
-	const counts = files.map((file, index): [string, number] => [file, related[index]?.length ?? 0])
+	const counts = new Map(files.map((file, index) => [file, related[index]?.length ?? 0]))
+	const counted = probes.map((probe) => ({ ...probe, reach: counts.get(probe.hunk.file) }))
 
-	return test_pinned_logic.by_reach(probes, new Map(counts))
+	return test_pinned_logic.by_reach(counted, counts)
 }
 
 function reached_of(verdicts: ReadonlyArray<RedProbe | undefined>): Array<Reached> {
@@ -126,10 +135,7 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 // Each hunk's verdict: the cached one where it still holds, else a fresh run's, in the hunks' order.
 // The held ones are written first and each fresh one as it is reached (`test_pinned_cache.writer`).
 // Under `is_first_unpinned` a hunk the run stopped before keeps no verdict.
-async function verdicts_on(
-	paths: ReadonlyArray<string>,
-	probing: ProbeRun,
-): Promise<Array<RedProbe | undefined>> {
+async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Promise<Verdicts> {
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
 	const probes = await by_reach(probes_of(probing.hunks, probing.known), probing.cache.reach)
@@ -137,7 +143,7 @@ async function verdicts_on(
 	const options = check_options(reached.length, probing.options)
 
 	await writer.record(reached)
-	await test_pinned_probe.checked_on(
+	const checked = await test_pinned_probe.checked_on(
 		paths,
 		probes,
 		async (index, verdict) => {
@@ -147,7 +153,7 @@ async function verdicts_on(
 		options,
 	)
 
-	return verdicts
+	return { verdicts, staged: checked.staged }
 }
 
 function outcome_of(
@@ -194,9 +200,9 @@ async function outcome_on(
 		)
 	}
 
-	const verdicts = await verdicts_on(paths, { hunks, known, cache, keys, options })
+	const { verdicts, staged } = await verdicts_on(paths, { hunks, known, cache, keys, options })
 
-	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts) }
+	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.
