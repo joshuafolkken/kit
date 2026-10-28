@@ -19,13 +19,6 @@ function time_of(hunk: Hunk, verdict: RedProbe, elapsed_ms: number): ProbeTime {
 	return { file: hunk.file, tests: verdict.ran, elapsed_ms }
 }
 
-// The lane this run is in, read off its checkout; `undefined` outside a lane.
-function issue_here(): number | undefined {
-	const lane = lane_paths.lane_issue_of(process.cwd())
-
-	return lane === undefined ? undefined : Number(lane)
-}
-
 // What started a run (joshuafolkken/kit#5262): `run:review`'s background check, the ship's pre-detach,
 // or a `josh test:pinned` typed by hand.
 type PinnedOrigin = NonNullable<TestPinnedRecord['origin']>
@@ -55,7 +48,7 @@ async function record(
 	elapsed_ms: number,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: issue_here(),
+		issue: lane_paths.issue_here(),
 		held: skipped.held,
 		rewired: skipped.rewired,
 		probes: [...probes],
@@ -72,7 +65,7 @@ async function record_discarded(
 	origin: PinnedOrigin = BACKGROUND_ORIGIN,
 ): Promise<void> {
 	await lane_ledger_write.record_test_pinned({
-		issue: issue_here(),
+		issue: lane_paths.issue_here(),
 		held: 0,
 		probes: [],
 		elapsed_ms,

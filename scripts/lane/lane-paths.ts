@@ -89,6 +89,17 @@ function lane_issue_of(
 	return is_lane_root(path.dirname(resolved), environment) ? issue : undefined
 }
 
+// The lane `directory` (this process's own by default) sits in, as a number; `undefined` outside a
+// lane — the `issue` a ledger row written from inside a lane carries.
+function issue_here(
+	directory: string = process.cwd(),
+	environment: LaneEnvironment = process.env,
+): number | undefined {
+	const lane = lane_issue_of(directory, environment)
+
+	return lane === undefined ? undefined : Number(lane)
+}
+
 function lane_branch(issue: string): string {
 	return `${issue}${LANE_BRANCH_SUFFIX}`
 }
@@ -111,6 +122,7 @@ const lane_paths = {
 	checkout_of,
 	default_lane_root,
 	is_lane_entry,
+	issue_here,
 	lane_branch,
 	lane_directory,
 	lane_issue_of,

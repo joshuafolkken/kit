@@ -4,10 +4,11 @@ import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // What each ship stage of a lane's breakdown spent its time on (joshuafolkken/kit#5294): the laps the
-// ship wrote for its inner steps (`run-ship-lap.ts`) and the lane's core-budget waits, each under the
-// stage it ended in, and the time between two ship stages split by the Bash the lane child ran there,
-// by the implementation's kinds (`lane-breakdown-implement.ts`). A lap and a wait inside it overlap —
-// the gate's wait for cores is part of its `josh gate` lap — so a stage's laps can add up to more.
+// ship wrote for its inner steps (`run-ship-lap.ts`), the lane's core-budget waits and the checks of
+// the lane's gates, each under the stage it ended in, and the time between two ship stages split by
+// the Bash the lane child ran there, by the implementation's kinds (`lane-breakdown-implement.ts`).
+// A lap and a wait or a check inside it overlap — the gate's wait for cores and its checks, run side
+// by side, are part of its `josh gate` lap — so a stage's laps can add up to more.
 
 const { KIND } = lane_ledger
 const CORE_WAIT_STEP = 'core-budget wait'
@@ -32,7 +33,19 @@ function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	return [{ at_ms: Date.parse(entry.at), part: { name: CORE_WAIT_STEP, ms: entry.waited_ms } }]
 }
 
-// The ship stage a lap or a wait ended in — never the time between stages, which the ship runs nothing in.
+// Each check the lane's gate ran, placed where the gate ended (joshuafolkken/kit#5319). A row with no
+// `issue` — outside a lane, or written before the gate recorded it — is no lane's; a reused check
+// started nothing, so its zero is no time spent.
+function checks_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
+	if (entry.kind !== KIND.GATE || entry.issue !== issue) return []
+	const at_ms = Date.parse(entry.at)
+
+	return (entry.checks ?? [])
+		.filter((check) => check.is_reused !== true)
+		.map((check) => ({ at_ms, part: { name: check.label, ms: check.elapsed_ms } }))
+}
+
+// The ship stage a lap, a wait or a check ended in — never the time between stages, which the ship runs nothing in.
 function stage_at(segments: ReadonlyArray<Segment>, at_ms: number): string | undefined {
 	const segment = segments.find((span) => at_ms > span.from_ms && at_ms <= span.to_ms)
 
@@ -70,7 +83,11 @@ function of(
 	breakdown: Breakdown,
 	calls: ReadonlyArray<ToolCall>,
 ): Laps {
-	const placed = entries.flatMap((entry) => [...lap_of(entry, issue), ...wait_of(entry, issue)])
+	const placed = entries.flatMap((entry) => [
+		...lap_of(entry, issue),
+		...wait_of(entry, issue),
+		...checks_of(entry, issue),
+	])
 	const laps = new Map(
 		[...grouped(placed, breakdown.ship)].map(([stage, parts]) => [
 			stage,

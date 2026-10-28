@@ -43,6 +43,9 @@ const gate_schema = z.object({
 	// A gate that reused a green record for this tree and base and started no check: counted, never
 	// timed (joshuafolkken/kit#4397).
 	is_reused: z.boolean().optional(),
+	// The lane the gate ran in, so `josh lane:breakdown` puts its checks under the lane's ship gate;
+	// absent outside a lane and on a row written before it (joshuafolkken/kit#5319).
+	issue: z.number().optional(),
 })
 // `available_mb`, `swapped_mb` and `lanes` are optional because each read can fail on its own — a
 // platform with no memory reading, a `git worktree` call that did not answer — and a sample is still

@@ -154,3 +154,42 @@ describe('followup_failed_tests.record', () => {
 		await expect(followup_failed_tests.record(FAILURES, ISSUE)).resolves.toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#5316: the main merge put before a rerun posts its own line the same way.
+describe('followup_failed_tests.record_entry', () => {
+	const entry = { slug: 'followup-main-merge-first', depth: 'd1', where: BUDGET_TEST, what: 'x' }
+
+	it('posts a given ledger entry on the issue', async () => {
+		await followup_failed_tests.record_entry(entry, ISSUE)
+
+		expect(observation_record.assess).toHaveBeenCalledWith(expect.objectContaining({ entry }))
+		expect(git_gh_issue_write.issue_comment).toHaveBeenCalledWith(
+			String(ISSUE),
+			review_comment_round.observation_body_of([SIGHTING]),
+		)
+	})
+
+	it('names the entry slug and the verdict in the console line', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await followup_failed_tests.record_entry(entry, ISSUE)
+
+		expect(info).toHaveBeenCalledWith(
+			'📝 Recorded the followup-main-merge-first observation: ledger',
+		)
+		info.mockRestore()
+	})
+
+	it('names the entry slug and the error in the console line of a failed post', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		vi.mocked(git_gh_issue_write.issue_comment).mockRejectedValue(new Error('HTTP 502'))
+
+		await followup_failed_tests.record_entry(entry, ISSUE)
+
+		expect(info).toHaveBeenCalledWith(
+			'⚠️ Could not record the followup-main-merge-first observation: Error: HTTP 502',
+		)
+		info.mockRestore()
+	})
+})
