@@ -1,3 +1,4 @@
+import { markdown_shape } from './markdown-shape'
 import { report_format_reference } from './report-format-reference'
 import { report_labels, type ReportLabels } from './report-labels'
 
@@ -16,10 +17,6 @@ const BACKTICK = '`'
 // in the label, or `Fix the parser` inside a sentence, does not stand in for a missing label.
 const LABEL_LEAD = /^\s*(?:(?:\d+\.|[-*])\s+)?(?:\*\*)?/u
 const LETTER_PATTERN = /^\p{L}/u
-
-function content_lines(summary: string): ReadonlyArray<string> {
-	return summary.split('\n').filter((line) => line.trim().length > 0)
-}
 
 function opens_with_label(line: string, label: string): boolean {
 	const rest = line.replace(LABEL_LEAD, '')
@@ -75,7 +72,7 @@ function lint_child_summary(
 	summary: string,
 	labels: ReportLabels = report_labels.session_labels(),
 ): ReadonlyArray<string> {
-	const lines = content_lines(summary)
+	const lines = markdown_shape.content_lines(summary)
 
 	return [
 		...length_violation(lines),

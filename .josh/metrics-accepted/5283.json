@@ -1,0 +1,9 @@
+{
+	"reason": "new josh review:lint command (rubric format checker) with its parser, findings checks and shared markdown-shape module",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 335,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 101
+	}
+}

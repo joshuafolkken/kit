@@ -15,4 +15,5 @@ its `review:attest` step.
 - Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says. Never run
   `pnpm josh review:brief` yourself: a new brief drops the attestation you left.
 - Apply a fix only where the brief's level and your dispatcher ask for one; never commit, stage or push.
-- Return the findings in the rubric's output format.
+- Return the findings in the rubric's output format; check it first with `pnpm josh review:lint`
+  (round 2: `--round 2`; findings on stdin) and fix what it reports.

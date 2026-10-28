@@ -1072,6 +1072,13 @@ exports[`COMMAND_MAP — reference metadata > keeps every canonical command and 
         "files",
       ],
     ],
+    "review:lint": [
+      "[--round <1|2>] (reads stdin)",
+      "automation",
+      [
+        "none",
+      ],
+    ],
     "review:record": [
       "--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>",
       "automation",

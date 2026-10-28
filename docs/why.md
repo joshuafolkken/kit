@@ -261,7 +261,7 @@ If you read this far thinking "I built something like this in my own repository"
 
 Update kit and the sync command brings the project along. The same keyword works the same way in every project. (Everything above reaches a `full`-profile project; a `basic` project gets only short rules and minimal formatting and Git settings.)
 
-For scale: there are 192 `josh` commands, and **126 of them are meant to be run by the agent**, not by a person. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
+For scale: there are 193 `josh` commands, and **127 of them are meant to be run by the agent**, not by a person. That is what it means to be built with the agent as the primary user, rather than having AI support bolted on later.
 
 ## What to know up front
 
