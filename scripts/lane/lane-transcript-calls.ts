@@ -13,6 +13,15 @@ import { z } from 'zod'
 // from the shell calls, **and so is its lane** — the transcript directory every session of one lane
 // (its child, its ship reviewer) writes under — so a per-lane value divides by lanes, not sessions
 // (joshuafolkken/kit#4630).
+//
+// **A subagent call keeps its agent type and model** — `subagent_type`, the harness's
+// `general-purpose` when absent, and `model` when named — so the implement's subagent time splits by
+// the agent dispatched (joshuafolkken/kit#5297).
+
+interface Subagent {
+	type: string
+	model: string | undefined
+}
 
 interface ToolCall {
 	session_id: string
@@ -22,6 +31,7 @@ interface ToolCall {
 	tool: string | undefined
 	background: boolean
 	command: string | undefined
+	subagent: Subagent | undefined
 	output: string
 }
 
@@ -30,6 +40,7 @@ interface ToolUse {
 	tool: string | undefined
 	background: boolean
 	command: string | undefined
+	subagent: Subagent | undefined
 }
 
 interface ToolResult {
@@ -48,19 +59,37 @@ function join_parts(parts: ReadonlyArray<TextPart>): string {
 interface RawInput {
 	command?: unknown
 	run_in_background?: unknown
+	subagent_type?: unknown
+	model?: unknown
 }
 
 interface CallInput {
 	background: boolean
 	command: string | undefined
+	subagent: Subagent
+}
+
+const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
+const GENERAL_PURPOSE = 'general-purpose'
+
+function string_or_undefined(value: unknown): string | undefined {
+	return typeof value === 'string' ? value : undefined
+}
+
+// A named string, `undefined` for an empty or non-string one.
+function named(value: unknown): string | undefined {
+	return value === '' ? undefined : string_or_undefined(value)
+}
+
+function subagent_of(input: RawInput | null | undefined): Subagent {
+	return { type: named(input?.subagent_type) ?? GENERAL_PURPOSE, model: named(input?.model) }
 }
 
 function to_input(input: RawInput | null | undefined): CallInput {
-	const command = input?.command
-
 	return {
 		background: input?.run_in_background === true,
-		command: typeof command === 'string' ? command : undefined,
+		command: string_or_undefined(input?.command),
+		subagent: subagent_of(input),
 	}
 }
 
@@ -69,7 +98,14 @@ const TEXT_PARTS_SCHEMA = z.array(z.object({ text: z.string().nullish() }))
 const RESULT_CONTENT_SCHEMA = z
 	.union([z.string(), TEXT_PARTS_SCHEMA.transform(join_parts)])
 	.catch('')
-const INPUT_SCHEMA = z.object({ command: z.unknown(), run_in_background: z.unknown() }).partial()
+const INPUT_SCHEMA = z
+	.object({
+		command: z.unknown(),
+		run_in_background: z.unknown(),
+		subagent_type: z.unknown(),
+		model: z.unknown(),
+	})
+	.partial()
 
 const BLOCK_SCHEMA = z.object({
 	type: z.string(),
@@ -100,10 +136,17 @@ interface Pairs {
 	results: Map<string, ToolResult>
 }
 
+// The agent a subagent call dispatched; any other tool's input names none.
+function subagent_in(tool: string | undefined, block: Block): Subagent | undefined {
+	return SUBAGENT_TOOLS.has(tool ?? '') ? block.input.subagent : undefined
+}
+
 function record_use(pairs: Pairs, block: Block, started_ms: number): void {
 	if (block.type !== 'tool_use' || !block.id) return
 
-	pairs.uses.set(block.id, { started_ms, tool: block.name ?? undefined, ...block.input })
+	const tool = block.name ?? undefined
+
+	pairs.uses.set(block.id, { started_ms, tool, ...block.input, subagent: subagent_in(tool, block) })
 }
 
 function record_result(pairs: Pairs, block: Block, ended_ms: number): void {
@@ -138,6 +181,7 @@ function to_call(source: CallSource, use: ToolUse, result: ToolResult | undefine
 		tool: use.tool,
 		background: use.background,
 		command: use.command,
+		subagent: use.subagent,
 		output: result?.output ?? '',
 	}
 }
@@ -154,5 +198,5 @@ function parse(source: CallSource, raw: string): Array<ToolCall> {
 
 const lane_transcript_calls = { parse }
 
-export type { ToolCall }
+export type { Subagent, ToolCall }
 export { lane_transcript_calls }

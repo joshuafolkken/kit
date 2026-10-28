@@ -11,6 +11,8 @@ const IMPLEMENT_FROM = 10 * MINUTE_MS
 const IMPLEMENT_TO = 61 * MINUTE_MS
 const REMAINDER = 'editing & thinking'
 const GATE = 'pnpm josh gate'
+const GENERAL_PURPOSE = 'subagent: general-purpose'
+const REVIEWER = 'subagent: reviewer'
 
 const BREAKDOWN: Breakdown = {
 	stages: [{ name: 'implement', ms: IMPLEMENT_TO - IMPLEMENT_FROM }],
@@ -28,9 +30,14 @@ interface CallShape {
 	tool: string
 	command?: string
 	background?: boolean
+	agent?: string
 }
 
+const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
+
 function call(shape: CallShape): ToolCall {
+	const is_subagent = SUBAGENT_TOOLS.has(shape.tool)
+
 	return {
 		session_id: 's',
 		lane: '4970',
@@ -39,6 +46,9 @@ function call(shape: CallShape): ToolCall {
 		tool: shape.tool,
 		background: shape.background ?? false,
 		command: shape.command,
+		subagent: is_subagent
+			? { type: shape.agent ?? 'general-purpose', model: undefined }
+			: undefined,
 		output: '',
 	}
 }
@@ -68,7 +78,7 @@ describe('lane_breakdown_implement.of — kinds', () => {
 
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 23],
-			['subagent', 10],
+			[GENERAL_PURPOSE, 10],
 			['check:related', 6],
 			['main:merge', 4],
 			['test', 3],
@@ -103,7 +113,7 @@ describe('lane_breakdown_implement.of — overlapping time', () => {
 
 		expect(kinds_of(calls)).toStrictEqual([
 			[REMAINDER, 43],
-			['subagent', 16],
+			[GENERAL_PURPOSE, 16],
 		])
 	})
 
@@ -132,5 +142,36 @@ describe('lane_breakdown_implement.of — backgrounded calls', () => {
 
 		expect(detail.background).toBe(1)
 		expect(detail.kinds).toStrictEqual([{ name: REMAINDER, ms: 51 * MINUTE_MS }])
+		expect(detail.untimed).toStrictEqual(new Map())
+	})
+
+	it('names a backgrounded subagent call under its type at no time, and counts it', () => {
+		const shape = { minute: 20, minutes: undefined, tool: 'Agent', background: true }
+		const detail = lane_breakdown_implement.of([call({ ...shape, agent: 'reviewer' })], BREAKDOWN)
+
+		expect(detail.kinds).toStrictEqual([
+			{ name: REMAINDER, ms: 51 * MINUTE_MS },
+			{ name: REVIEWER, ms: 0 },
+		])
+		expect(detail.untimed).toStrictEqual(new Map([[REVIEWER, 1]]))
+	})
+})
+
+// joshuafolkken/kit#5297: one `subagent` total hid which delegation took the time.
+describe('lane_breakdown_implement.of — subagent types', () => {
+	it('splits the subagent time by the agent type each call dispatched', () => {
+		const calls = [
+			call({ minute: 11, minutes: 3, tool: 'Agent', agent: 'investigator' }),
+			call({ minute: 20, minutes: 6, tool: 'Agent', agent: 'reviewer' }),
+			call({ minute: 30, minutes: 2, tool: 'Task', agent: 'reviewer-verification' }),
+			call({ minute: 40, minutes: 1, tool: 'Agent', agent: 'reviewer' }),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 39],
+			[REVIEWER, 7],
+			['subagent: investigator', 3],
+			['subagent: reviewer-verification', 2],
+		])
 	})
 })

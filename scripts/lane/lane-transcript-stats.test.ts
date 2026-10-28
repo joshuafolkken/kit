@@ -40,6 +40,7 @@ function call(overrides: Partial<ToolCall>): ToolCall {
 		tool: 'Bash',
 		background: false,
 		command: undefined,
+		subagent: undefined,
 		output: '',
 		...overrides,
 	}
