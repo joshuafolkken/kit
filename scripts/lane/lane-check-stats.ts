@@ -113,6 +113,6 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n\n')
 }
 
-const lane_check_stats = { WHOLE_GATE_LABEL, table }
+const lane_check_stats = { WHOLE_GATE_LABEL, cell, header, table }
 
 export { lane_check_stats }

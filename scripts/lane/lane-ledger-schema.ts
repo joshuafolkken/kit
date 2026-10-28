@@ -93,13 +93,17 @@ const dispatch_schema = z.object({
 })
 // One finished stage of a lane's run, passed or failed: `at` is its end and `elapsed_ms` its length, so
 // its start is read from the two. `issue` is absent where the writer does not hold one — `followup`'s
-// CI wait, which is timed on a path that fails before the issue is known.
+// CI wait where the run did not know its issue. On that `ci-wait` row,
+// `check_ms` is each check seen pending and then settled, by the time it settled into the wait, and
+// `last_check` the one that settled last — the wait's critical path (joshuafolkken/kit#5295).
 const stage_schema = z.object({
 	kind: z.literal(KIND.STAGE),
 	at: z.string(),
 	stage: z.string(),
 	elapsed_ms: z.number(),
 	issue: z.number().optional(),
+	last_check: z.string().optional(),
+	check_ms: z.record(z.string(), z.number()).optional(),
 })
 // A `josh ship` that stopped on `issue`: `reason` is the stage it stopped at, or `conflict` — the
 // retrospective's stop reason — and `cause` why (`run-ship-stop-cause.ts`), absent on a stop recorded

@@ -34,7 +34,7 @@ const STOP_SIGNAL = 'SIGTERM'
 // none follows, the late check is stopped rather than left holding cores.
 const GRACE_MS = 120_000
 const READ_COMMAND = 'pnpm josh run:review --pinned'
-const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\``
+const STILL_RUNNING_NOTE = `it is still running on this tree; wait for its answer with \`${READ_COMMAND}\` (a lane child: the ship's pre-detach reads it)`
 const TIMED_OUT_NOTE = `no answer within ${String(GRACE_MS / MS_PER_SECOND)}s of the gate and the review`
 const QUEUED_NOTE = 'it was still waiting for cores when the gate and the review ended'
 // A round 1 with fixes to make moves the tree, and the round's `josh review:record` starts the check

@@ -1,6 +1,7 @@
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown-implement'
 import { lane_breakdown_pinned } from './lane-breakdown-pinned'
+import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { LedgerEntry } from './lane-ledger'
 
 // A lane's breakdown in words (joshuafolkken/kit#4995): the stages longest first, the implementation's
@@ -19,6 +20,8 @@ interface Report {
 	pinned?: string
 	// The discarded `run:review` background probes' line, `''` when none (joshuafolkken/kit#5262).
 	discarded?: string
+	// The followup's CI wait's last check to settle, `''` when none was recorded (joshuafolkken/kit#5295).
+	critical?: string
 }
 
 function part_text(part: Stage): string {
@@ -41,14 +44,19 @@ function detail_text(detail: ImplementDetail): string {
 	return ` (${[...kinds, ...background].join(', ')})`
 }
 
-function stage_text(stage: Stage, report: Report): string {
-	if (stage.name === lane_breakdown.IMPLEMENT_STAGE) {
-		return `${part_text(stage)}${detail_text(report.detail)}`
+// The detail a stage's line carries after its minutes, `''` for a stage with none.
+function suffix_of(name: string, report: Report): string {
+	const suffixes: Record<string, string | undefined> = {
+		[lane_breakdown.IMPLEMENT_STAGE]: detail_text(report.detail),
+		[lane_breakdown.PRE_DETACH_STAGE]: report.pinned,
+		[lane_breakdown.FOLLOWUP_STAGE]: report.critical,
 	}
 
-	const is_pre_detach = stage.name === lane_breakdown.PRE_DETACH_STAGE
+	return suffixes[name] ?? ''
+}
 
-	return is_pre_detach ? `${part_text(stage)}${report.pinned ?? ''}` : part_text(stage)
+function stage_text(stage: Stage, report: Report): string {
+	return `${part_text(stage)}${suffix_of(stage.name, report)}`
 }
 
 function entries_of(report: Report): Array<string> {
@@ -78,6 +86,7 @@ function report_of(
 		detail: lane_breakdown_implement.of(calls, breakdown),
 		pinned: lane_breakdown_pinned.detail_text(rows),
 		discarded: lane_breakdown_pinned.discarded_text(entries, issue),
+		critical: lane_ci_path_stats.last_check_text(entries, issue),
 	}
 }
 
