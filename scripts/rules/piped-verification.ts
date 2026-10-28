@@ -136,7 +136,9 @@ function keeps_verdict_intact(command: string): boolean {
 // commonest masking still refused after #3875 (joshuafolkken/kit#3920). `tee` passes every line on, and an
 // `awk` or `sed` script reads to the end where it can neither exit nor reach past the pipe — read on the
 // typed piece, since the script is quoted: an `awk` program with no `exit`, `nextfile`, `system`, `getline` or `|`,
-// and a `sed` script of `p`, `d` and `s///` alone (joshuafolkken/kit#5266).
+// and a `sed` script of `p`, `d` and `s///` alone (joshuafolkken/kit#5266). A quoted `<`, `>` or `&`
+// still refuses below: inside `awk` a `>` may be `print > "f"`, which no reading here tells from a
+// comparison.
 //
 // **Each masked check is wrapped on its own, and the rest of the line runs as typed.** Most of the
 // refusals left after #3570 were a check chained beside other work — `vitest …; pnpm josh lint:related
@@ -154,7 +156,7 @@ function keeps_verdict_intact(command: string): boolean {
 const PIPEFAIL_OPEN = '(set -o pipefail; '
 const PIPEFAIL_CLOSE = ')'
 const COMMENT_START = /(?:^|\s)#/u
-const FULL_READING_FILTER = /^(?:tail|grep|cut|sort|uniq|wc|tee)\b/u
+const FULL_READING_FILTER = /^(?:tail|grep|cut|sort|uniq|wc|tee)(?=\s|$)/u
 const EARLY_EXIT_GREP =
 	/^grep\b.*\s(?:-[a-zA-Z]*[lLmq]|--(?:quiet|silent|max-count|files-with(?:out)?-match))/u
 const AWK_PROGRAM = /^awk\s+(?:-F\s*\S+\s+)?'[^']*'$/u

@@ -166,6 +166,11 @@ const REWRITES: Array<[string, string]> = [
 	],
 	["pnpm josh lint | awk -F: '{ print $1 }'", `${WRAP}pnpm josh lint | awk -F: '{ print $1 }')`],
 	["pnpm josh gate | sed -n '$p'", `${WRAP}pnpm josh gate | sed -n '$p')`],
+	// A quoted `|` before the script: the typed slice the script is read from stays at its offset.
+	[
+		`pnpm josh gate | grep -E "a|b" | sed -n '$p'`,
+		`${WRAP}pnpm josh gate | grep -E "a|b" | sed -n '$p')`,
+	],
 	[
 		String.raw`pnpm josh gate | sed -E 's/\x1b\[[0-9;]*m//g; /^$/d'`,
 		String.raw`${WRAP}pnpm josh gate | sed -E 's/\x1b\[[0-9;]*m//g; /^$/d')`,
@@ -183,9 +188,13 @@ const REFUSALS: Array<string> = [
 	'pnpm josh gate | grep -q failed',
 	'pnpm josh gate | grep -m 1 error',
 	'git status; pnpm josh lint:related | head -5',
+	// A filter's name ends at a space: `tee-x` is another command, not `tee`.
+	'pnpm josh gate | tee-x /tmp/gate.log',
 	// joshuafolkken/kit#5266: an `awk` or `sed` that exits early or reaches past the pipe.
 	"pnpm josh gate | awk 'NR == 3 { exit }'",
 	"pnpm josh gate | awk '/x/ { nextfile }'",
+	// A quoted `>` may be `print > "f"`, so even a comparison stays refused.
+	"pnpm josh gate | awk 'NR > 3'",
 	'pnpm josh gate | awk \'{ system("x") }\'',
 	'pnpm josh gate | awk \'{ print | "sh" }\'',
 	"pnpm josh gate | sed '10q'",

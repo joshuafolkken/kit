@@ -10,7 +10,8 @@ import { shell_segments } from './shell-segments'
 // The refusal text is one fixed reason, so the row's `refused` count says how often and never why; the
 // command that drew it is the call the errored result answers, paired by its `tool_use_id`
 // (joshuafolkken/kit#5266). A shape is named by the first that holds, in the order below: the filters
-// that hide a verdict first, the chain only where no filter explains the refusal.
+// that hide a verdict first, the chain — a line of more than one command, a heredoc's body lines
+// included — only where no filter explains the refusal.
 
 const SHAPE = {
 	head: 'head',
@@ -25,13 +26,13 @@ type ShapeCounts = Map<RefusalShape, number>
 
 const HEAD_FILTER = /^head\b/u
 const SCRIPT_FILTER = /^(?:awk|sed|tee)\b/u
-// The reason's opening, matched as `rule-value.ts` matches a refusal; a text without the cheap mark is
-// skipped unparsed, since nearly no transcript carries one.
+// The reason's opening, matched as `rule-value.ts` matches a refusal; a text without the cheap mark —
+// the reason's ASCII words, which the rewrite note does not share — is skipped unparsed.
 const SIGNATURE = piped_verification.PIPED_VERIFICATION_REASON.slice(
 	0,
 	rule_value.REASON_SIGNATURE_LENGTH,
 )
-const CHEAP_MARK = 'piped verification'
+const CHEAP_MARK = 'piped verification: a pipeline exits'
 const HEADING = 'piped-verification refusals by shape:'
 const SHAPE_GAP = ' · '
 
