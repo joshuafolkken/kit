@@ -23,8 +23,12 @@ const FAILURE_EXIT_CODE = 1
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-one-pass-'))
 const body_path = path.join(work, 'refused-thrice.md')
 
-// Opted into `auto-ok` with no run label named, and missing every section after the background.
-writeFileSync(body_path, '## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n')
+// Opted into `auto-ok` with no run label named, and missing every section after the background; its
+// start condition cites an issue, which a GitHub read would refuse.
+writeFileSync(
+	body_path,
+	'## 背景\n\n- 種別: 不具合\n- 人の判断: 不要\n- 実施可能条件: #4442 のマージ後 30 マージ\n',
+)
 
 function argv_of(path_of_body: string): Array<string> {
 	return ['A title', '--body-file', path_of_body]

@@ -38,11 +38,11 @@ import { size_estimate } from './size-estimate'
 // [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok]
 // [--release] [--blocks-finder]` — file an Issue with every filing step run: the third-party refusal,
 // the filing cap per origin and the fold question against the run's earlier filings, each ending the
-// filing on its own; then, each tier printing every refusal of its own at once, the local checks — the body lint, the size estimate against the split guide, the start condition a measurement
+// filing on its own; then, each tier printing every refusal of its own at once, the local checks —
+// the body lint, the size estimate against the split guide, the start condition a measurement
 // follow-up owes, the `## Origin` check for another repository, the `auto-ok` decision with the run
 // label it owes; once those pass, the start condition read as a pull request and the WIP cap count;
-// once those pass, the duplicate scout; then the missing
-// workflow labels created, the create call
+// once those pass, the duplicate scout; then the missing workflow labels created, the create call
 // carrying every label, a blocking interrupt's finder recorded as blocked by it, the release link on
 // `--release`, and `epic:bundle`.
 // A direct `gh api …/issues` filing is refused by the `direct-filing` delivered rule and pointed here.

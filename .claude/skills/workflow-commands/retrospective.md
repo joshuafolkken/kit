@@ -35,7 +35,7 @@ every regressed row, and the scout keeps a repeat sighting from filing twice.
 ledger** (drained by `pnpm josh observations:flush`). **File nothing when nothing passes.**
 
 **Exclude what is already filed or already done, through the existing scout** (`issue-scout.md`): file
-with `pnpm josh issue:file`, which scouts first — an **open** candidate covering it means do not file, a
+with `pnpm josh issue:file`, which scouts — an **open** candidate covering it means do not file, a
 `(closed)` one means already merged. It also runs `epic:bundle` on each new Issue.
 
 ## `auto-ok`, and closing the step

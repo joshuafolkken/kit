@@ -19,7 +19,7 @@ import { issue_wip } from './issue-wip'
 
 // joshuafolkken/kit#2808: `josh issue:file` runs every filing step, and any refusal stops the filing
 // before anything is sent; joshuafolkken/kit#5191: the refusals the caller answers from the body and
-// the arguments are printed in one pass. The network reads are stubbed at the namespaces the command
+// the arguments are printed in one pass, each tier at once (#5333). The network reads are stubbed at the namespaces the command
 // calls, so what is asserted is the order and the request — never a real filing.
 
 const HERE = 'joshuafolkken/kit'
