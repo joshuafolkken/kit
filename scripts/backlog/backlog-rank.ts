@@ -10,7 +10,8 @@ import { backlog_overlap, type Declared } from './backlog-overlap'
 // What the backlog offers, in the order it is decided: rank, then the
 // `run:solo` gate, then the cap. `backlog:next` and `backlog:plan --waves` both call `select`, so the
 // plan's first wave is what the run starts into an idle repository rather than an order the run never
-// takes.
+// takes. Only the cap's width differs: `backlog:next` prints `DISPLAY_LIMIT` rows, a wave holds the
+// lane limit (`limit`).
 //
 // **The cap comes last.** Applied while the standalone half is classified, before the gate, it would
 // cut a `run:solo` issue ranked sixth or lower before the gate could see it — and offer the issues
@@ -48,18 +49,23 @@ function rank_result(result: EpicNextResult, repo: string): EpicNextResult {
 function overflow_of(
 	offered: ReadonlyArray<EpicChild>,
 	standalone: ReadonlySet<string>,
+	limit: number,
 ): ReadonlySet<string> {
 	const keys = offered.map((child) => epic_graph.key_of(child)).filter((key) => standalone.has(key))
 
-	return new Set(keys.slice(git_next_issues.DISPLAY_LIMIT))
+	return new Set(keys.slice(limit))
 }
 
 function is_in(child: EpicChild, keys: ReadonlySet<string>): boolean {
 	return keys.has(epic_graph.key_of(child))
 }
 
-function cap(selection: SoloSelection, standalone: ReadonlySet<string>): SoloSelection {
-	const overflow = overflow_of(selection.offered, standalone)
+function cap(
+	selection: SoloSelection,
+	standalone: ReadonlySet<string>,
+	limit: number,
+): SoloSelection {
+	const overflow = overflow_of(selection.offered, standalone, limit)
 
 	if (overflow.size === 0) return selection
 
@@ -87,6 +93,8 @@ interface OfferInput {
 	lanes?: LaneRecords
 	// The keys of the issues that gave their lane back (`lane-yield.ts`). Absent, none did.
 	yielded?: ReadonlySet<string>
+	// How many standalone rows the cap keeps. Absent, `DISPLAY_LIMIT` — what `backlog:next` prints.
+	limit?: number
 }
 
 // A yielded issue ahead of the rank: its lane was taken from it, so it takes the first free one
@@ -115,7 +123,7 @@ function select(input: OfferInput): SoloSelection {
 		lanes,
 	})
 
-	return cap(separated, input.standalone)
+	return cap(separated, input.standalone, input.limit ?? git_next_issues.DISPLAY_LIMIT)
 }
 
 interface GateScope {
@@ -123,6 +131,9 @@ interface GateScope {
 	declared: Declared
 	lanes?: LaneRecords
 	yielded?: ReadonlySet<string>
+	// How many standalone rows a planned wave holds — the lane limit; `backlog:next`'s offer ignores
+	// it. Absent, a wave is not capped (joshuafolkken/kit#5300).
+	wave_limit?: number | undefined
 }
 
 // `backlog:next`'s gate: `epic_solo.gate` with this selection in place of its bare one.
