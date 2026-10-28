@@ -19,6 +19,7 @@ const BREAKDOWN: Breakdown = {
 	waits: [],
 	implement: [],
 	pre_detach: [{ from_ms: Date.parse(FROM), to_ms: Date.parse(TO) }],
+	ship: [],
 }
 
 function row(at: string, issue: number | undefined = ISSUE): TestPinnedEntry {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
-import type { StageEntry, TestPinnedEntry } from './lane-ledger'
+import type { ShipLapEntry, StageEntry, TestPinnedEntry } from './lane-ledger'
 
 // joshuafolkken/kit#4995: the breakdown reads as one bullet per stage on the lane's Issue and as one
 // line at the head of the investigation's prompt, the implementation's kinds beside it.
@@ -22,6 +22,7 @@ const REPORT: Report = {
 		waits: [],
 		implement: [],
 		pre_detach: [],
+		ship: [],
 	},
 	detail: {
 		kinds: [
@@ -87,6 +88,35 @@ describe('lane_breakdown_text.line', () => {
 	})
 })
 
+// joshuafolkken/kit#5294: a ship stage's laps print under it, longest first, and beside it on one line.
+describe('lane_breakdown_text — ship stage laps', () => {
+	const stages = [{ name: 'ship gate', ms: 6 * MINUTE_MS }]
+	const laps = new Map([
+		[
+			'ship gate',
+			[
+				{ name: 'josh gate', ms: 4 * MINUTE_MS },
+				{ name: 'scoped pair', ms: 2 * MINUTE_MS },
+			],
+		],
+	])
+	const report = { ...REPORT, breakdown: { ...REPORT.breakdown, stages }, laps }
+
+	it('prints the laps as sub-bullets under their stage', () => {
+		expect(lane_breakdown_text.comment(ISSUE, 6, report).split('\n').slice(2, 5)).toStrictEqual([
+			'- ship gate 6.0 min',
+			'  - josh gate 4.0 min',
+			'  - scoped pair 2.0 min',
+		])
+	})
+
+	it('writes the laps in brackets beside their stage on one line', () => {
+		expect(lane_breakdown_text.line(report)).toContain(
+			': ship gate 6.0 min [josh gate 4.0 min, scoped pair 2.0 min];',
+		)
+	})
+})
+
 // joshuafolkken/kit#5297: a backgrounded subagent call is counted beside its type, at no time.
 describe('lane_breakdown_text.line — subagent types', () => {
 	it('counts the backgrounded subagent calls beside their type', () => {
@@ -146,6 +176,32 @@ describe('lane_breakdown_text — the followup critical path', () => {
 		expect(lane_breakdown_text.line(report)).toContain(
 			'ship followup 4.0 min (last check: e2e 150.0s)',
 		)
+		read.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5294: the laps the ship wrote are read off the ledger into the report.
+describe('lane_breakdown_text.report_of — ship laps', () => {
+	it("reads the lane's ship laps off the ledger under the stage they ended in", () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const lap: ShipLapEntry = {
+			kind: 'ship-lap',
+			at: AT,
+			issue: ISSUE,
+			stage: 'gate',
+			step: 'josh gate',
+			elapsed_ms: 2 * MINUTE_MS,
+		}
+		const to_ms = Date.parse(AT)
+		const breakdown = {
+			...REPORT.breakdown,
+			stages: [{ name: 'ship gate', ms: 3 * MINUTE_MS }],
+			ship: [{ stage: 'ship gate', from_ms: to_ms - 3 * MINUTE_MS, to_ms }],
+		}
+
+		const report = lane_breakdown_text.report_of(ISSUE, breakdown, [lap])
+
+		expect(lane_breakdown_text.line(report)).toContain('ship gate 3.0 min [josh gate 2.0 min]')
 		read.mockRestore()
 	})
 })

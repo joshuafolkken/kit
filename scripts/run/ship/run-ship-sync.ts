@@ -10,6 +10,7 @@ import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { pre_push_related_switch } from '#scripts/hooks/pre-push-related-switch'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { error_text } from '#scripts/lib/error-message'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_overlap } from './run-ship-overlap'
 import { run_ship_scoped } from './run-ship-scoped'
 import { run_ship_stop_cause, type Cause } from './run-ship-stop-cause'
@@ -24,6 +25,7 @@ import { run_ship_stop_cause, type Cause } from './run-ship-stop-cause'
 // the files `main-merge-regenerate.ts` lists is resolved by the merge itself; any other conflict
 // stops the ship as `conflict`, naming the unmerged paths so the resumed session goes straight to them.
 
+const { STEP, timed } = run_ship_lap
 const should_forward_stderr = true
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -66,7 +68,7 @@ async function josh(argv: ReadonlyArray<string>): Promise<JoshResult> {
 // changed, and the followup still finds a real conflict on GitHub's side.
 async function merge_outcome(): Promise<MergeOutcome> {
 	try {
-		return await main_merge.merge()
+		return await timed(STEP.MERGE, async () => await main_merge.merge())
 	} catch (error) {
 		return { kind: 'refused', message: error_text.message_of(error) }
 	}
@@ -98,11 +100,15 @@ function sync_note(outcome: Exclude<MergeOutcome, { kind: 'conflict' }>): string
 async function commit_locally(title: string, is_dirty: boolean): Promise<JoshResult | undefined> {
 	if (!is_dirty) return undefined
 
-	const commit = await josh_command.josh_run(
-		['git', '-y', '--skip-push', '--skip-pr', title],
-		should_forward_stderr,
-		undefined,
-		{ [pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off' },
+	const commit = await timed(
+		STEP.LOCAL_COMMIT,
+		async () =>
+			await josh_command.josh_run(
+				['git', '-y', '--skip-push', '--skip-pr', title],
+				should_forward_stderr,
+				undefined,
+				{ [pre_commit_lint_switch.SWITCH_ENV_KEY]: 'off' },
+			),
 	)
 
 	return commit.code === SUCCESS_EXIT_CODE ? undefined : commit
@@ -119,9 +125,13 @@ async function commit_locally(title: string, is_dirty: boolean): Promise<JoshRes
 // two, and CI and the review bots run again on the second. A failed push stops nothing: the commit
 // stage pushes the gated tree.
 async function push_ahead(title: string): Promise<string> {
-	const push = await josh_command.josh_run(push_argv(title), should_forward_stderr, undefined, {
-		[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
-	})
+	const push = await timed(
+		STEP.PUSH,
+		async () =>
+			await josh_command.josh_run(push_argv(title), should_forward_stderr, undefined, {
+				[pre_push_related_switch.SWITCH_ENV_KEY]: pre_push_related_switch.SWITCH_ON,
+			}),
+	)
 
 	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')
 }
@@ -141,11 +151,20 @@ async function pushed_note(outcome: MergeOutcome, title: string): Promise<string
 	return await push_ahead(title)
 }
 
+async function waited_note(issue: string): Promise<string> {
+	const overlap = await timed(
+		STEP.OVERLAP_WAIT,
+		async () => await run_ship_overlap.await_overlap(issue),
+	)
+
+	return run_ship_overlap.note(overlap)
+}
+
 // The merge waits first for any lane whose open pull request changes the same paths
 // (`run-ship-overlap.ts`), so it brings that pull request in before the gate rather than meeting it
 // as `DIRTY` after CI.
 async function sync_stage(issue: string, title: string, is_dirty: boolean): Promise<StepResult> {
-	const waited = run_ship_overlap.note(await run_ship_overlap.await_overlap(issue))
+	const waited = await waited_note(issue)
 	const failed_commit = await commit_locally(title, is_dirty)
 
 	if (failed_commit !== undefined) {

@@ -1,0 +1,7 @@
+{
+	"reason": "#5294 adds ship lap recording (run-ship-lap), the ship-lap ledger kind and their lane:breakdown/lane:stats readers — new feature code",
+	"date": "2026-10-28",
+	"growth": {
+		"scripts.code_lines": 259
+	}
+}

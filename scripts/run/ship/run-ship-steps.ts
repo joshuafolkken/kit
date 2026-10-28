@@ -1,6 +1,7 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_review_steps } from './run-ship-review-steps'
@@ -79,7 +80,9 @@ async function commit_stage(args: ShipArguments, state: ShipState): Promise<Step
 
 	if (stop !== undefined) return stop
 
-	return await josh(['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title])
+	const argv = ['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]
+
+	return await run_ship_lap.timed(run_ship_lap.STEP.COMMIT, async () => await josh(argv))
 }
 
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair
