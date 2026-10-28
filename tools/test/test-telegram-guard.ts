@@ -82,8 +82,6 @@ function install(): void {
 	if (current[GUARDED_MARK] !== true) Reflect.set(globalThis, 'fetch', guarded_fetch(current))
 }
 
-// The wrapping is the setup file's whole purpose, so its top-level effect is deliberate.
-// eslint-disable-next-line unicorn/no-top-level-side-effects
 install()
 
 const test_telegram_guard = { BLOCKED_MESSAGE, guarded_fetch, is_telegram }

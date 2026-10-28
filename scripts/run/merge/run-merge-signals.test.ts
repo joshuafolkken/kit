@@ -54,9 +54,10 @@ function event(pos: number, kind: string): unknown {
 }
 
 type Context = Parameters<typeof run_merge_signals.read_signals>[0]
-type Read = Parameters<typeof run_merge_signals.read_signals>[1]
 
 async function signals_of(read: unknown): Promise<unknown> {
+	type Read = Parameters<typeof run_merge_signals.read_signals>[1]
+
 	return await run_merge_signals.read_signals(CONTEXT as Context, read as Read)
 }
 
