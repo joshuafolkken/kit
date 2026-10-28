@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { gh_author_association } from '#scripts/gh/gh-author-association'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
@@ -14,8 +15,8 @@ import { review_finding_ledger } from './review-finding-ledger'
 // a ledger line written then would be pushed onto the open pull request and restart its CI — and so
 // nothing that reads the ledger (`review:findings`, the retrospective) ever saw it.
 //
-// **The next run outside a lane that records a round carries it, or the next flush.** Once an issue is closed no round is added to it,
-// so `review:record` copies each closed issue's comment rounds not yet carried into
+// **The next run outside a lane that records a round carries it, or the next flush.** Once an issue
+// is closed no round is added to it, so `review:record` copies each closed issue's comment rounds not yet carried into
 // `<issue>-comment-rounds.md` in the ledger, and the lines ride that run's own commit: the ledger stays
 // the one place a reader looks, and no push restarts any CI. **The file is the carried mark** — an
 // issue whose file exists is never read again. **A lane child carries none** (joshuafolkken/kit#5326):
@@ -37,6 +38,7 @@ const COMMENT_NOTE =
 const CODE_FENCE = '```'
 const OBSERVATION_LINE_MARK = '- k:'
 const CARRIED_SUFFIX = '-comment-rounds'
+const CARRIED_FILE_PATTERN = new RegExp(String.raw`^\d+${CARRIED_SUFFIX}\.md$`, 'u')
 // One page of the newest closed issues: an issue leaves the search's interest once carried, so the
 // ones still to carry are the recently closed.
 const PER_PAGE = '100'
@@ -146,6 +148,11 @@ function carried_path(issue: number, root: string): string {
 	return observation_ledger_home.file_path(`${String(issue)}${CARRIED_SUFFIX}`, root)
 }
 
+// A path this carry writes, told by its file name alone so a git status path answers it too.
+function is_carried_file(file_path: string): boolean {
+	return CARRIED_FILE_PATTERN.test(path.basename(file_path))
+}
+
 // One issue's comment-round lines. Comments that could not be read throw, so no caller reads an
 // unread issue as one without a round.
 async function issue_lines(issue: number): Promise<Array<string>> {
@@ -179,6 +186,7 @@ const review_comment_round = {
 	body_of,
 	carried_path,
 	carry,
+	is_carried_file,
 	issue_lines,
 	lines_of,
 	observation_body_of,

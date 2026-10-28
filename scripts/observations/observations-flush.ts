@@ -395,11 +395,21 @@ async function prepare_ledger(): Promise<void> {
 	if (broken.length > 0) throw new Error(broken_lines_message(broken))
 }
 
-// **The closed issues' comment rounds are carried once the checkout is safe and caught up**
+// The checkout made safe and caught up: a carried file an earlier flush left uncommitted is discarded
+// first, since it would make git refuse the fast-forward (`review-comment-carry.ts`).
+async function ready_default_branch(status_output: string): Promise<string> {
+	const default_branch = await refuse_unsafe_flush(status_output)
+
+	review_comment_carry.discard_uncommitted(status_output, process.cwd())
+	await catch_up_default(default_branch)
+
+	return default_branch
+}
+
+// **The closed issues' comment rounds are carried only once a flush will go ahead**
 // (joshuafolkken/kit#5326): a lane child leaves them to this flush, so the carried files ride its pull
-// request, and the status is read again so a carry alone is a change to flush. Carried before the
-// fast-forward, a file the default branch already gained upstream would be written here untracked and
-// make git refuse that fast-forward on every later flush.
+// request, and the status is read again so a carry alone is a change to flush. A carry left behind by
+// a later stop is discarded by the next flush's `ready_default_branch`.
 async function carried_status(): Promise<string> {
 	await review_comment_carry.carry_reported(process.cwd())
 
@@ -414,20 +424,19 @@ async function carried_status(): Promise<string> {
 // only where git can do it without touching the ledger: a default branch
 // that predates another merged flush still stops here — before a branch is cut — rather than opening
 // a pull request that cannot merge. An earlier flush pull request still open is checked for the same
-// reason: a branch cut beside it conflicts with it at the ledger's tail.
+// reason: a branch cut beside it conflicts with it at the ledger's tail. So the order is: ready the
+// default branch, defer to an open flush, carry, then check, prepare and land.
 async function flush(now: Date): Promise<string> {
-	const default_branch = await refuse_unsafe_flush(await git_command.status())
+	const default_branch = await ready_default_branch(await git_command.status())
 
-	await catch_up_default(default_branch)
+	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
+	if (deferred !== undefined) return deferred
 
 	const status_output = await carried_status()
 
 	if (!has_ledger_change(status_output)) return CLEAN_MESSAGE
 
 	await prepare_ledger()
-
-	const deferred = await observations_flush_landing.refuse_open_flush(BRANCH_PREFIX)
-	if (deferred !== undefined) return deferred
 
 	const branch_name = branch_name_for(timestamp_for(now))
 

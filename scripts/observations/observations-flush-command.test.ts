@@ -79,7 +79,10 @@ vi.mock('./observation-ledger-prepare', () => ({
 }))
 // The carry reads GitHub and writes the ledger, so it is mocked like the preparation.
 vi.mock('#scripts/review/review-comment-carry', () => ({
-	review_comment_carry: { carry_reported: vi.fn(async () => undefined) },
+	review_comment_carry: {
+		carry_reported: vi.fn(async () => undefined),
+		discard_uncommitted: vi.fn(),
+	},
 }))
 
 const HOOK_REJECTION = 'cspell found an unknown word'

@@ -1,8 +1,8 @@
 {
-	"reason": "#5326 observation-ledger.md names observations:flush as the lane child's carry path",
+	"reason": "Lanes stop carrying comment rounds; observations:flush carries them and discards a carried file a stopped flush left untracked (round-1 medium fix), with tests",
 	"date": "2026-10-28",
 	"growth": {
-		"scripts.code_lines": 23,
+		"scripts.code_lines": 46,
 		"ai_cost.on_demand_bytes": 77
 	}
 }
