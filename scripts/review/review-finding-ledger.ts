@@ -13,6 +13,11 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 const PREFIX = { code: '- rf:', interaction: '- ri:' } as const
 const FIELD_SEPARATOR = ' | '
 const FIELD_COUNT = 5
+// **The disposition is a sixth field, written only when given** (joshuafolkken/kit#5286): a line
+// written before it existed keeps its five and reads as a finding with no disposition.
+const DISPOSED_FIELD_COUNT = FIELD_COUNT + 1
+const ISSUE_FIELD_INDEX = FIELD_COUNT - 1
+const SEVERITY_FIELD_INDEX = 1
 
 // The nine review-rubric categories, as slugs (`prompts/review-rubric.md` → "Review categories"). A
 // finding's category must be one of these so the aggregate stays countable rather than free text.
@@ -30,6 +35,12 @@ const CATEGORIES = [
 
 const SEVERITIES = ['high', 'medium', 'low'] as const
 
+// What became of a finding: fixed in this tree, a verified false positive, or left to another issue.
+// Only the first two close it for `josh review:round2`.
+const CLOSING_DISPOSITIONS = ['fixed', 'false-positive'] as const
+const DISPOSITION_PATTERN = /^(?:fixed|false-positive|(?:filed|deferred):#[1-9]\d*)$/u
+const DISPOSITION_SEPARATOR = ' '
+
 // The sentinel a zero-finding round writes, so "a round ran and found nothing" is a recorded line
 // rather than an absent one — the count's denominator survives.
 const NONE = 'none'
@@ -43,6 +54,12 @@ interface Finding {
 	category: Category
 	severity: Severity
 	file: string
+	disposition?: string
+}
+
+interface DisposedSpec {
+	disposition: string | undefined
+	spec: string
 }
 
 interface CategoryCount {
@@ -65,6 +82,25 @@ function is_valid_file(file: string): boolean {
 	return file.length > 0 && !file.includes(FIELD_SEPARATOR)
 }
 
+function is_disposition(value: string): boolean {
+	return DISPOSITION_PATTERN.test(value)
+}
+
+function is_closing(disposition: string | undefined): boolean {
+	return (CLOSING_DISPOSITIONS as ReadonlyArray<string | undefined>).includes(disposition)
+}
+
+// A positional's leading disposition — `fixed <spec>`, `filed:#12 <spec>` — split from the spec it
+// marks. The token the reviewer already writes before a finding it fixed, so one grammar serves both.
+function split_disposition(positional: string): DisposedSpec {
+	const end = positional.indexOf(DISPOSITION_SEPARATOR)
+	const head = end === -1 ? '' : positional.slice(0, end)
+
+	if (!is_disposition(head)) return { disposition: undefined, spec: positional }
+
+	return { disposition: head, spec: positional.slice(end + DISPOSITION_SEPARATOR.length) }
+}
+
 function issue_field(issue: number): string {
 	return issue_cite.plain(issue)
 }
@@ -79,7 +115,12 @@ function finding_line(
 	issue: number,
 	kind: LineKind = 'code',
 ): string {
-	return line_of([finding.category, finding.severity, finding.file, date, issue_field(issue)], kind)
+	const fields = [finding.category, finding.severity, finding.file, date, issue_field(issue)]
+
+	return line_of(
+		finding.disposition === undefined ? fields : [...fields, finding.disposition],
+		kind,
+	)
 }
 
 // **A zero-finding round records `none`, not nothing.** Reading its absence as "no findings" would
@@ -97,10 +138,20 @@ function fields_of(line: string, kind: LineKind = 'code'): ReadonlyArray<string>
 	return line.trimStart().slice(PREFIX[kind].length).split(FIELD_SEPARATOR)
 }
 
-function category_of(line: string): string | undefined {
-	const fields = fields_of(line)
+// The line's fields, or `undefined` for a malformed one — five, or six with a disposition.
+function well_formed_fields(
+	line: string,
+	kind: LineKind = 'code',
+): ReadonlyArray<string> | undefined {
+	const fields = fields_of(line, kind)
 
-	return fields.length === FIELD_COUNT ? fields[0] : undefined
+	return fields.length === FIELD_COUNT || fields.length === DISPOSED_FIELD_COUNT
+		? fields
+		: undefined
+}
+
+function category_of(line: string): string | undefined {
+	return well_formed_fields(line)?.[0]
 }
 
 function increment(counts: Map<string, number>, category: string): void {
@@ -149,9 +200,27 @@ function zero_round_count(content: string): number {
 // non-finding or malformed line. The record check reads this to ask whether a given issue's round was
 // recorded at all.
 function issue_of(line: string, kind: LineKind): string | undefined {
-	const fields = fields_of(line, kind)
+	return well_formed_fields(line, kind)?.[ISSUE_FIELD_INDEX]
+}
 
-	return fields.length === FIELD_COUNT ? fields[FIELD_COUNT - 1] : undefined
+interface DisposedLine {
+	severity: string
+	disposition: string | undefined
+}
+
+// One issue's `- rf:` lines, each with its severity and disposition — `undefined` disposition for a
+// line written without one. `josh review:round2` reads round 1's closure from this.
+function issue_dispositions(content: string, issue: number): ReadonlyArray<DisposedLine> {
+	const target = issue_field(issue)
+
+	return content
+		.split('\n')
+		.filter((line) => is_finding_line(line) && issue_of(line, 'code') === target)
+		.map((line) => well_formed_fields(line) ?? [])
+		.map((fields) => ({
+			severity: fields[SEVERITY_FIELD_INDEX] ?? NONE,
+			disposition: fields[FIELD_COUNT],
+		}))
 }
 
 // **A `none` zero-round line counts as recorded, exactly like a real finding line does.** The gate
@@ -172,13 +241,16 @@ const review_finding_ledger = {
 	finding_line,
 	has_issue_record,
 	is_category,
+	is_closing,
 	is_finding_line,
 	is_severity,
 	is_valid_file,
+	issue_dispositions,
 	SEVERITIES,
+	split_disposition,
 	zero_round_count,
 	zero_round_line,
 }
 
-export type { CategoryCount, Finding, LineKind }
+export type { CategoryCount, DisposedLine, Finding, LineKind }
 export { review_finding_ledger }

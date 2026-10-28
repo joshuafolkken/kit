@@ -48,8 +48,8 @@ in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its cons
 `pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
 skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round
-runs here). (9a) **Ask `pnpm josh review:round2 --round-1-closed` whether a second round is due**, once
-round 1's fixes are in and before the commit. (10) Where the tree was edited after the first gate
+runs here). (9a) **Ask `pnpm josh review:round2 --record <N>` whether a second round is due**, once
+round 1 is fixed and recorded, before the commit. (10) Where the tree was edited after the first gate
 started, re-run `pnpm josh gate` and join it. (11) `pnpm josh git -y "<title> #<N>"` — the pull request
 opens here, between the two rounds. (11a) Run the **second round** now beside the CI, where (9a)
 answered `required` (brief `pnpm josh review:brief --round 2`); a finding it fixes in place is pushed

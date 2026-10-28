@@ -108,13 +108,13 @@ the child rather than buying a further round.
 ### When round 2 is skipped entirely, and when it is not
 
 ```bash
-pnpm josh review:round2 --round-1-closed   # → required | skip ; the reason on stderr
+pnpm josh review:round2 --record <N>   # → required | skip ; the reason on stderr
 ```
 
-Ask once round 1's fixes are in, before the commit. Pass `--round-1-closed` only when every round-1
-High/Medium closed — fixed in this working tree or verified false positive — and none was filed or
-deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot included), the answer is
-`required`.
+Ask once round 1's fixes are in and the round is recorded with each finding's disposition
+(`pnpm josh review:record`'s usage), before the commit. Round 1 is closed only when the ledger shows
+every round-1 High/Medium as `fixed` or `false-positive`. Anything else, including a missing round-1
+snapshot, answers `required`.
 
 `skip` has exactly two arms, and the reason line names which fired:
 
@@ -128,8 +128,8 @@ deferred. Without the flag, and on any uncertainty (a missing round-1 snapshot i
 One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
 code line, or a source file whose comment-free text cannot be read.
 
-Record a skipped round on the Issue with a comment under `## Round 2 skipped`, naming which arm fired
-and quoting the command's reason line verbatim.
+`--record <N>` records a skipped round on the Issue itself: a comment under `## Round 2 skipped`
+naming which arm fired and quoting the reason line verbatim, written once however often it is asked.
 
 ### Three-way disposition after the cap
 

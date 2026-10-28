@@ -4,7 +4,7 @@ const LEVEL_ONLY = '--level-only'
 const CHECK = '--check'
 const MACHINE_READABLE = 'the verdict and the reason, machine-readable'
 const JSON_FLAG = '--json'
-const ROUND_1_CLOSED = '--round-1-closed'
+const RECORD = '--record'
 
 // The review and delegation commands, split out of `josh-commands-ai.ts` when each command's usage
 // moved onto its entry (#4185). `AI_COMMANDS` spreads this in at the same place, so the map keeps its
@@ -106,18 +106,18 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',
 		category: 'AI tools',
-		reference: ['[--round-1-closed] [--json]', 'automation', ['none']],
+		reference: ['[--record <N>] [--json]', 'automation', ['network']],
 		usage: {
 			examples: [
-				{ arguments: '', note: '→ required' },
-				{ arguments: ROUND_1_CLOSED, note: '→ required | skip' },
+				{ arguments: '', note: '→ required | skip, for the branch’s issue' },
+				{ arguments: `${RECORD} 123`, note: '→ required | skip, a skip commented on that issue' },
 				{ arguments: JSON_FLAG, note: MACHINE_READABLE },
 			],
 			flags: [
 				{
-					names: [ROUND_1_CLOSED],
+					names: [RECORD],
 					description:
-						'the caller states every round-1 High/Medium finding closed and none was filed or deferred; its absence answers `required`.',
+						'the issue whose ledger dispositions decide round 1’s closure — skip only when every High/Medium is `fixed` or `false-positive` — and where a skip is commented under `## Round 2 skipped`, once.',
 				},
 				{ names: [JSON_FLAG], description: 'machine-readable verdict and reason.' },
 			],
