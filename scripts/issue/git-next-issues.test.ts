@@ -114,6 +114,18 @@ describe('git_next_issues.prioritize - ranking keys', () => {
 	})
 })
 
+// joshuafolkken/kit#5302: the 2026-10-28 queue — one measured time-saver behind newer undeclared
+// issues of its priority — puts the time-saver first.
+describe('git_next_issues.prioritize - expected effect', () => {
+	it('puts the issue that declares an expected effect ahead of newer undeclared ones', () => {
+		const effect = '## 期待効果\n\n- 効く率: 週 23 回のうち 5 回\n- 1 回あたりの得: 約 250 秒\n'
+		const saver = { ...issue(1, CREATED_EARLIER), body: effect }
+		const issues = [saver, issue(2, CREATED_LATER), issue(3, CREATED_LATEST)]
+
+		expect(prioritized_numbers(issues)).toEqual([1, 3, 2])
+	})
+})
+
 describe('git_next_issues.prioritize - exclusions', () => {
 	// An epic tracks a batch and is never run directly (`queue` receives child issues only), and an
 	// in-progress issue is already claimed. The mixed casing covers repos whose label predates the

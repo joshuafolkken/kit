@@ -109,6 +109,42 @@ describe('expected-effect lint — value_of', () => {
 	})
 })
 
+// joshuafolkken/kit#5302: the backlog ranking reads the minutes a week off the rate and the gain.
+function effect(rate: string, gain: string): string {
+	return `## 期待効果\n\n- 効く率: ${rate}\n- 1 回あたりの得: ${gain}\n`
+}
+
+describe('expected-effect lint — weekly_minutes', () => {
+	const MINUTES_5273 = (5 * 250) / 60
+	const DIGITS = 6
+
+	it('reads the last count of a weekly rate times the gain in seconds, as #5273 states them', () => {
+		const body = effect(
+			'週 23 回の全件フォールバックのうち 5 回',
+			'約 250 秒（全件 294.8 秒 → 39.4 秒）',
+		)
+
+		expect(expected_effect_lint.weekly_minutes(body)).toBeCloseTo(MINUTES_5273, DIGITS)
+	})
+
+	it('divides a count over several weeks by its span', () => {
+		expect(expected_effect_lint.weekly_minutes(effect('過去 2 週間で 10 回', '3 分'))).toBe(15)
+		expect(expected_effect_lint.weekly_minutes(effect('2 週に 1 回', '4 分'))).toBe(2)
+	})
+
+	it('reads a gain stated in minutes', () => {
+		expect(expected_effect_lint.weekly_minutes(effect('週 3 回', '2.5 分'))).toBe(7.5)
+	})
+
+	it('answers 0 for a rate that is not a weekly count, a placeholder, or no section', () => {
+		expect(expected_effect_lint.weekly_minutes(`${DECLARED_3902}${EXPECTED_EFFECT}`)).toBe(0)
+		expect(expected_effect_lint.weekly_minutes(effect('9 割', '約 250 秒'))).toBe(0)
+		expect(expected_effect_lint.weekly_minutes(effect('週 5 回', '<浮く時間>'))).toBe(0)
+		expect(expected_effect_lint.weekly_minutes(DECLARED_3902)).toBe(0)
+		expect(expected_effect_lint.weekly_minutes()).toBe(0)
+	})
+})
+
 describe('expected-effect lint — the declaration', () => {
 	it('ignores the declaration outside the background section', () => {
 		const body = [...ISSUE_3902_BACKGROUND, ...ISSUE_3902_REST].join('\n')
