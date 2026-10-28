@@ -35,7 +35,7 @@ pnpm josh run:cut <N>
 
 - `cut` (0) — record written and handed to the lane's launch owner (OpenAI supervisor starts the
   successor after this process exits; Anthropic relaunches directly). **End the turn immediately.**
-- `under-threshold` (0) — the newest request's billed input is under `CONTEXT_CUT_THRESHOLD`; **continue to the gate.**
+- `under-threshold` (0) — the newest request's billed input is under the `pnpm josh cost --cut` threshold; **continue to the gate.**
 - `not-a-lane` (0) — not a dispatched child. **Continue to the gate.**
 - `unready` (1) — the tree is clean or on the default branch. Continue to the gate.
 - `busy` (1) — a cut is already in flight for this tree. Do not relaunch.
@@ -101,8 +101,7 @@ The child ends mid-implementation and a fresh one resumes **back into implementa
 ### The measurement is the parent hand-off's, never a second one
 
 Same `cost_verdict.per_request_cost` through `cost_cli.session_verdict` as `backlogrun-progress.md` →
-"The hand-off"; `run_cut.IMPLEMENTATION_CONTEXT_THRESHOLD` aliases the **135_000**
-`CONTEXT_CUT_THRESHOLD`.
+"The hand-off", against the same threshold `pnpm josh cost --cut` prints.
 
 ### It is a guard, fired at the edit that crosses the threshold
 
@@ -122,8 +121,8 @@ A child that ended without cutting is detected by
 
 ## The threshold
 
-`CONTEXT_CUT_THRESHOLD` and `cost_verdict.per_request_cost` live in
-`scripts/cost-runtime/context-cut-payback.ts`; both cuts and the parent hand-off read the same verdict,
+The threshold is the break-even context `scripts/cost-runtime/context-cut-payback.ts` prices at the
+session's model — `pnpm josh cost --cut` prints it, no fixed figure fits every model; both cuts and the parent hand-off read the same verdict,
 and an unmeasurable session is always cut. Both cuts end the turn **before** the gate, so the push is never a
 turn boundary (`chain-rule.md`).
 

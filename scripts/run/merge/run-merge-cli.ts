@@ -1,4 +1,3 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
@@ -132,8 +131,8 @@ function valid_child(parsed: ParsedArguments): string | undefined {
 }
 
 // `backlog:drive` has no context to cut, so its merge is never handed back `over`.
-function threshold_of(values: ParsedArguments['values']): number | undefined {
-	return values.driver === true ? undefined : CONTEXT_CUT_THRESHOLD
+function cut_check_of(values: ParsedArguments['values']): true | undefined {
+	return values.driver === true ? undefined : true
 }
 
 function to_context(parsed: ParsedArguments): MergeContext | undefined {
@@ -153,7 +152,7 @@ function to_context(parsed: ParsedArguments): MergeContext | undefined {
 		child,
 		epic: valid_epic(parsed.values.epic),
 		repo: valid_repo(parsed.values.repo),
-		over: threshold_of(parsed.values),
+		over: cut_check_of(parsed.values),
 		owner,
 		output: parsed.values.output,
 	}

@@ -1,4 +1,3 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge_token } from './run-merge-token'
 
@@ -346,13 +345,13 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RETRY)
 	})
 
-	it('uses the shared threshold without a numeric argument', () => {
-		expect(run_merge_cli.parse([CHILD])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+	it('asks the cut verdict without a numeric argument', () => {
+		expect(run_merge_cli.parse([CHILD])?.over).toBe(true)
 	})
 
 	it('accepts but ignores an in-flight legacy threshold', () => {
-		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
-		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(CONTEXT_CUT_THRESHOLD)
+		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(true)
+		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(true)
 	})
 
 	it('keeps legacy threshold parsing strict', () => {

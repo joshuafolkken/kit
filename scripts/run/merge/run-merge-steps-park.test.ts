@@ -1,4 +1,3 @@
-import { CONTEXT_CUT_THRESHOLD } from '#scripts/cost-runtime/context-cut-threshold'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_sample_prime } from '#scripts/issue/issue-sample-prime'
 import { issue_state_cli } from '#scripts/issue/issue-state-cli'
@@ -49,7 +48,7 @@ const CONTEXT = {
 	child: CHILD,
 	epic: undefined,
 	repo: undefined,
-	over: CONTEXT_CUT_THRESHOLD,
+	over: true as const,
 	owner: run_carry.NO_OWNER,
 }
 const IN_PROGRESS = 'in-progress'

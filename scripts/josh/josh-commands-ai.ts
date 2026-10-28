@@ -82,7 +82,7 @@ const AI_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '--cut',
-					note: 'compare billed input per request with the shared 135,000 context-cut threshold',
+					note: 'compare billed input per request with the context-cut threshold priced at the session model',
 				},
 				{ arguments: '--over <tokens>', note: 'compare with an explicit limit' },
 				{ arguments: `--cut ${PATH_DIR}`, note: 'Anthropic project or current OpenAI worktree' },
