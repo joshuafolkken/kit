@@ -15,6 +15,8 @@ const ITEM_LABELS: ReadonlyArray<string> = [RATE_LABEL, GAIN_LABEL, '外れた�
 // The numbers the backlog ranking reads off the rate and the gain (joshuafolkken/kit#5302).
 const WEEK = '週'
 const COUNT = /(?<![\d.])(?<count>\d+) ?回/gu
+const SPAN = /(?<![\d.])(?<weeks>\d+) ?週/u
+const ONE_WEEK = 1
 const DURATION = /(?<![\d.])(?<amount>\d+(?:\.\d+)?) ?(?<unit>[分秒])/u
 const SECONDS_UNIT = '秒'
 const SECONDS_PER_MINUTE = 60
@@ -57,16 +59,24 @@ function value_of(body: string, label: string): string | undefined {
 	return stated_value(effect_lines(body), label)
 }
 
-// The hits a week a rate states: its last count, so "5 of 23 a week" reads the 5 the speed-up applies to.
-// `0` when the rate names no week or no count.
+// The weeks a rate is counted over: its stated span ("10 in 2 weeks", "1 every 2 weeks"), else one.
+function weeks_of(rate: string): number {
+	const weeks = SPAN.exec(rate)?.groups?.['weeks']
+
+	return Math.max(Number(weeks ?? ONE_WEEK), ONE_WEEK)
+}
+
+// The hits a week a rate states: its last count, so "5 of 23 a week" reads the 5 the speed-up applies to,
+// over its span of weeks. `0` when the rate names no week or no count.
 function weekly_hits(rate: string | undefined): number {
 	if (!rate?.includes(WEEK)) return NONE
 	const counts = [...rate.matchAll(COUNT)].map((match) => Number(match.groups?.['count']))
 
-	return counts.at(-1) ?? NONE
+	return (counts.at(-1) ?? NONE) / weeks_of(rate)
 }
 
-// The minutes one hit saves: the gain's first duration, in seconds or minutes. `0` when it states none.
+// The minutes one hit saves: the first number the gain states in seconds or minutes — a range written
+// with one closing unit ("3-6 min") reads its upper bound. `0` when it states none.
 function minutes_per_hit(gain = ''): number {
 	const groups = DURATION.exec(gain)?.groups
 	if (groups === undefined) return NONE

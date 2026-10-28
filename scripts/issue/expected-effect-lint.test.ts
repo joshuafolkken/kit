@@ -127,6 +127,11 @@ describe('expected-effect lint — weekly_minutes', () => {
 		expect(expected_effect_lint.weekly_minutes(body)).toBeCloseTo(MINUTES_5273, DIGITS)
 	})
 
+	it('divides a count over several weeks by its span', () => {
+		expect(expected_effect_lint.weekly_minutes(effect('過去 2 週間で 10 回', '3 分'))).toBe(15)
+		expect(expected_effect_lint.weekly_minutes(effect('2 週に 1 回', '4 分'))).toBe(2)
+	})
+
 	it('reads a gain stated in minutes', () => {
 		expect(expected_effect_lint.weekly_minutes(effect('週 3 回', '2.5 分'))).toBe(7.5)
 	})
