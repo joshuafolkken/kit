@@ -106,7 +106,9 @@ describe('review_record_cli.run with a reason', () => {
 	it('keeps the ledger line to the spec alone, as a finding without a reason writes it', async () => {
 		const root = await record('ledger-spec', [`${EPERM_SPEC} - ${EPERM_REASON}`])
 
-		expect(ledger_of(root)).toBe('- rf:bug-risks | medium | tick.ts:187 | 2026-10-25 | #4772\n')
+		expect(ledger_of(root)).toBe(
+			'- rb:2026-10-25 | #4772\n- rf:bug-risks | medium | tick.ts:187 | 2026-10-25 | #4772\n',
+		)
 	})
 })
 
@@ -117,7 +119,7 @@ describe('review_record_cli.run without a reason', () => {
 		const root = await record('no-reason', [EPERM_SPEC, 'tests:low:a.test.ts'])
 
 		expect(ledger_of(root)).toBe(
-			'- rf:bug-risks | medium | tick.ts:187 | 2026-10-25 | #4772\n- rf:tests | low | a.test.ts | 2026-10-25 | #4772\n',
+			'- rb:2026-10-25 | #4772\n- rf:bug-risks | medium | tick.ts:187 | 2026-10-25 | #4772\n- rf:tests | low | a.test.ts | 2026-10-25 | #4772\n',
 		)
 		expect(existsSync(LOG)).toBe(false)
 	})
