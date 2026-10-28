@@ -11,7 +11,8 @@ import { lane_transcript_stats } from './lane-transcript-stats'
 //
 // **The subagents split by the agent dispatched** — `subagent: investigator`, `subagent: reviewer`, …
 // — and a backgrounded subagent call still names its kind, at no time, with its count beside it
-// (joshuafolkken/kit#5297).
+// (joshuafolkken/kit#5297). `run:review` and `ship` / `ship:wait` count apart from other bash
+// (joshuafolkken/kit#5293).
 
 const REMAINDER = 'editing & thinking'
 const OTHER_BASH = 'other bash'
@@ -28,6 +29,8 @@ const COMMAND_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
 	[/\bjosh main:merge\b/u, 'main:merge'],
 	[/\bjosh check:related\b/u, 'check:related'],
 	[/\bjosh gate\b/u, 'gate'],
+	[/\bjosh run:review\b/u, 'run:review'],
+	[/\bjosh ship(?::wait)?\b/u, 'ship / ship:wait'],
 	[/\bjosh test(?::[\w-]+)?\b/u, 'test'],
 	[/\bjosh (?:lint|cspell)(?::[\w-]+)?\b/u, 'lint / cspell'],
 ]

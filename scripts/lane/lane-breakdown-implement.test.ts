@@ -11,6 +11,8 @@ const IMPLEMENT_FROM = 10 * MINUTE_MS
 const IMPLEMENT_TO = 61 * MINUTE_MS
 const REMAINDER = 'editing & thinking'
 const GATE = 'pnpm josh gate'
+const GIT_STATUS = 'git status'
+const OTHER_BASH = 'other bash'
 const GENERAL_PURPOSE = 'subagent: general-purpose'
 const REVIEWER = 'subagent: reviewer'
 
@@ -63,6 +65,26 @@ function kinds_of(calls: ReadonlyArray<ToolCall>): Array<readonly [string, numbe
 	return detail.kinds.map((kind) => [kind.name, kind.ms / MINUTE_MS] as const)
 }
 
+// joshuafolkken/kit#5293: #5197's 13.5 minutes of other bash were run:review waits no kind named.
+describe('lane_breakdown_implement.of — run:review and ship', () => {
+	it('counts run:review and ship / ship:wait apart from other bash', () => {
+		const calls = [
+			bash(11, 10, 'pnpm josh run:review --pinned 2>&1'),
+			bash(25, 2, 'pnpm josh run:review --join'),
+			bash(30, 5, 'pnpm josh ship --detach --review "t #1"'),
+			bash(40, 4, 'pnpm josh ship:wait 1'),
+			bash(50, 1, GIT_STATUS),
+		]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 29],
+			['run:review', 12],
+			['ship / ship:wait', 9],
+			[OTHER_BASH, 1],
+		])
+	})
+})
+
 describe('lane_breakdown_implement.of — kinds', () => {
 	it('sums the calls by kind, longest first, the rest as editing & thinking', () => {
 		const calls = [
@@ -70,7 +92,7 @@ describe('lane_breakdown_implement.of — kinds', () => {
 			bash(20, 6, 'pnpm josh check:related'),
 			bash(30, 3, 'pnpm josh test:related a.test.ts'),
 			bash(35, 2, 'pnpm josh lint:related'),
-			bash(40, 1, 'git status'),
+			bash(40, 1, GIT_STATUS),
 			call({ minute: 42, minutes: 10, tool: 'Agent' }),
 			call({ minute: 55, minutes: 2, tool: 'Read' }),
 			call({ minute: 58, minutes: 1, tool: 'Edit' }),
@@ -84,7 +106,7 @@ describe('lane_breakdown_implement.of — kinds', () => {
 			['test', 3],
 			['lint / cspell', 2],
 			['read', 2],
-			['other bash', 1],
+			[OTHER_BASH, 1],
 		])
 	})
 
