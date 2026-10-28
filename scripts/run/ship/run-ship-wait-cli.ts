@@ -15,8 +15,10 @@ import { run_ship_waiter } from './run-ship-waiter'
 // - `ended` — the supervisor ended with no note for this session: nothing is left to wait for.
 // - `pending` — the chunk ran out with the ship still before its commit: issue the wait again.
 //
-// **A chunk ends below the Bash tool's ten-minute ceiling**, so the session re-issues it rather than
-// having it killed; the heartbeat outlives the chunk by the session gap.
+// **A chunk ends below the five-minute prompt-cache TTL a lane child runs on** (`lane-child-marker.ts`),
+// so re-issuing it is the keep-alive: the next request reads the cached context back (66k tokens on
+// Opus 5.5, about $0.013) instead of writing it whole again after the wait (about $0.33) —
+// joshuafolkken/kit#5344. The heartbeat outlives the chunk by the session gap.
 
 const VERDICT = {
 	RETURNED: 'returned',
@@ -32,7 +34,7 @@ interface Waited {
 	note?: string
 }
 
-const CHUNK_MS = 540_000
+const CHUNK_MS = 270_000
 const POLL_MS = 2000
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
@@ -133,7 +135,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-const run_ship_wait_cli = { VERDICT, run, wait_for }
+const run_ship_wait_cli = { CHUNK_MS, VERDICT, run, wait_for }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))

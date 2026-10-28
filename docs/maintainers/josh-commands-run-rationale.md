@@ -124,7 +124,7 @@ A `preflight` stage runs first: it asks every pull-request precondition at once 
 
 The lane session that detached a ship waits instead of ending its turn, so a stop in the gate or review round 1 comes back to the session that already holds the run rather than to a fresh one that re-reads it (joshuafolkken/kit#4711).
 
-Each poll refreshes a heartbeat; the stopped supervisor hands its note to a session whose heartbeat is fresh, and relaunches a fresh session where none takes it within two minutes. A chunk ends `pending` after nine minutes, below the Bash tool's ceiling, and the heartbeat outlives it long enough for the next wait.
+Each poll refreshes a heartbeat; the stopped supervisor hands its note to a session whose heartbeat is fresh, and relaunches a fresh session where none takes it within two minutes. A chunk ends `pending` after four and a half minutes, below the five-minute prompt-cache TTL a lane child runs on, so the next wait reads the cached context back instead of writing it whole again (joshuafolkken/kit#5344); the heartbeat outlives it long enough for the next wait.
 
 ## `josh run:event` in detail
 
