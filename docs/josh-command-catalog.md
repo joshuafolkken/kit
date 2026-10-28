@@ -185,6 +185,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh oracle:list` | — | automation | none | Print the decision oracles — commands that answer a rule question mechanically |
 | `josh pkg:scout` | `<keywords> [--size <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |
 | `josh plan:consumers` | `<identifier...>` | automation | none | List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section |
+| `josh prose:stale` | — | automation | none | List each removed export, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name |
 | `josh read:files` | `<path> [<path> ...]` | automation | none | Read several files in one call so edit targets fold into one turn |
 | `josh read:set` | `[<entry>] [--json]` | automation | none | Print what an entry point reads before it starts, and what that read costs |
 | `josh repo:party` | `[<owner/repo>]` | automation | none | Say whether a repository is first-party or third-party by owner equality (computed, not judged) |

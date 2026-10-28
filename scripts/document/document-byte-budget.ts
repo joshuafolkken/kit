@@ -79,8 +79,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
 	{ path: 'docs/josh-commands-run.md', bytes: 86_016 },
-	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 61_440 },
+	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
+	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 65_536 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
 	{ path: 'docs/josh-commands.md', bytes: 61_440 },
@@ -111,7 +112,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 8192 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
 	{ path: 'prompts/review-rubric.md', bytes: 12_288 },
-	{ path: 'prompts/review.md', bytes: 12_288 },
+	// Self-check 2's `josh prose:stale` pointer (joshuafolkken/kit#5287) crossed the 12288 block.
+	{ path: 'prompts/review.md', bytes: 16_384 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
 	{ path: 'prompts/testing-guide.md', bytes: 12_288 },
 ]

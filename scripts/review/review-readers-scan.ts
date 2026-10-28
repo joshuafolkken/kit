@@ -6,6 +6,8 @@
 // returned, spelled the way a reader writes it: a direct export as itself, a member of an exported
 // namespace object (`export { issue_merged }`) as `issue_merged.read_merged`. The namespace object
 // itself is skipped — a member added to it changes none of its readers.
+//
+// `declarations` and `exported_names` are also read by `prose-stale-scan.ts` over a diff's removed lines.
 
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
 const DECLARATION =
@@ -157,7 +159,7 @@ function edited(source: string, diff: string): Array<Edited> {
 	return found_targets.filter((entry): entry is Edited => entry.target !== undefined)
 }
 
-const review_readers_scan = { changed_lines, edited }
+const review_readers_scan = { changed_lines, declarations, edited, exported_names }
 
-export type { Edited }
+export type { Declaration, Edited }
 export { review_readers_scan }

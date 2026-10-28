@@ -23,6 +23,9 @@ import { review_untouched_readers, type ReadersRead } from './review-untouched-r
 
 const TEST_COMMAND_LINE =
 	'- The unit suite is `pnpm josh test:unit`. Do not reach for `npx vitest`; it is not how this project runs them.'
+// The self-check's question 2 ("Prose matches the code", `prompts/review.md`) as one command.
+const PROSE_STALE_LINE =
+	'- Self-check 2, prose matches the code: `pnpm josh prose:stale` lists each removed name, command, constant or heading docs, prompts or comments still name.'
 
 // **The checkout block, and why the target below names a path instead of assuming one**.
 // `/code-review` is forked by the harness and inherits the session's
@@ -489,6 +492,7 @@ function compose(input: BriefInput): string {
 		'',
 		gate_line(input.stamps, input.tree, input.base),
 		TEST_COMMAND_LINE,
+		PROSE_STALE_LINE,
 		'',
 		target,
 		...diff_block(input, target),
@@ -511,6 +515,7 @@ const review_brief = {
 	matching_stamp,
 	no_snapshot_line,
 	NOTHING_LEFT_LINE,
+	PROSE_STALE_LINE,
 	rubric_line,
 	RUBRIC_RELATIVE_PATH,
 	ROUND_TWO_HEADING,
