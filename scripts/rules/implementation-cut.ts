@@ -40,15 +40,23 @@ function is_edit_tool(name: string): boolean {
 // take one, so `cost-run-cut.ts` looks for the flag that makes it the implementation-phase cut.
 const CUT_COMMANDS: ReadonlySet<string> = new Set(['run:cut'])
 const IMPL_FLAG = /(?:^|\s)--impl(?:[=\s]|$)/u
+const RESUME_FLAG = /(?:^|\s)--resume(?:[=\s]|$)/u
 
-function is_impl_cut_segment(segment: string): boolean {
-	return shell_segments.is_josh_command(segment, CUT_COMMANDS) && IMPL_FLAG.test(segment)
+// Segment-wise so a spelling quoted inside a body is not read as the call.
+function calls_cut_with(command: string, flag: RegExp): boolean {
+	return shell_segments
+		.segments_of(command)
+		.some((segment) => shell_segments.is_josh_command(segment, CUT_COMMANDS) && flag.test(segment))
 }
 
-// Whether this command takes the implementation-phase cut, segment-wise so a spelling quoted inside a
-// body is not read as the call.
+// Whether this command takes the implementation-phase cut.
 function takes_the_impl_cut(command: string): boolean {
-	return shell_segments.segments_of(command).some((segment) => is_impl_cut_segment(segment))
+	return calls_cut_with(command, IMPL_FLAG)
+}
+
+// Whether this command asks for a cut's resume verdict — the call a relaunched lane child opens with.
+function resumes_a_cut(command: string): boolean {
+	return calls_cut_with(command, RESUME_FLAG)
 }
 
 // What the trigger has to know about the world, passed in so the decision is testable without a lane on
@@ -268,6 +276,7 @@ const implementation_cut = {
 	decide,
 	is_over_threshold_edit,
 	is_reissued_refusal,
+	resumes_a_cut,
 	takes_the_impl_cut,
 	uncut_run_issue,
 }

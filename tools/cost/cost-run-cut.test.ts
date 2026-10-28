@@ -4,6 +4,7 @@ import { cost_run_cut } from './cost-run-cut'
 
 const { BRANCH } = time_transcript_fixture
 const CUT_COMMAND = 'pnpm josh run:cut --impl 3223 --handoff /tmp/3223-handoff.md'
+const RESUME_COMMAND = 'pnpm josh run:cut --resume 3223'
 const REFUSAL =
 	'PreToolUse:Edit hook error: ⛔ implementation-phase cut: take the cut before this edit'
 
@@ -46,5 +47,21 @@ describe('cost_run_cut.took_cut_text', () => {
 	it('reads an empty or unparsable transcript as not cut', () => {
 		expect(cost_run_cut.took_cut_text('')).toBe(false)
 		expect(cost_run_cut.took_cut_text('not json')).toBe(false)
+	})
+})
+
+describe('cost_run_cut.is_ship_text', () => {
+	it('reads a session whose cut resume answered resume as the ship phase', () => {
+		expect(cost_run_cut.is_ship_text(cut_call('resume', RESUME_COMMAND))).toBe(true)
+	})
+
+	it('does not read an implementation resume or a fresh run as the ship phase', () => {
+		expect(cost_run_cut.is_ship_text(cut_call('resume-impl', RESUME_COMMAND))).toBe(false)
+		expect(cost_run_cut.is_ship_text(cut_call('fresh', RESUME_COMMAND))).toBe(false)
+	})
+
+	it('does not read a resume verdict answered to another call as the ship phase', () => {
+		expect(cost_run_cut.is_ship_text(cut_call('resume'))).toBe(false)
+		expect(cost_run_cut.is_ship_text(cut_call('resume', `echo "${RESUME_COMMAND}"`))).toBe(false)
 	})
 })

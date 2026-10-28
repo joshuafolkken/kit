@@ -38,6 +38,7 @@ function node(
 		baseline_tokens: 100,
 		is_readable: true,
 		took_cut: false,
+		is_ship: false,
 	}
 }
 
@@ -95,6 +96,19 @@ describe('cost_run_report.format_report', () => {
 
 	it('omits the before → after block unless a split instant was named', () => {
 		expect(text).not.toContain(SPLIT_HEADING)
+	})
+
+	it('prints the worker requests and cost by phase, and carries them in the record', () => {
+		const ship_lane: RunNode = { ...node('L2', 'lane', 1913, 1), is_ship: true }
+		const report = cost_run_report.build(1, 0, [...NODES, ship_lane])
+		const phase_text = cost_run_report.format_report(report)
+
+		expect(report.worker_phases).toMatchObject([
+			{ phase: 'implement', session_count: 1, request_count: 1 },
+			{ phase: 'ship', session_count: 1, request_count: 1 },
+		])
+		expect(phase_text).toContain('Worker by phase:')
+		expect(phase_text).toMatch(/ship\s+1 session\(s\) · 1 request\(s\) · \$/u)
 	})
 
 	it('adds the before → after block, and carries it in the record, when split', () => {

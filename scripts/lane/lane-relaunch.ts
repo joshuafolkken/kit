@@ -7,7 +7,7 @@ import { lane_dispatch_log } from './lane-dispatch-log'
 import type { LaneInfo } from './lane-registry'
 
 // Relaunching a lane child session into its own lane — a fresh agent process started detached, under
-// the lane's stored profile at the effort of the phase it resumes into, logging to the lane's dispatch
+// the lane's stored profile at the effort (and any model override) of the phase it resumes into, logging to the lane's dispatch
 // log and carrying the dispatch mark afresh. **It was `run:cut`'s alone until a second caller needed it**:
 // the detached `josh ship` supervisor hands a stopped stage back to an agent
 // the same way the pre-gate cut hands the gate to one, so the launch is shared rather than copied — the

@@ -259,7 +259,7 @@ function to_context(
 	return {
 		facts: (id) => usage.get(id) ?? { records: [], baseline_tokens: 0, is_readable: false },
 		lane_issue: (file) => lane_issue_of(file, projects_root, prefix),
-		took_cut: (file) => cost_run_cut.took_cut(file),
+		lane_marks: (file) => cost_run_cut.lane_marks(file),
 	}
 }
 

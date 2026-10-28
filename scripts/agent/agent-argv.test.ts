@@ -12,6 +12,7 @@ const LEGACY_MODEL = 'opus'
 const { PRE_GATE_PHASE, DEFAULT_PROFILES } = agent_role_profile
 const LEGACY_WORKER: AgentProfile = { ...DEFAULT_PROFILES.worker, model: LEGACY_MODEL }
 const OUTDATED = 'Claude Code 2.1.156 cannot run claude-opus-5-5'
+const SONNET = 'claude-sonnet-5-5'
 
 const check = vi.spyOn(agent_diagnostics, 'check')
 
@@ -28,6 +29,18 @@ describe('a stored lane profile across a cut', () => {
 		expect(built.kind === 'argv' && built.argv.args).toContain(LEGACY_MODEL)
 	})
 
+	// joshuafolkken/kit#5343: the ship key moves the pre-gate relaunch off the recorded model.
+	it('relaunches the pre-gate phase on the ship model when its key is set', () => {
+		check.mockReturnValue({ kind: 'ready' })
+		vi.stubEnv('JOSH_WORKER_SHIP_MODEL', SONNET)
+		const built = agent_argv.resume_argv(INVOCATION, LEGACY_WORKER, PRE_GATE_PHASE, LANE)
+
+		vi.unstubAllEnvs()
+
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET, effort: 'low' } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(SONNET)
+	})
+
 	it('resumes a session on the recorded model', () => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.with_resume_in(INVOCATION, LEGACY_WORKER, 'session', LANE)
@@ -40,13 +53,12 @@ describe('a stored lane profile across a cut', () => {
 describe('a review round', () => {
 	it('builds a later round under the verification profile', () => {
 		check.mockReturnValue({ kind: 'ready' })
-		const sonnet = 'claude-sonnet-5-5'
 		const built = agent_argv.review_in(INVOCATION, 2, LANE, {
-			JOSH_REVIEWER_VERIFICATION_MODEL: sonnet,
+			JOSH_REVIEWER_VERIFICATION_MODEL: SONNET,
 		})
 
-		expect(built).toMatchObject({ kind: 'argv', profile: { model: sonnet } })
-		expect(built.kind === 'argv' && built.argv.args).toContain(sonnet)
+		expect(built).toMatchObject({ kind: 'argv', profile: { model: SONNET } })
+		expect(built.kind === 'argv' && built.argv.args).toContain(SONNET)
 	})
 })
 
