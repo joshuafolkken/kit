@@ -11,6 +11,7 @@ import { run_cut_decline } from '#scripts/run/cut/run-cut-decline'
 import { run_cut_handoff } from '#scripts/run/cut/run-cut-handoff'
 import { run_cut_ready } from '#scripts/run/cut/run-cut-ready'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
+import { edit_tool } from './edit-tool'
 import { implementation_cut_verdict } from './implementation-cut-verdict'
 import { shell_segments } from './shell-segments'
 
@@ -25,15 +26,11 @@ import { shell_segments } from './shell-segments'
 // rather than approximating it — the same statistic and the same threshold, never a second
 // measurement.
 
-// The two edit tools the `PreToolUse` matcher routes here, and the working-tree boundary the cut is
-// taken at. A `PreToolUse` refusal fires *before* the edit lands, so the tree is at the consistent
-// state the previous edit left it — the "between edit batches, never mid-edit" boundary
+// The two edit tools the `PreToolUse` matcher routes here (`edit-tool.ts`), and the working-tree
+// boundary the cut is taken at. A `PreToolUse` refusal fires *before* the edit lands, so the tree is at
+// the consistent state the previous edit left it — the "between edit batches, never mid-edit" boundary
 // `pre-gate-cut.md` requires, reached without waiting for a check to go green.
-const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write'])
-
-function is_edit_tool(name: string): boolean {
-	return EDIT_TOOLS.has(name)
-}
+const { is_edit_tool } = edit_tool
 
 // The one spelling that takes this cut rather than the pre-gate one: `--impl`. A bare `pnpm josh
 // run:cut <N>` is the pre-gate boundary and `--resume` / `--end` / `--json` ask about a cut rather than

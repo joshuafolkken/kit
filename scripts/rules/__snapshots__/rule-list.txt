@@ -120,6 +120,10 @@
   - fires: `pnpm josh pretool:guard` — a heredoc write to an existing file, a writing `node -e` / interpreter heredoc, or `perl -0pi -e`. Every occurrence
   - silent: a new file, a read-only heredoc, or a short `sed -i`
   - not automated: the right form is another tool, which `updatedInput` cannot switch to
+- **No `sed -i` its countable conditions do not clear** (`sed-in-place`, `file-edits.md`)
+  - fires: `pnpm josh pretool:guard` — a `sed -i` whose script is not one `s` command, whose pattern or replacement has a meta character, or which does not match exactly once in a target file. Every occurrence
+  - silent: not in place, or one plain `s` command matching once in each file
+  - not automated: the right form is another tool, which `updatedInput` cannot switch to
 - **Index mutation** (`index-mutation`, `operating-rules.md`)
   - fires: `pnpm josh pretool:guard` — `git add` / `commit` / `reset` / `rm` / `mv` / `restore --staged` in any spelling. Every occurrence
   - silent: `pnpm josh git` — the approved commit flow
@@ -152,6 +156,10 @@
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` by an uncut lane child whose recent context is over the `pnpm josh cost --cut` threshold; it hands over `pnpm josh run:cut --impl <N> --handoff <path>`. At each threshold crossing
   - silent: not a lane child, a non-editing tool, the run's own handoff file, already cut, or under the threshold
   - not automated: the right act is another command, whose arguments the call does not carry
+- **No whole-file Write that keeps most of the old body** (`file-rewrite`, `file-edits.md`)
+  - fires: `pnpm josh pretool:guard` — a `Write` over an existing file whose new body shares more than half its non-blank lines with the old one. Every occurrence
+  - silent: a new file, the run's handoff, a rebuild sharing half or less, or an `Edit`
+  - not automated: the right form is another tool, which `updatedInput` cannot switch to
 - **Question 0 and the ordering question before writing a rule into prose** (`rule-body`, `residency.md`)
   - fires: `pnpm josh pretool:guard` — an `Edit` / `Write` to `CLAUDE.md` / `prompts/**/*.md` / `.claude/skills/**/*.md` appending at least the threshold. Refused until both `pnpm josh oracle:list` and `pnpm josh run:step` ran
   - silent: not a rule document, an append under the threshold (typo, link swap, deletion), or both commands ran

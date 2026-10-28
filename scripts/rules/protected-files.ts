@@ -4,6 +4,7 @@ import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { bash_triggers } from './bash-triggers'
+import { edit_tool } from './edit-tool'
 import { git_argv } from './git-argv'
 import { shell_segments } from './shell-segments'
 
@@ -23,7 +24,7 @@ import { shell_segments } from './shell-segments'
 // It fires on every occurrence, for the reason `git-force.ts` does.
 
 const READ_TOOL = 'Read'
-const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write'])
+const { is_edit_tool } = edit_tool
 const SECRET_FILES: ReadonlySet<string> = new Set(['.env', '.dev.vars'])
 const ENVIRONMENT_VARIANT_PREFIX = '.env.'
 // The two variants `.gitignore` un-ignores: they are tracked and hold placeholders, not secrets. The
@@ -172,7 +173,7 @@ function is_environment_shell_access(command: string): boolean {
 
 // A `Read` lands the secret in the transcript; an `Edit` / `Write` could set a guard switch.
 function is_environment_access(call: GuardedCall): boolean {
-	if (call.name === READ_TOOL || EDIT_TOOLS.has(call.name)) {
+	if (call.name === READ_TOOL || is_edit_tool(call.name)) {
 		return is_environment_path(file_path_of(call))
 	}
 
@@ -184,7 +185,7 @@ function is_consumer_settings_edit(
 	call: GuardedCall,
 	is_kit_consumer: (root: string) => boolean,
 ): boolean {
-	if (!EDIT_TOOLS.has(call.name)) return false
+	if (!is_edit_tool(call.name)) return false
 
 	const file_path = path.resolve(file_path_of(call))
 
