@@ -81,7 +81,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					arguments: '--pinned',
-					note: "read test:pinned alone (the ship's pre-detach reads it anyway)",
+					note: "read test:pinned alone (the ship's pre-detach reads it anyway); a lane child returns at once",
 				},
 				{
 					arguments: '--push',
