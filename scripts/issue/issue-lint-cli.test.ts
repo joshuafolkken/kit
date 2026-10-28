@@ -48,6 +48,21 @@ describe('issue:lint label output', () => {
 	})
 })
 
+// joshuafolkken/kit#5310: running last and a raised priority contradict each other.
+describe('issue:lint run-last declaration', () => {
+	const LAST_BODY = `${VALID_BODY}- 種別: 非不具合\n- 実施順: 最後\n`
+
+	it('accepts a run-last declaration alone', () => {
+		expect(issue_lint_cli.problems(`${LAST_BODY}${REQUIRED_SECTIONS}`)).toStrictEqual([])
+	})
+
+	it('refuses a run-last declaration beside a high priority', () => {
+		const raised = `${LAST_BODY}- 優先度: 高（期限）\n${REQUIRED_SECTIONS}`
+
+		expect(issue_lint_cli.problems(raised).join('\n')).toContain('- 実施順: 最後')
+	})
+})
+
 describe('issue:lint fenced headings', () => {
 	it('rejects required headings that appear only inside a fenced example', async () => {
 		const directory = mkdtempSync(path.join(tmpdir(), 'issue-lint-fenced-heading-'))

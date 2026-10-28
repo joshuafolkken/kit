@@ -5,6 +5,7 @@ import { expected_effect_lint } from './expected-effect-lint'
 import { issue_classification } from './issue-classification'
 import { issue_lint } from './issue-lint'
 import { issue_not_before } from './issue-not-before'
+import { issue_priority } from './issue-priority'
 import { issue_template_section } from './issue-template-section'
 import { measure_declaration } from './measure-declaration'
 import { size_estimate } from './size-estimate'
@@ -49,7 +50,10 @@ function problems(body: string): ReadonlyArray<string> {
 		...measure_declaration.problems(body),
 		...size_estimate.problems(body),
 		...aggregation_split.problems(body),
-	].map((problem) => with_template(problem))
+		issue_priority.order_problem(body),
+	]
+		.filter((problem) => problem !== undefined)
+		.map((problem) => with_template(problem))
 }
 
 function report(found: ReadonlyArray<string>, body: string): number {
