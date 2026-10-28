@@ -62,6 +62,16 @@ describe('test_pinned_ledger.record_discarded', () => {
 			discarded: true,
 		})
 	})
+
+	// joshuafolkken/kit#5327: the pre-detach's probe past its stop is written under its own origin.
+	it('writes the origin it is given', async () => {
+		vi.spyOn(lane_paths, 'lane_issue_of').mockReturnValue('5327')
+		const write = vi.spyOn(lane_ledger_write, 'record_test_pinned').mockResolvedValue()
+
+		await test_pinned_ledger.record_discarded(90_000, PRE_DETACH)
+
+		expect(write).toHaveBeenCalledWith(expect.objectContaining({ origin: PRE_DETACH }))
+	})
 })
 
 describe('test_pinned_ledger.origin_of', () => {

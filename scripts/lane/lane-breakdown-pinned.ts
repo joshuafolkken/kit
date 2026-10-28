@@ -10,7 +10,8 @@ type PinnedProbe = TestPinnedEntry['probes'][number]
 // The longest probes named; the rest are counted in the head alone.
 const MAX_SHOWN = 5
 
-const DISCARDED_LABEL = 'run:review background test:pinned probes discarded'
+// `run:review`'s check and the pre-detach's probe past its stop (joshuafolkken/kit#5327) alike.
+const DISCARDED_LABEL = 'background test:pinned probes discarded'
 
 function is_lane_row(entry: LedgerEntry, issue: number): entry is TestPinnedEntry {
 	return entry.kind === lane_ledger.KIND.TEST_PINNED && entry.issue === issue
@@ -37,7 +38,7 @@ function rows_of(
 		.filter((entry) => !is_discarded(entry) && is_in_pre_detach(entry, breakdown))
 }
 
-// `issue`'s `run:review` background probes stopped before their answer (joshuafolkken/kit#5262), as a
+// `issue`'s background probes stopped before their answer (joshuafolkken/kit#5262, #5327), as a
 // count and their wall time; `''` when none was.
 function discarded_text(entries: ReadonlyArray<LedgerEntry>, issue: number): string {
 	const rows = entries

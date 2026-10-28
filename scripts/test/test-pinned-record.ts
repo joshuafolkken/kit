@@ -36,6 +36,9 @@ interface PinnedSummary extends ReportParts {
 	// A `--first-unpinned` check that stopped before some hunks (joshuafolkken/kit#5153): its unpinned
 	// places are not every one, so no reason accepts it as the whole answer.
 	is_cut?: boolean
+	// How many hunks a cut check did not probe, for the note on the probe that goes on with them
+	// (joshuafolkken/kit#5327).
+	remaining?: number
 }
 
 // A place's key leaves out its line, so merging the default branch in, which moves the line, keeps the
@@ -66,7 +69,9 @@ function summary_with(report: PinnedReport, log: KeptLog | undefined): PinnedSum
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
 
-	return report.cut === undefined ? summary : { ...summary, is_cut: true }
+	return report.cut === undefined
+		? summary
+		: { ...summary, is_cut: true, remaining: report.cut.length }
 }
 
 function summary_of(report: PinnedReport, root: string = PROJECT_ROOT): PinnedSummary {
@@ -117,13 +122,20 @@ function tail_of(record: Record<string, unknown>): Pick<PinnedSummary, 'counts' 
 	return typeof counts === 'string' ? { counts, log: log_of(log) } : {}
 }
 
+// The count of hunks a cut check did not probe: absent from a record written before it was kept.
+function remaining_of(record: Record<string, unknown>): Pick<PinnedSummary, 'remaining'> {
+	const { remaining } = record
+
+	return typeof remaining === 'number' ? { remaining } : {}
+}
+
 function to_summary(record: Record<string, unknown>): PinnedSummary | undefined {
 	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
 	const summary = { text, unpinned, ...tail_of(record) }
 
-	return is_cut === true ? { ...summary, is_cut } : summary
+	return is_cut === true ? { ...summary, is_cut, ...remaining_of(record) } : summary
 }
 
 function parsed(raw: string): Record<string, unknown> | undefined {
@@ -154,13 +166,15 @@ function clear(token: string, root: string = PROJECT_ROOT): void {
 // A recorded launch's `josh test:pinned` arguments, the token last. **With no `--unpinned-ok` reason it
 // stops at the first unpinned hunk** (joshuafolkken/kit#5153): the launcher stops on it whatever the
 // rest say. Under a reason every hunk is probed, since a reason accepts the list as the whole answer.
-// `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262).
+// `origin` names the launcher on the run's ledger row (joshuafolkken/kit#5262). `is_whole` probes every
+// hunk with no reason: the background probe that goes on past a cut check's stop (joshuafolkken/kit#5327).
 function launch_argv(
 	token: string,
 	reason: string | undefined,
 	origin: PinnedOrigin,
+	is_whole = false,
 ): Array<string> {
-	const cut = reason === undefined ? [FIRST_UNPINNED_FLAG] : []
+	const cut = reason === undefined && !is_whole ? [FIRST_UNPINNED_FLAG] : []
 
 	return ['test:pinned', ...cut, '--origin', origin, '--record', token]
 }

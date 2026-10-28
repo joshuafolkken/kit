@@ -4,6 +4,7 @@ import { lane_guard_policy } from '#scripts/lane/lane-guard-policy'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
+import { concise_reply } from './concise-reply'
 import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
@@ -294,6 +295,8 @@ const MEASURED_RULES: ReadonlyArray<MeasuredRule> = [
 	...DELIVERED_RULES,
 	BATCHING_RULE,
 	INVESTIGATION_RULE,
+	// Delivered by `stop:guard`; listed here so `rule:value` counts its refusals.
+	concise_reply.ROW,
 ]
 
 // Once per run, so a run that obeyed is never wedged. A call the batching guard may refuse is stepped

@@ -5,7 +5,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import type { LaunchResult } from '#scripts/run/detached-launch'
-import { test_pinned_ledger } from '#scripts/test/test-pinned-ledger'
+import { test_pinned_ledger, type PinnedOrigin } from '#scripts/test/test-pinned-ledger'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review_steps } from './run-review-steps'
 
@@ -53,7 +53,8 @@ type Clock = () => number
 // `start` is the launched pid's start time, so a pid the OS has since reissued is told apart from the
 // check (joshuafolkken/kit#4828). `tree` is the digest of the tree it checks (`run-review-pinned-tree.ts`),
 // so `josh review:record` tells a round-1 fix that moved the tree (joshuafolkken/kit#4834).
-// `launched_at` is the launch's epoch milliseconds, the start of a stopped check's wall time.
+// `launched_at` is the launch's epoch milliseconds, the start of a stopped check's wall time; `origin`
+// its launcher, the one a stopped check's ledger row names (joshuafolkken/kit#5327).
 interface Launch {
 	pid: number
 	token: string
@@ -61,6 +62,7 @@ interface Launch {
 	start?: string | undefined
 	tree?: string | undefined
 	launched_at?: number | undefined
+	origin?: PinnedOrigin | undefined
 }
 
 function launch_path(root: string = PROJECT_ROOT): string {
@@ -71,10 +73,16 @@ function log_path(root: string = PROJECT_ROOT): string {
 	return stamp_file.stamp_path(LOG_PREFIX, root, '.log')
 }
 
-// The token ties the answer to this launch (`test-pinned-record.ts`).
-function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): LaunchResult {
-	const token = randomUUID()
-	const argv = test_pinned_record.launch_argv(token, reason, test_pinned_ledger.BACKGROUND_ORIGIN)
+interface LaunchOptions {
+	root: string
+	token: string
+	argv: Array<string>
+	origin: PinnedOrigin
+	reason?: string | undefined
+	tree?: string | undefined
+}
+
+function launch_with({ root, token, argv, origin, reason, tree }: LaunchOptions): LaunchResult {
 	const launched = run_review_steps.launch_josh(argv, log_path(root), root)
 
 	if (launched.kind === 'launched') {
@@ -87,18 +95,44 @@ function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): La
 			start: process_identity.read_start(pid),
 			tree,
 			launched_at: Date.now(),
+			origin,
 		})
 	}
 
 	return launched
 }
 
+// The token ties the answer to this launch (`test-pinned-record.ts`).
+function launch(root: string = PROJECT_ROOT, reason?: string, tree?: string): LaunchResult {
+	const token = randomUUID()
+	const origin = test_pinned_ledger.BACKGROUND_ORIGIN
+	const argv = test_pinned_record.launch_argv(token, reason, origin)
+
+	return launch_with({ root, token, argv, origin, reason, tree })
+}
+
+// **A pre-detach that stopped at its first unpinned hunk goes on probing the rest here**
+// (joshuafolkken/kit#5327): every hunk, with no reason, on the stamp `launch` writes, so the next
+// pre-detach joins it (`run-review-pinned-join.ts`) and `clear` discards it as it does that one.
+function launch_remaining(root: string = PROJECT_ROOT, tree?: string): LaunchResult {
+	const token = randomUUID()
+	const origin: PinnedOrigin = 'pre-detach'
+	const argv = test_pinned_record.launch_argv(token, undefined, origin, true)
+
+	return launch_with({ root, token, argv, origin, tree })
+}
+
 function optional_text(value: unknown): string | undefined {
 	return typeof value === 'string' ? value : undefined
 }
 
+// A stamp written before `origin` was kept names none; its stop is written as `run:review`'s.
+function origin_of(value: unknown): PinnedOrigin | undefined {
+	return typeof value === 'string' ? test_pinned_ledger.origin_of(value) : undefined
+}
+
 function to_launch(value: unknown): Launch | undefined {
-	const { pid, token, reason, start, tree, launched_at } = value as Record<string, unknown>
+	const { pid, token, reason, start, tree, launched_at, origin } = value as Record<string, unknown>
 	if (typeof pid !== 'number' || typeof token !== 'string') return undefined
 
 	return {
@@ -108,6 +142,7 @@ function to_launch(value: unknown): Launch | undefined {
 		start: optional_text(start),
 		tree: optional_text(tree),
 		launched_at: typeof launched_at === 'number' ? launched_at : undefined,
+		origin: origin_of(origin),
 	}
 }
 
@@ -154,7 +189,7 @@ function discard(launched: Launch): void {
 	signal_group(launched.pid)
 	if (launched.launched_at === undefined) return
 
-	void test_pinned_ledger.record_discarded(Date.now() - launched.launched_at)
+	void test_pinned_ledger.record_discarded(Date.now() - launched.launched_at, launched.origin)
 }
 
 // A stale stamp can outlive its check by days, so the start signals only a pid whose start time
@@ -337,6 +372,7 @@ const run_review_pinned_steps = {
 	is_live,
 	is_pending,
 	launch,
+	launch_remaining,
 	launched_reason,
 	launched_tree,
 	log_path,

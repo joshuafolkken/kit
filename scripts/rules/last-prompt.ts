@@ -57,6 +57,17 @@ function turn_prompt(tail: string): string {
 	return person_text(opener) ?? NO_PROMPT
 }
 
+// **The person's last prompt on the tail**, past what the harness wrote after it (a skill body, a task
+// notification) — `undefined` when no prompt of theirs is on it, so an unread prompt is told apart
+// from one that asked nothing.
+function person_prompt(tail: string): string | undefined {
+	return tail
+		.split('\n')
+		.filter((line) => turn_filings.is_prompt_line(line))
+		.map((line) => person_text(line))
+		.findLast((text) => text !== undefined)
+}
+
 // When the person last prompted on the tail, or `undefined` when no prompt of theirs is on it.
 function prompt_time(tail: string): string | undefined {
 	return tail
@@ -82,6 +93,6 @@ function pause_start(tail: string): string | undefined {
 	return prompt_time(tail) ?? tail_time(tail)
 }
 
-const last_prompt = { pause_start, turn_prompt }
+const last_prompt = { pause_start, person_prompt, turn_prompt }
 
 export { last_prompt }

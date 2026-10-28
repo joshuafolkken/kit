@@ -140,7 +140,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--review'],
 					description:
-						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship.',
+						'runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.',
 				},
 				{
 					names: ['--unpinned-ok <reason>'],
