@@ -76,7 +76,7 @@ describe('review_stops_cli.run', () => {
 		review_stop_log.record({ issue: 7, stage: 'review', findings: [stop(MEDIUM, 'a.ts')] }, log)
 
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-		const code = review_stops_cli.run([], { log_path: log })
+		const code = review_stops_cli.run([], { log_path: log, now_ms: NOW_MS })
 		const text = String(info.mock.calls[0]?.[0])
 
 		info.mockRestore()
