@@ -66,7 +66,7 @@ describe('lane_breakdown_text.line', () => {
 
 	// joshuafolkken/kit#5262: the discarded run:review background probes have a line of their own.
 	it('writes the discarded probes line before the waits taken out, and none when empty', () => {
-		const discarded = 'run:review background test:pinned probes discarded 2, 3.0 min'
+		const discarded = 'background test:pinned probes discarded 2, 3.0 min'
 
 		expect(lane_breakdown_text.line({ ...REPORT, discarded })).toContain(
 			`; ${discarded}; ${EXCLUDED_TEXT}.`,
@@ -170,7 +170,7 @@ describe('lane_breakdown_text.report_of', () => {
 
 		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [entry])
 
-		expect(report.discarded).toBe('run:review background test:pinned probes discarded 1, 2.0 min')
+		expect(report.discarded).toBe('background test:pinned probes discarded 1, 2.0 min')
 		read.mockRestore()
 	})
 })

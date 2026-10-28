@@ -67,7 +67,7 @@ describe('lane_breakdown_pinned.discarded_text', () => {
 		]
 
 		expect(lane_breakdown_pinned.discarded_text(entries, ISSUE)).toBe(
-			'run:review background test:pinned probes discarded 2, 3.0 min',
+			'background test:pinned probes discarded 2, 3.0 min',
 		)
 	})
 

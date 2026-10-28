@@ -141,3 +141,28 @@ describe('test_pinned_record — the record', () => {
 		expect(test_pinned_record.read(TOKEN, ROOT)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#5327: a cut check's stop leaves the rest probing in the background.
+describe('test_pinned_record — the hunks a cut answer left', () => {
+	const ORIGIN = 'pre-detach'
+
+	it('reads back how many hunks a cut answer did not probe', () => {
+		const summary = test_pinned_record.summary_of({ ...REPORT, cut: [HUNK, HUNK] }, ROOT)
+
+		test_pinned_record.write(TOKEN, summary, ROOT)
+
+		expect(test_pinned_record.read(TOKEN, ROOT)?.remaining).toBe(2)
+		rmSync(summary.log?.path ?? '', { force: true })
+	})
+
+	it('probes every hunk with no reason when the launch is whole, and stops at the first otherwise', () => {
+		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN, true)).toStrictEqual([
+			'test:pinned',
+			'--origin',
+			ORIGIN,
+			'--record',
+			TOKEN,
+		])
+		expect(test_pinned_record.launch_argv(TOKEN, undefined, ORIGIN)).toContain('--first-unpinned')
+	})
+})
