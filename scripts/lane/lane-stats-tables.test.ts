@@ -9,6 +9,7 @@ const NOW = Date.parse('2026-10-28T12:00:00.000Z')
 const WINDOW = lane_stats.window_of(1, NOW)
 const FIRST_HEADER_CELLS = [
 	'stage',
+	'followup critical path',
 	'implement sub-stage',
 	'stop',
 	'gap',
