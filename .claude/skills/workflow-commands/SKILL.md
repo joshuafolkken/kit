@@ -90,7 +90,7 @@ from — read at that trigger, never restated here.
 | A review has run | Its verdict counts only once `pnpm josh review:attest --check` answers `ok`; `missing` / `mismatch` are refusals `pnpm josh followup` blocks the merge on | `chain-rule.md` → "The brief names the checkout, and a review that read another one is refused" |
 | A command can take minutes | Issue it in the background; the turn never ends at the push (`pnpm josh followup` stays foreground) | `background-commands.md` → "Background the gate and push" |
 | E2E gate | The CI E2E job where the command ends in a PR (`fullrun` / `prrun` / `backlogrun`, enforced by `pnpm josh followup`); you run `pnpm josh test:e2e` yourself where it does not (`halfrun`) | `prompts/testing-guide.md` → "Closing the E2E gate without a human run" |
-| Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan first; read its duplicate and epic answers | `issue-scout.md` |
+| Filing any new Issue | `pnpm josh issue:file` — it runs the `issue:scout` scan; read its duplicate and epic answers | `issue-scout.md` |
 | Another Issue here must land first | A prerequisite is a dependency, not a park — file it, stash, record the dependency; `fullrun` / `halfrun` stop, `backlogrun` continues | `prerequisite.md` |
 | Something worth filing, none of the three | Unattended: file it (Tier A, first-party); else ask; a delegated child returns it to the parent instead | `observation-filing.md` |
 | A defect in kit's own verification turns up | It runs alone when all three conditions hold; a batch resumes once it merges | `backlogrun-lanes.md` → "A solo run" |
