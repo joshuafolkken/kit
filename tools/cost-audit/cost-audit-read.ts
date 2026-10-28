@@ -25,7 +25,8 @@ import { cost_audit_tool, type ToolCategory } from './cost-audit-tool'
 
 interface AuditSession {
 	kind: string
-	// Whether the transcript lives in a lane checkout's directory — a dispatched lane child's session.
+	// Whether the transcript is a dispatched lane child's own session: in a lane checkout's directory and
+	// not a delegated unit, which the kind cannot tell apart when its prompt names `/code-review`.
 	is_lane: boolean
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
@@ -82,7 +83,7 @@ function session_of(text: string, is_delegated: boolean, is_lane = false): Audit
 
 	return {
 		kind: cost_audit_kind.kind_of(parts.prompt, is_delegated),
-		is_lane,
+		is_lane: is_lane && !is_delegated,
 		records: cost_usage.dedupe(parts.records),
 		categories: parts.categories,
 		lines: parts.lines,
