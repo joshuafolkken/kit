@@ -96,6 +96,13 @@ describe('behavior_change_lint.problems — firing point', () => {
 		)
 	})
 
+	// joshuafolkken/kit#5328: a Stop-hook rule names the `Stop` hook `stop:guard` delivers on.
+	it('accepts the Stop hook as a firing point', () => {
+		const stop = TARGET_BODY.replace(FIRING_POINT, '`Stop`')
+
+		expect(behavior_change_lint.problems(stop)).toEqual([])
+	})
+
 	it('flags a firing point that is not a recognized tool call', () => {
 		const unknown = TARGET_BODY.replace(FIRING_POINT, '`MadeUpTool`')
 

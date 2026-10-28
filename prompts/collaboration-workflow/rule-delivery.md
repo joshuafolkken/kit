@@ -26,6 +26,10 @@
 pnpm josh notify --task-type confirmation --issue-url "<url>" --body=$'<reason>' --recommended "<choice>" --alternative "<other>"
 ```
 
+## concise-reply — 回答の長さ
+
+`principles.md` → "concise-reply"（`pnpm josh rule:list` の `concise-reply` 行）。散文が上限を超えた回答の Stop で、`pnpm josh stop:guard` が節の本文付きで 1 度だけ書き直させる。
+
 ## 配送は 1 ラン 1 回
 
 配送文はラン 1 回につき 1 度しか出ないので、**「同じ呼び出しをもう一度出せ」と明記する**。例外: 繰り返す行為を止める項目は毎回発火し（joshuafolkken/kit#1570）、前提の行為を求める項目は前提が末尾に現れるまで毎回拒否する（joshuafolkken/kit#2807）— その配送文にはそれぞれ「これは毎回発火する」「前提が末尾に現れるまで拒否する」と明記する。バッチングと調査の 2 ガードは違反が間隔分続けば再び発火する（joshuafolkken/kit#2164）。前提の証拠を読めないときは拒否する。

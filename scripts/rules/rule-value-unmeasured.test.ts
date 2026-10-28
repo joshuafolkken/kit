@@ -35,6 +35,8 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	// before the crossing is no act a run could make unaided (joshuafolkken/kit#5267).
 	IMPLEMENTATION_CUT,
 	'investigation',
+	// A Stop rule: a reply under the limit is the absence of an act, with no call to score.
+	'concise-reply',
 ]
 
 describe('rule_value.measure — rules nothing can score', () => {

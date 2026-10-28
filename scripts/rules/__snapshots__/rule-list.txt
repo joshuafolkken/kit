@@ -168,6 +168,10 @@
   - fires: `pnpm josh pretool:guard` — the `Read` / `Bash` that makes the third read of a file the run will not edit; fires **again** once reads pile up to the threshold again
   - silent: reads under the threshold — nothing to delegate yet
   - not automated: the right act is another command, whose arguments the call does not carry
+- **Concise reply** (`concise-reply`, `principles.md` → "concise-reply")
+  - fires: `pnpm josh stop:guard` — a reply whose narrative outside code, tables and lists is over 400 letters. Blocks the stop
+  - silent: a reply under the limit, a prompt asking for the detail (`詳しく` / `具体的に` / `詳細`), a fixed output in a code block, no prompt of the person’s on the transcript tail, or a headless session
+  - not automated: the shorter reply is prose only the model can write
 - **Stop notification** (`stop-notify`, `rule-delivery.md` → "stop-notify")
   - fires: `pnpm josh stop:guard` — a stop with the work tree held and no `confirmation` notify that turn. Sends the notify itself; blocks only when the send fails
   - silent: no hold, a `confirmation` notify on the tail, or a pre-gate cut taken
