@@ -5,6 +5,8 @@ import { cost_transcript, type SessionFile } from '#scripts/cost-runtime/cost-tr
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, vi } from 'vitest'
 import { delivered_rules } from './delivered-rules'
+import { piped_verification } from './piped-verification'
+import { piped_verification_shapes } from './piped-verification-shapes'
 import { rule_value_cache } from './rule-value-cache'
 import { rule_value_cli } from './rule-value-cli'
 import { rule_value_fixture } from './rule-value-fixture'
@@ -77,6 +79,20 @@ describe('rule_value_cli.render_parts — the candidates beside the table', () =
 
 		expect(parts.table.split('\n')).toHaveLength(delivered_rules.MEASURED_RULES.length)
 		expect(parts.candidates).toMatch(/^candidates:\n {2}retire .*\n {2}condense /u)
+	})
+
+	// joshuafolkken/kit#5266: the refusals of `piped-verification`, named by the filter that drew them.
+	it('ends the candidates with the piped-verification refusals counted by shape', () => {
+		const refusal = rule_value_fixture.answered_call(
+			'pnpm josh gate | head -5',
+			1,
+			piped_verification.PIPED_VERIFICATION_REASON,
+		)
+		const { candidates = '' } = rule_value_cli.render_parts([[refusal]])
+
+		expect(candidates.split('\n').at(-1)).toBe(
+			`${piped_verification_shapes.HEADING} head 1 · grep 0 · awk|sed|tee 0 · chain 0 · other 0`,
+		)
 	})
 })
 

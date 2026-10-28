@@ -165,7 +165,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 			title: 'Piped verification',
 			topic: '`output-bounds.md`',
 			fires:
-				'a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise',
+				'a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early), refused otherwise',
 			quiet: 'the exit code reaches the caller — a failure reads as a failure',
 		},
 	},

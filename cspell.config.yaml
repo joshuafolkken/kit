@@ -2,6 +2,9 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # awk's `getline` and `nextfile`, which reach outside the pipe or leave it early, so an `awk` filter using one is not rewritten (#5266).
+  - getline
+  - nextfile
   # macOS `caffeinate -i -s -w <pid>`, which keeps the host awake while a supervisor runs (#5173).
   - caffeinate
   # SonarJasmin, the SonarQube JS/TS taint engine; `sonar.jasmin.internal.*` keys a test keeps out (#5093).

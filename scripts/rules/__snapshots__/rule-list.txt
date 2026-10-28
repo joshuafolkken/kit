@@ -37,7 +37,7 @@
   - silent: no fix since the brief, already joined or detached, or not a lane child
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Piped verification** (`piped-verification`, `output-bounds.md`)
-  - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter is `tail` or a full-reading `grep`, refused otherwise
+  - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early), refused otherwise
   - silent: the exit code reaches the caller — a failure reads as a failure
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
 - **Early progress report** (`early-heartbeat`, `.claude/skills/workflow-commands/progress-watcher.md` → "Progress while the run is quiet")

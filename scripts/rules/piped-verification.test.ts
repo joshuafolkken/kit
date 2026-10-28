@@ -154,7 +154,54 @@ const REWRITES: Array<[string, string]> = [
 	],
 	['pnpm josh lint | sort | uniq', `${WRAP}pnpm josh lint | sort | uniq)`],
 	['pnpm josh cspell:dot | wc -l', `${WRAP}pnpm josh cspell:dot | wc -l)`],
+	// joshuafolkken/kit#5266: a `;` chain's `| tail -N`, `tee`, and an `awk` / `sed` that reads to the end.
+	[
+		'pnpm josh test:related; pnpm josh lint:related 2>&1 | tail -5; git status',
+		`pnpm josh test:related; ${WRAP}pnpm josh lint:related 2>&1 | tail -5); git status`,
+	],
+	['pnpm josh gate | tee /tmp/gate.log', `${WRAP}pnpm josh gate | tee /tmp/gate.log)`],
+	[
+		"pnpm josh gate 2>&1 | awk 'END { print }'",
+		`${WRAP}pnpm josh gate 2>&1 | awk 'END { print }')`,
+	],
+	["pnpm josh lint | awk -F: '{ print $1 }'", `${WRAP}pnpm josh lint | awk -F: '{ print $1 }')`],
+	["pnpm josh gate | sed -n '$p'", `${WRAP}pnpm josh gate | sed -n '$p')`],
+	[
+		String.raw`pnpm josh gate | sed -E 's/\x1b\[[0-9;]*m//g; /^$/d'`,
+		String.raw`${WRAP}pnpm josh gate | sed -E 's/\x1b\[[0-9;]*m//g; /^$/d')`,
+	],
+	[
+		"pnpm josh gate | sed -n '/✗/,$p' | tail -20",
+		`${WRAP}pnpm josh gate | sed -n '/✗/,$p' | tail -20)`,
+	],
 	[PIPED_CHECK_RELATED, `${WRAP}${PIPED_CHECK_RELATED})`],
+]
+
+const REFUSALS: Array<string> = [
+	// An early-exit filter: SIGPIPE under `pipefail` turns a pass into 141, and `head` cuts the verdict.
+	'pnpm josh lint:related | head -5',
+	'pnpm josh gate | grep -q failed',
+	'pnpm josh gate | grep -m 1 error',
+	'git status; pnpm josh lint:related | head -5',
+	// joshuafolkken/kit#5266: an `awk` or `sed` that exits early or reaches past the pipe.
+	"pnpm josh gate | awk 'NR == 3 { exit }'",
+	"pnpm josh gate | awk '/x/ { nextfile }'",
+	'pnpm josh gate | awk \'{ system("x") }\'',
+	'pnpm josh gate | awk \'{ print | "sh" }\'',
+	"pnpm josh gate | sed '10q'",
+	'pnpm josh gate | sed 10q',
+	"pnpm josh gate | sed -n '1,5p;5q'",
+	"pnpm josh gate | sed 's/a/b/w out'",
+	'pnpm josh gate | sed -i s/a/b/ f',
+	// A discarded stream hides the verdict however the rest is filtered.
+	'pnpm josh gate 2>/dev/null | tail -5',
+	// A heredoc's body lines would be cut as commands of their own.
+	"pnpm josh gate | tail -5; cat <<'EOF'\na; b\nEOF",
+	// The cut splits inside a group, which would leave the group's own pipe without `pipefail`.
+	'(cd x && pnpm josh lint) | tail -5',
+	'(pnpm josh lint | tail -5)',
+	// Masked as a whole line but in no part: wrapping nothing must not claim a wrap.
+	'pnpm josh lint\ngit log | head',
 ]
 
 describe('pipefail_input', () => {
@@ -165,20 +212,7 @@ describe('pipefail_input', () => {
 		})
 	})
 
-	it.each([
-		// An early-exit filter: SIGPIPE under `pipefail` turns a pass into 141, and `head` cuts the verdict.
-		'pnpm josh lint:related | head -5',
-		'pnpm josh gate | grep -q failed',
-		'pnpm josh gate | grep -m 1 error',
-		'git status; pnpm josh lint:related | head -5',
-		// A heredoc's body lines would be cut as commands of their own.
-		"pnpm josh gate | tail -5; cat <<'EOF'\na; b\nEOF",
-		// The cut splits inside a group, which would leave the group's own pipe without `pipefail`.
-		'(cd x && pnpm josh lint) | tail -5',
-		'(pnpm josh lint | tail -5)',
-		// Masked as a whole line but in no part: wrapping nothing must not claim a wrap.
-		'pnpm josh lint\ngit log | head',
-	])('leaves %j to the refusal', (command) => {
+	it.each(REFUSALS)('leaves %j to the refusal', (command) => {
 		expect(piped_verification.pipefail_input(bash(command))).toBeUndefined()
 	})
 
