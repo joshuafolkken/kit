@@ -43,6 +43,7 @@ function node(id: string, role: RunRole, start_ms: number, requests: number): Ru
 		baseline_tokens: 100,
 		is_readable: true,
 		took_cut: false,
+		is_ship: false,
 	}
 }
 
