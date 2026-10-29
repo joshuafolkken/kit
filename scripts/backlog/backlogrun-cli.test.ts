@@ -1,6 +1,7 @@
 import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
+import type { SupervisorLiveness } from '#scripts/run/run-stranded'
 import { describe, expect, it, vi } from 'vitest'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
 import type { StartResult } from './backlogrun-launch'
@@ -54,6 +55,7 @@ function harness(
 		repository_directory: vi.fn(async () => GIT_DIRECTORY),
 		is_running: vi.fn(() => is_running),
 		replacement: vi.fn(async () => SAME),
+		stranded: vi.fn(async (): Promise<ReplaceVerdict | undefined> => undefined),
 		start: vi.fn(() => started),
 		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
@@ -144,6 +146,7 @@ describe('backlogrun_cli.run beside a leftover lane', () => {
 		read_carry: (): CarryRead => ({ kind: 'carried', carry: CARRY }),
 		events: (): Array<RunEvent> => [{ pos: 1, at: DRAINED_AT, kind: 'drain', text: 'drained' }],
 		is_retrospective_owed: (): boolean => false,
+		supervisor: (): SupervisorLiveness => 'gone',
 	}
 
 	function beside(in_use: ReadonlyArray<string>): BacklogrunPorts['replacement'] {
@@ -236,6 +239,32 @@ describe('backlogrun_cli.run replacing nothing', () => {
 		await expect(backlogrun_cli.run(['3724'], ports)).resolves.toBe(0)
 		expect(ports.replacement).not.toHaveBeenCalled()
 		expect(ports.stop).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5401: a launch that died left its record, and retyping it, `--only` added or not, was refused.
+describe('backlogrun_cli.run over a stopped run', () => {
+	it.each([['5400'], ['5400', '--only']])(
+		'ends the record and starts `backlogrun %s`',
+		async (...argv: Array<string>) => {
+			const { ports, lines } = harness(false)
+			const stranded = { ...ports, stranded: async () => REPLACE }
+
+			await expect(backlogrun_cli.run(argv, stranded)).resolves.toBe(0)
+			expect(lines[0]).toMatch(/^backlogrun: replacing the stopped run with `backlogrun #5400/u)
+			expect(ports.stop).toHaveBeenCalledBefore(vi.mocked(ports.start))
+			expect(ports.replacement).not.toHaveBeenCalled()
+		},
+	)
+
+	it('starts nothing over a record it keeps, and says why', async () => {
+		const { ports, lines } = harness(false)
+		const kept = { ...ports, stranded: async () => ({ kind: 'keep', reason: 'lane' }) as const }
+
+		await expect(backlogrun_cli.run(['5400'], kept)).resolves.toBe(1)
+		expect(lines).toStrictEqual(['backlogrun: not starting — lane'])
+		expect(ports.stop).not.toHaveBeenCalled()
+		expect(ports.start).not.toHaveBeenCalled()
 	})
 })
 

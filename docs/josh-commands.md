@@ -922,6 +922,10 @@ The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - A run already going here is never joined by a second: the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
+- A record left with no process running it — a launch that died before ending it — is ended as `--stop` ends it and the typed invocation is started, the same one or a different one. It is kept, with the reason in one line and exit code 1, when:
+  - its `run:wake` supervisor is not proven gone, since it may still wake a successor (`--stop` ends both);
+  - a session cut handed it to a successor (`--restart` continues it);
+  - it owes its retrospective, a child is working in a lane, or it cannot be read.
 - An idle run is replaced by a different invocation. The run going is stopped as `--stop` stops it and the typed one is started when all of these hold:
   - the typed invocation differs from the one the run was started with — the same invocation, a bare one over a bare one included, only shows the board;
   - the run is watching: its backlog drained, it has launched no child since, and it owes no end-of-run retrospective (`JOSH_RETROSPECTIVE`);

@@ -22,10 +22,7 @@ afterAll(() => {
 })
 
 function openai_argv(): AgentArgv {
-	vi.spyOn(git_common_directory, 'resolve').mockReturnValue(COMMON_DIRECTORY)
-	vi.spyOn(git_common_directory, 'own').mockReturnValue(
-		path.join(COMMON_DIRECTORY, 'worktrees', 'kit'),
-	)
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(COMMON_DIRECTORY)
 	const diagnostic = vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	const built = run_wake_session.wake_argv(
 		INVOCATION,
@@ -54,7 +51,7 @@ test('the woken scheduler uses the selected OpenAI provider', () => {
 })
 
 test('the judgment prompt carries the driver result and resume state', () => {
-	vi.spyOn(git_common_directory, 'resolve').mockReturnValue(COMMON_DIRECTORY)
+	vi.spyOn(git_common_directory, 'repository').mockReturnValue(COMMON_DIRECTORY)
 	const diagnostic = vi.spyOn(agent_diagnostics, 'check').mockReturnValue({ kind: 'ready' })
 	const built = run_wake_session.wake_argv(
 		INVOCATION,

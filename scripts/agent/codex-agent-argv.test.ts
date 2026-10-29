@@ -23,13 +23,12 @@ const LEDGER_PARENT = path.dirname(OBSERVATION_LEDGER_DIRECTORY)
 const GRANT_PATTERN = /("(?:[^"\\]|\\.)*")=("(?:read|write)")/gu
 
 const WORKTREE_CONFIG = 'config.worktree'
+const PINNED_ENTRIES = ['hooks', 'config', 'commondir', WORKTREE_CONFIG]
 const OTHER_WORKTREE = path.join('worktrees', 'other-lane')
 
-const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
 const repository_directory = vi.spyOn(git_common_directory, 'repository')
 
 beforeEach(() => {
-	resolve_common_directory.mockReturnValue(undefined)
 	repository_directory.mockReturnValue(undefined)
 })
 
@@ -39,7 +38,7 @@ afterEach(() => {
 
 function link_lane(common_directory: string): string {
 	mkdirSync(common_directory, { recursive: true })
-	resolve_common_directory.mockReturnValue(common_directory)
+	repository_directory.mockReturnValue(common_directory)
 
 	return realpathSync(common_directory)
 }
@@ -63,6 +62,10 @@ function grants(args: ReadonlyArray<string>): Record<string, string> {
 
 function lane_grants(profile: AgentProfile): Record<string, string> {
 	return grants(codex_agent_argv.build(INVOCATION, profile, LANE).args)
+}
+
+function has_ledger(table: Record<string, string>): boolean {
+	return Object.keys(table).some((target) => target.endsWith(LEDGER_PARENT))
 }
 
 function openai_worker(): AgentProfile {
@@ -153,14 +156,14 @@ describe('Codex lane common Git directory scope', () => {
 		const common = link_lane(GIT_COMMON_DIRECTORY)
 
 		expect(lane_grants(openai_worker())[common]).toBe('write')
-		expect(resolve_common_directory).toHaveBeenCalledWith(LANE)
+		expect(repository_directory).toHaveBeenCalledWith(LANE)
 	})
 
 	it('keeps hooks, config, commondir and config.worktree read-only', () => {
 		const common = link_lane(GIT_COMMON_DIRECTORY)
 		const table = lane_grants(openai_worker())
 
-		for (const entry of ['hooks', 'config', 'commondir', WORKTREE_CONFIG]) {
+		for (const entry of PINNED_ENTRIES) {
 			expect(table[path.join(common, entry)]).toBe('read')
 		}
 	})
@@ -182,7 +185,7 @@ describe('Codex lane common Git directory location', () => {
 		const linked = path.join(FIXTURE, 'linked.git')
 
 		symlinkSync(common, linked)
-		resolve_common_directory.mockReturnValue(linked)
+		repository_directory.mockReturnValue(linked)
 
 		expect(lane_grants(openai_worker())[common]).toBe('write')
 		expect(lane_grants(openai_worker())).not.toHaveProperty(linked)
@@ -232,22 +235,61 @@ describe('Codex lane ledger scope', () => {
 		const table = lane_grants(agent_role_profile.OPENAI_PROFILES.reviewer)
 
 		expect(existsSync(path.join(PRIMARY, LEDGER_PARENT))).toBe(false)
-		expect(Object.values(table).filter((access) => access === 'write')).toHaveLength(4)
+		expect(has_ledger(table)).toBe(false)
 	})
 })
 
+function primary_checkout(): string {
+	const git_directory = path.join(PRIMARY, '.git')
+
+	mkdirSync(git_directory, { recursive: true })
+	repository_directory.mockReturnValue(git_directory)
+
+	return realpathSync(git_directory)
+}
+
 // joshuafolkken/kit#4743: the parent's records join its lanes' in the common git directory.
-describe('Codex backlogrun parent run-state scope', () => {
-	it('grants a parent in the primary checkout its run-state directory, not the git directory', () => {
-		const git_directory = path.join(PRIMARY, '.git')
-
-		mkdirSync(git_directory, { recursive: true })
-		repository_directory.mockReturnValue(git_directory)
+// joshuafolkken/kit#5401: the parent's `josh ms` writes `index.lock` in the primary checkout's `.git`.
+describe('Codex backlogrun parent in the primary checkout', () => {
+	it('writes the git directory, where index.lock lives, and the run-state directory', () => {
+		const git_directory = primary_checkout()
 		const table = lane_grants(openai_scheduler())
-		const state = realpathSync(durable_state.root_for(git_directory))
+		const state = realpathSync(durable_state.root_for(path.join(PRIMARY, '.git')))
 
+		expect(table[git_directory]).toBe('write')
 		expect(table[state]).toBe('write')
-		expect(table).not.toHaveProperty(realpathSync(git_directory))
 		expect(repository_directory).toHaveBeenCalledWith(LANE)
+	})
+
+	it('keeps what git runs or follows read-only inside the primary git directory', () => {
+		const git_directory = primary_checkout()
+		const table = lane_grants(openai_scheduler())
+
+		for (const entry of PINNED_ENTRIES) {
+			expect(table[path.join(git_directory, entry)]).toBe('read')
+		}
+	})
+
+	it('keeps each lane registered under it pointing at the common git directory', () => {
+		const git_directory = primary_checkout()
+
+		mkdirSync(path.join(git_directory, OTHER_WORKTREE), { recursive: true })
+		const table = lane_grants(openai_scheduler())
+
+		expect(table[path.join(git_directory, OTHER_WORKTREE, 'commondir')]).toBe('read')
+	})
+
+	it('grants the scheduler the git directory without the worker-only ledger', () => {
+		primary_checkout()
+		const table = lane_grants(openai_scheduler())
+
+		expect(existsSync(path.join(PRIMARY, LEDGER_PARENT))).toBe(false)
+		expect(has_ledger(table)).toBe(false)
+	})
+
+	it('grants nothing beyond the base outside a git repository', () => {
+		const { args } = codex_agent_argv.build(INVOCATION, openai_scheduler(), LANE)
+
+		expect(args).toContain(BASE_FILESYSTEM_CONFIG)
 	})
 })

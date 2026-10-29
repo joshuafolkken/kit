@@ -128,28 +128,31 @@ function filesystem_config(grants: ReadonlyArray<Grant>): string {
 	return `${FILESYSTEM_KEY}={${pairs.join(',')}}`
 }
 
-// A `backlogrun` parent runs in the primary checkout, where no common git directory grant is given,
-// so the run-state directory its lanes write through that grant is granted on its own — without it the
-// parent's records would fall back to the temp root, apart from its lanes'.
-function state_grants(cwd: string): ReadonlyArray<Grant> {
-	const repository = git_common_directory.repository(cwd)
-	if (repository === undefined) return []
+// The run-state directory is granted on its own, since a temp-root override moves it out of the
+// common git directory — without it the records would fall back to the temp root, apart from the run's.
+function state_grants(common_directory: string | undefined): ReadonlyArray<Grant> {
+	if (common_directory === undefined) return []
 
-	const state = durable_state.root_for(repository)
+	const state = durable_state.root_for(common_directory)
 
 	ensure_writable_directory(state, durable_state.STATE_DIRECTORY_MODE)
 
 	return [[realpathSync(state), WRITE]]
 }
 
+// The common git directory in every checkout, the primary one included: a `backlogrun` parent runs
+// there, and the sandbox refuses a work tree's own `.git` unless it is granted — `josh ms` could not
+// write `index.lock` (joshuafolkken/kit#5401).
 function lane_grants(cwd: string | undefined, profile: AgentProfile): ReadonlyArray<Grant> {
 	if (cwd === undefined) return []
 
-	const common_directory = git_common_directory.resolve(cwd)
+	const common_directory = git_common_directory.repository(cwd)
 
-	if (common_directory === undefined) return state_grants(cwd)
-
-	return [...git_grants(common_directory), ...ledger_grants(common_directory, profile)]
+	return [
+		...git_grants(common_directory),
+		...state_grants(common_directory),
+		...ledger_grants(common_directory, profile),
+	]
 }
 
 function permission_arguments(
