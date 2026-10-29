@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { lane_paths } from '#scripts/lane/lane-paths'
+import { busy_average } from './busy-average'
 import { core_admission, type LedgerEntry } from './core-admission'
 import { core_weights } from './core-weights'
 import type { MachineBudget } from './machine-capacity'
@@ -115,26 +116,42 @@ function is_outside_held(
 	return hold_reason(key, reservations, unloaded, granted) === undefined
 }
 
-// The machine as a waiting claim reads it: the mean raw busy cores (`busy_average.mean_busy`) and the
-// cores it has.
+// The machine as a waiting claim reads it at `now`: the mean raw busy cores (`busy_average.mean_busy`)
+// and the cores it has.
 interface MachineRoom {
 	busy_cores: number | undefined
 	cores: number
+	now: number
 }
 
 // A claim no heavier than this counts as small: every static check's weight (`core-weights.ts`).
 const SMALL_CLAIM_CORES = core_weights.CORE_WEIGHTS.lint
 
-// A small claim the machine runs beside its measured load without passing its cores, unless the run
-// queue reads it overloaded. An unread machine has no room to show.
-function has_room(weight: number, budget: MachineBudget, room: MachineRoom): boolean {
-	if (weight > SMALL_CLAIM_CORES || budget.is_overloaded === true) return false
+// The cores of claims admitted within the reading's averaging window, whose tools the mean does not
+// show yet — so small claims released on the same few polls do not each read the same room.
+function unseen_cores(reservations: ReadonlyArray<LedgerEntry>, now: number): number {
+	const fresh = reservations.filter(({ reservation: { admitted_at } }) => {
+		return admitted_at !== undefined && now - admitted_at < busy_average.AVERAGE_WINDOW_MS
+	})
 
-	return room.busy_cores !== undefined && room.busy_cores + weight <= room.cores
+	return core_admission.sum_load(fresh).cores
 }
 
-// **Whether only the ledger's cores hold a small claim the machine has room for** (joshuafolkken/kit#5391):
-// other lanes' claims reserve their whole weight while running below it, so a narrowed check waited out
+// A small claim the machine runs beside its measured load, and the load it does not show yet, without
+// passing its cores, unless the run queue reads it overloaded. An unread machine has no room to show.
+function has_room(
+	weight: number,
+	budget: MachineBudget,
+	room: MachineRoom,
+	unseen: number,
+): boolean {
+	if (weight > SMALL_CLAIM_CORES || budget.is_overloaded === true) return false
+
+	return room.busy_cores !== undefined && room.busy_cores + unseen + weight <= room.cores
+}
+
+// **Whether only the ledger's cores hold a small claim the machine has room for**
+// (joshuafolkken/kit#5391): other lanes' claims reserve their whole weight while running below it, so a narrowed check waited out
 // the cap behind them on a machine with cores to spare. Memory still holds it: with the cores unbounded
 // the claim must be admitted.
 function is_ledger_held_small(
@@ -145,7 +162,11 @@ function is_ledger_held_small(
 ): boolean {
 	const own = reservations.find((entry) => entry.key === key)?.reservation
 
-	if (own === undefined || !has_room(own.weight, budget, room)) return false
+	if (own === undefined) return false
+
+	const unseen = unseen_cores(reservations, room.now)
+
+	if (!has_room(own.weight, budget, room, unseen)) return false
 
 	return core_admission.is_admitted(key, reservations, { ...budget, cores: Infinity })
 }

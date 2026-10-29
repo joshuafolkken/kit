@@ -268,7 +268,8 @@ function is_wait_spent(
 
 	if (now >= context.deadline) return true
 
-	const room = { busy_cores: busy_average.mean_busy(context.busy_samples), cores: context.budget }
+	const busy_cores = busy_average.mean_busy(context.busy_samples)
+	const room = { busy_cores, cores: context.budget, now }
 
 	return (
 		busy_average.is_unrelieved(context.ease, now, context.ease_window_ms) &&

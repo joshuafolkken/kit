@@ -1,7 +1,7 @@
 {
-	"reason": "Admit a small ledger-held claim early when the machine has measured room (#5391): a predicate in core-wait, a raw busy mean, and their tests",
+	"reason": "Admit a small ledger-held claim early when the machine has measured room, counting claims the reading does not show yet (#5391): predicates in core-wait, a raw busy mean, and their tests",
 	"date": "2026-10-29",
 	"growth": {
-		"scripts.code_lines": 45
+		"scripts.code_lines": 61
 	}
 }

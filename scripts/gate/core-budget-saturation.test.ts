@@ -40,8 +40,9 @@ function busy(busy_cores: number): () => Promise<MachineReading> {
 	return async () => ({ busy_cores, available_mb: undefined })
 }
 
+// Admitted long enough ago that the machine reading already shows its load.
 function write_reserved(weight: number): void {
-	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: 0 }
+	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: LONG_AGO }
 
 	writeFileSync(path.join(probe.directory, BLOCKER), JSON.stringify(payload))
 }

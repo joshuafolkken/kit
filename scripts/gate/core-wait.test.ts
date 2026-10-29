@@ -1,5 +1,6 @@
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { busy_average } from './busy-average'
 import type { LedgerEntry } from './core-admission'
 import { core_wait, type BudgetWait } from './core-wait'
 
@@ -116,26 +117,33 @@ describe('core_wait.is_outside_held — whether only load outside the ledger hol
 
 // joshuafolkken/kit#5391: a small claim other lanes' ledger claims hold waited out the cap on a machine
 // whose measured load left it room.
-describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing', () => {
-	const budget = { cores: CORES, memory_mb: MEMORY_MB }
-	const idle = { busy_cores: 1, cores: CORES }
+const FREE_BUDGET = { cores: CORES, memory_mb: MEMORY_MB }
+// Past the reading's averaging window since `first` was admitted, so the mean shows its load.
+const READ_AT = busy_average.AVERAGE_WINDOW_MS
+const IDLE = { busy_cores: 1, cores: CORES, now: READ_AT }
 
-	function held(weight: number): Array<LedgerEntry> {
-		return [entry('first', CORES, 0), entry('second', weight, 0)]
-	}
+// `second`, of `weight`, waiting behind `first`, which reserves every core.
+function held(weight: number): Array<LedgerEntry> {
+	return [entry('first', CORES, 0), entry('second', weight, 0)]
+}
+
+describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing', () => {
+	const budget = FREE_BUDGET
+	const now = READ_AT
+	const idle = IDLE
 
 	it('answers yes for a small claim only the ledger holds while the machine has room', () => {
 		expect(core_wait.is_held_in_vain('second', held(1), budget, idle)).toBe(true)
 	})
 
 	it('answers no once the measured load leaves no room for the claim', () => {
-		const saturated = { busy_cores: CORES, cores: CORES }
+		const saturated = { busy_cores: CORES, cores: CORES, now }
 
 		expect(core_wait.is_held_in_vain('second', held(1), budget, saturated)).toBe(false)
 	})
 
 	it('answers no where the machine could not be read', () => {
-		const unread = { busy_cores: undefined, cores: CORES }
+		const unread = { busy_cores: undefined, cores: CORES, now }
 
 		expect(core_wait.is_held_in_vain('second', held(1), budget, unread)).toBe(false)
 	})
@@ -149,11 +157,32 @@ describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing
 	it('answers no for a claim heavier than a static check', () => {
 		expect(core_wait.is_held_in_vain('second', held(CORES - 1), budget, idle)).toBe(false)
 	})
+})
+
+describe('core_wait.is_held_in_vain — load the reading does not show yet', () => {
+	// A claim released a poll ago runs, but the mean does not show it yet: the next one counts it.
+	it('answers no once a claim admitted within the averaging window takes the room', () => {
+		const fresh: LedgerEntry = {
+			key: 'fresh',
+			reservation: { weight: CORES - 1, claimed_at: 0, admitted_at: READ_AT - 1 },
+		}
+
+		expect(core_wait.is_held_in_vain('second', [...held(1), fresh], FREE_BUDGET, IDLE)).toBe(false)
+	})
+
+	it('answers yes once that claim is past the averaging window', () => {
+		const shown: LedgerEntry = {
+			key: 'shown',
+			reservation: { weight: CORES - 1, claimed_at: 0, admitted_at: 0 },
+		}
+
+		expect(core_wait.is_held_in_vain('second', [...held(1), shown], FREE_BUDGET, IDLE)).toBe(true)
+	})
 
 	it('answers no for a small claim memory holds as well', () => {
 		const ledger = [entry('first', CORES, MEMORY_MB), entry('second', 1, MEMORY_MB)]
 
-		expect(core_wait.is_held_in_vain('second', ledger, budget, idle)).toBe(false)
+		expect(core_wait.is_held_in_vain('second', ledger, FREE_BUDGET, IDLE)).toBe(false)
 	})
 })
 
