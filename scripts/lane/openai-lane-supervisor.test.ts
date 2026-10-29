@@ -29,7 +29,7 @@ const EPHEMERAL_FLAG = '--ephemeral'
 const launch = vi.spyOn(detached_launch, 'launch_attached')
 const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
-const resolve_common_directory = vi.spyOn(git_common_directory, 'resolve')
+const repository_directory = vi.spyOn(git_common_directory, 'repository')
 const common_directory = path.join(scratch, 'repository with spaces', '.git')
 const ship_current = vi.spyOn(openai_lane_ship, 'current')
 const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
@@ -80,7 +80,7 @@ beforeEach(() => {
 	stamp_file.remove_stamp(openai_lane_supervisor.state_path(lane_directory))
 	worktree.mockResolvedValue(repository)
 	diagnostic.mockReturnValue({ kind: 'ready' })
-	resolve_common_directory.mockReturnValue(undefined)
+	repository_directory.mockReturnValue(undefined)
 	launch.mockResolvedValue({ kind: 'completed', pid: 9001, exit_code: 0 })
 	reset_ship()
 })
@@ -140,7 +140,7 @@ describe('OpenAI lane supervisor generations', () => {
 describe('OpenAI lane supervisor Git access', () => {
 	it('grants the common Git directory and the ledger in the launched generation', async () => {
 		mkdirSync(common_directory, { recursive: true })
-		resolve_common_directory.mockReturnValue(common_directory)
+		repository_directory.mockReturnValue(common_directory)
 
 		await supervise('git-common-directory')
 
@@ -150,7 +150,7 @@ describe('OpenAI lane supervisor Git access', () => {
 			path.dirname(OBSERVATION_LEDGER_DIRECTORY),
 		)
 
-		expect(resolve_common_directory).toHaveBeenCalledWith(lane_directory)
+		expect(repository_directory).toHaveBeenCalledWith(lane_directory)
 		expect(filesystem).toContain(`${JSON.stringify(realpathSync(common_directory))}="write"`)
 		expect(filesystem).toContain(`${JSON.stringify(realpathSync(ledger))}="write"`)
 		expect(filesystem).not.toContain('--add-dir')

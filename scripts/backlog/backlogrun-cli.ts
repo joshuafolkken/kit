@@ -35,6 +35,7 @@ interface BacklogrunPorts {
 	repository_directory: () => Promise<string | undefined>
 	is_running: (git_directory: string) => boolean
 	replacement: (invocation: string, git_directory: string) => Promise<ReplaceVerdict>
+	stranded: (git_directory: string) => Promise<ReplaceVerdict | undefined>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
 	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
@@ -48,6 +49,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 	is_running: backlogrun_launch.is_running,
 	replacement: async (invocation, git_directory) =>
 		await backlogrun_replace.decide(invocation, git_directory),
+	stranded: async (git_directory) => await backlogrun_replace.stranded(git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
@@ -91,6 +93,12 @@ function target_of(git_directory: string): LaunchTarget {
 	return { worktree: path.dirname(git_directory), git_directory }
 }
 
+function refuse(line: string, ports: BacklogrunPorts): number {
+	ports.write(line)
+
+	return FAILURE_EXIT_CODE
+}
+
 async function launch(
 	args: BacklogrunArguments,
 	git_directory: string,
@@ -98,11 +106,7 @@ async function launch(
 ): Promise<number> {
 	const result = ports.start(args, target_of(git_directory))
 
-	if (result.kind === 'failed') {
-		ports.write(`backlogrun: could not start: ${result.note}`)
-
-		return FAILURE_EXIT_CODE
-	}
+	if (result.kind === 'failed') return refuse(`backlogrun: could not start: ${result.note}`, ports)
 
 	ports.write(launched_note(result))
 	ports.write(supervisor_note(ports.start_supervisor(git_directory, args.provider)))
@@ -116,8 +120,9 @@ async function replace(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
+	kind = 'idle',
 ): Promise<number> {
-	ports.write(`backlogrun: replacing the idle run with \`${args.invocation}\``)
+	ports.write(`backlogrun: replacing the ${kind} run with \`${args.invocation}\``)
 
 	const report = await ports.stop(git_directory)
 
@@ -128,12 +133,28 @@ async function replace(
 	return await launch(args, git_directory, ports)
 }
 
+// No process runs the run, yet its record may stand — a launch that died before it ended the record
+// (joshuafolkken/kit#5401). The record gives way to the typed invocation unless `stranded` keeps it.
+async function start_fresh(
+	args: BacklogrunArguments,
+	git_directory: string,
+	ports: BacklogrunPorts,
+): Promise<number> {
+	const verdict = await ports.stranded(git_directory)
+
+	if (verdict === undefined) return await launch(args, git_directory, ports)
+
+	if (verdict.kind === 'keep') return refuse(`backlogrun: not starting — ${verdict.reason}`, ports)
+
+	return await replace(args, git_directory, ports, 'stopped')
+}
+
 async function begin(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
 ): Promise<number> {
-	if (!ports.is_running(git_directory)) return await launch(args, git_directory, ports)
+	if (!ports.is_running(git_directory)) return await start_fresh(args, git_directory, ports)
 
 	const verdict = await ports.replacement(args.invocation, git_directory)
 
@@ -163,12 +184,6 @@ async function dispatch(
 	if (parsed.kind === 'restart') return await ports.restart(git_directory)
 
 	return await begin(parsed.args, git_directory, ports)
-}
-
-function refuse(line: string, ports: BacklogrunPorts): number {
-	ports.write(line)
-
-	return FAILURE_EXIT_CODE
 }
 
 async function run(

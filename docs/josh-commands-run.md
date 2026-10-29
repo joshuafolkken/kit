@@ -161,7 +161,7 @@ The detached supervisor adopts the handed-off carry record (a dead owner's too),
 
 **A run started by [`pnpm josh backlogrun`](./josh-commands.md#josh-backlogrun) already has its supervisor**, so the parent's `--start` answers `running`.
 
-**To stop a `backlogrun`, use [`pnpm josh backlogrun --stop`](./josh-commands.md#josh-backlogrun)**: it stops this supervisor and ends the run's record together. `run:wake --stop` alone leaves the record behind with no owner, and the next `pnpm josh backlogrun` answers `standing` on it rather than starting.
+**To stop a `backlogrun`, use [`pnpm josh backlogrun --stop`](./josh-commands.md#josh-backlogrun)**: it stops this supervisor and ends the run's record together. `run:wake --stop` alone leaves the record behind with no owner; the next `pnpm josh backlogrun` ends it as a stopped run before starting, except where [`josh backlogrun`](./josh-commands.md#josh-backlogrun) keeps a stranded record.
 
 `scheduler` runs provider; listings show profile/result. OpenAI uses worktree-local
 `sqlite_home` and `--ephemeral`, retaining native auth/config.

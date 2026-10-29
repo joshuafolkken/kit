@@ -1,0 +1,7 @@
+{
+	"reason": "Stranded-record recovery in josh backlogrun (new verdict, live-supervisor guard, ports) and the primary-checkout git grant for Codex sessions (#5401)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 39
+	}
+}
