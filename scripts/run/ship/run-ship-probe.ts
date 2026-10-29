@@ -1,4 +1,5 @@
 import { git_command } from '#scripts/git/git-command'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { git_worktree } from '#scripts/git/git-worktree'
 import { error_text } from '#scripts/lib/error-message'
 import { review_round_reuse } from '#scripts/review/review-round-reuse'
@@ -14,7 +15,6 @@ import { run_ship_stage, type ShipState } from './run-ship-stage'
 // guard answers instead: `git -y` refuses an empty commit, a push of a commit origin already holds
 // changes nothing, and `followup` reads the pull request itself before it merges.
 
-const REPOSITORY_DIRECTORY_INDEX = 1
 const REMOTE_SHA_INDEX = 0
 const REMOTE_FIELD_SEPARATOR = /\s/u
 const HEAD_REFERENCE = 'HEAD'
@@ -97,22 +97,10 @@ async function read_state(): Promise<ShipState> {
 	}
 }
 
-// The common git directory every lane of the repository shares — what the stage record, the detached
-// supervisor's log and its pid are keyed on — or `undefined` outside one.
-async function repository_directory(): Promise<string | undefined> {
-	try {
-		const directories = await git_command.git_directories()
-
-		return directories[REPOSITORY_DIRECTORY_INDEX]
-	} catch {
-		return undefined
-	}
-}
-
 // The record's path for this issue, or `undefined` outside a repository — there is nothing to key on,
 // and a ship without a record still resumes from the state alone.
 async function record_target(issue: string): Promise<string | undefined> {
-	const repository = await repository_directory()
+	const repository = await git_common_directory.read_repository()
 
 	return repository === undefined ? undefined : run_ship_stage.record_path(repository, issue)
 }
@@ -122,7 +110,9 @@ const run_ship_probe = {
 	read_review_stale,
 	read_state,
 	record_target,
-	repository_directory,
+	// The leaf's read, kept on the ship's surface for its own callers; a module outside the ship's
+	// stages imports `git_common_directory` so it does not reach the review modules this one does.
+	repository_directory: git_common_directory.read_repository,
 }
 
 export { run_ship_probe }

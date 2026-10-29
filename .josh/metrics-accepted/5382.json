@@ -1,0 +1,7 @@
+{
+	"reason": "#5382 moves the ship's async common-directory read into the git leaf; the lint rule against member access on an await costs one line over the removed copy",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}

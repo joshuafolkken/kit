@@ -87,6 +87,19 @@ function repository(cwd?: string): string | undefined {
 	return directories(cwd)[COMMON_GIT_DIRECTORY]
 }
 
+// The common git directory every lane of the repository shares, asked asynchronously and never
+// remembered — what a ship's stage record, its detached supervisor's log and its pid are keyed on — or
+// `undefined` outside one.
+async function read_repository(): Promise<string | undefined> {
+	try {
+		const found = await git_command.git_directories()
+
+		return found[COMMON_GIT_DIRECTORY]
+	} catch {
+		return undefined
+	}
+}
+
 function select_linked(found: ReadonlyArray<string>): string | undefined {
 	const own_directory = found[OWN_GIT_DIRECTORY]
 	const common = found[COMMON_GIT_DIRECTORY]
@@ -104,6 +117,7 @@ const git_common_directory = {
 	STATE_DIRECTORY,
 	directories,
 	own,
+	read_repository,
 	repository,
 	resolve,
 	select_linked,
