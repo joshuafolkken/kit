@@ -10,10 +10,15 @@ import { codex_agent_argv } from './codex-agent-argv'
 const INVOCATION = 'fullrun #2071'
 const MODEL = 'gpt-6.1-sol'
 const EPHEMERAL_FLAG = '--ephemeral'
-const PROFILE_CONFIG = 'default_permissions="josh_lane"'
-const NETWORK_CONFIG = 'permissions.josh_lane.network.enabled=true'
-const FILESYSTEM_PREFIX = 'permissions.josh_lane.filesystem='
-const BASE_FILESYSTEM_CONFIG = `${FILESYSTEM_PREFIX}{":root"="read",":workspace_roots"="write",":slash_tmp"="write",":tmpdir"="write"}`
+const PROFILE_CONFIG = /^default_permissions="josh_lane_[a-f\d]+_0"$/u
+const NETWORK_CONFIG = 'network={enabled=true}'
+const FILESYSTEM_PREFIX = 'permissions.josh_lane_'
+const BASE_FILESYSTEM_GRANTS = Object.fromEntries([
+	[':root', 'read'],
+	[':workspace_roots', 'write'],
+	[':slash_tmp', 'write'],
+	[':tmpdir', 'write'],
+])
 const LANE = '/lanes/2071'
 const FIXTURE = path.join(process.cwd(), 'node_modules', '.cache', 'codex-argv-test')
 const PRIMARY = path.join(FIXTURE, 'primary')
@@ -52,7 +57,7 @@ function parse_string(literal: string): string {
 function grants(args: ReadonlyArray<string>): Record<string, string> {
 	type Grant = [string, string]
 
-	const table = args.find((argument) => argument.startsWith(FILESYSTEM_PREFIX)) ?? ''
+	const table = args.filter((argument) => argument.startsWith(FILESYSTEM_PREFIX)).join(',')
 	const pairs = [...table.matchAll(GRANT_PATTERN)].map(
 		([, target = '""', access = '""']): Grant => [parse_string(target), parse_string(access)],
 	)
@@ -86,25 +91,18 @@ describe('Codex argv construction', () => {
 	it('builds a non-interactive JSONL command as a safe argv array', () => {
 		const argv = codex_agent_argv.build(INVOCATION, openai_worker())
 
-		expect(argv).toStrictEqual({
-			command: 'codex',
-			args: [
-				'exec',
-				'--model',
-				MODEL,
-				'-c',
-				'model_reasoning_effort="medium"',
-				'-c',
-				PROFILE_CONFIG,
-				'-c',
-				BASE_FILESYSTEM_CONFIG,
-				'-c',
-				NETWORK_CONFIG,
-				'--json',
-				INVOCATION,
-			],
-			ends_with_prompt: true,
-		})
+		expect(argv.command).toBe('codex')
+		expect(argv.ends_with_prompt).toBe(true)
+		expect(argv.args.slice(0, 5)).toStrictEqual([
+			'exec',
+			'--model',
+			MODEL,
+			'-c',
+			'model_reasoning_effort="medium"',
+		])
+		expect(argv.args).toContainEqual(expect.stringMatching(PROFILE_CONFIG))
+		expect(argv.args.slice(-2)).toStrictEqual(['--json', INVOCATION])
+		expect(grants(argv.args)).toStrictEqual(BASE_FILESYSTEM_GRANTS)
 	})
 
 	it('keeps the prompt in one final element and passes no permission bypass', () => {
@@ -112,7 +110,7 @@ describe('Codex argv construction', () => {
 
 		expect(argv.args.at(-1)).toBe(INVOCATION)
 		expect(argv.args.join(' ')).not.toContain('dangerously')
-		expect(argv.args).toContain(NETWORK_CONFIG)
+		expect(argv.args).toContainEqual(expect.stringContaining(NETWORK_CONFIG))
 	})
 })
 
@@ -121,7 +119,7 @@ describe('Codex sandbox selection', () => {
 	it('selects the permission profile instead of a sandbox mode or added directories', () => {
 		const { args } = codex_agent_argv.build(INVOCATION, openai_worker(), LANE)
 
-		expect(args).toContain(PROFILE_CONFIG)
+		expect(args).toContainEqual(expect.stringMatching(PROFILE_CONFIG))
 		expect(args).not.toContain('--sandbox')
 		expect(args).not.toContain('--add-dir')
 	})
@@ -290,6 +288,6 @@ describe('Codex backlogrun parent in the primary checkout', () => {
 	it('grants nothing beyond the base outside a git repository', () => {
 		const { args } = codex_agent_argv.build(INVOCATION, openai_scheduler(), LANE)
 
-		expect(args).toContain(BASE_FILESYSTEM_CONFIG)
+		expect(grants(args)).toStrictEqual(BASE_FILESYSTEM_GRANTS)
 	})
 })

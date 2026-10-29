@@ -45,7 +45,9 @@ test('the woken scheduler uses the selected OpenAI provider', () => {
 	expect(argv.args).toContain('--json')
 	expect(argv.args).toContain('--ephemeral')
 	expect(argv.args).toContain('sqlite_home="/projects/kit/node_modules/.cache/josh/openai"')
-	expect(argv.args).toContain('default_permissions="josh_lane"')
+	expect(argv.args).toContainEqual(
+		expect.stringMatching(/^default_permissions="josh_lane_[a-f\d]+_0"$/u),
+	)
 	expect(argv.args.join(' ')).toContain(`${JSON.stringify(realpathSync(COMMON_DIRECTORY))}="write"`)
 	expect(argv.args.at(-1)).toBe(INVOCATION)
 })
