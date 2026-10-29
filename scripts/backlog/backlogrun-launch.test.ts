@@ -128,6 +128,18 @@ function stage_start(): void {
 }
 
 describe('backlogrun_launch.start', () => {
+	it.each(['anthropic', 'openai'] as const)(
+		'persists the launched scheduler provider %s',
+		(provider) => {
+			stage_start()
+			backlogrun_launch.start(INVOCATION, provider, TARGET)
+
+			expect(vi.mocked(stamp_file.replace_stamp).mock.calls[0]?.[1]).toMatchObject({
+				scheduler_provider: provider,
+			})
+		},
+	)
+
 	it('starts the parent with no Codex session key inherited from the shell it was typed in', () => {
 		stage_start()
 
@@ -170,6 +182,17 @@ function stage_launch(record: object, is_live = true): void {
 }
 
 describe('backlogrun_launch.pending_launch', () => {
+	it.each(['anthropic', 'openai'] as const)(
+		'reads the recorded scheduler provider %s',
+		(scheduler_provider) => {
+			stage_launch({ ...STARTED_RECORD, scheduler_provider })
+
+			expect(backlogrun_launch.pending_launch(GIT_DIRECTORY)?.scheduler_provider).toBe(
+				scheduler_provider,
+			)
+		},
+	)
+
 	it('reads what a live launch started and when', () => {
 		stage_launch(STARTED_RECORD)
 

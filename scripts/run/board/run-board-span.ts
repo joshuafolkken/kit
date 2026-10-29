@@ -1,3 +1,4 @@
+import type { AgentProvider } from '#scripts/agent/agent-provider'
 import type { PendingLaunch } from '#scripts/backlog/backlogrun-launch'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import type { EndedRun } from '#scripts/run/carry/run-carry-ended'
@@ -10,12 +11,21 @@ import type { RunEvent } from '#scripts/run/event/run-event-stream'
 
 // One run to draw. `ended_ms` is set only for a run that has ended.
 interface BoardSpan {
+	scheduler_provider?: AgentProvider | undefined
 	invocation: string
 	started_ms: number
 	ended_ms: number | undefined
 }
 
 const { moment_of } = run_event_scope
+
+function provider_of(
+	record: Pick<BoardSpan, 'scheduler_provider'>,
+): Pick<BoardSpan, 'scheduler_provider'> {
+	return record.scheduler_provider === undefined
+		? {}
+		: { scheduler_provider: record.scheduler_provider }
+}
 
 function ended_span(ended: EndedRun | undefined): BoardSpan | undefined {
 	if (ended === undefined) return undefined
@@ -25,7 +35,7 @@ function ended_span(ended: EndedRun | undefined): BoardSpan | undefined {
 
 	if (started_ms === undefined || ended_ms === undefined) return undefined
 
-	return { invocation: ended.invocation, started_ms, ended_ms }
+	return { invocation: ended.invocation, started_ms, ended_ms, ...provider_of(ended) }
 }
 
 // A run `josh backlogrun` launched and its parent has not claimed yet: it has no carry record, so the
@@ -35,7 +45,7 @@ function launch_span(launch: PendingLaunch | undefined): BoardSpan | undefined {
 
 	if (launch === undefined || started_ms === undefined) return undefined
 
-	return { invocation: launch.invocation, started_ms, ended_ms: undefined }
+	return { invocation: launch.invocation, started_ms, ended_ms: undefined, ...provider_of(launch) }
 }
 
 // With no carry record: the run on its way, else the one that last ended. **A launch older than that
@@ -67,7 +77,12 @@ function span_of(
 
 	if (started_ms === undefined) return undefined
 
-	return { invocation: read.carry.invocation, started_ms, ended_ms: undefined }
+	return {
+		invocation: read.carry.invocation,
+		started_ms,
+		ended_ms: undefined,
+		...provider_of(read.carry),
+	}
 }
 
 // Whether the span drawn with no carry record is the ended run's, rather than a launch's.

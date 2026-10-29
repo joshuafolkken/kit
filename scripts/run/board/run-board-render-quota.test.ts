@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { QuotaReading, Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
@@ -40,6 +41,34 @@ const QUOTAS: Quotas = {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+})
+
+function column_at(row: string, value: string): number {
+	return run_board_fit.width_of(row.slice(0, row.indexOf(value)))
+}
+
+describe('run_board_render_quota scheduler', () => {
+	it.each([
+		{ scheduler_provider: 'claude', value: '42%', weekly: '68%' },
+		{ scheduler_provider: 'codex', value: '—', weekly: '45%' },
+	] as const)(
+		'puts scheduler %s first without moving usage columns',
+		({ scheduler_provider, value, weekly }) => {
+			const view = { quotas: QUOTAS, scheduler_provider }
+			const [first = '', second = ''] = rows_of(view)
+			const plain =
+				rows_of({ quotas: QUOTAS }).find((row) => row.includes(scheduler_provider)) ?? ''
+
+			expect(first).toMatch(new RegExp(`^  🤖 ${scheduler_provider} `, 'u'))
+			expect(second).toMatch(/^ {5}(claude|codex) /u)
+			expect(second).not.toContain('🤖')
+			expect(column_at(first, value)).toBe(column_at(plain, value))
+			expect(column_at(first, weekly)).toBe(column_at(plain, weekly))
+			expect(usage_part({ ...view, now_ms: NOW_MS })?.summary).toMatch(
+				new RegExp(`^🤖 ${scheduler_provider} `, 'u'),
+			)
+		},
+	)
 })
 
 describe('run_board_render_quota.usage_part', () => {
@@ -123,6 +152,6 @@ describe('run_board_render_quota gauge colors', () => {
 	)
 
 	it('names ⛽, ┊ and ↻ in the legend', () => {
-		expect(LEGEND).toEqual(['⛽ usage', '┊ pace', '↻ reset'])
+		expect(LEGEND).toEqual(['⛽ usage', '🤖 scheduler', '┊ pace', '↻ reset'])
 	})
 })

@@ -15,6 +15,24 @@ const QUOTAS: Quotas = {
 }
 
 describe('run_board_tick.tick quotas', () => {
+	it.each(['claude', 'codex'] as const)(
+		'draws the recorded %s scheduler in expanded and folded usage',
+		async (scheduler_provider) => {
+			const { ports, frames, gathering } = harness({ ...LOCAL, scheduler_provider }, [
+				plan_titled('a'),
+			])
+
+			gathering.read_quotas = vi.fn(async () => QUOTAS)
+			await tick(FRESH_STATE, ports)
+			expect(frames.join('\n')).toContain(`🤖 ${scheduler_provider}`)
+			ports.folded = () => new Set(['usage'])
+			await tick(FRESH_STATE, ports)
+			expect(frames.at(-1)).toContain(`▸ ⛽ usage`)
+			expect(frames.at(-1)).toContain(`🤖 ${scheduler_provider}`)
+			expect(frames.join('\n')).toContain('🤖 scheduler')
+		},
+	)
+
 	it('reads the quotas with the machine sample and draws the usage section', async () => {
 		const { ports, frames, gathering } = harness(LOCAL, [plan_titled('a')])
 		const read_quotas = vi.fn(async () => QUOTAS)
