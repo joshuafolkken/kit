@@ -40,7 +40,7 @@ was delivered.
   `scripts/hooks/pretool-guard.ts`), run as `pnpm josh pretool:guard`. It folds the three
   `PreToolUse` guards — batching, investigation and rule — into one process, wired as a **single
   entry** in `.claude/settings.json`'s `PreToolUse` with the matcher
-  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task`. A
+  `Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch`. A
   batching refusal wins over an investigation refusal, which wins over a rule refusal, and each guard
   still honors its own environment switch.
 - **The switch**: `JOSH_RULE_GUARD` for the rule guard — on by default, off with `off` / `0` /

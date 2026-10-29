@@ -34,6 +34,9 @@ const payload_schema = z.object({
 	agent_id: z.string().nullish(),
 	tool_name: z.string().min(1),
 	tool_input: z.unknown(),
+	// The session's model where the harness hands it over (a Codex payload); Claude Code names it on
+	// the transcript's assistant entries instead (`scripts/rules/main-model.ts`).
+	model: z.string().nullish(),
 })
 const refusal_schema = z.object({ refused_at_ms: z.number() })
 
@@ -218,6 +221,10 @@ const { load_environment_file } = josh_environment_file
 interface GuardRun {
 	transcript: string
 	now_ms: number
+	// The payload's own model, where the harness names one.
+	model?: string | undefined
+	// The call comes from a delegated unit (the payload names its `agent_id`), not the main line.
+	is_unit?: boolean
 }
 
 // The notice half of a guard's rule, kept optional so a guard that only refuses supplies nothing and is
@@ -374,7 +381,9 @@ function guard_reason_for_payload(
 	// derived here rather than judged from the parent's frozen timeline.
 	const transcript = time_hook_transcript.transcript_of(payload.transcript_path, payload.agent_id)
 	const tail = time_density_hook.read_tail(transcript)
-	const context = { ...parts, tail, call, run: { transcript, now_ms } }
+	const is_unit = typeof payload.agent_id === 'string' && payload.agent_id.length > 0
+	const run = { transcript, now_ms, model: payload.model ?? undefined, is_unit }
+	const context = { ...parts, tail, call, run }
 
 	// The block path decides first, and the notice is asked only where it stayed clear. The two never
 	// both fire — a refusable call never notifies and a whole-file write never blocks — so this ordering

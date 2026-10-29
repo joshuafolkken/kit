@@ -44,7 +44,8 @@ forecast** — where the guard refuses, not a budget. Brief the unit on what was
 `pnpm josh rule:list` refuses the threshold call, in a lane child too (`pnpm josh delegate --list`).
 
 **Dispatch the unit as the `investigator` agent** (`kit:investigator` in a consumer) — read-only, on
-the `model` its definition names.
+the `model` its definition names. A `general-purpose` or `Explore` dispatch that investigates is
+briefed to return `file:line` citations too.
 
 **The main line does not idle while the unit reads** — the reads of files this run will edit go in
 the same message (the `investigator-foreground` row of `pnpm josh rule:list`); then verify the unit's
@@ -59,3 +60,9 @@ the main line decides what that means and what to change.
 
 **A `general-purpose` dispatch sets `model`** — `sonnet` for routine work, `opus` for judgment (the
 `agent-model` row of `pnpm josh rule:list`).
+
+## A consultation main line hands its investigation to a unit
+
+**On Fable or Codex Astra, broad investigation goes to a unit on the investigation model** — Claude
+`JOSH_INVESTIGATION_MODEL`, Codex `gpt-6.1-sol`; the main line keeps a narrow check of a cited line
+(the `consultation-investigation` rows of `pnpm josh rule:list`).

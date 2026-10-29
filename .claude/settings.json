@@ -73,7 +73,7 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch",
 				"hooks": [
 					{
 						"type": "command",

@@ -90,7 +90,7 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pret
 ```json
 "PreToolUse": [
 	{
-		"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task",
+		"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch",
 		"hooks": [
 			{
 				"type": "command",
@@ -111,7 +111,7 @@ Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/in
 
 #### The batching guard
 
-- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`; the trailing `AskUserQuestion` in the matcher is the rule guard's. `Bash`, `Edit`, `Read` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`; `AskUserQuestion`, `Agent` and `Task` in the matcher are the rule guard's. All but `Write` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **In a dispatched lane child** (`JOSH_LANE_CHILD`): off, except a chain of single-call `grep` / `rg` / `find` / `fd` / read-only `sed` searches, which the `search-batching` row refuses unless the investigation guard refuses the same call (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
 - **Fires more than once per run**: again every `REFIRE_EVERY` further single-call turns (the notice every `NOTICE_REFIRE_EVERY`); a batched turn starts a fresh sequence.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.

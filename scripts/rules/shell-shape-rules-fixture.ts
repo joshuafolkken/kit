@@ -68,6 +68,8 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'agent-model': [],
 	'investigator-foreground': [],
 	'reviewer-foreground': [],
+	'consultation-investigation': [],
+	'consultation-investigation-codex': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
 	'round-one-check-related': [],

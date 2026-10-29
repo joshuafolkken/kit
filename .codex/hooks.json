@@ -25,7 +25,7 @@
 		],
 		"PreToolUse": [
 			{
-				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|apply_patch",
+				"matcher": "Bash|Edit|Read|Write|AskUserQuestion|Agent|Task|Glob|Grep|WebFetch|apply_patch",
 				"hooks": [
 					{
 						"type": "command",

@@ -1,0 +1,8 @@
+{
+	"reason": "#5351 adds the consultation-investigation PreToolUse rows (broad-investigation classifier, main-model reader) and their delegation.md pointer section",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 329,
+		"ai_cost.on_demand_bytes": 440
+	}
+}
