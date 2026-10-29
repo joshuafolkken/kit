@@ -29,6 +29,16 @@ async function notice(): Promise<string | undefined> {
 	return found.text
 }
 
-const check_related_unplanned = { notice }
+// **The round prints the same notice** (joshuafolkken/kit#5388): a lane child runs no `check:related`
+// after round 1's fixes, so a file a fix added surfaced only at the ship's preflight. `josh run:review
+// --join` prints it after the review, and a lane child's `josh review:record` after the fixes.
+// Nothing unplanned prints nothing.
+async function show(): Promise<void> {
+	const text = await notice()
+
+	if (text !== undefined) console.info(text)
+}
+
+const check_related_unplanned = { notice, show }
 
 export { check_related_unplanned }

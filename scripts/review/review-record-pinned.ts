@@ -1,3 +1,4 @@
+import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
@@ -64,6 +65,10 @@ async function read_skipped_join(root: string = PROJECT_ROOT): Promise<void> {
 	} catch (error) {
 		error_text.trace_swallowed('review_record_pinned.read_skipped_join', error)
 	}
+
+	// The record follows round 1's fixes, which the join came before, so the ship's `unplanned` answer is
+	// printed whether the join was read or not (joshuafolkken/kit#5388).
+	await check_related_unplanned.show()
 }
 
 // Whether the lane's code round is on the ledger: from then on `review:record` owns the restart, behind
