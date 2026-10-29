@@ -8,7 +8,9 @@ const read_log_mock = vi.hoisted(() => vi.fn())
 vi.mock('#scripts/git/changed-paths', () => ({
 	changed_paths: { read_changed_paths: changed_mock },
 }))
-vi.mock('./run-ship-probe', () => ({ run_ship_probe: { repository_directory: repository_mock } }))
+vi.mock('#scripts/git/git-common-directory', () => ({
+	git_common_directory: { read_repository: repository_mock },
+}))
 vi.mock('#scripts/josh/stamp-file', () => ({
 	stamp_file: {
 		stamp_path: (prefix: string): string => `/tmp/${prefix}key.log`,

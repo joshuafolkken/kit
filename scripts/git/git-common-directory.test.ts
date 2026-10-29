@@ -46,3 +46,12 @@ describe('linked worktree Git common directory', () => {
 		expect(git_common_directory.select_linked([WORKTREE_DIRECTORY])).toBeUndefined()
 	})
 })
+
+// The read outside a repository answers `undefined`; `run-ship-probe.test.ts` pins that through
+// `record_target`, where git can be stubbed without making this file isolated.
+it('reads the common directory asynchronously as the synchronous reader names it', async () => {
+	const [, common] = await git_command.git_directories()
+
+	expect(await git_common_directory.read_repository()).toBe(common)
+	expect(git_common_directory.repository()).toBe(common)
+})

@@ -1,11 +1,11 @@
 import { stripVTControlCharacters } from 'node:util'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { changed_paths } from '#scripts/git/changed-paths'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
 import { z } from 'zod'
 import { run_ship_next } from './run-ship-next'
-import { run_ship_probe } from './run-ship-probe'
 import type { StopFinding } from './run-ship-review'
 
 // What a relaunched lane child needs in front of it to fix a stopped ship: the tail of the failed
@@ -61,7 +61,7 @@ function output_lines(output: string): Array<string> {
 // The full output is kept beside the ship log, keyed the same way, so the prompt's line range points at
 // text that reads exactly as the excerpt was cut from.
 async function keep_full_output(issue: string, output: string): Promise<string | undefined> {
-	const repository = await run_ship_probe.repository_directory()
+	const repository = await git_common_directory.read_repository()
 
 	if (repository === undefined) return undefined
 

@@ -1,13 +1,13 @@
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { poll } from '#scripts/lib/poll'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
-import { run_ship_probe } from '#scripts/run/ship/run-ship-probe'
 
 const POLL_MS = 250
 type ShipEnding = 'none' | 'success' | 'failed' | 'abnormal'
 type ShipReading = NonNullable<ReturnType<typeof run_ship_detach.read_result>>
 
 async function current(issue: string): Promise<ShipReading | undefined> {
-	const repository = await run_ship_probe.repository_directory()
+	const repository = await git_common_directory.read_repository()
 
 	return repository === undefined ? undefined : run_ship_detach.read_result(repository, issue)
 }

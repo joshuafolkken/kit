@@ -3,8 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest'
 const repository_mock = vi.hoisted(() => vi.fn())
 const result_mock = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/run/ship/run-ship-probe', () => ({
-	run_ship_probe: { repository_directory: repository_mock },
+vi.mock('#scripts/git/git-common-directory', () => ({
+	git_common_directory: { read_repository: repository_mock },
 }))
 vi.mock('#scripts/run/ship/run-ship-detach', () => ({
 	run_ship_detach: { read_result: result_mock },
