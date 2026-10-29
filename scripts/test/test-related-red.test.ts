@@ -20,7 +20,8 @@ const OWED_SOURCE = 'scripts/test/beta.ts'
 const MOVED_SOURCE = 'scripts/test/gamma.ts'
 const BEFORE: GateTree = { files: { [FAILED_TEST]: 'blob-1' }, base: BASE }
 const MOVED_TREE: GateTree = { files: { [FAILED_TEST]: 'blob-2' }, base: BASE }
-const RED_LOG = `FAIL  ${FAILED_TEST} > suite > case\n`
+const FAIL_LINE = `FAIL  ${FAILED_TEST} > suite > case\n`
+const RED_LOG = `${FAIL_LINE} Test Files  1 failed | 2 passed (3)\n`
 const STARTED_MS = 1_000_000
 const LOG_WRITTEN_S = 2000
 const LOG_STALE_S = 500
@@ -39,8 +40,8 @@ function red_run(overrides: Partial<RedRun> = {}): RedRun {
 	}
 }
 
-function write_log(seconds: number): void {
-	writeFileSync(log_path, RED_LOG)
+function write_log(seconds: number, output = RED_LOG): void {
+	writeFileSync(log_path, output)
 	utimesSync(log_path, seconds, seconds)
 }
 
@@ -70,6 +71,24 @@ afterAll(() => {
 	rmSync(directory, { recursive: true, force: true })
 })
 
+const CLEARS_WHEN = 'clears the record when %s'
+
+// The reviewer's case: a file that passed its tests but leaked a rejection prints no `FAIL` line.
+describe('test_related_red.record_red — a red the named files do not account for', () => {
+	it.each([
+		['an unhandled error failed the run too', `${RED_LOG}⎯⎯ Unhandled Errors ⎯⎯\n`],
+		['the summary counts more failed files', `${FAIL_LINE} Test Files  2 failed | 1 passed (3)\n`],
+		['the summary names no failed count', FAIL_LINE],
+	])(CLEARS_WHEN, async (_case, output) => {
+		write_log(LOG_WRITTEN_S, output)
+
+		await test_related_red.record_red(red_run())
+
+		expect(review_stamps.test_related_red_stamp.write).not.toHaveBeenCalled()
+		expect(review_stamps.test_related_red_stamp.remove).toHaveBeenCalled()
+	})
+})
+
 describe('test_related_red.record_red', () => {
 	it('records the failed files and the owed no-base files on the before-tree', async () => {
 		write_log(LOG_WRITTEN_S)
@@ -87,7 +106,7 @@ describe('test_related_red.record_red', () => {
 	it.each([
 		['the first pass was green', { first_exit: 0 }],
 		['the unit log is older than the run', { started_ms: LOG_STALE_S * 1000 + 1 }],
-	])('clears the record when %s', async (_case, overrides) => {
+	])(CLEARS_WHEN, async (_case, overrides) => {
 		write_log(LOG_STALE_S)
 
 		await test_related_red.record_red(red_run(overrides))

@@ -7,6 +7,7 @@ import { git_command } from '#scripts/git/git-command'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { test_no_base } from './test-no-base'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
 import { test_unit_guard } from './test-unit-guard'
@@ -43,12 +44,16 @@ const BASE = 'base-sha'
 const FIXED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const UNTOUCHED_SOURCE = path.join('scripts', 'test', 'test-related-scope.ts')
 const FAILED_TEST = path.join('scripts', 'test', 'test-related-scope-triggers.test.ts')
+// A file the red run's no-base pass never reached, carried by its record.
+const OWED_SOURCE = path.join('scripts', 'test', 'test-related-moved.ts')
 const BEFORE: GateTree = { files: { [FIXED_SOURCE]: 'blob' }, base: BASE }
 const RED_MOVED = { changed: [FIXED_SOURCE], synced: [] }
 const GREEN_MOVED = { changed: [FIXED_SOURCE, UNTOUCHED_SOURCE], synced: [] }
 
 function red_record(base: string): FileMapStamp {
-	return { taken_at: '', files: BEFORE.files, base, blobs: { [FAILED_TEST]: 'failed' } }
+	const blobs = { [FAILED_TEST]: 'failed', [OWED_SOURCE]: 'no-base' }
+
+	return { taken_at: '', files: BEFORE.files, base, blobs }
 }
 
 function vitest_arguments(): ReadonlyArray<string> {
@@ -99,6 +104,16 @@ describe('test_related.run_related_tests — after a red run', () => {
 		expect(vitest_arguments()).not.toContain(absolute(UNTOUCHED_SOURCE))
 	})
 
+	it('still runs the failed files when nothing moved since the red record', async () => {
+		mocked_moved.mockImplementation(async (stamp) =>
+			stamp === review_stamps.test_related_red_stamp ? { changed: [], synced: [] } : GREEN_MOVED,
+		)
+
+		await test_related.run_related_tests([])
+
+		expect(vitest_arguments()).toContain(absolute(FAILED_TEST))
+	})
+
 	it('records a full-reach green on the before-tree and clears the red record', async () => {
 		await expect(test_related.run_related_tests([])).resolves.toBe(0)
 
@@ -107,6 +122,14 @@ describe('test_related.run_related_tests — after a red run', () => {
 			exit_code: 0,
 		})
 		expect(review_stamps.test_related_red_stamp.remove).toHaveBeenCalled()
+	})
+
+	it("hands the no-base pass the files the red run's record still owes", async () => {
+		const no_base = vi.spyOn(test_no_base, 'run_if_touched').mockResolvedValue(0)
+
+		await test_related.run_related_tests([])
+
+		expect(no_base.mock.calls[0]?.[1]).toContain(OWED_SOURCE)
 	})
 
 	it('ignores a red record written on another base and narrows by the green one', async () => {

@@ -24,7 +24,7 @@
 **検証ゲートと差分は、切り詰められた結果で判断しない。**
 
 - 検証コマンド（`gate` ／ `check:related` ／ `lint:related` ／ `test:related`）の末尾を読む → 失敗と次のコマンド、`full output: <path>`（`lint:related` には無い）、最終行の合否の順（`scripts/gate/verification-tail.ts`）。内訳が切れたら `full output:` のファイルを読む（joshuafolkken/kit#1227）
-- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。読むための再実行はしない。直したら、引数なしの `pnpm josh test:related` を回す → 失敗したファイルとその後に動いたファイルだけを読み、緑なら到達範囲全体の緑として記録される（`scripts/test/test-related-red.ts`）。`rerun failed:` 行は失敗したファイルだけを回すが、緑の記録は残さない（`scripts/test/vitest-failure-summary.ts`）
+- `pnpm josh test:related` ／ `test:unit` が失敗した → 最後の `failed tests:` 一覧と `full output: <path>` を読む。読むための再実行はしない。直したら、引数なしの `pnpm josh test:related` を回す → 失敗したのが引数なしの `test:related` なら、失敗したファイルとその後に動いたファイルだけを読み、緑なら到達範囲全体の緑として記録される（`scripts/test/test-related-red.ts`）。`rerun failed:` 行は失敗したファイルだけを回すが、緑の記録は残さない（`scripts/test/vitest-failure-summary.ts`）
 - 差分には判定行が無い。差分はファイルへ落としてから範囲で読む（`git diff main...HEAD > /tmp/diff.patch && wc -l /tmp/diff.patch`）
 
 ## 検証コマンドをパイプに繋がない（joshuafolkken/kit#1556）

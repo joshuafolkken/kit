@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
+import { stripVTControlCharacters } from 'node:util'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
@@ -24,6 +25,7 @@ import { vitest_failure_summary } from './vitest-failure-summary'
 
 const FAILED_MARK = 'failed'
 const OWED_MARK = 'no-base'
+const FAILED_FILE_COUNT = /Test Files\s+(?<count>\d+) failed/u
 
 // A green record's reading is the same shape with no failed or owed file.
 interface RedReading {
@@ -99,6 +101,19 @@ async function narrowing(red: RedReading | undefined): Promise<RedReading | unde
 	return reading_of(parts, { failed: [], owed: [] })
 }
 
+// **The named files must account for the whole red**: an unhandled error fails the run from a file
+// that prints no `FAIL` line, and a file left out would be vouched for green.
+function is_accounted(output: string, failed: ReadonlyArray<string>): boolean {
+	const text = stripVTControlCharacters(output)
+
+	if (text.includes('Unhandled Error')) return false
+
+	const groups: Record<string, string | undefined> = FAILED_FILE_COUNT.exec(text)?.groups ?? {}
+	const { count } = groups
+
+	return count === String(failed.length)
+}
+
 // The unit log the first pass wrote, read only when this run wrote it: an older one names files
 // another run failed.
 function failed_of(scope: RelatedScope, started_ms: number): ReadonlyArray<string> {
@@ -107,8 +122,10 @@ function failed_of(scope: RelatedScope, started_ms: number): ReadonlyArray<strin
 	if (!existsSync(log) || statSync(log).mtimeMs < started_ms) return []
 
 	const { failed_files, failed_tests } = vitest_failure_summary
+	const output = readFileSync(log, 'utf8')
+	const failed = failed_files(failed_tests(output))
 
-	return failed_files(failed_tests(readFileSync(log, 'utf8')))
+	return is_accounted(output, failed) ? failed : []
 }
 
 function blobs_of(
