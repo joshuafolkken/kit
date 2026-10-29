@@ -4,6 +4,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { durable_state } from '#scripts/josh/durable-state'
 import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
+import { codex_permission_arguments } from './codex-permission-arguments'
 
 const AGENT_COMMAND = 'codex'
 const AGENT_FLAGS: ReadonlyArray<string> = ['exec']
@@ -22,10 +23,6 @@ const WRITE = 'write'
 // (joshuafolkken/kit#4653). It reads the whole disk and writes the work tree, the temp directories, the
 // network and the common git directory — whose root a ref deletion needs: `git branch -d` and
 // `git stash drop` rewrite `packed-refs` through `packed-refs.lock` there.
-const PERMISSION_PROFILE = 'josh_lane'
-const PROFILE_CONFIG = `default_permissions="${PERMISSION_PROFILE}"`
-const NETWORK_CONFIG = `permissions.${PERMISSION_PROFILE}.network.enabled=true`
-const FILESYSTEM_KEY = `permissions.${PERMISSION_PROFILE}.filesystem`
 const BASE_GRANTS: ReadonlyArray<Grant> = [
 	[':root', READ],
 	[':workspace_roots', WRITE],
@@ -119,15 +116,6 @@ function ledger_grants(
 	return [[realpathSync(ledger), WRITE]]
 }
 
-// An inline TOML table; a JSON string is a valid TOML basic string.
-function filesystem_config(grants: ReadonlyArray<Grant>): string {
-	const pairs = grants.map(
-		([target, access]) => `${JSON.stringify(target)}=${JSON.stringify(access)}`,
-	)
-
-	return `${FILESYSTEM_KEY}={${pairs.join(',')}}`
-}
-
 // The run-state directory is granted on its own, since a temp-root override moves it out of the
 // common git directory — without it the records would fall back to the temp root, apart from the run's.
 function state_grants(common_directory: string | undefined): ReadonlyArray<Grant> {
@@ -161,14 +149,7 @@ function permission_arguments(
 ): ReadonlyArray<string> {
 	const grants = [...BASE_GRANTS, ...lane_grants(cwd, profile)]
 
-	return [
-		CONFIG_FLAG,
-		PROFILE_CONFIG,
-		CONFIG_FLAG,
-		filesystem_config(grants),
-		CONFIG_FLAG,
-		NETWORK_CONFIG,
-	]
+	return codex_permission_arguments.build(grants)
 }
 
 function lane_arguments(cwd: string | undefined, profile: AgentProfile): ReadonlyArray<string> {

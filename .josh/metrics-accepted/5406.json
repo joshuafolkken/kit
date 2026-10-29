@@ -1,0 +1,7 @@
+{
+	"reason": "Replace one unbounded filesystem argument with per-path inherited Codex profiles; preserve quoted paths without config artifacts or launcher exceptions (+9 code lines).",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
