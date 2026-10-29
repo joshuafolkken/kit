@@ -67,6 +67,21 @@ test('claims the carry record and supplies a judgment branch with its resume mat
 	})
 })
 
+test.each(['anthropic', 'openai'] as const)(
+	'keeps scheduler %s while the supervisor claims the driver window',
+	async (provider) => {
+		run_carry.end_carry(scratch.target)
+		run_carry.begin_carry(scratch.target, INVOCATION, { provider })
+		vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: OUTPUT })
+
+		await run_wake_driver.drive(scratch.target)
+
+		expect(run_carry.read_carry(scratch.target)).toMatchObject({
+			carry: { owner_pid: process.pid, scheduler_provider: provider },
+		})
+	},
+)
+
 // joshuafolkken/kit#3696: the supervisor taking the run over is a stage `run:board` draws.
 test('says the run is handing off once the claim holds, before the driver runs', async () => {
 	const order: Array<string> = []
