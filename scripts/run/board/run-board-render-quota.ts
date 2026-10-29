@@ -11,7 +11,7 @@ import { run_board_render_section } from './run-board-render-section'
 // its length ends the row. Each bar carries ┊, how far through its window the clock is, so a bar past
 // it is spending faster than the window refills; ↻ is when the window resets.
 
-const { GAUGE_SHADES, bar_of, painted } = run_board_labels
+const { GAUGE_SHADES, bar_of } = run_board_labels
 const { minute_of, two_digits } = figure_format
 const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
@@ -129,9 +129,8 @@ function cell_of(window: QuotaWindow, now_ms: number): string {
 	const shade = GAUGE_SHADES[level]
 	const percent = run_board_machine.percent_text(shown.used_percent)
 	const reset = `${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`
-	const tinted = painted(level === 'normal' ? undefined : shade, percent)
 
-	return padded(`${tinted} ${bar_text(shown.used_percent, pace, shade)}  ${reset}`)
+	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}`)
 }
 
 // Each column's window, `undefined` where the provider reported none that stands in it.
