@@ -12,13 +12,18 @@ describe('firing_point.classify', () => {
 		expect(firing_point.classify(name)).toBe('delivered')
 	})
 
+	// joshuafolkken/kit#5351: the `consultation-investigation` rows bind on the search tools.
+	it.each([['Glob'], ['Grep'], ['WebFetch']])('matches the %s search tool', (name) => {
+		expect(firing_point.classify(name)).toBe('delivered')
+	})
+
 	// joshuafolkken/kit#5328: `stop:guard` delivers on the Stop hook.
 	it('matches the Stop hook', () => {
 		expect(firing_point.classify('Stop')).toBe('delivered')
 	})
 
 	it('reports a real but undeliverable tool as a mismatch', () => {
-		expect(firing_point.classify('WebFetch')).toBe('not-delivered')
+		expect(firing_point.classify('WebSearch')).toBe('not-delivered')
 	})
 
 	it('reports a name that is not a tool call at all as not in the table', () => {

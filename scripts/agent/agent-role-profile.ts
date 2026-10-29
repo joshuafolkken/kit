@@ -116,6 +116,22 @@ const VERIFICATION_KEYS = {
 	effort: 'JOSH_REVIEWER_VERIFICATION_EFFORT',
 }
 
+// **The consultation models, and the model the main line hands its investigation to**
+// (joshuafolkken/kit#5351). A main line consulted on one of these pays its rate for every byte it reads,
+// so broad investigation goes to a subagent on that provider's investigation model. The Astra id is
+// confirmed on a live Codex CLI by joshuafolkken/kit#5394.
+const CONSULTATION_MODELS: Readonly<Record<AgentProvider, string>> = {
+	anthropic: 'claude-fable-5-1',
+	openai: 'gpt-6.1-astra',
+}
+// The `Agent` tool's alias for the Claude consultation model.
+const CONSULTATION_ALIAS = 'fable'
+const INVESTIGATION_MODELS: Readonly<Record<AgentProvider, string>> = {
+	anthropic: ANTHROPIC_MODEL,
+	openai: OPENAI_MODEL,
+}
+const INVESTIGATION_MODEL_KEY = 'JOSH_INVESTIGATION_MODEL'
+
 // **Effort as a function of the run phase, not the role alone**. For the first
 // merge only the mechanical ship/bookkeeping region is lowered: the pre-gate resume drives the gate,
 // commit, PR and merge, applying fixes the gate has already named — work delegation.md calls the opposite
@@ -327,6 +343,26 @@ function describe_review(round: number, profile: AgentProfile): string {
 	return `review round ${String(round)} · ${describe(profile)}`
 }
 
+// The provider whose consultation model this is, by id or by the `Agent` alias; `undefined` for any
+// other model.
+function consultation_provider(model: string): AgentProvider | undefined {
+	if (model === CONSULTATION_ALIAS) return ANTHROPIC_PROVIDER
+
+	return PROVIDER_SCHEMA.options.find((provider) => CONSULTATION_MODELS[provider] === model)
+}
+
+// The model a consultation main line hands its investigation to. Its key moves the Claude model alone,
+// as every model key here does: an OpenAI session's model is never read from env.
+function investigation_model(
+	provider: AgentProvider,
+	environment: AgentEnvironment = process.env,
+): string {
+	const override =
+		provider === OPENAI_PROVIDER ? undefined : trimmed(environment[INVESTIGATION_MODEL_KEY])
+
+	return override ?? INVESTIGATION_MODELS[provider]
+}
+
 function parse(value: unknown): AgentProfile | undefined {
 	const parsed = PROFILE_SCHEMA.safeParse(value)
 
@@ -335,9 +371,11 @@ function parse(value: unknown): AgentProfile | undefined {
 
 const agent_role_profile = {
 	CODEX_SESSION_KEY,
+	CONSULTATION_MODELS,
 	DEFAULT_PROFILES,
 	HANDED_PROVIDER_KEY,
 	IMPLEMENTATION_PHASE,
+	INVESTIGATION_MODEL_KEY,
 	MAX_VALUE_LENGTH,
 	OPENAI_PROFILES,
 	PRE_GATE_PHASE,
@@ -346,11 +384,13 @@ const agent_role_profile = {
 	SCHEDULER,
 	VERIFICATION_PROFILES,
 	WORKER,
+	consultation_provider,
 	default_notice,
 	describe,
 	describe_review,
 	handoff_environment,
 	has_completion_callback,
+	investigation_model,
 	is_safe_prompt,
 	is_safe_value,
 	parse,
