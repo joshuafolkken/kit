@@ -1,0 +1,7 @@
+{
+	"reason": "Add deferred provider selection for new launches, preserving the board of an existing run even with an invalid configured default (#5403).",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 54
+	}
+}
