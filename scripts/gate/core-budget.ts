@@ -255,9 +255,8 @@ function mark_waiting(context: WaitContext, reason: WaitReason): void {
 	if (previous === undefined) context.report(core_wait.wait_line(context.fields.command, reason))
 }
 
-// Past the cap a held claim runs regardless, and so does one only load outside the ledger holds once
-// that load has not eased for a window of the wait — waiting on gains it nothing. A claim a swap stall
-// holds is the exception to both.
+// Past the cap a held claim runs regardless, and so does one held in vain (`core_wait.is_held_in_vain`)
+// once the load has not eased for a window of the wait. A claim a swap stall holds is the exception to both.
 function is_wait_spent(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
@@ -269,9 +268,11 @@ function is_wait_spent(
 
 	if (now >= context.deadline) return true
 
+	const room = { busy_cores: busy_average.mean_busy(context.busy_samples), cores: context.budget }
+
 	return (
 		busy_average.is_unrelieved(context.ease, now, context.ease_window_ms) &&
-		core_wait.is_outside_held(context.key, reservations, budget)
+		core_wait.is_held_in_vain(context.key, reservations, budget, room)
 	)
 }
 
@@ -296,8 +297,8 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 	return undefined
 }
 
-// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim only load
-// outside the ledger holds, that load not easing — admits it at minimum width.
+// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim held in
+// vain (`core_wait.is_held_in_vain`), the load not easing — admits it at minimum width.
 // A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
 // runs and the wait costs nothing.
 async function await_admission(context: WaitContext): Promise<Admission> {

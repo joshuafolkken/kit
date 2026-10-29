@@ -114,6 +114,49 @@ describe('core_wait.is_outside_held — whether only load outside the ledger hol
 	})
 })
 
+// joshuafolkken/kit#5391: a small claim other lanes' ledger claims hold waited out the cap on a machine
+// whose measured load left it room.
+describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing', () => {
+	const budget = { cores: CORES, memory_mb: MEMORY_MB }
+	const idle = { busy_cores: 1, cores: CORES }
+
+	function held(weight: number): Array<LedgerEntry> {
+		return [entry('first', CORES, 0), entry('second', weight, 0)]
+	}
+
+	it('answers yes for a small claim only the ledger holds while the machine has room', () => {
+		expect(core_wait.is_held_in_vain('second', held(1), budget, idle)).toBe(true)
+	})
+
+	it('answers no once the measured load leaves no room for the claim', () => {
+		const saturated = { busy_cores: CORES, cores: CORES }
+
+		expect(core_wait.is_held_in_vain('second', held(1), budget, saturated)).toBe(false)
+	})
+
+	it('answers no where the machine could not be read', () => {
+		const unread = { busy_cores: undefined, cores: CORES }
+
+		expect(core_wait.is_held_in_vain('second', held(1), budget, unread)).toBe(false)
+	})
+
+	it('answers no on an overloaded run queue', () => {
+		const overloaded = { ...budget, is_overloaded: true }
+
+		expect(core_wait.is_held_in_vain('second', held(1), overloaded, idle)).toBe(false)
+	})
+
+	it('answers no for a claim heavier than a static check', () => {
+		expect(core_wait.is_held_in_vain('second', held(CORES - 1), budget, idle)).toBe(false)
+	})
+
+	it('answers no for a small claim memory holds as well', () => {
+		const ledger = [entry('first', CORES, MEMORY_MB), entry('second', 1, MEMORY_MB)]
+
+		expect(core_wait.is_held_in_vain('second', ledger, budget, idle)).toBe(false)
+	})
+})
+
 describe('core_wait.wait_line — what a waiting command prints', () => {
 	it('names the command and the reason', () => {
 		expect(core_wait.wait_line('lint', 'pressure')).toBe(
