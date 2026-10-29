@@ -45,6 +45,8 @@ interface LegendDrawn {
 	checks: ReadonlyArray<string>
 	// 🚧 and the reasons a held check is drawn with (joshuafolkken/kit#4052).
 	held: ReadonlyArray<string>
+	// ⛽ and the marks its gauges are drawn with, while the usage section is (joshuafolkken/kit#5395).
+	quota?: ReadonlyArray<string> | undefined
 	// A lane row leads with 🧍, its `run:solo` mark (joshuafolkken/kit#4625).
 	solo: boolean
 	// A merged row ends on 🔍, its overrun investigation running where no spinner turns
@@ -156,6 +158,7 @@ function others_line(
 		...filed_legend(rows, notes),
 		...(drawn.overrun === true ? [`${OVERRUN_MARK} ${WORDS.overrun}`] : []),
 		...drawn.held,
+		...(drawn.quota ?? []),
 		...drawn.checks,
 		...run_board_render_notes.notes_legend(notes, named, rows),
 	]

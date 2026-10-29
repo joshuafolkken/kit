@@ -177,6 +177,22 @@ describe('run_board_fit.fit thanks', () => {
 	})
 })
 
+// joshuafolkken/kit#5395: the ⛽ usage gauges under the header give way whole, after the thanks and
+// before any plan row.
+describe('run_board_fit.fit usage', () => {
+	it('drops the thanks before the usage gauges, and the gauges before any plan row', () => {
+		const usage = { head: ['', '⛽'], lines: [{ text: '  claude', is_detail: false }] }
+		const parts = parts_of([issues(2)], { usage, thanks: THANKS })
+		const gauges = ['', '⛽', '  claude']
+		const rows = ['', '  1', '  2']
+
+		expect(fit_wide(parts, 10)).toStrictEqual([...HEADER, ...gauges, ...rows, ...THANKS])
+		expect(fit_wide(parts, 8)).toStrictEqual([...HEADER, ...gauges, ...rows])
+		expect(fit_wide(parts, 5)).toStrictEqual([...HEADER, ...rows])
+		expect(fit_wide(parts, 4)).toStrictEqual([...HEADER, '', '  more 2'])
+	})
+})
+
 // joshuafolkken/kit#4099: the parts give way from the frame's bottom up — a running, a decision, a
 // parked and a not-yet-started row above three notes, a 🔗 waiting and a finished row under them, the
 // thanks, the legend and the footer — 24 lines whole.

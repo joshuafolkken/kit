@@ -1,0 +1,7 @@
+{
+	"reason": "New ⛽ usage section in run:board: Claude/Codex quota readers with a widening tail over the newest few files, a held reader and the gauge renderer (#5395)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 521
+	}
+}

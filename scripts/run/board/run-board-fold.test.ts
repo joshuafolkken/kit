@@ -23,6 +23,7 @@ const WIDE = 80
 const RULE_WIDTH = 50
 const NONE: ReadonlySet<SectionKey> = new Set()
 const ALL: ReadonlyArray<SectionKey> = [
+	'usage',
 	'lanes',
 	'processes',
 	'findings',
@@ -37,6 +38,8 @@ const WAITING = '🔗 waiting'
 const FINDINGS = '📌 findings'
 const PROCESSES = '💻 processes'
 const GROUPS = '▶ 1.0 ── 🌐 2.0'
+const USAGE = '⛽ usage'
+const USAGE_SUMMARY = 'claude 42/68 · codex —/45'
 
 function rows(count: number, stage: YieldStage): Array<PlanLine> {
 	return Array.from({ length: count }, (_, index) => ({
@@ -74,6 +77,7 @@ function opened(plan: PlanSection): string {
 
 describe('run_board_fold.toggled', () => {
 	it.each([
+		{ key: 'u', section: 'usage' },
 		{ key: 'l', section: 'lanes' },
 		{ key: 'p', section: 'processes' },
 		{ key: 'f', section: 'findings' },
@@ -168,6 +172,21 @@ describe('run_board_fold.fold_parts folded', () => {
 	})
 })
 
+describe('run_board_fold.fold_parts usage', () => {
+	it('folds the usage gauges to their percents', () => {
+		const usage: DetailPart = {
+			head: heading_lines(USAGE),
+			lines: [{ text: '  claude  42%', is_detail: false }],
+			label: USAGE,
+			summary: USAGE_SUMMARY,
+		}
+		const folded = fold_parts(parts_of({ usage }), new Set(['usage'])).usage
+
+		expect(folded?.head).toStrictEqual(['', shut(USAGE, USAGE_SUMMARY)])
+		expect(folded?.lines).toStrictEqual([])
+	})
+})
+
 describe('run_board_fold.fold_parts long summary', () => {
 	it('ends a folded line on a rule even where its summary runs past the rule width', () => {
 		const summary = GROUPS.repeat(RULE_WIDTH)
@@ -218,6 +237,6 @@ describe('run_board_render_section.keyed', () => {
 
 describe('run_board_fold.KEYS_LINE', () => {
 	it('names every key once', () => {
-		expect(KEYS_LINE).toBe(' l p f q w d: fold · a: all · Ctrl-C: quit')
+		expect(KEYS_LINE).toBe(' u l p f q w d: fold · a: all · Ctrl-C: quit')
 	})
 })

@@ -5,13 +5,15 @@ import type { LaneEvent } from './run-board-lane-event'
 import type { BoardRow } from './run-board-layout'
 import type { SessionOperations } from './run-board-operation-read'
 import type { Phase } from './run-board-phase'
+import type { Quotas } from './run-board-quota-read'
 import { run_board_render_drawn } from './run-board-render-drawn'
 import { run_board_render_fixture } from './run-board-render-fixture'
+import { run_board_render_quota } from './run-board-render-quota'
 
 // joshuafolkken/kit#4047: the legend reads what the frame draws — the rows' leads, the header's third
 // line, the rows' ends and a followup row's checks.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, header } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, header, lines_of } = run_board_render_fixture
 const LEADS = new Set(['🔨'])
 const CHECKS: PrChecks = { pr: 3765, pass: 1, pending: 0, fail: 0, coderabbit: 'none' }
 
@@ -95,5 +97,34 @@ describe('run_board_render_drawn.drawn_of a held row', () => {
 		expect(drawn.icons).toContain('⚓')
 		expect(drawn.checks).toStrictEqual([])
 		expect(drawn.held).toStrictEqual(['🚧 held', '💪 waits for CPU'])
+	})
+})
+
+// joshuafolkken/kit#5395: the ⛽ usage section, and the legend naming its marks, show only where a
+// quota reader is open.
+describe('run_board_render_drawn.drawn_of usage', () => {
+	const quotas: Quotas = {
+		claude: {
+			windows: [{ minutes: 300, used_percent: 42, resets_ms: NOW + MINUTE }],
+			taken_ms: NOW,
+		},
+		codex: undefined,
+	}
+
+	it('names ⛽, ┊ and ↻ only where the header carries quotas', () => {
+		const row = running('implement')
+
+		expect(run_board_render_drawn.drawn_of(board(row), [row], LEADS).quota).toStrictEqual([])
+		expect(
+			run_board_render_drawn.drawn_of({ ...board(row), quotas }, [row], LEADS).quota,
+		).toStrictEqual(run_board_render_quota.LEGEND)
+	})
+
+	it('draws the usage section on a chat frame, without escapes', () => {
+		const text = lines_of(header({ quotas, form: 'chat' })).join('\n')
+
+		expect(text).toContain('⛽ usage')
+		expect(text).toMatch(/claude {8}42%/u)
+		expect(text).toContain('┊ pace')
 	})
 })

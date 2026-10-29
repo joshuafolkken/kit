@@ -214,6 +214,23 @@ function links_of(repo: string | undefined, link: Link): Links {
 	}
 }
 
+type Gauges = Pick<BoardHeader, 'machine' | 'usages' | 'budget_waits' | 'quotas' | 'quota_hold'>
+
+// The machine's gauges and the usage-limit windows, with the limit that holds the run's launches.
+function gauges_of(state: BoardState, local: LocalRead): Gauges {
+	const reset_ms = local.usage_reset_ms
+	const quota_hold =
+		reset_ms === undefined ? undefined : { reset_ms, parked: local.usage_parked ?? 0 }
+
+	return {
+		machine: state.gauges,
+		usages: state.usages,
+		budget_waits: state.budget_waits,
+		quotas: state.quotas,
+		quota_hold,
+	}
+}
+
 function header_of(
 	state: BoardState,
 	local: LocalRead,
@@ -230,9 +247,7 @@ function header_of(
 		read_failed_ms: state.read_failed_ms,
 		read_error: state.read_error,
 		is_plan_loading: state.plan_fetch !== undefined,
-		machine: state.gauges,
-		usages: state.usages,
-		budget_waits: state.budget_waits,
+		...gauges_of(state, local),
 		form: redraw.ports.form,
 		repo: state.plan?.context.repo,
 		spinner: redraw.ports.is_tty ? SPOT : undefined,

@@ -135,6 +135,22 @@ describe('run_merge_usage_limit.held_until', () => {
 	})
 })
 
+// joshuafolkken/kit#5395: the children the `⛽ usage` section counts as parked.
+describe('run_merge_usage_limit.held_count', () => {
+	const events = [
+		event(1, '#1 usage limit — resumes at 2026-10-22T00:00:00.000Z'),
+		event(2, `#2 usage limit — resumes at ${RESET_ISO}`),
+		event(3, `#3 usage limit — resumes at ${RESET_ISO}`),
+		event(4, '#4 usage limit — resumes at soon'),
+		event(5, '#5 parked', 'park'),
+	]
+
+	it('counts the stops whose reset is still ahead', () => {
+		expect(run_merge_usage_limit.held_count(events as never, RESET_MS - 1)).toBe(2)
+		expect(run_merge_usage_limit.held_count(events as never, RESET_MS)).toBe(0)
+	})
+})
+
 describe('run_merge_usage_limit.is_held', () => {
 	beforeEach(() => {
 		events_mock.mockResolvedValue([event(1, `#1 usage limit — resumes at ${RESET_ISO}`)])

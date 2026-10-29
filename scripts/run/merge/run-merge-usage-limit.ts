@@ -43,11 +43,17 @@ function held_until(events: ReadonlyArray<RunEvent>, now_ms: number): number | u
 	return reset_ms !== undefined && reset_ms > now_ms ? reset_ms : undefined
 }
 
+// How many children a usage limit stopped whose reset is still ahead at `now_ms` — the children the
+// `⛽ usage` section counts as parked behind it (joshuafolkken/kit#5395).
+function held_count(events: ReadonlyArray<RunEvent>, now_ms: number): number {
+	return events.filter((event) => event.kind === KIND && (time_of(event.text) ?? 0) > now_ms).length
+}
+
 // Whether a usage limit still holds launches at `now_ms` — the production `usage_limited` port.
 async function is_held(now_ms: number): Promise<boolean> {
 	return held_until(await run_event_stream_emit.current_events(), now_ms) !== undefined
 }
 
-const run_merge_usage_limit = { held_until, is_held, record, resume_ms }
+const run_merge_usage_limit = { held_count, held_until, is_held, record, resume_ms }
 
 export { run_merge_usage_limit }
