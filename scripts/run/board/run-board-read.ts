@@ -67,6 +67,8 @@ interface LocalRead {
 	// The reset a Claude usage limit holds the running run's launches until (`run-merge-usage-limit.ts`);
 	// `undefined` once it has passed, where none was recorded, or where no run is carried.
 	usage_reset_ms?: number | undefined
+	// How many children that limit stopped and still holds (joshuafolkken/kit#5395).
+	usage_parked?: number | undefined
 	// The driver holds its offered issue until the machine has memory for one more lane — the ledger's
 	// open hold is `backlog-drive-memory.ts`'s.
 	is_memory_held?: boolean | undefined
@@ -226,18 +228,20 @@ function ledger_here(repository: string): Pick<LocalRead, 'usual' | 'is_memory_h
 
 // The reset a usage limit holds the running run's launches until, read off the events `backlog:drive`
 // reads it off (`run_event_stream_emit.current_events`): the carried invocation's, so an ended run's
-// stop holds no row the driver would launch.
+// stop holds no row the driver would launch — and how many children it stopped.
 function usage_reset_here(
 	events: ReadonlyArray<RunEvent>,
 	carry: RunCarry | undefined,
-): number | undefined {
-	if (carry === undefined) return undefined
+): Pick<LocalRead, 'usage_reset_ms' | 'usage_parked'> {
+	if (carry === undefined) return { usage_reset_ms: undefined }
 	const scope = run_event_scope.scope_of({ kind: 'carried', carry })
+	const scoped = run_event_scope.scoped_events(events, scope) ?? []
+	const now_ms = Date.now()
 
-	return run_merge_usage_limit.held_until(
-		run_event_scope.scoped_events(events, scope) ?? [],
-		Date.now(),
-	)
+	return {
+		usage_reset_ms: run_merge_usage_limit.held_until(scoped, now_ms),
+		usage_parked: run_merge_usage_limit.held_count(scoped, now_ms),
+	}
 }
 
 // The run's own events, what its done rows say after their time with each open investigation's
@@ -247,7 +251,7 @@ async function span_events_here(
 	span: BoardSpan,
 	table: TableRead | undefined,
 	carry: RunCarry | undefined,
-): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms'>> {
+): Promise<Pick<LocalRead, 'events' | 'found' | 'usage_reset_ms' | 'usage_parked'>> {
 	const spanned = run_board_span.events_of(events, span)
 	// An overrun session outlives the run that launched it, so its notes and filings are read past the
 	// run's end too (joshuafolkken/kit#4818); the next run starts a span of its own.
@@ -256,7 +260,7 @@ async function span_events_here(
 	return {
 		events: spanned,
 		found: run_board_found.found_of(since, await run_board_found.live_in(table)),
-		usage_reset_ms: usage_reset_here(events, carry),
+		...usage_reset_here(events, carry),
 	}
 }
 

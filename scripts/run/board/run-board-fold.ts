@@ -16,6 +16,7 @@ import { run_board_render_section } from './run-board-render-section'
 
 const { folded_head, open_head } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
+	['u', 'usage'],
 	['l', 'lanes'],
 	['p', 'processes'],
 	['f', 'findings'],
@@ -88,13 +89,15 @@ function fold_notes(notes: NotesPart, folded: ReadonlySet<SectionKey>): NotesPar
 	return { ...headed(notes, label, count), lines: [], hidden: 0 }
 }
 
-// The processes say each group's totals.
-function fold_processes(
+// A folded detail part says its summary: the processes each group's totals, the usage gauges each
+// provider's percents.
+function fold_detail(
 	part: DetailPart | undefined,
 	folded: ReadonlySet<SectionKey>,
+	key: SectionKey,
 ): DetailPart | undefined {
 	if (part?.label === undefined) return part
-	if (!folded.has('processes')) return headed(part, part.label, undefined)
+	if (!folded.has(key)) return headed(part, part.label, undefined)
 
 	return { ...headed(part, part.label, part.summary ?? ''), lines: [] }
 }
@@ -102,9 +105,10 @@ function fold_processes(
 function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FrameParts {
 	return {
 		...parts,
+		usage: fold_detail(parts.usage, folded, 'usage'),
 		plan: parts.plan.map((section) => fold_section(section, folded)),
 		below: parts.below?.map((section) => fold_section(section, folded)),
-		processes: fold_processes(parts.processes, folded),
+		processes: fold_detail(parts.processes, folded, 'processes'),
 		notes: fold_notes(parts.notes, folded),
 	}
 }

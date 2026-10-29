@@ -6,6 +6,7 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { BoardUsage } from './run-board-header'
 import { run_board_idle, type IdleSince } from './run-board-idle'
 import { run_board_machine, type MachineGauges, type MachineMark } from './run-board-machine'
+import type { Quotas } from './run-board-quota-read'
 import type { LocalRead } from './run-board-read'
 import { run_board_state, type Pace } from './run-board-state'
 import type { UsageMark } from './run-board-usage'
@@ -35,6 +36,8 @@ interface GatherPorts {
 	read_waits?: (() => Array<BudgetWait>) | undefined
 	// Every process and its lane, the last reading's lanes reused (`run-board-usage-read.ts`).
 	read_usage: (before: UsageMark | undefined, table: TableRead) => Promise<UsageMark | undefined>
+	// The usage-limit windows' held readings (`run-board-quota-held.ts`); none where it is not given.
+	read_quotas?: (() => Promise<Quotas>) | undefined
 	// Whether the reads go on — a live board — so a usage reading has the last one to compare against.
 	is_live: boolean
 	now: () => number
@@ -52,6 +55,8 @@ interface GatherRead {
 	// Each lane's and each process group's usage, `undefined` where none could be read.
 	usages: BoardUsage | undefined
 	budget_waits: ReadonlyArray<BudgetWait>
+	// Claude's and Codex's usage-limit windows; `undefined` where no reader is given.
+	quotas?: Quotas | undefined
 	// When the reads last failed; `undefined` once a read has answered since.
 	read_failed_ms?: number | undefined
 	// Why they failed, the first line of the error; cleared with `read_failed_ms`.
@@ -149,8 +154,9 @@ async function resample(
 	const gauges = run_board_machine.gauges_of(state.machine, machine)
 	const budget_waits = ports.read_waits?.() ?? []
 	const usages = await run_board_usage_board.read_usages(state, ports, at.table)
+	const quotas = await ports.read_quotas?.()
 
-	return { ...state, ...usages, machine, gauges, budget_waits, sampled_ms: at.now_ms }
+	return { ...state, ...usages, machine, gauges, budget_waits, quotas, sampled_ms: at.now_ms }
 }
 
 // One round of the reads. The process snapshot is read once, by whichever of the lane read and the
@@ -163,10 +169,11 @@ async function gather(state: GatherState, ports: GatherPorts, pace: Pace): Promi
 
 // What a frame draws, without the marks the next reads compare against.
 function read_of(state: GatherState): GatherRead {
-	const { local, read_ms, idle_since, gauges, usages, budget_waits } = state
+	const { local, read_ms, idle_since, gauges, usages, budget_waits, quotas } = state
 	const { read_failed_ms, read_error } = state
+	const marks = { read_failed_ms, read_error }
 
-	return { local, read_ms, idle_since, gauges, usages, budget_waits, read_failed_ms, read_error }
+	return { local, read_ms, idle_since, gauges, usages, budget_waits, quotas, ...marks }
 }
 
 // A single frame's reads, taken afresh each time it is drawn.

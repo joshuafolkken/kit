@@ -4,6 +4,7 @@ import { run_board_layout, type BoardRow } from './run-board-layout'
 import { run_board_render_checks } from './run-board-render-checks'
 import { run_board_render_found } from './run-board-render-found'
 import type { LegendDrawn } from './run-board-render-legend'
+import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_waits } from './run-board-render-waits'
 
@@ -68,6 +69,7 @@ function drawn_of(
 		named: named_of(header, icons),
 		checks: run_board_render_checks.legend_of(checks),
 		held: run_board_render_waits.legend_of(header),
+		quota: header.quotas === undefined ? [] : run_board_render_quota.LEGEND,
 		solo: has_solo_lane(header),
 		overrun: rows.some((row) => run_board_render_found.is_still(row, header)),
 	}

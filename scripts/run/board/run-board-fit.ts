@@ -7,7 +7,7 @@ import { run_board_labels } from './run-board-labels'
 // how far it is — is what scrolls off. So the parts below it give way instead, least wanted first and
 // in the order the frame draws them from the bottom (joshuafolkken/kit#4099): the footer, the legend,
 // the rows under the notes — the finished, the 🔗 waiting, the not yet started — the notes from the
-// oldest, the reviewers thanked above the legend, the parked rows and, last, the rows waiting on a person's decision
+// oldest, the reviewers thanked above the legend, the ⛽ usage gauges, the parked rows and, last, the rows waiting on a person's decision
 // and the running rows — what a person keeps the board open to see. Each stage stops once the
 // frame fits, a cut row is counted on the plan's `more N` line — or on its folding section's own last
 // line while that section keeps a row (joshuafolkken/kit#4042) — and the order a row is drawn in
@@ -38,7 +38,7 @@ interface PlanLine {
 }
 
 // A section a person folds and unfolds with one key on a live board (`run-board-fold.ts`).
-type SectionKey = 'lanes' | 'processes' | 'findings' | 'queued' | 'waiting' | 'done'
+type SectionKey = 'usage' | 'lanes' | 'processes' | 'findings' | 'queued' | 'waiting' | 'done'
 
 // What a foldable part's rule is labeled, and whether a person folded it to its heading alone.
 interface Foldable {
@@ -72,9 +72,11 @@ interface DetailPart extends Foldable {
 }
 
 // A frame in its parts, top to bottom: the header above stays. The plan's sections are drawn around
-// the notes: `plan` above them, `below` under them; `processes` between the plan and the notes.
+// the notes: `plan` above them, `below` under them; `processes` between the plan and the notes. The
+// usage-limit gauges (`usage`) stand right under the header.
 interface FrameParts {
 	above: ReadonlyArray<string>
+	usage?: DetailPart | undefined
 	plan: ReadonlyArray<PlanSection>
 	processes?: DetailPart | undefined
 	notes: NotesPart
@@ -87,10 +89,11 @@ interface FrameParts {
 
 // One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),
 // or one issue row.
-type Yielder = 'thanks' | 'footer' | 'legend' | 'details' | 'note' | PlanLine
+type Yielder = 'thanks' | 'usage' | 'footer' | 'legend' | 'details' | 'note' | PlanLine
 
 interface Cut {
 	thanks: boolean
+	usage: boolean
 	footer: boolean
 	legend: boolean
 	details: boolean
@@ -100,6 +103,7 @@ interface Cut {
 
 const NO_CUT: Cut = {
 	thanks: false,
+	usage: false,
 	footer: false,
 	legend: false,
 	details: false,
@@ -234,9 +238,15 @@ function body_lines(parts: FrameParts, cut: Cut): Array<string> {
 	return [...lead, ...plan, ...more, ...notes]
 }
 
+// The usage gauges give way whole: their two rows are no details to drop.
+function usage_lines(part: DetailPart | undefined, cut: Cut): Array<string> {
+	return cut.usage ? [] : detail_lines(part, false)
+}
+
 function compose(parts: FrameParts, cut: Cut): Array<string> {
 	return [
 		...parts.above,
+		...usage_lines(parts.usage, cut),
 		...body_lines(parts, cut),
 		...(cut.thanks ? [] : (parts.thanks ?? [])),
 		...(cut.legend ? [] : parts.legend),
@@ -290,7 +300,7 @@ function rows_yielding(sections: ReadonlyArray<PlanSection>): Array<PlanLine> {
 }
 
 // Everything that gives way, in the order it does: the rows drawn under the notes before them, the
-// processes' details before the notes, the rows above them after the thanks.
+// processes' details before the notes, the usage gauges after the thanks, the rows above them last.
 function order_of(parts: FrameParts): Array<Yielder> {
 	const notes = parts.notes.lines.map((): Yielder => 'note')
 
@@ -301,6 +311,7 @@ function order_of(parts: FrameParts): Array<Yielder> {
 		'details',
 		...notes,
 		'thanks',
+		'usage',
 		...rows_yielding(parts.plan),
 	]
 }
@@ -315,6 +326,7 @@ function cut_of(order: ReadonlyArray<Yielder>, count: number): Cut {
 
 	return {
 		thanks: gone.includes('thanks'),
+		usage: gone.includes('usage'),
 		footer: gone.includes('footer'),
 		legend: gone.includes('legend'),
 		details: gone.includes('details'),

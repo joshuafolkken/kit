@@ -27,6 +27,7 @@ import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes
 import { run_board_render_lead } from './run-board-render-lead'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_processes } from './run-board-render-processes'
+import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_tail } from './run-board-render-tail'
 import { run_board_render_time } from './run-board-render-time'
@@ -391,6 +392,7 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
+		usage: run_board_render_quota.usage_part({ ...header, hold: header.quota_hold }),
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
 		notes: run_board_render_notes.notes_part(notes, { ...header, columns: view.size?.columns }),

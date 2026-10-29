@@ -10,7 +10,7 @@ import type { KeyInput } from './run-board-keys'
 const { STOPPED, harness } = run_board_fixture
 const ESCAPE = '\u{1B}'
 const LEAVE = `${ESCAPE}[?25h${ESCAPE}[?1049l`
-const KEYS_LINE = ' l p f q w d: fold · a: all · Ctrl-C: quit'
+const KEYS_LINE = ' u l p f q w d: fold · a: all · Ctrl-C: quit'
 
 function keyboard(calls: Array<string>): KeyInput {
 	return {
