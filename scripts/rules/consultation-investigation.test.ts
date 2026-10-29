@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { time_hook_transcript } from '#scripts/time-runtime/time-hook-transcript'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { agent_model } from './agent-model'
 import { consultation_investigation } from './consultation-investigation'
@@ -51,6 +52,25 @@ function delivered(
 	const payload = { transcript_path: transcript_on(model), tool_name, tool_input }
 
 	return delivered_rules.delivery(JSON.stringify(payload))
+}
+
+// A call as a delegated unit's arrives: `agent_id` naming the fork, whose own file — like the parent's —
+// names Fable, so only the payload's `agent_id` tells the unit from the main line.
+function unit_delivered(
+	tool_name: string,
+	tool_input: Record<string, unknown>,
+): string | undefined {
+	const agent_id = randomUUID()
+	const transcript_path = transcript_on(FABLE)
+	const fork = time_hook_transcript.fork_path(transcript_path, agent_id)
+	const entry = { type: 'assistant', message: { model: FABLE, content: [] } }
+
+	mkdirSync(path.dirname(fork), { recursive: true })
+	writeFileSync(fork, `\n${JSON.stringify(entry)}\n`)
+
+	return delivered_rules.delivery(
+		JSON.stringify({ transcript_path, agent_id, tool_name, tool_input }),
+	)
 }
 
 function codex_delivered(payload_model: string, command: string): string | undefined {
@@ -140,6 +160,10 @@ describe('consultation-investigation — a session that cannot dispatch', () => 
 
 	it('stands down inside a delegated unit', () => {
 		expect(is_satisfied(true)).toBe(true)
+	})
+
+	it('stands down on a payload naming a unit', () => {
+		expect(unit_delivered('Glob', glob.input)).toBeUndefined()
 	})
 
 	it('stands down in a reviewer session', () => {
