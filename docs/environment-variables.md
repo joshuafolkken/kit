@@ -73,6 +73,7 @@ Each role's model and effort for a `backlogrun`. The invoking CLI picks the prov
 | `JOSH_REVIEWER_EFFORT`              | No       | `medium`                                           | The effort of the review a lane's change gets.                             |
 | `JOSH_REVIEWER_VERIFICATION_MODEL`  | No       | `claude-sonnet-5-5`                                | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_MODEL`.  |
 | `JOSH_REVIEWER_VERIFICATION_EFFORT` | No       | `high`                                             | Round 2 and later verification pass; falls back to `JOSH_REVIEWER_EFFORT`. |
+| `JOSH_INVESTIGATION_MODEL`          | No       | `claude-opus-5-5`                                  | The model a Fable main line hands broad investigation to.                  |
 | `JOSH_LANE_MODEL`                   | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_MODEL` instead.                 |
 | `JOSH_LANE_EFFORT`                  | No       | —                                                  | Legacy worker-only alias; use `JOSH_WORKER_EFFORT` instead.                |
 
@@ -162,6 +163,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_AGENT_PROVIDER`       | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`.    |
 | `JOSH_AGENT_HEADLESS`       | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                   |
 | `JOSH_AGENT_ROLE`           | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                   |
+| `JOSH_HOOK_CWD`             | every kit hook command         | The directory the hook was launched in; a hook resolves a call's relative path against it.                                              |
 | `JOSH_RUN_HEADLESS`         | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
 | `JOSH_SHIP_SUPERVISED`      | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
 | `JOSH_SHIP_LAUNCH_ID`       | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |

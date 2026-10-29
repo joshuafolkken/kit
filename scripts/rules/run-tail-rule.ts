@@ -146,9 +146,26 @@ const RUN_TAIL_REASON =
 	'(`.claude/skills/workflow-commands/background-commands.md`). It fires on every foreground push, ' +
 	'not once per run.'
 
-const run_tail_rule = {
-	RUN_TAIL_REASON,
+// Reads `run_in_background` beside the command; `decide`, since a push recurs.
+const ROW = {
+	id: 'run-tail',
+	is_trigger: is_foreground_push_step,
+	reason: RUN_TAIL_REASON,
 	decide,
+	keeps: is_backgrounded_push_step,
+	reaches: is_push_step_call,
+	about: {
+		title: 'Idle run tail',
+		topic: '`.claude/skills/workflow-commands/background-commands.md`',
+		fires:
+			'`pnpm josh git -y` (`josh g`, `--yes` alike) issued in the **foreground**. Every occurrence',
+		quiet: 'issued in the background — its completion resumes the run',
+	},
+}
+
+const run_tail_rule = {
+	ROW,
+	RUN_TAIL_REASON,
 	is_backgrounded_push_step,
 	is_foreground_push_step,
 	is_push_step,

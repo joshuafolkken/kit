@@ -5,6 +5,7 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { concise_reply } from './concise-reply'
+import { consultation_investigation } from './consultation-investigation'
 import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
 import { direct_issue_comment } from './direct-issue-comment'
@@ -190,22 +191,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	test_declared_commit.ROW,
 	// Before `run-tail`, so a lane child goes straight to `ship --detach` instead of through both.
 	lane_background.ROW,
-	// Reads `run_in_background` beside the command; `decide`, since a push recurs.
-	{
-		id: 'run-tail',
-		is_trigger: run_tail_rule.is_foreground_push_step,
-		reason: run_tail_rule.RUN_TAIL_REASON,
-		decide: run_tail_rule.decide,
-		keeps: run_tail_rule.is_backgrounded_push_step,
-		reaches: run_tail_rule.is_push_step_call,
-		about: {
-			title: 'Idle run tail',
-			topic: '`.claude/skills/workflow-commands/background-commands.md`',
-			fires:
-				'`pnpm josh git -y` (`josh g`, `--yes` alike) issued in the **foreground**. Every occurrence',
-			quiet: 'issued in the background — its completion resumes the run',
-		},
-	},
+	run_tail_rule.ROW,
 	// Reads the lane name and the cut record. Once per run, not `decide`: taking the cut ends the
 	// process, and the verdicts that leave a run at the gate all need the reissue through. `reaches`
 	// tells the cutting run from the resumed one by the run's calls. Overlaps `piped-verification`
@@ -231,6 +217,9 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	agent_model.ROW,
 	investigator_foreground.ROW,
 	reviewer_foreground.ROW,
+	// After `agent-model`, its one overlap (an unnamed `general-purpose` on Fable): `model` fixes both.
+	consultation_investigation.ROW,
+	consultation_investigation.CODEX_ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first

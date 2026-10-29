@@ -49,9 +49,9 @@ interface EntryBudget {
 const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 36_864 },
 	{ entry: 'fullrun', bytes: 53_248 },
-	{ entry: 'halfrun', bytes: 45_056 },
+	{ entry: 'halfrun', bytes: 49_152 },
 	{ entry: 'prrun', bytes: 57_344 },
-	{ entry: 'backlogrun', bytes: 81_920 },
+	{ entry: 'backlogrun', bytes: 86_016 },
 	{ entry: LANE_CHILD, bytes: 45_056 },
 ]
 

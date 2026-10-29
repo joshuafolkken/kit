@@ -84,6 +84,14 @@
   - fires: `pnpm josh pretool:guard` — a dispatched lane child’s `Agent` / `Task` call of the `reviewer` or `reviewer-verification` type without `run_in_background: false` — rewritten with it, every occurrence
   - silent: not a lane child, another agent type, or `run_in_background: false` set
   - not automated: the hook makes the same call right itself; it refuses only a spelling it cannot rewrite
+- **Consultation main line delegates investigation (Claude)** (`consultation-investigation`, `.claude/skills/workflow-commands/delegation.md` → "A consultation main line hands its investigation to a unit")
+  - fires: `pnpm josh pretool:guard` — a broad investigation call — `Glob`, `WebFetch`, an unbounded `Read`, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on Fable. Every occurrence
+  - silent: a main line on any other model, or a narrow check (`Read` with `offset` / `limit` <= 200, `grep -n <pattern> <one file>`)
+  - not automated: which reading is narrow enough to keep is the author’s call
+- **Consultation main line delegates investigation (Codex)** (`consultation-investigation-codex`, `.claude/skills/workflow-commands/delegation.md` → "A consultation main line hands its investigation to a unit")
+  - fires: `pnpm josh pretool:guard` — a broad shell investigation on Codex Astra. Every occurrence
+  - silent: a main line on any other model, or a narrow check (`Read` with `offset` / `limit` <= 200, `grep -n <pattern> <one file>`)
+  - not automated: which reading is narrow enough to keep is the author’s call
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
   - silent: not a lane child — the parent owns the run budget
