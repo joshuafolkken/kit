@@ -1,0 +1,7 @@
+{
+	"reason": "#5383: josh test:unit moves a filter written after vitest's -u in front of the flag (new unit-update-arguments module + guard call)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 40
+	}
+}

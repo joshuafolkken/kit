@@ -386,6 +386,7 @@ pnpm josh test
 ```bash
 pnpm josh test:e2e --workers=1   # ✅ reaches Playwright
 pnpm josh test:unit -u           # ✅ reaches Vitest
+pnpm josh test:unit -u <filter>  # ✅ the filter moves in front of -u, which takes an optional type
 pnpm josh test --workers=1       # ❌ exits 1, naming test:unit and test:e2e
 ```
 
