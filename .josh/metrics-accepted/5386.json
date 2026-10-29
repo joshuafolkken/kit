@@ -1,0 +1,8 @@
+{
+	"reason": "#5386: red test:related record (new test-related-red.ts module) and the output-bounds.md rerun advice it changes",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 156,
+		"ai_cost.on_demand_bytes": 234
+	}
+}

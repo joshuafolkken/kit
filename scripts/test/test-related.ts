@@ -3,9 +3,7 @@ import path from 'node:path'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
-import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
-import { since_green } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { review_stamps } from '#scripts/review/review-stamps'
@@ -17,6 +15,7 @@ import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related_claim } from './test-related-claim'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_record, type RunInput } from './test-related-record'
+import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
@@ -29,7 +28,8 @@ import { test_unit_guard } from './test-unit-guard'
 //
 // **A green run leaves a record of the tree it was green on**, so
 // `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
-// and the three states in which it is withheld, are `scoped-green.ts`.
+// and the three states in which it is withheld, are `scoped-green.ts`. A red run leaves its failed
+// files instead, which the run after the fix reads with what moved (`test-related-red.ts`).
 
 // **A skipped vitest exits 0, and a zero from a run that started nothing must vouch for no tree.**
 // `test_unit_guard.report_no_run` returns 0 on its skip branch — vitest not installed — so in a
@@ -127,7 +127,8 @@ async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
 }
 
 // **What moved since this command's last green run** (`since-green.ts`), read as explicit arguments
-// are. A moved file — code or not — reaches the tests reading it as data through the map, whose
+// are — or since its last red run, joined by the files that failed in it (`test-related-red.ts`). A
+// moved file — code or not — reaches the tests reading it as data through the map, whose
 // entries hold no module that started reading it after the map's tree; the change since that tree
 // joins the list — a code file of it only when it names a moved file (`naming_moved`) — so such a
 // module runs the tests importing it. Nothing moved runs nothing; no map,
@@ -136,28 +137,29 @@ async function since_green_change(
 	root: string,
 	map: ReadMap | undefined,
 	is_whole: boolean,
+	red: RedReading | undefined,
 ): Promise<ChangeReading | undefined> {
-	const parts = (await is_green_narrowable(is_whole))
-		? await since_green.read_moved_parts(review_stamps.test_related_stamp, gate_labels.UNIT_LABEL)
+	const reading = (await is_green_narrowable(is_whole))
+		? await test_related_red.narrowing(red)
 		: undefined
 
-	if (parts === undefined) return undefined
+	if (reading === undefined) return undefined
 
-	const moved = moved_paths.union_of(parts)
+	const { parts, moved, failed } = reading
 
-	if (moved.length === 0) return { changed: [], map, is_unmoved: true }
+	if (moved.length + failed.length === 0) return { changed: [], map, is_unmoved: true }
 
 	const branch = await branch_change()
 	const split = await test_related_synced.split(root, parts.synced, branch, map)
 	const change = await explicit_change(
 		root,
-		test_related_moved.narrowed_moved(moved, split, branch, map),
+		[...test_related_moved.narrowed_moved(moved, split, branch, map), ...failed],
 		map,
 	)
 
 	if (change.map === undefined) return undefined
 
-	process.stdout.write(`${since_green.describe(related_scope.COMMAND_LABEL, moved)}\n`)
+	process.stdout.write(`${test_related_red.describe(reading)}\n`)
 
 	return test_related_moved.moved_reading(change, parts, branch, split)
 }
@@ -166,8 +168,9 @@ async function whole_change(
 	root: string,
 	map: ReadMap | undefined,
 	is_whole: boolean,
+	red: RedReading | undefined,
 ): Promise<ChangeReading> {
-	const since = await since_green_change(root, map, is_whole)
+	const since = await since_green_change(root, map, is_whole, red)
 
 	if (since !== undefined) return since
 
@@ -184,13 +187,14 @@ async function read_change(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	is_whole: boolean,
+	red: RedReading | undefined,
 ): Promise<ChangeReading> {
 	const map = test_read_map.read_map(root)
 	const explicit = explicit_files(root, command_arguments)
 
 	return explicit.length > 0
 		? await explicit_change(root, explicit, map)
-		: await whole_change(root, map, is_whole)
+		: await whole_change(root, map, is_whole, red)
 }
 
 // **The changed non-code files the map's tree held and that did not already differ from it** — the
@@ -322,13 +326,15 @@ async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
 	is_whole: boolean,
-): Promise<RunInput> {
-	const change = await read_change(root, command_arguments, is_whole)
+	before: GateTree | undefined,
+): Promise<RelatedInput> {
+	const red = await test_related_red.read_red(before)
+	const change = await read_change(root, command_arguments, is_whole, red)
 	const scope = await resolve_change(root, change, is_whole)
 
 	const { changed, synced = [], since_map = [], branch } = change
 
-	return { scope, root, changed, synced, since_map, branch }
+	return { scope, root, changed, synced, since_map, branch, owed: red?.owed ?? [] }
 }
 
 // Every run is timed and counted into the lane ledger (joshuafolkken/kit#4465).
@@ -352,19 +358,18 @@ async function run_and_record(
 // **The no-base pass is part of the run's verdict**, so a green record — the one `josh ship` and the
 // gate reuse — never vouches for a tree whose base-touching code fails in CI's checkout. It runs
 // only after a green first pass (`test-no-base.ts`), and only over this branch's own files: those
-// the map's tree or a main sync joined were verified by main's CI.
+// the map's tree or a main sync joined were verified by main's CI — and over those a red run before
+// this one never reached it with (`test_related_red.no_base_files`).
 async function with_no_base_pass(
-	input: RunInput,
+	input: RelatedInput,
 	command_arguments: ReadonlyArray<string>,
 	exit_code: number,
 ): Promise<number> {
 	if (exit_code !== 0) return exit_code
 
 	const flags = changed_file_scope.flags_of(command_arguments)
-	const joined = new Set([...input.since_map, ...input.synced])
-	const own = (input.changed ?? []).filter((file) => !joined.has(file))
 
-	return await test_no_base.run_if_touched(input.root, own, flags)
+	return await test_no_base.run_if_touched(input.root, test_related_red.no_base_files(input), flags)
 }
 
 // A non-code argument is resolved through the map, and a file every test imports through its
@@ -401,29 +406,44 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 	return await run_and_record(input, command_arguments)
 }
 
+// A green run records the tree it was green on, a red one the files it failed on
+// (`test-related-red.ts`), so the run after a fix reads only those and what moved.
+async function run_and_vouch(
+	input: RelatedInput,
+	command_arguments: ReadonlyArray<string>,
+	before: GateTree | undefined,
+): Promise<number> {
+	const started_ms = Date.now()
+	const first_exit = await run_and_record(input, command_arguments)
+	const exit_code = await with_no_base_pass(input, command_arguments, first_exit)
+	const tree = conclusive_tree(before)
+
+	await scoped_green.record_if_green(review_stamps.test_related_stamp, { before: tree, exit_code })
+
+	await test_related_red.record_red({
+		before: tree,
+		scope: input.scope,
+		first_exit,
+		started_ms,
+		owed: test_related_red.no_base_files(input),
+	})
+
+	return exit_code
+}
+
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
 	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
 
 	const { KEEP_WHOLE_SUITE_FLAG } = gate_labels
 	const command_arguments = given.filter((argument) => argument !== KEEP_WHOLE_SUITE_FLAG)
 	const root = await changed_file_scope.repository_root_or_cwd()
-	const input = await read_run_input(root, command_arguments, given.includes(KEEP_WHOLE_SUITE_FLAG))
+	const before = await scoped_green.read_before(command_arguments)
+	const is_whole = given.includes(KEEP_WHOLE_SUITE_FLAG)
+	const input = await read_run_input(root, command_arguments, is_whole, before)
 
 	report_unhanded(root, command_arguments, input.scope)
 
-	const before = await scoped_green.read_before(command_arguments)
-	const exit_code = await with_no_base_pass(
-		input,
-		command_arguments,
-		await run_and_record(input, command_arguments),
-	)
-
-	await scoped_green.record_if_green(review_stamps.test_related_stamp, {
-		before: conclusive_tree(before),
-		exit_code,
-	})
-
-	return exit_code
+	return await run_and_vouch(input, command_arguments, before)
 }
 
 const test_related = { reaches_tests, run_related_tests }
