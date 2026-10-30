@@ -31,6 +31,22 @@ const MEASUREMENT_PATTERNS = [
 	/(?<![#\w.,])\d[\d.,]*[kKM]?[\s-]?tokens?(?!\w)/u,
 ]
 
+// Strip only the value whose adjacent words state a design or input, so a measured value elsewhere
+// in the same comment still reports. Test files get no blanket exemption (joshuafolkken/kit#5366).
+const UNIT_VALUE = `(?:${MEASUREMENT_PATTERNS.map((pattern) => pattern.source).join('|')})`
+const DECLARED_VALUE_PATTERNS = [
+	new RegExp(
+		String.raw`${UNIT_VALUE}\s+(?:cache\s+)?(?:writes?|TTL|timeouts?|budgets?|limits?)\b`,
+		'giu',
+	),
+	new RegExp(
+		String.raw`\b(?:timeout|budget|limit|TTL|test input|fixture)(?: is| of|:)?\s+${UNIT_VALUE}`,
+		'giu',
+	),
+	new RegExp(String.raw`\bfor prompts (?:over|under|up to)\s+${UNIT_VALUE}`, 'giu'),
+	new RegExp(String.raw`\b(?:machine|input|fixture) (?:of|with)\s+${UNIT_VALUE}`, 'giu'),
+]
+
 /**
  * @param {string} sentence
  * @returns {boolean}
@@ -55,7 +71,10 @@ function has_history(text) {
  * @returns {boolean}
  */
 function has_measurement(text) {
-	return MEASUREMENT_PATTERNS.some((pattern) => pattern.test(text))
+	let measured_text = text
+	for (const pattern of DECLARED_VALUE_PATTERNS) measured_text = measured_text.replace(pattern, '')
+
+	return MEASUREMENT_PATTERNS.some((pattern) => pattern.test(measured_text))
 }
 
 /**
