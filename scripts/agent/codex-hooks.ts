@@ -27,7 +27,8 @@ interface HookConfig {
 	hooks: HookEvents
 }
 
-const CODEX_EDIT_TOOL = 'apply_patch'
+const CODEX_EDIT_TOOL = 'apply_patch|functions.apply_patch'
+const CODEX_SHELL_TOOLS = 'exec_command|functions.exec_command|exec|functions.exec'
 const TOOL_EVENTS: ReadonlySet<string> = new Set(['PreToolUse', 'PostToolUse'])
 const UNMATCHED_EVENTS: ReadonlySet<string> = new Set(['UserPromptSubmit'])
 const JSON_INDENT = '\t'
@@ -46,9 +47,16 @@ function codex_handler(handler: HookHandler): HookHandler {
 	return { ...handler, command: ADAPTED_COMMANDS.get(handler.command) ?? handler.command }
 }
 
+function additional_tools(event: string): string {
+	return event === 'PreToolUse' ? `${CODEX_EDIT_TOOL}|${CODEX_SHELL_TOOLS}` : CODEX_EDIT_TOOL
+}
+
 function codex_matcher(event: string, matcher: string | undefined): string | undefined {
 	if (UNMATCHED_EVENTS.has(event)) return undefined
-	if (matcher !== undefined && TOOL_EVENTS.has(event)) return `${matcher}|${CODEX_EDIT_TOOL}`
+
+	if (matcher !== undefined && TOOL_EVENTS.has(event)) {
+		return `${matcher}|${additional_tools(event)}`
+	}
 
 	return matcher
 }

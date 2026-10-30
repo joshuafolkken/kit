@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { json_value } from '#scripts/lib/json-value'
@@ -38,29 +39,62 @@ function edited_paths(tool_input: unknown): Array<string> {
 	)
 }
 
-function is_runtime_file(file_path: string, root: string): boolean {
+function is_external(relative: string): boolean {
+	return relative.startsWith(PARENT_PREFIX) || path.isAbsolute(relative)
+}
+
+function is_scratch_record(file_path: string): boolean {
+	const relative = path.relative(tmpdir(), file_path)
+	const is_scratch = !is_external(relative)
+
+	return is_scratch && ['.md', '.json', '.txt'].includes(path.extname(file_path))
+}
+
+function should_skip_external(
+	relative: string,
+	file_path: string,
+	should_include_external: boolean,
+): boolean {
+	return is_external(relative) && (!should_include_external || is_scratch_record(file_path))
+}
+
+function is_runtime_file(
+	file_path: string,
+	root: string,
+	should_include_external = false,
+): boolean {
 	const relative = path.relative(root, path.resolve(root, file_path))
 
-	if (relative.startsWith(PARENT_PREFIX) || path.isAbsolute(relative)) return false
+	if (should_skip_external(relative, path.resolve(root, file_path), should_include_external)) {
+		return false
+	}
 
 	return !test_declared_logic.is_exempt(relative.split(path.sep).join('/'))
 }
 
-function is_candidate(raw_payload: string, root: string): string | undefined {
+function is_candidate(
+	raw_payload: string,
+	root: string,
+	should_include_external = false,
+): string | undefined {
 	const payload = hook_decision.parse_hook_payload(raw_payload)
 
 	if (payload === undefined || !EDIT_TOOLS.has(payload.tool_name)) return undefined
 
 	const has_runtime_file = edited_paths(payload.tool_input).some((file_path) =>
-		is_runtime_file(file_path, root),
+		is_runtime_file(file_path, root, should_include_external),
 	)
 
 	return has_runtime_file ? payload.transcript_path : undefined
 }
 
 // Whether the payload edits a runtime file under `root` — the edit Step 0 and the lane plan precede.
-function is_runtime_edit(raw_payload: string, root: string = process.cwd()): boolean {
-	return is_candidate(raw_payload, root) !== undefined
+function is_runtime_edit(
+	raw_payload: string,
+	root: string = process.cwd(),
+	should_include_external = false,
+): boolean {
+	return is_candidate(raw_payload, root, should_include_external) !== undefined
 }
 
 function notice(raw_payload: string, root: string = process.cwd()): string | undefined {
@@ -77,6 +111,13 @@ function notice(raw_payload: string, root: string = process.cwd()): string | und
 	return NOTICE
 }
 
-const step_zero_notice = { NOTICE, is_runtime_edit, notice, stamp_path: STAMP.path }
+const step_zero_notice = {
+	NOTICE,
+	edited_paths,
+	is_runtime_edit,
+	is_runtime_file,
+	notice,
+	stamp_path: STAMP.path,
+}
 
 export { step_zero_notice }

@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { hook_decision, type GuardOutcome } from '#scripts/josh/hook-decision'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -16,6 +17,8 @@ const TYPESCRIPT_FILE = path.join(TEST_DIRECTORY, 'app.ts')
 const MARKDOWN_FILE = path.join(TEST_DIRECTORY, 'notes.md')
 const THIRD_FILE = path.join(TEST_DIRECTORY, 'third.json')
 const ALLOW: GuardOutcome = { reason: undefined, notice: undefined, fault: undefined }
+const UNKNOWN_INPUT = 'Cannot verify'
+const PATCH_TOOLS = ['apply_patch', 'functions.apply_patch']
 const { open_turn_lines, target_turn_lines } = time_transcript_fixture
 
 writeFileSync(TYPESCRIPT_FILE, 'export const value = 1\n')
@@ -27,6 +30,7 @@ afterAll(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 function patch_command(paths: ReadonlyArray<string>): string {
@@ -35,18 +39,74 @@ function patch_command(paths: ReadonlyArray<string>): string {
 	return `*** Begin Patch\n${changes}\n*** End Patch`
 }
 
-function codex_payload(paths: ReadonlyArray<string>): string {
+function codex_payload(paths: ReadonlyArray<string>, tool_name = 'apply_patch'): string {
 	return JSON.stringify({
 		session_id: 'session-1',
 		transcript_path: path.join(TEST_DIRECTORY, 'transcript.jsonl'),
 		cwd: TEST_DIRECTORY,
 		hook_event_name: 'PreToolUse',
 		turn_id: 'turn-1',
-		tool_name: 'apply_patch',
+		tool_name,
 		tool_use_id: 'call-1',
 		tool_input: { command: patch_command(paths) },
 	})
 }
+
+describe('Codex implementation scope', () => {
+	it.each(PATCH_TOOLS)('refuses a source patch from %s', (tool_name) => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+		const raw_payload = JSON.stringify({
+			tool_name,
+			tool_input: patch_command(['notes.md', 'scripts/example.ts']),
+			transcript_path: path.join(TEST_DIRECTORY, 'scope.jsonl'),
+		})
+
+		const { reason } = codex_hook_adapter.pretool_outcome(raw_payload)
+
+		expect(reason).toContain('lane:dispatch')
+		expect(reason).not.toContain(UNKNOWN_INPUT)
+	})
+
+	it.each(['exec_command', 'functions.exec_command'])(
+		'refuses a shell write from %s',
+		(tool_name) => {
+			vi.stubEnv(agent_session_role.KEY, undefined)
+			const raw_payload = JSON.stringify({
+				tool_name,
+				tool_input: { cmd: 'echo changed > scripts/example.ts' },
+				transcript_path: path.join(TEST_DIRECTORY, 'shell-scope.jsonl'),
+			})
+
+			expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(UNKNOWN_INPUT)
+		},
+	)
+})
+
+describe('Codex unverified input scope', () => {
+	it.each(PATCH_TOOLS)(
+		'refuses an unrecognized %s input instead of silently passing it through',
+		(tool_name) => {
+			vi.stubEnv(agent_session_role.KEY, 'reviewer')
+
+			expect(codex_hook_adapter.pretool_outcome(codex_payload([], tool_name)).reason).toContain(
+				UNKNOWN_INPUT,
+			)
+		},
+	)
+})
+
+describe('Codex orchestration scope', () => {
+	it('refuses namespaced opaque orchestration through the canonical guard', () => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+		const raw_payload = JSON.stringify({
+			tool_name: 'functions.exec',
+			tool_input: { code: 'opaque orchestration' },
+			transcript_path: path.join(TEST_DIRECTORY, 'exec-scope.jsonl'),
+		})
+
+		expect(codex_hook_adapter.pretool_outcome(raw_payload).reason).toContain(UNKNOWN_INPUT)
+	})
+})
 
 function adapted_call(paths: ReadonlyArray<string>): GuardedCall {
 	const payload = hook_decision.parse_hook_payload(

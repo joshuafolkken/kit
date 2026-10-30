@@ -148,8 +148,8 @@ describe('pretool_outcome', () => {
 			const payload = edit_payload_with_transcript()
 			const asynchronous = await pretool_outcome_async(payload)
 
-			expect(pretool_outcome(payload).reason).toBe(agent_session_role.scope_line())
-			expect(asynchronous.reason).toBe(agent_session_role.scope_line())
+			expect(pretool_outcome(payload).reason).toContain(agent_session_role.scope_line())
+			expect(asynchronous.reason).toBe(pretool_outcome(payload).reason)
 		},
 	)
 

@@ -83,6 +83,9 @@ pnpm josh pretool:guard   # run by the PreToolUse hook, the pending tool call as
 
 It also runs the duplicate-read guard. A refusal leaves through `hookSpecificOutput.permissionDecision`; a call no guard claims writes nothing.
 
+Only a launcher-assigned `worker` may edit source. Other roles retain explicit record writes and
+recognized reads/operations; unverified shell or patch inputs are refused on every attempt.
+
 **How each guard behaves in a dispatched lane child is an enumeration** in `scripts/lane/lane-guard-policy.ts` — `refuse`, `notice` or `off` per guard; `lane-guard-policy.test.ts` pins it to the guards' live behavior.
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pretool:guard` in detail".
@@ -213,6 +216,10 @@ pnpm josh codex:hook-adapter posttool   # a Codex PostToolUse payload on stdin
 <!-- /usage -->
 
 It answers in Codex's hook format. `.codex/hooks.json` launches it as `sh scripts/hooks/run-hook.sh codex-hook-adapter <pretool|posttool>`; this command is the fallback when the bundle cannot run.
+
+The adapter normalizes patch and shell calls into the same authority check. Opaque orchestration is
+refused for non-workers. Hosts that skip PreToolUse, including nested tool calls, have no verified
+enforcement; generated settings alone do not establish host coverage.
 
 ### `josh stop:guard`
 
