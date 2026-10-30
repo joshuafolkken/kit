@@ -1,3 +1,4 @@
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE, MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { StreamRead } from './run-event-stream'
 
@@ -50,11 +51,14 @@ async function follow(
 	const deadline = ports.now() + options.interval_ms
 	let read = ports.read(position)
 
-	while (read.events.length === 0 && ports.now() < deadline) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await ports.sleep(options.tick_ms)
-		read = ports.read(position)
-	}
+	await poll.poll_until(() => read.events.length > 0 || ports.now() >= deadline, {
+		attempts: Infinity,
+		interval_ms: options.tick_ms,
+		sleeper: async (milliseconds) => {
+			await ports.sleep(milliseconds)
+			read = ports.read(position)
+		},
+	})
 
 	return read
 }

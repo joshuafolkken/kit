@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { lane_ledger_kind } from './lane-ledger-kind'
 import { lane_ledger_schema } from './lane-ledger-schema'
 
 // The ledger's line shapes: a known kind parses, anything else is a line `read_entries` skips.
 
-const { KIND, entry_schema } = lane_ledger_schema
+const { KIND } = lane_ledger_kind
+const { entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
 const PROBED = 'scripts/a.ts'
 
@@ -25,6 +27,12 @@ describe('lane_ledger_schema.entry_schema — test reuse', () => {
 		}
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
+describe('lane_ledger_schema runtime boundary', () => {
+	it('exposes only the entry parser so callers take constants from their leaves', () => {
+		expect(Object.keys(lane_ledger_schema)).toStrictEqual(['entry_schema'])
 	})
 })
 

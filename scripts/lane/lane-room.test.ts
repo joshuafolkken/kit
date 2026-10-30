@@ -4,7 +4,7 @@ import { lane_state, type LaneState, type LaneStateRecord } from '#scripts/lane/
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { backlog_ready } from './backlog-ready'
+import { lane_room } from './lane-room'
 
 // joshuafolkken/kit#4241: the paused-lane check blocked `run:board`'s event loop with one synchronous
 // spawn per lane process; the count now reads one asynchronous `ps` whatever the lane count.
@@ -79,11 +79,11 @@ afterEach(() => {
 	vi.clearAllMocks()
 })
 
-describe('backlog_ready.lane_room — the lane state record', () => {
+describe('lane_room.read — the lane state record', () => {
 	it('counts a lane whose processes are stopped but whose record is running', async () => {
 		arrange_records([record_of(PAUSED, 'running'), record_of(RUNNING, 'running')])
 
-		const room = await backlog_ready.lane_room(LANES, async () => lane_process_table.parse(LISTING))
+		const room = await lane_room.read(LANES, async () => lane_process_table.parse(LISTING))
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([PAUSED, RUNNING])
 		expect(room.unknown).toEqual([])
@@ -92,7 +92,7 @@ describe('backlog_ready.lane_room — the lane state record', () => {
 	it('counts a lane with no record as holding a place, and names it unknown', async () => {
 		arrange_records([record_of(RUNNING, 'running')])
 
-		const room = await backlog_ready.lane_room(LANES, async () => lane_process_table.parse(LISTING))
+		const room = await lane_room.read(LANES, async () => lane_process_table.parse(LISTING))
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([PAUSED, RUNNING])
 		expect(room.unknown).toEqual([PAUSED])
@@ -100,12 +100,12 @@ describe('backlog_ready.lane_room — the lane state record', () => {
 	})
 })
 
-describe('backlog_ready.lane_room', () => {
+describe('lane_room.read', () => {
 	it('reads one asynchronous `ps` and no synchronous spawn, leaving the lane recorded paused uncounted', async () => {
 		vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue(LANES)
 		run_ps.mockResolvedValue({ stdout: LISTING })
 
-		const room = await backlog_ready.lane_room(LANES)
+		const room = await lane_room.read(LANES)
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
 		expect(room.idle).toEqual([])
@@ -122,7 +122,7 @@ describe('backlog_ready.lane_room', () => {
 
 		run_ps.mockResolvedValue({ stdout: LISTING })
 
-		const room = await backlog_ready.lane_room(lanes)
+		const room = await lane_room.read(lanes)
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
 		expect(room.idle).toEqual([IDLE])
@@ -133,7 +133,7 @@ describe('backlog_ready.lane_room', () => {
 
 	// joshuafolkken/kit#4246: `run:board` hands over the snapshot its redraw already read.
 	it('reads the snapshot it is given rather than a `ps` of its own', async () => {
-		const room = await backlog_ready.lane_room(LANES, async () => lane_process_table.parse(LISTING))
+		const room = await lane_room.read(LANES, async () => lane_process_table.parse(LISTING))
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
 		expect(run_ps).not.toHaveBeenCalled()
@@ -142,7 +142,7 @@ describe('backlog_ready.lane_room', () => {
 	it('counts every lane not recorded paused, none idle, when the snapshot could not be read', async () => {
 		run_ps.mockRejectedValue(new Error('ps failed'))
 
-		const room = await backlog_ready.lane_room(LANES)
+		const room = await lane_room.read(LANES)
 
 		expect(room.occupied.map((lane) => lane.issue)).toEqual([RUNNING])
 		expect(room.idle).toEqual([])

@@ -2,11 +2,8 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import type { JoshResult } from '#scripts/josh/josh-run'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
-import { lane_process_table, type TableRead } from '#scripts/lane/lane-process-table'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
-import { lane_snapshot_trace } from '#scripts/lane/lane-snapshot-trace'
-import { lane_spent } from '#scripts/lane/lane-spent'
-import { lane_state } from '#scripts/lane/lane-state'
+import { lane_room as local_room, type LaneRoom, type LaneUse } from '#scripts/lane/lane-room'
 import type { RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
@@ -15,7 +12,6 @@ import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_drive_restore } from './backlog-drive-restore'
 import { backlog_next_shared } from './backlog-next-shared'
-import { backlog_occupied } from './backlog-occupied'
 import { backlog_offer_exclude } from './backlog-offer-exclude'
 import { backlog_stalled } from './backlog-stalled'
 
@@ -29,24 +25,6 @@ interface ReadyReading {
 	free_lanes: number
 }
 
-// How many open lanes hold a place under the limit, how many hold a port seat, and the ones with no
-// lane state record.
-interface LaneUse {
-	occupied: number
-	seated: number
-	unknown: ReadonlyArray<string>
-}
-
-// The lanes that hold a place under the limit, read once for every count drawn from them.
-interface LaneRoom {
-	occupied: ReadonlyArray<LaneInfo>
-	// The open lanes no child is working in, read from the same snapshot.
-	idle: ReadonlyArray<string>
-	// The open lanes with no lane state record, counted as holding a place until one is written.
-	unknown: ReadonlyArray<string>
-	use: LaneUse
-}
-
 interface LaneCount {
 	limit: number
 	free: number
@@ -57,46 +35,7 @@ interface ReadyPorts {
 	ready_issues: () => Promise<ReadonlyArray<string>>
 }
 
-// The lanes that hold a place under the limit (`backlog-occupied.ts`), the idle ones and the unknown
-// ones. Paused is each lane's state record's answer; every lane's idle reading is drawn from one
-// asynchronous process snapshot, so the count never blocks its caller's event loop
-// (joshuafolkken/kit#4241, #4245); `run:board` passes the snapshot its redraw already read (#4246).
-async function occupancy_of(
-	open: ReadonlyArray<LaneInfo>,
-	table: TableRead,
-): Promise<Omit<LaneRoom, 'use'>> {
-	const rows = await table()
-	const issues = open.map((lane) => lane.issue)
-	const trace = { process_trace: await lane_snapshot_trace.traces_of(issues, rows) }
-	const records = await lane_state.read_states(issues)
-	const is_merge_waiting = await lane_snapshot_trace.merge_waits_of(issues, rows)
-	const occupied = backlog_occupied.occupied_lanes(
-		open,
-		(live) => lane_spent.idle_lanes(live, trace),
-		records,
-		is_merge_waiting,
-	)
-	const unknown = backlog_occupied.unknown_lanes(open, records)
-
-	return { occupied, idle: lane_spent.idle_lanes(open, trace), unknown }
-}
-
-// Execution places and port ownership are independent; a saved tree alone occupies neither seat.
-async function lane_room(
-	lanes?: ReadonlyArray<LaneInfo>,
-	table: TableRead = lane_process_table.read_table,
-): Promise<LaneRoom> {
-	const open = lanes ?? (await lane_registry.list_lanes())
-	const occupancy = await occupancy_of(open, table)
-	const seated =
-		lane_registry.unreadable_lanes(open).length > 0
-			? lane_capacity.seated_limit(Infinity)
-			: lane_registry.used_seats(open).length
-
-	const use = { occupied: occupancy.occupied.length, seated, unknown: occupancy.unknown }
-
-	return { ...occupancy, use }
-}
+const lane_room = local_room.read
 
 async function lane_use(lanes?: ReadonlyArray<LaneInfo>): Promise<LaneUse> {
 	const room = await lane_room(lanes)
@@ -132,12 +71,8 @@ async function free_under(limit: number): Promise<number> {
 // safe direction, since both the stall and the ready line need a free lane and reporting one that is
 // not there is the false positive neither may raise.
 //
-// **Occupancy is the local worktree count, not the dispatch budget's busy read.** `epic-lane-offer`
-// measures occupancy with `epic_busy.occupied_lanes`, a network read of in-progress issue labels; this
-// counts the worktrees that hold a place instead (`backlog-occupied.ts`), deliberately — it runs on the
-// cheap-first path where the costly read (`backlog:next`) is gated behind a free lane, so a network
-// read here would defeat that design. The two can diverge, but only toward over-counting live lanes →
-// fewer free lanes, the safe direction.
+// The local snapshot gates the costly network read (`backlog:next`). Epic selection reconciles its
+// labelled holders with this same snapshot, retaining labels for holders this machine cannot verify.
 async function free_lane_count(): Promise<number> {
 	return (await free_lanes_beside(await lane_registry.list_lanes())) ?? NO_FREE
 }
@@ -303,4 +238,5 @@ const backlog_ready = {
 }
 
 export { backlog_ready }
-export type { LaneCount, LaneRoom, LaneUse, ReadyPorts, ReadyReading }
+export type { LaneCount, ReadyPorts, ReadyReading }
+export type { LaneRoom, LaneUse } from '#scripts/lane/lane-room'

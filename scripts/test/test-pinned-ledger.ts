@@ -1,5 +1,5 @@
 import type { TestPinnedRecord } from '#scripts/lane/lane-ledger'
-import { lane_ledger_schema } from '#scripts/lane/lane-ledger-schema'
+import { lane_ledger_pinned_origin } from '#scripts/lane/lane-ledger-pinned-origin'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { Hunk } from './test-pinned-logic'
@@ -32,7 +32,7 @@ const BACKGROUND_ORIGIN: PinnedOrigin = 'run-review'
 // A `--origin` value: none is `manual`, one not named above `undefined`.
 function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 	if (raw === undefined) return MANUAL_ORIGIN
-	const parsed = lane_ledger_schema.pinned_origin_schema.safeParse(raw)
+	const parsed = lane_ledger_pinned_origin.pinned_origin_schema.safeParse(raw)
 
 	return parsed.success ? parsed.data : undefined
 }

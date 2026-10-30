@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { error_text } from '#scripts/lib/error-message'
+import { poll } from '#scripts/lib/poll'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
 import { test_pinned } from '#scripts/test/test-pinned'
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
@@ -65,13 +66,13 @@ async function is_restarted(root: string): Promise<boolean> {
 	}
 }
 
-// The cached verdicts' unpinned hunks, read without a probe; `undefined` when none is unpinned or the
+// Cached unpinned and unchecked places, read without a probe; `undefined` when neither remains or the
 // tree could not be read, so the caller says the check is still running.
 async function cached_summary(): Promise<PinnedSummary | undefined> {
 	try {
 		const report = await test_pinned.cached(test_pinned_logic.DEFAULT_MAX_HUNKS)
 
-		return report.unpinned.length === 0
+		return report.unpinned.length === 0 && !test_pinned_logic.has_unchecked(report)
 			? undefined
 			: test_pinned_record.partial_summary(report, PENDING_NOTE)
 	} catch (error) {
@@ -184,8 +185,11 @@ async function is_coming_on_tree(root: string): Promise<boolean> {
 }
 
 async function wait_on_tree(root: string, is_within: () => boolean, pause: Pause): Promise<void> {
-	// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-	while (is_within() && (await is_coming_on_tree(root))) await pause()
+	await poll.poll_until(async () => !is_within() || !(await is_coming_on_tree(root)), {
+		attempts: Infinity,
+		interval_ms: run_review_steps.POLL_INTERVAL_MS,
+		sleeper: pause,
+	})
 }
 
 // **The answer of a check the caller just started on this tree, waited for** (joshuafolkken/kit#4987):

@@ -8,6 +8,7 @@ import { lane_child_invocation } from '#scripts/lane/lane-child-invocation'
 import { json_value } from '#scripts/lib/json-value'
 import { run_hold, type RunHold } from '#scripts/run/hold/run-hold'
 import { z } from 'zod'
+import { run_cut_adoption } from './run-cut-adoption'
 import { run_cut_digest, type SessionDigest } from './run-cut-digest'
 import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 
@@ -29,13 +30,8 @@ import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 // recover on its own — which issue, which branch, and that a declared cut (not a crash) put it here —
 // and the resume *verifies* the tree against it rather than restoring it.
 //
-// **No owner is recorded, and that is deliberate.** A cut relaunches
-// exactly one fresh process — `begin_cut`'s exclusive create refuses a second cut — so there is no
-// live owner a resume must be blocked against, and recording the cutting session's pid would only
-// stall the resume against a process that is on its way out. **Resume uniqueness rests on the
-// hand-off instead**: `adopt_cut` spends `is_handed_off`, so a second resume reads a record no longer
-// handed off and is refused `stale`, and its exclusive create refuses a truly concurrent second
-// adopter.
+// Adoption spends the handoff and records its session. Only that session may replace an adopted
+// pre-gate cut with an implementation cut after returning to review fixes.
 
 const CUT_PREFIX = 'josh-run-cut-'
 // **The two phase names are `agent-role-profile.ts`'s**: a lane child resumes into a phase, and that
@@ -83,6 +79,7 @@ interface RunCut {
 	// Set by the cut, and spent by the adoption. A crash never sets it, which is what makes a declared
 	// cut the only state that resumes, and spending it is what makes a resume unique.
 	is_handed_off?: boolean | undefined
+	adopted_session?: string | undefined
 	// The instruction and work state the run was told to carry across the cut. Optional so a pre-gate
 	// record of the scalar fields alone parses, while a resume into implementation refuses to continue without it (`classify_resume`
 	// → `incomplete`), so a session is never silently continued lacking the instruction it needs.
@@ -153,6 +150,7 @@ const run_cut_schema = z.object({
 	phase: z.string(),
 	cut_at: z.string(),
 	is_handed_off: z.boolean().optional(),
+	adopted_session: z.string().optional(),
 	handoff: run_cut_handoff.handoff_schema.optional(),
 	digest: run_cut_digest.session_digest_schema.optional(),
 	is_merge_relaunched: z.boolean().optional(),
@@ -296,14 +294,27 @@ function with_digest(spec: CutSpec, digest_of: () => SessionDigest | undefined):
 	return record_within_bound(digested) ? digested : spec
 }
 
-// **Create-exclusively, exactly as `run-hold.ts` claims a tree.** A record already here means a cut is
-// already in flight for this tree, so `undefined` is "do not launch a second one" rather than an
-// error — the exclusive create is what makes a double cut, and so a double relaunch, impossible. A
-// record that would not fit the hand-off bound is refused the same way rather than written and carried.
+// The CLI holds its per-tree lock over the read and replacement. Only the pre-gate adopter may
+// replace its spent record; the atomic replacement keeps outside readers from seeing an empty slot.
+function replace_adopted(target: string, cut: RunCut): boolean {
+	const previous = read_cut(target)
+
+	if ('cut' in previous && run_cut_adoption.can_replace(previous.cut, cut)) {
+		stamp_file.replace_stamp(target, cut)
+
+		return true
+	}
+
+	return false
+}
+
+// New cuts create exclusively. An adopted pre-gate cut may become an implementation cut belonging
+// to the same session; every other existing record stays untouched.
 function begin_cut(target: string, spec: CutSpec, now: Date = new Date()): RunCut | undefined {
 	const cut = fresh_cut(spec, now)
 
 	if (!within_handoff_bound(cut)) return undefined
+	if (replace_adopted(target, cut)) return cut
 
 	return stamp_file.create_stamp(target, cut) ? cut : undefined
 }
@@ -377,7 +388,7 @@ function classify_resume(cut: RunCut, request: CutResumeRequest): CutResume {
 // refused `stale`. It removes and then creates exclusively, so two truly concurrent resumes cannot
 // both win the create.
 function adopt_cut(target: string, cut: RunCut): RunCut | undefined {
-	const next: RunCut = { ...cut, is_handed_off: false }
+	const next: RunCut = { ...cut, is_handed_off: false, adopted_session: run_cut_adoption.session() }
 
 	stamp_file.remove_stamp(target)
 

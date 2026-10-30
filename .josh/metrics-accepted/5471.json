@@ -1,0 +1,7 @@
+{
+	"reason": "Expose unchecked cached places and retain their state in the shared pinned summary; the 12 runtime lines reuse existing report formatting and add no probes.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 12
+	}
+}

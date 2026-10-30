@@ -253,6 +253,7 @@ async function ahead(issue_number: string): Promise<Array<string>> {
 }
 
 const run_ship_preflight = {
+	SCOPED_PRECONDITION: PRECONDITION.SCOPED,
 	EVIDENCE_PENDING,
 	EVIDENCE_PROBLEM,
 	acceptance_pending_text,

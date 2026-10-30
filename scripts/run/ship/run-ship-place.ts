@@ -4,6 +4,7 @@ import { git_common_directory } from '#scripts/git/git-common-directory'
 import { lane_capacity } from '#scripts/lane/lane-capacity'
 import { lane_handoff } from '#scripts/lane/lane-handoff'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { poll } from '#scripts/lib/poll'
 import { run_ship_stage, type Stage } from './run-ship-stage'
 
 // **A followup stop past the lane limit waits for a place, then relaunches**: its lane held no place
@@ -76,14 +77,14 @@ function mark(lane: LaneInfo, is_waiting: boolean): void {
 	}
 }
 
-async function poll(issue: string): Promise<void> {
-	for (let polled = 0; polled < PLACE_POLLS; polled += 1) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on a lane the previous one saw busy
-		if (!(await is_place_taken(issue))) return
+async function wait_for_place(issue: string): Promise<void> {
+	const is_free = await poll.poll_until(async () => !(await is_place_taken(issue)), {
+		attempts: PLACE_POLLS,
+		interval_ms: PLACE_POLL_MS,
+		sleeper: sleep,
+	})
 
-		// eslint-disable-next-line no-await-in-loop -- polling: the wait between two lane counts
-		await sleep(PLACE_POLL_MS)
-	}
+	if (!is_free) await sleep(PLACE_POLL_MS)
 }
 
 async function await_place(lane: LaneInfo, stage: Stage): Promise<void> {
@@ -92,7 +93,7 @@ async function await_place(lane: LaneInfo, stage: Stage): Promise<void> {
 	mark(lane, true)
 
 	try {
-		await poll(lane.issue)
+		await wait_for_place(lane.issue)
 	} finally {
 		mark(lane, false)
 	}

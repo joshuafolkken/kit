@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -11,6 +10,7 @@ import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
+import { run_ship_record_wait } from './run-ship-record-wait'
 
 // `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent.
 // This starts `josh ship` itself as a detached process, so the agent ends at the hand-off and nothing
@@ -53,23 +53,11 @@ const LAUNCHED = 'launched'
 const BUSY = 'busy'
 const FAILED = 'failed'
 const RESULT_PREFIX = durable_state.PREFIX.SHIP_RESULT
-const RECORD_POLL_MS = 25
-const RECORD_WAIT_ATTEMPTS = 200
 // How long a bare launched pid is believed before the supervisor must have claimed the record: far above
 // a `pnpm josh ship` start-up, far below the lifetime a reused pid could otherwise be believed for.
 const CLAIM_WINDOW_MS = 120_000
 type ShipResult = 'running' | 'success' | 'failed' | 'abnormal'
 type StartRead = (pid: number) => string | undefined
-
-interface ShipRecord {
-	pid?: number | undefined
-	process_start?: string | undefined
-	launched_at?: number | undefined
-	launcher_pid?: number | undefined
-	launcher_start?: string | undefined
-	launch_id: string
-	result?: 'success' | 'failed' | undefined
-}
 
 const ship_record_schema = z.object({
 	pid: z.number().int().positive().optional(),
@@ -79,7 +67,10 @@ const ship_record_schema = z.object({
 	launcher_start: z.string().optional(),
 	launch_id: z.string(),
 	result: z.enum(['success', 'failed']).optional(),
+	stop_invocation: z.string().optional(),
 })
+
+type ShipRecord = z.infer<typeof ship_record_schema>
 
 // `detached_launch.log_header`'s shape — `\n=== <time> · started by process <pid> · <command> ===` — read
 // back to find where the last launch into the log began.
@@ -176,7 +167,14 @@ function read_result(
 	repository: string,
 	number: string,
 	read: StartRead = process_identity.read_start,
-): { launch_id: string; launched_at?: number | undefined; result: ShipResult } | undefined {
+):
+	| {
+			launch_id: string
+			launched_at?: number | undefined
+			result: ShipResult
+			stop_invocation?: string | undefined
+	  }
+	| undefined {
 	const record = read_record(repository, number)
 
 	return record === undefined
@@ -185,6 +183,7 @@ function read_result(
 				launch_id: record.launch_id,
 				launched_at: record.launched_at,
 				result: result_of(record, read),
+				...(record.stop_invocation !== undefined && { stop_invocation: record.stop_invocation }),
 			}
 }
 
@@ -204,22 +203,8 @@ function running_since(repository: string, number: string): number | undefined {
 		: undefined
 }
 
-function is_pending(record: ShipRecord | undefined): boolean {
-	return record !== undefined && record.pid === undefined
-}
-
 async function ready_record(repository: string, number: string): Promise<ShipRecord | undefined> {
-	let record = current_record(repository, number)
-
-	for (let attempt = 0; attempt < RECORD_WAIT_ATTEMPTS; attempt += 1) {
-		if (!is_pending(record)) return record
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(RECORD_POLL_MS)
-		record = current_record(repository, number)
-	}
-
-	return undefined
+	return await run_ship_record_wait.ready_record(() => current_record(repository, number))
 }
 
 async function update_record(
@@ -235,6 +220,14 @@ async function update_record(
 
 async function mark_result(repository: string, number: string, code: number): Promise<void> {
 	await update_record(repository, number, { result: code === 0 ? 'success' : 'failed' })
+}
+
+async function mark_stop(
+	repository: string,
+	number: string,
+	stop_invocation: string,
+): Promise<void> {
+	await update_record(repository, number, { stop_invocation })
 }
 
 // A supervisor that cannot name its own start either (no probe and no beacon) leaves the launcher's
@@ -371,6 +364,7 @@ function is_supervised(source: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 const run_ship_detach = {
+	mark_stop,
 	BUSY,
 	FAILED,
 	LAUNCHED,
@@ -391,5 +385,5 @@ const run_ship_detach = {
 	supervisor_environment,
 }
 
-export type { DetachRequest, DetachResult }
+export type { DetachRequest, DetachResult, ShipRecord }
 export { run_ship_detach }

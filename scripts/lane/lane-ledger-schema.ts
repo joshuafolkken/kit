@@ -1,11 +1,14 @@
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
+import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
 const { KIND } = lane_ledger_kind
-const { ship_lap_schema, stop_schema, unplanned_notice_schema } = lane_ledger_schema_ship
+const { ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
+	lane_ledger_schema_ship
+const { pinned_origin_schema } = lane_ledger_pinned_origin
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -195,8 +198,7 @@ const test_related_schema = z.object({
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
-// (joshuafolkken/kit#5385), absent on a test's verdict.
-const pinned_origin_schema = z.enum(['run-review', 'pre-detach', 'manual'])
+// (joshuafolkken/kit#5385), absent on a test's verdict. Origin values live in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -262,6 +264,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	lane_state_schema,
 	push_miss_schema,
 	ship_lap_schema,
+	size_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -296,6 +299,8 @@ type PushMissEntry = z.infer<typeof push_miss_schema>
 type PushMissRecord = Omit<PushMissEntry, 'kind' | 'at'>
 type ShipLapEntry = z.infer<typeof ship_lap_schema>
 type ShipLapRecord = Omit<ShipLapEntry, 'kind' | 'at'>
+type SizeEntry = z.infer<typeof size_schema>
+type SizeRecord = Omit<SizeEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -308,7 +313,7 @@ type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 	waiting?: ReadonlyArray<number> | undefined
 }
 
-const lane_ledger_schema = { KIND, entry_schema, pinned_origin_schema }
+const lane_ledger_schema = { entry_schema }
 
 export type {
 	CoreWaitEntry,
@@ -335,6 +340,8 @@ export type {
 	RoundTwoRecord,
 	ShipLapEntry,
 	ShipLapRecord,
+	SizeEntry,
+	SizeRecord,
 	SplitFiledEntry,
 	SplitFiledRecord,
 	SplitNoticeEntry,

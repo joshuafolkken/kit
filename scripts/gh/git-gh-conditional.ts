@@ -1,4 +1,6 @@
 import { git_gh_exec, has_stdout_field } from './git-gh-exec'
+import { gh_failure } from './git-gh-failure'
+import { gh_retry } from './git-gh-retry'
 
 // A `gh api` GET that sends the ETag of the previous answer, so a resource polled every few minutes
 // costs nothing when it has not changed: GitHub answers `304 Not Modified` to a matching
@@ -49,7 +51,14 @@ function failure_status(error: unknown): number | undefined {
 	return has_stdout_field(cause) ? git_gh_exec.parse_status_line(cause.stdout) : undefined
 }
 
-async function read_conditional(
+function rethrow_failure(error: unknown): ConditionalRead {
+	const status = failure_status(error)
+	if (status === NOT_MODIFIED_STATUS) return UNCHANGED
+	if (status !== undefined && error instanceof Error) gh_failure.attach(error, { status })
+	throw error
+}
+
+async function request_conditional(
 	path: string,
 	etag: string | undefined,
 	timeout_ms?: number,
@@ -57,9 +66,21 @@ async function read_conditional(
 	try {
 		return to_read(await git_gh_exec.exec_gh_command(to_args(path, etag), timeout_ms))
 	} catch (error) {
-		return failure_status(error) === NOT_MODIFIED_STATUS
-			? UNCHANGED
-			: { kind: 'unreadable', cause: error }
+		return rethrow_failure(error)
+	}
+}
+
+async function read_conditional(
+	path: string,
+	etag: string | undefined,
+	timeout_ms?: number,
+): Promise<ConditionalRead> {
+	try {
+		return await gh_retry.with_read_retry(
+			async () => await request_conditional(path, etag, timeout_ms),
+		)
+	} catch (error) {
+		return { kind: 'unreadable', cause: error }
 	}
 }
 

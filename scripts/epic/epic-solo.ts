@@ -118,19 +118,25 @@ function select_candidates(
 	children: ReadonlyArray<EpicChild>,
 	read: BusyRead,
 	repo: string,
+	occupied: number,
 ): SoloSelection {
 	const queue = queue_of(children)
 
 	if (queue === undefined) return first_of(children, children.length)
 	if (queue.index > 0) return first_of(children, queue.index)
-	if (read.kind === 'idle') return first_of(children, 1)
+	if (occupied === 0 && read.kind === 'idle') return first_of(children, 1)
 
 	return none_of(children, waiting_message(queue.solo.number, repo))
 }
 
 // An unreadable or truncated listing keeps nothing: without it a running `run:solo` issue cannot be
 // ruled out.
-function select(children: ReadonlyArray<EpicChild>, read: BusyRead, repo: string): SoloSelection {
+function select(
+	children: ReadonlyArray<EpicChild>,
+	read: BusyRead,
+	repo: string,
+	occupied: number = epic_busy.occupied_lanes(read),
+): SoloSelection {
 	if (read.kind === 'unreadable' || read.kind === 'truncated') {
 		return none_of(children, epic_busy.busy_reason(read, repo, 0))
 	}
@@ -139,7 +145,7 @@ function select(children: ReadonlyArray<EpicChild>, read: BusyRead, repo: string
 
 	if (holder !== undefined) return none_of(children, held_message(holder, repo))
 
-	return select_candidates(children, read, repo)
+	return select_candidates(children, read, repo, occupied)
 }
 
 // The offered candidates of `repo` stay; the withheld ones move to `waiting`, which is where the

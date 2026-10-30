@@ -17,6 +17,7 @@ const FIRST_HEADER_CELLS = [
 	'round 1',
 	'round 2',
 	'noticed lanes',
+	'measured lanes',
 	'held by',
 	'lane',
 	'process',

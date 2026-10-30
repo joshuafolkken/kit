@@ -12,6 +12,7 @@ import { lane_process_stats } from './lane-process-stats'
 import { lane_round_one_stats } from './lane-round-one-stats'
 import { lane_round_two_stats } from './lane-round-two-stats'
 import { lane_ship_lap_stats } from './lane-ship-lap-stats'
+import { lane_size_stats } from './lane-size-stats'
 import { lane_split_stats } from './lane-split-stats'
 import { lane_stage_stats } from './lane-stage-stats'
 import type { StatsWindow } from './lane-stats'
@@ -41,6 +42,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_round_one_stats.table(entries, window),
 		lane_round_two_stats.table(entries, window),
 		lane_split_stats.table(entries, window),
+		lane_size_stats.table(entries, window),
 		lane_held_stats.table(entries, window),
 		lane_core_wait_stats.table(entries, window),
 		lane_process_stats.table(entries, window),

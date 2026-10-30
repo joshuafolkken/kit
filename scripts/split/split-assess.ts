@@ -3,8 +3,8 @@ import { test_declared_logic } from '#scripts/test/test-declared-logic'
 // The size half of the split assessment, measured rather than estimated.
 //
 // `split-assessment.md` → "The question" asks two things, and only the second is mechanical: does the
-// change **clearly exceed** what one verification gate confirms in one pass, the guide being about 10
-// changed files and about 400 changed lines, test files excluded. The first — are there two or more
+// change exceed what one verification gate confirms in one pass, the guide being more than
+// `FILE_GUIDE` changed files or more than `LINE_GUIDE` changed lines, test files excluded. The first — are there two or more
 // separately-mergeable deliverables — stays a judgement, so this answers the size question alone and
 // never claims to have decided the split.
 //
@@ -28,10 +28,10 @@ interface SizeMeasurement {
 }
 
 // The guide's single source: `split-assessment.md` states these once and a test pins the two equal.
-// Strictly greater than: "about 10 changed files" and a change
-// that "lands at 11 files is not thereby a split" put the bar above the round number, not at it.
-const FILE_GUIDE = 10
-const LINE_GUIDE = 400
+// Strictly greater than: "more than" puts the bar above the number, not at it. Lowered from 10 / 400
+// once a lane estimated at 6 files / 250 lines merged at about 23 files / 390 lines (joshuafolkken/kit#5384).
+const FILE_GUIDE = 8
+const LINE_GUIDE = 200
 
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
@@ -75,11 +75,11 @@ function non_test_changes(changes: ReadonlyArray<FileChange>): Array<FileChange>
 	return changes.filter((change) => !test_declared_logic.is_test_file(change.path))
 }
 
-// `split` only when **both** guides are exceeded together — the size condition a split has to clear,
-// per `split-assessment.md`'s conservative default. Either one alone leaves the change one Issue. A
-// filing's declared estimate is judged by this same call (`issue/size-estimate.ts`).
+// `split` when **either** guide is exceeded — the AND form never fired, even on the lanes cut twice
+// mid-implementation (joshuafolkken/kit#5384). A filing's declared estimate and `backlog:next`'s offer
+// are judged by this same call (`issue/size-estimate.ts`).
 function verdict_for(files: number, lines: number): SplitVerdict {
-	return files > FILE_GUIDE && lines > LINE_GUIDE ? SPLIT_VERDICT : SINGLE_VERDICT
+	return files > FILE_GUIDE || lines > LINE_GUIDE ? SPLIT_VERDICT : SINGLE_VERDICT
 }
 
 function measure(changes: ReadonlyArray<FileChange>): SizeMeasurement {
@@ -95,8 +95,8 @@ function assess(raw: string): SizeMeasurement {
 }
 
 const SPLIT_TAIL =
-	'both exceed the guide — the size condition for a split is met (separability is a separate judgement)'
-const SINGLE_TAIL = 'under the guide on at least one axis — one Issue, however separable'
+	'over the guide — the size condition for a split is met (separability is a separate judgement)'
+const SINGLE_TAIL = 'under the guide on both axes — one Issue, however separable'
 
 // The sentence printed on stderr: what was counted, against which guide, and what the verdict does
 // and does not mean. Test files are already dropped from the counts, so the reason says so.
@@ -117,9 +117,8 @@ const QUESTION_SECTION = 'The question'
 const REASON_PREFIX = '- 分割しない理由:'
 const NOTICE_ACTION = `record why it stays one Issue in an Issue comment line \`${REASON_PREFIX} <理由>\`, or carve the rest out with \`pnpm josh issue:file --route split\` — split-assessment.md → "${NOTICE_SECTION}"`
 
-// The pre-gate notice `josh main:merge` prints for a diff over the guide. "Clearly" is the `split`
-// verdict — both guides exceeded — so the one bar this file draws is the one the notice fires on,
-// and a diff under it prints nothing.
+// The pre-gate notice `josh main:merge` prints for a diff over the guide — the `split` verdict, so the
+// one bar this file draws is the one the notice fires on, and a diff under it prints nothing.
 function notice(measurement: SizeMeasurement): string | undefined {
 	if (measurement.verdict !== SPLIT_VERDICT) return undefined
 

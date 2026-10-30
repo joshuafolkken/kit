@@ -2,26 +2,27 @@ import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
-import {
-	lane_ledger_schema,
-	type CoreWaitRecord,
-	type GateRecord,
-	type HeldRecord,
-	type LaneStateChangeRecord,
-	type LedgerEntry,
-	type OverlapRecord,
-	type PushMissRecord,
-	type RoundOneRecord,
-	type RoundTwoRecord,
-	type ShipLapRecord,
-	type SplitFiledRecord,
-	type SplitNoticeRecord,
-	type StageRecord,
-	type StopRecord,
-	type TestPinnedRecord,
-	type TestRelatedRecord,
-	type UnitFileRecord,
-	type UnplannedNoticeRecord,
+import { lane_ledger_kind } from './lane-ledger-kind'
+import type {
+	CoreWaitRecord,
+	GateRecord,
+	HeldRecord,
+	LaneStateChangeRecord,
+	LedgerEntry,
+	OverlapRecord,
+	PushMissRecord,
+	RoundOneRecord,
+	RoundTwoRecord,
+	ShipLapRecord,
+	SizeRecord,
+	SplitFiledRecord,
+	SplitNoticeRecord,
+	StageRecord,
+	StopRecord,
+	TestPinnedRecord,
+	TestRelatedRecord,
+	UnitFileRecord,
+	UnplannedNoticeRecord,
 } from './lane-ledger-schema'
 
 // The measurement ledger the lane limit is tuned against: one JSON line per
@@ -34,6 +35,8 @@ import {
 // ship`, the dispatch and the backlog driver write here, and dozens of suites import them; the reading
 // and the measurement modules built on it import `lane-ledger.ts`, so a change there no longer reaches
 // every suite a writer sits under.
+//
+// This writer still reaches the suites of its importing hubs — dispatch, gate and followup — until those hubs are cut (joshuafolkken/kit#5177).
 //
 // **Its own file rather than the run's event stream.** The stream is capped at 500 events and is
 // rewritten whole on every append, which is right for "where is the run" and wrong for a measurement
@@ -67,7 +70,7 @@ const { O_APPEND, O_CREAT, O_NOFOLLOW, O_WRONLY } = constants
 // eslint-disable-next-line no-bitwise -- POSIX open flags are a bit field; `||` here would be a bug
 const APPEND_FLAGS = O_WRONLY | O_APPEND | O_CREAT | O_NOFOLLOW
 
-const { KIND } = lane_ledger_schema
+const { KIND } = lane_ledger_kind
 
 function target_of(repository: string): string {
 	return durable_state.path(LEDGER_PREFIX, repository, LEDGER_SUFFIX)
@@ -211,6 +214,10 @@ async function record_ship_lap(lap: ShipLapRecord, path?: string): Promise<void>
 	await record({ kind: KIND.SHIP_LAP, at: now_iso(), ...lap }, path)
 }
 
+async function record_size(size: SizeRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SIZE, at: now_iso(), ...size }, path)
+}
+
 async function record_unplanned_notice(
 	notice: UnplannedNoticeRecord,
 	path?: string,
@@ -242,6 +249,7 @@ const lane_ledger_write = {
 	record_round_one,
 	record_round_two,
 	record_ship_lap,
+	record_size,
 	record_split_filed,
 	record_split_notice,
 	record_stage,

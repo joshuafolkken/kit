@@ -107,6 +107,7 @@ describe('pr_merge', () => {
 		arrange(MERGED_RESPONSE, rest_pull())
 
 		await git_gh_pr.pr_merge(PR_BRANCH, HEAD_SHA)
+		expect(merge_request().should_retry).toBe(false)
 
 		expect(merge_request().timeout_ms).toBe(MERGE_REQUEST_TIMEOUT_MS)
 	})

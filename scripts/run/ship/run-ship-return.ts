@@ -7,10 +7,12 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_wake_driver } from '#scripts/run/wake/run-wake-driver'
 import type { ShipSection } from './run-ship'
+import { run_ship_detach } from './run-ship-detach'
 import { run_ship_next, type ShipResume } from './run-ship-next'
 import { run_ship_place } from './run-ship-place'
 import { run_ship_probe } from './run-ship-probe'
@@ -140,15 +142,17 @@ async function await_server(
 	previous?: string,
 	polls = SERVING_POLLS,
 ): Promise<string | undefined> {
-	for (let polled = 0; polled < polls; polled += 1) {
-		const session = lane_session_broker.serving_session(lane.directory, lane.issue)
-		if (session !== undefined && session !== previous) return session
+	const found = await poll.poll_for(
+		() => {
+			const session = lane_session_broker.serving_session(lane.directory, lane.issue)
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on the scan the previous one missed
-		await sleep(SERVING_POLL_MS)
-	}
+			return session === previous ? undefined : session
+		},
+		{ attempts: polls, interval_ms: SERVING_POLL_MS, sleeper: sleep },
+	)
+	if (found === undefined && polls > 0) await sleep(SERVING_POLL_MS)
 
-	return undefined
+	return found
 }
 
 function polls_after(reply: BrokerReply): number {
@@ -216,6 +220,17 @@ async function parked(issue: string, reason: string): Promise<ReturnOutcome> {
 
 // `output` is the failed stage's own output: the relaunched child's prompt carries the body's tail, and
 // the stop is classified on its standard output (`run-ship-stop-cause.ts`).
+// The OpenAI supervisor owns its child relaunch and reads the generated invocation from this launch.
+async function keep_stop(issue: string, stop: ShipStop): Promise<void> {
+	const repository = await run_ship_probe.repository_directory()
+	if (repository === undefined) return
+	await run_ship_detach.mark_stop(
+		repository,
+		issue,
+		lane_child_invocation.ship_stop_invocation(issue, stop),
+	)
+}
+
 async function stopped(
 	issue: string,
 	stage: Stage,
@@ -226,6 +241,7 @@ async function stopped(
 		run_event_stream.EVENT_KIND.SHIP_STOP,
 		stop_text(issue, stage, resume, output),
 	)
+	await keep_stop(issue, { stage, ...resume })
 
 	const lane = await lane_to_relaunch(issue)
 
