@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest'
 // the package `files` entry is guarded beside it. Matched as text, as `plugin-manifest.test.ts` does.
 const ROOT = process.cwd()
 const AGENT_PATH = '.claude/agents/investigator.md'
+const DELEGATION_PATH = '.claude/skills/workflow-commands/delegation.md'
 const FRONTMATTER = /^---\n(?<body>[\s\S]*?)\n---\n/u
 
 function read(relative: string): string {
@@ -40,5 +41,26 @@ describe('investigator agent definition', () => {
 describe('package ships the agent definitions', () => {
 	it('lists .claude/agents in files', () => {
 		expect(read('package.json')).toContain('".claude/agents"')
+	})
+})
+
+describe.each([AGENT_PATH, DELEGATION_PATH])('investigation handoff in %s', (relative) => {
+	it('requests callable signatures and reusable test fixtures with citations', () => {
+		const document = read(relative)
+
+		expect(document).toContain('existing function signatures')
+		expect(document).toContain('parameters, return types')
+		expect(document).toContain('overloads')
+		expect(document).toContain('existing test fixtures')
+		expect(document).toContain('paths and setup or')
+		expect(document).toContain('helper usage')
+		expect(document).toContain('`file:line` citations')
+	})
+
+	it('asks for explicit absence instead of invented interfaces', () => {
+		const document = read(relative)
+
+		expect(document).toContain('does not apply or was not found')
+		expect(document).toContain('invent')
 	})
 })

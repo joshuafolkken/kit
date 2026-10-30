@@ -1,6 +1,8 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -72,6 +74,7 @@ async function run_edit(fixture: OverThresholdLane): Promise<string> {
 		cwd: fixture.lane,
 		extendEnv: false,
 		env: {
+			...agent_session_role.env_for(agent_role_profile.WORKER),
 			PATH: process.env['PATH'] ?? '',
 			HOME: fixture.home,
 			[agent_session_environment.SESSION_ID_KEY]: SESSION_ID,

@@ -40,8 +40,9 @@ function busy(busy_cores: number): () => Promise<MachineReading> {
 	return async () => ({ busy_cores, available_mb: undefined })
 }
 
+// Admitted long enough ago that the machine reading already shows its load.
 function write_reserved(weight: number): void {
-	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: 0 }
+	const payload = { ...process_identity.own_fields(), weight, claimed_at: 0, admitted_at: LONG_AGO }
 
 	writeFileSync(path.join(probe.directory, BLOCKER), JSON.stringify(payload))
 }
@@ -236,6 +237,11 @@ async function waited_ms(
 	return { waited: clock.value, is_overflow: handle.admission.overflow !== undefined }
 }
 
+// Busy cores well under a full ledger's, behind a run queue past twice the cores beyond it.
+async function overloaded_with_room(): Promise<MachineReading> {
+	return { busy_cores: RESERVED - 2, available_mb: undefined, run_queue: CORES * 3 + 1 }
+}
+
 describe('core_budget.reserve — a wait that does not ease the load ends early', () => {
 	it('admits at minimum width before the cap while the load holds steady', async () => {
 		const run = await waited_ms(busy(CORES + 2))
@@ -261,6 +267,21 @@ describe('core_budget.reserve — a wait that does not ease the load ends early'
 		const run = await waited_ms(busy(CORES), CORES)
 
 		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
+	})
+
+	// joshuafolkken/kit#5391: other lanes' claims reserve the whole machine but run below it, so a small
+	// claim they hold starts at minimum width rather than waiting out the cap.
+	it('admits a small claim the ledger holds before the cap while the machine has room', async () => {
+		const run = await waited_ms(busy(RESERVED - 2), CORES)
+
+		expect(run.is_overflow).toBe(true)
+		expect(run.waited).toBe(STEP_MS * EASE_STEPS)
+	})
+
+	it('keeps a small claim the ledger holds waiting to the cap on an overloaded machine', async () => {
+		const run = await waited_ms(overloaded_with_room, CORES)
+
 		expect(run.waited).toBe(STEP_MS * STEPS_TO_CAP)
 	})
 })

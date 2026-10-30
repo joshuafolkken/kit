@@ -15,4 +15,8 @@ to find out **how the subject currently works**, not what to change.
   scratchpad, run, and deleted; return its output alone.
 - Return the conclusion plus the `file:line` citations that support each claim. Never paste file
   text beyond a short quoted line — the main line opens the cited lines to verify you.
+- Include the existing function signatures the planned change will call (parameters, return types
+  and overloads it needs), plus the existing test fixtures its tests will use (paths and setup or
+  helper usage), each with `file:line` citations. If either does not apply or was not found, say so;
+  do not invent an API or fixture, or paste whole implementations.
 - Report what the code does, never a root cause or a fix: deciding that stays in the main line.

@@ -1,0 +1,8 @@
+{
+	"reason": "Human-review dispatches retain capacity even after interrupted stops; named-queue reconciliation and board state/time readers now handle the same lifecycle, with regression coverage.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 58,
+		"ai_cost.on_demand_bytes": 259
+	}
+}

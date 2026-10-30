@@ -1,4 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { lane_state } from '#scripts/lane/lane-state'
 import { run_cli_fault } from '#scripts/run/run-cli-fault'
 import { run_halfrun_resume } from '#scripts/run/run-halfrun-resume'
 import { run_label } from '#scripts/run/run-label'
@@ -380,6 +381,14 @@ const SEND_BY_KIND: Readonly<Record<StopKind, (target: string, issue: string) =>
 // way, with the commit it stopped on. **A marked stop then sends its own `confirmation`**
 // (`run-stop-notify.ts`), after the mark, since the mark rewrites the record its send is stamped on.
 async function marked_stop(target: string, request: StopRequest): Promise<number> {
+	if (request.kind === HUMAN_REVIEW_STOP_KIND) {
+		await lane_state.record_change({
+			issue: request.issue,
+			state: 'human-review',
+			command: 'run:hold --human-review-stop',
+		})
+	}
+
 	await SEND_BY_KIND[request.kind](target, request.issue)
 
 	return report_hold()

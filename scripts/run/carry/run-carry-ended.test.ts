@@ -29,6 +29,17 @@ afterAll(() => {
 })
 
 describe('run_carry_ended', () => {
+	it.each(['anthropic', 'openai'] as const)(
+		'keeps the scheduler %s after the run ends',
+		(scheduler_provider) => {
+			const target = path.join(scratch, `${scheduler_provider}.json`)
+			const record = { ...carry(EPIC_RUN), scheduler_provider }
+
+			run_carry_ended.record_ended(target, { kind: 'carried', carry: record }, ENDED_AT)
+			expect(run_carry_ended.read_ended(target)?.scheduler_provider).toBe(scheduler_provider)
+		},
+	)
+
 	it('records the ended run’s invocation, start and end, and the next end replaces it', () => {
 		const target = path.join(scratch, 'replace.json')
 

@@ -1,0 +1,7 @@
+{
+	"reason": "Persist the actual scheduler provider through launch, new parent ownership, supervisor driver windows and ended records; reuse existing provider resolution and terminal width measurement.",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 73
+	}
+}

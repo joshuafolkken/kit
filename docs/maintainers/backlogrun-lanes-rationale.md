@@ -75,8 +75,8 @@ work trees, so `lane:open` answers `full` rather than handing out ports twice. T
 `epic:next`'s — it counts a parked child as having released its lane — and it costs one child offered
 that cannot get a lane, which is visible and recoverable.
 
-A `needs-human-review` stop lets in-flight lanes finish because killing units mid-gate would strand as
-many trees as there are lanes.
+A `needs-human-review` stop retains that lane for the person; other lanes continue and free lanes
+can take new children.
 
 ## Why CI concurrency is capped by the lane limit
 

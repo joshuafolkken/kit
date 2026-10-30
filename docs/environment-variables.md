@@ -62,8 +62,15 @@ A missing `.env` file is not itself an error: both commands also read the two va
 
 Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider.
 
+Set `JOSH_AGENT_PROVIDER=openai` in the project's `.env` to start `pnpm josh backlogrun` with Codex and its existing role profiles. `anthropic`, an unset value, or a blank value selects Claude Code.
+
+An exported value takes precedence over `.env`; `--agent claude|codex` takes precedence over both. Other nonempty provider values are rejected before launch. This default selects a new run; opening an existing run's board or using `--restart` keeps its recorded provider.
+
+Detached launchers also hand this variable to processes without an agent session. A detected session keeps determining its own provider.
+
 | Variable                            | Required | Default                                            | Used when                                                                  |
 | ----------------------------------- | -------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
+| `JOSH_AGENT_PROVIDER`               | No       | `anthropic`                                        | The default provider for a new `josh backlogrun`: `anthropic` or `openai`. |
 | `JOSH_SCHEDULER_MODEL`              | No       | `claude-opus-5-5`                                  | The model of the run that schedules the batch.                             |
 | `JOSH_SCHEDULER_EFFORT`             | No       | `medium`                                           | The effort of the run that schedules the batch.                            |
 | `JOSH_WORKER_MODEL`                 | No       | `claude-opus-5-5`                                  | The model of each lane that implements an Issue.                           |
@@ -154,13 +161,12 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | --------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `JOSH_LANE_CHILD`           | a `backlogrun` dispatch        | This session is a dispatched lane child.                                                                                                |
 | `JOSH_LANE_OVERRUN`         | a merged lane's overrun launch | This session investigates a merged lane's overrun; `josh issue:file` records its filings as the investigation's.                        |
-| `JOSH_LANE_SEAT`            | `josh lane:open`               | The lane's seat (`1`–`9`), added to the port offset.                                                                                    |
+| `JOSH_LANE_SEAT`            | `josh lane:open` / dispatch    | The last assigned seat (`1`–`9`), added to the port offset; reacquired before each start or re-dispatch.                                |
 | `JOSH_LANE_OUTPUT`          | `josh lane:open`               | Where the lane's child writes its output.                                                                                               |
 | `JOSH_LANE_AGENT_PROVIDER`  | a `backlogrun` dispatch        | The provider the lane's child was launched with.                                                                                        |
 | `JOSH_LANE_AGENT_ROLE`      | a `backlogrun` dispatch        | The role the lane's child was launched as.                                                                                              |
 | `JOSH_LANE_AGENT_MODEL`     | a `backlogrun` dispatch        | The model the lane's child was launched with.                                                                                           |
 | `JOSH_LANE_AGENT_EFFORT`    | a `backlogrun` dispatch        | The effort the lane's child was launched with.                                                                                          |
-| `JOSH_AGENT_PROVIDER`       | a detached launcher            | The provider handed to a process that is not itself an agent session; unset outside a session, the provider defaults to `anthropic`.    |
 | `JOSH_AGENT_HEADLESS`       | every kit agent launch         | This agent session was launched by kit, so no person reads its reply.                                                                   |
 | `JOSH_AGENT_ROLE`           | every kit agent launch         | The role this agent session was launched in; a reviewer takes no cut.                                                                   |
 | `JOSH_HOOK_CWD`             | every kit hook command         | The directory the hook was launched in; a hook resolves a call's relative path against it.                                              |

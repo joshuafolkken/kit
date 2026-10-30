@@ -13,11 +13,8 @@ const LAST_LANE_SEAT = 9
 /**
  * The free seats, lowest first — the ones no live lane holds.
  *
- * **Read from the lanes themselves — never from a counter.** A number derived from how many lanes
- * have ever been opened hands a closed-and-reopened lane the seat a running lane is still using; the
- * seats here come from the `JOSH_LANE_SEAT` of each open work tree, so closing one frees its seat and
- * nothing else has to be told. **An empty result means the caller fails** — the range is never
- * wrapped, because wrapping is that same collision under a friendlier name.
+ * The caller supplies current ownership, not saved tree counts. **An empty result means the caller
+ * fails** — the range is never wrapped, because wrapping would collide with a running lane.
  *
  * The whole ascending list is returned rather than only the lowest, because the caller claims each
  * seat atomically and steps to the next when a concurrent `lane:open` claimed it first:

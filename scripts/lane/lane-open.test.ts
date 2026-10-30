@@ -11,9 +11,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { GATE_CACHE_FILES } from '#scripts/josh/josh-command-types'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_registry } from './lane-open-registry-fixture'
 import { lane_paths } from './lane-paths'
-import type { LaneInfo, lane_registry as LaneRegistryModule } from './lane-registry'
+import type { LaneInfo } from './lane-registry'
+import { lane_seat } from './lane-seat'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 // joshuafolkken/kit#1490, joshuafolkken/kit#1494: opening a lane produces a work tree that keeps the
 // project's own `PORT_SEED` and adds its seat in `JOSH_LANE_SEAT`. `git_command` is mocked because
@@ -40,34 +43,11 @@ vi.mock('#scripts/lint/eslint-warm', () => ({ eslint_warm: { start: vi.fn() } })
 vi.mock('./lane-leftover', () => ({
 	lane_leftover: { reclaim: vi.fn() },
 }))
-vi.mock('./lane-registry', async (import_original) => {
-	type LaneRegistry = typeof LaneRegistryModule
-
-	const { lane_registry: actual } = await import_original<{ lane_registry: LaneRegistry }>()
-
-	return {
-		lane_registry: {
-			find_lane: (lanes: ReadonlyArray<LaneInfo>, issue: string): LaneInfo | undefined =>
-				lanes.find((lane) => lane.issue === issue),
-			list_lanes: vi.fn(),
-			main_repository_root: vi.fn(),
-			unreadable_lanes: (lanes: ReadonlyArray<LaneInfo>): Array<LaneInfo> =>
-				lanes.filter((lane) => !lane.is_stranded && lane.seat === undefined),
-			used_seats: (lanes: ReadonlyArray<LaneInfo>): Array<number> =>
-				lanes.flatMap((lane) => lane.seat ?? []),
-			// Real, so the `.env` this module writes lands on disk with the mode it is given.
-			write_environment: actual.write_environment,
-			OWNER_ONLY_MODE: actual.OWNER_ONLY_MODE,
-		},
-	}
-})
-
 const { git_command } = await import('#scripts/git/git-command')
 const { git_worktree } = await import('#scripts/git/git-worktree')
 const { lane_install } = await import('./lane-install')
 const { eslint_warm } = await import('#scripts/lint/eslint-warm')
 const { lane_leftover } = await import('./lane-leftover')
-const { lane_registry } = await import('./lane-registry')
 const { lane_open } = await import('./lane-open')
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'lane-open-test-'))
@@ -78,6 +58,8 @@ const CHAT_ID = 'TELEGRAM_CHAT_ID=42'
 const ROOT_SEED_LINE = 'PORT_SEED=5'
 const SEAT_1_LINE = 'JOSH_LANE_SEAT=1'
 const SEAT_2_LINE = 'JOSH_LANE_SEAT=2'
+const RESERVED_SEAT = 5
+const LOCK_DIRECTORY = '.seat-locks'
 const ROOT_ENV = [BOT_TOKEN, CHAT_ID, ROOT_SEED_LINE, ''].join('\n')
 // The permission bits are the mode below the file-type bits, `0o777` at most.
 const PERMISSION_RANGE = 0o1000
@@ -101,6 +83,10 @@ afterAll(() => {
 	Reflect.deleteProperty(process.env, lane_paths.LANE_ROOT_KEY)
 })
 
+afterEach(() => {
+	vi.restoreAllMocks()
+})
+
 function root_environment_file(): string {
 	return readFileSync(path.join(REPOSITORY_ROOT, '.env'), 'utf8')
 }
@@ -114,7 +100,7 @@ function lane_environment_mode(issue: string): number {
 }
 
 function seat_lock_path(seat: number): string {
-	return path.join(LANE_ROOT, '.seat-locks', `seat-${String(seat)}`)
+	return path.join(LANE_ROOT, LOCK_DIRECTORY, `seat-${String(seat)}`)
 }
 
 function live_lane(issue: string, seat: number | undefined): LaneInfo {
@@ -153,6 +139,8 @@ function git_answers(): void {
 	})
 }
 
+beforeEach(lane_seat_fixture.mock_ownership)
+
 beforeEach(() => {
 	rmSync(LANE_ROOT, { force: true, recursive: true })
 	mkdirSync(REPOSITORY_ROOT, { recursive: true })
@@ -165,6 +153,17 @@ beforeEach(() => {
 	// The stage an open writes goes to the checkout's own stream, which is a live run's: never from a test.
 	vi.spyOn(run_event_setup, 'emit').mockReset().mockResolvedValue()
 	git_answers()
+})
+
+it('writes the seat acquired by the shared allocator rather than choosing one independently', async () => {
+	vi.spyOn(lane_seat, 'reserve').mockResolvedValue({
+		seat: RESERVED_SEAT,
+		lock: seat_lock_path(RESERVED_SEAT),
+		issue_lock: path.join(LANE_ROOT, LOCK_DIRECTORY, `lane-${ISSUE}`),
+	})
+	await lane_open.open_lane(ISSUE)
+
+	expect(lane_environment_file(ISSUE)).toContain(`JOSH_LANE_SEAT=${String(RESERVED_SEAT)}`)
 })
 
 describe('opening a lane', () => {
@@ -251,7 +250,7 @@ describe('claiming a lane seat atomically', () => {
 	// The lock's window is the unreadable window and no longer: once the `.env` is on disk the lane is
 	// readable, so the lock is dropped before the multi-minute install runs. A lock outlasting that
 	// window would inflate the in-flight count and mask a genuinely broken lane (joshuafolkken/kit#2147).
-	it('releases the seat lock before the install runs, not after', async () => {
+	it('holds the seat lock until installation finishes, then releases it', async () => {
 		let is_lock_held_during_install = true
 
 		vi.mocked(lane_install.install_dependencies).mockImplementation(async () => {
@@ -262,7 +261,7 @@ describe('claiming a lane seat atomically', () => {
 
 		await lane_open.open_lane(ISSUE)
 
-		expect(is_lock_held_during_install).toBe(false)
+		expect(is_lock_held_during_install).toBe(true)
 	})
 
 	// The lock is what closes the gap between reading the free seats and writing the `.env`: a seat
@@ -280,6 +279,7 @@ describe('claiming a lane seat atomically', () => {
 	// stepping past it (joshuafolkken/kit#2147).
 	it('opens past an unreadable lane that still holds its seat lock', async () => {
 		mkdirSync(seat_lock_path(1), { recursive: true })
+		mkdirSync(path.join(LANE_ROOT, LOCK_DIRECTORY, `lane-${OTHER_ISSUE}`))
 		lanes_are([live_lane(OTHER_ISSUE, undefined)])
 
 		const outcome = await lane_open.open_lane(ISSUE)

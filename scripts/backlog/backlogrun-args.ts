@@ -1,4 +1,9 @@
-import type { AgentProvider } from '#scripts/agent/agent-role-profile'
+import {
+	agent_provider,
+	type AgentEnvironment,
+	type AgentProvider,
+	type ProviderResult,
+} from '#scripts/agent/agent-provider'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_invocation } from '#scripts/run/run-invocation'
 
@@ -25,8 +30,10 @@ const ISSUE_PREFIX = '#'
 const FLAG_PREFIX = '-'
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
-const AGENTS: Readonly<Record<string, AgentProvider>> = { claude: 'anthropic', codex: 'openai' }
-const DEFAULT_AGENT = 'claude'
+const AGENTS: ReadonlyMap<string, AgentProvider> = new Map([
+	['claude', 'anthropic'],
+	['codex', 'openai'],
+])
 
 interface BacklogrunArguments {
 	provider: AgentProvider
@@ -41,7 +48,7 @@ type ArgumentsResult =
 	| { kind: 'args'; args: BacklogrunArguments }
 	| { kind: 'stop' }
 	| { kind: 'restart' }
-	| { kind: 'refused' }
+	| { kind: 'refused'; note?: string }
 
 interface AgentSplit {
 	agent: string | undefined
@@ -52,11 +59,31 @@ interface AgentSplit {
 function split_agent(argv: ReadonlyArray<string>): AgentSplit {
 	const at = argv.indexOf(AGENT_FLAG)
 
-	if (at === NOT_FOUND) return { agent: DEFAULT_AGENT, rest: argv }
+	if (at === NOT_FOUND) return { agent: undefined, rest: argv }
 
 	const after = at + FLAG_AND_VALUE
 
-	return { agent: argv[at + 1], rest: [...argv.slice(0, at), ...argv.slice(after)] }
+	return { agent: argv[at + 1] ?? '', rest: [...argv.slice(0, at), ...argv.slice(after)] }
+}
+
+// Only the configured default matters here; the invoking session does not select the new run.
+function selected_provider(
+	agent: string | undefined,
+	environment: AgentEnvironment,
+): ProviderResult {
+	const { HANDED_PROVIDER_KEY } = agent_provider
+
+	if (agent === undefined) {
+		return agent_provider.resolve_provider({
+			[HANDED_PROVIDER_KEY]: environment[HANDED_PROVIDER_KEY],
+		})
+	}
+
+	const provider = AGENTS.get(agent)
+
+	return provider === undefined
+		? { kind: 'rejected', note: 'expected --agent claude|codex' }
+		: { kind: 'provider', provider }
 }
 
 function issue_token(token: string): string {
@@ -71,22 +98,26 @@ function normalized(rest: ReadonlyArray<string>): Array<string> {
 	return [...rest.slice(0, split_at).map((token) => issue_token(token)), ...rest.slice(split_at)]
 }
 
-function parse_start(argv: ReadonlyArray<string>): ArgumentsResult {
+function parse_start(argv: ReadonlyArray<string>, environment: AgentEnvironment): ArgumentsResult {
 	const { agent, rest } = split_agent(argv)
-	const provider = agent === undefined ? undefined : AGENTS[agent]
+	const selected = selected_provider(agent, environment)
 	const invocation = run_invocation.rebuild([BACKLOG_COMMAND, ...normalized(rest)].join(' '))
 
-	if (provider === undefined || invocation === undefined) return { kind: 'refused' }
+	if (invocation === undefined) return { kind: 'refused' }
+
+	if (selected.kind === 'rejected') {
+		return agent === undefined ? { kind: 'refused', note: selected.note } : { kind: 'refused' }
+	}
 
 	const issues = run_invocation.issue_numbers(invocation) ?? []
 
-	return { kind: 'args', args: { provider, invocation, issues } }
+	return { kind: 'args', args: { provider: selected.provider, invocation, issues } }
 }
 
-function parse(argv: ReadonlyArray<string>): ArgumentsResult {
+function parse(argv: ReadonlyArray<string>, environment: AgentEnvironment = {}): ArgumentsResult {
 	const lone = argv.map((token) => LONE_FLAGS.get(token)).find((kind) => kind !== undefined)
 
-	if (lone === undefined) return parse_start(argv)
+	if (lone === undefined) return parse_start(argv, environment)
 
 	return { kind: argv.length === 1 ? lone : 'refused' }
 }

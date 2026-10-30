@@ -12,8 +12,13 @@ import { run_ending } from '#scripts/run/run-ending'
 const MS_PER_SECOND = 1000
 
 // When the host last booted, in epoch milliseconds.
-function booted_ms(): number {
-	return Date.now() - uptime() * MS_PER_SECOND
+function booted_ms(): number | undefined {
+	try {
+		return Date.now() - uptime() * MS_PER_SECOND
+	} catch {
+		// A denied host reading is no evidence of a restart (joshuafolkken/kit#5431).
+		return undefined
+	}
 }
 
 // Whether the newest launch ended on its own exit record. The log is appended across launches, and where
@@ -30,8 +35,10 @@ async function is_host_restart(child: string, output: string | undefined): Promi
 
 	const lane = await lane_registry.find_open_lane(child)
 	const dispatched_ms = lane?.dispatched_ms
+	if (dispatched_ms === undefined) return false
+	const boot_ms = booted_ms()
 
-	return dispatched_ms !== undefined && dispatched_ms < booted_ms()
+	return boot_ms !== undefined && dispatched_ms < boot_ms
 }
 
 const run_merge_restart = { is_host_restart }

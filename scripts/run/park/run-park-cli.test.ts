@@ -37,6 +37,7 @@ const PARK_ARGV = [ISSUE, BODY_FILE_FLAG, BODY_FILE]
 writeFileSync(BODY_FILE, BODY)
 
 beforeEach(() => {
+	writeFileSync(BODY_FILE, BODY)
 	apply_mock.mockReset().mockResolvedValue({ is_labelled: true, is_commented: true })
 	clear_label_mock.mockReset().mockResolvedValue(true)
 	record_mock.mockReset().mockReturnValue(true)
@@ -51,6 +52,20 @@ afterAll(() => {
 
 // joshuafolkken/kit#4132: one call parks a lane child, and one call takes the park back off.
 describe('run:park', () => {
+	it.each(['推奨: A', 'recommend A', 'Recommended: A', 'RECOMMENDATION: A'])(
+		'refuses a reason containing %s before any park write',
+		async (recommendation) => {
+			writeFileSync(BODY_FILE, `${QUESTION}\n${recommendation}`)
+
+			await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+			expect(apply_mock).not.toHaveBeenCalled()
+			expect(record_mock).not.toHaveBeenCalled()
+			expect(console.error).toHaveBeenCalledWith(
+				expect.stringContaining('pnpm josh epic --decide <E> <N...> --decision-file <path|->'),
+			)
+		},
+	)
+
 	it('comments, applies needs-decision and records the park', async () => {
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
 		expect(apply_mock).toHaveBeenCalledWith(ISSUE, LABEL, expect.stringContaining(QUESTION))

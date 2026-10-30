@@ -1,0 +1,8 @@
+{
+	"reason": "Keep approval writes before verification and distinguish unknown Git checkouts from primary before carrying closed comment rounds.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 12,
+		"ai_cost.on_demand_bytes": 228
+	}
+}

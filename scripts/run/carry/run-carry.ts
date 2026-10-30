@@ -1,3 +1,4 @@
+import { agent_provider, type AgentProvider } from '#scripts/agent/agent-provider'
 import { git_command } from '#scripts/git/git-command'
 import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
@@ -58,6 +59,7 @@ const READ_COMMAND = 'pnpm josh run:carry --json'
 const OWNER_ARGUMENT = '--owner "$PPID"'
 
 interface RunCarry {
+	scheduler_provider?: AgentProvider | undefined
 	// The invocation the person typed — a `backlogrun` one in `run_invocation.rebuild`'s spelling — so
 	// a resumed session runs the same command rather than one it inferred. `CLAUDE.md` → "Explicit invocation required" forbids inferring; naming the
 	// invocation is what leaves nothing to infer. **It is not the ownership test** — that is
@@ -139,6 +141,7 @@ interface RunCarry {
 // token, so a reissued pid is never mistaken for the process that wrote the record — and the
 // transcript of the conversation that process runs, which outlives it (`run-carry-conversation.ts`).
 interface CarryOwner {
+	provider?: AgentProvider | undefined
 	pid?: number | undefined
 	start?: string | undefined
 	transcript?: string | undefined
@@ -189,6 +192,7 @@ const NO_OWNER: CarryOwner = {}
 const carry_addition_schema = z.object({ issue: z.number(), is_priority: z.boolean() })
 
 const run_carry_schema = z.object({
+	scheduler_provider: agent_provider.PROVIDER_SCHEMA.optional(),
 	invocation: z.string(),
 	started_at: z.string(),
 	merged: z.number(),
@@ -261,6 +265,7 @@ function owner_of(
 
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
 	return {
+		...(owner.provider && { scheduler_provider: owner.provider }),
 		invocation,
 		started_at: now.toISOString(),
 		merged: NO_INCREMENT,
@@ -309,6 +314,7 @@ function adopt_carry(
 	// writes `undefined`, so the previous owner cannot survive — and the declared hand-off is spent.
 	const next: RunCarry = {
 		...carry,
+		scheduler_provider: owner.provider,
 		owner_pid: owner.pid,
 		owner_start: owner.start,
 		owner_transcript: owner.transcript,

@@ -1,4 +1,5 @@
 import { josh_command } from '#scripts/josh/josh-run'
+import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
@@ -13,6 +14,22 @@ import { backlog_drive_owner } from './backlog-drive-owner'
 
 const ACTIVE = '2026-09-24T00:00:00.000Z'
 const WINDOW_MINUTES = 9
+
+it.each([false, true])(
+	'clears pending admission on driver exit, throwing=%s',
+	async (should_throw) => {
+		const keep = vi.spyOn(lane_launch_cli, 'keep_pending')
+		const read = vi.spyOn(run_carry, 'repository_directory')
+
+		vi.spyOn(lane_sampler, 'start').mockReturnValue(vi.fn())
+		vi.spyOn(console, 'info').mockImplementation(vi.fn())
+		if (should_throw) read.mockRejectedValue(new Error('git died'))
+		else read.mockResolvedValue(undefined)
+		await backlog_drive_cli.run(['--owner', '4242'])
+
+		expect(keep).toHaveBeenCalledWith([])
+	},
+)
 
 const CARRY: RunCarry = {
 	invocation: 'backlogrun',

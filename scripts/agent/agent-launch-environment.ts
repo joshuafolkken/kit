@@ -59,12 +59,12 @@ function build(
 	profile: AgentProfile | undefined,
 	environment: LaunchEnvironment = {},
 ): LaunchEnvironment {
-	if (profile === undefined) return environment
+	if (profile === undefined) return { ...environment, [agent_session_role.KEY]: undefined }
 
 	const marked = {
 		...agent_headless.environment(),
-		...agent_session_role.env_for(profile.role),
 		...environment,
+		...agent_session_role.env_for(profile.role),
 	}
 	if (profile.provider !== OPENAI_PROVIDER) return marked
 

@@ -14,6 +14,7 @@ import { lane_dispatch } from './lane-dispatch'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 import { lane_state, type RecordOutcome } from './lane-state'
 
 // joshuafolkken/kit#2464: the stall detector ages the last dispatch from the stream's `child-launch`, and
@@ -40,6 +41,8 @@ const LANE: LaneInfo = {
 	output: undefined,
 	is_stranded: false,
 }
+
+beforeEach(lane_seat_fixture.mock_start)
 
 beforeEach(() => {
 	vi.clearAllMocks()

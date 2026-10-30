@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
@@ -22,6 +23,7 @@ const ENDED_PREFIX = durable_state.PREFIX.ENDED
 const TRANSCRIPT_SUFFIX = '.jsonl'
 
 const ended_run_schema = z.object({
+	scheduler_provider: agent_provider.PROVIDER_SCHEMA.optional(),
 	invocation: z.string(),
 	started_at: z.string(),
 	ended_at: z.string(),
@@ -62,6 +64,7 @@ function record_ended(
 	const ended_at = now.toISOString()
 
 	stamp_file.replace_stamp(target, {
+		...(read.carry.scheduler_provider && { scheduler_provider: read.carry.scheduler_provider }),
 		invocation,
 		started_at,
 		ended_at,

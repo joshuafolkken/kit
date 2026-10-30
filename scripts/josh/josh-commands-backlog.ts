@@ -25,7 +25,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		],
 		usage: {
 			examples: [
-				{ arguments: '', note: 'start in Claude, then show the board' },
+				{ arguments: '', note: 'start with the configured provider, then show the board' },
 				{ arguments: '3437 --only', note: 'the arguments go to backlogrun as typed' },
 				{ arguments: '--agent codex', note: 'start in Codex' },
 				{ arguments: '--stop', note: 'stop the run in this repository' },

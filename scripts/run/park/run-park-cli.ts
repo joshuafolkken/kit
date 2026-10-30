@@ -27,6 +27,16 @@ const CLEAR_FLAG = '--clear'
 const USAGE = `Usage: josh run:park <issue-number> --body-file <path> | <issue-number> ${CLEAR_FLAG}`
 const CLEAR_OPTIONS = { clear: { type: 'boolean' } } as const
 
+function has_recommendation(body: string): boolean {
+	if (!/推奨|recommend/iu.test(body)) return false
+
+	console.error(
+		'Park refused: the reason contains a recommendation. Apply decision-autonomy in prompts/collaboration-workflow/operating-rules.md. For a reversible Tier A choice, adopt it and record the decision with pnpm josh epic --decide <E> <N...> --decision-file <path|-> (対象 / 採用 / 却下 / 理由 / 決定日), then continue. Tier C still requires explicit authorization; state the required action without recommending a choice.',
+	)
+
+	return true
+}
+
 function clear_issue(argv: ReadonlyArray<string>): string | undefined {
 	const parsed = cli_flags.arguments_of(argv, CLEAR_OPTIONS)
 
@@ -37,6 +47,9 @@ function clear_issue(argv: ReadonlyArray<string>): string | undefined {
 
 async function park(request: CommentRequest, directory: string): Promise<number> {
 	const { issue_number, body } = request
+
+	if (has_recommendation(body)) return FAILURE_EXIT_CODE
+
 	const write = await issue_park.apply(issue_number, NEEDS_DECISION_LABEL, body)
 	const is_parked = write.is_labelled && write.is_commented
 	const is_recorded = is_parked && run_park.record(issue_number, directory)

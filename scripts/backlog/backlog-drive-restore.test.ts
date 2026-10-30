@@ -12,6 +12,21 @@ function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-09-24T00:00:00.000Z' }
 }
 
+it('settles a human-review dispatch without retiring the issue from the run', () => {
+	const events = [
+		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(2, 'human-review', '#2508 waiting for human review'),
+	]
+
+	expect([...backlog_drive_restore.active_issues(events)]).toStrictEqual([])
+	expect(backlog_drive_restore.restore([CHILD], events, [], [CHILD])).toStrictEqual([])
+	expect([...backlog_drive_restore.settled_issues(events)]).toStrictEqual([Number(CHILD)])
+	expect(backlog_drive_restore.offer_exclude(events)).toStrictEqual([])
+	const resumed = [...events, event(3, CHILD_LAUNCH, CHILD_DISPATCHED)]
+
+	expect(backlog_drive_restore.restore([CHILD], resumed, [])).toStrictEqual([CHILD])
+})
+
 it('excludes from the offer the merged children and the ones still in flight', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),

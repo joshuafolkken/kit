@@ -182,7 +182,7 @@ pnpm josh cspell:dot   # includes dotfiles
 
 <!-- usage: check:related -->
 
-Run related lint, unit, type and dotfile spelling checks in parallel.
+Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes.
 
 ```bash
 pnpm josh check:related
@@ -192,6 +192,8 @@ pnpm josh check:related --full   # whole outputs
 <!-- /usage -->
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+
+`test:related` starts once `lint:related` passes; on a failed `lint:related` it is not run: its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`. A reused `lint:related` lets it start at once.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 
@@ -909,7 +911,7 @@ Helpers for AI-assisted development workflows.
 Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record.
 
 ```bash
-pnpm josh backlogrun                 # start in Claude, then show the board
+pnpm josh backlogrun                 # start with the configured provider, then show the board
 pnpm josh backlogrun 3437 --only     # the arguments go to backlogrun as typed
 pnpm josh backlogrun --agent codex   # start in Codex
 pnpm josh backlogrun --stop          # stop the run in this repository
@@ -919,6 +921,10 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 <!-- /usage -->
 
 The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+
+To default to Codex, add `JOSH_AGENT_PROVIDER=openai` to the project's `.env`. Provider selection is `--agent claude|codex` first, then the exported `JOSH_AGENT_PROVIDER`, then `.env`, then Claude Code (`anthropic`).
+
+The environment accepts `anthropic|openai`; an unset or blank value selects Claude, and other values are refused with a reason unless `--agent` overrides them. Codex uses the existing OpenAI role profiles. Changing this setting only affects a new launch: showing an existing run or `--restart` keeps its recorded provider.
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - A run already going here is never joined by a second: the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.
@@ -962,7 +968,9 @@ The run keeps the environment it started with, so this writes an override onto t
 
 - The next lane allocation uses the new limit. Raising it writes a `lane-limit` event, and the parent's `run:progress --wait` watcher wakes within a minute to fill the freed lanes.
 - Lowering it stops no running child; a lane that finishes is not refilled.
-- The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A lane with no child in it is not counted — its tree, branch and port seat stay, and when its issue is picked up again the driver starts it ahead of a fresh launch, inside the free lanes.
+- The lanes in use are the open lane work trees whose child is working, or whose process probe did not answer. A stopped lane keeps its tree and changes; its port seat becomes free once its owned processes and listeners are gone.
+- Every dispatch atomically acquires a seat and updates `.env` and the child's environment before starting. Kept trees are prioritized within the same free-seat limit as fresh launches.
+- A live or suspended lane child or listener keeps its seat; idle shells and portless helpers do not. Unreadable process ownership or ports block allocation with a reason. A saved `.env` seat alone is no reservation, so older stopped trees need no manual cleanup.
 - A lane whose child and every process under it are stopped (`lane:pause`, `kill -STOP`) is not counted either; `lane:resume` continues it in place, and it is counted again.
 - `run:board` leads the waiting row with `🧵 <used>/<limit>`; it counts the lanes in use and does not name them — some may be no board row, such as a lane an earlier run left.
 - The limit counts lanes, not memory or usage: the driver opens no lane under memory pressure or a Claude usage limit, and `run:board` leads the waiting row with `🧠` or `🪫 <reset>`.
@@ -1063,7 +1071,7 @@ pnpm josh lane:adopt --all   # every open lane with no record
 - A lane is recorded `open` only when every fact reads: its process probe answers that no child is there, and its work tree status, unpushed commits, pull request and issue all read. Any one unread leaves it unknown, counted in use as before. A lane with a record is left as it is.
 - The pull request is the branch's open one, else its newest, printed with its state — a reopened lane's branch can still carry the merged one.
 - `open`, not `paused`: nobody suspended it. The next launch moves it to `running`, and the next `backlogrun` takes the lane back while its issue still carries `in-progress`.
-- It still holds its port seat, as every open lane does.
+- It holds its port seat while its child or listeners remain; a stopped tree alone holds no seat.
 - An adoption adds one `note` line to the run's event stream (`#<N> adopted by lane:adopt`) — not a `lane-state` line, which would re-send the paused-lanes notice though no paused lane changed.
 
 **Output / exit codes:** one line per lane — `recorded open — branch <b> · uncommitted changes · <n> unpushed commit(s) · PR #<n> <OPEN|MERGED|CLOSED> · issue OPEN (<labels>)`, `already recorded <state>`, or `left unknown — <reason>`. Exit 0, also for a lane already recorded. A named lane left unknown, no open lane for it, or bad arguments, exit 1; under `--all` a lane left unknown is no failure.

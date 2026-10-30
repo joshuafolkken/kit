@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { git_worktree } from '#scripts/git/git-worktree'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
@@ -16,7 +17,7 @@ import { run_tail, type TailSection } from './run-tail'
 // — and go to `issue:cite`; the other two take none. A `run:tail` with no numbers still closes the run,
 // because `issue:cite` with no target exits zero.
 //
-// **A dispatched lane child skips the ledger step**. A flush opens a
+// **Every linked checkout, and a dispatched lane child, skips the ledger step**. A flush opens a
 // ledger-only pull request and waits out its whole CI before it merges — minutes per issue, spent on a
 // file only the retrospective and the measurements read — and a lane has nothing for it: its lines
 // merged with its own pull request. A single run outside a lane keeps the
@@ -50,8 +51,8 @@ const REPORT_STEPS: ReadonlyArray<Step> = [
 	{ header: run_tail.RELEASE_HEADER, argv: () => ['release:scope'] },
 ]
 
-function steps_for(is_lane_child: boolean): ReadonlyArray<Step> {
-	return is_lane_child ? REPORT_STEPS : [...LEDGER_STEPS, ...REPORT_STEPS]
+function steps_for(should_keep_checkout: boolean): ReadonlyArray<Step> {
+	return should_keep_checkout ? REPORT_STEPS : [...LEDGER_STEPS, ...REPORT_STEPS]
 }
 
 // Numbers only — a target `issue:cite` reads as an issue, so a stray flag is refused rather than
@@ -77,10 +78,11 @@ async function run_step(step: Step, issues: ReadonlyArray<string>): Promise<Tail
 async function close_run(issues: ReadonlyArray<string>): Promise<ReadonlyArray<TailSection>> {
 	const sections: Array<TailSection> = []
 
-	const is_lane_child = lane_child_marker.is_child_of(process.cwd())
+	const should_keep_checkout =
+		lane_child_marker.is_child_of(process.cwd()) || (await git_worktree.is_linked())
 
 	// eslint-disable-next-line no-await-in-loop -- the tail steps run in their declared order
-	for (const step of steps_for(is_lane_child)) sections.push(await run_step(step, issues))
+	for (const step of steps_for(should_keep_checkout)) sections.push(await run_step(step, issues))
 
 	return sections
 }

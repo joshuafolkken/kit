@@ -13,9 +13,9 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_preserve } from '#scripts/lane/lane-preserve'
-import { lane_reap } from '#scripts/lane/lane-reap'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { lane_seat_stop } from '#scripts/lane/lane-seat-stop'
 import { lane_vacant } from '#scripts/lane/lane-vacant'
 import { poll } from '#scripts/lib/poll'
 import { settled_together } from '#scripts/lib/settled-together'
@@ -301,7 +301,7 @@ async function do_merged(
 // `in-progress`, and close its lane if the child left nothing in it. The reap comes first, so the lane
 // reads with no live process.
 async function release_child(child: string): Promise<void> {
-	lane_reap.reap_child(await lane_registry.lane_location(child))
+	await lane_seat_stop.stop(child)
 	await run_label.unmark(child)
 	await close_vacant_lane(child)
 }
@@ -474,7 +474,7 @@ async function resume_cut(child: string): Promise<boolean> {
 
 	if (found === undefined || !run_cut.mark_merge_relaunched(found.target, found.cut)) return false
 
-	const result = lane_relaunch.resume(found.lane, found.cut.phase, (note) => {
+	const result = await lane_relaunch.resume(found.lane, found.cut.phase, (note) => {
 		console.error(note)
 	})
 

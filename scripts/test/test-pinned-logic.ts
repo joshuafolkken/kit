@@ -31,6 +31,8 @@ const SETTLED_VERDICTS: ReadonlySet<RedVerdict> = new Set<RedVerdict>(['red', ST
 
 interface Hunk {
 	file: string
+	// A move's disjoint deletion/addition; intervening hunks stay independent.
+	parts?: ReadonlyArray<Hunk>
 	// The first changed line of the working file; for a pure deletion, the line the removed ones sat after.
 	new_start: number
 	new_count: number
@@ -178,8 +180,11 @@ function start_index(hunk: Hunk): number {
 // The working file's content with this one hunk put back to the base's lines.
 function revert(content: string, hunk: Hunk): string {
 	const lines = content.split(LINE_BREAK)
+	const parts = (hunk.parts ?? [hunk]).toSorted(
+		(left, right) => start_index(right) - start_index(left),
+	)
 
-	lines.splice(start_index(hunk), hunk.new_count, ...hunk.old_lines)
+	for (const part of parts) lines.splice(start_index(part), part.new_count, ...part.old_lines)
 
 	return lines.join(LINE_BREAK)
 }

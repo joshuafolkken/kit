@@ -91,6 +91,7 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 	// A drive-closed measurement completes its issue as a merge does (`issue-merged.ts` → `is_measured`).
 	[KIND.MEASURED]: 'merged',
 	[KIND.PARK]: 'parked',
+	[KIND.HUMAN_REVIEW]: 'human',
 	[KIND.SPLIT]: 'done',
 	[KIND.STOP]: 'done',
 	[KIND.WITHDRAW]: 'withdrawn',
