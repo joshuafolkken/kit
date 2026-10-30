@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { agent_role_profile, type AgentProfile } from './agent-role-profile'
+import { agent_session_role } from './agent-session-role'
 
 const AGENT_COMMAND = 'codex'
 const AGENT_FLAGS: ReadonlyArray<string> = ['exec']
@@ -27,6 +28,10 @@ function effort_config(profile: AgentProfile): string {
 	return `model_reasoning_effort="${profile.effort}"`
 }
 
+function role_config(profile: AgentProfile): string {
+	return `shell_environment_policy.set.${agent_session_role.KEY}=${JSON.stringify(profile.role)}`
+}
+
 function sqlite_config(cwd: string): string {
 	return `sqlite_home=${JSON.stringify(path.resolve(cwd, ...SQLITE_CACHE_PATH))}`
 }
@@ -50,6 +55,8 @@ function build(invocation: string, profile: AgentProfile, cwd?: string): CodexAr
 			profile.model,
 			CONFIG_FLAG,
 			effort_config(profile),
+			CONFIG_FLAG,
+			role_config(profile),
 			...PERMISSION_ARGUMENTS,
 			...lane_arguments(cwd, profile),
 			JSON_FLAG,

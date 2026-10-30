@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { session_language, type Resolution } from './session-language'
@@ -63,7 +64,11 @@ async function is_run_live(ports: LivePorts = LIVE_PORTS): Promise<boolean> {
 }
 
 function prompt_lines(resolution: Resolution, is_live: boolean): Array<string> {
-	return [format_line(resolution), is_live ? BOARD_LINE : ''].filter((line) => line !== '')
+	return [
+		agent_session_role.scope_line(),
+		format_line(resolution),
+		is_live ? BOARD_LINE : '',
+	].filter((line) => line !== '')
 }
 
 async function print_prompt_lines(): Promise<void> {

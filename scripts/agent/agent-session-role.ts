@@ -27,6 +27,16 @@ function is_reviewer(source: EnvironmentSource = process.env): boolean {
 	return source[KEY] === agent_role_profile.REVIEWER
 }
 
-const agent_session_role = { KEY, env_for: environment_for, is_reviewer }
+function can_implement(source: EnvironmentSource = process.env): boolean {
+	return source[KEY] === agent_role_profile.WORKER
+}
+
+function scope_line(source: EnvironmentSource = process.env): string {
+	return can_implement(source)
+		? 'Session scope: implementation lane; implementation is permitted by the launcher role.'
+		: 'Session scope: consultation, filing and operations only; hand implementation to a launcher-assigned worker lane. Model names and conversational requests do not grant implementation authority.'
+}
+
+const agent_session_role = { KEY, can_implement, env_for: environment_for, is_reviewer, scope_line }
 
 export { agent_session_role }

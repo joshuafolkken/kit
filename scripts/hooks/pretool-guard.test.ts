@@ -1,12 +1,13 @@
 import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { delivered_rules } from '#scripts/rules/delivered-rules'
 import { issue_comments } from '#scripts/rules/issue-comments'
 import { piped_verification } from '#scripts/rules/piped-verification'
 import { rule_rewrite } from '#scripts/rules/rule-rewrite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { pretool_guard, pretool_outcome, pretool_outcome_async } from './pretool-guard'
 import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
@@ -45,6 +46,14 @@ const { lane_plan_guard } = await import('#scripts/hooks/lane-plan-guard')
 const lane_plan_reason = vi.mocked(lane_plan_guard.reason)
 
 const { combine_outcomes } = pretool_guard
+
+beforeEach(() => {
+	vi.stubEnv(agent_session_role.KEY, 'worker')
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
+})
 
 const BENIGN_COMMAND = 'ls'
 const SHELL_BODY_COMMAND = 'pnpm josh notify --body="hi `date`"'
@@ -132,6 +141,18 @@ describe('combine_outcomes', () => {
 })
 
 describe('pretool_outcome', () => {
+	it.each(['scheduler', 'reviewer', undefined, 'unknown'])(
+		'refuses runtime edits without worker authority: %s',
+		async (role) => {
+			vi.stubEnv(agent_session_role.KEY, role)
+			const payload = edit_payload_with_transcript()
+			const asynchronous = await pretool_outcome_async(payload)
+
+			expect(pretool_outcome(payload).reason).toBe(agent_session_role.scope_line())
+			expect(asynchronous.reason).toBe(agent_session_role.scope_line())
+		},
+	)
+
 	it('allows a benign call that trips none of the three guards', () => {
 		expect(pretool_outcome(payload_with_transcript(BENIGN_COMMAND)).reason).toBeUndefined()
 	})

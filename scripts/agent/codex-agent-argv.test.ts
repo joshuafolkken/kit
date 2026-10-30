@@ -22,6 +22,8 @@ describe('Codex argv construction', () => {
 					'-c',
 					`model_reasoning_effort="${profile.effort}"`,
 					'-c',
+					`shell_environment_policy.set.JOSH_AGENT_ROLE="${profile.role}"`,
+					'-c',
 					'default_permissions=":danger-full-access"',
 					'-c',
 					'approval_policy="never"',
