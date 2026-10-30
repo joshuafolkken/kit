@@ -194,6 +194,10 @@ start, or does not claim the run within two minutes, is a `failed` stop; an uncl
 
 **Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
 
+Trusted local Codex batches use `:danger-full-access` and `approval_policy="never"`.
+Launch from a normal Terminal outside an inherited OS sandbox; see
+[Codex batch permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
+
 | Provider  | scheduler                    | worker                       | reviewer                     |
 | --------- | ---------------------------- | ---------------------------- | ---------------------------- |
 | Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |

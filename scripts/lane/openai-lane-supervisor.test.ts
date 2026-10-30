@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
@@ -6,7 +6,6 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { OBSERVATION_LEDGER_DIRECTORY } from '#scripts/observations/observation-ledger'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
@@ -30,7 +29,6 @@ const launch = vi.spyOn(detached_launch, 'launch_attached')
 const worktree = vi.spyOn(run_cut, 'worktree_directory')
 const diagnostic = vi.spyOn(agent_diagnostics, 'check')
 const repository_directory = vi.spyOn(git_common_directory, 'repository')
-const common_directory = path.join(scratch, 'repository with spaces', '.git')
 const ship_current = vi.spyOn(openai_lane_ship, 'current')
 const ship_wait = vi.spyOn(openai_lane_ship, 'wait_for_ship')
 const with_server = vi.spyOn(lane_session_broker, 'with_server')
@@ -59,6 +57,14 @@ function launched_request(index = 0): LaunchRequest {
 	if (request === undefined) throw new Error('expected a child launch')
 
 	return request
+}
+
+function expect_trusted_launch(index = 0): void {
+	const { args } = launched_request(index).argv
+
+	expect(args).toContain('default_permissions=":danger-full-access"')
+	expect(args).toContain('approval_policy="never"')
+	expect(args.some((value) => value.startsWith('permissions.'))).toBe(false)
 }
 
 async function supervise(nonce: string): Promise<number> {
@@ -134,26 +140,16 @@ describe('OpenAI lane supervisor generations', () => {
 		expect(launched_request(1).argv.args).not.toContain(EPHEMERAL_FLAG)
 		expect(launched_request(1).profile).toStrictEqual(profile)
 		expect(launched_request(2).argv.args.at(-1)).toContain(RESUME_PROMPT)
+
+		for (const index of [0, 1, 2]) expect_trusted_launch(index)
 	})
 })
 
 describe('OpenAI lane supervisor Git access', () => {
-	it('grants the common Git directory and the ledger in the launched generation', async () => {
-		mkdirSync(common_directory, { recursive: true })
-		repository_directory.mockReturnValue(common_directory)
-
+	it('uses the trusted local policy without generating Git or ledger grants', async () => {
 		await supervise('git-common-directory')
 
-		const filesystem = launched_request().argv.args.join(' ')
-		const ledger = path.join(
-			path.dirname(common_directory),
-			path.dirname(OBSERVATION_LEDGER_DIRECTORY),
-		)
-
-		expect(repository_directory).toHaveBeenCalledWith(lane_directory)
-		expect(filesystem).toContain(`${JSON.stringify(realpathSync(common_directory))}="write"`)
-		expect(filesystem).toContain(`${JSON.stringify(realpathSync(ledger))}="write"`)
-		expect(filesystem).not.toContain('--add-dir')
+		expect_trusted_launch()
 	})
 })
 

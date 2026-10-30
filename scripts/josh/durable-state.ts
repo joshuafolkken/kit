@@ -13,9 +13,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // unreadable. Everything that means nothing past the process that wrote it — a lock, a pid, a socket,
 // a per-process cache — stays in `PLATFORM_TEMP_ROOT`, where a reboot clearing it is the right answer.
 //
-// **The common git directory rather than the home directory**, because a Codex lane's sandbox reads
-// `$HOME` but may write the common git directory (`codex-agent-argv.ts`), and every lane of one
-// repository shares it. A repository's own clone is also where `review-stops.jsonl` already lives.
+// **The common git directory rather than the home directory**, because every lane of one repository
+// shares it. A repository's own clone is also where `review-stops.jsonl` already lives.
 // Outside a repository there is no such directory, and the record falls back to the temp root.
 //
 // **Records a run left in `/tmp` are copied in once per directory, and a log not written for two
@@ -40,13 +39,8 @@ function state_root(override: string | undefined, common: string | undefined): s
 // Read once at import, as `PLATFORM_TEMP_ROOT` is, so both roots answer for the same override.
 const STATE_ROOT_OVERRIDE = process.env[platform_temporary.TEMP_ROOT_KEY]
 
-// The root for a named common git directory — what a launcher grants a sandboxed child before it runs.
-function root_for(common: string | undefined): string {
-	return state_root(STATE_ROOT_OVERRIDE, common)
-}
-
 function root(): string {
-	return root_for(git_common_directory.repository())
+	return state_root(STATE_ROOT_OVERRIDE, git_common_directory.repository())
 }
 
 // Every record kept here, by the prefix of its file name — the list the one-time copy from `/tmp`
@@ -101,11 +95,9 @@ function durable_path(prefix: string, key_root: string, suffix?: string): string
 
 const durable_state = {
 	PREFIX,
-	STATE_DIRECTORY_MODE,
 	ensure,
 	path: durable_path,
 	root,
-	root_for,
 	state_root,
 }
 
