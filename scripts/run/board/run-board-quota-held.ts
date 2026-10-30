@@ -5,7 +5,6 @@ import {
 	type QuotaProvider,
 	type QuotaReading,
 	type Quotas,
-	type QuotaWindow,
 } from './run-board-quota-read'
 
 // The usage-limit gauges' readings as the board holds them (joshuafolkken/kit#5395): a redraw draws
@@ -22,7 +21,7 @@ const NO_QUOTAS: Quotas = { claude: undefined, codex: undefined }
 // one holds.
 interface QuotaSource {
 	find: () => Promise<Array<QuotaFile>>
-	windows_of: (text: string) => Array<QuotaWindow>
+	reading_of: (text: string) => QuotaReading | undefined
 }
 
 interface QuotaPorts {
@@ -48,15 +47,13 @@ async function file_reading(
 	source: QuotaSource,
 	ports: QuotaPorts,
 	mark: QuotaMark | undefined,
-): Promise<QuotaReading> {
+): Promise<QuotaReading | undefined> {
 	if (mark !== undefined && is_unchanged(mark.file, file)) return mark.reading
 
-	const windows = await run_board_quota_read.windows_in(
+	return await run_board_quota_read.reading_in(
 		async (bytes) => await ports.read_tail(file.path, bytes),
-		source.windows_of,
+		source.reading_of,
 	)
-
-	return { windows, taken_ms: file.mtime_ms }
 }
 
 // The first of the files, newest first, that holds a reading; only that one is marked.
@@ -72,7 +69,9 @@ async function first_reading(
 
 	const reading = await file_reading(file, ports.sources[provider], ports, marks.get(provider))
 
-	if (reading.windows.length === 0) return await first_reading(older, provider, ports, marks)
+	if (reading === undefined || reading.windows.length === 0) {
+		return await first_reading(older, provider, ports, marks)
+	}
 
 	marks.set(provider, { file, reading })
 
@@ -85,13 +84,8 @@ async function fresh_reading(
 	marks: QuotaMarks,
 ): Promise<QuotaReading | undefined> {
 	const files = await ports.sources[provider].find()
-	const [newest] = files
 
-	if (newest === undefined) return undefined
-
-	const reading = await first_reading(files, provider, ports, marks)
-
-	return reading ?? { windows: [], taken_ms: newest.mtime_ms }
+	return await first_reading(files, provider, ports, marks)
 }
 
 // A provider whose file cannot be read reads as none; the other is read all the same.
@@ -128,13 +122,13 @@ function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
 
 // The production reader: the run-state directory's newest lane logs and Codex's newest rollout files.
 function live_quota_reader(): () => Promise<Quotas> {
-	const { claude_files, claude_windows, codex_files, codex_windows, read_tail } =
+	const { claude_files, claude_reading, codex_files, codex_reading, read_tail } =
 		run_board_quota_read
 
 	return quota_reader({
 		sources: {
-			claude: { find: async () => await claude_files(), windows_of: claude_windows },
-			codex: { find: async () => await codex_files(Date.now()), windows_of: codex_windows },
+			claude: { find: async () => await claude_files(), reading_of: claude_reading },
+			codex: { find: async () => await codex_files(Date.now()), reading_of: codex_reading },
 		},
 		read_tail,
 		now: Date.now,

@@ -31,7 +31,7 @@ function resume_of(child: number | string): string {
 
 // The next action as a clause, which a park comment's `Next:` and the plan's note end with.
 function next_step(child: number | string): string {
-	return `fix the cause, then resume it with \`${resume_of(child)}\` or remove \`${RUN_STALLED_LABEL}\` to offer it again`
+	return `fix the cause, then use \`pnpm josh run:add ${String(child)} --retry\` in the live backlogrun or resume it with \`${resume_of(child)}\``
 }
 
 function park_event(child: number | string, cause: string): string {

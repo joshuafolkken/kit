@@ -1,5 +1,4 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import type { StopFinding } from '#scripts/run/ship/run-ship-review'
@@ -71,8 +70,6 @@ function reuse_line(answer: ReuseAnswer): string {
 
 const NOT_REQUIRED_LINE =
 	'No review-finding ledger is kept in this checkout, so there is nothing to check.'
-const LANE_CARRY_LINE =
-	'Not carrying the closed issues’ comment rounds: a lane child leaves them to `pnpm josh observations:flush`.'
 const OPTIONS = {
 	issue: { type: 'string' },
 	check: { type: 'boolean' },
@@ -279,20 +276,6 @@ async function run_check(parsed: Parsed, root: string): Promise<number> {
 	return await report_check(Number(issue), CHECK_MODES[kind_of(parsed)], root)
 }
 
-// The closed issues' comment rounds ride this round's commit (`review-comment-round.ts`) — **except in a
-// lane child** (joshuafolkken/kit#5326): parallel lanes each wrote the same newly closed issue's file,
-// so their ships waited on each other's overlap and their merges with main conflicted on it.
-// `observations:flush` carries them for the lanes, on the default branch, in one pull request.
-async function carry_comment_rounds(root: string): Promise<void> {
-	if (lane_child_marker.is_child_of(root)) {
-		console.info(LANE_CARRY_LINE)
-
-		return
-	}
-
-	await review_comment_carry.carry_reported(root)
-}
-
 // The round lands in its own issue's file, so two lanes recording at once
 // write two files, and their pull requests never conflict on the ledger.
 interface AppendedRound {
@@ -318,7 +301,7 @@ async function append_round(round: AppendedRound): Promise<number> {
 
 	await observation_ledger_home.append(ledger_path, ledger_lines(round))
 	console.info(confirmation(lines.length, ledger_path))
-	await carry_comment_rounds(root)
+	await review_comment_carry.carry_from_record(root)
 
 	if (kind === 'code') await review_record_code_round.follow(issue, root, findings)
 

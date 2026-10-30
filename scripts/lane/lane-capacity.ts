@@ -11,16 +11,18 @@ import { lane_seed_policy } from './lane-seed'
 // is what would have to be undone the first time two epics run together, which is why the scheduler
 // is epic-free.
 //
-// **It is a ceiling, not a prediction.** Four lanes does not say four children will run at once; it
-// says a fifth will not start. What actually runs is bounded by what is runnable, by the port
+// **It is a ceiling, not a prediction.** Eight lanes does not say eight children will run at once; it
+// says a ninth will not start. What actually runs is bounded by what is runnable, by the port
 // seats `lane-seed.ts` can allocate, and by the machine.
 
-// Four rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
+// Eight rather than the nine seats `lane_seed_policy` can allocate: the seats are the hard structural
 // bound, this is the one a person tunes, and leaving headroom between them means raising the limit
 // never lands on "the ports ran out" as its first symptom. joshuafolkken/kit#3788 lowered it from
 // six: a week of `lane:stats` showed 1.5 effective lanes, while the hours at five or six lanes held
 // the swap peak, the slowest gates and most of the gate and commit failures.
-const DEFAULT_LANE_LIMIT = 4
+// joshuafolkken/kit#5409 raises it to eight with launch memory admission in the same core budget
+// ledger as the gates: memory bounds starts while gate reservations bound overlapping heavy work.
+const DEFAULT_LANE_LIMIT = 8
 const LANE_LIMIT_KEY = 'JOSH_LANE_LIMIT'
 const NO_LANES = 0
 
@@ -59,10 +61,8 @@ function seated_limit(limit: number): number {
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
 //
-// **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
-// `seated` counts every open lane, so the free count never offers more launches than seats are left.
-// The places left under the limit, port seats aside: what resuming a lane that keeps its seat is
-// weighed against (joshuafolkken/kit#4107).
+// `seated` counts current port ownership independently of execution places. A saved tree alone
+// holds no seat; a suspended process can still hold one while taking no execution place.
 function limit_room(limit: number, occupied: number): number {
 	return Math.max(NO_LANES, seated_limit(limit) - occupied)
 }

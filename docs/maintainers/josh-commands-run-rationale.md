@@ -3,6 +3,25 @@
 History behind [josh-commands-run.md](../josh-commands-run.md), kept here so the reference states
 only each command's contract — what it does, its arguments, output, exit codes and side effects.
 
+## Codex batch permissions
+
+Trusted local Codex batches use the shared launcher's built-in `:danger-full-access` permission
+profile and `approval_policy="never"` for scheduler, worker and reviewer, including supervisor
+generations (joshuafolkken/kit#5438). Custom filesystem profiles and Git pointer pins are retired.
+
+SQLite remains checkout-local; workers retain their rollout and the other roles remain ephemeral.
+User/project configuration and hooks still load. Merge, deletion and other explicit-authorization
+rules and verification gates remain in force. Codex hooks and Claude Code's deny list are separate
+mechanisms.
+
+The built-in profile and approval policy are documented in the
+[OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+Start these batches from a normal Terminal outside an inherited OS sandbox. A child permission
+profile cannot remove its parent's OS restrictions: Git worktree administration, RSS collection and
+nested sandbox tests can still be refused under a restricted parent. Such a refusal needs a fresh
+launch from the permitted environment, not a weaker verification gate.
+
 ## `josh lane:dispatch` applies `in-progress` before it launches
 
 Before the label moved to the dispatch, a lane counted as busy only once the child's own `fullrun`

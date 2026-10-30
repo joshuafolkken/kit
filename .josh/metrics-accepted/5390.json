@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #5390 requires the investigator brief to request callable signatures and test fixtures; these instructions need change-specific judgment and avoid repeated investigation.",
+	"date": "2026-10-30",
+	"growth": {
+		"ai_cost.on_demand_bytes": 397
+	}
+}

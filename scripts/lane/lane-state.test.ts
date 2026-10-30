@@ -24,6 +24,7 @@ const OPEN = 'lane:open'
 const DISPATCH = 'lane:dispatch'
 const PAUSE = 'lane:pause'
 const CLOSE = 'lane:close'
+const HUMAN_REVIEW = 'human-review'
 
 const state = { directory: '' }
 
@@ -132,6 +133,17 @@ describe('lane_state.read_states and paused_note', () => {
 })
 
 describe('lane_state.record_change — transitions', () => {
+	it('keeps a human-review lane until a fresh dispatch resumes it', async () => {
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), LAUNCHED_AT)
+		await record_at(change_of(HUMAN_REVIEW, 'run:hold --human-review-stop'), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({
+			state: HUMAN_REVIEW,
+			launched_at: LAUNCHED_AT.toISOString(),
+		})
+		await record_at(change_of('running', DISPATCH, { is_launch: true }), PAUSED_AT)
+		expect(await lane_state.read_state(ISSUE, state.directory)).toMatchObject({ state: 'running' })
+	})
+
 	it('writes no transition the lifecycle lacks, and warns instead', async () => {
 		await record_at(change_of('ended', CLOSE), OPENED_AT)
 		const outcome = await lane_state.record_change(change_of('paused', PAUSE), {

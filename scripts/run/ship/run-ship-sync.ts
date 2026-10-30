@@ -1,3 +1,4 @@
+import { git_gh_code_scanning } from '#scripts/gh/git-gh-code-scanning'
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import {
 	FAILURE_MESSAGE_PREFIX,
@@ -138,17 +139,18 @@ async function push_ahead(title: string): Promise<string> {
 	return push.code === SUCCESS_EXIT_CODE ? PUSHED_NOTE : [PUSH_FAILED_NOTE, push.out].join('\n')
 }
 
-// An unreadable pull request reads as none: the commit stage pushes after the gate either way.
-async function has_open_pull(): Promise<boolean> {
+// An unreadable pull request reads as none: the commit stage pushes after the gate either way, and
+// the followup merges again as it did before.
+async function open_pull_number(): Promise<number | undefined> {
 	try {
-		return (await git_gh_pr_read.pr_get_number(await git_command.branch())) !== undefined
+		return await git_gh_pr_read.pr_get_number(await git_command.branch())
 	} catch {
-		return false
+		return undefined
 	}
 }
 
 async function pushed_note(outcome: MergeOutcome, title: string): Promise<string> {
-	if (outcome.kind !== 'merged' || !(await has_open_pull())) return ''
+	if (outcome.kind !== 'merged' || (await open_pull_number()) === undefined) return ''
 
 	return await push_ahead(title)
 }
@@ -239,12 +241,39 @@ function is_checks_failure(failed: JoshResult): boolean {
 	return [failed.out, failed.err].some((text) => names_merge_fixable(text))
 }
 
+// The check code scanning reports as, by name in the followup's `failed checks:` list.
+const CODE_SCANNING_CHECK = 'CodeQL'
+
+// A red the code scanning check itself raised, including one reported beside a merge conflict.
+function names_code_scanning_red(text: string | undefined): boolean {
+	return text?.split(`${FAILURE_REASON_CHECKS}: `)[1]?.includes(CODE_SCANNING_CHECK) === true
+}
+
+// A code scanning alert in the pull request's own files stays red on any base, so a followup red on
+// the code scanning check stops on it, naming each rule and `file:line`, rather than merging and
+// gating again (joshuafolkken/kit#5381). Any other red merges again as before.
+async function own_alerts_stop(failed: JoshResult): Promise<StepResult | undefined> {
+	if ([failed.out, failed.err].every((text) => !names_code_scanning_red(text))) return undefined
+
+	const pr_number = await open_pull_number()
+	const note =
+		pr_number === undefined ? undefined : await git_gh_code_scanning.own_alerts_note(pr_number)
+	if (note === undefined) return undefined
+
+	return { ...failed, out: [failed.out, note].join('\n'), cause: run_ship_stop_cause.CAUSE.CHECK }
+}
+
 // The result to stop on, or `undefined` once a clean merge is pushed and the followup can wait again.
 // A followup that failed on the checks merges again whenever the default branch moved since the push,
 // conflicting or not: a red CI on the merge ref is then reproduced by the local gate or cleared by the
-// new push. An unmoved default branch, or any other failure, stands.
+// new push. An unmoved default branch, an alert in the pull request's own files, or any other failure
+// stands.
 async function merge_again(title: string, failed: JoshResult): Promise<StepResult | undefined> {
 	if (!is_checks_failure(failed)) return failed
+
+	const alerts = await own_alerts_stop(failed)
+
+	if (alerts !== undefined) return alerts
 
 	const outcome = await merge_outcome()
 

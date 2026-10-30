@@ -1,4 +1,5 @@
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
@@ -49,6 +50,8 @@ beforeEach(() => {
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	vi.spyOn(lane_registry, 'lane_location').mockResolvedValue(CHILD_LANE)
 })
+
+beforeEach(lane_seat_fixture.mock_stop)
 
 describe('run_merge_steps.do_outage — an unanswered ship stop', () => {
 	it('re-dispatches the child without adding to the outage streak', async () => {

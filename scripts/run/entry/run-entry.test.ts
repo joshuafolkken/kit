@@ -1,3 +1,4 @@
+import { run_step } from '#scripts/run/run-step'
 import { describe, expect, it } from 'vitest'
 import { run_entry, type EntryParts } from './run-entry'
 
@@ -14,6 +15,28 @@ function parts(overrides: Partial<EntryParts>): EntryParts {
 		...overrides,
 	}
 }
+
+describe('run_entry.stage_verdict — preserve the entry gates on PR resume', () => {
+	it('routes only ordinary implementation to the verification gate', () => {
+		expect(run_entry.stage_verdict('pr-open', 'implement')).toBe('gate')
+		expect(run_entry.stage_verdict('fresh', 'implement')).toBe('implement')
+	})
+
+	it.each([
+		run_step.UNKNOWN,
+		run_step.HUMAN_REVIEW,
+		run_step.UPDATE_DEPS,
+		run_step.ALREADY_DONE,
+		run_step.KEEP_WORK,
+	])('preserves %s from the fresh issue read', (verdict) => {
+		const resumed = run_entry.stage_verdict('pr-open', verdict)
+
+		expect(resumed).toBe(verdict)
+		expect(run_entry.exit_code(parts({ verdict: resumed }))).toBe(
+			verdict === run_step.UNKNOWN ? FAILED : OK,
+		)
+	})
+})
 
 describe('run_entry.summary — the first line carries the three facts a run branches on', () => {
 	it('names the hold, the budget and the pre-implementation verdict in order', () => {

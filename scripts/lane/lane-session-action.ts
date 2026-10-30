@@ -189,14 +189,14 @@ async function launch_reviews(lane: LaneInfo, action: ReviewAction): Promise<Bro
 }
 
 // An OpenAI lane's successor is its supervisor's to start, never a relaunch's.
-function relaunch(lane: LaneInfo, stop: ShipStop): BrokerAnswer {
+async function relaunch(lane: LaneInfo, stop: ShipStop): Promise<BrokerAnswer> {
 	if (lane_relaunch.is_openai_lane(lane)) {
 		return failure('an OpenAI lane is relaunched by its own supervisor')
 	}
 
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
 	const phase = agent_role_profile.IMPLEMENTATION_PHASE
-	const result = lane_relaunch.relaunch(lane, invocation, phase, console.error)
+	const result = await lane_relaunch.relaunch(lane, invocation, phase, console.error)
 
 	return result.kind === 'launched'
 		? SUCCESS
@@ -208,7 +208,7 @@ function relaunch(lane: LaneInfo, stop: ShipStop): BrokerAnswer {
 async function perform(lane: LaneInfo, action: BrokerAction): Promise<BrokerAnswer> {
 	if (await lane_parked.is_parked(lane.issue)) return failure('the issue is parked')
 
-	if (action.kind === 'relaunch') return relaunch(lane, action.stop)
+	if (action.kind === 'relaunch') return await relaunch(lane, action.stop)
 
 	return await launch_reviews(lane, action)
 }

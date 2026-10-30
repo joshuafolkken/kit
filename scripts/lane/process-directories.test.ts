@@ -38,6 +38,6 @@ describe('process_directories.lane_of', () => {
 
 describe('process_directories.list_all', () => {
 	it('lists nothing on a platform the board does not read', () => {
-		expect(process_directories.list_all('linux')).toStrictEqual(new Map())
+		expect(process_directories.list_all('win32')).toStrictEqual(new Map())
 	})
 })

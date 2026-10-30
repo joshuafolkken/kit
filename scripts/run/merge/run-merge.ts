@@ -38,7 +38,7 @@ const ONE = 1
 // - `merged`      — CLOSED by a merge; the child finished and its pull request merged. Also an OPEN, unparked
 //                   child a merged pull request's `closes #N` names — GitHub merged it without closing
 //                   the issue.
-// - `human-review` — OPEN and carrying `needs-human-review`; the run's own ending (needs-human-review.md).
+// - `human-review` — OPEN and carrying `needs-human-review`; only this child stops (needs-human-review.md).
 // - `parked`      — OPEN and carrying a park label (`PARKED_LABELS`); a person still owns it.
 // - `split`       — OPEN and carrying `epic`; its work was divided into new children.
 // - `outage`      — OPEN and carrying neither, but the exit record shows it could not reach the API, a

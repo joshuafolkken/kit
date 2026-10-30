@@ -9,7 +9,7 @@
 - **No clones — single-source, even across package boundaries.** Duplicate non-trivial logic only after presenting the alternative and getting explicit approval. `prompts/collaboration-workflow/principles.md` → "no-clones".
 - **Design for elegance and simplicity first.** Before adding a hook, guard, rule or abstraction, ask whether fixing the cause makes it unnecessary. `prompts/collaboration-workflow/principles.md` → "elegant-design"; conflicting quality goals, or a remedy for defects → "quality-priority".
 - **Write concise prose: conditions and actions only.** `prompts/collaboration-workflow/principles.md` → "concise-prose".
-- **Distinguish consultation from execution.** A question or goal statement asks for analysis only — act on an explicit imperative or a workflow keyword. `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
+- **Distinguish consultation from execution.** Main-session scope and implementation handoff: `prompts/collaboration-workflow/principles.md` → "consult-vs-execute".
 - **Route distributed-doc / config changes upstream to kit.** In a consumer repo never edit kit-distributed docs/config; in kit you are the source. `prompts/collaboration-workflow/principles.md` → "upstream-to-kit".
 - **Latest-first, fix forward — pin back only as a last resort.** `prompts/collaboration-workflow/principles.md` → "latest-first".
 - **Output language follows `JOSH_SESSION_LANG`** (default `ja`) for session output and artifact prose; English for Issue/PR titles, code comments, test titles, commit messages and script strings. `prompts/collaboration-workflow/overview.md`.

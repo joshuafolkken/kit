@@ -6,25 +6,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_board_quota_read } from './run-board-quota-read'
 
 const { FIVE_HOURS_MINUTES, SEVEN_DAYS_MINUTES } = run_board_quota_read
-const { claude_files, claude_windows, codex_files, codex_windows } = run_board_quota_read
+const { claude_files, claude_reading, codex_files, codex_reading } = run_board_quota_read
 const RESET_S = 1_761_730_000
 const RESET_MS = RESET_S * 1000
 const NOW_MS = Date.parse('2026-10-29T12:00:00')
 const NONE = 'null'
+const TAKEN = '2026-10-29T03:00:00Z'
+const TAKEN_MS = Date.parse(TAKEN)
+const EARLIER = '2026-10-28T03:00:00Z'
+// External logs can contain null timestamps; the parser must retain their windows.
+const NULL_TIME: unknown = JSON.parse(NONE)
+const INVALID_TIME = 'invalid'
+const UNKNOWN_TIME_TEST = 'keeps windows with unknown time for %s'
 
-function claude_line(five_hour: number, seven_day?: number): string {
+function claude_line(five_hour: number, seven_day?: number, timestamp?: unknown): string {
 	const windows = {
 		five_hour: { utilization: five_hour, resetsAt: RESET_S },
 		...(seven_day !== undefined && { seven_day: { utilization: seven_day, resetsAt: RESET_S } }),
 	}
 	const info = { status: 'allowed', unifiedWindows: windows }
 
-	return JSON.stringify({ type: 'rate_limit_event', rate_limit_info: info, session_id: 's' })
+	return JSON.stringify({ type: 'rate_limit_event', rate_limit_info: info, timestamp })
 }
 
 // A rollout's `token_count` line as Codex writes it, `rate_limits` given as its JSON text.
-function codex_line(rate_limits: string): string {
-	const head = '{"timestamp":"2026-10-29T03:00:00Z","type":"event_msg"'
+function codex_line(rate_limits: string, timestamp: unknown = TAKEN): string {
+	const head = JSON.stringify({ timestamp, type: 'event_msg' }).slice(0, -1)
 
 	return `${head},"payload":{"type":"token_count","rate_limits":${rate_limits}}}`
 }
@@ -46,68 +53,123 @@ async function written(file: string, seconds: number): Promise<string> {
 	return file
 }
 
-describe('run_board_quota_read.claude_windows', () => {
+describe('run_board_quota_read.claude_reading', () => {
 	it('reads the last rate_limit_event, both windows in percent', () => {
 		const text = [claude_line(0.1, 0.2), '{"type":"assistant"}', claude_line(0.42, 0.68)].join('\n')
 
-		expect(claude_windows(text)).toEqual([
-			{ minutes: FIVE_HOURS_MINUTES, used_percent: 42, resets_ms: RESET_MS },
-			{ minutes: SEVEN_DAYS_MINUTES, used_percent: 68, resets_ms: RESET_MS },
-		])
+		expect(claude_reading(text)).toEqual({
+			windows: [
+				{ minutes: FIVE_HOURS_MINUTES, used_percent: 42, resets_ms: RESET_MS },
+				{ minutes: SEVEN_DAYS_MINUTES, used_percent: 68, resets_ms: RESET_MS },
+			],
+			taken_ms: undefined,
+		})
 	})
 
 	it('reads a window the event leaves out as none, and a broken or cut line as no event', () => {
-		expect(claude_windows(claude_line(0.5))).toHaveLength(1)
-		expect(claude_windows(`${claude_line(0.5).slice(10)}\n{"type":"rate_limit_event"`)).toEqual([])
+		expect(claude_reading(claude_line(0.5))?.windows).toHaveLength(1)
+		expect(
+			claude_reading(`${claude_line(0.5).slice(10)}\n{"type":"rate_limit_event"`),
+		).toBeUndefined()
+	})
+
+	it('keeps the timestamp of the last usage event across unrelated later lines', () => {
+		const text = [
+			claude_line(0.1, undefined, EARLIER),
+			claude_line(0.42, undefined, TAKEN),
+			'{"type":"assistant","timestamp":"2026-10-30T03:00:00Z"}',
+		].join('\n')
+
+		expect(claude_reading(text)?.taken_ms).toBe(TAKEN_MS)
+	})
+
+	it.each([undefined, NULL_TIME, INVALID_TIME, 123])(UNKNOWN_TIME_TEST, (timestamp) => {
+		const parsed = claude_reading(claude_line(0.42, undefined, timestamp))
+
+		expect(parsed?.windows).toHaveLength(1)
+		expect(parsed?.taken_ms).toBeUndefined()
 	})
 })
 
-describe('run_board_quota_read.codex_windows', () => {
+describe('run_board_quota_read.codex_reading', () => {
 	it('reads the last non-null rate_limits, primary and secondary', () => {
 		const limits = `{"primary":${codex_window(12, 300)},"secondary":${codex_window(45, 10_080)}}`
 		const text = [codex_line(limits), codex_line(NONE)].join('\n')
 
-		expect(codex_windows(text)).toEqual([
-			{ minutes: 300, used_percent: 12, resets_ms: RESET_MS },
-			{ minutes: 10_080, used_percent: 45, resets_ms: RESET_MS },
-		])
+		expect(codex_reading(text)).toEqual({
+			windows: [
+				{ minutes: 300, used_percent: 12, resets_ms: RESET_MS },
+				{ minutes: 10_080, used_percent: 45, resets_ms: RESET_MS },
+			],
+			taken_ms: TAKEN_MS,
+		})
 	})
 
 	it('reads a free plan: one 30-day primary and no secondary', () => {
 		const text = codex_line(`{"primary":${codex_window(7, 43_200)},"secondary":${NONE}}`)
 
-		expect(codex_windows(text)).toEqual([{ minutes: 43_200, used_percent: 7, resets_ms: RESET_MS }])
+		expect(codex_reading(text)?.windows).toEqual([
+			{ minutes: 43_200, used_percent: 7, resets_ms: RESET_MS },
+		])
 	})
 
 	it('reads a file holding only null rate_limits or broken lines as none', () => {
-		expect(codex_windows(`${codex_line(NONE)}\n{"rate_limits":{broken`)).toEqual([])
+		expect(codex_reading(`${codex_line(NONE)}\n{"rate_limits":{broken`)).toBeUndefined()
+	})
+})
+
+describe('run_board_quota_read.codex_reading time', () => {
+	it('pairs time and values from the same latest event, ignoring unrelated append and null limits', () => {
+		const limits = `{"primary":${codex_window(42, 300)}}`
+		const text = [
+			codex_line(limits, EARLIER),
+			codex_line(limits),
+			codex_line(NONE, '2026-10-30T03:00:00Z'),
+			'{"timestamp":"2026-10-30T04:00:00Z","payload":{"type":"message"}}',
+		].join('\n')
+
+		expect(codex_reading(text)?.taken_ms).toBe(TAKEN_MS)
+	})
+
+	it.each([NULL_TIME, INVALID_TIME, 123])(UNKNOWN_TIME_TEST, (timestamp) => {
+		const parsed = codex_reading(codex_line(`{"primary":${codex_window(42, 300)}}`, timestamp))
+
+		expect(parsed?.windows).toHaveLength(1)
+		expect(parsed?.taken_ms).toBeUndefined()
+	})
+
+	it('keeps a timestamp-less legacy event unknown instead of inheriting an older time', () => {
+		const limits = `{"primary":${codex_window(42, 300)}}`
+		const legacy = `{"payload":{"rate_limits":${limits}}}`
+
+		expect(codex_reading(`${codex_line(limits)}\n${legacy}`)?.taken_ms).toBeUndefined()
 	})
 })
 
 // A lane log runs megabytes of tool output past its last `rate_limit_event`.
-describe('run_board_quota_read.windows_in', () => {
-	const { TAIL_BYTES, TAIL_LIMIT_BYTES, windows_in } = run_board_quota_read
+describe('run_board_quota_read.reading_in', () => {
+	const { TAIL_BYTES, TAIL_LIMIT_BYTES, reading_in } = run_board_quota_read
 
 	it('widens the tail until it holds a reading, and reads no wider', async () => {
 		const tail_of = vi.fn(async (bytes: number) =>
-			bytes > TAIL_BYTES ? claude_line(42) : full_tail(bytes),
+			bytes > TAIL_BYTES ? claude_line(0.42, undefined, TAKEN) : full_tail(bytes),
 		)
 
-		expect(await windows_in(tail_of, claude_windows)).toHaveLength(1)
+		expect(await reading_in(tail_of, claude_reading)).toMatchObject({ taken_ms: TAKEN_MS })
 		expect(tail_of.mock.calls.map(([bytes]) => bytes)).toEqual([TAIL_BYTES, TAIL_BYTES * 8])
 	})
 
 	it('stops at the limit where no tail holds a reading', async () => {
 		const tail_of = vi.fn(async (bytes: number) => full_tail(bytes))
 
-		expect(await windows_in(tail_of, claude_windows)).toEqual([])
+		expect(await reading_in(tail_of, claude_reading)).toBeUndefined()
 		expect(tail_of).toHaveBeenLastCalledWith(TAIL_LIMIT_BYTES)
 	})
 
 	it('reads no wider than a tail shorter than asked, the whole file', async () => {
 		const tail_of = vi.fn(async () => 'short')
 
-		expect(await windows_in(tail_of, claude_windows)).toEqual([])
+		expect(await reading_in(tail_of, claude_reading)).toBeUndefined()
 		expect(tail_of).toHaveBeenCalledTimes(1)
 	})
 })

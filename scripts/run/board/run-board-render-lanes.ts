@@ -18,7 +18,7 @@ import { run_board_usage_text, type CellLimits } from './run-board-usage-text'
 const { HEADER_ICONS } = run_board_labels
 const { cell_widths, cells_of, lane_limits } = run_board_usage_text
 const { columns_rule } = run_board_render_section
-const { ELAPSED_START, USAGE_START } = run_board_render_lead
+const { ELAPSED_START, LANES_LABEL, USAGE_START, column_offset, lane_label } = run_board_render_lead
 const { width_of } = run_board_fit
 const GAUGE = 5
 const CELL_GAP = ' '
@@ -26,7 +26,6 @@ const CELL_GAP = ' '
 const LABEL_TAIL = 2
 // Icons Unicode draws as emoji by default, which `string-width` counts two columns wide as a
 // terminal draws them: 🛤 and 🗜, text symbols drawn as emoji, overlapped the blank after them.
-const LANES_LABEL = `${run_board_labels.LANES_ICON} lanes`
 const COLUMN_LABELS = [`${HEADER_ICONS.cpu} CPU`, `${HEADER_ICONS.memory} MEM`, '🤏 CMPRS']
 
 // What one frame's lane cells are drawn with.
@@ -121,14 +120,17 @@ function label_columns(first: number, gauge: number): Array<RuleColumn> {
 function lanes_section(
 	lines: ReadonlyArray<PlanLine>,
 	cells: LaneCells | undefined,
+	header: BoardHeader,
 ): Array<PlanSection> {
 	if (lines.length === 0) return []
 
-	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START }
-	const usage = cells === undefined ? [] : label_columns(USAGE_START, cells.gauge)
-	const rule = columns_rule(LANES_LABEL, [elapsed, ...usage])
+	const offset = column_offset(header)
+	const label = lane_label(header)
+	const elapsed = { label: HEADER_ICONS.elapsed, start: ELAPSED_START + offset }
+	const usage = cells === undefined ? [] : label_columns(USAGE_START + offset, cells.gauge)
+	const rule = columns_rule(label, [elapsed, ...usage])
 
-	return [{ head: ['', rule], lines, label: LANES_LABEL, key: 'lanes' }]
+	return [{ head: ['', rule], lines, label, key: 'lanes' }]
 }
 
 const run_board_render_lanes = {

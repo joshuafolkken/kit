@@ -19,13 +19,13 @@ const MINUTES_PER_DAY = 1440
 const DAYS_PER_WEEK = 7
 const WEEK_MS = DAYS_PER_WEEK * MINUTES_PER_DAY * MS_PER_MINUTE
 const STALE_MINUTES = 10
-const BAR_WIDTH = 10
+const BAR_WIDTH = 20
 const PERCENT = 100
 const YELLOW_PERCENT = 50
 const RED_PERCENT = 90
 const INDENT = '  '
 const NAME_WIDTH = 13
-const CELL_WIDTH = 29
+const CELL_WIDTH = 39
 const FIRST_COLUMN = INDENT.length + NAME_WIDTH
 const NONE = '—'
 // `—` under a percent's last digit.
@@ -148,6 +148,8 @@ function lengths_of(windows: ReadonlyArray<QuotaWindow>): Array<string> {
 }
 
 function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
+	if (reading.taken_ms === undefined) return '(time unknown)'
+
 	const minutes = Math.floor((now_ms - reading.taken_ms) / MS_PER_MINUTE)
 
 	return minutes > STALE_MINUTES ? `(${String(minutes)}′ ago)` : undefined
@@ -162,12 +164,12 @@ function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
 	return [...cells, ...lengths_of(reading?.windows ?? [])].join('').trimEnd()
 }
 
-// A reading older than `STALE_MINUTES` is dimmed and says how old it is.
+// Age annotates the observation; values and warning colors remain readable as it ages.
 function reading_text(reading: QuotaReading | undefined, now_ms: number): string {
 	const cells = cells_text(reading, now_ms)
-	const stale = reading === undefined ? undefined : stale_text(reading, now_ms)
+	const stale = reading?.windows.length ? stale_text(reading, now_ms) : undefined
 
-	return stale === undefined ? cells : styleText('dim', `${cells} ${stale}`)
+	return stale === undefined ? cells : `${cells} ${styleText('dim', stale)}`
 }
 
 function hold_text(hold: QuotaHold, now_ms: number): string {

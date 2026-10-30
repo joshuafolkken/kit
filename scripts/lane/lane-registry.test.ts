@@ -10,6 +10,7 @@ import {
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { lane_seat_ownership } from './lane-seat-ownership'
 
 // joshuafolkken/kit#1490: the open lanes and their seats are read from git and from each lane's own
 // `.env`, never from a ledger. That is what makes `git worktree remove` erase the record of a seat
@@ -79,6 +80,7 @@ function list_of(...blocks: ReadonlyArray<string>): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_seat_ownership, 'snapshot').mockResolvedValue(undefined)
 	// `JOSH_LANE_ROOT` is a supported setting and vitest loads `.env` into `process.env`, so a machine
 	// that has one set would send `lane_root` somewhere other than the scratch tree and fail every
 	// test below. Blank is how `lane_paths` spells "not set", so this pins the default path.
@@ -88,6 +90,20 @@ beforeEach(() => {
 	vi.mocked(git_command.repository_root).mockResolvedValue(MAIN_TREE)
 	rmSync(LANE_ROOT, { force: true, recursive: true })
 	mkdirSync(LANE_ROOT, { recursive: true })
+})
+
+it('keeps a stopped tree and its saved seat while returning the reservation', async () => {
+	open_on_disk('1490', '6')
+	list_of(lane_block('1490'))
+	vi.mocked(lane_seat_ownership.snapshot).mockResolvedValue({
+		running: new Set(),
+		ports: new Set(),
+	})
+	const lanes = await lane_registry.list_lanes()
+
+	expect(lanes[0]?.seat).toBe(6)
+	expect(lanes[0]?.seat_held).toBe(false)
+	expect(lane_registry.used_seats(lanes)).toEqual([])
 })
 
 describe('reading the open lanes', () => {

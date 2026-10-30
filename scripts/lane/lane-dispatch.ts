@@ -20,6 +20,7 @@ import { lane_ledger_write } from './lane-ledger-write'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_resume, type ResumePlan } from './lane-resume'
+import { lane_seat_start } from './lane-seat-start'
 import { lane_state } from './lane-state'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
@@ -45,7 +46,6 @@ import { openai_lane_supervisor } from './openai-lane-supervisor'
 // procedure a `run:cut` successor follows, so naming it lets the child read one section rather than the
 // workflow-commands entry documents it would otherwise read to learn it is a resume at all.
 const NOTE_SEPARATOR = '; '
-const WARNING_TITLE = 'lane child dispatch'
 const WARNING_RECOVERY =
 	'Check the lane with `pnpm josh lane:list`, then run `pnpm josh lane:dispatch <issue-number>` again.'
 // The discriminant for a dispatch refused because the `in-progress` marker could not be applied, named
@@ -53,7 +53,6 @@ const WARNING_RECOVERY =
 const LABEL_UNSET_KIND = 'label-unset'
 const RESTART_START = 'restart'
 // The role a lane child runs under, resolved once so the fresh and resume builders read the same one.
-const RESOLVED_ROLE = agent_role_profile.WORKER
 
 interface Dispatched {
 	kind: 'dispatched'
@@ -263,7 +262,10 @@ async function started(request: StartRequest): Promise<DispatchOutcome> {
 			cwd: request.lane.directory,
 			log_path: request.log_path,
 			profile: request.profile,
-			env: lane_child_marker.env_for(request.lane.issue),
+			env: {
+				...lane_child_marker.env_for(request.lane.issue),
+				...lane_seat_start.environment(request.lane),
+			},
 		},
 		(note) => {
 			notes.push(note)
@@ -293,7 +295,7 @@ function built_for(plan: ResumePlan, profile: AgentProfile, lane: LaneInfo): Age
 // fresh dispatch never reads the record**: a person restarting a child (`lane:restart`) wants a new
 // session that reads the Issue from the start, whatever the previous one ended on.
 function prepared(lane: LaneInfo, is_fresh: boolean): Prepared {
-	const resolved = agent_role_profile.resolve(RESOLVED_ROLE)
+	const resolved = agent_role_profile.resolve(agent_role_profile.WORKER)
 
 	if (resolved.kind === 'rejected') return resolved
 
@@ -408,7 +410,11 @@ async function dispatch_child(
 
 	if (log.kind !== 'ready') return log
 
-	return await finish_dispatch(issue, { lane, log_path: log.path, ...built }, start)
+	return await lane_seat_start.start(
+		lane,
+		async (seated) =>
+			await finish_dispatch(issue, { lane: seated, log_path: log.path, ...built }, start),
+	)
 }
 
 // **A launch whose log could not be opened is still a launch, and the reader has to hear both halves.**
@@ -476,7 +482,7 @@ function is_worth_warning(outcome: DispatchOutcome): boolean {
 // own failures to standard error and never throws, so this cannot turn a refusal into an exception.
 async function warn_of_problem(outcome: DispatchOutcome, issue: string): Promise<void> {
 	await telegram_notify.warn({
-		issue_title: `${WARNING_TITLE} ${issue_cite.plain(issue)}`,
+		issue_title: `lane child dispatch ${issue_cite.plain(issue)}`,
 		body: describe(outcome, issue),
 		recovery: WARNING_RECOVERY,
 	})

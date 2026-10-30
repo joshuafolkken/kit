@@ -1,6 +1,7 @@
 import { composite_arguments, USAGE_ERROR_EXIT_CODE } from '#scripts/josh/josh-composite-arguments'
 import { error_text } from '#scripts/lib/error-message'
 import { git_command } from './git-command'
+import { git_worktree } from './git-worktree'
 import { gone_branch, type PruneResult } from './gone-branch'
 import { lockfile_sync } from './lockfile-sync'
 
@@ -29,12 +30,6 @@ const COMMAND_NAME = 'main:sync'
 const INSTALL_FAILURE =
 	'node_modules is behind pnpm-lock.yaml and `pnpm install --frozen-lockfile` failed; run `pnpm josh ms` again, or the install here by hand.'
 
-// `git_directories()` returns `[--absolute-git-dir, --git-common-dir]`. They are the same path in the
-// main work tree and differ in a linked one, which is git's own definition of the distinction rather
-// than a guess from a directory name.
-const OWN_GIT_DIRECTORY = 0
-const COMMON_GIT_DIRECTORY = 1
-
 // The refusal covers every linked work tree, not lanes alone, because the hijack is a property of
 // the work tree rather than of what opened it. It names both ways out for that reason.
 const LANE_REFUSAL = [
@@ -42,12 +37,6 @@ const LANE_REFUSAL = [
 	'Checking the default branch out here takes it from whichever work tree holds it, and a lane that loses its own branch drops out of `josh lane:list` with its port seat still allocated.',
 	'Run `pnpm josh ms` in the primary checkout instead; a lane is finished with `pnpm josh lane:close <issue-number>`.',
 ].join('\n')
-
-async function is_linked_work_tree(): Promise<boolean> {
-	const directories = await git_command.git_directories()
-
-	return directories[OWN_GIT_DIRECTORY] !== directories[COMMON_GIT_DIRECTORY]
-}
 
 // The count rather than the names: the first run on a long-lived checkout removes hundreds. A branch
 // `git branch -d` refused is named, because that one is left for a person to look at.
@@ -120,7 +109,7 @@ async function dispatch(argv: ReadonlyArray<string>): Promise<number> {
 		return USAGE_ERROR_EXIT_CODE
 	}
 
-	if (await is_linked_work_tree()) {
+	if (await git_worktree.is_linked()) {
 		console.error(LANE_REFUSAL)
 
 		return FAILURE_EXIT_CODE

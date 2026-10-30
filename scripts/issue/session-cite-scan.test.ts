@@ -104,6 +104,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
 	['run/merge/run-merge-cli.ts', 6],
+	['run/merge/run-merge-human-review.ts', 1],
 	// The `run:stalled` park event, and the resume command a park comment and a board row name.
 	['run/park/run-stalled.ts', 2],
 	// The `run:pause` stash name, its idempotence marker, and the pause comment on the paused Issue.

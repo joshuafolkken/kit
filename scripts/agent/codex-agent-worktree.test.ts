@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,21 +8,30 @@ import { codex_agent_argv } from './codex-agent-argv'
 
 const is_cli_available =
 	process.platform === 'darwin' && spawnSync('codex', ['--version']).status === 0
-const FETCH_HEAD = 'FETCH_HEAD'
-const PR_BODY = 'josh-pr-body.md'
-const PROTECTED = ['hooks/pre-commit', 'config', 'commondir', 'config.worktree']
-const CONTENT = 'sandbox regression\n'
 const ROOTS: Array<string> = []
-const PROBE = `
+const PROBE = String.raw`
+const {execFileSync} = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const [root, content, ...entries] = process.argv.slice(1);
-const results = entries.map(entry => {
-  try { fs.mkdirSync(path.dirname(path.join(root, entry)), {recursive:true});
-    fs.writeFileSync(path.join(root, entry), content); return 'write'; }
-  catch (error) { return error.code; }
-});
-process.stdout.write(JSON.stringify(results));
+const [root] = process.argv.slice(1);
+const git = args => execFileSync('git', args, {encoding:'utf8'}).trim();
+const detached = path.join(root, 'verification tree');
+git(['worktree', 'add', '--quiet', '--detach', detached, 'HEAD']);
+const own = execFileSync('git', ['rev-parse', '--absolute-git-dir'],
+  {cwd:detached, encoding:'utf8'}).trim();
+fs.writeFileSync(path.join(own, 'FETCH_HEAD'), 'fixture');
+fs.writeFileSync(path.join(own, 'josh-pr-body.md'), 'fixture');
+git(['worktree', 'remove', '--force', detached]);
+git(['worktree', 'add', '--quiet', '--detach', detached, 'HEAD']);
+git(['worktree', 'remove', '--force', detached]);
+const rows = execFileSync('ps', ['-axo', 'pid=,ppid=,rss=,comm='],
+  {encoding:'utf8'}).trim().split('\n');
+const ownRow = rows.map(row => row.trim().split(/\s+/)).find(row => Number(row[0]) === process.pid);
+const rss = ownRow?.[2];
+execFileSync('/usr/bin/time', ['-l', process.execPath, '-e', ''], {stdio:'pipe'});
+const nested = execFileSync('codex', ['sandbox', '-P', ':workspace', '--',
+  process.execPath, '-e', 'process.stdout.write("nested-ok")'], {encoding:'utf8'});
+process.stdout.write(JSON.stringify({removed:!fs.existsSync(detached), rss:Number(rss), nested}));
 `
 
 afterEach(() => {
@@ -73,47 +82,28 @@ function permissions(cwd: string): ReadonlyArray<string> {
 	)
 }
 
-function probe(cwd: string, root: string, entries: ReadonlyArray<string>): string {
+function probe(cwd: string, root: string): string {
 	const result = spawnSync(
 		'codex',
-		[
-			'sandbox',
-			'-C',
-			cwd,
-			...permissions(cwd),
-			'--',
-			process.execPath,
-			'-e',
-			PROBE,
-			root,
-			CONTENT,
-			...entries,
-		],
+		['sandbox', '-C', cwd, ...permissions(cwd), '--', process.execPath, '-e', PROBE, root],
 		{ encoding: 'utf8' },
 	)
 
-	expect(result.stderr).toBe('')
-	expect(result.status).toBe(0)
+	expect(result.status, result.stderr).toBe(0)
 
 	return result.stdout
 }
 
-// A table assertion alone misses Codex's implicit protection of linked worktree admin directories.
+// Real operations catch restrictions an argv assertion cannot observe (joshuafolkken/kit#5438).
 describe.skipIf(!is_cli_available)('Codex worktree sandbox regression', () => {
-	it('writes FETCH_HEAD and PR bodies while protecting Git execution and pointer files', () => {
+	it('creates, reuses and removes verification trees, measures RSS and nests a sandbox', () => {
 		const lane = worktree()
-		const own = git(lane, ['rev-parse', '--absolute-git-dir'])
-		const common = git(lane, ['rev-parse', '--path-format=absolute', '--git-common-dir'])
-		const pointer = readFileSync(path.join(own, 'commondir'), 'utf8')
+		const result: unknown = JSON.parse(probe(lane, path.dirname(lane)))
 
-		expect(probe(lane, own, [FETCH_HEAD, PR_BODY])).toBe(JSON.stringify(['write', 'write']))
-
-		for (const entry of [FETCH_HEAD, PR_BODY]) {
-			expect(readFileSync(path.join(own, entry), 'utf8')).toBe(CONTENT)
-		}
-
-		expect(probe(lane, own, PROTECTED)).toBe(JSON.stringify(PROTECTED.map(() => 'EPERM')))
-		expect(probe(lane, common, PROTECTED)).toBe(JSON.stringify(PROTECTED.map(() => 'EPERM')))
-		expect(readFileSync(path.join(own, 'commondir'), 'utf8')).toBe(pointer)
+		expect(result).toMatchObject({ removed: true, nested: 'nested-ok' })
+		expect(result).toHaveProperty(
+			'rss',
+			expect.toSatisfy((rss: number) => rss > 0),
+		)
 	})
 })

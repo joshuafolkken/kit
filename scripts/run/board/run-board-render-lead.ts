@@ -1,4 +1,5 @@
 import { run_board_earlier } from './run-board-earlier'
+import { run_board_fit } from './run-board-fit'
 import { run_board_fresh } from './run-board-fresh'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -31,6 +32,19 @@ const ELAPSED_START =
 	LANE_INDENT.length + PROGRESS_WIDTH + SPACE + ICON_WIDTH + SPACE + TIME_WIDTH + SPACE
 // The column a lane row's usage cells start at, after the lead and one blank; the processes rows' too.
 const USAGE_START = ELAPSED_START + TIME_WIDTH + SPACE
+const LANES_LABEL = `${run_board_labels.LANES_ICON} lanes`
+// Two leading rules, a space, and the separator before the first column.
+const RULE_ROOM = 6
+
+function lane_label(header: BoardHeader): string {
+	if (header.occupied_count === undefined) return LANES_LABEL
+
+	return `${LANES_LABEL} ${String(header.occupied_count)}/${String(header.lane_limit ?? '—')}`
+}
+
+function column_offset(header: BoardHeader): number {
+	return Math.max(0, run_board_fit.width_of(lane_label(header)) + RULE_ROOM - ELAPSED_START)
+}
 
 // A running row's part that changed at `at_ms`, emphasized while fresh (`run-board-fresh.ts`) — its
 // start and its phase; a settled row's are long past.
@@ -73,16 +87,21 @@ function lead_of(row: BoardRow, header: BoardHeader): string {
 	const icon = running_fresh(row, state_icon(row), row.status?.phase_ms, header)
 	const phase = phase_time(row, header, TIME_WIDTH)
 
-	return [progress_of(row, header), icon, phase, whole_of(row, header)].join(' ')
+	const progress = `${progress_of(row, header)}${' '.repeat(column_offset(header))}`
+
+	return [progress, icon, phase, whole_of(row, header)].join(' ')
 }
 
 const run_board_render_lead = {
 	ELAPSED_START,
+	LANES_LABEL,
 	LANE_INDENT,
 	TIME_WIDTH,
 	USAGE_START,
+	column_offset,
 	indent_of,
 	lead_of,
+	lane_label,
 	running_fresh,
 }
 

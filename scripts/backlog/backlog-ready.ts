@@ -81,15 +81,17 @@ async function occupancy_of(
 	return { occupied, idle: lane_spent.idle_lanes(open, trace), unknown }
 }
 
-// The open lanes as the free count reads them: those that hold a place under the limit, and every
-// open one, since an uncounted lane still holds its port seat.
+// Execution places and port ownership are independent; a saved tree alone occupies neither seat.
 async function lane_room(
 	lanes?: ReadonlyArray<LaneInfo>,
 	table: TableRead = lane_process_table.read_table,
 ): Promise<LaneRoom> {
 	const open = lanes ?? (await lane_registry.list_lanes())
 	const occupancy = await occupancy_of(open, table)
-	const seated = open.filter((lane) => !lane.is_stranded).length
+	const seated =
+		lane_registry.unreadable_lanes(open).length > 0
+			? lane_capacity.seated_limit(Infinity)
+			: lane_registry.used_seats(open).length
 
 	const use = { occupied: occupancy.occupied.length, seated, unknown: occupancy.unknown }
 
@@ -155,7 +157,7 @@ async function drive_free_lane_count(): Promise<number> {
 	return await free_under(await drive_limit())
 }
 
-// The drive's room under the limit alone, for resuming a kept lane, which already holds its port seat.
+// Execution room alone; the drive also checks free port seats for fresh and resumed children.
 async function drive_limit_room(): Promise<number> {
 	const limit = await drive_limit()
 	const use = await lane_use()

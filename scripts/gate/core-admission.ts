@@ -38,6 +38,8 @@ interface LedgerReservation {
 	admitted_at?: number | undefined
 	granted?: number | undefined
 	is_unit?: boolean | undefined
+	is_strict_admission?: boolean | undefined
+	is_memory_pending?: boolean | undefined
 }
 
 interface LedgerEntry {
@@ -191,7 +193,13 @@ function is_swap_held(
 // like the first waiter (`first_waiter_limit`) until a poll reads the load back under the cap, or stalled
 // on swap (`is_swap_stalled`), where it waits until the traffic stops or its memory is free.
 function runs_alone(placement: Placement, budget: MachineBudget): boolean {
-	if (!placement.is_oldest || placement.running.length > 0) return false
+	if (
+		!placement.is_oldest ||
+		placement.running.length > 0 ||
+		placement.own.reservation.is_strict_admission === true
+	) {
+		return false
+	}
 
 	return budget.is_overloaded !== true && !is_swap_stalled(placement, budget)
 }
@@ -252,7 +260,11 @@ function admitted_keys(
 function is_ramped(reservation: LedgerReservation, now: number): boolean {
 	const { admitted_at } = reservation
 
-	return admitted_at !== undefined && now - admitted_at >= RAMP_UP_MS
+	return (
+		reservation.is_memory_pending !== true &&
+		admitted_at !== undefined &&
+		now - admitted_at >= RAMP_UP_MS
+	)
 }
 
 // **The load the ledger already accounts for.** CPU use shows in the reading the moment a tool starts,
@@ -356,6 +368,7 @@ const core_admission = {
 	RAMP_UP_MS,
 	admitted_keys,
 	admitted_load,
+	compare_claim,
 	describe_overflow,
 	is_admitted,
 	is_swap_held,

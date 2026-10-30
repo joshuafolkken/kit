@@ -8,6 +8,7 @@ import { test_pinned_ledger, type PinnedOrigin, type ProbeTime } from './test-pi
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_pinned_stage, type Staged, type StagePlan } from './test-pinned-stage'
+import { test_pinned_type_check } from './test-pinned-type-check'
 import { test_red } from './test-red'
 import type { RedProbe } from './test-red-logic'
 import { related_scope, type RelatedScope } from './test-related-scope'
@@ -21,7 +22,7 @@ import { unit_worker_share } from './unit-worker-share'
 // A hunk with a `recheck` runs only those tests — the ones added or edited since its stored `green` or
 // `no-test` verdict, or the ones its stored `red` failed in (`test-pinned-cache-logic.ts`); a `red`
 // recheck they no longer fail falls back to a fresh probe, which runs in stages where the file's reach
-// is wide (`test-pinned-stage.ts`).
+// is wide (`test-pinned-stage.ts`), type-checked between the stages (`test-pinned-type-check.ts`).
 
 const TREE_PREFIX = 'josh-test-pinned-'
 const HEAD = 'HEAD'
@@ -95,8 +96,21 @@ async function selection_of(
 	return selection_over(root, plan.direct ?? plan.reach, workers)
 }
 
-// The run with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
+// `action` with this one hunk reverted. The file is put back before the next hunk runs, or that hunk's
 // tests would also see this revert.
+async function with_revert<T>(tree: BaseTree, hunk: Hunk, action: () => Promise<T>): Promise<T> {
+	const target = path.join(tree.tree, hunk.file)
+	const content = await readFile(target, 'utf8')
+
+	await writeFile(target, test_pinned_logic.revert(content, hunk))
+
+	try {
+		return await action()
+	} finally {
+		await writeFile(target, content)
+	}
+}
+
 async function reverted_run(
 	tree: BaseTree,
 	hunk: Hunk,
@@ -104,16 +118,16 @@ async function reverted_run(
 ): Promise<RedProbe> {
 	if (selection === undefined) return NO_TEST
 
-	const target = path.join(tree.tree, hunk.file)
-	const content = await readFile(target, 'utf8')
+	return await with_revert(tree, hunk, async () => await test_red.probe_in(tree, selection))
+}
 
-	await writeFile(target, test_pinned_logic.revert(content, hunk))
+// Whether the type check over the hunk's file and its direct importers reads red with it reverted and
+// green without: a scope already red before the revert answers nothing.
+async function is_reverted_type_red(tree: BaseTree, hunk: Hunk): Promise<boolean> {
+	const scope = await test_pinned_type_check.scope_of(hunk.file)
+	if (scope.length === 0 || (await test_pinned_type_check.is_red(tree, scope))) return false
 
-	try {
-		return await test_red.probe_in(tree, selection)
-	} finally {
-		await writeFile(target, content)
-	}
+	return await with_revert(tree, hunk, async () => await test_pinned_type_check.is_red(tree, scope))
 }
 
 // Set once a probe is unpinned in a `--first-unpinned` run (joshuafolkken/kit#5153): no lane starts
@@ -140,7 +154,11 @@ async function fresh_verdict(tree: BaseTree, probe: Probe, lane: Lane): Promise<
 		return await reverted_run(tree, probe.hunk, selection_over(tree.tree, files, lane.workers))
 	}
 
-	return await test_pinned_stage.staged_verdict(plan, run, lane.staged)
+	async function is_type_red(): Promise<boolean> {
+		return await is_reverted_type_red(tree, probe.hunk)
+	}
+
+	return await test_pinned_stage.staged_verdict(plan, run, is_type_red, lane.staged)
 }
 
 // The hunk's verdict: its recheck's answer, or a fresh probe where it answers none.
