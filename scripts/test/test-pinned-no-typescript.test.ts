@@ -21,6 +21,7 @@ const COMMENT_DIFF = [
 	'+// a new comment',
 	'',
 ].join('\n')
+const MOVE_DIFF = `--- a/${CHANGED}\n+++ b/${CHANGED}\n@@ -2 +1,0 @@\n-role\n@@ -3,0 +3 @@\n+role\n`
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -37,4 +38,17 @@ it('reports an added file unchecked and keeps a comment hunk when typescript is 
 
 	expect(report.unparsed).toEqual([ADDED])
 	expect(report.unchecked.map((hunk) => test_pinned_logic.location(hunk))).toEqual([`${CHANGED}:3`])
+})
+
+it('keeps both ends of a move together when typescript is absent', async () => {
+	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue('base')
+	vi.spyOn(changed_paths, 'read_changed_since').mockResolvedValue([CHANGED])
+	vi.spyOn(changed_paths, 'read_held_at').mockResolvedValue([CHANGED])
+	vi.spyOn(git_spawn, 'read').mockResolvedValue(MOVE_DIFF)
+	vi.spyOn(review_code_tree, 'load_typescript').mockReturnValue(undefined)
+
+	const report = await test_pinned.run(0)
+
+	expect(report.unchecked).toHaveLength(1)
+	expect(report.unchecked[0]?.parts).toHaveLength(2)
 })

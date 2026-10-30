@@ -38,7 +38,8 @@ function probed_of(
 		.map((hunk, index) => ({ hunk, content: contents[index] ?? '' }))
 		.filter((read) => changes_runtime(api, read.content, read.hunk))
 	const probed = runtime.filter(
-		(read) => !test_pinned_rewire.is_rewire(api, read.content, read.hunk),
+		(read) =>
+			read.hunk.parts !== undefined || !test_pinned_rewire.is_rewire(api, read.content, read.hunk),
 	)
 
 	return { hunks: probed.map((read) => read.hunk), rewired: runtime.length - probed.length }

@@ -24,7 +24,8 @@ interface CodeChange {
 
 // A stub probe on an added file puts back a body it wrote, not the base's lines, so it records nothing.
 function is_line_hunk(hunk: Hunk): boolean {
-	return hunk.function_name === undefined
+	// A green move proves only its joint revert, never either end on its own.
+	return hunk.function_name === undefined && hunk.parts === undefined
 }
 
 // The line hunks whose verdict is `green` — the ones the cache records, and the only ones its `pruned`

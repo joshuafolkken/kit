@@ -45,6 +45,12 @@ interface PinnedSummary extends ReportParts {
 // key (joshuafolkken/kit#4775): the file, the function, and a digest of the lines the change replaced
 // and the lines it put in their place.
 function site_of(hunk: UnpinnedHunk): string {
+	if (hunk.parts !== undefined) {
+		return stamp_file.digest(
+			JSON.stringify(hunk.parts.map((part) => site_of({ ...part, is_green: hunk.is_green }))),
+		)
+	}
+
 	const body = JSON.stringify([hunk.new_count, hunk.old_lines, hunk.new_lines ?? []])
 	const key = stamp_file.digest(body).slice(0, SITE_KEY_LENGTH)
 	const place = hunk.function_name === undefined ? hunk.file : `${hunk.file} ${hunk.function_name}`
