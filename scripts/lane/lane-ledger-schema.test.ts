@@ -5,6 +5,7 @@ import { lane_ledger_schema } from './lane-ledger-schema'
 
 const { KIND, entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
+const PROBED = 'scripts/a.ts'
 
 // joshuafolkken/kit#5078
 describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
@@ -14,7 +15,7 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 			at: AT,
 			issue: 5078,
 			held: 2,
-			probes: [{ file: 'scripts/a.ts', elapsed_ms: 5 }],
+			probes: [{ file: PROBED, elapsed_ms: 5 }],
 			elapsed_ms: 9,
 		}
 
@@ -42,6 +43,18 @@ describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 
 		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
 		expect(entry_schema.safeParse({ ...run, origin: 'ship' }).success).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5385
+describe('lane_ledger_schema.entry_schema on a test-pinned probe', () => {
+	it('keeps a probe the type check pinned, and rejects an unknown pinner', () => {
+		const probe = { file: PROBED, elapsed_ms: 5, pinned_by: 'type-check' }
+		const run = { kind: KIND.TEST_PINNED, at: AT, held: 0, probes: [probe], elapsed_ms: 9 }
+		const unknown = { ...run, probes: [{ ...probe, pinned_by: 'lint' }] }
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+		expect(entry_schema.safeParse(unknown).success).toBe(false)
 	})
 })
 

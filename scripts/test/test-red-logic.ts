@@ -13,13 +13,16 @@ import { test_declared_logic } from './test-declared-logic'
 // of them has to fail there.
 
 type RedVerdict = 'red' | 'green' | 'no-test' | 'stopped' | 'test-only'
+type PinnedBy = 'type-check'
 
 // One run's verdict and the test files that failed in it. `ran` is the number of test files the run
-// ran, absent on a verdict read back from a cache (joshuafolkken/kit#5078).
+// ran, absent on a verdict read back from a cache (joshuafolkken/kit#5078). `pinned_by` marks a `red`
+// the type check reached, not a test (joshuafolkken/kit#5385).
 interface RedProbe {
 	verdict: RedVerdict
 	failed: ReadonlyArray<string>
 	ran?: number
+	pinned_by?: PinnedBy
 }
 
 // The declaration a bug-fix Issue carries under its background heading, in the same slot as the
@@ -119,5 +122,5 @@ const test_red_logic = {
 	verdict_for,
 }
 
-export type { RedProbe, RedVerdict }
+export type { PinnedBy, RedProbe, RedVerdict }
 export { test_red_logic }

@@ -2,11 +2,14 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_ledger } from './test-pinned-ledger'
+import type { Hunk } from './test-pinned-logic'
+import type { PinnedBy, RedProbe } from './test-red-logic'
 
 const FILE = 'scripts/a.ts'
 const PROBE = { file: FILE, tests: 2, elapsed_ms: 1500 }
 const BACKGROUND = 'run-review'
 const PRE_DETACH = 'pre-detach'
+const TYPE_CHECK: PinnedBy = 'type-check'
 
 afterEach(() => {
 	vi.restoreAllMocks()
@@ -90,5 +93,18 @@ describe('test_pinned_ledger.time_of', () => {
 		expect(test_pinned_ledger.time_of(hunk, { verdict: 'red', failed: [], ran: 2 }, 1500)).toEqual(
 			PROBE,
 		)
+	})
+
+	// joshuafolkken/kit#5385
+	it('records a red the type check reached as pinned by it', () => {
+		const hunk: Hunk = { file: FILE, new_start: 1, new_count: 1, old_lines: [] }
+		const verdict: RedProbe = { verdict: 'red', failed: [], pinned_by: TYPE_CHECK }
+
+		expect(test_pinned_ledger.time_of(hunk, verdict, 1500)).toStrictEqual({
+			file: FILE,
+			tests: undefined,
+			elapsed_ms: 1500,
+			pinned_by: TYPE_CHECK,
+		})
 	})
 })

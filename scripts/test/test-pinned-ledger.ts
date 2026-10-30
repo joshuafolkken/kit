@@ -3,7 +3,7 @@ import { lane_ledger_schema } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { lane_paths } from '#scripts/lane/lane-paths'
 import type { Hunk } from './test-pinned-logic'
-import type { RedProbe } from './test-red-logic'
+import type { PinnedBy, RedProbe } from './test-red-logic'
 
 // One `test-pinned` ledger row per `josh test:pinned` run that probed (joshuafolkken/kit#5078): how
 // many hunks the verdict cache answered, and each probed hunk's test files and wall time, so
@@ -13,10 +13,13 @@ interface ProbeTime {
 	file: string
 	tests?: number | undefined
 	elapsed_ms: number
+	pinned_by?: PinnedBy | undefined
 }
 
 function time_of(hunk: Hunk, verdict: RedProbe, elapsed_ms: number): ProbeTime {
-	return { file: hunk.file, tests: verdict.ran, elapsed_ms }
+	const time: ProbeTime = { file: hunk.file, tests: verdict.ran, elapsed_ms }
+
+	return verdict.pinned_by === undefined ? time : { ...time, pinned_by: verdict.pinned_by }
 }
 
 // What started a run (joshuafolkken/kit#5262): `run:review`'s background check, the ship's pre-detach,
