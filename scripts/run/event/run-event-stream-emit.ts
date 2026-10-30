@@ -180,19 +180,30 @@ async function emit_heartbeat(line: string): Promise<void> {
 
 // The events of the invocation now running, for a reader restoring the run from its stream
 // (`backlog:drive`). Fail-quiet like the writers: no repository, an unreadable stream or an
-// undetermined scope is an empty invocation.
-async function current_events(): Promise<ReadonlyArray<RunEvent>> {
+// undetermined scope is an empty invocation. Required reads propagate failures so a retry cannot
+// mistake unknown history for permission to queue an issue.
+function read_current_events(
+	repository: string | undefined,
+	is_required: boolean,
+): ReadonlyArray<RunEvent> {
+	if (repository === undefined) throw new Error('Could not resolve the run event stream.')
+
+	const read = run_carry.read_carry(run_carry.carry_path(repository))
+	const scope = run_event_scope.scope_of(read)
+	const events = run_event_stream.read_events(run_event_stream.target_of(repository), is_required)
+	const scoped = run_event_scope.scoped_events(events, scope)
+
+	if (scoped === undefined) throw new Error('Could not determine the run event scope.')
+
+	return scoped
+}
+
+async function current_events(is_required = false): Promise<ReadonlyArray<RunEvent>> {
 	try {
-		const repository = await run_carry.repository_directory()
+		return read_current_events(await run_carry.repository_directory(), is_required)
+	} catch (error) {
+		if (is_required) throw error
 
-		if (repository === undefined) return []
-
-		const read = run_carry.read_carry(run_carry.carry_path(repository))
-		const scope = run_event_scope.scope_of(read)
-		const events = run_event_stream.read_events(run_event_stream.target_of(repository))
-
-		return run_event_scope.scoped_events(events, scope) ?? []
-	} catch {
 		return []
 	}
 }

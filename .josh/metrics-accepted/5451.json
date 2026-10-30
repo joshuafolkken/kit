@@ -2,6 +2,6 @@
 	"reason": "Issue #5451 adds retry validation, terminal-history protection and a shared attempt boundary for carry, driver restoration and board status.",
 	"date": "2026-10-30",
 	"growth": {
-		"scripts.code_lines": 152
+		"scripts.code_lines": 161
 	}
 }

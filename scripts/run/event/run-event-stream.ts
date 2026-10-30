@@ -262,10 +262,11 @@ function parse_line(line: string): RunEvent | undefined {
 
 // Every line on the stream that parses, oldest first, whatever its kind. An absent or unreadable file
 // is an empty stream, the same fail-quiet direction `stamp_file.read_stamp_text` takes for a planted or
-// unowned file.
-function read_lines(target: string): ReadonlyArray<RunEvent> {
+// unowned file. A required read refuses that unknown history instead of treating it as empty.
+function read_lines(target: string, is_required = false): ReadonlyArray<RunEvent> {
 	const raw = stamp_file.read_stamp_text(target)
 
+	if (raw === undefined && is_required) throw new Error('Could not read the run event stream.')
 	if (raw === undefined) return []
 
 	return raw
@@ -279,8 +280,8 @@ function read_lines(target: string): ReadonlyArray<RunEvent> {
 // Every event on the stream, oldest first. A line whose kind the enumeration no longer names — one a
 // previous version wrote — reads as no event, so no reader takes it for a position or for the run's
 // newest activity.
-function read_events(target: string): ReadonlyArray<RunEvent> {
-	return read_lines(target).filter((event) => is_event_kind(event.kind))
+function read_events(target: string, is_required = false): ReadonlyArray<RunEvent> {
+	return read_lines(target, is_required).filter((event) => is_event_kind(event.kind))
 }
 
 function last_position(events: ReadonlyArray<RunEvent>): number {

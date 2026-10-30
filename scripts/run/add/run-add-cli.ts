@@ -157,7 +157,7 @@ const GH_PORTS: AddPorts = { read_issue, apply_label, clear_label }
 
 async function context_of(live: LiveRun, is_retry: boolean): Promise<AddContext> {
 	const lanes = await lane_spent.lanes_in_use()
-	const events = await run_event_stream_emit.current_events()
+	const events = await run_event_stream_emit.current_events(is_retry)
 	const active = backlog_drive_restore.active_issues(events)
 	const terminal = events.filter((event) => event.kind !== run_event_stream.EVENT_KIND.PARK)
 

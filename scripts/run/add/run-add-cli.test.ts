@@ -114,6 +114,27 @@ describe('retry against a disappearing record', () => {
 	})
 })
 
+describe('unreadable retry history', () => {
+	it('preserves labels and done when retry history cannot be read', async () => {
+		completed_retry()
+		vi.mocked(run_event_stream_emit.current_events).mockRestore()
+		vi.spyOn(run_event_stream, 'read_events').mockImplementation(() => {
+			throw new Error(DISK_ERROR)
+		})
+		const apply_label = vi.fn(OPEN_PORTS.apply_label)
+		const clear_label = vi.fn(OPEN_PORTS.clear_label)
+
+		await expect(
+			run_add_cli.run(RETRY_ARGS, { ...OPEN_PORTS, apply_label, clear_label }),
+		).rejects.toThrow(DISK_ERROR)
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? read.carry.done : []).toStrictEqual([5413])
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(clear_label).not.toHaveBeenCalled()
+	})
+})
+
 describe('non-mechanical retry protection', () => {
 	it.each(['withdraw', 'merge', 'human-review', 'split'])(
 		'refuses a previous %s rather than queueing an excluded issue',
