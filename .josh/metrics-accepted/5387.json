@@ -1,0 +1,7 @@
+{
+	"reason": "check:related runs test:related after a green lint:related, with a not-run status (#5387)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 51
+	}
+}

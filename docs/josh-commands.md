@@ -182,7 +182,7 @@ pnpm josh cspell:dot   # includes dotfiles
 
 <!-- usage: check:related -->
 
-Run related lint, unit, type and dotfile spelling checks in parallel.
+Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes.
 
 ```bash
 pnpm josh check:related
@@ -192,6 +192,8 @@ pnpm josh check:related --full   # whole outputs
 <!-- /usage -->
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+
+`test:related` starts once `lint:related` passes; on a failed `lint:related` it is not run: its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`. A reused `lint:related` lets it start at once.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 

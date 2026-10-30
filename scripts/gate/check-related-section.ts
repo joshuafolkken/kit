@@ -8,13 +8,19 @@ const PASSED_TAIL_LINES = 5
 const FAILED_TAIL_LINES = 40
 const FULL_FLAG = '--full'
 
+const NOT_RUN = 'not run'
+
 interface CheckResult {
 	command: string
 	exit_code: number
 	output: string
+	// A check never started because one it waits on failed (`check-related-order.ts`).
+	is_skipped?: boolean
 }
 
 function result_status(result: CheckResult): string {
+	if (result.is_skipped === true) return NOT_RUN
+
 	return result.exit_code === 0 ? 'passed' : `failed (${String(result.exit_code)})`
 }
 
@@ -48,6 +54,7 @@ function is_full_requested(arguments_: ReadonlyArray<string>): boolean {
 
 const check_related_section = {
 	FAILED_TAIL_LINES,
+	NOT_RUN,
 	format_section,
 	is_full_requested,
 	result_status,
