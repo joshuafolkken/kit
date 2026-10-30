@@ -191,20 +191,19 @@ describe('test_e2e_guard.run_guarded_e2e — the core budget it claims', () => {
 	beforeEach(prepare_reserved_run)
 	afterEach(release_reserved_run)
 
-	it('claims the e2e weight before Playwright runs', async () => {
+	it('claims the e2e cores and measured memory before Playwright runs', async () => {
 		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
 
 		await test_e2e_guard.run_guarded_e2e(ctx.project_directory, [])
 
-		expect(reservation).toHaveBeenCalledWith(
-			core_budget.CORE_WEIGHTS.e2e,
-			expect.any(Function),
-			expect.anything(),
-		)
+		expect(reservation).toHaveBeenCalledWith(core_budget.CORE_WEIGHTS.e2e, expect.any(Function), {
+			command: 'test:e2e',
+			memory_mb: core_budget.MEMORY_MB.e2e,
+		})
 	})
 
-	it('claims nothing when it skips', async () => {
-		rmSync(path.join(ctx.project_directory, 'tests'), { recursive: true, force: true })
+	it.each(['tests', 'node_modules'])('claims nothing when %s is missing', async (directory) => {
+		rmSync(path.join(ctx.project_directory, directory), { recursive: true, force: true })
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		const reservation = vi.spyOn(core_budget, 'with_command_reservation')
 

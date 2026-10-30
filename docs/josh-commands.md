@@ -371,6 +371,9 @@ pnpm josh test:e2e
 
 <!-- /usage -->
 
+Runs reserve CPU cores and measured memory for Playwright, Chromium and the web server through
+the shared admission budget. Skipped runs reserve nothing.
+
 ### `josh test`
 
 <!-- usage: test -->
