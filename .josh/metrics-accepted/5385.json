@@ -1,0 +1,7 @@
+{
+	"reason": "type-check stage of test:pinned (#5385)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 97
+	}
+}
