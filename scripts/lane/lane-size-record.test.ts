@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { split_measure } from '#scripts/split/split-measure'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_ledger_write } from './lane-ledger-write'
 import { lane_size_record } from './lane-size-record'
 
@@ -9,6 +10,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 }))
 vi.mock('#scripts/split/split-measure', () => ({ split_measure: { read_branch: vi.fn() } }))
 vi.mock('./lane-ledger-write', () => ({ lane_ledger_write: { record_size: vi.fn() } }))
+
+afterEach(() => {
+	vi.restoreAllMocks()
+})
 
 beforeEach(() => {
 	vi.resetAllMocks()
@@ -42,12 +47,15 @@ describe('lane_size_record.record', () => {
 	})
 
 	it.each(['', undefined])('skips an absent or empty body: %s', async (text) => {
+		const declared_size = vi.spyOn(size_estimate, 'declared_size')
+
 		vi.mocked(git_gh_command.issue_get_body_classified).mockResolvedValue({
 			kind: 'read',
 			text,
 		})
 		await lane_size_record.record(true, '5384')
 
+		expect(declared_size).not.toHaveBeenCalledWith(undefined)
 		expect(split_measure.read_branch).not.toHaveBeenCalled()
 		expect(lane_ledger_write.record_size).not.toHaveBeenCalled()
 	})
