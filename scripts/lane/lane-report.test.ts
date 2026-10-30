@@ -32,6 +32,13 @@ function lane(overrides: Partial<LaneInfo> = {}): LaneInfo {
 
 const UNREADABLE = { seat: undefined, development_port: undefined, preview_port: undefined }
 
+it('distinguishes a released seat and unreadable ownership from an active reservation', () => {
+	const problem = 'ownership unreadable'
+
+	expect(lane_report.describe_lane(lane({ seat_held: false }))).toContain('seat released')
+	expect(lane_report.describe_lane(lane({ seat_problem: problem }))).toContain(problem)
+})
+
 describe('listing the open lanes', () => {
 	it('says which issue, which seat and ports, and where, on one line per lane', () => {
 		const line = lane_report.describe_lane(lane())

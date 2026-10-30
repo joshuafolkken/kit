@@ -23,6 +23,8 @@ const COLUMN_SEPARATOR = '  '
 
 function lane_state(lane: LaneInfo): string {
 	if (lane.is_stranded) return STRANDED_STATE
+	if (lane.seat_problem !== undefined) return lane.seat_problem
+	if (lane.seat_held === false) return 'seat released'
 
 	return lane.seat === undefined ? UNREADABLE_STATE : OPEN_STATE
 }

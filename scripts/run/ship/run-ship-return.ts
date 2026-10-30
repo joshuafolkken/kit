@@ -106,7 +106,7 @@ async function record_failed_relaunch(issue: string, reason: string): Promise<vo
 async function relaunched(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
 	const phase = agent_role_profile.IMPLEMENTATION_PHASE
-	const result = lane_relaunch.relaunch(lane, invocation, phase, note)
+	const result = await lane_relaunch.relaunch(lane, invocation, phase, note)
 
 	if (result.kind === 'launched') return 'relaunched'
 

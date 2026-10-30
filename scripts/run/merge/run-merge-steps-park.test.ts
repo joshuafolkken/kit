@@ -4,6 +4,7 @@ import { issue_state_cli } from '#scripts/issue/issue-state-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry } from '#scripts/lane/lane-registry'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_stalled } from '#scripts/run/park/run-stalled'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -84,6 +85,8 @@ beforeEach(() => {
 	vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(undefined)
 	serve_labels(IN_PROGRESS)
 })
+
+beforeEach(lane_seat_fixture.mock_stop)
 
 // joshuafolkken/kit#3591: the removal named the canonical spelling in the request path and swallowed
 // its failure, so a label stored as `In-Progress` answered 404 and stayed on with no trace.

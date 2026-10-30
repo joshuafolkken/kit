@@ -115,9 +115,9 @@ function report_relaunch_failure(target: string, note: string): number {
 // ship/bookkeeping region, lowered — while an implementation resume keeps the role default. The
 // phase-aware profile is `agent_argv.resume_argv`'s; a person's `JOSH_WORKER_EFFORT` still wins over it,
 // and a pre-gate resume moves to `JOSH_WORKER_SHIP_MODEL` when that is set.
-function relaunch(target: string, lane: LaneInfo, phase: string): number {
+async function relaunch(target: string, lane: LaneInfo, phase: string): Promise<number> {
 	const notes: Array<string> = []
-	const result = lane_relaunch.resume(lane, phase, (note) => {
+	const result = await lane_relaunch.resume(lane, phase, (note) => {
 		notes.push(note)
 	})
 
@@ -205,7 +205,7 @@ async function finish_cut(target: string, lane: LaneInfo, request: CutRequest): 
 
 	return lane_relaunch.is_openai_lane(lane)
 		? report_relaunched_cut()
-		: relaunch(target, lane, request.phase)
+		: await relaunch(target, lane, request.phase)
 }
 
 // **A `fullrun` held in its own checkout takes the implementation cut too**, so a run a person started

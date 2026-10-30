@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_dispatch } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 
 // joshuafolkken/kit#3591: a launch that never started took `in-progress` back off by the canonical
 // spelling and swallowed the failure, so a label stored as `In-Progress` answered 404 and stayed on an
@@ -43,6 +44,8 @@ function mock_lane(): void {
 		output: LOG_PATH,
 	})
 }
+
+beforeEach(lane_seat_fixture.mock_start)
 
 beforeEach(() => {
 	vi.clearAllMocks()

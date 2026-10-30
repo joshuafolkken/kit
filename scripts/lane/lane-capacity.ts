@@ -61,10 +61,8 @@ function seated_limit(limit: number): number {
 // was lowered, or a stale label outlived its run — has no free lane, and a negative count read as
 // "how many to offer" would be a slice nobody meant.
 //
-// **A lane that holds no place under the limit still holds its port seat** (joshuafolkken/kit#3967):
-// `seated` counts every open lane, so the free count never offers more launches than seats are left.
-// The places left under the limit, port seats aside: what resuming a lane that keeps its seat is
-// weighed against (joshuafolkken/kit#4107).
+// `seated` counts current port ownership independently of execution places. A saved tree alone
+// holds no seat; a suspended process can still hold one while taking no execution place.
 function limit_room(limit: number, occupied: number): number {
 	return Math.max(NO_LANES, seated_limit(limit) - occupied)
 }
