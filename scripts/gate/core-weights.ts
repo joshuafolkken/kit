@@ -65,6 +65,9 @@ const CORE_WEIGHTS = {
 // (joshuafolkken/kit#4595) `josh metrics`, its process tree sampled four times a second, peaked at
 // 1,176 MB on a merge-base cache hit and 1,851 MB on a miss, where its own untyped `max-lines`-only
 // eslint pass still holds its heap beside the `--json` child measuring the merge-base. It takes the miss.
+// On 2026-10-31 (joshuafolkken/kit#5413), a passing two-worker Chromium + SvelteKit dev-server
+// fixture, its full Playwright process tree sampled with `ps` once a second (10 samples), peaked at
+// 1,769.6875 MiB (1,812,160 KiB). E2E takes 1,800 MB for the whole run, not per worker.
 const MEMORY_MB = {
 	lint: 2400,
 	metrics: 1900,
@@ -75,6 +78,7 @@ const MEMORY_MB = {
 	format: 300,
 	retrospective: 900,
 	install: 100,
+	e2e: 1800,
 } as const
 
 // **The program a command launches, mapped to the `MEMORY_MB` row it holds** — the one table
@@ -87,6 +91,7 @@ const TOOL_MEMORY: Readonly<Partial<Record<string, keyof typeof MEMORY_MB>>> = {
 	vitest: 'unit_worker',
 	prettier: 'format',
 	install: 'install',
+	playwright: 'e2e',
 }
 
 const core_weights = { CORE_WEIGHTS, MEASURED, MEMORY_MB, TOOL_MEMORY }

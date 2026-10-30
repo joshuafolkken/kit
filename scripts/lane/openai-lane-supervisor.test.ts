@@ -9,6 +9,7 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_cut } from '#scripts/run/cut/run-cut'
 import { detached_launch, type LaunchRequest } from '#scripts/run/detached-launch'
 import { afterAll, beforeEach, describe, expect, it, test, vi } from 'vitest'
+import { lane_child_invocation } from './lane-child-invocation'
 import type { LaneInfo } from './lane-registry'
 import { lane_session_broker } from './lane-session-broker'
 import { openai_lane_ship } from './openai-lane-ship'
@@ -196,6 +197,23 @@ describe('OpenAI lane supervisor detached ship completion', () => {
 		ship_wait.mockResolvedValue('abnormal')
 		expect(await supervise('ship-abnormal')).toBe(1)
 		expect(launch).toHaveBeenCalledTimes(1)
+	})
+
+	it('relaunches with the stopped ship title, body, citations and review options', async () => {
+		const invocation = lane_child_invocation.ship_stop_invocation(ISSUE, {
+			stage: 'preflight',
+			title: `Resume shipping #${ISSUE}`,
+			is_review: true,
+			flags: ['--body-file', path.join(scratch, 'body.md'), '--cite', '5473'],
+			unpinned_ok: ['--unpinned-ok', 'reason'],
+		})
+
+		ship_current
+			.mockResolvedValueOnce(undefined)
+			.mockResolvedValue({ launch_id: 'stopped', result: 'failed', stop_invocation: invocation })
+		ship_wait.mockResolvedValueOnce('failed').mockResolvedValueOnce('none')
+		expect(await supervise('ship-resume-options')).toBe(0)
+		expect(launched_request(1).argv.args.at(-1)).toBe(invocation)
 	})
 })
 
