@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { check_related_unplanned } from '#scripts/gate/check-related-unplanned'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
@@ -286,6 +287,8 @@ async function run_join(is_fixing = false): Promise<number> {
 
 	// An unpinned change stops the round whatever the gate answered; a tree a fix moved is checked again.
 	const is_unpinned = await show_pinned(run_review_join_read.read(PROJECT_ROOT, is_fixing))
+
+	await check_related_unplanned.show()
 
 	return is_unpinned ? run_review.UNPINNED_EXIT_CODE : join_exit_code(state)
 }

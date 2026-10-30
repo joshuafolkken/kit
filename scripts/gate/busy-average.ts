@@ -14,9 +14,12 @@ import type { MachineReading } from './machine-capacity'
 // admitted against within seconds.
 const AVERAGE_WINDOW_MS = 3000
 
+// `busy_cores` is the raw reading, kept beside the load outside the ledger so `mean_busy` can tell
+// cores the ledger reserves from cores the machine actually runs.
 interface BusySample {
 	at: number
 	external_cores: number
+	busy_cores: number
 }
 
 // The samples still inside the window once `reading` taken at `now`, against a ledger holding
@@ -33,7 +36,20 @@ function with_reading(
 
 	if (busy_cores === undefined) return kept
 
-	return [...kept, { at: now, external_cores: Math.max(0, busy_cores - ledger_cores) }]
+	return [...kept, { at: now, external_cores: Math.max(0, busy_cores - ledger_cores), busy_cores }]
+}
+
+// The mean of the raw busy cores in `samples`, or `undefined` where none were read. Unlike `averaged`,
+// it does not floor the load at the ledger's declared cores: claims that reserve more than they run
+// leave this lower (joshuafolkken/kit#5391).
+function mean_busy(samples: ReadonlyArray<BusySample>): number | undefined {
+	if (samples.length === 0) return undefined
+
+	let total = 0
+
+	for (const sample of samples) total += sample.busy_cores
+
+	return total / samples.length
 }
 
 // `reading` with its busy cores replaced by the mean load outside the ledger on top of the ledger's
@@ -84,7 +100,14 @@ function is_unrelieved(ease: LoadEase | undefined, now: number, window_ms: numbe
 	return ease !== undefined && now - ease.eased_at >= window_ms
 }
 
-const busy_average = { AVERAGE_WINDOW_MS, averaged, is_unrelieved, with_ease, with_reading }
+const busy_average = {
+	AVERAGE_WINDOW_MS,
+	averaged,
+	is_unrelieved,
+	mean_busy,
+	with_ease,
+	with_reading,
+}
 
 export type { BusySample, LoadEase }
 export { busy_average }
