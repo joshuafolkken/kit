@@ -71,6 +71,29 @@ describe('test_related_record.record_of', () => {
 
 		expect(record).not.toHaveProperty('test_files')
 	})
+})
+
+describe('test_related_record.record_of — reuse evidence', () => {
+	it('records reuse and miss counts, their reason and comparison time in the existing ledger shape', () => {
+		const reuse = {
+			excluded: [],
+			reused: 1,
+			missed: 1,
+			reason: 'closed-inputs-unchanged',
+			elapsed_ms: ELAPSED_MS,
+		}
+		const record = test_related_record.record_of(
+			{ ...related_input(), reuse },
+			{ elapsed_ms: 0, test_files: 1 },
+		)
+
+		expect(record).toMatchObject({
+			reused: 1,
+			reuse_missed: 1,
+			reuse_reason: reuse.reason,
+			reuse_elapsed_ms: Math.round(ELAPSED_MS),
+		})
+	})
 
 	// joshuafolkken/kit#4572: a synced non-code file joins `since_map` as well.
 	it('counts a synced file that is also in the since-map part once, as synced', () => {
@@ -150,18 +173,19 @@ describe('test_related_record.with_test_count', () => {
 		const before = process.env[unit_count_file.COUNT_FILE_ENVIRONMENT]
 		const result = await test_related_record.with_test_count(async () => {
 			await unit_count_file.write_count(TEST_FILES, count_target())
+			await unit_count_file.write_files([READER_TEST], count_target())
 
 			return 1
 		})
 
-		expect(result).toEqual({ exit_code: 1, test_files: TEST_FILES })
+		expect(result).toEqual({ exit_code: 1, test_files: TEST_FILES, passed: [READER_TEST] })
 		expect(process.env[unit_count_file.COUNT_FILE_ENVIRONMENT]).toBe(before)
 	})
 
 	it('answers no count when the run wrote none', async () => {
 		const result = await test_related_record.with_test_count(async () => 0)
 
-		expect(result).toEqual({ exit_code: 0, test_files: undefined })
+		expect(result).toEqual({ exit_code: 0, test_files: undefined, passed: [] })
 	})
 
 	it('still runs, uncounted, when the temp root cannot be written', async () => {

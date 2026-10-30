@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { test_no_base } from './test-no-base'
 import { test_read_map } from './test-read-map'
 import { test_related } from './test-related'
+import { test_related_reuse } from './test-related-reuse'
 import { test_unit_guard } from './test-unit-guard'
 
 // joshuafolkken/kit#5386: the bare run after a red one re-ran the whole reach of the last green record,
@@ -92,6 +93,18 @@ beforeEach(() => {
 	mocked_moved.mockImplementation(async (stamp) =>
 		stamp === review_stamps.test_related_red_stamp ? RED_MOVED : GREEN_MOVED,
 	)
+})
+
+describe('test_related.run_related_tests — reuse after failure', () => {
+	it('executes failed tests without consulting an old success record for exclusions', async () => {
+		const read = vi.spyOn(test_related_reuse, 'read')
+
+		await test_related.run_related_tests([])
+
+		expect(read).toHaveBeenCalledWith(REPOSITORY_ROOT, expect.anything(), undefined)
+		expect(vitest_arguments()).not.toContain('--exclude')
+		expect(vitest_arguments()).toContain(absolute(FAILED_TEST))
+	})
 })
 
 describe('test_related.run_related_tests — after a red run', () => {

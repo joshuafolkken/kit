@@ -7,6 +7,27 @@ const { KIND, entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
 const PROBED = 'scripts/a.ts'
 
+describe('lane_ledger_schema.entry_schema — test reuse', () => {
+	it('preserves reuse counts, reason and comparison time on a related run', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'related',
+			changed: 1,
+			synced: 1,
+			since_map: 0,
+			readers: 1,
+			elapsed_ms: 5,
+			reused: 1,
+			reuse_missed: 1,
+			reuse_reason: 'matched-inputs',
+			reuse_elapsed_ms: 1,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 // joshuafolkken/kit#5078
 describe('lane_ledger_schema.entry_schema on a test-pinned run', () => {
 	it('parses a probe whose test file count is left out', () => {

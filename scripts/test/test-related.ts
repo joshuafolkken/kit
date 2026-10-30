@@ -6,20 +6,17 @@ import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
-import { review_stamps } from '#scripts/review/review-stamps'
 import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
-import { related_heavy_tests } from './related-heavy-tests'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
-import { test_related_claim } from './test-related-claim'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
-import { test_related_record, type RunInput } from './test-related-record'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
+import { test_related_reuse } from './test-related-reuse'
+import { test_related_run } from './test-related-run'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { test_related_synced } from './test-related-synced'
 import { test_related_touched } from './test-related-touched'
-import { test_unit_guard } from './test-unit-guard'
 
 // `josh test:related` — the unit check an implementation loop runs between edits.
 // The narrowing itself is `test-related-scope.ts` over the shared
@@ -30,19 +27,6 @@ import { test_unit_guard } from './test-unit-guard'
 // `josh review:brief` can tell a tree this check has read from one it has not. What the record means,
 // and the three states in which it is withheld, are `scoped-green.ts`. A red run leaves its failed
 // files instead, which the run after the fix reads with what moved (`test-related-red.ts`).
-
-// **A skipped vitest exits 0, and a zero from a run that started nothing must vouch for no tree.**
-// `test_unit_guard.report_no_run` returns 0 on its skip branch — vitest not installed — so in a
-// project with no unit suite the record would say the tests were green over a run in which none
-// executed, and `josh review:brief` would stop refusing on the strength of it. **The guard's own
-// decision is asked again rather than re-derived here**, so the two can never disagree; it is asked
-// only when a record is otherwise due, since the question costs a project-wide glob. A basic project's
-// own test script counts as a run: it executes the whole suite, which covers any narrowing.
-function conclusive_tree(before: GateTree | undefined): GateTree | undefined {
-	if (before === undefined) return undefined
-
-	return test_unit_guard.is_running(process.cwd()) ? before : undefined
-}
 
 // A failure answers `undefined` rather than an empty list: the two are opposite inputs to
 // `resolve_scope`, and only one of them means "could not tell".
@@ -279,37 +263,6 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 	return scope.mode !== 'none'
 }
 
-// A change known to reach no test succeeds without starting vitest, and says why.
-async function run_scope(
-	scope: RelatedScope,
-	root: string,
-	command_arguments: ReadonlyArray<string>,
-): Promise<number> {
-	const description = related_scope.describe_scope(scope, root)
-
-	if (scope.mode === 'none') {
-		process.stdout.write(`${description}\n`)
-
-		return 0
-	}
-
-	const vitest_arguments = related_scope.vitest_arguments(scope, [
-		...changed_file_scope.flags_of(command_arguments),
-		...related_heavy_tests.exclude_flags(scope, root),
-	])
-
-	return await test_related_claim.with_unit_claim(
-		scope.mode === 'related' ? scope.files : undefined,
-		async () =>
-			await test_unit_guard.run_guarded_vitest(
-				process.cwd(),
-				vitest_arguments,
-				related_scope.COMMAND_NAME,
-				description,
-			),
-	)
-}
-
 async function resolve_change(
 	root: string,
 	change: ChangeReading,
@@ -322,6 +275,10 @@ async function resolve_change(
 	return await scope_of(root, change, is_whole)
 }
 
+function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
+	return red?.owed ?? []
+}
+
 async function read_run_input(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
@@ -331,45 +288,20 @@ async function read_run_input(
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
 	const scope = await resolve_change(root, change, is_whole)
+	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
 
 	const { changed, synced = [], since_map = [], branch } = change
 
-	return { scope, root, changed, synced, since_map, branch, owed: red?.owed ?? [] }
-}
-
-// Every run is timed and counted into the lane ledger (joshuafolkken/kit#4465).
-async function run_and_record(
-	input: RunInput,
-	command_arguments: ReadonlyArray<string>,
-): Promise<number> {
-	const started = performance.now()
-	const { exit_code, test_files } = await test_related_record.with_test_count(
-		async () => await run_scope(input.scope, input.root, command_arguments),
-	)
-
-	await test_related_record.record_run(input, {
-		elapsed_ms: performance.now() - started,
-		test_files,
-	})
-
-	return exit_code
-}
-
-// **The no-base pass is part of the run's verdict**, so a green record — the one `josh ship` and the
-// gate reuse — never vouches for a tree whose base-touching code fails in CI's checkout. It runs
-// only after a green first pass (`test-no-base.ts`), and only over this branch's own files: those
-// the map's tree or a main sync joined were verified by main's CI — and over those a red run before
-// this one never reached it with (`test_related_red.no_base_files`).
-async function with_no_base_pass(
-	input: RelatedInput,
-	command_arguments: ReadonlyArray<string>,
-	exit_code: number,
-): Promise<number> {
-	if (exit_code !== 0) return exit_code
-
-	const flags = changed_file_scope.flags_of(command_arguments)
-
-	return await test_no_base.run_if_touched(input.root, test_related_red.no_base_files(input), flags)
+	return {
+		scope,
+		root,
+		changed,
+		synced,
+		since_map,
+		branch,
+		owed: owed_of(red),
+		reuse,
+	}
 }
 
 // A non-code argument is resolved through the map, and a file every test imports through its
@@ -403,34 +335,11 @@ async function run_touched(given: ReadonlyArray<string>): Promise<number> {
 	const scope = test_related_touched.touched_scope(root, changed)
 	const input = { scope, root, changed, synced: [], since_map: [], kind: TOUCHED_KIND }
 
-	return await run_and_record(input, command_arguments)
+	return await test_related_run.run_and_record(input, command_arguments)
 }
 
 // A green run records the tree it was green on, a red one the files it failed on
 // (`test-related-red.ts`), so the run after a fix reads only those and what moved.
-async function run_and_vouch(
-	input: RelatedInput,
-	command_arguments: ReadonlyArray<string>,
-	before: GateTree | undefined,
-): Promise<number> {
-	const started_ms = Date.now()
-	const first_exit = await run_and_record(input, command_arguments)
-	const exit_code = await with_no_base_pass(input, command_arguments, first_exit)
-	const tree = conclusive_tree(before)
-
-	await scoped_green.record_if_green(review_stamps.test_related_stamp, { before: tree, exit_code })
-
-	await test_related_red.record_red({
-		before: tree,
-		scope: input.scope,
-		first_exit,
-		started_ms,
-		owed: test_related_red.no_base_files(input),
-	})
-
-	return exit_code
-}
-
 async function run_related_tests(given: ReadonlyArray<string>): Promise<number> {
 	if (given.includes(test_related_touched.TOUCHED_FLAG)) return await run_touched(given)
 
@@ -443,7 +352,7 @@ async function run_related_tests(given: ReadonlyArray<string>): Promise<number> 
 
 	report_unhanded(root, command_arguments, input.scope)
 
-	return await run_and_vouch(input, command_arguments, before)
+	return await test_related_run.run_and_vouch(input, command_arguments, before)
 }
 
 const test_related = { reaches_tests, run_related_tests }
