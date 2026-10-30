@@ -39,10 +39,10 @@ describe('run_stalled.row_text', () => {
 })
 
 describe('run_stalled.next_step', () => {
-	it('names the resume command and the label to remove', () => {
+	it('names the standalone resume and the live backlog retry command', () => {
 		const step = run_stalled.next_step(CHILD)
 
 		expect(step).toContain(`\`${run_stalled.resume_of(CHILD)}\``)
-		expect(step).toContain(`remove \`${RUN_STALLED_LABEL}\``)
+		expect(step).toContain('pnpm josh run:add 4188 --retry')
 	})
 })

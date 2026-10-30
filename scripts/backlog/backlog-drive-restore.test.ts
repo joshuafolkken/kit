@@ -12,6 +12,35 @@ function event(pos: number, kind: string, text: string): RunEvent {
 	return { pos, kind, text, at: '2026-09-24T00:00:00.000Z' }
 }
 
+it('restores only parks after the newest retry, leaving other issues settled', () => {
+	const events = [
+		event(1, 'park', CHILD_DISPATCHED),
+		event(2, 'park', PARKED_2509),
+		event(3, 'add', 'retry #2508'),
+	]
+
+	expect(backlog_drive_restore.settled_issues(events)).toStrictEqual(new Set([2509]))
+	expect(backlog_drive_restore.parked_issues(events)).toStrictEqual(new Set([2509]))
+	const stopped_again = [
+		...events,
+		event(4, CHILD_LAUNCH, CHILD_DISPATCHED),
+		event(5, 'park', CHILD_DISPATCHED),
+	]
+
+	expect(backlog_drive_restore.settled_issues(stopped_again)).toStrictEqual(
+		new Set([2509, Number(CHILD)]),
+	)
+	expect(backlog_drive_restore.parked_issues(stopped_again)).toStrictEqual(
+		new Set([2509, Number(CHILD)]),
+	)
+})
+
+it('does not reset parks on an ordinary add', () => {
+	const events = [event(1, 'park', CHILD_DISPATCHED), event(2, 'add', 'added #2508')]
+
+	expect(backlog_drive_restore.settled_issues(events)).toStrictEqual(new Set([Number(CHILD)]))
+})
+
 it('settles a human-review dispatch without retiring the issue from the run', () => {
 	const events = [
 		event(1, CHILD_LAUNCH, CHILD_DISPATCHED),

@@ -129,16 +129,18 @@ Add issues to a live backlogrun, ahead of the queue unless --no-priority.
 ```bash
 pnpm josh run:add 101 102             # ahead of the rest of the queue (`#N` works too)
 pnpm josh run:add 101 --no-priority   # at the end of the queue
+pnpm josh run:add 101 --retry         # retry a mechanically stopped issue in this run
 ```
 
 <!-- /usage -->
 
-Targets the `backlogrun` running in this repository without stopping it or any running child: an added issue takes the next lane that frees.
+Adds to this repository's live `backlogrun` at the next free lane, without interrupting running children.
 
-- A child filed into an epic the run names needs no `run:add`: `backlog:drive` reads that epic's current children on every pass.
-- Each issue gets `auto-ok` and `run:lane`, plus `priority:high` unless `--no-priority`. A `backlogrun #N --only` run also gets the issue written to its carry record, so its named list includes it; the recorded invocation is never rewritten.
-- A closed issue, one that could not be read, or one a label would not apply to is refused; the others are still added. An issue with open blockers is added and reported as waiting on them.
-- Each added issue is written to the run's event stream as an `add` event, which wakes a `run:progress --wait` so the run offers the issue the next free lane.
+- Epic children are read on every driver pass and need no `run:add`.
+- Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`. Named runs also record additions beside their unchanged invocation.
+- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Each `add` event wakes `run:progress --wait`.
+- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 

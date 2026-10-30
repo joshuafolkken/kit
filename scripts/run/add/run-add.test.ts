@@ -23,6 +23,7 @@ function fake_ports(refused_label?: string): AddPorts & { applied: Array<string>
 	return {
 		applied,
 		read_issue: async (issue) => VIEWS.get(issue),
+		clear_label: async () => true,
 		apply_label: async (issue, label) => {
 			if (label === refused_label) return false
 

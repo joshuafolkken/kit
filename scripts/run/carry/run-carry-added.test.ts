@@ -38,6 +38,35 @@ afterAll(() => {
 	rmSync(scratch, { recursive: true, force: true })
 })
 
+describe('explicit retry', () => {
+	it('retries only the requested issue while preserving counts, ownership and other completions', () => {
+		const carry = {
+			...named_run(),
+			done: [1749, 1762],
+			merged: 1,
+			merged_issues: [1762],
+			filed: 1,
+			owner_pid: 123,
+			lane_limit: 1,
+		}
+		const retried = run_carry_added.add_issues(
+			target(),
+			carry,
+			[{ issue: 1749, is_priority: true }],
+			[1749],
+		)
+
+		expect(retried).toStrictEqual({
+			...carry,
+			done: [1762],
+			added: [{ issue: 1749, is_priority: true }],
+		})
+		const read = run_carry.read_carry(target())
+
+		expect(read.kind === 'carried' ? run_carry.remaining_of(read.carry) : []).toStrictEqual([1749])
+	})
+})
+
 describe('the issues run:add put into a --only run', () => {
 	it('come first in the order added, and the appended ones last', () => {
 		expect(run_carry.remaining_of(added_run())).toStrictEqual([3432, 3433, 1762, 1749, 3434])
