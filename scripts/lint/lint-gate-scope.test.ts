@@ -1,10 +1,12 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
 	ESLINT_CACHE_FILE,
 	ESLINT_CACHE_FLAGS,
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { lint_gate_scope } from './lint-gate-scope'
 
 // joshuafolkken/kit#4085: the gate lints the branch's changed files, and falls back to the whole tree
@@ -15,10 +17,34 @@ const ROOT = process.cwd()
 const SOURCE = path.join(ROOT, 'scripts', 'lint', 'lint-gate-scope.ts')
 const NOT_CI = {}
 const IN_CI = { CI: 'true' }
+const ESLINT_CONFIG = 'eslint.config.js'
+const WIRED_RULE = 'eslint/rules/naming-convention.js'
 
 function scope_of(relative: string): ReturnType<typeof lint_gate_scope.resolve_gate_scope> {
 	return lint_gate_scope.resolve_gate_scope([SOURCE, path.join(ROOT, relative)], ROOT, NOT_CI)
 }
+
+describe('lint_gate_scope.resolve_gate_scope for unimported modules', () => {
+	it('uses the supplied checkout config rather than the running checkout config', () => {
+		const root = mkdtempSync(path.join(tmpdir(), 'kit-lint-scope-'))
+		const rule = path.join(root, WIRED_RULE)
+
+		mkdirSync(path.dirname(rule), { recursive: true })
+		writeFileSync(rule, '')
+		writeFileSync(path.join(root, ESLINT_CONFIG), '')
+		onTestFinished(() => {
+			rmSync(root, { recursive: true, force: true })
+		})
+		expect(lint_gate_scope.resolve_gate_scope([rule], root, NOT_CI).mode).toBe('related')
+	})
+
+	it.each(['eslint/rules/comment-why-only.js', 'eslint/config-fingerprint.test.ts'])(
+		'keeps %j scoped when the config does not import it',
+		(relative) => {
+			expect(scope_of(relative).mode).toBe('related')
+		},
+	)
+})
 
 describe('lint_gate_scope.resolve_gate_scope', () => {
 	it('narrows to the changed files outside CI', () => {
@@ -41,8 +67,8 @@ describe('lint_gate_scope.resolve_gate_scope', () => {
 		'.prettierrc.json',
 		'prettier.config.js',
 		'prettier/index.js',
-		'eslint.config.js',
-		'eslint/rules/naming-convention.js',
+		ESLINT_CONFIG,
+		WIRED_RULE,
 		'tsconfig.json',
 		'tsconfig/base.json',
 		'svelte.config.js',

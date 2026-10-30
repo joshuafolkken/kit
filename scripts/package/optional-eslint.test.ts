@@ -160,6 +160,7 @@ it('resolves the public config against an opted-in consumer and runs ESLint', ()
 	const directory = path.join(SCRATCH, 'eslint')
 
 	extract_kit(directory)
+	for (const name of Object.keys(MANIFEST.dependencies)) link_package(directory, name)
 	for (const name of ESLINT_PACKAGES) link_package(directory, name)
 	writeFileSync(path.join(directory, '.gitignore'), '')
 	const config_path = path.join(directory, 'lint-probe.mjs')

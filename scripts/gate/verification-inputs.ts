@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { config_fingerprint } from '#eslint/config-fingerprint.js'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { gate_labels } from './gate-labels'
@@ -53,11 +54,12 @@ const PRETTIER_CONFIG_PREFIX = '.prettierrc'
 const COMPILER_CONFIG_PREFIXES = ['tsconfig', 'svelte.config.'] as const
 const TEST_CONFIG_PREFIXES = [...COMPILER_CONFIG_PREFIXES, 'vitest.config.', 'vite.config.']
 
-// A file name starting with one of these, or a path under one of the directories, configures prettier,
-// eslint or the TypeScript program its type-aware rules read. Prettier keys its cache on the options
-// too, so a changed `prettier.config.*` re-checks every file the whole-tree run reads.
+// A file name starting with one of these, a path under one of the directories, or a module the eslint
+// config imports configures prettier, eslint or the TypeScript program its type-aware rules read.
+// Prettier keys its cache on the options too, so a changed `prettier.config.*` re-checks every file
+// the whole-tree run reads.
 const LINT_CONFIG_PREFIXES = ['eslint.config.', 'prettier.config.', ...COMPILER_CONFIG_PREFIXES]
-const LINT_CONFIG_DIRECTORIES: ReadonlySet<string> = new Set(['eslint', 'prettier', 'tsconfig'])
+const LINT_CONFIG_DIRECTORIES: ReadonlySet<string> = new Set(['prettier', 'tsconfig'])
 
 const SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
 	'.ts',
@@ -93,7 +95,7 @@ type InputReads = 'matched' | 'recorded'
 interface InputDeclaration {
 	readonly is_input: FileTest | undefined
 	readonly reads: InputReads
-	readonly is_config: (relative: string) => boolean
+	readonly is_config: (relative: string, root: string) => boolean
 	readonly tools: ReadonlyArray<string>
 	readonly env: ReadonlyArray<string>
 }
@@ -137,10 +139,37 @@ function configures_tests(relative: string): boolean {
 	return names_any(relative, TEST_CONFIG_PREFIXES)
 }
 
-function configures_lint(relative: string): boolean {
+function read_lint_config_modules(root: string): ReadonlySet<string> {
+	const entries = config_fingerprint.list_config_entries(root)
+	const modules = [...config_fingerprint.list_reachable_modules(entries)]
+
+	return new Set(modules.map((file) => path.relative(root, file).split(path.sep).join('/')))
+}
+
+const lint_config_modules_by_root = new Map<string, ReadonlySet<string>>()
+
+// joshuafolkken/kit#5380: the modules an import chain from the project's `eslint.config.*` reaches —
+// the reach the config fingerprint hashes (`eslint/config-fingerprint.js`). A rule module not wired in
+// yet changes no lint result, so a change to it alone keeps `lint --changed` scoped. Read once per
+// root: one narrowing asks it for every moved path.
+function lint_config_modules(root: string): ReadonlySet<string> {
+	const cached = lint_config_modules_by_root.get(root)
+
+	if (cached !== undefined) return cached
+
+	const modules = read_lint_config_modules(root)
+
+	lint_config_modules_by_root.set(root, modules)
+
+	return modules
+}
+
+function configures_lint(relative: string, root: string): boolean {
 	const [top = ''] = relative.split('/', 1)
 
-	return LINT_CONFIG_DIRECTORIES.has(top) || names_any(relative, LINT_CONFIG_PREFIXES)
+	if (LINT_CONFIG_DIRECTORIES.has(top) || names_any(relative, LINT_CONFIG_PREFIXES)) return true
+
+	return lint_config_modules(root).has(relative)
 }
 
 const LINT: InputDeclaration = {
@@ -200,12 +229,18 @@ function is_declared(label: string): boolean {
 	return DECLARATIONS.has(label)
 }
 
-// Whether any of `relatives` (repository-root relative) configures the check `label` — `true` for an
-// undeclared one, which no narrowing can read past.
-function configures(label: string, relatives: ReadonlyArray<string>): boolean {
+// Whether any of `relatives` (relative to `root`, the repository root) configures the check `label` —
+// `true` for an undeclared one, which no narrowing can read past.
+function configures(
+	label: string,
+	relatives: ReadonlyArray<string>,
+	root: string = PROJECT_ROOT,
+): boolean {
 	const declaration = DECLARATIONS.get(label)
 
-	return declaration === undefined || relatives.some((relative) => declaration.is_config(relative))
+	return (
+		declaration === undefined || relatives.some((relative) => declaration.is_config(relative, root))
+	)
 }
 
 function tool_version(root: string, tool: string): string {

@@ -1,0 +1,7 @@
+{
+	"reason": "verification-inputs reads the eslint config's import reach so an unconnected rule module stops forcing a whole-tree lint (#5380)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 22
+	}
+}
