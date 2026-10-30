@@ -15,7 +15,7 @@ function estimate(files: number, lines: number): string {
 	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
 }
 
-const UNDER_GUIDE = body_with(estimate(10, 900))
+const UNDER_GUIDE = body_with(estimate(8, 200))
 const OVER_GUIDE = body_with(estimate(30, 900))
 
 describe('size_estimate.problems', () => {
@@ -76,8 +76,32 @@ describe('size_estimate.guide_problem', () => {
 		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined)
 
 		expect(problem).toContain('30 file(s) / 900 line(s)')
-		expect(problem).toContain('10 files / 400 lines')
+		expect(problem).toContain('more than 8 files or 200 lines')
 		expect(problem).toContain('split-assessment.md → "The question"')
+	})
+
+	// joshuafolkken/kit#5384: either axis alone is over the guide.
+	it('refuses an estimate over the guide on the line axis alone', () => {
+		const body = body_with(estimate(3, 201))
+
+		expect(size_estimate.guide_problem(body, undefined)).toContain('3 file(s) / 201 line(s)')
+	})
+})
+
+describe('size_estimate.over_guide', () => {
+	it('answers the estimate over the guide with no reason', () => {
+		const body = body_with(estimate(9, 10))
+
+		expect(size_estimate.over_guide(body, undefined)).toEqual({
+			files: 9,
+			lines: 10,
+			verdict: 'split',
+		})
+	})
+
+	it('answers nothing under the guide, or excused', () => {
+		expect(size_estimate.over_guide(UNDER_GUIDE, undefined)).toBeUndefined()
+		expect(size_estimate.over_guide(OVER_GUIDE, SPLIT_ROUTE)).toBeUndefined()
 	})
 
 	it('passes an estimate over the guide filed as a split', () => {

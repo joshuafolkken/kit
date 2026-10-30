@@ -30,7 +30,8 @@ const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
 
 const ISSUE_NUMBER = 4642
 const ISSUE_BRANCH = `${String(ISSUE_NUMBER)}-lane`
-const LINES_PER_FILE = 50
+// Small enough that the file guide alone decides: the guide's line axis stays under at FILE_GUIDE files.
+const LINES_PER_FILE = 25
 const UNDER_GUIDE_NUMSTAT = `${String(LINES_PER_FILE)}\t0\tscripts/a.ts`
 
 function numstat_of(file_count: number): string {

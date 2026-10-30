@@ -59,6 +59,24 @@ describe('lane_ledger names', () => {
 	})
 })
 
+describe('lane_ledger_write.record_size', () => {
+	it('appends declared and actual sizes that the ledger can read back', async () => {
+		const target = ledger('size-round-trip')
+		const size = {
+			issue: 5384,
+			declared: { files: 7, lines: 160 },
+			actual: { files: 20, lines: 286 },
+		}
+
+		await lane_ledger_write.record_size(size, target)
+
+		const entries = lane_ledger.read_entries(target)
+
+		expect(entries).toMatchObject([{ kind: 'size', ...size }])
+		expect(typeof entries[0]?.at).toBe('string')
+	})
+})
+
 // joshuafolkken/kit#4263: `run:board` reads the ledger on every local read; an unchanged file is not
 // parsed again.
 describe('lane_ledger.read_entries over an unchanged ledger', () => {

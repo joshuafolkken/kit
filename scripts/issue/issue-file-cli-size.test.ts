@@ -72,7 +72,7 @@ function refusals(): string {
 describe('issue_file_cli.run — a size estimate over the split guide', () => {
 	it('refuses the filing, naming the guide and the question', async () => {
 		expect(await issue_file_cli.run(argv_of(over_path))).toBe(FAILURE_EXIT_CODE)
-		expect(refusals()).toContain('exceeds the guide (10 files / 400 lines)')
+		expect(refusals()).toContain('exceeds the guide (more than 8 files or 200 lines)')
 		expect(refusals()).toContain('split-assessment.md → "The question"')
 	})
 
