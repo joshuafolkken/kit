@@ -6,6 +6,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_await, type AwaitState } from '#scripts/lane/lane-await'
+import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_sampler } from '#scripts/lane/lane-sampler'
 import { error_text } from '#scripts/lib/error-message'
@@ -238,6 +239,14 @@ function child_ports(
 	}
 }
 
+async function offer_for(state: DriveState, context: DriveContext): Promise<OfferRead | undefined> {
+	const read = await read_offer(state, context)
+
+	lane_launch_cli.keep_pending(read?.verdict === 'run' ? read.issues : [])
+
+	return read
+}
+
 function ports_of(
 	context: DriveContext,
 	seeded: ReadonlyArray<string>,
@@ -246,7 +255,7 @@ function ports_of(
 ): LoopPorts {
 	return {
 		...child_ports(seeded, context.owner),
-		offer: async (state) => await read_offer(state, context),
+		offer: async (state) => await offer_for(state, context),
 		launch: async (issue) => await backlog_drive_launch.launch(issue, context.owner),
 		...room_ports(),
 		judgement_owed: judgement_reader(),
@@ -344,6 +353,7 @@ async function run_safe(context: DriveContext): Promise<number> {
 
 		return FAILURE_EXIT_CODE
 	} finally {
+		lane_launch_cli.keep_pending([])
 		stop_sampling()
 	}
 }

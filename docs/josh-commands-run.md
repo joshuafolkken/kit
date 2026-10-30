@@ -859,7 +859,7 @@ pnpm josh lane:prune
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 
@@ -961,6 +961,8 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 <!-- /usage -->
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
+
+Launches reserve 270 MB in the shared core budget and wait for free memory without a timeout bypass. The child retains the claim. `run:board` shows its lane and wait reason; `lane:stats` lists completed waits as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
