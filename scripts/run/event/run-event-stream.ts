@@ -31,9 +31,8 @@ const EVENT_PREFIX = durable_state.PREFIX.EVENTS
 // distinction the ambient `.log` draws.
 const EVENT_SUFFIX = '.jsonl'
 // A week of a busy run's events, so `josh lane:stats --period 7` reads the parks that end a stop's wait
-// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). A four-lane `backlogrun` wrote about
-// 75 events an hour (1,877 in 25 hours), so fifteen thousand holds about eight days at that rate and
-// still bounds the file to a few megabytes — past it the oldest events roll off.
+// and `run:board` keeps every ship stage (joshuafolkken/kit#3997). The cap retains enough history
+// to inspect a long run while preventing unbounded growth; past it the oldest events roll off.
 const EVENT_CAP = 15_000
 const FIRST_POSITION = 0
 const POSITION_INCREMENT = 1

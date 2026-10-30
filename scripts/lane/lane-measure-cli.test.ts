@@ -307,7 +307,7 @@ function lane_state(state: string, minute: number): string {
 	return JSON.stringify({ kind: 'lane-state', at: at_minute(minute), issue: PAUSED_ISSUE, state })
 }
 
-// One lane session of `PAUSED_ISSUE`: a `Read` from 20 to 10 minutes before `NOW`, then its ship.
+// A read spans the pause so the test can distinguish active tool time from paused time.
 function paused_lane_transcript(): string {
 	const directory = path.join(
 		mkdtempSync(path.join(scratch, 'paused-')),
@@ -353,7 +353,7 @@ describe('lane_measure_cli.run — stats paused lanes', () => {
 	})
 })
 
-// One lane session that made one `Edit` taking 1.5 seconds, at `NOW`.
+// An edit-only session isolates tool time from the rest of the lane's work.
 function edit_transcript(): string {
 	const directory = mkdtempSync(path.join(scratch, 'value-'))
 	const use = { type: 'tool_use', id: 'e', name: 'Edit', input: {} }

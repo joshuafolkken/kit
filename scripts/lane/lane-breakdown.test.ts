@@ -5,8 +5,8 @@ import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_yield } from './lane-yield'
 
-// joshuafolkken/kit#4995: #4970 ran 79.5 minutes of net time, 51 of them its implementation, and the
-// overrun investigation saw only the total. Its stages add up to the net time, waits taken out.
+// joshuafolkken/kit#4995: the overrun investigation needs stages, not only a total, to locate the cost.
+// Its stages add up to the net time, waits taken out.
 
 const ISSUE = 4970
 const OTHER = 4971

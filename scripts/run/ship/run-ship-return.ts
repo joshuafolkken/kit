@@ -43,7 +43,7 @@ import { run_ship_waiter } from './run-ship-waiter'
 // front of the agent that ran it.
 
 const OPENAI_PROVIDER = 'openai'
-// A minute of polling, long enough for the supervisor's 5-second lane scan to reopen a server.
+// Polling spans the supervisor's lane scan so a reopened server can receive the return.
 const SERVING_POLL_MS = 1000
 const SERVING_POLLS = 60
 // The wait for a broker on older code to be replaced: its refusal makes its supervisor reload onto the

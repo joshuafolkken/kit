@@ -42,8 +42,8 @@ const REPOSITORY_DIRECTORY_INDEX = 1
 const NO_INCREMENT = 0
 
 // The most session cuts one invocation may take. This bounds `cuts`, which
-// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge (~one per
-// 50 minutes of work), not the `run:cut` phase cuts a lane child takes. Each
+// only `run:carry --cut` increments — a `backlogrun`'s session hand-off at a child's merge,
+// not the `run:cut` phase cuts a lane child takes. Each
 // cut drops the context it accumulated but pays a cold preamble to resume, so past a point the
 // re-establishment costs more than the accumulation it sheds; six sits well under the ~10 a night of
 // work could otherwise take and refuses a run that has begun to churn. `is_at_cut_cap` reads it, and the

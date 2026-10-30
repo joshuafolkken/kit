@@ -18,10 +18,10 @@ import { run_board_usage_top, type TopReading, type TopReadings } from './run-bo
 // How `run:board` reads which lane each process belongs to and what it uses.
 // **One `ps` a second, and `lsof` only for a process not seen before.** `ps` — the snapshot the lane
 // count reads in the same refresh (`lane-process-table.ts`), never one of its own — lists every process's
-// cumulative CPU time and resident memory in about 15 ms; a process is put in the lane its working
+// cumulative CPU time and resident memory; a process is put in the lane its working
 // directory sits under (`.kit-lanes/<N>`), else its nearest ancestor's. A directory is looked up once
-// and remembered — asked again only when an `lsof` cut short left it out — so a full `lsof` (about
-// 220 ms) is paid on the first sample alone (`run-board-usage-lanes.ts`).
+// and remembered — asked again only when an `lsof` cut short left it out — so a full `lsof`
+// is needed on the first sample alone (`run-board-usage-lanes.ts`).
 // **Only this repository's lanes root counts** — another repository's lane of the same number is a
 // different lane. **macOS alone:** Linux's `ps` prints `time` in whole seconds, too coarse for a
 // one-second difference, so there the board draws no column rather than a figure flickering to 0.

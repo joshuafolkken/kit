@@ -125,7 +125,7 @@ describe('josh run:wake — the stdout contract', () => {
 		expect(await run_wake_cli.run([LOOP_FLAG, INTERVAL_FLAG, '0'])).toBe(FAILURE)
 	})
 
-	// `setTimeout` clamps a delay past 2^31−1 ms to one millisecond, so an interval large enough to
+	// `setTimeout` clamps an overflowing delay to its minimum, so an interval large enough to
 	// look like "poll rarely" produces the busy loop the lower bound exists to prevent.
 	it('refuses an interval large enough to wrap round to a busy loop', async () => {
 		expect(await run_wake_cli.run([LOOP_FLAG, INTERVAL_FLAG, '3000000'])).toBe(FAILURE)

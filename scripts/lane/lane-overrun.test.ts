@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
-// joshuafolkken/kit#4751: a merged lane over 40 minutes of net time is investigated in a detached
+// joshuafolkken/kit#4751: a merged lane over the net-time threshold is investigated in a detached
 // session that files its unfiled causes against the lane; one at or under it stops before its records.
 
 const mocks = vi.hoisted(() => ({

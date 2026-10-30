@@ -37,7 +37,7 @@ const ONE_GROUP = 1
 // The interval is whole and positive (`cli_flags.to_positive`): a zero interval is a busy loop against
 // the temp directory, not a faster supervisor.
 // **Bounded above as well as below, and for the same reason.** `setTimeout` clamps any delay past
-// 2^31−1 ms to *one millisecond*, so a number large enough to look like "poll rarely" produces exactly
+// its maximum to the minimum delay, so a number large enough to look like "poll rarely" produces exactly
 // the busy loop the lower bound exists to prevent. An hour is far past any useful polling interval and
 // nowhere near the clamp.
 const MAX_INTERVAL_SECONDS = 3600

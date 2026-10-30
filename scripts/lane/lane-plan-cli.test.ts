@@ -180,8 +180,7 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 		expect(error).not.toHaveBeenCalled()
 	})
 
-	// joshuafolkken/kit#4926: joshuafolkken/kit#4916 waited 27 minutes on joshuafolkken/kit#4910 for
-	// this file alone.
+	// joshuafolkken/kit#4926: a shared document alone must not block independent implementation.
 	it('runs on at once when only a document under docs/ overlaps the holder’s plan', async () => {
 		fetch_opted_in.mockResolvedValue(HOLDING)
 

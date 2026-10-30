@@ -8,7 +8,7 @@ import { lane_withdraw, type WithdrawOutcome } from './lane-withdraw'
 import { lane_withdraw_closed } from './lane-withdraw-closed'
 
 // joshuafolkken/kit#4915: #4906 was closed as not planned while its lane stayed open. Its child was
-// resumed by a cut and kept working for 75 minutes, holding one of the two lanes the run had.
+// resumed by a cut and kept working, holding one of the two lanes the run had.
 
 const WITHDRAWN = '4906'
 const MERGED = '4912'

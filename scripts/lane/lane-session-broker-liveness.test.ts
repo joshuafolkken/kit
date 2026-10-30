@@ -229,7 +229,7 @@ describe('lane_session_broker — waiting on a review the server is still runnin
 	})
 })
 
-// joshuafolkken/kit#4344: a relaunch waited out the review's 30 minutes on a broker that never answered.
+// joshuafolkken/kit#4344: an unanswered broker must not consume the review's wait window.
 describe('lane_session_broker — a relaunch the server never answers', () => {
 	const RELAUNCH = {
 		kind: 'relaunch',

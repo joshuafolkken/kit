@@ -18,9 +18,8 @@ import { run_ship_waiter } from './run-ship-waiter'
 // - `pending` — the chunk ran out with the ship still before its commit: issue the wait again.
 //
 // **A chunk ends below the five-minute prompt-cache TTL a lane child runs on** (`lane-child-marker.ts`),
-// so re-issuing it is the keep-alive: the next request reads the cached context back (66k tokens on
-// Opus 5.5, about $0.013) instead of writing it whole again after the wait (about $0.33) —
-// joshuafolkken/kit#5344. The heartbeat outlives the chunk by the session gap.
+// so re-issuing it keeps the next request on cached context instead of rewriting the whole context
+// (joshuafolkken/kit#5344). The heartbeat outlives the chunk by the session gap.
 
 const VERDICT = {
 	RETURNED: 'returned',

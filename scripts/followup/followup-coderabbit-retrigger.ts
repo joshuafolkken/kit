@@ -19,8 +19,7 @@ import { followup_coderabbit_wait, type CodeRabbitWait } from './followup-codera
 // request, not the ledger, answers "already retriggered", so a re-run `followup` reads the same answer.
 
 const RETRIGGER_BODY = '@coderabbitai review'
-// `Please wait **12 minutes and 34 seconds** before requesting another review.` — the clause between
-// `wait` and `before`, read as `<number> <unit>` token pairs.
+// CodeRabbit's own notice supplies the wait, so the window follows the service's rate limit.
 const WAIT_OPENER = /please wait/iu
 const WAIT_CLOSER = /before/iu
 const TOKEN = /\d+|[a-z]+/giu

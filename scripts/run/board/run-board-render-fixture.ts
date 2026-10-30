@@ -14,7 +14,7 @@ import type { LaneUsages, UsageFigure } from './run-board-usage'
 const { WORDS } = run_board_labels
 const MINUTE = MS_PER_MINUTE
 const STARTED = Date.parse('2026-10-08T09:00:00.000Z')
-// The run has gone 130 minutes, so a row past an hour reads as `2°05′30″` and the header as `2°10′00″`.
+// A run past an hour exercises hour formatting in both the rows and the header.
 const RUN_MINUTES = 130
 const NOW = STARTED + RUN_MINUTES * MINUTE
 const EMPTY_LAYOUT: BoardLayout = { active: [], queued: [], people: [], unreached: [] }

@@ -175,7 +175,7 @@ describe('run_checks — the swallowed failure stays visible', () => {
 
 // The watch fails both for "a check failed" and for "no checks reported", and `run_checks` does not
 // read its message — only the pull request's own rollup separates them.
-// Falling through on an empty one would trade a failure reported in seconds for the whole 32-minute
+// Falling through on an empty one would trade an immediate failure for the whole
 // budget spent on a required check that is missing rather than pending.
 describe('run_checks — a pull request with no checks still fails fast', () => {
 	it('rethrows the watch failure when the pull request has no checks', async () => {
