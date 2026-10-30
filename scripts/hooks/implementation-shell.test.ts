@@ -34,6 +34,22 @@ describe('visible shell write scope', () => {
 	})
 })
 
+describe('unverified shell argument expansion', () => {
+	it.each([
+		'git diff --out{put,put}=app.ts',
+		'git diff --out{p,"p"}ut=app.ts',
+		'git diff --out?ut=app.ts',
+		'git diff --out*ut=app.ts',
+		'git diff --out[p]ut=app.ts',
+		'gh api repos/owner/repo --out{put,put}=app.ts',
+		'gh api repos/owner/repo --out[p]ut=app.ts',
+		'rg --p{re,re} custom-editor pattern app.ts',
+		'rg --p[r]e custom-editor pattern app.ts',
+	])('refuses expansion before classifying arguments: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
 describe('operational shell reads and records', () => {
 	it.each([
 		'printf "example > app.ts"',
@@ -49,6 +65,9 @@ describe('operational shell reads and records', () => {
 		'pnpm josh backlog:plan --waves',
 		'gh pr view 123',
 		'cat app.ts 2>&1',
+		'git diff -- "*.ts"',
+		"git diff -- 'app[12].ts'",
+		'printf "{plan,record} * ? [literal]"',
 	])('allows a visible read or record write: %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})

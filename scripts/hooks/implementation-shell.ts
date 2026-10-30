@@ -50,6 +50,7 @@ const DYNAMIC_PATH = /[$`*?{}\\]/u
 const SUBSTITUTION = /\$\(|`|[<>]\(/u
 const ENV_ASSIGNMENT = /(?:^|\s)[A-Za-z_]\w*=/u
 const ARGUMENT_QUOTES = /['"\\]/gu
+const ARGUMENT_EXPANSION = /[*?{}[\]]/u
 
 function unsafe_path(target: string, root: string): boolean {
 	const file_path = target.replaceAll(QUOTES, '')
@@ -137,7 +138,8 @@ function input_is_unverified(command: string): boolean {
 }
 
 function is_unsafe(command: string, root: string = process.cwd()): boolean {
-	if (input_is_unverified(command)) return true
+	const plain = time_shell.blanked(command) ?? command
+	if (input_is_unverified(command) || ARGUMENT_EXPANSION.test(plain)) return true
 
 	return shell_segments
 		.quote_aware_commands_of(command)

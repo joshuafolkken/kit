@@ -83,6 +83,9 @@ describe('shell implementation authority', () => {
 		'bash -c "echo changed > scripts/example.ts"',
 		'printf changed > "$TARGET"',
 		'custom-editor scripts/example.ts',
+		'git diff --out{put,put}=app.ts',
+		'gh api repos/owner/repo --out?ut=app.ts',
+		'rg --p[r]e custom-editor pattern app.ts',
 	])('refuses an implementation or unverifiable shell path: %s', (command) => {
 		vi.stubEnv(agent_session_role.KEY, 'scheduler')
 
