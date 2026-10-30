@@ -40,15 +40,18 @@ describe('import_test_inputs', () => {
 
 		expect(read(TEST)).toBeUndefined()
 	})
-	it.each(['import(name)', 'process.env.TZ', 'fetch("url")'])(
-		'refuses a transitive unknown read: %s',
-		(source) => {
-			writeFileSync(SOURCE, source)
-			const read = import_test_inputs.create(typescript, () => ({ file: SOURCE, external: false }))
+	it.each([
+		'import(name)',
+		'process.env.TZ',
+		'fetch("url")',
+		'import { expect } from "vitest"; expect(() => { throw new Error("actual") }).toThrowErrorMatchingSnapshot()',
+		'import { expect } from "vitest"; expect("actual").matchSnapshot()',
+	])('refuses a transitive unknown read: %s', (source) => {
+		writeFileSync(SOURCE, source)
+		const read = import_test_inputs.create(typescript, () => ({ file: SOURCE, external: false }))
 
-			expect(read(TEST)).toBeUndefined()
-		},
-	)
+		expect(read(TEST)).toBeUndefined()
+	})
 })
 
 describe('import_graph.test_inputs — runtime ambiguity', () => {

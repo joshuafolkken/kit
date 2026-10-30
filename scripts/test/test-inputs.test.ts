@@ -23,6 +23,8 @@ describe('test_inputs.is_closed', () => {
 		'import { vi as mock } from "vitest"; mock.importActual("./hidden")',
 		'import { expect } from "vitest"; expect("actual").toMatchSnapshot()',
 		'import { expect } from "vitest"; expect("actual").toMatchFileSnapshot("expected.txt")',
+		'import { expect } from "vitest"; expect(() => { throw new Error("actual") }).toThrowErrorMatchingSnapshot()',
+		'import { expect } from "vitest"; expect("actual").matchSnapshot()',
 		'function local() { const fetch = () => 1 }; fetch("url")',
 	])('refuses unknown input: %s', (source) => {
 		expect(test_inputs.is_closed(typescript, FILE, source)).toBe(false)
