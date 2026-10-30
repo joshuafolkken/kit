@@ -1,0 +1,7 @@
+{
+	"reason": "run:review --join and review:record print the ship preflight's unplanned notice (#5388)",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}
