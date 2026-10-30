@@ -23,6 +23,7 @@ const COLUMNS = [
 ] as const
 const MS_PER_HOUR = 3_600_000
 const MAX_HOLD_MS = MS_PER_HOUR
+const LAUNCH_COMMAND = 'lane:launch'
 const { NOT_MEASURED } = lane_stage_stats
 // A period with no hold: the table still prints, so a reader sees zero holds rather than no table.
 const NONE_ROW = ['none', NOT_MEASURED, NOT_MEASURED, NOT_MEASURED, '0', '0']
@@ -66,6 +67,16 @@ function holds_of(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
 		.map((held) => ({ reason: held.reason, wait_ms: wait_ms(held, ends) }))
 }
 
+// Launch admission already writes its exact wait to the shared ledger; do not infer it from
+// unrelated driver events, which may happen while another lane is still waiting to launch.
+function launch_holds(entries: ReadonlyArray<LedgerEntry>): Array<Hold> {
+	return entries.flatMap((entry) =>
+		entry.kind === lane_ledger.KIND.CORE_WAIT && entry.command === LAUNCH_COMMAND
+			? { reason: LAUNCH_COMMAND, wait_ms: entry.waited_ms }
+			: [],
+	)
+}
+
 function total(values: ReadonlyArray<number>): number {
 	return values.reduce((sum, value) => sum + value, 0)
 }
@@ -102,7 +113,8 @@ function reasons_of(holds: ReadonlyArray<Hold>): Array<string> {
 
 // The period's table: `entries` is the whole ledger, filtered here to `window`.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const holds = holds_of(lane_stats.in_window(entries, window))
+	const period = lane_stats.in_window(entries, window)
+	const holds = [...holds_of(period), ...launch_holds(period)]
 	const rows = reasons_of(holds).map((reason) => reason_row(reason, holds))
 
 	return [

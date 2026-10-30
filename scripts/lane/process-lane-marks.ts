@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { lane_child_marker } from './lane-child-marker'
+import { process_linux } from './process-linux'
 
 // Each process's lane mark — the `JOSH_LANE_CHILD` it inherited — read from `ps -E`
 // (joshuafolkken/kit#4315).
@@ -18,7 +19,7 @@ import { lane_child_marker } from './lane-child-marker'
 // **An application bundle is never marked.** A lane that opened Docker Desktop passed its environment
 // to an application the whole machine uses; it is a person's, not the lane's.
 //
-// **macOS alone**, as `process-directories.ts` reads it: elsewhere nothing is listed.
+// macOS uses ps; Linux reads exact inherited assignments from the current account's procfs entries.
 
 const PS_COMMAND = '/bin/ps'
 const LISTING_ARGUMENTS = ['-A', '-ww', '-o', 'pid=,command=']
@@ -72,21 +73,26 @@ function listing(arguments_: ReadonlyArray<string>): string | undefined {
 		stdio: ['ignore', 'pipe', 'ignore'],
 	})
 
-	return result.error === undefined ? result.stdout : undefined
+	return result.error === undefined && result.status === 0 ? result.stdout : undefined
 }
 
 /**
  * Every marked process's issue, `undefined` where `ps` could not be run or timed out — never read as
  * "nothing marked".
  */
-function list_all(platform: NodeJS.Platform = process.platform): Map<number, string> | undefined {
-	if (!LISTING_PLATFORMS.has(platform)) return new Map()
+function darwin_marks(): Map<number, string> | undefined {
 	const plain = listing(LISTING_ARGUMENTS)
 	const with_environment = listing([ENVIRONMENT_FLAG, ...LISTING_ARGUMENTS])
 
 	if (plain === undefined || with_environment === undefined) return undefined
 
 	return parse(plain, with_environment)
+}
+
+function list_all(platform: NodeJS.Platform = process.platform): Map<number, string> | undefined {
+	if (platform === 'linux') return process_linux.marks()
+
+	return LISTING_PLATFORMS.has(platform) ? darwin_marks() : new Map()
 }
 
 const process_lane_marks = { list_all, parse }

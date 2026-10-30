@@ -5,7 +5,7 @@ import { lane_capacity } from './lane-capacity'
 // than a prediction, so the tests are about what the number refuses, never about what it promises.
 
 const { LANE_LIMIT_KEY } = lane_capacity
-const DEFAULT_LIMIT = 4
+const DEFAULT_LIMIT = 8
 const CONFIGURED_LIMIT = 3
 const OVERRIDE_LIMIT = 8
 const NO_LANES = 0
@@ -33,13 +33,13 @@ async function limit_of(value: string | undefined): ReturnType<typeof lane_capac
 describe('lane_capacity.lane_limit', () => {
 	// The documented default. Asserted against a literal rather than against the constant it reads,
 	// so a change to the number is a change to this test — which is what "documented" means here.
-	it('is four when the variable is unset', async () => {
+	it('is eight when the variable is unset', async () => {
 		await expect(limit_of(undefined)).resolves.toEqual({ kind: 'limit', limit: DEFAULT_LIMIT })
 	})
 
 	// Blank is the shape an `.env.example` key ships in, so it is unset rather than invalid — the
 	// reading `lane_paths.lane_root` already applies to `JOSH_LANE_ROOT`.
-	it('is four when the variable is blank', async () => {
+	it('is eight when the variable is blank', async () => {
 		await expect(limit_of('  ')).resolves.toEqual({ kind: 'limit', limit: DEFAULT_LIMIT })
 	})
 
@@ -110,6 +110,12 @@ describe('lane_capacity.seated_limit', () => {
 })
 
 describe('lane_capacity.free_lanes', () => {
+	it('refuses a ninth lane when the default eight are occupied', async () => {
+		const choice = await limit_of(undefined)
+
+		expect(choice.kind === 'limit' && lane_capacity.free_lanes(choice.limit, DEFAULT_LIMIT)).toBe(0)
+	})
+
 	it('is the whole limit when nothing is running', () => {
 		expect(lane_capacity.free_lanes(DEFAULT_LIMIT, NO_LANES)).toBe(DEFAULT_LIMIT)
 	})

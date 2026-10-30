@@ -192,19 +192,16 @@ are active.
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
 start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
 
-**Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
-
-Trusted local Codex batches use `:danger-full-access` and `approval_policy="never"`.
-Launch from a normal Terminal outside an inherited OS sandbox; see
-[Codex batch permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
+Unattended profiles: Codex → OpenAI; Claude Code → Anthropic.
+[Codex permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
 
 | Provider  | scheduler                    | worker                       | reviewer                     |
 | --------- | ---------------------------- | ---------------------------- | ---------------------------- |
 | Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |
 | OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     |
 
-Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
-either provider, and legacy `JOSH_LANE_*` values to the worker only. Review round 2 and later (the
+Overrides resolve before launch: model for Claude Code, effort for either provider, `JOSH_LANE_*`
+for workers. Review round 2 and later (the
 verification pass) runs Anthropic on `claude-sonnet-5-5` / `high` and OpenAI on `gpt-6.1-sol` / `high`, overridable by
 `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}`, then `JOSH_REVIEWER_*`. With no session marker and no
 `JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
@@ -863,7 +860,7 @@ pnpm josh lane:prune
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 
@@ -965,6 +962,8 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 <!-- /usage -->
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
+
+Launches reserve 270 MB in the shared core budget and wait for free memory without a timeout bypass. The child retains the claim. `run:board` shows its lane and wait reason; `lane:stats` lists completed waits as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 
