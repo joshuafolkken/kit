@@ -68,7 +68,6 @@ describe('no-measurement-comment', () => {
 	it.each([
 		'// The warm run takes 1.9 seconds.',
 		'// That costs ~12k tokens.',
-		'// It waits out a 10-second budget.',
 		'// That costs about 16,000 tokens per turn.',
 		'// The ledger grows by 64 MB a second.',
 		'// A cold start takes 120ms.',
@@ -92,5 +91,32 @@ describe('no-measurement-comment', () => {
 		expect(
 			message_ids_for('// It took 5 seconds.\nconst PROBE = 1\n', MEASUREMENT_RULE_ID),
 		).toEqual(['measurement'])
+	})
+})
+
+describe('declared values in measurement comments', () => {
+	it.each([
+		'// A cache read bills a 5-minute cache write.',
+		'// Published pricing: 5-minute write, 1-hour write, cache read, output.',
+		'// The published row is "for prompts over 100,000 tokens".',
+		'// A machine of 100 MB, so the available figure is the share free.',
+		'// It waits out a 10-second budget.',
+		'// The timeout is 120ms.',
+		'// A 64 MB limit prevents unbounded allocation.',
+		'// Test input: 12k tokens.',
+		'/* The fixture of 100 MB exercises the boundary. */',
+	])('allows %s', (comment) => {
+		expect(measurement_count(comment)).toBe(0)
+	})
+
+	it.each([
+		'// A 10-second budget; the warm run takes 1.9 seconds.',
+		'// The warm run takes 1.9 seconds with a 10-second budget.',
+		'// Test input: 12k tokens; the preamble costs about 16,000 tokens per request.',
+		'/* A machine of 100 MB.\n * A duplicate read takes ~17 seconds. */',
+		'// The budget took 5 seconds to compute.',
+		'// The fixture consumed 64 MB.',
+	])('still flags measurements beside declared values: %s', (comment) => {
+		expect(measurement_count(comment)).toBe(1)
 	})
 })

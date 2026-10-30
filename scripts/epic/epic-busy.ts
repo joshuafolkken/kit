@@ -16,11 +16,12 @@ import { session_cite } from '#scripts/issue/session-cite'
 // with its own branch and its own ports, so the question is not "is anything running" but "how many
 // are running" — and the answer is a count the caller compares against `lane_capacity`'s limit.
 //
-// **The count is read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
+// **The holders are read from GitHub, never kept in the session.** Two `epicrun`s counting to six in
 // their own memory give twelve lanes; the label on an open issue is the one record both of them
 // read. It is an advisory guard rather than a mutex — the label is applied after the read, so two
 // sessions starting in the same instant can still take one seat twice. What it closes is the window
 // that actually occurs: a lane holding the label for minutes.
+// `epic-lane-occupancy.ts` reconciles these holders with the shared local snapshot before selection.
 
 // Wide enough that the cap is never what decides the answer: a repository with a hundred issues
 // carrying `in-progress` at once is already the state this guard exists to report.

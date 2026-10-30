@@ -1,0 +1,7 @@
+{
+	"reason": "Share existing lane occupancy with epic selection and preserve solo handoff protection and unlabelled active occupancy for issue #5458.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 218
+	}
+}

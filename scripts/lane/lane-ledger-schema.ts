@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { lane_ledger_kind } from './lane-ledger-kind'
+import { lane_ledger_pinned_origin } from './lane-ledger-pinned-origin'
 import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
@@ -7,6 +8,7 @@ import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 const { KIND } = lane_ledger_kind
 const { ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
 	lane_ledger_schema_ship
+const { pinned_origin_schema } = lane_ledger_pinned_origin
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -192,8 +194,7 @@ const test_related_schema = z.object({
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
-// (joshuafolkken/kit#5385), absent on a test's verdict.
-const pinned_origin_schema = z.enum(['run-review', 'pre-detach', 'manual'])
+// (joshuafolkken/kit#5385), absent on a test's verdict. Origin values live in the constants leaf.
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
@@ -308,7 +309,7 @@ type HeldRecord = Omit<HeldEntry, 'kind' | 'at' | 'waiting'> & {
 	waiting?: ReadonlyArray<number> | undefined
 }
 
-const lane_ledger_schema = { KIND, entry_schema, pinned_origin_schema }
+const lane_ledger_schema = { entry_schema }
 
 export type {
 	CoreWaitEntry,
