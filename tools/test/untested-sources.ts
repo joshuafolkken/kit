@@ -50,7 +50,6 @@ const UNTESTED_SOURCES: ReadonlyArray<string> = [
 	'scripts/document/bash-output-cap.ts',
 	'scripts/document/document-scan.ts',
 	'tools/document/generate-catalog.ts',
-	'tools/document/command-derive.ts',
 	'tools/document/generate-catalog-main.ts',
 	'scripts/document/read-set-cost.ts',
 	'scripts/document/resident-budget.ts',

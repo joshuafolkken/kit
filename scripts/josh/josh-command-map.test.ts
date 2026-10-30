@@ -116,19 +116,6 @@ describe('COMMAND_MAP — reference metadata', () => {
 			expect(entry.reference[0], `composite command ${name} advertises rejected arguments`).toBe('')
 		}
 	})
-
-	// The per-command values are pinned by the snapshot below rather than by hand-picked examples:
-	// three `toEqual` assertions duplicating snapshot entries meant every metadata edit had to be
-	// made twice, and `josh-command-reference.test.ts` now checks each synopsis against its own
-	// parser, which is what those examples were reaching for.
-	it('keeps every canonical command and alias stable', () => {
-		const references = Object.fromEntries(
-			Object.entries(COMMAND_MAP).map(([name, entry]) => [name, entry.reference]),
-		)
-
-		// The hint is printed with a mismatch, so a stale snapshot names the command that rewrites it (#4970).
-		expect({ aliases: ALIASES, references }).toMatchSnapshot('regenerate: pnpm josh command:derive')
-	})
 })
 
 describe('COMMAND_MAP — command lookup by name', () => {

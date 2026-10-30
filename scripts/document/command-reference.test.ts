@@ -113,6 +113,24 @@ describe('the command catalog is up to date', () => {
 	})
 })
 
+describe('the catalog pins alias targets', () => {
+	it('rejects an alias reassigned to another existing command', () => {
+		const original = ALIASES['ga']
+
+		if (original === undefined) throw new Error('the gate alias must exist')
+
+		try {
+			ALIASES['ga'] = 'lint'
+
+			expect(() => {
+				expect_catalog_current(readFileSync(CATALOG_FILE, 'utf8'), generate_catalog())
+			}).toThrow('the catalog is stale')
+		} finally {
+			ALIASES['ga'] = original
+		}
+	})
+})
+
 // The ceiling and the count are `command-reference-line-budget.ts`'s, shared with `josh lint:related`.
 describe('the command reference keeps its entries short', () => {
 	it('keeps at most the ratcheted number of lines over the length limit', () => {
