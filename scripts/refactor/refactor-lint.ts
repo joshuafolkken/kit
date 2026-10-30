@@ -19,9 +19,8 @@ import { z } from 'zod'
 const ESLINT_BIN = 'eslint'
 const PNPM = 'pnpm'
 const PNPM_EXEC = 'exec'
-// `--no-inline-config` so a `/* eslint-disable */` in a file cannot hide a candidate from the scan the
-// way it can from the gate; the scan reports what the rules say, not what a file asked to suppress.
-const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json', '--no-inline-config']
+// Honor the same inline configuration as the gate, including external-format naming exceptions.
+const FORMAT_FLAGS: ReadonlyArray<string> = ['--format', 'json']
 
 type Priority = 'high' | 'medium' | 'low'
 const HIGH: Priority = 'high'
