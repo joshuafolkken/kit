@@ -3,6 +3,7 @@ import type { EpicChild } from '#scripts/epic/epic-graph'
 import { describe, expect, it } from 'vitest'
 import { run_board_fit } from './run-board-fit'
 import { run_board_fixture } from './run-board-fixture'
+import { run_board_gather } from './run-board-gather'
 import type { BoardPlan } from './run-board-layout'
 import { run_board_tick } from './run-board-tick'
 
@@ -12,6 +13,7 @@ import { run_board_tick } from './run-board-tick'
 
 const { LOCAL, harness } = run_board_fixture
 const { FRESH_STATE, tick } = run_board_tick
+const { LOCAL_READ_MS } = run_board_gather
 const CHILD = 3421
 const LAUNCH = {
 	pos: 1,
@@ -58,6 +60,21 @@ async function loading(events: ReadonlyArray<typeof LAUNCH>): Promise<Array<stri
 
 	return lines_of(frames[0])
 }
+
+describe('run_board_tick.tick capacity', () => {
+	it('refreshes occupied slots and the live limit independently of visible running rows', async () => {
+		const local = { ...LOCAL, events: [LAUNCH], occupied_count: 2, lane_limit: 6 }
+		const { ports, frames, read_local, clock } = harness(local, [])
+		const state = await tick(FRESH_STATE, ports)
+
+		read_local.mockResolvedValue({ ...local, occupied_count: 0, lane_limit: 12 })
+		clock.now_ms += LOCAL_READ_MS
+		await tick(state, ports)
+
+		expect(frames[0]).toContain('🧵 lanes 2/6')
+		expect(frames.at(-1)).toContain('🧵 lanes 0/12')
+	})
+})
 
 describe('run_board_tick.tick before the plan is read', () => {
 	it('draws three header lines and a blank, the run’s own child, and - for what it does not know', async () => {
