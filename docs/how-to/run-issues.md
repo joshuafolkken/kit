@@ -4,6 +4,12 @@
 
 You want an agent to take a GitHub Issue from plan to merge. You type a keyword to the agent — `kickoff`, `halfrun`, `prrun`, `fullrun` or `backlogrun` — followed by `#N` for an existing Issue or `new` for one it should file. These are not `josh` commands; the agent drives `josh` for you.
 
+The consultation main session handles discussion, filing and lane operations; implementation runs
+in an implementation lane. Asking it to file an Issue performs the filing. Asking it to handle an
+agreed change updates the Issue and hands implementation to an existing lane. A workflow keyword
+selects its procedure and stopping point; `kickoff` stops after filing and planning. The role boundary
+is defined in [consult-vs-execute](../../prompts/collaboration-workflow/principles.md#consult-vs-execute--相談と実行を区別する).
+
 ## Which keyword
 
 | Keyword      | What the agent does                                                                                                        | Use it when                                               |
