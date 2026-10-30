@@ -10,6 +10,7 @@ import { execa } from 'execa'
 import { project_test_script, type ProjectScriptState } from './project-test-script'
 import { SKIP_MARKER } from './skip-marker'
 import { test_read_recording, type RecordingEnvironment } from './test-read-recording'
+import { unit_update_arguments } from './unit-update-arguments'
 import { unit_worker_share } from './unit-worker-share'
 import { vitest_failure_summary } from './vitest-failure-summary'
 
@@ -305,7 +306,13 @@ async function run_guarded_unit(
 	project_directory: string,
 	extra_arguments: ReadonlyArray<string>,
 ): Promise<number> {
-	return await run_guarded_vitest(project_directory, ['run', ...extra_arguments])
+	const { arguments: ordered, filter } = unit_update_arguments.reorder(extra_arguments)
+
+	if (filter !== undefined) {
+		console.info(`josh ${UNIT_COMMAND_LABEL}: ${unit_update_arguments.notice(filter)}`)
+	}
+
+	return await run_guarded_vitest(project_directory, ['run', ...ordered])
 }
 
 const test_unit_guard = {

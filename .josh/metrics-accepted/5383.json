@@ -1,0 +1,7 @@
+{
+	"reason": "Vitest update argument normalization and parser regression tests prevent file filters from being swallowed (#5383)",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 55
+	}
+}
