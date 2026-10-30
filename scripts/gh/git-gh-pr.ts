@@ -185,6 +185,7 @@ async function put_merge(pr_number: number, head_sha: string): Promise<void> {
 		method: PUT_METHOD,
 		body: JSON.stringify({ merge_method: MERGE_COMMIT_METHOD, sha: head_sha }),
 		timeout_ms: MERGE_REQUEST_TIMEOUT_MS,
+		should_retry: false,
 	})
 }
 

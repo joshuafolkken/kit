@@ -116,6 +116,12 @@ async function run_child(generation: Generation): Promise<ChildResult> {
 	return child_result(result)
 }
 
+async function stop_invocation(issue: string): Promise<string> {
+	const current = await openai_lane_ship.current(issue)
+
+	return current?.stop_invocation ?? lane_child_invocation.ship_stop_invocation(issue)
+}
+
 async function run_generations(generation: Generation): Promise<number> {
 	const prior = await openai_lane_ship.current(generation.lane.issue)
 	const result = await run_child(generation)
@@ -132,7 +138,7 @@ async function run_generations(generation: Generation): Promise<number> {
 			...generation,
 			epoch: generation.epoch + 1,
 			is_resume: false,
-			invocation: lane_child_invocation.ship_stop_invocation(generation.lane.issue),
+			invocation: await stop_invocation(generation.lane.issue),
 		})
 	}
 
