@@ -1,7 +1,7 @@
 {
-	"reason": "#5383: josh test:unit moves a filter written after vitest's -u in front of the flag (new unit-update-arguments module + guard call)",
-	"date": "2026-10-29",
+	"reason": "Vitest update argument normalization and parser regression tests prevent file filters from being swallowed (#5383)",
+	"date": "2026-10-30",
 	"growth": {
-		"scripts.code_lines": 40
+		"scripts.code_lines": 55
 	}
 }

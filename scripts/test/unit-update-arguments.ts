@@ -30,15 +30,34 @@ function is_filter_word(value: string | undefined): value is string {
 	return !Object.hasOwn(UPDATE_VALUES, value)
 }
 
+function filter_words(vitest_arguments: ReadonlyArray<string>): ReadonlyArray<string> {
+	const next_option = vitest_arguments.findIndex((argument) => argument.startsWith(OPTION_PREFIX))
+
+	return next_option === NOT_FOUND ? vitest_arguments : vitest_arguments.slice(0, next_option)
+}
+
+function filter_flag(vitest_arguments: ReadonlyArray<string>): number {
+	const delimiter = vitest_arguments.indexOf('--')
+	const options = delimiter === NOT_FOUND ? vitest_arguments : vitest_arguments.slice(0, delimiter)
+
+	return options.findIndex(
+		(argument, index) => UPDATE_FLAGS.has(argument) && is_filter_word(options[index + 1]),
+	)
+}
+
 function reorder(vitest_arguments: ReadonlyArray<string>): UpdateReorder {
-	const flag_index = vitest_arguments.findIndex((argument) => UPDATE_FLAGS.has(argument))
+	const flag_index = filter_flag(vitest_arguments)
 	const value = flag_index === NOT_FOUND ? undefined : vitest_arguments[flag_index + 1]
 
 	if (!is_filter_word(value)) return { arguments: vitest_arguments }
 
-	const without_value = vitest_arguments.toSpliced(flag_index + 1, 1)
+	const filters = filter_words(vitest_arguments.slice(flag_index + 1))
+	const ordered = vitest_arguments.toSpliced(flag_index + 1, filters.length)
 
-	return { arguments: without_value.toSpliced(flag_index, 0, value), filter: value }
+	return {
+		arguments: reorder(ordered.toSpliced(flag_index, 0, ...filters)).arguments,
+		filter: value,
+	}
 }
 
 function notice(filter: string): string {
