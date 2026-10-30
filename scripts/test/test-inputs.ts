@@ -42,6 +42,8 @@ const UNSAFE: ReadonlySet<string> = new Set([
 	'vitest',
 	'inject',
 	'provide',
+	'toMatchSnapshot',
+	'toMatchFileSnapshot',
 ])
 
 type TypeScript = typeof ts
