@@ -15,6 +15,7 @@ import {
 	type HunkOutcome,
 	type PinnedReport,
 } from './test-pinned-logic'
+import { test_pinned_moves } from './test-pinned-moves'
 import { test_pinned_probe, type CheckOptions, type Probe } from './test-pinned-probe'
 import { test_pinned_reach, type Reach } from './test-pinned-reach'
 import type { Staged } from './test-pinned-stage'
@@ -229,11 +230,12 @@ async function stub_hunks_of(added: ReadonlyArray<string>): Promise<StubRead> {
 // (`test-pinned-emit.ts`), so neither is `unchecked`; without `typescript` every hunk is kept, so the
 // run checks more rather than less.
 async function runtime_hunks(hunks: ReadonlyArray<Hunk>): Promise<ProbeRead> {
+	const grouped = test_pinned_moves.group(hunks)
 	const api = review_code_tree.load_typescript(process.cwd())
-	if (api === undefined) return { hunks: [...hunks], unparsed: [], rewired: 0 }
-	const contents = await Promise.all(hunks.map(async (hunk) => await readFile(hunk.file, 'utf8')))
+	if (api === undefined) return { hunks: grouped, unparsed: [], rewired: 0 }
+	const contents = await Promise.all(grouped.map(async (hunk) => await readFile(hunk.file, 'utf8')))
 
-	return { ...test_pinned_emit.probed_of(api, hunks, contents), unparsed: [] }
+	return { ...test_pinned_emit.probed_of(api, grouped, contents), unparsed: [] }
 }
 
 async function read_probes(base: string, targets: ReadonlyArray<string>): Promise<ProbeRead> {

@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #5459 requires pairing moved hunks, joint reverts and complete cache identities; independent intervening probes remain intact.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 54
+	}
+}
