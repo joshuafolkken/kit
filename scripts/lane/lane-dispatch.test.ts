@@ -16,6 +16,7 @@ import { lane_child_marker } from './lane-child-marker'
 import { lane_dispatch, type DispatchOutcome } from './lane-dispatch'
 import { lane_output } from './lane-output'
 import { lane_registry, type LaneInfo } from './lane-registry'
+import { lane_seat_fixture } from './lane-seat-fixture'
 import { openai_lane_supervisor } from './openai-lane-supervisor'
 
 // **The launch and the lane lookup are spied on, not reimplemented.** What this file pins is the
@@ -80,6 +81,8 @@ function mock_supervisor(): void {
 	approve_supervisor.mockReturnValue(true)
 	cancel_supervisor.mockReturnValue(true)
 }
+
+beforeEach(lane_seat_fixture.mock_start)
 
 beforeEach(() => {
 	vi.clearAllMocks()

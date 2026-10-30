@@ -38,7 +38,7 @@ function lane(issue: string): LaneInfo {
 		issue,
 		branch: `${issue}-lane`,
 		directory: `/lanes/${issue}`,
-		seat: undefined,
+		seat: 1,
 		development_port: undefined,
 		preview_port: undefined,
 		output: undefined,
