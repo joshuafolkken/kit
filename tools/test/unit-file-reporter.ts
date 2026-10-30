@@ -68,6 +68,12 @@ async function report(
 
 // The count target is read once, in vitest's own process, so a test file the run starts cannot
 // overwrite it (joshuafolkken/kit#4465).
+function passed_files(
+	modules: ReadonlyArray<Pick<TestModule, 'state' | 'moduleId'>>,
+): Array<string> {
+	return modules.filter((module) => module.state() === 'passed').map((module) => module.moduleId)
+}
+
 function create(): Reporter {
 	const count_target = process.env[unit_count_file.COUNT_FILE_ENVIRONMENT]
 
@@ -76,6 +82,7 @@ function create(): Reporter {
 			await Promise.all([
 				report(modules),
 				unit_count_file.write_count(modules.length, count_target),
+				unit_count_file.write_files(passed_files(modules), count_target),
 			])
 		},
 	}
@@ -84,6 +91,7 @@ function create(): Reporter {
 const unit_file_reporter = {
 	SLOWEST_COUNT,
 	create,
+	passed_files,
 	record_to_ledger,
 	report,
 	slowest_files,

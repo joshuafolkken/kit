@@ -9,6 +9,27 @@ const { entry_schema } = lane_ledger_schema
 const AT = '2026-10-22T00:00:00.000Z'
 const PROBED = 'scripts/a.ts'
 
+describe('lane_ledger_schema.entry_schema — test reuse', () => {
+	it('preserves reuse counts, reason and comparison time on a related run', () => {
+		const run = {
+			kind: KIND.TEST_RELATED,
+			at: AT,
+			scope: 'related',
+			changed: 1,
+			synced: 1,
+			since_map: 0,
+			readers: 1,
+			elapsed_ms: 5,
+			reused: 1,
+			reuse_missed: 1,
+			reuse_reason: 'matched-inputs',
+			reuse_elapsed_ms: 1,
+		}
+
+		expect(entry_schema.safeParse(run).data).toStrictEqual(run)
+	})
+})
+
 describe('lane_ledger_schema runtime boundary', () => {
 	it('exposes only the entry parser so callers take constants from their leaves', () => {
 		expect(Object.keys(lane_ledger_schema)).toStrictEqual(['entry_schema'])

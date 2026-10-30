@@ -176,6 +176,10 @@ const unit_files_schema = z.object({
 // how many vitest ran, absent where none reported. `trigger_files` are the changed files that sent a
 // full-suite run there, absent where none did and on rows written before it (joshuafolkken/kit#4510).
 const test_related_schema = z.object({
+	reused: z.number().optional(),
+	reuse_missed: z.number().optional(),
+	reuse_reason: z.string().optional(),
+	reuse_elapsed_ms: z.number().optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
 	scope: z.string(),

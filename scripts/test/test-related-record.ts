@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
 
@@ -15,6 +16,8 @@ const COUNT_FILE_NAME = 'count'
 
 // The facts the run knew before vitest started: the scope, and the change it was resolved from.
 interface RunInput {
+	passed?: ReadonlyArray<string>
+	reuse?: TestReuse
 	scope: RelatedScope
 	root: string
 	// Repository-root-relative, as the change was read; `undefined` when it could not be.
@@ -56,7 +59,7 @@ function count_directory(): string | undefined {
 // A run that started no vitest writes none, which is an absent count rather than zero.
 async function with_test_count(
 	run: () => Promise<number>,
-): Promise<{ exit_code: number; test_files: number | undefined }> {
+): Promise<{ exit_code: number; test_files: number | undefined; passed?: ReadonlyArray<string> }> {
 	const directory = count_directory()
 
 	if (directory === undefined) return { exit_code: await run(), test_files: undefined }
@@ -67,7 +70,13 @@ async function with_test_count(
 	set_count_target(file)
 
 	try {
-		return { exit_code: await run(), test_files: unit_count_file.read_count(file) }
+		const exit_code = await run()
+
+		return {
+			exit_code,
+			test_files: unit_count_file.read_count(file),
+			passed: unit_count_file.read_files(file),
+		}
 	} finally {
 		set_count_target(previous)
 		rmSync(directory, { recursive: true, force: true })
@@ -113,9 +122,21 @@ function parts_of(input: RunInput): Record<'own' | 'synced' | 'since_map', Reado
 	}
 }
 
+function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> {
+	if (reuse === undefined) return {}
+
+	return {
+		reused: reuse.reused,
+		reuse_missed: reuse.missed,
+		reuse_reason: reuse.reason,
+		reuse_elapsed_ms: Math.round(reuse.elapsed_ms),
+	}
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
+		...reuse_record(input.reuse),
 		scope: input.kind ?? related_scope.scope_kind(input.scope),
 		changed: own.length,
 		synced: synced.length,
