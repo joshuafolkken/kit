@@ -5,6 +5,7 @@ import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { poll } from '#scripts/lib/poll'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
 import { busy_average, type BusySample, type LoadEase } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
@@ -282,14 +283,10 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 // A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
 // runs and the wait costs nothing.
 async function await_admission(context: WaitContext): Promise<Admission> {
-	let admission = await poll_admission(context)
-
-	while (admission === undefined) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await context.sleep(context.poll_interval_ms)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		admission = await poll_admission(context)
-	}
+	const admission = await poll.wait_for(async () => await poll_admission(context), {
+		interval_ms: context.poll_interval_ms,
+		sleeper: context.sleep,
+	})
 
 	await core_wait_record.record_admitted(context.fields, context.now(), context.record_wait)
 
