@@ -3,11 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// #818: the port numbers used to be independent literals in `playwright.config.ts`, app-kit's DAST
-// module and every consumer's `preview` scripts, so a project could not move off the defaults
-// without editing all of them in lockstep and keeping them in agreement forever. `ports/index.js`
-// is now the one definition in kit; a literal reappearing anywhere else is a second definition that
-// would silently stop following `PORT_SEED`.
+// #818: `ports/index.js` owns the port definitions so Playwright, DAST and preview scripts follow
+// PORT_SEED together. A literal elsewhere would silently stop following that seed.
 const PORTS_DIR = path.dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = path.resolve(PORTS_DIR, '..')
 const DEFINITION_FILE = path.join(PORTS_DIR, 'index.js')

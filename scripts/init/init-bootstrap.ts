@@ -28,11 +28,8 @@ function real_directory(directory: string): string | undefined {
 	return existsSync(directory) ? realpathSync(directory) : undefined
 }
 
-// A `pnpm dlx` (or global) run executes whatever kit its cache held, which may be days behind the
-// registry — and `init` pins the kit it runs as, so a stale cache used to leave its version and its
-// templates in the project for good. Only the kit the project itself installs
-// does the setup. Compared by real path, so a global virtual store shared with the project still
-// reads as the project's own kit.
+// Only the project's installed kit performs setup so a stale dlx/global cache cannot pin stale
+// templates and a stale version. Real-path comparison recognizes a shared global virtual store.
 function is_project_kit(package_directory: string, project_root: string): boolean {
 	const installed = real_directory(path.join(project_root, NODE_MODULES, KIT_PACKAGE_NAME))
 

@@ -184,8 +184,8 @@ describe('adopt_toolkits.discover_toolkits', () => {
 	})
 })
 
-// The drop `discover_toolkits` makes used to be invisible, which is how a partial install synced kit
-// alone and reverted the overlay tier (joshuafolkken/kit#1540). This is what makes it nameable.
+// A partial install must name missing toolkits so syncing kit alone cannot silently revert the
+// overlay tier (joshuafolkken/kit#1540).
 describe('adopt_toolkits.unresolved_toolkits', () => {
 	it('names a declared toolkit whose CLI shim is not installed', () => {
 		write_manifest(state.project, {

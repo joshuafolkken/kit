@@ -142,9 +142,8 @@ describe('josh_logic.run_command — the .env flag', () => {
 	})
 })
 
-// joshuafolkken/kit#3345: the heavy commands an agent calls directly used to start their tools outside
-// the machine-wide core budget. Each one now declares a weight, and the dispatch every command passes
-// through reserves it.
+// Direct heavy commands must reserve their declared weight through the common dispatch so they
+// respect the machine-wide core budget (joshuafolkken/kit#3345).
 const WEIGHTED_COMMANDS: ReadonlyArray<string> = [
 	'lines',
 	'refactor:scan',

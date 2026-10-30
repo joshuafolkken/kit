@@ -372,10 +372,9 @@ function parse_timeline(text: string): Timeline {
 }
 
 // **"No span was read" is the one criterion every scope withholds a transcript figure on**.
-// A run whose transcript could not be attributed, a child of an epic in
-// that state, and a batch no child contributed to are the same fact asked at three scales, and each
-// used to spell it out for itself — which is how the run scope came to print three `0.0 min` rows
-// beside the epic scope's `not measured` for the very same child.
+// A run without an attributed transcript, an epic child in that state, and a batch without child
+// contributions are the same missing measurement at three scales. Sharing the criterion keeps
+// every scope from presenting missing data as a zero duration.
 //
 // It takes the count rather than the array so the three callers can pass what they hold: the spans
 // themselves before a report exists, and `TimeReport.span_count` afterwards.

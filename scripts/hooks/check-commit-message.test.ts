@@ -44,9 +44,8 @@ describe('is_safe_commit_message_path', () => {
 		expect(is_safe_commit_message_path(temporary_path, GIT_DIRECTORIES)).toBe(true)
 	})
 
-	// joshuafolkken/kit#1106: the shape a linked work tree produces. It is absolute and shares no
-	// prefix with `.git/`, so the prefix test this guard used to be refused it — before the real
-	// check ran, which made every commit inside a work tree impossible.
+	// Linked work trees supply absolute paths without a `.git/` prefix; those paths must reach the
+	// message check (joshuafolkken/kit#1106).
 	it('accepts the absolute path a linked work tree passes', () => {
 		const worktree_path = `${WORKTREE_GIT_DIRECTORY}/COMMIT_EDITMSG`
 
@@ -125,10 +124,8 @@ describe('check_commit_message — branch with issue number', () => {
 		expect(result.message).toContain('#42')
 	})
 
-	// joshuafolkken/kit#1106: with no path passed, the file is read from the work tree's own git
-	// directory. The relative `.git/COMMIT_EDITMSG` this used to hardcode names a *file* in a linked
-	// work tree, so reading through it ends at ENOTDIR — the same defect as the guard's, on the
-	// branch the guard never reaches because there is no argument to check.
+	// Without an argument, resolve the work tree's git directory: its `.git` is a file and cannot
+	// serve as the parent of COMMIT_EDITMSG (joshuafolkken/kit#1106).
 	it('reads from the git directory git reports, not a literal .git', async () => {
 		mocked_branch.mockResolvedValue(ISSUE_BRANCH)
 		mocked_git_directories.mockResolvedValue([WORKTREE_GIT_DIRECTORY, MAIN_GIT_DIRECTORY])

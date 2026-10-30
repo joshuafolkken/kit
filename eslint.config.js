@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import { create_base_config } from './eslint/base.js'
 import { code_quality_rules } from './eslint/rules/code-quality.js'
+import { comment_why_only_plugin } from './eslint/rules/comment-why-only.js'
 import { english_only_prose_plugin } from './eslint/rules/english-only-prose.js'
 import {
 	CENTRALIZED_TESTS_DIRECTORY_ENTRY,
@@ -80,8 +81,10 @@ export default [
 	// follows is the CLAUDE.md exception for `eslint/rules/`, where a rule module may explain its
 	// rationale in Japanese. The off block comes last so nothing re-enables it for those files.
 	{
-		plugins: { kit: english_only_prose_plugin },
-		rules: { 'kit/english-only-prose': 'error' },
+		plugins: {
+			kit: { rules: { ...english_only_prose_plugin.rules, ...comment_why_only_plugin.rules } },
+		},
+		rules: { 'kit/english-only-prose': 'error', 'kit/no-history-comment': 'error' },
 	},
 	{
 		files: ['eslint/rules/**'],

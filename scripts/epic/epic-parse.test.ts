@@ -221,8 +221,7 @@ describe('epic_parse.parse_dependency_links', () => {
 	})
 })
 
-// joshuafolkken/kit#864: the auto-close used to bail the moment it saw one of these. Reading them
-// needs the repository and the number, in both spellings a task list may use.
+// Auto-close needs both repository and number from either task-list spelling (joshuafolkken/kit#864).
 const REMOTE_REPO = 'joshuafolkken/app-kit'
 const SHORTHAND_ROW = `- [ ] ${REMOTE_REPO}#7`
 const URL_ROW = `- [ ] https://github.com/${REMOTE_REPO}/issues/7`

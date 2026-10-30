@@ -133,9 +133,8 @@ describe('observations_flush — the refusals name what to do next', () => {
 		expect(message).toContain(ONLY_COPY)
 	})
 
-	// joshuafolkken/kit#1785: the exits it used to name — finish the branch, or delete it — are both
-	// denied to an agent by the distributed `.claude/settings.json`, so the message has to name the
-	// one route that is open.
+	// The message must name a recovery route the distributed permissions allow, rather than a branch
+	// operation denied to agents (joshuafolkken/kit#1785).
 	it('sends a committed flush branch to a push it is allowed to make', () => {
 		const message = observations_flush.flush_branch_message(FLUSH_BRANCH, ONE_COMMIT)
 

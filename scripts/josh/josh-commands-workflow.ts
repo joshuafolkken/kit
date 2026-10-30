@@ -146,8 +146,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict,
-	// which a run used to type as a `cat | grep -c` and judge by hand.
+	// Counting, appending and deciding a second sighting together keeps ledger judgments consistent.
 	'observation:record': {
 		script: 'scripts/observations/observation-record-cli.ts',
 		description: 'Record an observation sighting and answer whether it is now filed',

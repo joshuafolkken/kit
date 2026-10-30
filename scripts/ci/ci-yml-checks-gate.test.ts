@@ -17,9 +17,7 @@ import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 const RUNTIME_GATE_JOB = 'static-checks'
 const TEMPLATE_CHECKS_JOB = 'checks'
 const GATE_STEP = 'pnpm josh gate'
-// The five invocations the job used to spell out. Each one is now reached through the `josh`
-// sub-command that defines it, so finding any of them here again means the job has gone back to
-// verifying a set of its own rather than the one the local gate verifies.
+// These invocations belong to their `josh` subcommands so CI and the local gate verify the same set.
 const RESTATED_TOOL_TOKENS: ReadonlyArray<string> = [
 	'pnpm exec cspell',
 	'pnpm exec prettier',

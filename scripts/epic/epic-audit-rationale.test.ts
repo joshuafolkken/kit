@@ -145,9 +145,8 @@ describe('find_unjustified_orders — what it will not judge', () => {
 	})
 })
 
-// The regression round 2 found: an epic created exactly as documented used to fail its own audit at
-// once, so `epicrun #E` stopped at step one on a brand-new epic. Asserted against a body the real
-// builder produced and the real section reader, not a hand-written fixture.
+// A documented epic must pass its own audit. Using the real builder and section reader proves
+// their agreement without relying on a hand-written fixture.
 describe('find_unjustified_orders — an epic created with `--ordered`', () => {
 	it('reports nothing, because the creation records the order it declared', () => {
 		const body = epic_body.build_epic_body({

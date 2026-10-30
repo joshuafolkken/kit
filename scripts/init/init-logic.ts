@@ -40,22 +40,10 @@ const LEGACY_POSTINSTALL_KEY = 'postinstall'
 // global installs outside a git repo) does not abort `pnpm install`. These are
 // developer-only hooks, so they live in `prepare` (local install + pack/publish)
 // rather than `postinstall`, which also runs when the package is a consumer dependency.
-// A failing `lefthook install` used to be indistinguishable from a missing binary: `|| true` swallowed
-// both, so an install that left **zero** hooks in place still exited 0 and said nothing. The way it
-// happens in practice is `core.hooksPath` — lefthook refuses to install while any custom hooks path is
-// set — and the developer then commits and pushes for weeks with no pre-commit or pre-push check
-// running at all, believing they are.
-//
-// **The `|| true` stays**: a consumer's `pnpm install` must not die over a developer-only hook, which
-// is what it was added for. What changes is that the failure is named on standard error. The warning
-// sits **inside the branch the binary check already gates**, which is what separates the two cases —
-// the ordinary production or CI install, where lefthook is simply absent, stays exactly as silent as
-// it was, and only "lefthook is here and could not install" speaks up.
-// **It names a likely cause rather than asserting one, and links a URL rather than a path.** A set
-// `core.hooksPath` is much the commonest reason, but not the only one — a dev-dependency install in a
-// container with no `.git` fails here too — so a message that diagnosed would misdiagnose that build
-// on every run. And `docs/` is not among the files `josh init` copies, so a consumer told to read
-// `docs/init.md` is told to open a file their repository does not contain.
+// Warn only when an installed lefthook fails, so developers know their hooks are absent while
+// production installs without the binary remain silent. The consumer install must still succeed.
+// `core.hooksPath` is a likely cause, not a diagnosis: a container without `.git` can also fail.
+// Link to the published documentation because consumers do not receive kit's `docs/` directory.
 const HOOK_INSTALL_WARNING =
 	'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything'
 const LEFTHOOK_BINARY_GUARD = 'command -v lefthook >/dev/null 2>&1'
@@ -146,7 +134,7 @@ const LEFTHOOK_EXTENDS = 'node_modules/@joshuafolkken/kit/lefthook/vanilla.yml'
 // the preset still work.
 const TSCONFIG_EXTENDS = './node_modules/@joshuafolkken/kit/tsconfig/base.json'
 
-// Preset file basename within the package's tsconfig/ directory, used to read the base
+// Preset file basename within the package's tsconfig/ directory, for reading the base
 // compilerOptions when normalizing a consumer tsconfig.json during sync.
 const TSCONFIG_PRESET_FILENAME = 'base.json'
 

@@ -81,8 +81,7 @@ describe('josh doc:section', () => {
 	})
 })
 
-// An unrecognized keyword used to produce a complete report with a saving of zero and exit 0, so a
-// typo answered "nothing to save" rather than "no such entry".
+// An unrecognized keyword must fail so a typo cannot look like a valid report with no savings.
 describe('josh read:set — what it refuses', () => {
 	it('refuses an entry the table does not carry, and lists the ones it does', () => {
 		const { code, err } = captured(() => read_set_cli.run([MISTYPED], ROOT))

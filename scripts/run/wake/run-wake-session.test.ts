@@ -100,10 +100,8 @@ describe('the launched session does not inherit what the launcher must not pass 
 	})
 })
 
-// joshuafolkken/kit#1746. A woken session that exits without claiming the carry record used to leave
-// nothing at all behind, because `stdio: 'ignore'` rode along with `detached` — and the two are
-// separate requirements. These pin the half that changed: the child is still detached, and its output
-// now survives it.
+// A detached wake child still needs durable output so a session that exits without claiming the
+// carry record leaves diagnostic evidence (joshuafolkken/kit#1746).
 
 const MARKER = 'wake-log-marker'
 const POLL_LIMIT = 60

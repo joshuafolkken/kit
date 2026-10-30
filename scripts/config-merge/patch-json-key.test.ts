@@ -13,8 +13,8 @@ const TRAILING_NOTE = '// keep this note'
 const CRLF_DOCUMENT = '{\r\n\t"a": 1\r\n}\r\n'
 const BASE_PRESET_DOCUMENT = `{\n\t"${EXTENDS_KEY}": ["./base.json"]\n}\n`
 
-// Shaped like a tsconfig.json `sv create` produces: comments above a key and inside a nested object,
-// which the whole-file write-back this module replaced used to delete (#798).
+// A tsconfig.json shaped like `sv create` output checks that edits preserve comments above keys
+// and inside nested objects (#798).
 const COMMENTED_TSCONFIG = `{
 	"${EXTENDS_KEY}": ["${SVELTE_KIT_PRESET}"],
 	"${COMPILER_OPTIONS_KEY}": {
@@ -175,8 +175,7 @@ describe('patch_json_key.set_json_key — document edges', () => {
 		expect(result).toBe(`{"${EXTENDS_KEY}": ["a"],\n"${EXCLUDE_KEY}": ["dist"]}\n`)
 	})
 
-	// An object whose body is only a comment still has a comment to lose. Rewriting the braces
-	// wholesale — the one whole-region edit this module used to make — dropped it.
+	// An object containing only a comment still needs that comment preserved when its keys change.
 	it('keeps a comment-only body when adding the first key', () => {
 		const result = patch_json_key.set_json_key(`{\n\t${TRAILING_NOTE}\n}\n`, EXCLUDE_KEY, ['dist'])
 
@@ -226,8 +225,7 @@ describe('patch_json_key.remove_json_key', () => {
 		expect(patch_json_key.remove_json_key(content, 'a')).toBe(ONLY_SURVIVOR_DOCUMENT)
 	})
 
-	// Removing the first key used to span up to the next key, which swallowed the comment describing
-	// that next key — the same silent deletion this module exists to prevent.
+	// Removing a key must preserve the comment describing its next sibling.
 	it('removes the first key while keeping the comment that documents the next one', () => {
 		const content = `{\n\t"a": 1,\n\t${TRAILING_NOTE}\n${SURVIVING_PROPERTY}\n}\n`
 

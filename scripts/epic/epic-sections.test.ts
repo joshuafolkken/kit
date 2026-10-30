@@ -63,8 +63,8 @@ describe('epic_sections.is_in_range', () => {
 	})
 })
 
-// The rule scopes the `Dependencies` rewrite too, which used to stop at a heading of any level. Pinned
-// here as well as on the `Dependencies` side so the two consumers cannot drift apart.
+// The rule also scopes the `Dependencies` rewrite. Pinning both consumers keeps their section
+// boundaries aligned.
 describe('epic_sections.find_section_range — a deeper heading belongs to the section', () => {
 	const DEPENDENCIES = /^#{1,6}[ \t]+Dependencies\b/u
 

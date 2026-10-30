@@ -5,8 +5,7 @@ export const import_rules = {
 	// joshuafolkken/kit#3599: off for the same reason, and for one more. These six read the exports of
 	// the imported file, so a per-file content cache keeps a stale "no problem" for an unchanged
 	// importer after the file it imports changes. The compiler runs the first four checks on every
-	// file it type-checks; the last two never ran on a `.ts` import before the resolver was wired, so
-	// nothing that used to be reported is lost. `base.js` switches all six back on for hand-authored
+	// file it type-checks. `base.js` switches all six back on for hand-authored
 	// JavaScript, which the compiler does not check.
 	'import-x/named': 'off',
 	'import-x/namespace': 'off',

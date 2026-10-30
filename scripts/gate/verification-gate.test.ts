@@ -36,9 +36,8 @@ const REFUSAL_MESSAGE = 'josh gate takes no extra arguments'
 
 const { as_execa_implementation, capture_stdout, fake_result, FORWARDED_FLAG } = gate_test_fixture
 
-// This suite mocks execa but not the tree, so every green run here used to write the green-gate record
-// for the *real* working tree — and the next `pnpm josh gate` would have skipped its four checks on the
-// strength of it (joshuafolkken/kit#1328). The destinations exist as options for exactly this reason.
+// This suite mocks execa but not the tree, so it must use isolated record destinations: simulated
+// success must not authorize skipping checks on the real working tree (joshuafolkken/kit#1328).
 const RECORDS = gate_test_fixture.suite_records('fan-out')
 
 function step_command(step: GateStep): string {

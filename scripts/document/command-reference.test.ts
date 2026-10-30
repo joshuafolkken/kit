@@ -12,9 +12,8 @@ import { all_documents, COMMAND_REFERENCE_DOCS, read_document } from './ai-docum
 import { command_reference_line_budget } from './command-reference-line-budget'
 import { document_scan } from './document-scan'
 
-// Every `pnpm josh <x>` a document names in a code span has to be a real command. A per-rule marker
-// suite used to pin a handful of command names by hand; this checks all of them at once, and a
-// renamed or mistyped command fails here rather than at run time (joshuafolkken/kit#1923).
+// Every documented `pnpm josh <x>` code span must name a real command, so renamed or mistyped
+// commands fail before run time across the whole document set (joshuafolkken/kit#1923).
 
 // `josh <x>` forms a document writes that are legitimately not COMMAND_MAP sub-commands: the
 // workflow keywords a person types (`prrun`, …), the built-in `help`, and `review`, which

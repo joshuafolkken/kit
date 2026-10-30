@@ -276,8 +276,8 @@ describe('pr_get_state_snapshot — failures throw rather than answering green',
 		await expect(pr_get_state_snapshot(PR_BRANCH)).rejects.toThrow(NO_PULL_REQUEST_MESSAGE)
 	})
 
-	// joshuafolkken/kit#1048: a rate-limited lookup used to reach the merge gate as "there is no pull
-	// request for this branch", which sent the diagnosis after a pull request that plainly exists.
+	// A rate-limited lookup must stay distinct from an absent pull request so the merge diagnostic
+	// names the failed read (joshuafolkken/kit#1048).
 	it('says the lookup failed rather than that the branch has no pull request', async () => {
 		mocked_api.mockRejectedValue(gh_failure())
 

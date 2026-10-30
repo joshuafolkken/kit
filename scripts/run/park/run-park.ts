@@ -7,10 +7,8 @@ import { z } from 'zod'
 
 // The local record of a lane child's park — the half of `run:park` a `PreToolUse` guard can read.
 //
-// **The park itself is a GitHub label, which a synchronous guard cannot read**, so `lane-park` used to
-// fire on every lane-child stop, parked or not (joshuafolkken/kit#4132). `run:park` writes this record
-// once the comment and the label are both on the issue, and the guard reads it back synchronously, the
-// way the pre-gate cut guard reads `run-cut.ts`'s record.
+// A synchronous guard cannot read the GitHub park label, so `run:park` records the completed comment
+// and label locally for `lane-park` to recognize a parked child (joshuafolkken/kit#4132).
 //
 // **Keyed to the repository and the issue, not the work tree.** The child parks from its lane, and the
 // parent clears the park from the main checkout once a person has decided; both resolve the same

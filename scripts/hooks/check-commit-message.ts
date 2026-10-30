@@ -46,10 +46,8 @@ function is_safe_commit_message_path(
 	)
 }
 
-// Where git would have written the message, for a run that was passed no path. The work tree's own
-// git directory rather than a literal `.git/`: in a linked work tree that name is a *file*, so the
-// relative spelling this used to hardcode ends the run at ENOTDIR — the same defect as the guard's,
-// on the branch the guard does not reach.
+// An omitted path needs the work tree's own git directory: `.git` is a file in a linked work tree,
+// so appending a message filename to that literal would fail with ENOTDIR.
 function default_commit_message_path(git_directories: ReadonlyArray<string>): string {
 	return path.join(git_directories[0] ?? FALLBACK_GIT_DIRECTORY, COMMIT_MESSAGE_FILE_NAME)
 }

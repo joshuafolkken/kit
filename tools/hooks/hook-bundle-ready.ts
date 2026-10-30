@@ -11,9 +11,8 @@ import { error_text } from '#scripts/lib/error-message'
 // `dist/hooks/<name>.js` in this same process; a checkout that cannot build runs its `pnpm josh`
 // fallback, which runs the live source.
 //
-// **One node launch per hook call**. The gate and the bundle used to be two
-// `node` processes, so every tool call paid the node start-up twice. The bundle is imported here
-// instead, with `process.argv` set to what `node dist/hooks/<name>.js [arguments...]` would have given
+// One node launch per hook call avoids paying startup twice. The bundle is imported here
+// with `process.argv` set to what `node dist/hooks/<name>.js [arguments...]` would have given
 // it, because every hook runs its main from `process.argv[1] === fileURLToPath(import.meta.url)`.
 //
 // **Stale bundles are rebuilt rather than skipped.** The fallback pays a pnpm launch and a cold tsx

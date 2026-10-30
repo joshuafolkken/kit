@@ -74,8 +74,8 @@ describe.each(AI_DOCS)('%s — UI gate names the shipped skill', (document_path)
 		expect(content).toContain(SKILL_REFERENCE)
 	})
 
-	// The gate used to name `/verify`, which this package does not ship and Claude Code bundles with
-	// a broader meaning of its own; leaving the old name in place is what made the gate open-loop.
+	// The gate must name the UI skill this package ships; `/verify` belongs to Claude Code and has
+	// a broader meaning.
 	it('no longer sends the reader to a skill this package does not ship', () => {
 		expect(content).not.toContain('the `/verify` or `/run` skill')
 	})

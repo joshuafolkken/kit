@@ -99,8 +99,7 @@ describe('parse_line — the user side', () => {
 })
 
 describe('parse_line — a block it has never seen', () => {
-	// One unexpected block used to fail the array it sat in, taking every other block on the line
-	// with it — a whole assistant turn dropped from the table because one tool wrote a new shape.
+	// An unknown block must not discard the recognized blocks sharing its assistant turn.
 	it('costs one block rather than the whole line', () => {
 		const blocks = cost_blocks.parse_line(
 			assistant_line([{ shape: 'nobody has seen this' }, { type: 'text', text: 'kept' }]),

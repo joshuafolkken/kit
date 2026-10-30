@@ -18,14 +18,13 @@ import {
 } from './git-gh-pr-fixture'
 import { forget_pr_numbers } from './git-gh-pr-read'
 
-// joshuafolkken/kit#1077. `PUT pulls/{N}/merge` is the least idempotent write in this layer, and a
-// request that fails *after* the server has merged used to end `followup` before its completion
-// notification and the epic auto-close — with a re-run then answering 405 on a pull request that was
-// already merged. The recovery is to re-read the pull request and let its own state settle it.
+// A failed `PUT pulls/{N}/merge` may still have merged on the server. Re-reading the pull request
+// settles whether completion and epic auto-close can proceed without repeating the write
+// (joshuafolkken/kit#1077).
 //
 // **The read is the whole point, so the merge and the detail are answered separately.** "The write
 // failed and the pull request is merged" needs two different *outcomes* on two paths, which is why
-// the shared `gh_api_routes` was widened to take a thunk beside a body rather than copied here.
+// the shared `gh_api_routes` accepts a thunk beside a body instead of requiring a copied fixture.
 vi.mock('./git-gh-exec', () => ({
 	git_gh_exec: {
 		exec_gh_command: vi.fn(),
@@ -41,8 +40,7 @@ const mocked_api = vi.mocked(git_gh_exec.exec_gh_api)
 const REPO_PATH = 'repos/{owner}/{repo}'
 const PR_MERGE_PATH = `${REPO_PATH}/pulls/${String(PR_NUMBER)}/merge`
 const MERGED_RESPONSE = '{"sha":"b0d386c","merged":true}'
-// What GitHub answers a merge request aimed at a pull request that is already merged — the failure a
-// re-run of `followup` used to die on.
+// GitHub's answer for an already-merged pull request must remain recoverable on a re-run.
 const ALREADY_MERGED = 'gh: Pull Request is not mergeable (HTTP 405)'
 // `merged_at` alone is the listing's spelling of a merge; the single-pull endpoint carries `merged`.
 // Both have to settle the question, so both are exercised.

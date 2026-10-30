@@ -2,10 +2,8 @@ import { DISTRIBUTED_SKILL_FILE } from '#scripts/managed-marker/managed-config-f
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
-// joshuafolkken/kit#1592. The managed config-file answer used to end the run before the CI wait, and
-// in kit — the distribution source — the condition it tests is true of nearly every change: two of
-// three children of `epicrun #1413` stopped here over changes those Issues had themselves ordered. It
-// reports now, into **both** destinations, and this suite is what pins that end to end.
+// Managed config changes need a report in both destinations while CI continues, especially in kit
+// where editing the distributed source is expected (joshuafolkken/kit#1592, #1413).
 //
 // **`./git-pr-managed-config` is deliberately left real**, unlike in `git-pr-followup.test.ts` where
 // it is mocked to keep that suite off the working copy. Here the composed report *is* what is under
@@ -156,7 +154,7 @@ describe('followup — a diff that changes a distributed file', () => {
 		given_changed([UNDISTRIBUTED_FILE, DISTRIBUTED_SKILL_FILE])
 	})
 
-	// The change itself. This used to throw before the CI wait was even entered.
+	// Reporting a managed change must allow the CI wait to begin.
 	it('merges instead of stopping', async () => {
 		await git_pr_followup.run(BASE_INPUT)
 

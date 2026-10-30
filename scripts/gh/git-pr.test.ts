@@ -223,9 +223,8 @@ describe('git_pr.create_with_issue_info — a merged pull request', () => {
 	})
 })
 
-// joshuafolkken/kit#1232. The command used to sleep five seconds and then watch the rollup on a
-// two-minute budget, and `pnpm josh followup` started the same wait over the moment it returned.
-// These assertions pin that the wait is gone from every path, not only the freshly-created one.
+// `pnpm josh followup` owns the CI wait, so PR creation must return without waiting on every path
+// (joshuafolkken/kit#1232).
 describe('git_pr.create — returns as soon as the pull request is open', () => {
 	it('does not watch the checks after creating the PR', async () => {
 		await git_pr.create(PR_TITLE, PR_BODY, BRANCH, { label: BUGFIX })
@@ -265,8 +264,8 @@ describe('git_pr.create — returns as soon as the pull request is open', () => 
 	})
 })
 
-// joshuafolkken/kit#3263: an unreadable state used to answer "not merged", so a rate limit wrote the
-// new body onto a pull request that had already merged.
+// An unreadable state cannot authorize a body update: the pull request may already be merged
+// (joshuafolkken/kit#3263).
 describe('git_pr.create — a pull request whose state cannot be read', () => {
 	it('stops without writing when the PR state read fails', async () => {
 		const failure = new Error('gh api could not read the pull requests for branch')

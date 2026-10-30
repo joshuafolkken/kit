@@ -331,7 +331,7 @@ describe('core_budget.reserve — an overloaded machine holds the first waiter',
 		expect(run.is_overflow).toBe(false)
 	})
 
-	// The oldest claim with nothing running used to start before the overload was consulted.
+	// An empty running set must still respect overload before admitting the oldest claim.
 	it('keeps the oldest claim waiting on an empty ledger while the run queue stays past the cap', async () => {
 		const run = await claim_one(queue_in_turn([OVERLOADED]))
 

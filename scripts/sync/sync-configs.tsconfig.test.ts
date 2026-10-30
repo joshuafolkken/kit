@@ -171,8 +171,7 @@ describe('sync_configs.sync_tsconfig — prettier-clean serialization', () => {
 		expect(await prettier_format_json(written)).toBe(written)
 	})
 
-	// The kit#798 regression, end to end through the real sync: `sv create` ships this comment, and
-	// the whole-file write-back used to delete it the first time sync had anything to add.
+	// Real sync must preserve this `sv create` comment when adding configuration (kit#798).
 	it('leaves a comment in the consumer file intact while stripping a redundant option', () => {
 		const content = PRETTIER_CLEAN_TSCONFIG.split(EXCLUDE_LINE_START).join(
 			`\t${SV_CREATE_COMMENT}\n${EXCLUDE_LINE_START}`,

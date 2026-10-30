@@ -1,8 +1,5 @@
-// Pulling machine-checkable references out of the distributed documents, so a few structural scans
-// can replace the ~140 per-phrase marker suites the documents used to carry.
-// Every function here is a pure string extractor: it takes document text and returns the references
-// it names, which is what lets the scans that call it be checked on a synthetic string with a
-// deliberately broken reference in it.
+// Structural scans share these pure string extractors so synthetic documents with broken references
+// can exercise the same reference parsing as the distributed documents.
 
 // A command reference, only inside a code span. `` `pnpm josh gate` `` and `` `josh review:brief` ``
 // are the copy-and-paste form; the leading backtick keeps prose like "josh will decide" out, which

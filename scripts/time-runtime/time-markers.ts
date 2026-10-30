@@ -7,7 +7,7 @@ import { json_value } from '#scripts/lib/json-value'
 // A stage is bounded by things a transcript can be read for, so this module is the one rule for what
 // counts as a boundary — and it is deliberately about **recognizable commands, never durations**: a
 // boundary guessed from "this interval looks like a review" would move whenever a run got faster,
-// which is the one thing a measurement used to compare two runs must not do.
+// which would make comparisons between runs unreliable.
 //
 // **Only the boundaries `josh_command` cannot already express live here.** `gate`, `pr` and `merge`
 // are `pnpm josh <cmd>` invocations that `time-spans.ts` already names, and re-detecting them here

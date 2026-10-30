@@ -109,10 +109,8 @@ function issue_lines(offset: number, branch: string = BRANCH): Array<string> {
 	]
 }
 
-// One `tool_use` line carrying its input, named by the tool (joshuafolkken/kit#1472). `call_line`
-// above carries no input at all, and the three builders below each used to write this same object
-// with one field changed — a clone that would have needed a fourth copy the moment a suite wanted a
-// tool none of them names, which `MultiEdit` and `NotebookEdit` now do.
+// A shared tool-use builder with input lets fixtures name any tool without duplicating the object
+// shape; `call_line` intentionally carries no input (joshuafolkken/kit#1472).
 interface ToolLine {
 	name: string
 	input: unknown

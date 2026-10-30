@@ -167,8 +167,7 @@ describe('the tracked children and the citable ones are the same set', () => {
 })
 
 describe('epic_audit_checks — references between children of another repository', () => {
-	// Written `owner/repo#N`, a reference used to be dropped before it was read at all, so a real
-	// missing dependency between two cross-repository children went unreported.
+	// Cross-repository references must participate in the audit so missing dependencies are reported.
 	it('reads a qualified reference to a sibling in the same other repository', () => {
 		const findings = epic_audit_checks.find_implicit_dependencies(
 			[child(12, OTHER_REPO, `uses ${OTHER_40}`), child(40, OTHER_REPO, '')],

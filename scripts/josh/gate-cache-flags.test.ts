@@ -22,11 +22,9 @@ import {
 	TS_CACHE_FLAGS,
 } from './josh-command-types'
 
-// joshuafolkken/kit#1256: the type check and the spell check used to rescan the whole tree on every
-// run. What makes them incremental is a flag on the command definition and an ignore rule naming the
-// file that flag writes, and neither half fails visibly on its own: drop the flag and the gate is
-// merely slow again, drop the ignore rule and a multi-hundred-kilobyte cache file is committed —
-// or, worse, spell-checked, which is a red gate with nothing misspelled in the tree.
+// Incremental type and spell checks require both a command flag and an ignore rule for its cache.
+// Omitting the flag wastes checks; omitting the ignore can commit or spell-check generated cache
+// content (joshuafolkken/kit#1256).
 const GITIGNORE_PATHS: ReadonlyArray<string> = ['.gitignore', 'templates/gitignore']
 // The distributed dictionary. A consumer's `.gitignore` only gains the patterns on its next
 // `josh sync`, while the flags that write the files arrive with the package itself, so the

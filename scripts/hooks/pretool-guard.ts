@@ -16,12 +16,9 @@ import { lane_plan_guard } from './lane-plan-guard'
 import { shell_rules_notice } from './shell-rules-notice'
 import { step_zero_notice } from './step-zero-notice'
 
-// One PreToolUse process for the three guards that used to be three. A Bash
-// call used to spawn `batch:guard`, `investigation:guard` and `rule:guard` separately — three pnpm
-// launches on top of the tool call — while consumers paid that thrice on every guarded call. The
-// three share one shell (`hook-decision.ts`): the same payload schema, the same deny envelope, the
-// same `.env` load. So the consolidation is a composition, not a rewrite — each guard's own
-// `refusal` / `outcome` is called, unchanged, on the one payload this process reads.
+// One PreToolUse process shares the payload schema, deny envelope and `.env` load across all three
+// guards (`hook-decision.ts`) without paying a pnpm launch for each guard. Each guard's own
+// `refusal` / `outcome` reads the same payload, preserving the individual decisions.
 //
 // **The verdict is identical to running the three in turn**, and that is the whole point. Each guard
 // self-gates on the tool name inside its own `is_candidate` / trigger, so running all three on the

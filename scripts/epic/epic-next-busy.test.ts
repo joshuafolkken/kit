@@ -18,15 +18,9 @@ import { epic_next } from './epic-next'
 import type { EpicView } from './epic-next-views'
 import { epic_view_fixture } from './epic-view-fixture'
 
-// joshuafolkken/kit#925: `epic:next --repo` used to answer from the epic's own children alone, so an
-// `in-progress` issue belonging to a *different* epic was invisible. Two `epicrun`s in one checkout
-// then both answered "nothing of mine is in progress", and two children ran in the same working
-// tree — destruction rather than interleaving. The invariant is per *repository*.
-//
-// joshuafolkken/kit#1491 made that invariant a count rather than a yes/no: an `in-progress` issue
-// occupies one lane, and a repository offers children until its lanes are full. The one-lane case is
-// exactly the old behavior, which is why the tests written for it pass `ONE_LANE` and still assert
-// what they asserted before.
+// Lane occupancy is per repository so children of different epics cannot share one working tree
+// (joshuafolkken/kit#925). Each in-progress issue occupies a lane; children are offered only while
+// capacity remains (joshuafolkken/kit#1491). ONE_LANE exercises exclusive access.
 
 // `issue_blocked_by_references` is here because `epic:next --repo` confirms the candidate it is about
 // to offer against its own relations listing (joshuafolkken/kit#1121). Left out, every candidate is

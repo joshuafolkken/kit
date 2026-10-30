@@ -7,9 +7,8 @@ import { lane_reap } from './lane-reap'
 import { lane_registry, type LaneInfo } from './lane-registry'
 import { lane_restart } from './lane-restart'
 
-// joshuafolkken/kit#4233: `git stash` refuses a tree with unresolved merge conflicts ("needs merge"),
-// so `lane:restart` used to stop the child and then strand the lane. What is pinned against real git
-// is that such a tree is refused before anything is stopped.
+// `git stash` refuses unresolved merge conflicts, so restart must reject that tree before stopping
+// its child. Real git pins the refusal boundary (joshuafolkken/kit#4233).
 
 const ISSUE = '4233'
 const FILE = 'shared.txt'

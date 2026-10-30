@@ -12,10 +12,8 @@ import {
 } from './latest-corepack-fixture'
 import { build_package_manager_manifest } from './package-manager-manifest-fixture'
 
-// The kit#773 regression: `devEngines.packageManager.version` used to be realigned only
-// after a successful bump. An up-to-date repository never bumps, so a manifest that
-// arrived with the two fields out of step never self-healed and pnpm kept printing the
-// dual-declaration warning on every invocation. main() now aligns on every path.
+// Align both package-manager declarations on every path, including an up-to-date repository with
+// no version bump, so drift cannot keep triggering pnpm's dual-declaration warning (kit#773).
 vi.mock('execa', () => ({ execaSync: vi.fn() }))
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }))
 vi.mock('./development-engines-verdict', () => ({

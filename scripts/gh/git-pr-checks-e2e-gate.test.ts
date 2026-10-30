@@ -6,12 +6,9 @@ import {
 	type RollupCheck,
 } from './git-pr-checks-parse'
 
-// joshuafolkken/kit#902 removed the completion gate's human E2E run: nobody is asked to run
-// `pnpm josh test` and paste the output any more. That leaves the CI E2E job as the only E2E signal
-// a `fullrun` reads, so what used to be an implementation detail of the wait loop is now the
-// verification itself — these are the assertions that removing the human step did not open the
-// gate. The claim they pin is written out in `prompts/testing-guide.md` → "Closing the E2E gate
-// without a human run" → "The gate is not weakened".
+// The CI E2E job is the completion gate's E2E evidence, so the wait must block an unverified merge
+// (joshuafolkken/kit#902; `prompts/testing-guide.md` → "Closing the E2E gate without a human run"
+// → "The gate is not weakened").
 //
 // **Two separate mechanisms hold the gate closed, and each fixture below picks one.** `E2E` is
 // deliberately not in `DEFAULT_REQUIRED_CHECKS`. A *failed* E2E job is caught by
@@ -82,8 +79,7 @@ describe('a non-passing E2E job keeps the merge closed', () => {
 
 	// The one opening in the wall is the temporary kit#753 CodeRabbit skip, and it applies only when
 	// *every* non-passing check is CodeRabbit's. An E2E job that is not passing beside a pending
-	// review must not be swept through it — that would be the exact weakening the removed human step
-	// used to catch. Both statuses are asserted because they take different routes: `fail` is caught
+	// review must still block the merge. Both statuses are asserted because they take different routes: `fail` is caught
 	// by the kit#990 fast fail before the exemption is reached, while `pending` is what actually puts
 	// the exemption to the test.
 	it.each([{ e2e_status: 'fail' }, { e2e_status: 'pending' }])(
@@ -140,11 +136,9 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 // The joshuafolkken/kit#991 decision, pinned rather than left in prose: `E2E` stays off the default
 // required list. Three things decide it.
 //
-// It would not have caught the defect that raised the question. A required check is satisfied by a
-// *skipped* job — the parser maps SKIPPED to `pass`, asserted directly above — so a required `E2E`
-// would have passed on exactly the skipped job that let a merge through with the suite never run.
-// What guarantees the job actually runs is the detection rule, and that is where the fix went:
-// `scripts/ci/ci-yml-e2e-detect.test.ts` executes it against the layouts it used to miss.
+// A required check is satisfied by a skipped job, because the parser maps SKIPPED to `pass`.
+// The detection rule must therefore ensure the suite runs; `scripts/ci/ci-yml-e2e-detect.test.ts`
+// exercises that rule against the supported layouts.
 //
 // It would add nothing to the failure path either. A red E2E already ends the wait at once
 // (joshuafolkken/kit#990) and can never reach `success`, which is what the first two describes here

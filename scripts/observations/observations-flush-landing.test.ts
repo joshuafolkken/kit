@@ -15,10 +15,9 @@ import {
 } from './observations-flush-fixture'
 import { observations_flush_landing } from './observations-flush-landing'
 
-// joshuafolkken/kit#2497. A flush pull request used to merge only inside the flush's own wait, so a
-// wait that ended early left it open with nobody to merge it. These drive `flush()` against a mocked
-// git and GitHub, the harness `observations-flush-command.test.ts` uses, and pin the two halves of the
-// fix: auto-merge is requested before the wait, and an earlier flush left open is noticed.
+// Requesting auto-merge before waiting gives a flush PR a landing path even when the wait ends
+// early. The mocked git/GitHub harness also pins discovery of an open earlier flush
+// (joshuafolkken/kit#2497).
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: {
 		add_path: vi.fn(),

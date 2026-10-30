@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { backlog_named, type NamedItem } from './backlog-named'
 
-// joshuafolkken/kit#1984: `backlogrun #N1 #N2 …` runs the named issues in order and then drains the
-// opted-in backlog, folding in what `queue` used to be a separate keyword for. joshuafolkken/kit#1985:
-// a named item may itself be an epic, whose children run to completion before the next item, folding in
-// what `epicrun` used to be a separate keyword for. These pin the decisions the folded procedure rests
-// on — the execution order, what a failure partway through the named list does, and how an epic item
-// completes — so the plan and the loop cannot drift from each other.
+// Named issues run in order before the opted-in backlog (joshuafolkken/kit#1984); a named epic's
+// children complete before the next item (joshuafolkken/kit#1985). Pinning order, partial failures
+// and epic completion keeps the plan and the loop aligned.
 
 function single(issue: number): NamedItem {
 	return { issue, is_epic: false }

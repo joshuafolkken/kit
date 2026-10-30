@@ -7,14 +7,9 @@ import type { IssueReference } from '#scripts/issue/issue-reference'
 import { z } from 'zod'
 import { MERGED_STATE, to_gh_state } from './git-gh-rest-state'
 
-// The translation between one REST issue (`repos/{owner}/{repo}/issues/{N}`) and the JSON shape
-// `gh issue view --json <fields>` used to answer with.
-//
-// `gh issue view` goes through GraphQL, which a cloud session is answered 403 for while the REST
-// endpoint is served normally. The reads in `git-gh-issue-read.ts` are what
-// every epic command goes through, so they move to REST — and every caller downstream keeps reading
-// the field names it already reads. The mapping lives here rather than beside the requests because
-// it is pure: given the two responses, it decides the answer with nothing else to know.
+// Translate REST issues into the `gh issue view --json <fields>` shape expected by callers.
+// Cloud sessions can receive GraphQL 403s while REST remains available. Keeping the pure mapping
+// separate from requests preserves the caller contract without coupling it to transport.
 
 // Only the fields the mapping itself reads are named; every other key passes through untouched,
 // which is what lets a caller ask for a field this file has never heard of.
