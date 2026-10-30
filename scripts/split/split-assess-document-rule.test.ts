@@ -45,3 +45,13 @@ describe('split:assess is a registered decision oracle', () => {
 		expect(oracle?.vocabulary).toEqual(['split', 'single'])
 	})
 })
+
+describe('the issue template uses the shared split guide', () => {
+	it('counts follow-up files and points either axis at the question', () => {
+		const template = read_repo_file('prompts/collaboration-workflow/issue-template.md')
+
+		expect(template).toContain('文書・スナップショット・コマンド一覧の追従も数える')
+		expect(template).toContain('ファイル数または行数が分割の目安')
+		expect(template).toContain(`split-assessment.md\` → "${split_assess.QUESTION_SECTION}"`)
+	})
+})

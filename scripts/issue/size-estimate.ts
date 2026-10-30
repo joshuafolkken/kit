@@ -64,20 +64,32 @@ function is_excused(body: string, route: string | undefined): boolean {
 	return route === SPLIT_ROUTE_LABEL || (declared(body, REASON_PREFIX) ?? '') !== ''
 }
 
-function refusal(estimate: SizeMeasurement): string {
-	const counted = `size estimate ${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s) exceeds the guide (${String(split_assess.FILE_GUIDE)} files / ${String(split_assess.LINE_GUIDE)} lines)`
-
-	return `${counted} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+// The counts against the guide, shared by the filing refusal and `backlog:next`'s offer note.
+function exceeded(estimate: SizeMeasurement): string {
+	return `size estimate ${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s) exceeds the guide (more than ${String(split_assess.FILE_GUIDE)} files or ${String(split_assess.LINE_GUIDE)} lines)`
 }
 
-// The filing refusal for an estimate over the guide; `undefined` under it, on a split filing, or with
-// the reason declared. A missing or malformed estimate is `problems`' refusal, not this one.
-function guide_problem(body: string, route: string | undefined): string | undefined {
+function refusal(estimate: SizeMeasurement): string {
+	return `${exceeded(estimate)} — file it split (\`--route split\`) or declare \`${REASON_PREFIX} <理由>\`; split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+}
+
+// The declared estimate when it is over the guide and not excused; `undefined` under it, on a split
+// filing, with the reason declared, or with no parsable estimate. `issue:file` and `backlog:next` both
+// judge through it (joshuafolkken/kit#5384).
+function over_guide(body: string, route: string | undefined): SizeMeasurement | undefined {
 	const estimate = parse(body)
 
 	if (estimate?.verdict !== split_assess.SPLIT_VERDICT) return undefined
 
-	return is_excused(body, route) ? undefined : refusal(estimate)
+	return is_excused(body, route) ? undefined : estimate
+}
+
+// The filing refusal for an estimate over the guide. A missing or malformed estimate is `problems`'
+// refusal, not this one.
+function guide_problem(body: string, route: string | undefined): string | undefined {
+	const estimate = over_guide(body, route)
+
+	return estimate === undefined ? undefined : refusal(estimate)
 }
 
 // The declared file count, or `undefined` when there is no estimate or it does not parse.
@@ -85,6 +97,13 @@ function declared_files(body: string): number | undefined {
 	return parse(body)?.files
 }
 
-const size_estimate = { declared_files, guide_problem, problems }
+const size_estimate = {
+	declared_files,
+	declared_size: parse,
+	exceeded,
+	guide_problem,
+	over_guide,
+	problems,
+}
 
 export { size_estimate }
