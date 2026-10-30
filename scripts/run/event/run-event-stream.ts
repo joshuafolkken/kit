@@ -55,6 +55,7 @@ const EVENT_KIND = {
 	CHILD_LAUNCH: 'child-launch',
 	MERGE: 'merge',
 	PARK: 'park',
+	HUMAN_REVIEW: 'human-review',
 	SPLIT: 'split',
 	OUTAGE: 'outage',
 	// A Claude usage limit stopped a lane child (joshuafolkken/kit#4745). Its text names the reset time,

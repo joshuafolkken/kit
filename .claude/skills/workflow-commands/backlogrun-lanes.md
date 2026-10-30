@@ -138,8 +138,8 @@ run:release <N>` in the lane (**a release names the run it belongs to**); `lane:
 release it. `cd` out of the lane **before** `pnpm josh lane:close <N>`. **A `needs-human-review` stop is
 not a park and keeps its hold.**
 
-**A `needs-human-review` stop ends the run, and the lanes already in flight are allowed to finish** —
-no new lane opens, no unit is killed mid-gate; then report and stop.
+**A `needs-human-review` stop ends only its child** — its lane stays in use; the parent keeps
+launching children in the remaining free lanes (`backlogrun-park.md`).
 
 ### CI concurrency
 

@@ -14,6 +14,7 @@ import { run_stalled, type StallCause } from '#scripts/run/park/run-stalled'
 import { run_merge, type ChildOutcome } from './run-merge'
 import { run_merge_auth } from './run-merge-auth'
 import { run_merge_driver } from './run-merge-driver'
+import { run_merge_human_review } from './run-merge-human-review'
 import { run_merge_signals } from './run-merge-signals'
 import { run_merge_steps, type FailedResult, type MergeContext } from './run-merge-steps'
 import { run_merge_token, type MergeToken } from './run-merge-token'
@@ -26,8 +27,8 @@ import { run_merge_withdrawn, type Collected } from './run-merge-withdrawn'
 //
 // The contract is `run:carry`'s: **standard output carries one token** (or the newline-separated
 // offer `epic:next --lanes` prints), and everything else is a captured subprocess or a quiet
-// in-process call. The verdicts this command adds to the offer are `over` (hand off), `human-review`
-// (stop — the child's own ending), `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
+// in-process call. The verdicts this command adds to the offer are `over` (hand off),
+// `stop` (the consecutive-failure guard tripped, or a failed child could not be parked) and `retry` (the
 // child's state could not be read; re-read before deciding).
 
 const SUCCESS_EXIT_CODE = 0
@@ -403,10 +404,13 @@ async function on_yielded(ctx: MergeContext): Promise<MergeVerdict> {
 	return await on_collected(ctx, await run_merge_withdrawn.collect_yield(ctx.child))
 }
 
-// The child's own ending: it stopped before its commit for a person to look at, so nothing is counted
-// and no next child is offered.
-async function on_human_review(): Promise<MergeVerdict> {
-	return emit(MERGE_TOKEN.HUMAN_REVIEW, SUCCESS_EXIT_CODE)
+// Settle this dispatch without releasing the human-review lane or counting a merge/failure.
+async function on_human_review(ctx: MergeContext): Promise<MergeVerdict> {
+	if (!(await run_merge_human_review.retain(ctx.child))) {
+		return emit(MERGE_TOKEN.RETRY, FAILURE_EXIT_CODE)
+	}
+
+	return await offered(ctx)
 }
 
 // The state could not be read, which is never `OPEN`: re-read before deciding anything.

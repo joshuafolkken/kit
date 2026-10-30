@@ -173,6 +173,7 @@ describe('run_event_scope.last_issue_event — the parent’s batch record', () 
 		['the parent’s stall', STALL],
 		['another lane’s cut', FOREIGN_CUT],
 		['the parent’s strand, whose invocation names it', STRANDED],
+		['the parent’s human review', named(9, KIND.HUMAN_REVIEW, `#${ISSUE} waiting for review`)],
 	])('leaves %s out of a lane child’s position', (_label, foreign) => {
 		expect(run_event_scope.last_issue_event([PLAN, foreign], since(START), ISSUE, true)).toEqual(
 			PLAN,
@@ -242,12 +243,10 @@ describe('run_event_scope.is_merge_owed', () => {
 		expect(run_event_scope.is_merge_owed([launch, foreign], since(START), ISSUE)).toBe(true)
 	})
 
-	it('owes nothing for a child run:merge already parked or split', () => {
-		const park = named(2, KIND.PARK, `#${ISSUE} parked (needs-decision)`)
-		const split = named(2, KIND.SPLIT, `#${ISSUE} split`)
+	it.each([KIND.PARK, KIND.SPLIT, KIND.HUMAN_REVIEW])('owes nothing after %s', (kind) => {
+		const settled = named(2, kind, `#${ISSUE} settled`)
 
-		expect(run_event_scope.is_merge_owed([launch, park], since(START), ISSUE)).toBe(false)
-		expect(run_event_scope.is_merge_owed([launch, split], since(START), ISSUE)).toBe(false)
+		expect(run_event_scope.is_merge_owed([launch, settled], since(START), ISSUE)).toBe(false)
 	})
 
 	it('owes the merge of a child relaunched after its park', () => {

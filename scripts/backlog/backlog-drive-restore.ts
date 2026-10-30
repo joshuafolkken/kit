@@ -7,6 +7,7 @@ const ISSUE_IN_EVENT = /#([1-9]\d*)\b/u
 const SETTLED_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
 	run_event_stream.EVENT_KIND.PARK,
+	run_event_stream.EVENT_KIND.HUMAN_REVIEW,
 	run_event_stream.EVENT_KIND.SPLIT,
 	run_event_stream.EVENT_KIND.WITHDRAW,
 	run_event_stream.EVENT_KIND.OUTAGE,
@@ -15,6 +16,7 @@ const SETTLED_KINDS: ReadonlySet<string> = new Set([
 const DONE_KINDS: ReadonlySet<string> = new Set([
 	run_event_stream.EVENT_KIND.MERGE,
 	run_event_stream.EVENT_KIND.PARK,
+	run_event_stream.EVENT_KIND.HUMAN_REVIEW,
 	run_event_stream.EVENT_KIND.SPLIT,
 	run_event_stream.EVENT_KIND.WITHDRAW,
 ])

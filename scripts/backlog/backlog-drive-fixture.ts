@@ -41,6 +41,7 @@ interface Script {
 	// Children `run:merge` handled as parked, withdrawn, yielded or failed rather than merged; every other
 	// reads as merged.
 	parked?: ReadonlyArray<string>
+	human_review?: ReadonlyArray<string>
 	withdrawn?: ReadonlyArray<string>
 	yielded?: ReadonlyArray<string>
 	unmerged?: ReadonlyArray<string>
@@ -81,6 +82,7 @@ type MergeOutcome = Awaited<ReturnType<LoopPorts['merge']>>['outcome']
 function merge_outcome(script: Script, issue: string): MergeOutcome {
 	const scripted: ReadonlyArray<[ReadonlyArray<string> | undefined, MergeOutcome]> = [
 		[script.parked, 'parked'],
+		[script.human_review, 'human-review'],
 		[script.withdrawn, 'withdrawn'],
 		[script.yielded, 'yielded'],
 		[script.unmerged, 'failed'],
