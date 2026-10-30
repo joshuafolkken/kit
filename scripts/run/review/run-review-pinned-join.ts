@@ -65,13 +65,13 @@ async function is_restarted(root: string): Promise<boolean> {
 	}
 }
 
-// The cached verdicts' unpinned hunks, read without a probe; `undefined` when none is unpinned or the
+// Cached unpinned and unchecked places, read without a probe; `undefined` when neither remains or the
 // tree could not be read, so the caller says the check is still running.
 async function cached_summary(): Promise<PinnedSummary | undefined> {
 	try {
 		const report = await test_pinned.cached(test_pinned_logic.DEFAULT_MAX_HUNKS)
 
-		return report.unpinned.length === 0
+		return report.unpinned.length === 0 && !test_pinned_logic.has_unchecked(report)
 			? undefined
 			: test_pinned_record.partial_summary(report, PENDING_NOTE)
 	} catch (error) {

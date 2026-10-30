@@ -1,5 +1,5 @@
 import { test_pinned_logic } from '#scripts/test/test-pinned-logic'
-import type { PinnedSummary } from '#scripts/test/test-pinned-record'
+import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 
 // The round-1 check of `josh run:review` (joshuafolkken/kit#4647): `josh test:pinned` over the change,
 // changed hunks and added files' functions alike. A change no test pins is the finding a review used
@@ -20,7 +20,7 @@ const OK_ARGUMENT_COUNT = 2
 const STOP_NOTE =
 	'Pin each unpinned place with a test that turns red without it, then re-run `pnpm josh run:review`; for a change no test can pin, leave the tree as it is and pass the reason with `pnpm josh run:review --unpinned-ok "<reason>"` — on this tree and a green gate it judges this answer (or, cut at its first unpinned place, checks the whole change) and re-runs neither the gate nor the pair (`pnpm josh ship --review` forwards it).'
 
-type PinnedKind = 'clear' | 'stop' | 'accepted'
+type PinnedKind = 'clear' | 'stop' | 'accepted' | 'unchecked'
 
 interface PinnedVerdict {
 	kind: PinnedKind
@@ -40,7 +40,12 @@ function ok_reason_of(argv: ReadonlyArray<string>): string | undefined {
 function verdict_of(summary: PinnedSummary, reason: string | undefined): PinnedVerdict {
 	const { report_text } = test_pinned_logic
 
-	if (summary.unpinned.length === 0) return { kind: 'clear', text: report_text(summary) }
+	if (summary.unpinned.length === 0) {
+		return summary.is_unchecked === true
+			? { kind: 'unchecked', text: report_text(summary, test_pinned_record.UNCHECKED_NOTE) }
+			: { kind: 'clear', text: report_text(summary) }
+	}
+
 	if (reason === undefined) return { kind: 'stop', text: report_text(summary, `${STOP_NOTE}\n`) }
 	const note = `Unpinned accepted by the implementer: ${reason}\n`
 
