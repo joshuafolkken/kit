@@ -79,10 +79,11 @@ const OPEN_STATE: IssueState = { state: 'OPEN', labels: [], is_human_review: fal
 const RUN_START = '2026-09-21T00:00:00.000Z'
 const BEFORE_RUN = '2026-09-19T18:00:00.000Z'
 const CARRIED = 'carried'
+const PARENT_PID = 4242
 
 interface CarriedRead {
 	kind: typeof CARRIED
-	carry: { started_at: string }
+	carry: { started_at: string; owner_pid: number }
 }
 
 interface StreamEvent {
@@ -93,7 +94,7 @@ interface StreamEvent {
 }
 
 function carried(started_at: string = RUN_START): CarriedRead {
-	return { kind: CARRIED, carry: { started_at } }
+	return { kind: CARRIED, carry: { started_at, owner_pid: PARENT_PID } }
 }
 
 function stream_event(kind: string, at: string): StreamEvent {
@@ -153,6 +154,7 @@ beforeEach(() => {
 // A gate run inside a headless lane inherits the mark, which exempts the cut cap.
 beforeEach(() => {
 	vi.stubEnv('JOSH_RUN_HEADLESS', '')
+	ancestry_mock.mockReturnValue(new Set([PARENT_PID]))
 })
 
 afterEach(() => {
