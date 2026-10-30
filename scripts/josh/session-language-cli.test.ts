@@ -1,3 +1,4 @@
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { session_language_cli, type LivePorts } from './session-language-cli'
 
@@ -14,6 +15,7 @@ const {
 const DEFAULT_RESULT = { lang: DEFAULT_SESSION_LANG, is_default: true }
 const ENGLISH_RESULT = { lang: 'en', is_default: false }
 const ENGLISH_LINE = `Session language (${ENV_KEY}): en`
+const SCOPE_LINE = agent_session_role.scope_line()
 const GIT_DIRECTORY = '/repository/.git'
 // Characters, a little above the line as written: it is injected on every prompt while a run is live.
 const BOARD_LINE_LIMIT = 130
@@ -72,19 +74,19 @@ describe('format_line', () => {
 // session asked about a run it was not driving never saw it.
 describe('prompt_lines', () => {
 	it('adds the run:board line while a backlogrun is live', () => {
-		expect(prompt_lines(ENGLISH_RESULT, true)).toStrictEqual([ENGLISH_LINE, BOARD_LINE])
+		expect(prompt_lines(ENGLISH_RESULT, true)).toStrictEqual([SCOPE_LINE, ENGLISH_LINE, BOARD_LINE])
 	})
 
 	it('names the command to answer a progress question with', () => {
 		expect(BOARD_LINE).toContain('pnpm josh run:board --chat')
 	})
 
-	it('prints the language line alone when no backlogrun is live', () => {
-		expect(prompt_lines(ENGLISH_RESULT, false)).toStrictEqual([ENGLISH_LINE])
+	it('prints the scope and language when no backlogrun is live', () => {
+		expect(prompt_lines(ENGLISH_RESULT, false)).toStrictEqual([SCOPE_LINE, ENGLISH_LINE])
 	})
 
-	it('prints nothing for the ja default when no backlogrun is live', () => {
-		expect(prompt_lines(DEFAULT_RESULT, false)).toStrictEqual([])
+	it('still prints the session scope for the ja default', () => {
+		expect(prompt_lines(DEFAULT_RESULT, false)).toStrictEqual([SCOPE_LINE])
 	})
 
 	it('keeps the board line within its bound', () => {
@@ -114,6 +116,9 @@ describe('is_run_live', () => {
 			throw new Error('unreadable stamp')
 		})
 
-		expect(prompt_lines(ENGLISH_RESULT, await is_run_live(ports))).toStrictEqual([ENGLISH_LINE])
+		expect(prompt_lines(ENGLISH_RESULT, await is_run_live(ports))).toStrictEqual([
+			SCOPE_LINE,
+			ENGLISH_LINE,
+		])
 	})
 })

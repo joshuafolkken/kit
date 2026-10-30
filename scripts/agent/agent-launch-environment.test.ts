@@ -147,13 +147,36 @@ describe('headless agent mark', () => {
 	it('leaves a launch with no agent profile unmarked', () => {
 		const input = { JOSH_LANE_CHILD_ISSUE: MARKER }
 
-		expect(agent_launch_environment.build(CWD, undefined, input)).toBe(input)
+		expect(agent_launch_environment.build(CWD, undefined, input)).toEqual({
+			...input,
+			[agent_session_role.KEY]: undefined,
+		})
 	})
 })
 
 // joshuafolkken/kit#3623: a ship reviewer inherits its launcher's lane mark, so the role is what tells
 // it apart from the implementing child — written on every launch, so an inherited value never stands.
 describe('agent session role mark', () => {
+	it.each(Object.values(agent_role_profile.DEFAULT_PROFILES))(
+		'overwrites an inherited worker role with the launcher role $role',
+		(profile) => {
+			const environment = agent_launch_environment.build(CWD, profile, {
+				...agent_session_role.env_for(agent_role_profile.WORKER),
+			})
+
+			expect(environment[agent_session_role.KEY]).toBe(profile.role)
+		},
+	)
+
+	it('clears inherited authority without a profile', () => {
+		const environment = agent_launch_environment.build(CWD, undefined, {
+			...agent_session_role.env_for(agent_role_profile.WORKER),
+		})
+
+		expect(environment[agent_session_role.KEY]).toBeUndefined()
+		expect(agent_session_role.can_implement(environment)).toBe(false)
+	})
+
 	it.each([
 		['Anthropic', agent_role_profile.DEFAULT_PROFILES.reviewer],
 		['OpenAI', agent_role_profile.OPENAI_PROFILES.reviewer],
