@@ -37,7 +37,10 @@ const patch_input_schema = z.object({ command: z.string().min(1) })
 type PayloadFormatter = (raw_payload: string, project_root: string) => Promise<string | undefined>
 
 function parse_payload(raw_payload: string): z.infer<typeof codex_payload_schema> | undefined {
-	return json_value.parse_with(raw_payload, codex_payload_schema)
+	const payload = json_value.parse_with(raw_payload, codex_payload_schema)
+	if (payload === undefined) return undefined
+
+	return { ...payload, tool_name: payload.tool_name.replace(/^functions\./u, '') }
 }
 
 function paths_matching(command: string, pattern: RegExp): Array<string> {
@@ -49,7 +52,9 @@ function paths_matching(command: string, pattern: RegExp): Array<string> {
 }
 
 function patch_paths(tool_input: unknown): Array<string> {
-	const parsed = patch_input_schema.safeParse(tool_input)
+	const parsed = patch_input_schema.safeParse(
+		typeof tool_input === 'string' ? { command: tool_input } : tool_input,
+	)
 	if (!parsed.success) return []
 	const paths = [
 		...paths_matching(parsed.data.command, PATCH_FILE_PATTERN),
@@ -67,12 +72,20 @@ function canonical_payload(
 	return JSON.stringify({ ...payload, tool_name: EDIT_TOOL, tool_input: { file_path, file_paths } })
 }
 
+function shell_payload(payload: z.infer<typeof codex_payload_schema>): string {
+	const input = json_value.is_record(payload.tool_input) ? payload.tool_input : {}
+
+	return JSON.stringify({ ...payload, tool_name: 'Bash', tool_input: { command: input['cmd'] } })
+}
+
 function pretool_payload(raw_payload: string): string {
 	const payload = parse_payload(raw_payload)
-	if (payload?.tool_name !== APPLY_PATCH_TOOL) return raw_payload
+	if (payload === undefined) return raw_payload
+	if (payload.tool_name === 'exec_command') return shell_payload(payload)
+	if (payload.tool_name !== APPLY_PATCH_TOOL) return JSON.stringify(payload)
 	const paths = patch_paths(payload.tool_input)
 	const [file_path] = paths
-	if (file_path === undefined) return raw_payload
+	if (file_path === undefined) return JSON.stringify(payload)
 
 	return canonical_payload(payload, file_path, paths)
 }
