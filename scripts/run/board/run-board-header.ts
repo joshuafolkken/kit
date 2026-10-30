@@ -100,6 +100,8 @@ interface BoardHeader {
 	usual?: UsualTimes | undefined
 	// How many lanes the run may hold at once, which the estimated finish stacks the waiting children on.
 	lane_limit?: number | undefined
+	// The slots occupied according to the same capacity read that supplies the limit.
+	occupied_count?: number | undefined
 	// What each done row says after its time (`run-board-found.ts`); none where nothing was read.
 	found?: FoundOf | undefined
 	// Whether `JOSH_LANE_INVESTIGATION` is on; off, a merged row hides its minutes and investigation

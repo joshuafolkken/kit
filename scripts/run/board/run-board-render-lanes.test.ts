@@ -95,11 +95,11 @@ describe('run_board_render_lanes.number_text lane share colors', () => {
 
 describe('run_board_render_lanes.lanes_section', () => {
 	it('draws no section without lines', () => {
-		expect(lanes_section([], CELLS)).toStrictEqual([])
+		expect(lanes_section([], CELLS, header())).toStrictEqual([])
 	})
 
 	it('heads the lines with a rule with ⏰ over the elapsed column where no cells are drawn', () => {
-		const [section] = lanes_section([LINE], undefined)
+		const [section] = lanes_section([LINE], undefined, header())
 		const rule = section?.head[1] ?? ''
 
 		expect(section).toMatchObject({ label: LANES_LABEL, key: 'lanes', lines: [LINE] })
@@ -109,7 +109,7 @@ describe('run_board_render_lanes.lanes_section', () => {
 	})
 
 	it('heads the lines with a rule whose labels stand over the cells', () => {
-		const [section] = lanes_section([LINE], CELLS)
+		const [section] = lanes_section([LINE], CELLS, header())
 		const rule = section?.head[1] ?? ''
 
 		expect(rule.startsWith('── 🧵 lanes ')).toBe(true)

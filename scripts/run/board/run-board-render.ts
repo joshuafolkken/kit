@@ -249,7 +249,7 @@ function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 		is_line_kept: is_tailed || is_found_squeezed(indent, row, frame),
 		lead: frame.filed.has(row.number) ? FILED_LEAD.length : 0,
 		head: (cut) => `${indent}${head_text(row, { ...frame, ...cut })}`,
-		is_head_kept: frame.cells !== undefined,
+		is_head_kept: frame.is_lane_row === true,
 		shared: is_tailed ? frame.shared : undefined,
 	}
 }
@@ -357,6 +357,7 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 	const lanes = lanes_section(
 		lead.map((row) => row_line(indent_of(row), row, { ...lane_frame, shared })),
 		cells,
+		frame.header,
 	)
 
 	return [...lanes, ...rows_section(decision, people, frame)]

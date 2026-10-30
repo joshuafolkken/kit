@@ -269,14 +269,16 @@ describe('run_board_read.read_local free lanes', () => {
 		arrange(NONE, STOPPED)
 		vi.mocked(lane_registry.list_lanes).mockResolvedValue([lane('3432'), stranded])
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: FREE_LANES })
+		await expect(run_board_read.read_local()).resolves.toMatchObject(LANE_ROOM)
 	})
 
 	it('reads no count where the limit is not a number anyone set', async () => {
 		arrange(NONE, STOPPED)
 		vi.mocked(lane_capacity.lane_limit).mockResolvedValue({ kind: 'problem', problem: 'bad' })
 
-		await expect(run_board_read.read_local()).resolves.toMatchObject({ free_lanes: undefined })
+		const expected = { free_lanes: undefined, lane_limit: undefined, occupied_count: 1 }
+
+		await expect(run_board_read.read_local()).resolves.toMatchObject(expected)
 	})
 })
 
