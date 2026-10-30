@@ -7,6 +7,12 @@ const josh_run_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('execa', () => ({ execa: vi.fn() }))
+vi.mock('./lane-launch-admission', () => ({
+	lane_launch_admission: {
+		launch: async (context: unknown, run: (context: unknown) => Promise<unknown>) =>
+			await run(context),
+	},
+}))
 
 const find_open_lane_mock = vi.hoisted(() => vi.fn())
 
