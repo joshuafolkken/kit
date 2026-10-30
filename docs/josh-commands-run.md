@@ -192,15 +192,16 @@ are active.
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
 start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
 
-**Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
+Unattended profiles: Codex → OpenAI; Claude Code → Anthropic.
+[Codex permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
 
 | Provider  | scheduler                    | worker                       | reviewer                     |
 | --------- | ---------------------------- | ---------------------------- | ---------------------------- |
 | Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |
 | OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     |
 
-Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
-either provider, and legacy `JOSH_LANE_*` values to the worker only. Review round 2 and later (the
+Overrides resolve before launch: model for Claude Code, effort for either provider, `JOSH_LANE_*`
+for workers. Review round 2 and later (the
 verification pass) runs Anthropic on `claude-sonnet-5-5` / `high` and OpenAI on `gpt-6.1-sol` / `high`, overridable by
 `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}`, then `JOSH_REVIEWER_*`. With no session marker and no
 `JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person

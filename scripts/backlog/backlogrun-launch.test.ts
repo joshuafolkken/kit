@@ -78,6 +78,10 @@ describe('backlogrun_launch.argv_of', () => {
 			profile: { provider: 'openai' },
 		})
 		expect(built.kind === 'argv' && built.argv.args[0]).toBe('exec')
+		expect(built.kind === 'argv' && built.argv.args).toContain(
+			'default_permissions=":danger-full-access"',
+		)
+		expect(built.kind === 'argv' && built.argv.args).toContain('approval_policy="never"')
 	})
 
 	it('refuses with the diagnostic note of a CLI that cannot run', () => {

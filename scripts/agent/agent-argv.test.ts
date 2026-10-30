@@ -51,6 +51,17 @@ describe('a stored lane profile across a cut', () => {
 
 // joshuafolkken/kit#3926: a verification round builds under its own reviewer profile.
 describe('a review round', () => {
+	it.each([1, 2])('keeps the trusted local policy for OpenAI review round %s', (round) => {
+		check.mockReturnValue({ kind: 'ready' })
+		const built = agent_argv.review_in(INVOCATION, round, LANE, { JOSH_AGENT_PROVIDER: 'openai' })
+
+		expect(built.kind === 'argv' && built.argv.args).toContain(
+			'default_permissions=":danger-full-access"',
+		)
+		expect(built.kind === 'argv' && built.argv.args).toContain('approval_policy="never"')
+		expect(built.kind === 'argv' && built.argv.args).toContain('--ephemeral')
+	})
+
 	it('builds a later round under the verification profile', () => {
 		check.mockReturnValue({ kind: 'ready' })
 		const built = agent_argv.review_in(INVOCATION, 2, LANE, {
