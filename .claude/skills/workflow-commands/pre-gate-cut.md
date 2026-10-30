@@ -89,7 +89,8 @@ or re-normalize the title; the plan and decisions are read back from the issue.
 
 - **The resume verifies the tree against the record**: branch, dirty tree, issue, and the cutting
   run's hold. Any mismatch is `stale`.
-- **No owner is recorded on the cut** (OpenAI keeps its supervisor owner separately).
+- **Adoption records its session**; only that session may replace its adopted pre-gate record with an
+  implementation cut. An unknown adopter stays protected (OpenAI keeps its supervisor owner separately).
 - **The cut is exclusive** — a second cut on the same tree is `busy`.
 - **The resume is unique** — a spent record answers `handed-off`, and the take-over is an exclusive
   create. One lane crosses the pre-gate boundary exactly once.
