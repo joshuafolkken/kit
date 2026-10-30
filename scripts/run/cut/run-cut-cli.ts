@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
+import { repository_lock } from '#scripts/git/repository-lock'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
@@ -131,10 +132,11 @@ async function relaunch(target: string, lane: LaneInfo, phase: string): Promise<
 const { is_lane_branch } = run_cut_ready
 const { declined } = run_cut_decline
 
-// An expired record is a fresh process that never started; it is cleared so the next cut can begin
-// rather than being wedged behind a stale file the exclusive create would refuse forever.
+// An unadopted expired cut may be cleared. An adopted record can still belong to a live session;
+// its age alone never permits another session to delete it.
 function clear_expired(target: string): void {
-	if (run_cut.read_cut(target).kind === 'expired') run_cut.end_cut(target)
+	const read = run_cut.read_cut(target)
+	if (read.kind === 'expired' && read.cut.is_handed_off !== false) run_cut.end_cut(target)
 }
 
 function has_matching_supervisor(lane: LaneInfo, issue: string): boolean {
@@ -298,8 +300,6 @@ async function act(target: string, request: Request): Promise<number> {
 
 	if (request.kind === 'resume') return await run_cut_resume.resume(target, request.issue)
 
-	if (request.kind === 'read') return read_json(target)
-
 	return end(target)
 }
 
@@ -308,7 +308,17 @@ async function answer(request: Request): Promise<number> {
 
 	if (directory === undefined) return report_unknown()
 
-	return await act(run_cut.cut_path(directory), request)
+	const target = run_cut.cut_path(directory)
+	// Atomic record replacement lets diagnostics read a complete snapshot without the mutation lock.
+	if (request.kind === 'read') return read_json(target)
+
+	const result = await repository_lock.with_lock(
+		async () => await act(target, request),
+		`${target}.lock`,
+		0,
+	)
+
+	return result ?? report_cut_exists(target)
 }
 
 function refuse(): number {
