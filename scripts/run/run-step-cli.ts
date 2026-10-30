@@ -58,6 +58,15 @@ const UNREADABLE_RUN: RunReads = {
 	last_event: undefined,
 }
 
+// A repository's carry belongs to its parent and dispatched children. An interactive numbered
+// fullrun beside another owner uses the existing no-carry path, without changing that owner's record.
+function invocation_carry(carry: CarryRead, is_lane_child: boolean): CarryRead {
+	if (carry.kind !== 'carried') return carry
+	if (is_lane_child || run_headless.is_owned_here(carry.carry, lane_reap.own_ancestry)) return carry
+
+	return { kind: 'none' }
+}
+
 // The run-level reads, keyed on the common git directory both the carry and the event stream share. A
 // directory that cannot be read leaves the position unknowable, which `next_action` answers `unknown`.
 function read_run(
@@ -67,7 +76,10 @@ function read_run(
 ): RunReads {
 	if (directory === undefined) return UNREADABLE_RUN
 
-	const carry = run_carry.read_carry(run_carry.carry_path(directory))
+	const carry = invocation_carry(
+		run_carry.read_carry(run_carry.carry_path(directory)),
+		is_lane_child,
+	)
 	const events = run_event_stream.read_events(run_event_stream.target_of(directory))
 	// The last event *within this invocation's scope*, not the raw newest one: a stale event a previous
 	// invocation left on the stream — an old `child-launch`, say — must not be read as this run's
