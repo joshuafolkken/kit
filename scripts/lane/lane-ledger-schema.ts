@@ -5,7 +5,8 @@ import { lane_ledger_schema_ship } from './lane-ledger-schema-ship'
 // The shape of each line `lane-ledger.ts` appends and reads back — one schema per entry kind.
 
 const { KIND } = lane_ledger_kind
-const { ship_lap_schema, stop_schema, unplanned_notice_schema } = lane_ledger_schema_ship
+const { ship_lap_schema, size_schema, stop_schema, unplanned_notice_schema } =
+	lane_ledger_schema_ship
 
 const merge_schema = z.object({ kind: z.literal(KIND.MERGE), at: z.string(), issue: z.number() })
 const check_schema = z.object({
@@ -258,6 +259,7 @@ const entry_schema = z.discriminatedUnion('kind', [
 	lane_state_schema,
 	push_miss_schema,
 	ship_lap_schema,
+	size_schema,
 ])
 
 type LedgerEntry = z.infer<typeof entry_schema>
@@ -292,6 +294,8 @@ type PushMissEntry = z.infer<typeof push_miss_schema>
 type PushMissRecord = Omit<PushMissEntry, 'kind' | 'at'>
 type ShipLapEntry = z.infer<typeof ship_lap_schema>
 type ShipLapRecord = Omit<ShipLapEntry, 'kind' | 'at'>
+type SizeEntry = z.infer<typeof size_schema>
+type SizeRecord = Omit<SizeEntry, 'kind' | 'at'>
 type RoundOneRecord = Omit<RoundOneEntry, 'kind' | 'at'>
 type RoundTwoRecord = Omit<RoundTwoEntry, 'kind' | 'at'>
 // What a finished gate reports; the ledger stamps the kind and the time.
@@ -331,6 +335,8 @@ export type {
 	RoundTwoRecord,
 	ShipLapEntry,
 	ShipLapRecord,
+	SizeEntry,
+	SizeRecord,
 	SplitFiledEntry,
 	SplitFiledRecord,
 	SplitNoticeEntry,

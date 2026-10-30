@@ -135,6 +135,7 @@ describe('test_pinned_main.main --record', () => {
 			token: TOKEN,
 			text: `\`josh test:pinned\` could not run, so nothing was checked: ${reason}\n`,
 			unpinned: [],
+			is_unchecked: true,
 		})
 	})
 

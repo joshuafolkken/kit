@@ -44,6 +44,23 @@ const ship_lap_schema = z.object({
 	elapsed_ms: z.number(),
 })
 
-const lane_ledger_schema_ship = { ship_lap_schema, stop_schema, unplanned_notice_schema }
+// A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
+// measured diff, test files excluded, so `lane:stats` reads how far estimates miss the guide's
+// counting (joshuafolkken/kit#5384). Written before the merge, while the branch is still checked out.
+const counts_schema = z.object({ files: z.number(), lines: z.number() })
+const size_schema = z.object({
+	kind: z.literal(KIND.SIZE),
+	at: z.string(),
+	issue: z.number(),
+	declared: counts_schema,
+	actual: counts_schema,
+})
+
+const lane_ledger_schema_ship = {
+	ship_lap_schema,
+	size_schema,
+	stop_schema,
+	unplanned_notice_schema,
+}
 
 export { lane_ledger_schema_ship }

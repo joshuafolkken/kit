@@ -14,6 +14,7 @@ import {
 	type RoundOneRecord,
 	type RoundTwoRecord,
 	type ShipLapRecord,
+	type SizeRecord,
 	type SplitFiledRecord,
 	type SplitNoticeRecord,
 	type StageRecord,
@@ -211,6 +212,10 @@ async function record_ship_lap(lap: ShipLapRecord, path?: string): Promise<void>
 	await record({ kind: KIND.SHIP_LAP, at: now_iso(), ...lap }, path)
 }
 
+async function record_size(size: SizeRecord, path?: string): Promise<void> {
+	await record({ kind: KIND.SIZE, at: now_iso(), ...size }, path)
+}
+
 async function record_unplanned_notice(
 	notice: UnplannedNoticeRecord,
 	path?: string,
@@ -242,6 +247,7 @@ const lane_ledger_write = {
 	record_round_one,
 	record_round_two,
 	record_ship_lap,
+	record_size,
 	record_split_filed,
 	record_split_notice,
 	record_stage,

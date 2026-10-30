@@ -113,7 +113,7 @@ Ask for a big feature in one go and the direction drifts halfway, tests go missi
 
 - Plan before starting: `kickoff` writes what will change and how into the Issue, then stops. Implementation reads that first.
 - One Issue = one PR = one verification: every change passes the gate and the review, so a diff stays a size you can read.
-- Split when too big: when the work separates into independently shippable parts and exceeds one verification (roughly 10 files or 400 lines), kit creates child Issues under an epic and stops; `backlogrun` works through them later. The split decision uses the same criteria every time, and the default is not to split.
+- Split when too big: when the work separates into independently shippable parts and exceeds one verification (a file-count or line-count guide, tests excluded), kit creates child Issues under an epic and stops; `backlogrun` works through them later. The split decision uses the same criteria every time, and the default is not to split.
 
 ### I spend all day talking to the agent
 

@@ -13,15 +13,14 @@ import { run_ship_detach } from './run-ship-detach'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_lap } from './run-ship-lap'
-import type { PreDetachResult } from './run-ship-pre-detach'
 import { run_ship_pre_detach_pinned } from './run-ship-pre-detach-pinned'
 import { run_ship_pre_detach_timed } from './run-ship-pre-detach-timed'
+import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
-import type { StepResult } from './run-ship-sync'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -341,29 +340,32 @@ function should_detach(args: ShipArguments): boolean {
 	return !run_ship_detach.is_supervised() && lane_child_marker.is_child_of(process.cwd())
 }
 
-// The preflight stop's unmet kinds, with the red pre-detach checks' own kinds added beside them
-// (`run-ship-pre-detach.ts`).
-function with_checks(stop: ShipSection, checks: PreDetachResult): ShipSection {
-	if (checks.code === SUCCESS_EXIT_CODE) return stop
+// Record the stopped pre-detach stage while preserving the report's refusal order.
+async function pre_detach_stop(
+	args: ShipArguments,
+	stage: Stage,
+	sections: ReadonlyArray<ShipSection>,
+): Promise<ReadonlyArray<ShipSection>> {
+	await record_stop(args, stage, sections[0])
 
-	return {
-		...stop,
-		preconditions: [...(stop.preconditions ?? []), ...(checks.preconditions ?? [])],
-	}
+	return sections
 }
 
-// The stop is the sync stage's, so it is recorded and resumed as that stage's `conflict` is; the
-// preflight's refusal, if any, still prints last.
-async function conflict_sections(
+async function pre_detach_checks(
 	args: ShipArguments,
-	conflict: StepResult,
 	preflight: ShipSection,
 ): Promise<ReadonlyArray<ShipSection>> {
-	const section = run_ship.section_of(run_ship.SYNC_HEADER, conflict)
+	const result = await run_ship_pre_detach_timed.checks(
+		args.number,
+		run_ship_pre_detach_pinned.checks_for(args),
+	)
+	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
 
-	await record_stop(args, STAGE.SYNC, section)
+	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
+		await record_stop(args, STAGE.PREFLIGHT, run_ship.with_checks(preflight, result))
+	}
 
-	return [section, preflight]
+	return [checks, preflight]
 }
 
 // The preflight is deterministic and fast, so it runs here, in the agent's own turn, before the
@@ -384,23 +386,25 @@ async function conflict_sections(
 //
 // **A conflict with origin/main stops before the checks** (joshuafolkken/kit#5018): the supervisor's
 // sync would stop on it after them, so they would only be run again once it is resolved.
+// A scoped failure stops before both the conflict and pinned probes: the review fix must pass its
+// local checks before costly work starts (joshuafolkken/kit#5472).
 async function pre_detach_sections(args: ShipArguments): Promise<ReadonlyArray<ShipSection>> {
 	const preflight = await run_stage(run_ship_steps.PREFLIGHT_STEP, args, await open_context(args))
-	const conflict = await run_ship_conflict_probe.probe()
 
-	if (conflict !== undefined) return await conflict_sections(args, conflict, preflight)
-
-	const result = await run_ship_pre_detach_timed.checks(
-		args.number,
-		run_ship_pre_detach_pinned.checks_for(args),
-	)
-	const checks = { header: run_ship.PRE_DETACH_HEADER, body: result.out, code: result.code }
-
-	if (run_ship.exit_code([checks, preflight]) !== SUCCESS_EXIT_CODE) {
-		await record_stop(args, run_ship_steps.PREFLIGHT_STEP.stage, with_checks(preflight, result))
+	if (preflight.preconditions?.includes(run_ship_preflight.SCOPED_PRECONDITION)) {
+		return await pre_detach_stop(args, STAGE.PREFLIGHT, [preflight])
 	}
 
-	return [checks, preflight]
+	const conflict = await run_ship_conflict_probe.probe()
+
+	if (conflict !== undefined) {
+		return await pre_detach_stop(args, STAGE.SYNC, [
+			run_ship.section_of(run_ship.SYNC_HEADER, conflict),
+			preflight,
+		])
+	}
+
+	return await pre_detach_checks(args, preflight)
 }
 
 async function detach_after_preflight(args: ShipArguments): Promise<number> {

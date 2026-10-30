@@ -11,6 +11,7 @@
 
 import { run_section, type Section } from '#scripts/run/run-section'
 import { run_tail } from '#scripts/run/run-tail'
+import type { PreDetachResult } from './run-ship-pre-detach'
 import type { Cause } from './run-ship-stop-cause'
 import type { StepResult } from './run-ship-sync'
 
@@ -88,6 +89,16 @@ function format_report(sections: ReadonlyArray<ShipSection>): string {
 	return `${body}${run_section.SECTION_SEPARATOR}${STOPPED_PREFIX}${failed.header}`
 }
 
+// Preserve the preflight refusal and add any failed pre-detach check kinds to its stop record.
+function with_checks(stop: ShipSection, checks: PreDetachResult): ShipSection {
+	if (checks.code === run_section.SUCCESS_EXIT_CODE) return stop
+
+	return {
+		...stop,
+		preconditions: [...(stop.preconditions ?? []), ...(checks.preconditions ?? [])],
+	}
+}
+
 // The exit code is non-zero when any executed step failed — the composite only ever collects a failed
 // step as its last, so it reads the same clean/red verdict as the loop that stopped there.
 const run_ship = {
@@ -106,6 +117,7 @@ const run_ship = {
 	failed_section,
 	format_report,
 	section_of,
+	with_checks,
 }
 
 export type { ShipSection }

@@ -3,7 +3,7 @@ import { split_assess } from './split-assess'
 import { split_assess_cli } from './split-assess-cli'
 
 // joshuafolkken/kit#2218: the size half of the split assessment, measured. The counts exclude test
-// files, the verdict needs both guides exceeded, and an empty diff is `single`.
+// files, the verdict needs either guide exceeded (joshuafolkken/kit#5384), and an empty diff is `single`.
 
 const NO_DELETE = '0'
 const A_TS = 'scripts/a.ts'
@@ -63,27 +63,27 @@ describe('measure excludes test files from both counts', () => {
 	})
 })
 
-describe('verdict needs both guides exceeded', () => {
+describe('verdict needs either guide exceeded', () => {
 	it('splits when files and lines both exceed the guide', () => {
-		expect(split_assess.assess(runtime_numstat(11, 40)).verdict).toBe('split')
+		expect(split_assess.assess(runtime_numstat(9, 40)).verdict).toBe('split')
 	})
 
 	it('is single at exactly the guide on both axes', () => {
-		expect(split_assess.assess(runtime_numstat(10, 40)).verdict).toBe('single')
+		expect(split_assess.assess(runtime_numstat(8, 25)).verdict).toBe('single')
 	})
 
-	it('is single when only the line guide is exceeded', () => {
-		expect(split_assess.assess(runtime_numstat(3, 500)).verdict).toBe('single')
+	it('splits when only the line guide is exceeded', () => {
+		expect(split_assess.assess(runtime_numstat(3, 500)).verdict).toBe('split')
 	})
 
-	it('is single when only the file guide is exceeded', () => {
-		expect(split_assess.assess(runtime_numstat(11, 1)).verdict).toBe('single')
+	it('splits when only the file guide is exceeded', () => {
+		expect(split_assess.assess(runtime_numstat(9, 1)).verdict).toBe('split')
 	})
 
 	it('judges a bare file and line count by the same rule', () => {
-		expect(split_assess.verdict_for(11, 401)).toBe('split')
-		expect(split_assess.verdict_for(11, 400)).toBe('single')
-		expect(split_assess.verdict_for(10, 401)).toBe('single')
+		expect(split_assess.verdict_for(9, 200)).toBe('split')
+		expect(split_assess.verdict_for(8, 201)).toBe('split')
+		expect(split_assess.verdict_for(8, 200)).toBe('single')
 	})
 
 	it('is single for an empty diff', () => {
@@ -98,12 +98,13 @@ describe('reason', () => {
 		const reason = split_assess.reason({ files: 2, lines: 30, verdict: 'single' })
 
 		expect(reason).toContain('2 changed file(s), 30 changed line(s), tests excluded')
-		expect(reason).toContain('under the guide')
+		expect(reason).toContain('under the guide on both axes')
 	})
 
 	it('says the size condition is met but separability is separate on a split verdict', () => {
 		const reason = split_assess.reason({ files: 12, lines: 500, verdict: 'split' })
 
+		expect(reason).toContain('— over the guide —')
 		expect(reason).toContain('size condition for a split is met')
 		expect(reason).toContain('separability is a separate judgement')
 	})

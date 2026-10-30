@@ -53,6 +53,25 @@ afterEach(() => {
 })
 
 describe('josh ship --detach — red pre-detach checks behind a passed preflight', () => {
+	it('returns a scoped failure before conflict and pinned probes or a detached push', async () => {
+		const failure = 'scripts/review-fix.test.ts:9: too many statements'
+
+		vi.spyOn(run_ship_preflight, 'stage').mockResolvedValue({
+			code: FAILED,
+			out: failure,
+			preconditions: [run_ship_preflight.SCOPED_PRECONDITION],
+		})
+
+		expect(await run_ship_cli.run([TITLE, '--detach', '--review'])).toBe(FAILED)
+		expect(run_ship_conflict_probe.probe).not.toHaveBeenCalled()
+		expect(run_ship_pre_detach_timed.checks).not.toHaveBeenCalled()
+		expect(run_ship_detach.detach).not.toHaveBeenCalled()
+		expect(console.info).toHaveBeenCalledWith(expect.stringContaining(failure))
+		expect(lane_ledger_write.record_stop).toHaveBeenCalledWith(
+			expect.objectContaining({ preconditions: ['scoped'] }),
+		)
+	})
+
 	it('records the stop under the preflight as unpinned', async () => {
 		vi.spyOn(run_ship_pre_detach_timed, 'checks').mockResolvedValue({
 			code: FAILED,
