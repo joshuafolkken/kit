@@ -9,6 +9,9 @@ const is_child_mock = vi.hoisted(() => vi.fn())
 const yield_mock = vi.hoisted(() => vi.fn())
 const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
+const open_pr_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: vi.fn() } }))
@@ -60,12 +63,26 @@ const info_lines: Array<string> = []
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	open_pr_mock.mockResolvedValue(false)
 	josh_run_mock.mockResolvedValueOnce(FRESH).mockResolvedValueOnce(HELD).mockResolvedValue(UNDER)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
 	})
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+describe('run_entry_cli.run — an existing fullrun pull request', () => {
+	it('routes an existing fullrun pull request to the gate after claiming and reading the issue', async () => {
+		is_child_mock.mockReturnValue(false)
+		open_pr_mock.mockResolvedValue(true)
+		yield_mock.mockResolvedValue(false)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('at: pr-open · to: fullrun · start: gate')
+		expect(info_lines.join('\n')).toContain('verdict: gate')
+		expect(record_baseline_mock).toHaveBeenCalledWith(ISSUE)
+	})
 })
 
 describe('run_entry_cli.run — the entry probe of a lane child', () => {

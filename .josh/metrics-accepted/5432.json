@@ -1,0 +1,7 @@
+{
+	"reason": "Linked checkout synchronization and existing-PR resume require shared detection and a gate verdict that preserves unreadable, human-review, dependency-update, and terminal states; regression tests cover these branches.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 32
+	}
+}

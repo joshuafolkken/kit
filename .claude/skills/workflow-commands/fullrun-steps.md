@@ -14,12 +14,9 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    `--title "<title>"` when the title is not in English or can be phrased more clearly (the plan goes
    into the body when it is blank and its author has write access, otherwise into a comment; its
    `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
-4. Run `pnpm josh ms`, then update dependencies only where the `run:prep` report answers
-   `latest: required` — `latest-gate.md` is its single source, and on `required` load the
-   `dependency-update` skill afterwards. **A dispatched lane child skips `pnpm josh ms`** — it refuses
-   in a lane, and ship's sync brings the latest default in before its gate. The parent runs
-   `pnpm josh ms` in the primary checkout, never the child — `backlogrun-lanes.md` and
-   `backlogrun-child.md` are the single sources.
+4. Synchronize as `entry-sequence.md` → "The ordered entry sequence" directs, then update dependencies only where the `run:prep` report answers
+   `latest: required` — `latest-gate.md` is its single source. Load the `dependency-update` skill
+   after an update. **A dispatched lane child skips entry synchronization**; ship syncs before its gate.
 5. Implement. The `plan` event `run:board` draws 📝 from is written by code — by `run:entry` for a
    `run:planned` issue, else at the first implementation edit — never by hand; no cut follows the
    plan — a lane child's context is bounded by the threshold-gated implementation cut alone.
@@ -31,8 +28,8 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    ...\nFix: ...\nResult: ...\n\nDetails:\n- <change1>\n- <change2>"`. **`pnpm josh followup` waits
    for CI, verifies AI review findings, sends the completion notification, then merges; if blockers
    are found it exits non-zero — fix and re-run.**
-8. `run:tail` returns the checkout to the default branch (`main:sync`) after the merge; a lane child's
-   `run:tail` skips that step and the parent syncs the primary checkout.
+8. `run:tail` returns the primary checkout to the default branch (`main:sync`) after the merge;
+   every linked checkout skips that step and keeps its branch and port seat.
 
 ## The `fullrun new` step list
 
@@ -44,7 +41,7 @@ that covers the same work stops the run rather than filing a second Issue (`issu
 `<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
 every later stop releases with `run:release <N>`. (4) Record the agreed plan
 in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers section as in
-`kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) `pnpm josh ms`. (7)
+`kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) Synchronize per `entry-sequence.md`. (7)
 `pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
 skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run the verification gate (as in `chain-rule.md`; only the first review round

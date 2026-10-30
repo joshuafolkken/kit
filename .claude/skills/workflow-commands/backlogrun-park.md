@@ -53,9 +53,8 @@ precedence in `epic:next`). Return to step 1.
 `pnpm josh run:release <N>` — `backlogrun-lanes.md` → "What happens to a lane". A lost merge race
 resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
 
-**Parking replaces stopping the session, not the rule that produced the stop** — an upstream defect is
-still filed at once, and a workaround is still forbidden. `epic:bundle`'s `ask` is Tier A, not a park:
-`pnpm josh epic --add <E> <N> --after <M>` and record it on both Issues' `## Decisions`.
+**Parking keeps the stop's rule** — file upstream defects; never work around them.
+`epic:bundle`'s `ask` is Tier A (`epic-commands` skill).
 
 **Removing the label is Tier A — do it without asking**, once the decision is recorded:
 
@@ -70,15 +69,17 @@ lane:launch <N>`.
 
 **`needs-decision` means "a person has to choose", and nothing else.** It carries only:
 
-- a design choice nobody has made;
-- a Tier B toss-up, or a Tier C action (`CLAUDE.md` → "Decision autonomy");
+- a Tier B toss-up with no recommendation, or a Tier C action (decision-autonomy below);
 - an upstream defect in another package, whose wait-or-defer is the person's (`upstream-interrupt.md`);
 - information only the web holds — no lane launches a web tool (`scripts/agent/claude-agent-argv.ts`),
   so a person fetches it.
 
 It never carries:
 
-- a choice with a clearly better default — that is Tier A: decide it and record it as an Issue comment;
+- a recommended, reversible choice — Tier A: adopt it, record it in the epic's Decisions and child
+  comment with `pnpm josh epic --decide <E> <N...> --decision-file <path|->`, and continue
+  (`prompts/collaboration-workflow/operating-rules.md` → "decision-autonomy", the single source).
+  `run:park` refuses `推奨` / `recommend` (case-insensitive); Tier C still needs explicit authorization;
 - whether to run something already planned and opted in with `auto-ok` — the opt-in is that decision;
 - a wait for the next published release — a dependency, `pnpm josh issue:release <N> --wait`
   (`prerequisite.md`);
