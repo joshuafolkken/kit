@@ -18,6 +18,7 @@ vi.setConfig({ testTimeout: LINT_PROBE_TIMEOUT_MS })
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const GITIGNORE = '.gitignore'
+const ESLINT_CONFIG = 'eslint.config.js'
 // A second checkout location. Nothing exists there, which is the point of the cache-hit probe: a run
 // that re-linted under it could not load the project and would report a fatal parse error.
 const OTHER_CHECKOUT = path.join(tmpdir(), 'kit-other-checkout', 'kit')
@@ -40,6 +41,21 @@ function create_probe_checkout(): string {
 	writeFileSync(path.join(checkout, PROBE_FILE), SOURCE)
 	writeFileSync(path.join(checkout, 'tsconfig.json'), JSON.stringify(PROBE_TSCONFIG))
 	writeFileSync(path.join(checkout, GITIGNORE), 'node_modules\n')
+
+	return checkout
+}
+
+function create_matching_checkout(): string {
+	const checkout = create_probe_checkout()
+	const config_entry = path.relative(checkout, path.join(REPO_ROOT, ESLINT_CONFIG))
+
+	writeFileSync(
+		path.join(checkout, ESLINT_CONFIG),
+		`import '${config_entry.split(path.sep).join('/')}'\n`,
+	)
+	onTestFinished(() => {
+		rmSync(checkout, { recursive: true, force: true })
+	})
 
 	return checkout
 }
@@ -106,12 +122,14 @@ describe('checkout_rooted_parser.create', () => {
 
 describe('create_base_config — the serialized config across checkouts', () => {
 	it('serializes the same config for two checkouts at different paths', async () => {
+		const checkout = create_matching_checkout()
 		const [here, there] = await Promise.all([
 			serialized_config(REPO_ROOT),
-			serialized_config(OTHER_CHECKOUT),
+			serialized_config(checkout),
 		])
 
 		expect(here).not.toContain(REPO_ROOT)
+		expect(there).not.toContain(checkout)
 		expect(there).toBe(here)
 	})
 

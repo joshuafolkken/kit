@@ -3,6 +3,7 @@ import { test_related } from '#scripts/test/test-related'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { check_inputs } from './check-inputs'
 import { gate_labels } from './gate-labels'
+import { verification_inputs } from './verification-inputs'
 
 // joshuafolkken/kit#3903: each scoped check names the paths it reads, over-approximating — a path in
 // doubt is an input, and a check with no scope always runs.
@@ -19,6 +20,19 @@ async function never_ignored(): Promise<boolean> {
 async function always_ignored(): Promise<boolean> {
 	return true
 }
+
+describe('check_inputs.touches_inputs configuration root', () => {
+	it('uses the caller root when identifying lint configuration modules', async () => {
+		const configures = vi.spyOn(verification_inputs, 'configures').mockReturnValue(true)
+		const root = '/other-checkout'
+
+		await expect(
+			check_inputs.touches_inputs(LINT_LABEL, [SOURCE], never_ignored, root),
+		).resolves.toBe(true)
+		expect(configures).toHaveBeenCalledWith(LINT_LABEL, [SOURCE], root)
+		configures.mockRestore()
+	})
+})
 
 describe('check_inputs.touches_inputs', () => {
 	it('reads a source module as an input of every scoped check', async () => {

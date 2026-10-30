@@ -63,7 +63,7 @@ async function touches_inputs(
 ): Promise<boolean> {
 	const declaration = verification_inputs.declaration_of(label)
 
-	if (declaration === undefined || verification_inputs.configures(label, paths)) return true
+	if (declaration === undefined || verification_inputs.configures(label, paths, root)) return true
 
 	return await reads_any(declaration, paths, is_ignored, root)
 }

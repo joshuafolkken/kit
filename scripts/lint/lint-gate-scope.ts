@@ -62,6 +62,7 @@ function configures_lint(files: ReadonlyArray<string>, root: string): boolean {
 	return verification_inputs.configures(
 		gate_labels.LINT_LABEL,
 		files.map((file) => path.relative(root, file).split(path.sep).join('/')),
+		root,
 	)
 }
 
