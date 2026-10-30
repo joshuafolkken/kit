@@ -1,5 +1,7 @@
+import { lane_registry } from '#scripts/lane/lane-registry'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_merge, type ChildOutcome } from './run-merge'
+import type { run_merge_restart as RunMergeRestart } from './run-merge-restart'
 
 // joshuafolkken/kit#3908: the readings `run:merge` takes beside a returned child's GitHub state — a
 // person's withdrawal among them — and the outcome they decide.
@@ -8,6 +10,10 @@ const events_mock = vi.hoisted(() => vi.fn())
 const closing_pr_mock = vi.hoisted(() => vi.fn())
 const merged_mock = vi.hoisted(() => vi.fn())
 const restart_mock = vi.hoisted(() => vi.fn())
+const uptime_mock = vi.hoisted(() => vi.fn())
+const RESTART_MODULE = vi.hoisted(() => './run-merge-restart')
+
+vi.mock(import('node:os'), async (original) => ({ ...(await original()), uptime: uptime_mock }))
 
 vi.mock('#scripts/run/event/run-event-stream-emit', () => ({
 	run_event_stream_emit: { current_events: events_mock },
@@ -29,7 +35,7 @@ vi.mock('./run-merge-ship', () => ({
 	run_merge_ship: { is_unanswered: vi.fn().mockResolvedValue(false) },
 }))
 
-vi.mock('./run-merge-restart', () => ({
+vi.mock(RESTART_MODULE, () => ({
 	run_merge_restart: { is_host_restart: restart_mock },
 }))
 
@@ -87,6 +93,31 @@ async function failures_of(children: ReadonlyArray<string>): Promise<number> {
 }
 
 describe('run_merge_signals — children a host restart killed', () => {
+	it('continues ordinary failure classification when host uptime is denied', async () => {
+		const { run_merge_restart } = await vi.importActual<{
+			run_merge_restart: typeof RunMergeRestart
+		}>(RESTART_MODULE)
+
+		restart_mock.mockImplementation(run_merge_restart.is_host_restart)
+		uptime_mock.mockImplementation(() => {
+			throw Object.assign(new Error('uv_uptime returned EPERM'), { code: 'EPERM' })
+		})
+		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValueOnce({
+			issue: CHILD,
+			branch: `${CHILD}-lane`,
+			directory: `/Users/runner/.kit-lanes/${CHILD}`,
+			seat: undefined,
+			development_port: undefined,
+			preview_port: undefined,
+			output: undefined,
+			dispatched_ms: 1,
+			is_stranded: false,
+		})
+
+		expect(await outcome_of_child(CHILD)).toBe('failed')
+		expect(uptime_mock).toHaveBeenCalledOnce()
+	})
+
 	it('reads a killed child as an outage left out of the run-wide streak', async () => {
 		restart_mock.mockResolvedValue(true)
 
