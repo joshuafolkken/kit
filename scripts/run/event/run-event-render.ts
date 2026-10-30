@@ -23,6 +23,7 @@ const KIND_LABELS: Readonly<Record<EventKind, KindLabel>> = {
 	'child-launch': { ja: '着手', en: 'launched' },
 	merge: { ja: 'マージ', en: 'merged' },
 	park: { ja: '保留', en: 'parked' },
+	'human-review': { ja: '人のレビュー待ち', en: 'human review' },
 	split: { ja: '分割', en: 'split' },
 	outage: { ja: '障害', en: 'outage' },
 	'usage-limit': { ja: '利用上限', en: 'usage limit' },

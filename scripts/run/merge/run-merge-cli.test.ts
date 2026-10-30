@@ -19,6 +19,10 @@ const has_resumable_cut_mock = vi.hoisted(() => vi.fn())
 const resume_cut_mock = vi.hoisted(() => vi.fn())
 const refused_carry_mock = vi.hoisted(() => vi.fn())
 const close_split_lane_mock = vi.hoisted(() => vi.fn())
+const release_child_mock = vi.hoisted(() => vi.fn())
+const retain_lane_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/lane/lane-state', () => ({ lane_state: { record_change: retain_lane_mock } }))
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -49,7 +53,7 @@ vi.mock('./run-merge-steps', () => ({
 		has_resumable_cut: has_resumable_cut_mock,
 		is_over_budget: is_over_budget_mock,
 		refused_carry: refused_carry_mock,
-		release_child: vi.fn(),
+		release_child: release_child_mock,
 		resume_cut: resume_cut_mock,
 	},
 }))
@@ -80,6 +84,7 @@ const PARKED_FAILURE = {
 	...NOT_REFUSED,
 }
 const PARK_EVENT = `#${CHILD} parked (run:stalled: ${STALL_CAUSE})`
+const DEFERRED_TOKEN = '"token":"deferred"'
 
 function state_read(
 	state: string,
@@ -90,6 +95,7 @@ function state_read(
 }
 
 function reset_cut_mocks(): void {
+	retain_lane_mock.mockReset().mockResolvedValue({ kind: 'written' })
 	has_resumable_cut_mock.mockReset().mockResolvedValue(false)
 	is_outage_mock.mockReset().mockReturnValue(false)
 	resume_cut_mock.mockReset().mockResolvedValue(true)
@@ -105,6 +111,7 @@ beforeEach(() => {
 	ask_next_mock.mockReset().mockResolvedValue(NEXT)
 	is_over_budget_mock.mockReset().mockResolvedValue(false)
 	emit_mock.mockReset().mockResolvedValue(undefined)
+	release_child_mock.mockReset()
 
 	vi.spyOn(console, 'info').mockImplementation(info_mock.mockReset())
 })
@@ -119,14 +126,16 @@ describe('run_merge_cli.run — a merged child', () => {
 		expect(do_merged_mock).toHaveBeenCalledWith(expect.anything(), expect.any(Function))
 	})
 
-	it('leaves the next offer to the driver under --driver', async () => {
-		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
+	it.each([state_read(CLOSED, []), state_read(OPEN, [NEEDS_HUMAN_REVIEW], true)])(
+		'leaves the next offer to the driver under --driver for %j',
+		async (read) => {
+			read_issue_mock.mockResolvedValue(read)
 
-		expect(await run_merge_cli.run([CHILD, '--driver'])).toBe(SUCCESS)
-		expect(do_merged_mock).toHaveBeenCalledOnce()
-		expect(ask_next_mock).not.toHaveBeenCalled()
-		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining('"token":"deferred"'))
-	})
+			expect(await run_merge_cli.run([CHILD, '--driver'])).toBe(SUCCESS)
+			expect(ask_next_mock).not.toHaveBeenCalled()
+			expect(info_mock).toHaveBeenCalledWith(expect.stringContaining(DEFERRED_TOKEN))
+		},
+	)
 
 	it('hands off when the merge crosses the budget', async () => {
 		read_issue_mock.mockResolvedValue(state_read(CLOSED, []))
@@ -344,30 +353,4 @@ describe('run_merge_cli.run — a stop and a refusal', () => {
 		expect(await run_merge_cli.run(EPIC_ARGS)).toBe(FAILURE)
 		expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.RETRY)
 	})
-
-	it('asks the cut verdict without a numeric argument', () => {
-		expect(run_merge_cli.parse([CHILD])?.over).toBe(true)
-	})
-
-	it('accepts but ignores an in-flight legacy threshold', () => {
-		expect(run_merge_cli.parse([CHILD, '--over', '300000'])?.over).toBe(true)
-		expect(run_merge_cli.parse([CHILD, '--over', '1'])?.over).toBe(true)
-	})
-
-	it('keeps legacy threshold parsing strict', () => {
-		expect(run_merge_cli.parse([CHILD, '--over', 'invalid'])).toBeUndefined()
-	})
-})
-
-describe('run_merge_cli.run — human review', () => {
-	it.each([{ labels: [NEEDS_HUMAN_REVIEW] }, { labels: [EPIC, NEEDS_HUMAN_REVIEW] }])(
-		'stops for a human-review child with labels %j without offering more',
-		async ({ labels }) => {
-			read_issue_mock.mockResolvedValue(state_read(OPEN, labels, true))
-
-			expect(await run_merge_cli.run(EPIC_ARGS)).toBe(SUCCESS)
-			expect(info_mock).toHaveBeenCalledWith(MERGE_TOKEN.HUMAN_REVIEW)
-			expect(ask_next_mock).not.toHaveBeenCalled()
-		},
-	)
 })

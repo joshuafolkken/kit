@@ -49,7 +49,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--human-review-stop'],
 					description:
-						'marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
+						'marks a `halfrun` stop and a `human-review` lane (still in use), sends the `confirmation` naming it; the parent continues in free lanes. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.',
 				},
 				{
 					names: ['--prrun-stop'],

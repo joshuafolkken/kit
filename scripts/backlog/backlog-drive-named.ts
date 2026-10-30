@@ -13,7 +13,13 @@ const { MERGE_TOKEN } = run_merge_token
 
 const NO_RETRIES = 0
 const FIRST = 0
-const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set(['merged', 'parked', 'split', 'withdrawn'])
+const TERMINAL_OUTCOMES: ReadonlySet<string> = new Set([
+	'merged',
+	'parked',
+	'human-review',
+	'split',
+	'withdrawn',
+])
 
 // The skip follows the declared order alone: an issue `run:add` put in was
 // asked for on its own, so its failure skips nothing and a declared failure does not skip it.

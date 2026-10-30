@@ -23,7 +23,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--fullrun` — marks the record as `fullrun #N`'s.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
-- `--human-review-stop` — marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
+- `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane (still in use), sends the `confirmation` naming it; the parent continues in free lanes. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
 <!-- /usage -->
@@ -487,10 +487,12 @@ branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut), `human-review` (the child stopped
-before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped,
+`over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut),
+`stop` (failure guard), `environment` (the consecutive-outage guard tripped,
 or a child could not authenticate; it keeps `in-progress`, uncounted, for `/login`), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
 (unreadable), `busy` (refused count; exit 1).
+
+A human-review child keeps its lane and hold, counts nothing, and offers more children.
 
 ### `josh run:review`
 

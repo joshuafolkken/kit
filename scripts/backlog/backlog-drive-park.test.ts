@@ -4,6 +4,20 @@ import { backlog_drive_fixture } from './backlog-drive-fixture'
 
 const { FIRST_CHILD, SECOND_CHILD, harness, offer, state } = backlog_drive_fixture
 
+it('launches the next child in a free lane after collecting a human-review stop', async () => {
+	const { ports, calls } = harness({
+		finished: [FIRST_CHILD],
+		human_review: [FIRST_CHILD],
+		offers: [offer('run', [SECOND_CHILD])],
+		free_lanes: [1],
+	})
+	const result = await backlog_drive.run_pass(state([FIRST_CHILD]), true, ports)
+
+	expect(calls).toStrictEqual([`merge ${FIRST_CHILD}`, 'offer', `launch ${SECOND_CHILD}`])
+	expect(result.kind === 'continue' && result.state.in_flight).toStrictEqual([SECOND_CHILD])
+	expect(result.state.exclude).toStrictEqual([])
+})
+
 // joshuafolkken/kit#3041: a parked child stayed excluded for the rest of the driver's process, so one a
 // person released from `needs-decision` was never offered again until the driver restarted.
 describe('backlog_drive — a parked child is not excluded', () => {

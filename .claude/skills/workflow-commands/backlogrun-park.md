@@ -27,13 +27,15 @@ parks, re-dispatches or files.
 
 ## `needs-human-review` — the one stop that is not a park
 
-A child carrying **`needs-human-review`** stops `halfrun`-shaped and **the whole run ends there**:
+A child carrying **`needs-human-review`** stops `halfrun`-shaped in **its own lane**:
 implementation and the gate run, nothing is committed, the tree is left dirty and unstashed,
 `pnpm josh run:hold <N> --human-review-stop` sends the `confirmation` Telegram with the resume command
-and the lane directory, and the remaining children are not started.
+and the lane directory. The parent collects that dispatch and offers the next children.
 
 **The child goes on holding its repository**, and **its lane is left open and untouched**. **Name the
-lane directory in the stop report.** Lanes in flight finish; no new lane opens.
+lane directory in the stop report.** The stopped lane stays counted in use by `lane:limit`;
+never park or release it. The parent keeps launching children while free lanes remain. A fresh
+dispatch resumes the lane's normal lifecycle after the person reviews it.
 
 **Never apply or remove the label** — a person's alone (`needs-human-review.md`, the single source).
 
