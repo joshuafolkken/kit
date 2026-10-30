@@ -53,7 +53,7 @@ the behavior.
 
 ## `josh refactor:scan` in detail
 
-Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 describes, run as a command: it picks the target files (branch diff plus untracked, or `scripts/`; excluding `demo`, `src/routes/stories`, `/* @refactor-ignore */`), expands the scope along the import graph, asks the project's own eslint for the §4.2 categories, and answers `verdict: clear` / `verdict: candidates`. Reports and never fails.
+Compute the refactoring candidates `prompts/refactoring.md` §4.1–§4.3 describes, run as a command: it picks the target files (branch diff plus untracked, or `scripts/`; excluding `demo`, `src/routes/stories`, `/* @refactor-ignore */`), expands the scope along the import graph, asks the project's own eslint for the §4.2 categories, and answers `verdict: clear` / `verdict: candidates`. Completed scans exit zero; execution failures retain diagnostics, report `verdict: error` and exit non-zero.
 
 ## `josh format:edited` in detail
 

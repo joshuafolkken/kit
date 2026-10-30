@@ -1,8 +1,8 @@
 import path from 'node:path'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { json_value } from '#scripts/lib/json-value'
-import { LINT_TIMEOUT_MS } from '#scripts/lib/timeouts'
-import { execa } from 'execa'
+import { SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
+import { execa, type Options, type Result } from 'execa'
 import { z } from 'zod'
 
 // The mechanical half of `prompts/refactoring.md`: the refactoring
@@ -186,48 +186,64 @@ function eslint_command(root: string, files: ReadonlyArray<string>): ReadonlyArr
 	return shim === undefined ? [PNPM, PNPM_EXEC, ESLINT_BIN, ...args] : [shim, ...args]
 }
 
-// `undefined` means the run did not produce parseable eslint JSON — a failure, kept distinct from a
-// valid empty array (a clean scope), so a scan that could not run is never reported as `clear`.
 function parse_results(raw: string | undefined = 'null'): Array<LintResult> | undefined {
 	return json_value.parse_with(raw, results_schema)
 }
 
+function execution_results(stdout: string, stderr: string): Array<LintResult> {
+	const results = parse_results(stdout)
+
+	if (results === undefined) throw new Error(`Invalid ESLint JSON output: ${stdout}\n${stderr}`)
+
+	return results
+}
+
+function execution_failed<OptionsType extends Options>(result: Result<OptionsType>): boolean {
+	const interrupted = [result.timedOut, result.isCanceled, result.isMaxBuffer, result.isTerminated]
+
+	return result.failed && (result.exitCode !== 1 || interrupted.some(Boolean))
+}
+
+function execution_failure<OptionsType extends Options>(result: Result<OptionsType>): Error {
+	const status = `ESLint execution failed (exit ${String(result.exitCode)}, timed out: ${String(result.timedOut)}, signal: ${result.signal ?? 'none'})`
+	const diagnostic = [status, result.code, result.originalMessage, result.stderr]
+
+	return new Error(diagnostic.filter(Boolean).join('\n'))
+}
+
 // The project's own eslint over the scope, in JSON. `reject: false` because eslint exits non-zero when
 // it finds anything — which it will — and the JSON is on stdout regardless. An empty file list is a
-// clean answer (`[]`); a spawn error or unparseable output is a failure (`undefined`), so the caller
-// can tell "no candidates" from "the scan did not run".
+// clean answer (`[]`); execution and JSON failures throw with their diagnostic intact.
 async function run_eslint_json(
 	files: ReadonlyArray<string>,
 	root: string,
-): Promise<Array<LintResult> | undefined> {
+): Promise<Array<LintResult>> {
 	if (files.length === 0) return []
 
 	const [bin, ...command_arguments] = eslint_command(root, files)
 
-	try {
-		const result = await execa(bin ?? PNPM, command_arguments, {
-			cwd: root,
-			reject: false,
-			stdout: 'pipe',
-			stderr: 'ignore',
-			timeout: LINT_TIMEOUT_MS,
-		})
+	const result = await execa(bin ?? PNPM, command_arguments, {
+		cwd: root,
+		reject: false,
+		stdout: 'pipe',
+		stderr: 'pipe',
+		// Import expansion can reach thousands of files, like the full verification suite.
+		timeout: SUITE_TIMEOUT_MS,
+	})
 
-		return parse_results(result.stdout)
-	} catch {
-		return undefined
-	}
+	if (execution_failed(result)) throw execution_failure(result)
+
+	return execution_results(result.stdout, result.stderr)
 }
 
-// The categories, or `undefined` when the eslint run failed — the failure is propagated rather than
-// flattened to an empty (and therefore `clear`) result.
+// Execution failures propagate instead of being flattened to an empty (and therefore clear) result.
 async function scan_categories(
 	files: ReadonlyArray<string>,
 	root: string,
-): Promise<ReadonlyArray<CategoryResult> | undefined> {
+): Promise<ReadonlyArray<CategoryResult>> {
 	const results = await run_eslint_json(files, root)
 
-	return results === undefined ? undefined : categorize(results, root)
+	return categorize(results, root)
 }
 
 const refactor_lint = {
