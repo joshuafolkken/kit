@@ -2,7 +2,7 @@ import { document_byte_budget } from '#scripts/document/document-byte-budget'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
 
 // Adding a command moves every artifact derived from the command map at once: the usage spans, the
-// catalog, the command-map snapshot and `docs/why.md`'s counts. One command writes them all, and every
+// catalog and `docs/why.md`'s counts. One command writes them all, and every
 // test that finds one stale names it, so a failure never fixes one artifact and hides the next (#4970).
 
 const DERIVE_COMMAND = 'pnpm josh command:derive'
