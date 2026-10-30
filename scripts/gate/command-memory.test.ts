@@ -37,6 +37,7 @@ describe('command_memory.estimated_memory_mb', () => {
 		['pnpm vitest run', MEMORY_MB.unit_worker * VITEST_DEFAULT_WORKERS],
 		['pnpm tsc --noEmit', MEMORY_MB.type_check],
 		['pnpm install', MEMORY_MB.install],
+		['pnpm exec playwright test --workers=2', MEMORY_MB.e2e],
 		// A heredoc a shell reads is its script, the `sh -c` escape spelled another way.
 		[`bash <<'EOF'\ncd x\n${ESLINT_FOUR}\nEOF`, MEMORY_MB.lint * FOUR_WORKERS],
 		[`sh -s <<EOF\n${ESLINT_FOUR}\nEOF\necho done`, MEMORY_MB.lint * FOUR_WORKERS],
