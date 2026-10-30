@@ -1,0 +1,7 @@
+{
+	"reason": "Usage observations carry their event timestamp with windows; missing or invalid timestamps stay unknown, and file mtime is used only for cache invalidation (#5400).",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 14
+	}
+}
