@@ -42,6 +42,7 @@ describe('test_pinned_record', () => {
 		test_pinned_record.write(TOKEN, summary, ROOT)
 
 		expect(summary.text).toContain('unchecked 2 — over the 20-hunk cap\n')
+		expect(summary.is_unchecked).toBe(true)
 		expect(readFileSync(path, 'utf8')).toContain('unchecked a.ts:4 — over the 20-hunk cap')
 		expect(test_pinned_record.read(TOKEN, ROOT)?.log).toStrictEqual({ path })
 		rmSync(path, { force: true })

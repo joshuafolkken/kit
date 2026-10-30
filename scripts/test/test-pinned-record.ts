@@ -23,6 +23,8 @@ const FIRST_UNPINNED_FLAG = '--first-unpinned'
 const LIST_PREFIX = 'josh-test-pinned-list-'
 const LIST_SUFFIX = '.log'
 const LIST_HEADER = 'josh test:pinned — every unpinned and unchecked place'
+const UNCHECKED_NOTE =
+	'Unchecked places are not verified: map each listed place to its related regression test before ship; reuse the pending probe or cached verdicts, and fix unresolved places with the round-1 findings.\n'
 
 type UnpinnedHunk = PinnedReport['unpinned'][number]
 
@@ -31,6 +33,7 @@ type UnpinnedHunk = PinnedReport['unpinned'][number]
 // `text`, `counts` and `log` are the printed report's parts (`test_pinned_logic.report_text`).
 interface PinnedSummary extends ReportParts {
 	unpinned: ReadonlyArray<string>
+	is_unchecked?: boolean
 	// What a check still running reached so far; it is shown, never judged or remembered as the answer.
 	is_partial?: boolean
 	// A `--first-unpinned` check that stopped before some hunks (joshuafolkken/kit#5153): its unpinned
@@ -71,6 +74,7 @@ function kept_log(report: PinnedReport, root: string): KeptLog | undefined {
 function summary_with(report: PinnedReport, log: KeptLog | undefined): PinnedSummary {
 	const summary = {
 		...test_pinned_logic.report_parts(report),
+		...(test_pinned_logic.has_unchecked(report) && { is_unchecked: true }),
 		log,
 		unpinned: test_pinned_cache_logic.distinct(report.unpinned.map((hunk) => site_of(hunk))),
 	}
@@ -89,14 +93,17 @@ function summary_of(report: PinnedReport, root: string = PROJECT_ROOT): PinnedSu
 function partial_summary(report: PinnedReport, note: string): PinnedSummary {
 	const summary = summary_with(report, undefined)
 
-	return { ...summary, text: `${note}\n${summary.text}`, is_partial: true }
+	const places = test_pinned_logic.format(report)
+	const next = summary.is_unchecked === true ? UNCHECKED_NOTE : ''
+
+	return { ...summary, text: `${note}\n${places}\n${next}`, is_partial: true }
 }
 
 // A check that could not run checked nothing, so it names no unpinned place and the run fails open.
 function not_run_summary(error: unknown): PinnedSummary {
 	const message = error instanceof Error ? error.message : String(error)
 
-	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned: [] }
+	return { text: `${NOT_RUN_NOTE}${message}\n`, unpinned: [], is_unchecked: true }
 }
 
 function record_path(token: string, root: string = PROJECT_ROOT): string {
@@ -139,7 +146,8 @@ function to_summary(record: Record<string, unknown>): PinnedSummary | undefined 
 	const { text, unpinned, is_cut } = record
 
 	if (typeof text !== 'string' || !is_text_list(unpinned)) return undefined
-	const summary = { text, unpinned, ...tail_of(record) }
+	const unchecked = record['is_unchecked'] === true ? { is_unchecked: true } : {}
+	const summary = { text, unpinned, ...tail_of(record), ...unchecked }
 
 	return is_cut === true ? { ...summary, is_cut, ...remaining_of(record) } : summary
 }
@@ -186,6 +194,7 @@ function launch_argv(
 }
 
 const test_pinned_record = {
+	UNCHECKED_NOTE,
 	clear,
 	launch_argv,
 	is_text_list,
