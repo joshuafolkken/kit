@@ -86,7 +86,7 @@ function yielded(minute: number, by: string = lane_yield.YIELD_TEXT.name): RunEv
 	)
 }
 
-// joshuafolkken/kit#5216: #5171 yielded its seat at 7 minutes and waited 43 for its redispatch.
+// joshuafolkken/kit#5216: a yielded lane's redispatch wait must not count as work.
 describe('lane_net_time.net_ms -- a yield', () => {
 	it('is the two seats together, the wait for the redispatch taken out', () => {
 		const entries = [dispatch(0), dispatch(50), merge(104)]

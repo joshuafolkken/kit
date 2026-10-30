@@ -23,7 +23,7 @@ const ACTIVITY = '👀 3′00″'
 const SECOND = MINUTE / 60
 const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
-// A phase three digits of minutes long, as a run past 100 minutes reaches.
+// A long phase exercises the wider duration field.
 const LONG_PHASE = 125 * MINUTE
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 

@@ -175,8 +175,8 @@ describe('run_report.build_report — an undetermined scope', () => {
 // `run-event-scope.test.ts`, its single-source home (joshuafolkken/kit#2395); this file pins how the report
 // renders a scope, not how the scope is derived.
 
-// The harm the scope removes: the observed body was 138 events and 11,689 bytes, and Telegram rejected it for
-// length. The fixture is that stream — 138 events of which 40 are this invocation's — so the byte count
+// The scope prevents Telegram from rejecting a report that includes other invocations' events.
+// The fixture mixes this invocation with others, so the byte count
 // measures the scope rather than `format_event`'s line length: unscoped, the same input is over the limit.
 const TELEGRAM_BODY_LIMIT_BYTES = 4096
 const OBSERVED_STREAM_EVENTS = 138

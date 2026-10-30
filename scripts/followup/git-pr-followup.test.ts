@@ -68,10 +68,9 @@ vi.mock('#scripts/notify/telegram-notify', () => ({
 
 // **The missing mock, added while the merge-gate recovery in joshuafolkken/kit#1077 was being
 // verified.** `completion_sender` asks this collaborator for the unreleased-merge line, and the real
-// one resolves the tip by running `git fetch origin main` — measured at about 5 seconds in a linked
-// work tree. Every one of this file's tests calls `run`, so every one of them made that request, and
-// against the 10-second `testTimeout` a handful of them failed on network variance rather than on
-// anything under test. That is exactly what joshuafolkken/kit#1353's network guard exists to prevent;
+// one resolves the tip by running `git fetch origin main`. Every test here calls `run`, so an
+// unmocked fetch makes this suite depend on network variance rather than the behavior under test.
+// That is exactly what joshuafolkken/kit#1353's network guard exists to prevent;
 // the guard watched `gh` only, so a `git` fetch walked straight past it — **which it no longer does**:
 // joshuafolkken/kit#1515 extended the shim to `git`, so this mock going missing now fails the whole
 // suite rather than costing it four seconds a test. Nothing here asserts on the

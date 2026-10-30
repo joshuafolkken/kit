@@ -16,7 +16,7 @@ vi.mock('execa', async () => {
 })
 
 const AT = '2026-10-10T00:00:00.000Z'
-// Half the memory available, and 256 + 512 pages of 4 KB: 3 MB swapped since boot.
+// Mixed swap counters ensure the available-memory and swap readings stay independent.
 const SYSCTL_OUTPUT = [
 	'kern.memorystatus_level: 50',
 	'vm.compressor.swapper.swapins_total: 256',

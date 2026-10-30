@@ -17,7 +17,7 @@ import { process_tools } from './process-tools'
 
 // Detached lane children are not harness-tracked processes, so their completion fires no
 // re-invocation event in the parent's session. Without a blocking wait the parent notices only
-// on the next heartbeat interval -- up to 15 minutes after the fact.
+// on the next heartbeat interval, delaying the next runnable child.
 //
 // **The re-confirm delay is the one value the caller must not be left to choose.** A process that
 // disappears briefly and reappears (the pre-gate boundary cut, where one process exits and a

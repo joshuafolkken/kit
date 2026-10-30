@@ -134,9 +134,8 @@ interface PreparedNotify {
 
 // **The four reads in front of the check wait are issued together**. Not one
 // of them is a wait on anything: the `closes #N` check reads the pull request body, and the
-// notification needs the repository name, the issue title and the pull request URL — four requests
-// that were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds, purely because they
-// were written as consecutive statements.
+// notification needs the repository name, the issue title and the pull request URL. Independent
+// requests need not delay one another (joshuafolkken/kit#1446).
 //
 // **This overlaps requests; it decides nothing differently.** The `closes #N` warning still fires on
 // the same body, the context still carries the same four fields, and the required-check wait and the

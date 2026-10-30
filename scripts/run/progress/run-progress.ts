@@ -4,16 +4,15 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 // `josh run:progress` — the one line an unattended run prints when it has gone quiet, and the clock
 // that decides when that is.
 //
-// **The trigger is silence, not a timer.** An `epicrun` reports when a child merges or is parked, and
-// a child is 20–46 minutes of wall clock; between those two events it says nothing at all, so the
-// person watching has to type "how is it going" to find out — the polling this command exists to
+// **The trigger is silence, not a timer.** An `epicrun` reports when a child merges or is parked.
+// Between those events it says nothing, so the person watching has to type "how is it going"
+// to find out — the polling this command exists to
 // remove. What it deliberately does **not** do is print on a fixed clock: the interval is measured
 // from the last report of *any* kind, so a heartbeat never lands immediately behind a real one, where
 // it would be noise rather than news. `--mark` is how the run tells this clock a real report happened.
 //
-// **A line that could say "still running" is a line not worth printing.** The default is twenty
-// minutes: a child measures 20–46 minutes, and twenty gives one to two reports per child rather than a
-// run of lines saying what the last one said. Every field below is
+// **A line that could say "still running" is a line not worth printing.** The interval avoids a
+// run of lines saying what the last one said (joshuafolkken/kit#5367). Every field below is
 // re-read on each tick rather than remembered — a child's labels, whether a pull request exists yet,
 // which lanes are open, the load average, and how long the whole set has been identical.
 //

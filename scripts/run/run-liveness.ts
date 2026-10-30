@@ -169,7 +169,7 @@ function definitive_verdict(traces: Traces): LivenessVerdict | undefined {
 }
 
 // A live process is a unit inside a long check — a `pnpm josh followup` waiting on CI writes
-// nothing for up to 32 minutes, which is longer than the silent window and is exactly the false
+// nothing for longer than the silent window, which is exactly the false
 // positive this trace exists to stop. **It is asked after the unreadable check rather than before it**:
 // a `pgrep` scoped a shade too wide answers `alive` on a
 // machine running several kit projects at once, and read ahead of an output path that resolves to
@@ -323,7 +323,7 @@ interface FreshnessRequest {
 
 // Frozen means both: nothing was written inside the silent window, and nothing was written between
 // two samples taken a few seconds apart. The window alone would call a unit stopped the moment its
-// clock crossed 30 minutes, and the two samples alone would call a slow turn a stop.
+// clock crossed the window, and the two samples alone would call a slow turn a stop.
 async function read_output_frozen(request: FreshnessRequest): Promise<boolean | undefined> {
 	const first = sample_output(request.output_path)
 

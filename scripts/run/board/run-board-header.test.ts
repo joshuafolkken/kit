@@ -36,7 +36,7 @@ function row(number: number, state: BoardRow['state']): BoardRow {
 
 const RUNNING_LAYOUT: BoardLayout = { ...EMPTY_LAYOUT, active: [row(1, 'running')] }
 
-// A 40-minute heartbeat drawn alarming — read at the call, after the case has forced color on.
+// Read the alarming heartbeat at the call, after the case has forced color on.
 function alarmed(): string {
 	return styleText('red', STALE_BEAT)
 }

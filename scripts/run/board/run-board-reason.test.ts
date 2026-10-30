@@ -182,7 +182,7 @@ describe('run_board_reason.reader — a row a blocker keeps waiting', () => {
 	})
 })
 
-// joshuafolkken/kit#4270: a paused lane held five rows back for 1 h 40 min with no word of why.
+// joshuafolkken/kit#4270: a paused holder must explain why the queued rows cannot start.
 describe('run_board_reason.reader — a paused holder', () => {
 	it('names when and by what the holder was paused after the path', () => {
 		const plan = plan_of([child(HELD)], DECLARED)

@@ -6,7 +6,7 @@ import { process_tools } from './process-tools'
 // Ending a lane child that did not end itself.
 //
 // **A detached child is kept alive on purpose and was never ended by anything.** `detached_launch`
-// lets a child outlive its parent's session, and every reader of it — `run:liveness`, the 30-minute
+// lets a child outlive its parent's session, and every reader of it — `run:liveness`, the
 // silence window — only *reads* whether it stopped. So a child that merged and then hung on a wait
 // loop of its own lived on for a day, and the documented `pgrep -laf "fullrun #<N>$"` answered
 // `alive` for that issue number forever, which is a verification answering wrongly. The close and the

@@ -3,10 +3,10 @@ import { run_board_held } from './run-board-held'
 
 // Each process's memory and compressed memory as `top`'s MEM and CMPRS count them — the columns
 // Activity Monitor's "Memory" and "Compressed Memory" show. Compressed pages are what a resident set
-// leaves out: `eslint_d` holds about 28 MB resident against 1 GB in `top`'s MEM (joshuafolkken/kit#4171).
+// leaves out, so resident memory alone understates the footprint (joshuafolkken/kit#4171).
 // **CMPRS has no cheaper reader**: `proc_pid_rusage` carries the footprint (MEM) but no compressed
-// count, and `top -l 1` costs about 1.1 s of system CPU against `ps`'s 30 ms. So `top` runs at most once
-// every 30 s, in the background, and the board draws the last reading; only the very first read waits.
+// count. Its sampling cost warrants a cached background reading: the board draws the last reading,
+// and only the very first read waits.
 
 const TOP_ARGUMENTS = ['-l', '1', '-F', '-R', '-stats', 'pid,mem,cmprs']
 const TOP_INTERVAL_MS = 30_000

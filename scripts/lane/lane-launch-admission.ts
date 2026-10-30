@@ -3,9 +3,8 @@ import { core_wait } from '#scripts/gate/core-wait'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 import { lane_paths } from './lane-paths'
 
-// Claude's per-process RSS median was 270 MB across 1,014 lane-process-load samples, 2026-10-24
-// through 2026-10-29, in the durable f660a273f2e9309a lane ledger. Each sample's aggregate rss_mb
-// is divided by its Claude count before taking the median (joshuafolkken/kit#5409).
+// Admission uses the per-process RSS median so an aggregate does not overcharge each new lane
+// (joshuafolkken/kit#5409).
 const LANE_MEMORY_MB = 270
 
 function checkout_of(issue: string): string {

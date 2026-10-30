@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { run_board_lane_state, type BoardLanes } from './run-board-lane-state'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
-// joshuafolkken/kit#3893: a lane whose child had died stood at 🔄 running, its 🔧 past 80 minutes,
-// because nothing on the stream says a child died.
+// joshuafolkken/kit#3893: a lane whose child died must not stay at 🔄 running just because the
+// stream has no child-death event.
 
 const KIND = run_event_stream.EVENT_KIND
 const T0 = '2026-10-08T09:00:00.000Z'

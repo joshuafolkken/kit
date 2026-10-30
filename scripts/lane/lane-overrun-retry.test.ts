@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_overrun } from './lane-overrun'
 
-// joshuafolkken/kit#4930: #4916's 70-minute overrun was refused its launch, and a refused launch was
+// joshuafolkken/kit#4930: #4916's overrun was refused its launch, and a refused launch was
 // final, so the lane went without an investigation.
 
 const mocks = vi.hoisted(() => ({

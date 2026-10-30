@@ -80,7 +80,7 @@ describe('ping_life and is_life_fresh — staleness detection (joshuafolkken/kit
 
 		run_progress_clock.ping_life(target)
 
-		// is_life_fresh with a threshold of 0 ms always returns false
+		// A zero threshold leaves no interval in which the life record can be fresh.
 		expect(run_progress_clock.is_life_fresh(target, 0)).toBe(false)
 	})
 
