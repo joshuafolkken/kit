@@ -24,6 +24,7 @@ const KIND = {
 	LANE_STATE: 'lane-state',
 	PUSH_MISS: 'push-miss',
 	SHIP_LAP: 'ship-lap',
+	SIZE: 'size',
 } as const
 
 const lane_ledger_kind = { KIND }

@@ -49,7 +49,7 @@ const RESTATEMENTS: ReadonlyArray<string> = [
 	`above ${WIP_CAP} open`,
 	`cap of ${WIP_CAP}`,
 	`${WIP_CAP} 件`,
-	`about ${FILE_GUIDE} changed files`,
+	`than ${FILE_GUIDE} changed files`,
 	`${LINE_GUIDE} changed lines`,
 	...ROUND_CAP_RESTATEMENTS,
 ]
@@ -72,7 +72,7 @@ describe('each rule number agrees with its source in code', () => {
 
 	it('states the split guide in split-assessment.md as FILE_GUIDE and LINE_GUIDE', () => {
 		expect(read_unwrapped(SPLIT_SKILL)).toContain(
-			`about ${FILE_GUIDE} changed files and about ${LINE_GUIDE} changed lines`,
+			`more than ${FILE_GUIDE} changed files or more than ${LINE_GUIDE} changed lines`,
 		)
 	})
 

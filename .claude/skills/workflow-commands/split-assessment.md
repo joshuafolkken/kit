@@ -8,14 +8,13 @@ several. Every command applies it identically.
 **The default is not to split.** Two questions have to answer yes **together**:
 
 1. **Does the request contain two or more deliverables that could each be merged separately?**
-2. **Does the whole of it clearly exceed what one verification gate can confirm in one pass?** The
-   guide is **about 10 changed files and about 400 changed lines** (test files excluded).
-   Under that, it is one Issue however many separable pieces a reader can name inside it.
+2. **Does the whole of it exceed what one verification gate can confirm in one pass?** The guide is
+   **more than 8 changed files or more than 200 changed lines** (test files excluded) — either one is
+   over. Docs, snapshots and command listings the change has to follow count as files.
+   Under both, it is one Issue however many separable pieces a reader can name inside it.
 
 A change that must land in one commit to be correct is one deliverable however big it is; **separability
-alone no longer splits anything**. **"Clearly" is the operative word** — a run that has to argue past
-the numbers has answered no. They are read against the whole request's estimate, and 11 files is not
-thereby a split.
+alone no longer splits anything**. The numbers are read against the whole request's estimate.
 
 ## The same two questions decide the filing-time fold
 

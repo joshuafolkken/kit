@@ -20,6 +20,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
+import { backlog_next_size } from './backlog-next-size'
 import { backlog_pool } from './backlog-pool'
 import { backlog_rank } from './backlog-rank'
 import { backlog_wait_cause } from './backlog-wait-cause'
@@ -162,6 +163,7 @@ function report(result: EpicNextResult, context: PoolContext): number {
 	const tokens = tokens_of(result, context.repo)
 
 	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
+	backlog_next_size.warn_over_guide(tokens, context)
 	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE

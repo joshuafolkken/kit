@@ -39,8 +39,8 @@ epic` writes only the repository it runs in, and the promote arm stops when that
 checked out here. A third-party owner is Tier C: stop rather than file.
 
 **Read `split-assessment.md` → "The question" first** — `kickoff #N` assesses scope exactly as
-`kickoff new` does. The default is not to split: separability and a scope clearly over one verification
-gate must hold **together**. The rest of `split-assessment.md` is read when a split is found.
+`kickoff new` does. The default is not to split: separability and a scope over the size guide must hold
+**together**. The rest of `split-assessment.md` is read when a split is found.
 
 - `kickoff new` or `kickoff new "<title>"`: (0) **Scope assessment** per `split-assessment.md` — one
   deliverable takes the **single-issue path**, several the **multi-issue split path**.

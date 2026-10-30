@@ -32,7 +32,7 @@ const WIP_TOPIC = 'prompts/collaboration-workflow/wip-cap.md'
 const LANES_DOC = '.claude/skills/workflow-commands/backlogrun-lanes.md'
 // The guide, written once: the single source and the entry summary have to state the same numbers,
 // and a guide that drifted between them would be two different thresholds under one rule.
-const SPLIT_GUIDE = 'about 10 changed files and about 400 changed lines'
+const SPLIT_GUIDE = 'more than 8 changed files or more than 200 changed lines'
 
 // Default 1 — the split assessment. The number is pinned as well as the default, because a default
 // stated without a guide is read as "split when it feels large", which is the discretion the

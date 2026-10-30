@@ -1,0 +1,8 @@
+{
+	"reason": "Record declared and actual lane size and share the stricter split guide with backlog offers; existing median aggregation is reused. Document that docs, snapshots and command lists count toward the guide.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 145,
+		"ai_cost.on_demand_bytes": 114
+	}
+}
