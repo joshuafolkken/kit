@@ -182,7 +182,7 @@ pnpm josh cspell:dot   # includes dotfiles
 
 <!-- usage: check:related -->
 
-Run related lint, unit, type and dotfile spelling checks in parallel.
+Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes.
 
 ```bash
 pnpm josh check:related
@@ -192,6 +192,8 @@ pnpm josh check:related --full   # whole outputs
 <!-- /usage -->
 
 Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+
+`test:related` starts once `lint:related` passes; on a failed `lint:related` it is not run: its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`. A reused `lint:related` lets it start at once.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 
@@ -909,7 +911,7 @@ Helpers for AI-assisted development workflows.
 Start a backlogrun in the background and show its board; with one already running, only show the board, or replace it when it is idle and the invocation differs; --stop stops it; --restart replaces its processes and keeps its record.
 
 ```bash
-pnpm josh backlogrun                 # start in Claude, then show the board
+pnpm josh backlogrun                 # start with the configured provider, then show the board
 pnpm josh backlogrun 3437 --only     # the arguments go to backlogrun as typed
 pnpm josh backlogrun --agent codex   # start in Codex
 pnpm josh backlogrun --stop          # stop the run in this repository
@@ -919,6 +921,10 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 <!-- /usage -->
 
 The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+
+To default to Codex, add `JOSH_AGENT_PROVIDER=openai` to the project's `.env`. Provider selection is `--agent claude|codex` first, then the exported `JOSH_AGENT_PROVIDER`, then `.env`, then Claude Code (`anthropic`).
+
+The environment accepts `anthropic|openai`; an unset or blank value selects Claude, and other values are refused with a reason unless `--agent` overrides them. Codex uses the existing OpenAI role profiles. Changing this setting only affects a new launch: showing an existing run or `--restart` keeps its recorded provider.
 
 - The arguments are the `backlogrun` keyword's own: named Issues, `--only`, `--max <n>`, `--idle <minutes>`. A bare number is read as `#<n>`, since an unquoted `#` starts a shell comment.
 - A run already going here is never joined by a second: the board is shown, and each named Issue is printed as a `run:add` line to add it by hand.

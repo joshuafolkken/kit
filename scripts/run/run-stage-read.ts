@@ -1,6 +1,7 @@
 import { issue_state } from '#scripts/issue/issue-state'
 import { issue_state_cli, type StateRead } from '#scripts/issue/issue-state-cli'
 import { run_halfrun_resume } from './run-halfrun-resume'
+import { run_open_pr } from './run-open-pr'
 import { run_prrun_resume, type PrrunToken } from './run-prrun-resume'
 import { run_stage, type StageState } from './run-stage'
 
@@ -49,7 +50,10 @@ async function read_stage(issue: string): Promise<StageRead> {
 		is_planned: issue_state.is_planned(issue_read),
 	})
 
-	return { state, prrun_token: stop.prrun_token }
+	const has_pr = state === run_stage.FRESH || state === run_stage.PLANNED
+	const selected = has_pr && (await run_open_pr.is_pending(issue)) ? run_stage.PR_OPEN : state
+
+	return { state: selected, prrun_token: stop.prrun_token }
 }
 
 const run_stage_read = { read_stage }

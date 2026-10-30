@@ -5,7 +5,7 @@ import { issue_cite } from '#scripts/issue/issue-cite'
 // issue**. A run that finds work already done resumes after it rather than redoing it, and a command
 // whose stopping point the issue has already reached reports that and stops.
 //
-// This module is the pure half of that rule: the five states an issue can be found in, the four
+// This module is the pure half of that rule: the states an issue can be found in, the four
 // commands, and the one table that maps a (state, command) pair to a start and an end. `run:entry` reads
 // the state (`run-stage-read.ts`) and branches on the answer; the stage table in
 // `docs/how-to/run-issues.md` and each stop's `Next:` line are pinned to this module by
@@ -29,9 +29,11 @@ const PLANNED = 'planned'
 const HALFRUN_STOPPED = 'halfrun-stopped'
 const PRRUN_STOPPED = 'prrun-stopped'
 const MERGED = 'merged'
+const PR_OPEN = 'pr-open'
 
-// In ladder order: a state's index is how many rungs the issue has already climbed.
-const STATES = [FRESH, PLANNED, HALFRUN_STOPPED, PRRUN_STOPPED, MERGED] as const
+// Ranked states have completed that many rungs. An unverified open PR resumes at the gate.
+const RANKED_STATES = [FRESH, PLANNED, HALFRUN_STOPPED, PRRUN_STOPPED, MERGED] as const
+const STATES = [...RANKED_STATES, PR_OPEN] as const
 
 type StageState = (typeof STATES)[number]
 
@@ -45,6 +47,7 @@ const STARTS: Readonly<Record<StageState, string>> = {
 	[HALFRUN_STOPPED]: 'gate',
 	[PRRUN_STOPPED]: 'followup',
 	[MERGED]: REACHED,
+	[PR_OPEN]: 'gate',
 }
 
 // Every start a decision can print, in ladder order — the `run:entry` oracle's vocabulary.
@@ -94,7 +97,8 @@ function state_of(facts: StageFacts): StageState {
 }
 
 function decide(state: StageState, command: StageCommand): StageDecision {
-	const is_reached = STATES.indexOf(state) > COMMANDS.indexOf(command)
+	const ranked_state = state === PR_OPEN ? PLANNED : state
+	const is_reached = RANKED_STATES.indexOf(ranked_state) > COMMANDS.indexOf(command)
 	const start = is_reached ? REACHED : STARTS[state]
 
 	return { state, command, start, end: ENDS[command], is_reached }
@@ -144,6 +148,7 @@ const run_stage = {
 	KICKOFF,
 	MERGED,
 	PLANNED,
+	PR_OPEN,
 	PRRUN,
 	PRRUN_STOPPED,
 	REACHED,

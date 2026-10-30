@@ -12,7 +12,7 @@ import { run_board_now, type NowLine } from './run-board-now'
 import type { SessionOperations } from './run-board-operation-read'
 import { run_board_priority } from './run-board-priority'
 import type { ProcessGroups } from './run-board-process-groups'
-import type { Quotas } from './run-board-quota-read'
+import type { QuotaProvider, Quotas } from './run-board-quota-read'
 import type { QuotaHold } from './run-board-render-quota'
 import { run_board_render_slot } from './run-board-render-slot'
 import { run_board_render_title } from './run-board-render-title'
@@ -94,6 +94,7 @@ interface BoardHeader {
 	// Claude's and Codex's usage-limit windows, and the usage limit holding the run's launches
 	// (`run-board-render-quota.ts`); `undefined` where none was read or none holds.
 	quotas?: Quotas | undefined
+	scheduler_provider?: QuotaProvider | undefined
 	quota_hold?: QuotaHold | undefined
 	// How long each phase usually takes; a running row's phase time is colored against it.
 	usual?: UsualTimes | undefined

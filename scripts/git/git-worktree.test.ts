@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { git_command } from './git-command'
 import { git_common_directory } from './git-common-directory'
 import { git_worktree } from './git-worktree'
 
@@ -54,6 +55,8 @@ vi.mock('./git-spawn', () => ({
 const ORIGIN_MAIN_REF = 'refs/remotes/origin/main'
 const LANE_DIRECTORY = '/w/.kit-lanes/1490'
 const LANE_BRANCH = '1490-lane'
+const PRIMARY_GIT_DIRECTORY = '/repo/.git'
+const GIT_FAILURE = 'git failed'
 
 // joshuafolkken/kit#1709: what `ls-remote` is asked for is a full ref path, so that a pattern which
 // matches the tail of some *other* ref cannot answer for this branch. Written out rather than
@@ -78,6 +81,23 @@ beforeEach(() => {
 afterAll(() => {
 	vi.restoreAllMocks()
 	rmSync(scratch, { force: true, recursive: true })
+})
+
+describe('git_worktree.is_linked', () => {
+	it.each([
+		[[PRIMARY_GIT_DIRECTORY, PRIMARY_GIT_DIRECTORY], false],
+		[['/repo/.git/worktrees/5432', PRIMARY_GIT_DIRECTORY], true],
+	])('compares git directories %j', async (directories, expected) => {
+		vi.spyOn(git_command, 'git_directories').mockResolvedValue(directories)
+
+		expect(await git_worktree.is_linked()).toBe(expected)
+	})
+
+	it('propagates an unreadable checkout', async () => {
+		vi.spyOn(git_command, 'git_directories').mockRejectedValue(new Error(GIT_FAILURE))
+
+		await expect(git_worktree.is_linked()).rejects.toThrow(GIT_FAILURE)
+	})
 })
 
 describe('git_worktree worktree calls', () => {

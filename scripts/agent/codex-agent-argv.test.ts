@@ -32,9 +32,11 @@ const PINNED_ENTRIES = ['hooks', 'config', 'commondir', WORKTREE_CONFIG]
 const OTHER_WORKTREE = path.join('worktrees', 'other-lane')
 
 const repository_directory = vi.spyOn(git_common_directory, 'repository')
+const own_directory = vi.spyOn(git_common_directory, 'own')
 
 beforeEach(() => {
 	repository_directory.mockReturnValue(undefined)
+	own_directory.mockReturnValue(undefined)
 })
 
 afterEach(() => {
@@ -46,6 +48,16 @@ function link_lane(common_directory: string): string {
 	repository_directory.mockReturnValue(common_directory)
 
 	return realpathSync(common_directory)
+}
+
+function link_own(common: string, linked: string): string {
+	const own = path.join(common, OTHER_WORKTREE)
+
+	mkdirSync(own, { recursive: true })
+	symlinkSync(own, linked)
+	own_directory.mockReturnValue(linked)
+
+	return own
 }
 
 function parse_string(literal: string): string {
@@ -178,6 +190,21 @@ describe('Codex lane common Git directory scope', () => {
 })
 
 describe('Codex lane common Git directory location', () => {
+	it('explicitly grants the own Git directory at its real path with protected entries', () => {
+		const common = link_lane(GIT_COMMON_DIRECTORY)
+		const linked = path.join(FIXTURE, 'own.git')
+		const own = link_own(common, linked)
+		const table = lane_grants(openai_worker())
+
+		expect(table[own]).toBe('write')
+		expect(table).not.toHaveProperty(linked)
+		expect(own_directory).toHaveBeenCalledWith(LANE)
+
+		for (const entry of PINNED_ENTRIES) {
+			expect(table[path.join(own, entry)]).toBe('read')
+		}
+	})
+
 	it('grants a common Git directory reached through a symlink at its real path', () => {
 		const common = link_lane(GIT_COMMON_DIRECTORY)
 		const linked = path.join(FIXTURE, 'linked.git')
@@ -242,6 +269,7 @@ function primary_checkout(): string {
 
 	mkdirSync(git_directory, { recursive: true })
 	repository_directory.mockReturnValue(git_directory)
+	own_directory.mockReturnValue(git_directory)
 
 	return realpathSync(git_directory)
 }

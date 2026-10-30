@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { AgentEnvironment } from '#scripts/agent/agent-provider'
 import type { AgentProvider } from '#scripts/agent/agent-role-profile'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { run_board_cli } from '#scripts/run/board/run-board-cli'
@@ -42,6 +43,11 @@ interface BacklogrunPorts {
 	restart: (git_directory: string) => Promise<number>
 	show_board: () => Promise<number>
 	write: (line: string) => void
+}
+
+interface StartRequest {
+	argv: ReadonlyArray<string>
+	environment: AgentEnvironment
 }
 
 const LIVE_PORTS: BacklogrunPorts = {
@@ -149,16 +155,43 @@ async function start_fresh(
 	return await replace(args, git_directory, ports, 'stopped')
 }
 
+function refusal_message(note: string | undefined): string {
+	return note === undefined ? USAGE : `${USAGE}\n${note}`
+}
+
+// Resolve a new run's provider only after deciding whether this invocation starts one.
+async function launch_configured(
+	request: StartRequest,
+	git_directory: string,
+	ports: BacklogrunPorts,
+	is_replacement = false,
+): Promise<number> {
+	const parsed = backlogrun_args.parse(request.argv, request.environment)
+
+	if (parsed.kind !== 'args') {
+		return refuse(refusal_message(parsed.kind === 'refused' ? parsed.note : undefined), ports)
+	}
+
+	return is_replacement
+		? await replace(parsed.args, git_directory, ports)
+		: await start_fresh(parsed.args, git_directory, ports)
+}
+
 async function begin(
 	args: BacklogrunArguments,
 	git_directory: string,
 	ports: BacklogrunPorts,
+	request: StartRequest,
 ): Promise<number> {
-	if (!ports.is_running(git_directory)) return await start_fresh(args, git_directory, ports)
+	if (!ports.is_running(git_directory)) {
+		return await launch_configured(request, git_directory, ports)
+	}
 
 	const verdict = await ports.replacement(args.invocation, git_directory)
 
-	if (verdict.kind === 'replace') return await replace(args, git_directory, ports)
+	if (verdict.kind === 'replace') {
+		return await launch_configured(request, git_directory, ports, true)
+	}
 
 	for (const note of [...kept_notes(verdict), ...running_notes(args.issues)]) ports.write(note)
 
@@ -179,16 +212,18 @@ async function dispatch(
 	parsed: Exclude<ArgumentsResult, { kind: 'refused' }>,
 	git_directory: string,
 	ports: BacklogrunPorts,
+	request: StartRequest,
 ): Promise<number> {
 	if (parsed.kind === 'stop') return await stop(git_directory, ports)
 	if (parsed.kind === 'restart') return await ports.restart(git_directory)
 
-	return await begin(parsed.args, git_directory, ports)
+	return await begin(parsed.args, git_directory, ports, request)
 }
 
 async function run(
 	argv: ReadonlyArray<string>,
 	ports: BacklogrunPorts = LIVE_PORTS,
+	environment: AgentEnvironment = {},
 ): Promise<number> {
 	const parsed = backlogrun_args.parse(argv)
 
@@ -198,7 +233,7 @@ async function run(
 
 	if (git_directory === undefined) return refuse('backlogrun: not inside a git repository', ports)
 
-	return await dispatch(parsed, git_directory, ports)
+	return await dispatch(parsed, git_directory, ports, { argv, environment })
 }
 
 const backlogrun_cli = { run }
@@ -207,7 +242,7 @@ const backlogrun_cli = { run }
 // `JOSH_SESSION_LANG` while the unit tests see no developer's `.env`.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	josh_environment_file.load_environment_file()
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
+	process.exitCode = await run(process.argv.slice(ARGV_OFFSET), LIVE_PORTS, process.env)
 }
 
 export type { BacklogrunPorts }

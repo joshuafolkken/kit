@@ -146,7 +146,12 @@ function claim_record(target: string, invocation: string): boolean {
 		return false
 	}
 
-	return run_carry.adopt_carry(target, current.carry, run_carry.owner_of(process.pid)) !== undefined
+	const owner = {
+		...run_carry.owner_of(process.pid),
+		provider: current.carry.scheduler_provider,
+	}
+
+	return run_carry.adopt_carry(target, current.carry, owner) !== undefined
 }
 
 // **A verdict with nothing to judge is re-driven here, never handed to a session.** A woken session
