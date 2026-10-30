@@ -22,6 +22,7 @@ const STARTS: ReadonlyArray<[StageState, ReadonlyArray<string>]> = [
 	[run_stage.HALFRUN_STOPPED, [REACHED, REACHED, GATE, GATE]],
 	[run_stage.PRRUN_STOPPED, [REACHED, REACHED, REACHED, 'followup']],
 	[run_stage.MERGED, [REACHED, REACHED, REACHED, REACHED]],
+	[run_stage.PR_OPEN, [REACHED, GATE, GATE, GATE]],
 ]
 
 describe('run_stage.decide — the command sets the end, the issue sets the start', () => {
