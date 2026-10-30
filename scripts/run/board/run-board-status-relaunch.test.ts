@@ -47,6 +47,22 @@ function relaunched_by(kind: string, text: string): ItemStatus | undefined {
 	)
 }
 
+describe('run_board_status.statuses_of retry', () => {
+	it('shows a retried park as waiting, then running after dispatch', () => {
+		const events: ReadonlyArray<[string, string, string]> = [
+			[T0, KIND.CHILD_LAUNCH, `#${String(ISSUE)} dispatched`],
+			[T1, KIND.PARK, `#${String(ISSUE)} parked (run:stalled)`],
+			[T2, KIND.ADD, `retry #${String(ISSUE)}`],
+		]
+
+		expect(status_after(...events)?.state).toBe('waiting')
+		expect(status_after(...events)?.reason).toBeUndefined()
+		expect(
+			status_after(...events, [T3, KIND.CHILD_LAUNCH, `#${String(ISSUE)} dispatched`])?.state,
+		).toBe('running')
+	})
+})
+
 describe('run_board_status.statuses_of relaunch', () => {
 	it.each<[string, string, string]>([
 		['a re-dispatch after an outage', KIND.CHILD_LAUNCH, `#${String(ISSUE)} dispatched`],

@@ -247,8 +247,35 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		git_directories_mock.mockRejectedValue(new Error(GIT_GONE))
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(GIT_GONE)
+	})
+})
+
+describe('required invocation history', () => {
+	it('refuses required history when the stream cannot be read', async () => {
+		const repository = fresh_repository()
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_carry.begin_carry(run_carry.carry_path(repository), 'backlogrun')
+
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(
+			'Could not read the run event stream.',
+		)
 	})
 
+	it('accepts a readable empty stream as required history', async () => {
+		const repository = fresh_repository()
+		const target = run_event_stream.target_of(repository)
+
+		git_directories_mock.mockResolvedValue([WORKTREE, repository])
+		run_carry.begin_carry(run_carry.carry_path(repository), 'backlogrun')
+		run_event_stream.append(target, MERGE, '#6 merged', EARLIER_ISO)
+
+		expect(await run_event_stream_emit.current_events(true)).toStrictEqual([])
+	})
+})
+
+describe('undetermined invocation scope', () => {
 	it('does not adopt old events when the carry scope is missing', async () => {
 		const repository = fresh_repository()
 
@@ -261,6 +288,9 @@ describe('run_event_stream_emit.current_events — the invocation now running', 
 		)
 
 		expect(await run_event_stream_emit.current_events()).toStrictEqual([])
+		await expect(run_event_stream_emit.current_events(true)).rejects.toThrow(
+			'Could not determine the run event scope.',
+		)
 	})
 })
 

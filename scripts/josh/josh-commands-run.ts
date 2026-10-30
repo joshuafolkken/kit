@@ -150,11 +150,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/add/run-add-cli.ts',
 		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
 		category: 'AI tools',
-		reference: ['<issue...> [--no-priority]', 'automation', ['network', 'files']],
+		reference: ['<issue...> [--no-priority] [--retry]', 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{ arguments: '101 102', note: 'ahead of the rest of the queue (`#N` works too)' },
 				{ arguments: '101 --no-priority', note: 'at the end of the queue' },
+				{ arguments: '101 --retry', note: 'retry a mechanically stopped issue in this run' },
 			],
 		},
 	},
