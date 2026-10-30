@@ -160,6 +160,14 @@ describe('core_wait.is_held_in_vain — whether waiting on gains a claim nothing
 })
 
 describe('core_wait.is_held_in_vain — load the reading does not show yet', () => {
+	it('shares measured room in claim order across waiters reading the same snapshot', () => {
+		const keys = ['a', 'b', 'c', 'd']
+		const ledger = [...keys.toReversed().map((key) => entry(key, 1, 0)), entry('first', CORES, 0)]
+		const admitted = keys.map((key) => core_wait.is_held_in_vain(key, ledger, FREE_BUDGET, IDLE))
+
+		expect(admitted).toEqual([true, true, true, false])
+	})
+
 	// A claim released a poll ago runs, but the mean does not show it yet: the next one counts it.
 	it('answers no once a claim admitted within the averaging window takes the room', () => {
 		const fresh: LedgerEntry = {

@@ -127,11 +127,19 @@ interface MachineRoom {
 // A claim no heavier than this counts as small: every static check's weight (`core-weights.ts`).
 const SMALL_CLAIM_CORES = core_weights.CORE_WEIGHTS.lint
 
-// The cores of claims admitted within the reading's averaging window, whose tools the mean does not
-// show yet — so small claims released on the same few polls do not each read the same room.
-function unseen_cores(reservations: ReadonlyArray<LedgerEntry>, now: number): number {
-	const fresh = reservations.filter(({ reservation: { admitted_at } }) => {
-		return admitted_at !== undefined && now - admitted_at < busy_average.AVERAGE_WINDOW_MS
+// Count earlier waiters as well as fresh admissions: concurrent polls can read the same snapshot
+// before any admitted marker is written, so claim order must allocate the measured room too.
+function unseen_cores(
+	own: LedgerEntry,
+	reservations: ReadonlyArray<LedgerEntry>,
+	now: number,
+): number {
+	const fresh = reservations.filter((entry) => {
+		const { admitted_at } = entry.reservation
+
+		if (admitted_at === undefined) return core_admission.compare_claim(entry, own) < 0
+
+		return now - admitted_at < busy_average.AVERAGE_WINDOW_MS
 	})
 
 	return core_admission.sum_load(fresh).cores
@@ -160,13 +168,13 @@ function is_ledger_held_small(
 	budget: MachineBudget,
 	room: MachineRoom,
 ): boolean {
-	const own = reservations.find((entry) => entry.key === key)?.reservation
+	const own = reservations.find((entry) => entry.key === key)
 
 	if (own === undefined) return false
 
-	const unseen = unseen_cores(reservations, room.now)
+	const unseen = unseen_cores(own, reservations, room.now)
 
-	if (!has_room(own.weight, budget, room, unseen)) return false
+	if (!has_room(own.reservation.weight, budget, room, unseen)) return false
 
 	return core_admission.is_admitted(key, reservations, { ...budget, cores: Infinity })
 }

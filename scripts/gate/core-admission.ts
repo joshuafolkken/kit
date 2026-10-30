@@ -356,6 +356,7 @@ const core_admission = {
 	RAMP_UP_MS,
 	admitted_keys,
 	admitted_load,
+	compare_claim,
 	describe_overflow,
 	is_admitted,
 	is_swap_held,
