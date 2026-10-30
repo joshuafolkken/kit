@@ -36,7 +36,7 @@ describe('refactor lint execution', () => {
 		])
 		expect(execute).toHaveBeenCalledWith(
 			expect.any(String),
-			expect.arrayContaining(['--format', 'json', '--no-inline-config', ...FILES]),
+			['exec', 'eslint', '--format', 'json', ...FILES],
 			expect.objectContaining({ cwd: ROOT, timeout: SUITE_TIMEOUT_MS, stderr: 'pipe' }),
 		)
 	})

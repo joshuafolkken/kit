@@ -1,0 +1,8 @@
+{
+	"reason": "有効な外部形式の例外と未抑制の違反を区別する gate 同一性の契約を一行で明示するため。",
+	"date": "2026-10-30",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 197
+	}
+}
