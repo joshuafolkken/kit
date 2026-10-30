@@ -5,6 +5,7 @@ import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { launch_priority } from '#scripts/run/launch-priority'
+import { attached_log } from './attached-log'
 
 // Starting a process that outlives this one, and keeping what it writes.
 //
@@ -225,10 +226,12 @@ function spawn_options(
 	environment: Readonly<Record<string, string | undefined>> = {},
 	is_detached = true,
 ): SpawnOptions {
+	const output = log ?? 'ignore'
+
 	return {
 		cwd,
 		detached: is_detached,
-		stdio: log === undefined ? 'ignore' : ['ignore', log, log],
+		stdio: ['ignore', is_detached ? output : 'pipe', output],
 		env: { ...process.env, ...agent_session_environment.removed_environment(), ...environment },
 	}
 }
@@ -265,7 +268,8 @@ async function attached_spawn(
 			on_error(note_of(error))
 			resolve({ kind: 'failed', note: note_of(error) })
 		})
-		child.once('exit', (exit_code) => {
+		attached_log.record(child, log, on_error)
+		child.once('close', (exit_code) => {
 			resolve({ kind: 'completed', pid: child.pid ?? 0, exit_code })
 		})
 		launch_priority.lower(child.pid)
