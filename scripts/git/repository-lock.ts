@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { linkSync, renameSync, rmSync } from 'node:fs'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { process_identity } from '#scripts/josh/process-identity'
 import { process_owner_schema, type ProcessOwner } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { git_common_directory } from './git-common-directory'
 
 // One holder at a time per repository, for work that every work tree of that repository shares
@@ -111,13 +111,14 @@ function release(target: string): void {
 async function acquire(target: string, max_wait_ms: number): Promise<boolean> {
 	const deadline = Date.now() + max_wait_ms
 
-	while (!claim(target)) {
-		if (Date.now() >= deadline) return false
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_INTERVAL_MS)
-	}
+	return await poll.wait_for(
+		() => {
+			if (claim(target)) return true
 
-	return true
+			return Date.now() >= deadline ? false : undefined
+		},
+		{ interval_ms: POLL_INTERVAL_MS },
+	)
 }
 
 // A blocking wait for a caller that cannot await. `Atomics.wait` parks the thread without spinning, so

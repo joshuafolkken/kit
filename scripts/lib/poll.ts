@@ -7,9 +7,9 @@
 // it, so the definition moved here and those three import it.
 //
 // **The loop is here for the same reason the sleep is.** A caller that only needs "ask again until
-// this is true, then give up" would otherwise write its own `for` with its own off-by-one; the one
-// existing loop that is *not* folded in is `wait_for_pr_success`, whose body carries the merge
-// gate's stable-read counting and failure classification and is therefore not this shape at all.
+// this is true, then give up" would otherwise write its own `for` with its own off-by-one. Callers
+// carry domain state in their read, including the merge gate's stable-read counters and
+// failure classification; the wait itself stays here.
 
 async function sleep(duration_ms: number): Promise<void> {
 	await new Promise<void>((resolve) => {
@@ -20,13 +20,13 @@ async function sleep(duration_ms: number): Promise<void> {
 interface PollOptions {
 	attempts: number
 	interval_ms: number
-	// Injected by the tests so a poll costs no wall clock. Production callers leave it out.
+	// A caller's existing wait, or an injected sleeper so tests cost no wall clock.
 	sleeper?: (duration_ms: number) => Promise<void>
 }
 
 // **The wait goes between attempts, never after the last one**, so the budget a caller computes from
-// `attempts × interval_ms` is the budget it actually spends. The pre-existing merge-gate loop in
-// `git-pr-checks.ts` guards its sleep the same way; extracted here so the loop keeps one branch.
+// `attempts × interval_ms` bounds the wait. The merge gate uses this same loop to keep its
+// stable-read and read-failure counters while sharing the wait between attempts.
 async function wait_between(
 	wait: (duration_ms: number) => Promise<void>,
 	interval_ms: number,

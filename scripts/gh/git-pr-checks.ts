@@ -177,7 +177,6 @@ interface PollAttempt {
 	options: WaitForPrSuccessOptions
 	stable_count: number
 	failure_count: number
-	attempt: number
 }
 
 interface PollAttemptResult {
@@ -211,21 +210,10 @@ async function read_pr_state(
 	}
 }
 
-// The loop sleeps between attempts and not after the last one, so a poll that is about to be the
-// final one returns immediately and lets the caller run out of attempts.
-async function sleep_before_next_attempt(input: PollAttempt): Promise<void> {
-	if (input.attempt < input.options.max_attempts - 1) {
-		await poll.sleep(input.options.interval_ms)
-	}
-}
-
 // The unreadable branch: count it, give up at the cap with the failure that caused it, and otherwise
 // wait out the interval exactly as a pending poll does — without the sleep a broken endpoint would be
 // spun on rather than re-read.
-async function retry_after_unreadable(
-	input: PollAttempt,
-	cause: unknown,
-): Promise<PollAttemptResult> {
+function retry_after_unreadable(input: PollAttempt, cause: unknown): PollAttemptResult {
 	const next_failure_count = input.failure_count + 1
 	if (next_failure_count >= MAX_CONSECUTIVE_READ_FAILURES) throw cause
 
@@ -234,7 +222,6 @@ async function retry_after_unreadable(
 	console.warn(
 		`Could not read the PR state (${String(next_failure_count)}/${String(MAX_CONSECUTIVE_READ_FAILURES)}); asking again on the next poll: ${String(cause)}`,
 	)
-	await sleep_before_next_attempt(input)
 
 	return { next_stable_count: 0, next_failure_count, read_failure: cause }
 }
@@ -250,7 +237,7 @@ function to_exhaustion_error(last_read_failure: unknown): unknown {
 async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptResult> {
 	const evaluator = input.options.evaluator ?? MERGE_GATE_EVALUATOR
 	const read = await read_pr_state(input, evaluator)
-	if (read.kind === 'unreadable') return await retry_after_unreadable(input, read.cause)
+	if (read.kind === 'unreadable') return retry_after_unreadable(input, read.cause)
 
 	const classification = classify_poll_result({
 		snapshot: read.snapshot,
@@ -263,32 +250,36 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 		return { snapshot: read.snapshot, next_stable_count: 0, next_failure_count: 0 }
 	}
 
-	await sleep_before_next_attempt(input)
-
 	return { next_stable_count: classification.next_stable_count, next_failure_count: 0 }
 }
 
 async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<PrStateSnapshot> {
 	// The whole carry-over of one poll into the next, in one value: the stable-read window, the
 	// consecutive-failure count, and what the last poll could not be read with.
-	let carried: PollAttemptResult = { next_stable_count: 0, next_failure_count: 0 }
-
-	for (let attempt = 0; attempt < options.max_attempts; attempt += 1) {
-		console.info(`Checking PR status… (${String(attempt + 1)}/${String(options.max_attempts)})`)
-		// eslint-disable-next-line no-await-in-loop -- polling: the check belongs to this poll, not to all of them at once
-		await options.before_poll?.()
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		carried = await attempt_pr_success_poll({
-			options,
-			stable_count: carried.next_stable_count,
-			failure_count: carried.next_failure_count,
-			attempt,
-		})
-
-		if (carried.snapshot !== undefined) return carried.snapshot
+	const progress: { carried: PollAttemptResult } = {
+		carried: { next_stable_count: 0, next_failure_count: 0 },
 	}
+	let attempt = 0
+	const snapshot = await poll.poll_for(
+		async () => {
+			attempt += 1
+			console.info(`Checking PR status… (${String(attempt)}/${String(options.max_attempts)})`)
+			await options.before_poll?.()
+			const carried = await attempt_pr_success_poll({
+				options,
+				stable_count: progress.carried.next_stable_count,
+				failure_count: progress.carried.next_failure_count,
+			})
 
-	throw to_exhaustion_error(carried.read_failure)
+			Object.assign(progress, { carried })
+
+			return carried.snapshot
+		},
+		{ attempts: options.max_attempts, interval_ms: options.interval_ms },
+	)
+	if (snapshot !== undefined) return snapshot
+
+	throw to_exhaustion_error(progress.carried.read_failure)
 }
 
 // The snapshot module rather than `git-gh-command`, which is deliberate: `git-gh-command` also
