@@ -13,6 +13,10 @@ Its single source is `CLAUDE.md` → "Explicit invocation required (MANDATORY)",
 holds when this skill is not loaded. **A session cut inside a declared budget is not a new invocation — for `backlogrun`
 alone**: `backlogrun-steps.md` → "The session cut is inside the invocation".
 
+**Consultation main-session scope and implementation handoff follow
+`prompts/collaboration-workflow/principles.md` → "consult-vs-execute".** A keyword selects the
+existing procedure below; it does not turn the consultation main session into an implementation lane.
+
 ## 1. Which file to read
 
 Read this file, then the files the typed command's row names. A command file is a **manifest** of

@@ -154,7 +154,7 @@ function has_live_identity(pid: number, record: ShipRecord, read: StartRead): bo
 		return is_within_claim_window(record) && process_identity.is_live_pid(pid)
 	}
 
-	return process_identity.is_same_process(pid, record.process_start, read) !== false
+	return process_identity.is_present_process(pid, record.process_start, read) !== false
 }
 
 function result_of(record: ShipRecord, read: StartRead): ShipResult {

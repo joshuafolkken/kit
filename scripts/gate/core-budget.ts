@@ -4,14 +4,12 @@ import { availableParallelism } from 'node:os'
 import path from 'node:path'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { process_identity } from '#scripts/josh/process-identity'
-import { process_owner_schema } from '#scripts/josh/process-owner'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { json_value } from '#scripts/lib/json-value'
 import { unit_worker_share } from '#scripts/test/unit-worker-share'
-import { z } from 'zod'
 import { busy_average, type BusySample, type LoadEase } from './busy-average'
 import { core_admission, type Admission, type LedgerEntry, type Overflow } from './core-admission'
 import { core_budget_timing, type TimingConfig } from './core-budget-timing'
+import { core_reservation, type Reservation, type ReservationFields } from './core-reservation'
 import { core_wait, type BudgetWait, type WaitReason } from './core-wait'
 import { core_wait_record, type WaitSink } from './core-wait-record'
 import { core_weights } from './core-weights'
@@ -54,29 +52,17 @@ const MIN_BUDGET = 1
 // `command`, `checkout`, `lane`, `lanes_root` and `wait_reason` name a waiting claim on `run:board`
 // (`core-wait.ts`). `is_unit` marks a unit suite's claim, which may be admitted narrowed to `granted`
 // past the wait cap, or once outside load holding it does not ease (`core_admission.narrowed_weight`).
-const reservation_schema = process_owner_schema.extend({
-	weight: z.number(),
-	claimed_at: z.number(),
-	memory_mb: z.number().optional(),
-	admitted_at: z.number().optional(),
-	is_unit: z.boolean().optional(),
-	granted: z.number().optional(),
-	command: z.string().optional(),
-	checkout: z.string().optional(),
-	lane: z.string().optional(),
-	lanes_root: z.string().optional(),
-	wait_reason: z.enum(core_wait.WAIT_REASONS).optional(),
-})
-
-type Reservation = z.infer<typeof reservation_schema>
-
-type ReservationFields = Omit<Reservation, 'pid' | 'process_start'>
+const { claim_fields, read_reservation, write_reservation } = core_reservation
 
 interface LiveReservation extends LedgerEntry {
 	reservation: Reservation
 }
 
 interface ReserveOptions {
+	// Lane launches must wait for room even alone or beyond the gate's wait cap.
+	is_strict_admission?: boolean | undefined
+	is_memory_pending?: boolean | undefined
+	checkout?: string | undefined
 	budget?: number
 	memory_mb?: number | undefined
 	// What the claim is for, named on the waiting line and on `run:board`.
@@ -108,14 +94,6 @@ function marker_name(key: string): string {
 // way costs a reservation a slower admission, while the other way admits past a run that is still there.
 function is_running(reservation: Reservation): boolean {
 	return process_identity.is_same_process(reservation.pid, reservation.process_start) !== false
-}
-
-function read_reservation(source: string): Reservation | undefined {
-	const raw = stamp_file.read_stamp_text(source)
-
-	if (raw === undefined) return undefined
-
-	return json_value.parse_with(raw, reservation_schema)
 }
 
 // **A dead marker is removed, not merely skipped** — otherwise a reissued pid turns a leaked place into
@@ -170,10 +148,6 @@ function normalize_budget(budget: number): number {
 // **Replaced atomically, never unlinked and recreated**: the admitted rewrite lands on a marker other
 // lanes are polling, and a reader that hit the gap between an unlink and its create would see the ledger
 // without this place and admit past it.
-function write_reservation(target: string, fields: ReservationFields): void {
-	stamp_file.replace_stamp(target, { ...process_identity.own_fields(), ...fields })
-}
-
 function report_wait(line: string): void {
 	process.stderr.write(`${line}\n`)
 }
@@ -255,23 +229,30 @@ function mark_waiting(context: WaitContext, reason: WaitReason): void {
 	if (previous === undefined) context.report(core_wait.wait_line(context.fields.command, reason))
 }
 
-// Past the cap a held claim runs regardless, and so does one only load outside the ledger holds once
-// that load has not eased for a window of the wait — waiting on gains it nothing. A claim a swap stall
-// holds is the exception to both.
+// Past the cap a held claim runs regardless, and so does one held in vain (`core_wait.is_held_in_vain`)
+// once the load has not eased for a window of the wait. A claim a swap stall holds is the exception to both.
 function is_wait_spent(
 	context: WaitContext,
 	reservations: ReadonlyArray<LiveReservation>,
 	budget: MachineBudget,
 ): boolean {
-	if (core_admission.is_swap_held(context.key, reservations, budget)) return false
+	if (
+		context.fields.is_strict_admission === true ||
+		core_admission.is_swap_held(context.key, reservations, budget)
+	) {
+		return false
+	}
 
 	const now = context.now()
 
 	if (now >= context.deadline) return true
 
+	const busy_cores = busy_average.mean_busy(context.busy_samples)
+	const room = { busy_cores, cores: context.budget, now }
+
 	return (
 		busy_average.is_unrelieved(context.ease, now, context.ease_window_ms) &&
-		core_wait.is_outside_held(context.key, reservations, budget)
+		core_wait.is_held_in_vain(context.key, reservations, budget, room)
 	)
 }
 
@@ -296,8 +277,8 @@ async function poll_admission(context: WaitContext): Promise<Admission | undefin
 	return undefined
 }
 
-// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim only load
-// outside the ledger holds, that load not easing — admits it at minimum width.
+// Poll the ledger until this reservation is admitted, or until the wait cap — or, for a claim held in
+// vain (`core_wait.is_held_in_vain`), the load not easing — admits it at minimum width.
 // A solo run is admitted on the first read — its own claim is the ledger's head — so the loop body never
 // runs and the wait costs nothing.
 async function await_admission(context: WaitContext): Promise<Admission> {
@@ -326,19 +307,7 @@ function resolve_ports(
 	}
 }
 
-// The checkout the claim runs in, so `run:board` can say whose claim waits. The ledger is the
-// machine's, so the checkout may be another repository's (`core-wait.ts` → `where_of`).
-function claim_fields(
-	weight: number,
-	claimed_at: number,
-	options: ReserveOptions,
-): ReservationFields {
-	const { memory_mb, command, is_unit } = options
-
-	return { weight, claimed_at, memory_mb, command, is_unit, ...core_wait.where_of(process.cwd()) }
-}
-
-async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
+function claim(weight: number, options: ReserveOptions = {}): WaitContext {
 	const timing = core_budget_timing.resolve_timing(options)
 	const directory = options.directory ?? PLATFORM_TEMP_ROOT
 	const claimed_at = timing.now()
@@ -347,7 +316,8 @@ async function reserve(weight: number, options: ReserveOptions = {}): Promise<Ha
 	const fields = claim_fields(weight, claimed_at, options)
 
 	write_reservation(target, fields)
-	const admission = await await_admission({
+
+	return {
 		...timing,
 		key: name,
 		target,
@@ -357,9 +327,26 @@ async function reserve(weight: number, options: ReserveOptions = {}): Promise<Ha
 		fields,
 		busy_samples: [],
 		...resolve_ports(options),
-	})
+	}
+}
 
-	return { target, admission }
+async function reserve(weight: number, options: ReserveOptions = {}): Promise<Handle> {
+	const context = claim(weight, options)
+	const admission = await await_admission(context)
+
+	return { target: context.target, admission }
+}
+
+// A resident scheduler polls the same claim between child-collection passes instead of blocking
+// its monitoring loop. The waiting marker remains visible until admission or explicit release.
+async function poll_claim(context: WaitContext): Promise<Handle | undefined> {
+	const admission = await poll_admission(context)
+
+	if (admission === undefined) return undefined
+
+	await core_wait_record.record_admitted(context.fields, context.now(), context.record_wait)
+
+	return { target: context.target, admission }
 }
 
 // The claims waiting in the ledger now, for a `run:board` running in `home`.
@@ -371,7 +358,7 @@ function budget_waits(
 	return core_wait.waits_of(live_reservations(directory), now, home)
 }
 
-function release(handle: Handle): void {
+function release(handle: { target: string }): void {
 	sweep_marker(handle.target)
 }
 
@@ -439,19 +426,23 @@ const core_budget = {
 	admitted_keys: core_admission.admitted_keys,
 	admitted_load: core_admission.admitted_load,
 	budget_waits,
+	claim,
 	describe_overflow: core_admission.describe_overflow,
 	held_unit_claim,
 	is_covered,
 	is_held: held_mark.is_held,
 	live_reservations,
+	poll_claim,
 	release,
 	reserve,
+	transfer: core_reservation.transfer,
 	with_command_reservation,
 	with_core_reservation,
 	with_held_mark: held_mark.with_held_mark,
 }
 
-export type { LiveReservation, Reservation, ReserveOptions }
+export type { Handle, LiveReservation, ReserveOptions }
+export type { Reservation } from './core-reservation'
 export { core_budget }
 
 export { type Admission } from './core-admission'

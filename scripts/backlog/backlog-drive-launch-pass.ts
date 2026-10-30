@@ -30,6 +30,7 @@ async function refused(
 	state: DriveState,
 	ports: DrivePorts,
 ): Promise<PassResult> {
+	if (outcome === 'waiting') return { kind: 'continue', state }
 	if (outcome !== UNOPENED) return handed_back(issue, state)
 	if ((await ports.free_lanes()) <= NO_FREE_LANES) return { kind: 'continue', state }
 

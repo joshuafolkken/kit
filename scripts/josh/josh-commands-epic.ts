@@ -96,7 +96,7 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--lanes'],
 					description:
-						'print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 4. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).',
+						'print one issue number per free lane (requires `--repo`); `JOSH_LANE_LIMIT` sets the ceiling, default 8. Prints `triage` instead while any candidate carries neither `run:solo` nor `run:lane` (the triage gate in `josh backlog:next`).',
 				},
 			],
 		},

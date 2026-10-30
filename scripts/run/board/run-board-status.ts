@@ -6,6 +6,7 @@ import {
 } from '#scripts/issue/issue-labels'
 import type { Span } from '#scripts/lane/lane-spans'
 import type { PrChecks } from '#scripts/run/event/run-event-checks'
+import { run_event_retry } from '#scripts/run/event/run-event-retry'
 import { run_event_scope } from '#scripts/run/event/run-event-scope'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_board_checks } from './run-board-checks'
@@ -91,6 +92,7 @@ const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
 	// A drive-closed measurement completes its issue as a merge does (`issue-merged.ts` → `is_measured`).
 	[KIND.MEASURED]: 'merged',
 	[KIND.PARK]: 'parked',
+	[KIND.HUMAN_REVIEW]: 'human',
 	[KIND.SPLIT]: 'done',
 	[KIND.STOP]: 'done',
 	[KIND.WITHDRAW]: 'withdrawn',
@@ -210,6 +212,7 @@ function advanced(previous: ItemStatus | undefined, event: RunEvent): ItemStatus
 
 // One event folded into the status of the child it names; an event the board does not track keeps it.
 function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemStatus | undefined {
+	if (run_event_retry.is_retry(event)) return settled_as(previous, 'waiting')
 	if (LAUNCH_KINDS.has(event.kind)) return launched(previous, event)
 
 	const ending = ENDING_STATES[event.kind]

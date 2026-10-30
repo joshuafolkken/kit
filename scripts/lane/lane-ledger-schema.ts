@@ -190,12 +190,14 @@ const test_related_schema = z.object({
 // hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
-// older rows.
+// older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
+// (joshuafolkken/kit#5385), absent on a test's verdict.
 const pinned_origin_schema = z.enum(['run-review', 'pre-detach', 'manual'])
 const test_pinned_probe_schema = z.object({
 	file: z.string(),
 	tests: z.number().optional(),
 	elapsed_ms: z.number(),
+	pinned_by: z.literal('type-check').optional(),
 })
 const test_pinned_schema = z.object({
 	kind: z.literal(KIND.TEST_PINNED),

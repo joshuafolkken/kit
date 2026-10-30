@@ -9,6 +9,16 @@ import { run_step } from './run-step'
 
 const ISSUE = '4910'
 const RUN_START = '2026-10-25T14:42:26.000Z'
+const FOREIGN_PID = 5151
+const FOREIGN_CARRY = {
+	kind: 'carried',
+	carry: {
+		started_at: RUN_START,
+		owner_pid: FOREIGN_PID,
+		invocation: 'backlogrun #5381',
+		is_handed_off: false,
+	},
+}
 const lane_child_mock = vi.hoisted(() => vi.fn(() => true))
 const lane_plan_line_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
@@ -118,5 +128,41 @@ describe('run_step_cli.run — a lane child', () => {
 		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 		expect(printed_lines()).not.toContain(LANE_PLAN_LINE)
 		expect(lane_plan_line_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5430: a person running fullrun in a lane is not the batch's dispatched child.
+describe('run_step_cli.run — an interactive fullrun beside a backlog parent', () => {
+	beforeEach(() => {
+		lane_child_mock.mockReturnValue(false)
+		read_carry_mock.mockReturnValue(structuredClone(FOREIGN_CARRY))
+	})
+
+	it.each([run_event_stream.EVENT_KIND.CHILD_LAUNCH, 'merge', 'stop', 'drain'])(
+		'ignores another owner’s %s without changing its carry',
+		async (kind) => {
+			stream([{ pos: 1, at: RUN_START, kind, text: `#${ISSUE} dispatched` }])
+
+			await run_step_cli.run([ISSUE])
+
+			expect(printed_lines()[0]).toBe(run_step.IMPLEMENT)
+			expect(read_carry_mock.mock.results[0]?.value).toStrictEqual(FOREIGN_CARRY)
+		},
+	)
+
+	it('still reads its own ship position beside another owner’s backlog carry', async () => {
+		stream([
+			{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` },
+			{
+				pos: 2,
+				at: RUN_START,
+				kind: run_event_stream.EVENT_KIND.CHILD_LAUNCH,
+				text: '#99 dispatched',
+			},
+		])
+
+		await run_step_cli.run([ISSUE])
+
+		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 	})
 })

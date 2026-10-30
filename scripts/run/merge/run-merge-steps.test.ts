@@ -8,6 +8,7 @@ import { josh_command } from '#scripts/josh/josh-run'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { poll } from '#scripts/lib/poll'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_cut } from '#scripts/run/cut/run-cut'
@@ -33,6 +34,8 @@ vi.mock('#scripts/lane/lane-reap', () => ({
 vi.mock('#scripts/epic/epic-close', () => ({ epic_close: { close_completed_epics: vi.fn() } }))
 
 const { run_merge_steps } = await import('./run-merge-steps')
+
+beforeEach(lane_seat_fixture.mock_stop)
 
 const CONTEXT = {
 	child: '2070',
@@ -345,7 +348,7 @@ describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
 		vi.spyOn(lane_registry, 'find_open_lane').mockResolvedValue(CUT_LANE)
 		vi.spyOn(run_cut, 'lane_cut_sync').mockReturnValue({ target: CUT_TARGET, cut: LANE_CUT })
 		mark = vi.spyOn(run_cut, 'mark_merge_relaunched').mockReturnValue(true)
-		relaunch = vi.spyOn(lane_relaunch, 'resume').mockReturnValue({ kind: 'launched', pid: 1 })
+		relaunch = vi.spyOn(lane_relaunch, 'resume').mockResolvedValue({ kind: 'launched', pid: 1 })
 	})
 
 	it('reads an unadopted cut as resumable and relaunches it at its phase', async () => {
@@ -373,7 +376,7 @@ describe('run_merge_steps.resume_cut — the fallback relaunch', () => {
 	})
 
 	it('reports a relaunch that could not start', async () => {
-		relaunch.mockReturnValue({ kind: 'failed', note: 'no binary' })
+		relaunch.mockResolvedValue({ kind: 'failed', note: 'no binary' })
 
 		expect(await run_merge_steps.resume_cut(CONTEXT.child)).toBe(false)
 	})

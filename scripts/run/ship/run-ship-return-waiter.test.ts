@@ -51,7 +51,7 @@ const STAGE = 'review'
 
 beforeEach(() => {
 	offer_mock.mockReset().mockResolvedValue(false)
-	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+	relaunch_mock.mockReset().mockResolvedValue({ kind: 'launched', pid: 1 })
 	request_mock.mockReset()
 	place_mock.mockReset().mockResolvedValue(undefined)
 	is_over_mock.mockReset().mockResolvedValue(false)

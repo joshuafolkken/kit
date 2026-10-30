@@ -1,6 +1,7 @@
 import { closeSync, mkdtempSync, openSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { agent_session_role } from '#scripts/agent/agent-session-role'
 import type { GuardOutcome } from '#scripts/josh/hook-decision'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { piped_verification } from '#scripts/rules/piped-verification'
@@ -43,6 +44,7 @@ const REFUSED: GuardOutcome = {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 function in_lane(): boolean {
@@ -113,6 +115,7 @@ describe('pretool_guard.foreground_rewrite', () => {
 // a piped check ran at the two-minute default and was moved aside.
 describe('pretool_guard.respond — the foreground cap on top of a row rewrite', () => {
 	it("caps a lane child's ship on top of the pipefail rewrite, deciding nothing", async () => {
+		vi.stubEnv(agent_session_role.KEY, 'worker')
 		vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
 		const envelope = await written(ship_input(false, `${PIPED_LINT} && ${LANE_SHIP}`))
 

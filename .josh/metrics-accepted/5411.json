@@ -1,0 +1,8 @@
+{
+	"reason": "#5411 adds recommendation rejection before park writes and documents the decision recording path",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 8,
+		"ai_cost.on_demand_bytes": 114
+	}
+}

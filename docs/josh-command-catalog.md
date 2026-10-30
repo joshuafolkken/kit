@@ -10,7 +10,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh behavior` · `josh bh` | — | developer | files | Check the current run's recorded transcript against the behavior assertions (no model call) |
 | `josh bytes` · `josh by` | `<files...>` | developer | none | Print an agent-read document's byte size against its ceiling and the headroom left |
 | `josh check` · `josh c` | `[arguments...]` | developer | processes | Type-check with tsc (skips a basic project with no TypeScript to check) |
-| `josh check:related` · `josh cr` | — | developer | processes | Run related lint, unit, type and dotfile spelling checks in parallel |
+| `josh check:related` · `josh cr` | — | developer | processes | Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes |
 | `josh codex:hook-adapter` | `<pretool\|posttool>` | automation | none | Codex hook: run the pretool or posttool guard on a Codex payload (reads the tool call on stdin) |
 | `josh cspell:dot` · `josh sd` | — | developer | processes | Run spell check including dotfiles |
 | `josh e2e:retry-check` | — | automation | none | Report whether the preview server crashed during a failed E2E attempt (CI) |
@@ -199,7 +199,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a ship reviewer's findings, read from stdin, where the ship reads them |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
-| `josh run:add` | `<issue...> [--no-priority]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
+| `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
 | `josh run:board` | `[--once \| --chat \| --every <minutes>]` | automation | files, network | Draw a live board of the running backlogrun, redrawn every second |
 | `josh run:carry` | `<operation> [arguments...]` | automation | files | Carry one invocation’s budget across its own session cuts |
 | `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |

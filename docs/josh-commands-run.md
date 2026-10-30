@@ -23,7 +23,7 @@ pnpm josh run:hold --adopt 1091     # hand a `new` run's hold to the issue it fi
 - `--fullrun` — marks the record as `fullrun #N`'s.
 - `--adopt <issue>` — re-keys the unnumbered `new` run's record to the filed issue and applies `in-progress`; answers `none` (exit 1) when the tree holds no record.
 - `--halfrun-stop` — marks a `halfrun` stop for `run:entry` to adopt, and sends its `confirmation` Telegram; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
-- `--human-review-stop` — marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.
+- `--human-review-stop` — marks a `halfrun` stop and a `human-review` lane (still in use), sends the `confirmation` naming it; the parent continues in free lanes. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.
 - `--prrun-stop` — marks a `prrun` stop with the commit its pull request is on, and sends its `confirmation` Telegram.
 
 <!-- /usage -->
@@ -129,16 +129,18 @@ Add issues to a live backlogrun, ahead of the queue unless --no-priority.
 ```bash
 pnpm josh run:add 101 102             # ahead of the rest of the queue (`#N` works too)
 pnpm josh run:add 101 --no-priority   # at the end of the queue
+pnpm josh run:add 101 --retry         # retry a mechanically stopped issue in this run
 ```
 
 <!-- /usage -->
 
-Targets the `backlogrun` running in this repository without stopping it or any running child: an added issue takes the next lane that frees.
+Adds to this repository's live `backlogrun` at the next free lane, without interrupting running children.
 
-- A child filed into an epic the run names needs no `run:add`: `backlog:drive` reads that epic's current children on every pass.
-- Each issue gets `auto-ok` and `run:lane`, plus `priority:high` unless `--no-priority`. A `backlogrun #N --only` run also gets the issue written to its carry record, so its named list includes it; the recorded invocation is never rewritten.
-- A closed issue, one that could not be read, or one a label would not apply to is refused; the others are still added. An issue with open blockers is added and reported as waiting on them.
-- Each added issue is written to the run's event stream as an `add` event, which wakes a `run:progress --wait` so the run offers the issue the next free lane.
+- Epic children are read on every driver pass and need no `run:add`.
+- Adds `auto-ok`, `run:lane`, and `priority:high` unless `--no-priority`. Named runs also record additions beside their unchanged invocation.
+- Refuses closed/unreadable issues, failed writes, `needs-decision`, `needs-human-review`, `already-done`, active/unreadable lanes, and prior withdrawals, merges, reviews or splits. Open blockers wait.
+- Each `add` event wakes `run:progress --wait`.
+- `--retry` records a fresh attempt and clears this issue's `run:stalled` and `done`. A restarted driver ignores earlier parks. Without it, completed or stalled issues are refused.
 
 **Output / exit codes:** one line per issue — `queued #N · next free lane`, `queued #N · end of the queue`, `queued #N · waiting: blocked by #M`, or `refused #N · <reason>`. Exits 0 when every issue was added, 1 when any was refused or no `backlogrun` is running here (nothing is added then), 2 on a malformed argument.
 
@@ -192,15 +194,16 @@ are active.
 The lanes and the carry record stay, as `backlogrun --restart` leaves them. A successor that does not
 start, or does not claim the run within two minutes, is a `failed` stop; an unclaimed one is stopped.
 
-**Every unattended role runs with the provider selected from the invoking CLI (Codex: OpenAI; Claude Code: Anthropic) and its own profile.**
+Unattended profiles: Codex → OpenAI; Claude Code → Anthropic.
+[Codex permissions](./maintainers/josh-commands-run-rationale.md#codex-batch-permissions).
 
 | Provider  | scheduler                    | worker                       | reviewer                     |
 | --------- | ---------------------------- | ---------------------------- | ---------------------------- |
 | Anthropic | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` | `claude-opus-5-5` / `medium` |
 | OpenAI    | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     | `gpt-6.1-sol` / `medium`     |
 
-Role overrides resolve before launch; model overrides apply only to Claude Code, effort overrides to
-either provider, and legacy `JOSH_LANE_*` values to the worker only. Review round 2 and later (the
+Overrides resolve before launch: model for Claude Code, effort for either provider, `JOSH_LANE_*`
+for workers. Review round 2 and later (the
 verification pass) runs Anthropic on `claude-sonnet-5-5` / `high` and OpenAI on `gpt-6.1-sol` / `high`, overridable by
 `JOSH_REVIEWER_VERIFICATION_{MODEL,EFFORT}`, then `JOSH_REVIEWER_*`. With no session marker and no
 `JOSH_AGENT_PROVIDER` the provider defaults to Anthropic (Claude Code), which is what lets a person
@@ -486,10 +489,12 @@ branch, clean tree, no live process — `lane-vacant.ts`), else kept.
 
 **Output:** one child number (or several, one per free lane), or a verdict token. Beyond the offer
 `epic:next` prints (`run` becomes numbers; `wait` / `stop` / `complete` / `error` pass through), it adds
-`over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut), `human-review` (the child stopped
-before its commit — stop), `stop` (failure guard), `environment` (the consecutive-outage guard tripped,
+`over` (the merge crossed the `pnpm josh cost --cut` context threshold: hand the lanes over and cut),
+`stop` (failure guard), `environment` (the consecutive-outage guard tripped,
 or a child could not authenticate; it keeps `in-progress`, uncounted, for `/login`), `resumed` (a cut child's successor was relaunched — await that lane again), `retry`
 (unreadable), `busy` (refused count; exit 1).
+
+A human-review child keeps its lane and hold, counts nothing, and offers more children.
 
 ### `josh run:review`
 
@@ -548,7 +553,7 @@ It folds `main:sync`, `observations:flush`, `issue:cite` (the closed issue and a
 
 The flush is residual: a run's lines ride its own commit, so it commits only a line appended after that and otherwise prints `clean`. The checkout returns to the default branch first because the flush refuses anywhere else.
 
-**A lane child skips `main:sync` and `observations:flush`**; `main:sync` refuses inside a lane, and its lines merged with its own pull request.
+**Every linked checkout and lane child skips `main:sync` and `observations:flush`**; the checkout keeps its branch, and its ledger lines merged with its own pull request.
 
 ### `josh ship`
 
@@ -581,7 +586,9 @@ A `preflight` stage first asks every pull-request precondition together, so a st
 
 One precondition is `unplanned`: a code file in the branch diff that the lane's `lane:plan` record does not list stops the ship with `unplanned: <files>`. Only script sources (`.ts`, `.js`, `.svelte`, `.sh`, …) count — never tests, Markdown, data files, `docs/**`, `prompts/**` or `.josh/**` — and a branch with no plan record, or a yielded one, passes.
 
-In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once `check:related` printed it.
+In scope, run the `lane:plan` command the stop prints (every path, as a re-run replaces the record) and comment the reason on the Issue — a `yield` answer means another lane holds the file, and its printed instruction wins; out of scope, revert the file and file it with `issue:file`. The stop row and `lane:stats` count it as `unplanned`, `(noticed)` once an earlier notice printed it.
+
+The notice is the same answer, printed ahead of the ship by `check:related`, `run:review --join` and a lane child's `review:record` after round 1's fixes — a file a fix added is planned before the ship.
 
 A re-run resumes: a per-issue stage record, honored only where the actual state (committed, pushed, merged) corroborates it, passes over finished stages; each stage is logged as a `ship-stage` trace event.
 
@@ -857,7 +864,7 @@ pnpm josh lane:prune
 **Settings:**
 
 - `JOSH_LANE_ROOT` — where lanes go; unset means `.<repository-name>-lanes`, a hidden sibling of the repository root.
-- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 4); applied by `josh epic:next`.
+- `JOSH_LANE_LIMIT` — how many lanes one repository may run at once (default 8); applied by `josh epic:next`. A live `lane:limit` override takes precedence; memory admission may hold starts below the limit.
 
 **Output / exit codes:** `lane:open` prints the directory on stdout (an empty capture plus non-zero exit is a refusal); explanations go to stderr. Seats are `1..9` (main work tree is seat 0), claimed atomically. A failed install fails the command; warming is best-effort. `lane:list` prints one line per lane — issue, seat, ports, branch, state, directory, output path, and profile.
 
@@ -959,6 +966,8 @@ pnpm josh lane:launch 1749 --stash "backlogrun: josh latest before lanes"   # th
 <!-- /usage -->
 
 Dependencies are re-installed against the lock the popped stash brought in. A thin layer over `lane:open`, `stash:pop` and `lane:dispatch`, reusing their guards and messages.
+
+Launches reserve 270 MB in the shared core budget and wait for free memory without a timeout bypass. The child retains the claim. `run:board` shows its lane and wait reason; `lane:stats` lists completed waits as `lane:launch` under held-by.
 
 The child's pid is the one thing on stdout; a refusal is an empty capture beside a non-zero exit, as `lane:dispatch`'s is. A lane a park kept (dispatched before) is dispatched into, not reopened; a refused `lane:open`, pop or re-install stops it before dispatch.
 

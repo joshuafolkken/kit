@@ -25,7 +25,8 @@ const NO_LANES: BoardLanes = { own: new Map(), earlier: new Map(), unknown: [] }
 
 // The record states a lane holds a child in; an `open` lane has launched none yet, an `ended` one is
 // done with its child, and neither draws a row of its own.
-const HELD_STATES: ReadonlySet<string> = new Set(['running', 'paused'])
+const HUMAN_REVIEW = 'human-review'
+const HELD_STATES: ReadonlySet<string> = new Set(['running', 'paused', HUMAN_REVIEW])
 
 function time_of(at: string | undefined): number | undefined {
 	return at === undefined ? undefined : Date.parse(at)
@@ -43,6 +44,10 @@ function is_own(record: LaneStateRecord, started_ms: number): boolean {
 function recorded(record: LaneStateRecord, folded: ItemStatus | undefined): ItemStatus {
 	const started_ms = time_of(record.launched_at) ?? folded?.started_ms
 	const lane = `lane ${record.issue}`
+
+	if (record.state === HUMAN_REVIEW) {
+		return { ...folded, state: 'human', started_ms, ended_ms: time_of(record.changed_at), lane }
+	}
 
 	if (record.state === 'paused') {
 		const ended_ms = time_of(record.changed_at)

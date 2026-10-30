@@ -1,0 +1,8 @@
+{
+	"reason": "既存の役割判定を再利用し、Codex の core 環境にも launcher が割り当てた役割を届けるため。独立した権限判定は追加しない。",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 34,
+		"ai_cost.on_demand_bytes": 36
+	}
+}

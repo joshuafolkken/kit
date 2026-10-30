@@ -1,0 +1,7 @@
+{
+	"reason": "Issue #5444 separates retained worktrees from live port ownership, shares atomic seat allocation across start and resume, and confirms owned process shutdown before reuse. The added process probing and lifecycle code is required to prevent collisions while preserving stopped work.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 401
+	}
+}

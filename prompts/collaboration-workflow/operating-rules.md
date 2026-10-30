@@ -48,7 +48,7 @@
 
   1〜3 は直後に `pnpm josh stash:pop "<メッセージ>"` で復元する（位置指定の pop は `worktree-mutation` 行が拒否する）。4 は復元しない — 代わりに stash を子の Issue にコメントで記録する（`prerequisite.md` の stash と同じく、記録だけが後で pop させる手がかり）
 
-- **会話で作った実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**
+- **既存の実装をランへ渡す「引き渡し用の stash」も `pnpm josh stash:pop "<メッセージ>"` で復元する。当てたあと stash は消える**。担当範囲は `principles.md` → "consult-vs-execute" に従う
   - 計画には復元手順としてこの 1 行だけを書く。`git stash apply` / `git stash pop` も「drop しない」という条件も書かない
   - 計画がガードの拒否する復元形を指していたら、実行側は `stash:pop` に読み替えて続行し、Issue コメントに残す（Tier A）。`needs-decision` では止まらない
   - stash を残すのは持ち主の判断だけ。持ち主が計画に理由を書き、ランはそこで止まって確認する

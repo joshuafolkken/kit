@@ -115,7 +115,7 @@ describe('lane_session_action.answer', () => {
 	})
 
 	it('names the note of a rejected relaunch', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockReturnValue({ kind: 'rejected', note: 'no profile' })
+		vi.spyOn(lane_relaunch, 'relaunch').mockResolvedValue({ kind: 'rejected', note: 'no profile' })
 
 		const answer = await lane_session_action.answer(LANE, RELAUNCH)
 
@@ -123,7 +123,7 @@ describe('lane_session_action.answer', () => {
 	})
 
 	it('answers a thrown action as a failure naming its error', async () => {
-		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(() => {
+		vi.spyOn(lane_relaunch, 'relaunch').mockImplementation(async () => {
 			throw new Error('spawn EACCES')
 		})
 

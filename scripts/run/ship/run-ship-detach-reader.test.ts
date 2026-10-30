@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { durable_state } from '#scripts/josh/durable-state'
 import { stamp_file } from '#scripts/josh/stamp-file'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_detach } from './run-ship-detach'
 
 // joshuafolkken/kit#4245: a reader holding a process snapshot answers the recorded start times itself,
@@ -9,6 +9,7 @@ import { run_ship_detach } from './run-ship-detach'
 
 const NUMBER = '4245'
 const RECORDED_START = 'Tue Oct 20 08:39:04 2026'
+const REUSED_START = 'Tue Oct 20 09:00:00 2026'
 
 function record_live_ship(): string {
 	const repository = `/tmp/josh-ship-detach-reader-test-${randomUUID()}`
@@ -25,9 +26,11 @@ function record_live_ship(): string {
 }
 
 describe('run_ship_detach.read_result with a start reader', () => {
+	afterEach(() => vi.restoreAllMocks())
+
 	it.each([
 		['matches', RECORDED_START, 'running'],
-		['differs', 'Tue Oct 20 09:00:00 2026', 'abnormal'],
+		['differs', REUSED_START, 'abnormal'],
 	])(
 		'compares the recorded start through the reader given, where it %s',
 		(_name, observed, result) => {
@@ -37,4 +40,19 @@ describe('run_ship_detach.read_result with a start reader', () => {
 			expect(read).toHaveBeenCalledWith(process.pid)
 		},
 	)
+
+	it.each([
+		['EPERM', RECORDED_START, 'running'],
+		['EPERM', undefined, 'running'],
+		['EPERM', REUSED_START, 'abnormal'],
+		['ESRCH', RECORDED_START, 'abnormal'],
+	])('handles signal refusal %s with observed identity %s as %s', (code, observed, result) => {
+		const repository = record_live_ship()
+
+		vi.spyOn(process, 'kill').mockImplementation(() => {
+			throw Object.assign(new Error('signal refused'), { code })
+		})
+
+		expect(run_ship_detach.read_result(repository, NUMBER, () => observed)?.result).toBe(result)
+	})
 })

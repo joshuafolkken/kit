@@ -4,7 +4,8 @@ import type { LaneRecords } from '#scripts/lane/lane-state'
 // The open lanes that hold a place under the lane limit — the one count `lane:limit`, the drive and
 // `run:board` all subtract from it.
 //
-// **A lane with no child working in it holds no place, whatever it waits on** (joshuafolkken/kit#4107).
+// **A lane stopped for human review keeps its place**, even after its child exits (#5410).
+// Other lanes with no child working in them hold no place (joshuafolkken/kit#4107).
 // The limit caps the load on the machine, and a lane whose child is gone puts none on it — parked,
 // blocked by another issue, waiting on a decision, or left by an earlier run (joshuafolkken/kit#3967,
 // #4028). Its tree, branch and port seat stay; when its issue is picked up again the drive seats it
@@ -48,12 +49,13 @@ function occupied_lanes(
 	const live = lanes.filter((lane) => !lane.is_stranded)
 	const idle_issues = new Set(idle(live))
 
-	return live.filter(
-		(lane) =>
-			!idle_issues.has(lane.issue) &&
-			records.get(lane.issue)?.state !== 'paused' &&
-			!is_merge_waiting(lane.issue),
-	)
+	return live.filter((lane) => {
+		const state = records.get(lane.issue)?.state
+
+		if (state === 'human-review') return true
+
+		return !idle_issues.has(lane.issue) && state !== 'paused' && !is_merge_waiting(lane.issue)
+	})
 }
 
 /** The issues of the live lanes in `lanes` that have no state record. */

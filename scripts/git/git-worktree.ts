@@ -1,5 +1,6 @@
 import { INSTALL_TIMEOUT_MS, SUITE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { PORCELAIN_FLAG } from './constants'
+import { git_command } from './git-command'
 import { ls_remote_branch_arguments } from './git-ls-remote'
 import { git_spawn } from './git-spawn'
 import { repository_lock } from './repository-lock'
@@ -148,7 +149,14 @@ async function branch_delete(branch_name: string): Promise<string> {
 	return await git_spawn.read(['branch', '-D', branch_name])
 }
 
+async function is_linked(): Promise<boolean> {
+	const [own, common] = await git_command.git_directories()
+
+	return own !== common
+}
+
 const git_worktree = {
+	is_linked,
 	branch_delete,
 	ls_remote_branch,
 	set_upstream,

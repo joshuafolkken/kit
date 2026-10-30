@@ -49,7 +49,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--human-review-stop'],
 					description:
-						'marks a `needs-human-review` stop as a `halfrun` stop, and sends its `confirmation` Telegram naming the lane; answers `e2e-owed` (exit 1) until `test:e2e` answered green on this tree.',
+						'marks a `halfrun` stop and a `human-review` lane (still in use), sends the `confirmation` naming it; the parent continues in free lanes. Answers `e2e-owed` (exit 1) until `test:e2e` is green on this tree.',
 				},
 				{
 					names: ['--prrun-stop'],
@@ -150,11 +150,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/add/run-add-cli.ts',
 		description: 'Add issues to a live backlogrun, ahead of the queue unless --no-priority',
 		category: 'AI tools',
-		reference: ['<issue...> [--no-priority]', 'automation', ['network', 'files']],
+		reference: ['<issue...> [--no-priority] [--retry]', 'automation', ['network', 'files']],
 		usage: {
 			examples: [
 				{ arguments: '101 102', note: 'ahead of the rest of the queue (`#N` works too)' },
 				{ arguments: '101 --no-priority', note: 'at the end of the queue' },
+				{ arguments: '101 --retry', note: 'retry a mechanically stopped issue in this run' },
 			],
 		},
 	},

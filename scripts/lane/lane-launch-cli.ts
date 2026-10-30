@@ -6,6 +6,8 @@ import { cli_flags } from '#scripts/lib/cli-flags'
 import { INSTALL_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { execa } from 'execa'
+import { lane_launch_admission } from './lane-launch-admission'
+import { lane_launch_pending } from './lane-launch-pending'
 
 // `josh lane:launch <issue> [--stash <message>]` — one composite command for a `backlogrun` lane-start
 // event. Opening one lane was four to six turns of the parent: `lane:open`,
@@ -92,7 +94,11 @@ async function prepare(context: LaunchContext, directory: string): Promise<boole
 
 // Where the chain ended. `unopened` is a `lane:open` refusal — no lane was taken; `failed` is a step
 // after it, which leaves the opened lane holding a seat, so a caller cannot read the two alike.
-type LaunchOutcome = { kind: 'launched'; pid: string } | { kind: 'unopened' } | { kind: 'failed' }
+type LaunchOutcome =
+	| { kind: 'launched'; pid: string }
+	| { kind: 'unopened' }
+	| { kind: 'failed' }
+	| { kind: 'waiting' }
 
 const UNOPENED: LaunchOutcome = { kind: 'unopened' }
 const FAILED: LaunchOutcome = { kind: 'failed' }
@@ -129,7 +135,7 @@ async function lane_directory(issue: string): Promise<string | undefined> {
 // The launch chain in-process. The CLI prints the pid; `backlog:drive` launches through this same
 // chain. The dispatch is said on the run's stream before it starts, so the board draws a lane that is
 // ready apart from one still being filled.
-async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
+async function launch_admitted(context: LaunchContext): Promise<LaunchOutcome> {
 	const directory = await lane_directory(context.issue)
 
 	if (directory === undefined) return UNOPENED
@@ -144,6 +150,14 @@ async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
 	)
 
 	return dispatched.code === SUCCESS_EXIT_CODE ? { kind: 'launched', pid: dispatched.out } : FAILED
+}
+
+async function launch_lane(context: LaunchContext): Promise<LaunchOutcome> {
+	return await lane_launch_admission.launch(context, launch_admitted)
+}
+
+async function launch_ready_lane(context: LaunchContext): Promise<LaunchOutcome> {
+	return await lane_launch_pending.launch(context, launch_admitted)
 }
 
 async function launch(context: LaunchContext): Promise<number> {
@@ -168,7 +182,13 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await launch(context)
 }
 
-const lane_launch_cli = { launch_lane, read_context, run }
+const lane_launch_cli = {
+	keep_pending: lane_launch_pending.keep,
+	launch_lane,
+	launch_ready_lane,
+	read_context,
+	run,
+}
 
 export type { LaunchContext, LaunchOutcome }
 export { lane_launch_cli }

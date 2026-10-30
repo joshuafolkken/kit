@@ -77,7 +77,7 @@ beforeEach(() => {
 	emit_mock.mockReset()
 	is_child_mock.mockReset().mockReturnValue(true)
 	find_lane_mock.mockReset().mockResolvedValue(LANE)
-	relaunch_mock.mockReset().mockReturnValue({ kind: 'launched', pid: 1 })
+	relaunch_mock.mockReset().mockResolvedValue({ kind: 'launched', pid: 1 })
 	serving_mock.mockReset().mockReturnValue(undefined)
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
@@ -129,7 +129,7 @@ describe('run_ship_return.return_control when no relaunch started', () => {
 	const RELAUNCH_FAILED = 'relaunch-failed'
 
 	it('records the stop and the failed relaunch when the relaunch could not start', async () => {
-		relaunch_mock.mockReturnValue({ kind: 'failed', note: 'no claude' })
+		relaunch_mock.mockResolvedValue({ kind: 'failed', note: 'no claude' })
 
 		expect(await run_ship_return.return_control(ISSUE, 'commit', RESUME, OUTPUT)).toBe('recorded')
 		expect(emit_mock).toHaveBeenCalledTimes(2)

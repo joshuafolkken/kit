@@ -308,6 +308,30 @@ describe('run_ship_pre_detach.checks — the metrics totals', () => {
 	})
 })
 
+// joshuafolkken/kit#5442: starting the approval first is insufficient; its write must finish.
+describe('run_ship_pre_detach.checks — an approval write still in progress', () => {
+	it('waits for the approval write to finish before starting verification', async () => {
+		is_kit_mock.mockReturnValue(true)
+		read_tree_mock.mockClear()
+		const metrics = run_ship_pre_detach.METRICS_RERECORD_COMMAND.join(' ')
+		const pinned = vi.fn().mockResolvedValue({ code: OK, out: '' })
+
+		run_mock.mockImplementation(async (list: ReadonlyArray<string>) => {
+			if (list.join(' ') !== metrics) return { exit_code: OK, output: '' }
+
+			await Promise.resolve()
+			expect(commands()).toStrictEqual([metrics])
+			expect(read_tree_mock).not.toHaveBeenCalled()
+			expect(pinned).not.toHaveBeenCalled()
+
+			return { exit_code: OK, output: '' }
+		})
+		await run_ship_pre_detach.checks(tree.directory, undefined, pinned)
+		expect(commands()).toStrictEqual([metrics, ...STATIC])
+		expect(pinned).toHaveBeenCalledOnce()
+	})
+})
+
 interface Handed {
 	label: string
 	command: string

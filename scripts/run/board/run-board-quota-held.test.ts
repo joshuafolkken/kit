@@ -8,6 +8,9 @@ const FAILED = new Error('unreadable')
 const CODEX_FILE = 'codex.jsonl'
 const CLAUDE_FILE = 'claude.log'
 const EMPTY_FILE = 'empty.log'
+const TAKEN_MS = 5
+const TAKEN = '2026-10-29T03:00:00Z'
+const LATER = '2026-10-30T03:00:00Z'
 
 type Found = QuotaFile | Array<QuotaFile> | Error | undefined
 
@@ -34,7 +37,8 @@ function source_of(file: () => Found): QuotaSource {
 
 			return listed(found)
 		},
-		windows_of: (text) => (text === EMPTY_FILE ? [] : [WINDOW]),
+		reading_of: (text) =>
+			text === EMPTY_FILE ? undefined : { windows: [WINDOW], taken_ms: TAKEN_MS },
 	}
 }
 
@@ -50,14 +54,77 @@ function fixture_of(): Fixture {
 	return { clock, files, read_tail, ports: { sources, read_tail, now: () => clock.ms } }
 }
 
+function codex_event(timestamp?: string): string {
+	const rate_limits = { primary: { used_percent: 42, window_minutes: 300, resets_at: 100 } }
+
+	return JSON.stringify({ timestamp, payload: { rate_limits } })
+}
+
+function event_fixture(): Fixture {
+	const fixture = fixture_of()
+
+	fixture.ports.sources.codex.reading_of = run_board_quota_read.codex_reading
+	fixture.read_tail.mockResolvedValue(codex_event(TAKEN))
+
+	return fixture
+}
+
+describe('run_board_quota_held event time', () => {
+	it('preserves event time on redraws and periodic reads after an unrelated append', async () => {
+		const { clock, files, read_tail, ports } = event_fixture()
+		const read = quota_reader(ports)
+		const first = await read()
+
+		read_tail.mockResolvedValue(`${codex_event(TAKEN)}\n${JSON.stringify({ timestamp: LATER })}`)
+		files.codex = { path: CODEX_FILE, mtime_ms: 30 }
+		clock.ms = QUOTA_INTERVAL_MS
+		await read()
+		await vi.waitFor(async () => {
+			const refreshed = await read()
+
+			expect(read_tail).toHaveBeenCalledTimes(3)
+			expect(refreshed).not.toBe(first)
+			expect(refreshed.codex).toEqual(first.codex)
+		})
+	})
+})
+
+describe('run_board_quota_held updated and missing event time', () => {
+	it('updates observation time when a new usage event is appended', async () => {
+		const { clock, files, read_tail, ports } = event_fixture()
+		const read = quota_reader(ports)
+
+		await read()
+		read_tail.mockResolvedValue(codex_event(LATER))
+		files.codex = { path: CODEX_FILE, mtime_ms: 30 }
+		clock.ms = QUOTA_INTERVAL_MS
+		await read()
+		await vi.waitFor(async () => {
+			const refreshed = await read()
+
+			expect(refreshed.codex?.taken_ms).toBe(Date.parse(LATER))
+		})
+	})
+
+	it('does not substitute file mtime for a missing event time', async () => {
+		const { read_tail, ports } = event_fixture()
+
+		read_tail.mockResolvedValue(codex_event())
+
+		const quotas = await quota_reader(ports)()
+
+		expect(quotas.codex).toMatchObject({ taken_ms: undefined })
+	})
+})
+
 describe('run_board_quota_held.quota_reader', () => {
 	it('reads each provider once and draws the held readings on a redraw before the interval', async () => {
 		const { clock, read_tail, ports } = fixture_of()
 		const read = quota_reader(ports)
 
 		expect(await read()).toEqual({
-			claude: { windows: [WINDOW], taken_ms: 10 },
-			codex: { windows: [WINDOW], taken_ms: 20 },
+			claude: { windows: [WINDOW], taken_ms: TAKEN_MS },
+			codex: { windows: [WINDOW], taken_ms: TAKEN_MS },
 		})
 
 		clock.ms = QUOTA_INTERVAL_MS - 1
@@ -95,7 +162,7 @@ describe('run_board_quota_held.quota_reader', () => {
 
 		const quotas = await quota_reader(other.ports)()
 
-		expect(quotas.claude?.taken_ms).toBe(10)
+		expect(quotas.claude?.taken_ms).toBe(TAKEN_MS)
 	})
 })
 
@@ -111,7 +178,7 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 		const read = quota_reader(ports)
 		const first = await read()
 
-		expect(first.claude).toEqual({ windows: [WINDOW], taken_ms: 10 })
+		expect(first.claude).toEqual({ windows: [WINDOW], taken_ms: TAKEN_MS })
 
 		read_tail.mockClear()
 		clock.ms = QUOTA_INTERVAL_MS
@@ -123,13 +190,13 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 		expect(read_tail).not.toHaveBeenCalledWith(CLAUDE_FILE, expect.any(Number))
 	})
 
-	it('reads a provider none of whose files holds a reading as no windows at the newest mtime', async () => {
+	it('reads a provider none of whose files holds a reading as none', async () => {
 		const { files, ports } = fixture_of()
 
 		files.claude = [{ path: EMPTY_FILE, mtime_ms: 50 }]
 
 		const quotas = await quota_reader(ports)()
 
-		expect(quotas.claude).toEqual({ windows: [], taken_ms: 50 })
+		expect(quotas.claude).toBeUndefined()
 	})
 })

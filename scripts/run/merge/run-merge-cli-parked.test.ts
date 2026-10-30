@@ -69,6 +69,7 @@ const CHILD = '2987'
 const IN_PROGRESS = 'in-progress'
 const NEEDS_DECISION = 'needs-decision'
 const CLOSED_STATE = { kind: 'state', state: { state: 'CLOSED', labels: [] } }
+const HUMAN_REVIEW = 'human-review'
 
 function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 	const ctx = run_merge_cli.parse([CHILD])
@@ -81,6 +82,32 @@ function context(): NonNullable<ReturnType<typeof run_merge_cli.parse>> {
 function open_with(labels: ReadonlyArray<string>): unknown {
 	return { kind: 'state', state: { state: 'OPEN', labels } }
 }
+
+describe('run_merge_cli.merge_child — human review', () => {
+	it.each([
+		{ kind: 'written', code: 0, token: '2039', events: 1 },
+		{ kind: 'skipped', code: 1, token: 'retry', events: 0 },
+	])('offers only after retaining the lane: %j', async ({ kind, code, token, events }) => {
+		read_issue_mock.mockResolvedValue({
+			kind: 'state',
+			state: { state: 'OPEN', labels: ['epic', 'needs-human-review'], is_human_review: true },
+		})
+		record_change_mock.mockResolvedValue({ kind })
+
+		expect(await run_merge_cli.merge_child(context())).toMatchObject({ code, token })
+		expect(record_change_mock).toHaveBeenCalledWith({
+			issue: CHILD,
+			state: HUMAN_REVIEW,
+			command: 'run:merge',
+		})
+		expect(release_mock).not.toHaveBeenCalled()
+		expect(emit_mock).toHaveBeenCalledTimes(events)
+
+		if (events > 0) {
+			expect(emit_mock).toHaveBeenCalledWith(HUMAN_REVIEW, `#${CHILD} waiting for human review`)
+		}
+	})
+})
 
 beforeEach(() => {
 	read_issue_mock.mockReset()

@@ -12,6 +12,7 @@ const WINDOW = lane_stats.window_of(1, NOW)
 const BLOCKED = 'offer:wait:blocked'
 const HAND_BACK = 'hand-back:merge'
 const MEMORY = 'memory'
+const LAUNCH = 'lane:launch'
 const LONG_AGO_MINUTES = 300
 
 function minutes_before_now(minutes: number): string {
@@ -32,6 +33,22 @@ function row_of(entries: ReadonlyArray<LedgerEntry>, reason: string): string | u
 		.split('\n')
 		.find((line) => line.startsWith(`| ${reason} |`))
 }
+
+describe('lane_held_stats.table — launch admission', () => {
+	it('reports launch admission waits without using unrelated driver dispatches as their end', () => {
+		const launch_wait: LedgerEntry = {
+			kind: 'core-wait',
+			at: minutes_before_now(5),
+			command: LAUNCH,
+			issue: 17,
+			waited_ms: MS_PER_MINUTE,
+		}
+
+		expect(row_of([held(MEMORY, 30), dispatch(20), launch_wait], LAUNCH)).toBe(
+			'| lane:launch | 1.0 | 1.0 | 1.0 | 1 | 0 |',
+		)
+	})
+})
 
 describe('lane_held_stats.table', () => {
 	it('tiles consecutive holds up to the dispatch that ended them', () => {

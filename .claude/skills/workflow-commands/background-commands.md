@@ -5,8 +5,9 @@
 - **The clean path folds the region into one backgrounded `pnpm josh ship`** (preflight → gate → `git -y` →
   foreground `followup` → `run:tail`). The calls below serve a due second round.
 - Background `pnpm josh gate` beside the review; join it before commit. Also `lint:related` /
-  `test:related` / `check:related` / `metrics` with work to overlap: a wait past the 5-min cache TTL
+  `test:related` / `check:related` / read-only `metrics` with work to overlap: a wait past the 5-min cache TTL
   rewrites the context.
+- `metrics --accept` writes must finish before verification starts; use the existing `josh ship` pre-detach sequence (`run-ship-pre-detach.ts`) for approval re-recording before checks.
 - Issue `pnpm josh git -y` in the background; its completion resumes the run, so the turn never ends
   at the push.
 - `pnpm josh followup` stays in the foreground (`followup.md`).

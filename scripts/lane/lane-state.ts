@@ -10,7 +10,7 @@ import { run_carry } from '#scripts/run/carry/run-carry'
 import { z } from 'zod'
 
 // One record per lane of where it is in its life — opened, running, paused, ended — written only by
-// the lane commands (joshuafolkken/kit#4268), so a reader asks the record rather than guessing from
+// the lane commands and human-review stops, so a reader asks the record rather than guessing from
 // the `.env` mtime, the event stream or the `ps` state.
 //
 // **It is a `durable_state` path keyed on the common git directory**, in
@@ -32,7 +32,8 @@ const STATE_SUFFIX = '.json'
 const LOCK_SUFFIX = '.lock'
 // A change holds the lock for one read and one rename; a wait this long means a holder is stuck.
 const LOCK_WAIT_MS = 5000
-const LANE_STATES = ['open', 'running', 'paused', 'ended'] as const
+const HUMAN_REVIEW = 'human-review'
+const LANE_STATES = ['open', 'running', 'paused', HUMAN_REVIEW, 'ended'] as const
 // What a lane with no record is answered with: its state is unknown, so it keeps its place.
 const NO_STATE_HINT = 'no lane state — counted in use'
 
@@ -62,9 +63,10 @@ type LaneRecords = ReadonlyMap<string, LaneStateRecord>
 // The states each one moves to. A lane with no record yet (opened before the record existed) moves to
 // any of them.
 const TRANSITIONS: Record<LaneState, ReadonlyArray<LaneState>> = {
-	open: ['open', 'running', 'ended'],
-	running: ['running', 'paused', 'ended'],
+	open: ['open', 'running', HUMAN_REVIEW, 'ended'],
+	running: ['running', 'paused', HUMAN_REVIEW, 'ended'],
 	paused: ['paused', 'running', 'ended'],
+	[HUMAN_REVIEW]: [HUMAN_REVIEW, 'running', 'ended'],
 	ended: ['ended', 'open'],
 }
 

@@ -6,6 +6,7 @@ import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
+import { check_related_order } from './check-related-order'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import { check_related_section, type CheckResult } from './check-related-section'
@@ -91,9 +92,10 @@ async function run_checks(
 	execute: CheckExecutor = execute_check,
 	commands: ReadonlyArray<string> = CHECKS,
 ): Promise<Array<CheckResult>> {
+	const ordered = check_related_order.lint_first(execute, commands)
 	const tasks = commands.map((command): run_parallel.Task<CheckResult> => {
 		return (complete): void => {
-			void start_check(command, execute, complete)
+			void start_check(command, ordered, complete)
 		}
 	})
 
@@ -104,8 +106,19 @@ async function run_checks(
 	})
 }
 
+// A check that was not run did not fail; the one it waited on is the failure to fix.
 function failed_commands(results: ReadonlyArray<CheckResult>): ReadonlyArray<string> {
-	return results.filter((result) => result.exit_code !== 0).map((result) => result.command)
+	return results
+		.filter((result) => result.exit_code !== 0 && result.is_skipped !== true)
+		.map((result) => result.command)
+}
+
+function not_run_suffix(results: ReadonlyArray<CheckResult>): string {
+	const skipped = results.filter((result) => result.is_skipped === true)
+
+	if (skipped.length === 0) return ''
+
+	return ` (${check_related_section.NOT_RUN}: ${skipped.map((result) => result.command).join(', ')})`
 }
 
 // The verdict is the last line, as every josh check prints it, so a reader of the tail sees every
@@ -147,7 +160,7 @@ function verdict_line(
 	has_metrics_notice: boolean,
 	reused: ReadonlySet<string>,
 ): string {
-	const line = `${checks_line(results)}${reused_suffix(reused)}`
+	const line = `${checks_line(results)}${not_run_suffix(results)}${reused_suffix(reused)}`
 
 	return has_metrics_notice ? `${line} — ${METRICS_STOP}` : line
 }

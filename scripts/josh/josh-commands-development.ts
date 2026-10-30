@@ -186,7 +186,8 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'check:related': {
 		script: 'scripts/gate/check-related.ts',
-		description: 'Run related lint, unit, type and dotfile spelling checks in parallel',
+		description:
+			'Run related lint, type and dotfile spelling checks in parallel, and the unit tests once lint passes',
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		usage: {

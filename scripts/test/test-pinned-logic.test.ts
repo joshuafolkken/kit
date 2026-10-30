@@ -260,7 +260,7 @@ describe('test_pinned_logic.report_text', () => {
 
 	// joshuafolkken/kit#5292
 	it('prints how many probes the direct importers decided and how many escalated', () => {
-		const report = { ...EMPTY_REPORT, staged: { direct: 3, escalated: 1 } }
+		const report = { ...EMPTY_REPORT, staged: { direct: 3, escalated: 1, typed: 0 } }
 
 		expect(printed(report)).toBe('unpinned 0 · unchecked 0 · direct 3 · escalated 1\n')
 	})

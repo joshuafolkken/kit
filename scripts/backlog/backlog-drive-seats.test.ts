@@ -19,10 +19,10 @@ function ports(free: number, room = free): Parameters<typeof backlog_drive_seats
 // issue takes a place under it — ahead of a fresh launch, and never past the limit. It keeps its port
 // seat, so seats filled by idle kept lanes do not shut out their resumes.
 describe('backlog_drive_seats.seated', () => {
-	it('resumes kept lanes by the limit room when idle kept lanes fill every seat', async () => {
-		expect(await backlog_drive_seats.seated(['3870', KEPT, KEPT_TOO], ports(0, 1))).toStrictEqual([
-			KEPT,
-		])
+	it('requires a free port seat for a kept lane as well as a fresh launch', async () => {
+		expect(await backlog_drive_seats.seated(['3870', KEPT, KEPT_TOO], ports(0, 1))).toStrictEqual(
+			[],
+		)
 	})
 
 	it('seats fresh launches only in what the resumes leave of the limit room', async () => {

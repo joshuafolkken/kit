@@ -8,6 +8,7 @@ import { cost_cli, type CostVerdict } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { lane_dispatch_log } from '#scripts/lane/lane-dispatch-log'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
+import { lane_seat_fixture } from '#scripts/lane/lane-seat-fixture'
 import { review_attest } from '#scripts/review/review-attest'
 import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
@@ -127,6 +128,12 @@ function write_handoffs(): void {
 	)
 }
 
+function reset_review(): void {
+	split_refusal.mockResolvedValue(undefined)
+	is_attested_on.mockReturnValue(false)
+	record_check.mockResolvedValue({ status: 'not-required' })
+}
+
 // Registers the suite's hooks and the spies no case reads, from each suite's top level. The scratch
 // directory and the spies the cases read are created when this module is imported.
 function install(): void {
@@ -147,12 +154,10 @@ function install(): void {
 		emit.mockResolvedValue(undefined)
 	})
 
+	beforeEach(lane_seat_fixture.mock_start)
+
 	// No case got the split notice unless it says so.
-	beforeEach(() => {
-		split_refusal.mockResolvedValue(undefined)
-		is_attested_on.mockReturnValue(false)
-		record_check.mockResolvedValue({ status: 'not-required' })
-	})
+	beforeEach(reset_review)
 
 	afterAll(() => {
 		vi.restoreAllMocks()

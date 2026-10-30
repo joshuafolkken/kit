@@ -99,7 +99,7 @@ test('stops after all named issues when only mode is declared', () => {
 
 // joshuafolkken/kit#3908: a child a person withdrew is as settled as a merged one, so the named run
 // moves past it rather than waiting on an issue that will never merge.
-test.each(['merged', 'withdrawn'] as const)(
+test.each(['merged', 'withdrawn', 'human-review'] as const)(
 	'records a named %s child under the separate supervisor PID',
 	async (outcome) => {
 		const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-named-'))
@@ -121,21 +121,22 @@ test.each(['merged', 'withdrawn'] as const)(
 	},
 )
 
-test('recovers a named merge from the event stream after an interrupted handoff', async () => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reconcile-'))
-	const target = run_carry.carry_path(directory)
-	const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
-	const carry = run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
-	if (carry === undefined) throw new Error('carry not created')
-	const events = [
-		{ pos: 1, kind: run_event_stream.EVENT_KIND.MERGE, text: '#1 merged', at: ACTIVE },
-	]
+test.each([run_event_stream.EVENT_KIND.MERGE, run_event_stream.EVENT_KIND.HUMAN_REVIEW])(
+	'recovers a named %s from the event stream after an interrupted handoff',
+	async (kind) => {
+		const directory = mkdtempSync(path.join(tmpdir(), 'josh-drive-reconcile-'))
+		const target = run_carry.carry_path(directory)
+		const read_directory = vi.spyOn(run_carry, 'repository_directory').mockResolvedValue(directory)
+		const carry = run_carry.begin_carry(target, CARRY.invocation, run_carry.owner_of(process.pid))
+		if (carry === undefined) throw new Error('carry not created')
+		const events = [{ pos: 1, kind, text: '#1 settled', at: ACTIVE }]
 
-	await backlog_drive_named.reconcile(carry, events, String(process.pid))
-	expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
-	read_directory.mockRestore()
-	rmSync(directory, { recursive: true, force: true })
-})
+		await backlog_drive_named.reconcile(carry, events, String(process.pid))
+		expect(run_carry.read_carry(target)).toMatchObject({ kind: 'carried', carry: { done: [1] } })
+		read_directory.mockRestore()
+		rmSync(directory, { recursive: true, force: true })
+	},
+)
 
 // An offer's `stop` passed through the merge is not the failure guard (joshuafolkken/kit#3781): the
 // failed child is settled like any other, and only the control `stop` leaves it unmarked.

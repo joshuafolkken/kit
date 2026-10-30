@@ -1,5 +1,7 @@
 import { git_command } from '#scripts/git/git-command'
+import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_ship_planned, type Unplanned } from '#scripts/run/ship/run-ship-planned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GATE_GREEN, GATE_MOVED, run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
@@ -30,6 +32,12 @@ beforeEach(() => {
 	vi.spyOn(git_command, 'git_directories').mockResolvedValue([])
 })
 
+// No unplanned file, so the join neither prints the notice nor writes its record (joshuafolkken/kit#5388).
+beforeEach(() => {
+	vi.spyOn(run_ship_planned, 'unplanned').mockResolvedValue(undefined)
+	vi.spyOn(console, 'info').mockReturnValue(undefined)
+})
+
 afterEach(() => {
 	vi.restoreAllMocks()
 })
@@ -55,6 +63,30 @@ describe('run --join on a gate that passed before the tree moved', () => {
 		expect(run_review_steps.complete_timing).toHaveBeenCalledWith(
 			expect.objectContaining({ gate_ended_at: GATE_TAKEN_AT }),
 		)
+	})
+})
+
+// joshuafolkken/kit#5388: a file a round-1 fix added surfaced only at the ship's preflight, after
+// its pre-detach.
+const UNPLANNED: Unplanned = {
+	issue: 5388,
+	files: ['scripts/run/run-step.ts'],
+	text: 'unplanned: scripts/run/run-step.ts — run `pnpm josh lane:plan 5388 scripts/run/run-step.ts`',
+}
+
+describe('run --join on a lane plan the change outgrew', () => {
+	it("prints the ship preflight's unplanned answer and keeps the gate's exit code", async () => {
+		vi.spyOn(lane_ledger_write, 'record_unplanned_notice').mockResolvedValue()
+		vi.mocked(run_ship_planned.unplanned).mockResolvedValue(UNPLANNED)
+
+		expect(await run_review_cli.run(['--join'])).toBe(run_review.MOVED_EXIT_CODE)
+		expect(console.info).toHaveBeenCalledExactlyOnceWith(UNPLANNED.text)
+	})
+
+	it('prints no unplanned answer where every changed file is planned', async () => {
+		await run_review_cli.run(['--join'])
+
+		expect(console.info).not.toHaveBeenCalled()
 	})
 })
 
