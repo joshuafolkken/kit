@@ -17,10 +17,10 @@ import { gh_failure } from './git-gh-failure'
 //
 // **A retried write can land twice** when the first attempt reached GitHub before it failed. The
 // writes on this path tolerate it: a duplicate pull request is refused with the 422 the creator reads
-// (`handle_pr_create_error`), a repeated merge is read back by `has_merge_landed`, and at worst a
-// review-round comment is posted twice — cheaper than the stopped stage it replaces. Issue creation
-// has no such guard — a second issue opens and nothing reads the first back — so
-// `issue_create_request` opts out with `should_retry: false`.
+// (`handle_pr_create_error`), and at worst a
+// review-round comment is posted twice — cheaper than the stopped stage it replaces. Merge requests
+// opt out so their caller reads the result before another write; issue creation opts out because a
+// second issue opens and nothing reads the first back.
 
 const FIRST_RETRY_DELAY_MS = 2000
 const SECOND_RETRY_DELAY_MS = 5000
@@ -65,25 +65,37 @@ function has_answer(spawn_error: unknown): boolean {
 	return typeof spawn_error.stdout === 'string' && spawn_error.stdout.trim().length > 0
 }
 
-function is_transient_status(status: number | undefined, spawn_error: unknown): boolean {
+function is_transient_status(
+	status: number | undefined,
+	spawn_error: unknown,
+	is_read: boolean,
+): boolean {
+	if (is_read && has_timed_out(spawn_error)) return true
 	if (status === undefined) return !has_answer(spawn_error)
 
 	return status >= SERVER_ERROR_FLOOR
 }
 
-// A spawn no wait can change: one it killed on its budget, or one gh refused before asking.
-function is_final_spawn(spawn_error: unknown): boolean {
-	return has_timed_out(spawn_error) || get_exit_code(spawn_error) === GH_AUTH_REQUIRED_EXIT_CODE
+// A timed-out write may have landed; a read can safely be repeated. Auth never improves by waiting.
+function is_final_spawn(spawn_error: unknown, is_read: boolean): boolean {
+	return (
+		(!is_read && has_timed_out(spawn_error)) ||
+		get_exit_code(spawn_error) === GH_AUTH_REQUIRED_EXIT_CODE
+	)
 }
 
-function is_transient(error: unknown): boolean {
+function is_transient_request(error: unknown, is_read: boolean): boolean {
 	const failure = gh_failure.failure_of(error)
 
 	if (failure === undefined || !(error instanceof Error)) return false
 
 	const status = failure.status ?? summary_status(error)
 
-	return !is_final_spawn(error.cause) && is_transient_status(status, error.cause)
+	return !is_final_spawn(error.cause, is_read) && is_transient_status(status, error.cause, is_read)
+}
+
+function is_transient(error: unknown): boolean {
+	return is_transient_request(error, false)
 }
 
 function first_line(error: unknown): string {
@@ -98,8 +110,8 @@ function retry_note(error: unknown, attempt: number, wait_ms: number): string {
 
 // The wait before asking again, or `undefined` when this failure is final — not transient, or the
 // last attempt spent.
-function retry_delay(error: unknown, attempt: number): number | undefined {
-	return is_transient(error) ? RETRY_DELAYS_MS[attempt - 1] : undefined
+function retry_delay(error: unknown, attempt: number, is_read: boolean): number | undefined {
+	return is_transient_request(error, is_read) ? RETRY_DELAYS_MS[attempt - 1] : undefined
 }
 
 // The line a request transient to its last attempt leaves on stderr, naming the failure by the first
@@ -109,8 +121,33 @@ function spent_note(message: string): string {
 	return `${SPENT_NOTE} (${message})`
 }
 
-function note_spent(error: unknown, attempt: number, hooks: RetryHooks): void {
-	if (attempt === MAX_ATTEMPTS && is_transient(error)) hooks.note(spent_note(first_line(error)))
+function note_spent(error: unknown, attempt: number, hooks: RetryHooks, is_read: boolean): void {
+	if (attempt === MAX_ATTEMPTS && is_transient_request(error, is_read)) {
+		hooks.note(spent_note(first_line(error)))
+	}
+}
+
+async function retry_request<T>(
+	request: () => Promise<T>,
+	hooks: RetryHooks,
+	attempt: number,
+	is_read: boolean,
+): Promise<T> {
+	try {
+		return await request()
+	} catch (error) {
+		const wait_ms = retry_delay(error, attempt, is_read)
+
+		if (wait_ms === undefined) {
+			note_spent(error, attempt, hooks, is_read)
+			throw error
+		}
+
+		hooks.note(retry_note(error, attempt, wait_ms))
+		await hooks.wait(wait_ms)
+
+		return await retry_request(request, hooks, attempt + 1, is_read)
+	}
 }
 
 async function with_retry<T>(
@@ -118,24 +155,24 @@ async function with_retry<T>(
 	hooks: RetryHooks = DEFAULT_HOOKS,
 	attempt = 1,
 ): Promise<T> {
-	try {
-		return await request()
-	} catch (error) {
-		const wait_ms = retry_delay(error, attempt)
-
-		if (wait_ms === undefined) {
-			note_spent(error, attempt, hooks)
-			throw error
-		}
-
-		hooks.note(retry_note(error, attempt, wait_ms))
-		await hooks.wait(wait_ms)
-
-		return await with_retry(request, hooks, attempt + 1)
-	}
+	return await retry_request(request, hooks, attempt, false)
 }
 
-const gh_retry = { MAX_ATTEMPTS, RETRY_DELAYS_MS, is_transient, spent_note, with_retry }
+async function with_read_retry<T>(
+	request: () => Promise<T>,
+	hooks: RetryHooks = DEFAULT_HOOKS,
+): Promise<T> {
+	return await retry_request(request, hooks, 1, true)
+}
+
+const gh_retry = {
+	MAX_ATTEMPTS,
+	RETRY_DELAYS_MS,
+	is_transient,
+	spent_note,
+	with_retry,
+	with_read_retry,
+}
 
 export type { RetryHooks }
 export { gh_retry }

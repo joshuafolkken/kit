@@ -1,0 +1,7 @@
+{
+	"reason": "E2E memory declaration and Playwright mapping require two data rows; existing reservation tests are strengthened in place.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
