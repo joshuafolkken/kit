@@ -142,6 +142,12 @@ vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { commit_ledger_step: vi.fn() },
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#5384): `main` runs at import time, so the real
+// record would read the Issue from GitHub and append a size line to this checkout's ledger.
+vi.mock('#scripts/lane/lane-size-record', () => ({
+	lane_size_record: { record: vi.fn() },
+}))
+
 // **Mocked for the same reason** (joshuafolkken/kit#3023): `main` runs at import time, and the real
 // read asks GitHub whether the branch's pull request merged. Answers "open" with the merge requested.
 vi.mock('./git-followup-merged', () => ({
@@ -156,6 +162,7 @@ vi.mock('./git-followup-merged', () => ({
 
 const { git_followup_workflow } = await import('./git-followup-workflow')
 const { git_followup_flush } = await import('./git-followup-flush')
+const { lane_size_record } = await import('#scripts/lane/lane-size-record')
 
 // joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
 // the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
@@ -167,6 +174,7 @@ describe('prepare_merge — a pull request that has already merged', () => {
 		attested_mock.mockClear()
 		evidence_check_mock.mockClear()
 		vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
+		vi.mocked(lane_size_record.record).mockClear()
 		await git_followup_workflow.prepare_merge(
 			{ is_merged: true, should_merge: true, merged_at: '2026-10-04T00:00:00Z' },
 			ISSUE,
@@ -176,10 +184,12 @@ describe('prepare_merge — a pull request that has already merged', () => {
 		expect(attested_mock).not.toHaveBeenCalled()
 		expect(evidence_check_mock).not.toHaveBeenCalled()
 		expect(git_followup_flush.commit_ledger_step).not.toHaveBeenCalled()
+		expect(lane_size_record.record).not.toHaveBeenCalled()
 	})
 
 	it('still runs both on an open pull request', async () => {
 		vi.mocked(git_followup_flush.commit_ledger_step).mockClear()
+		vi.mocked(lane_size_record.record).mockClear()
 		await git_followup_workflow.prepare_merge(
 			{ is_merged: false, should_merge: true, merged_at: undefined },
 			ISSUE,
@@ -187,6 +197,7 @@ describe('prepare_merge — a pull request that has already merged', () => {
 		)
 
 		expect(git_followup_flush.commit_ledger_step).toHaveBeenCalledWith(true, ISSUE)
+		expect(lane_size_record.record).toHaveBeenCalledWith(true, ISSUE)
 	})
 })
 

@@ -129,7 +129,7 @@ Answers: `ok` (attested the briefed checkout), `missing` (a brief was recorded a
 
 ## `josh split:assess` in detail
 
-`split` needs **both** the file guide (10) and the line guide (400) exceeded; either alone, or an empty diff, is `single` — the conservative default of `.claude/skills/workflow-commands/split-assessment.md` → "The question". It answers the size question only: separability stays a judgement, so `split` is the size condition met, not a decision to divide the Issue. Untracked files have no diff base — commit before measuring for an exact count.
+`split` needs **either** the file guide or the line guide exceeded; under both, or an empty diff, is `single` — `.claude/skills/workflow-commands/split-assessment.md` → "The question". The AND form it replaced never fired, even on lanes cut twice mid-implementation (joshuafolkken/kit#5384). It answers the size question only: separability stays a judgement, so `split` is the size condition met, not a decision to divide the Issue. Untracked files have no diff base — commit before measuring for an exact count.
 
 ## `josh oracle:list` in detail
 

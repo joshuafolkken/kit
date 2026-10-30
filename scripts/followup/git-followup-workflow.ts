@@ -4,6 +4,7 @@ import { git_branch } from '#scripts/git/git-branch'
 import { git_error } from '#scripts/git/git-error'
 import { cli_body } from '#scripts/josh/cli-body'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
+import { lane_size_record } from '#scripts/lane/lane-size-record'
 import { git_notify, type GitNotifyConfig } from '#scripts/notify/git-notify'
 import { acceptance_map_check } from '#scripts/review/acceptance-map-check'
 import { live_evidence } from '#scripts/review/live-evidence'
@@ -176,7 +177,8 @@ async function assert_merge_gates(
 	await assert_removed_tests_disposed(should_merge, branch_name)
 }
 
-// After the gates, before the CI wait: a line appended since the run's commit rides the pull request
+// After the gates, before the CI wait: the lane's size line is written while the branch is still
+// checked out, then a line appended since the run's commit rides the pull request
 // itself, so it merges with it — a lane's included. **A pull request that has
 // already merged skips both**: the gates guard a merge this run no longer
 // makes, and a ledger commit would land on a branch that has already gone in.
@@ -188,6 +190,7 @@ async function prepare_merge(
 	if (plan.is_merged) return
 
 	await assert_merge_gates(plan.should_merge, issue_number, branch_name)
+	if (is_valid_issue(issue_number)) await lane_size_record.record(plan.should_merge, issue_number)
 	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)
 }
 
