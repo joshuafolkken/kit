@@ -1,4 +1,5 @@
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { run_stage, type StageState } from '#scripts/run/run-stage'
 import { run_step } from '#scripts/run/run-step'
 
 // `josh run:entry <N>` — the one call a `fullrun` makes to open a run. It folds the fixed entry
@@ -78,6 +79,10 @@ function exit_code(parts: EntryParts): number {
 	return is_ok ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+function stage_verdict(state: StageState, verdict: string): string {
+	return state === run_stage.PR_OPEN && verdict === run_step.IMPLEMENT ? 'gate' : verdict
+}
+
 const run_entry = {
 	COST_OVER,
 	COST_SKIPPED,
@@ -87,6 +92,7 @@ const run_entry = {
 	format_report,
 	can_proceed,
 	summary,
+	stage_verdict,
 }
 
 export type { EntryParts }

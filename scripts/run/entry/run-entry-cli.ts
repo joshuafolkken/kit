@@ -333,7 +333,10 @@ async function proceed(
 	// update is measured against (`issue-watch.ts`).
 	await issue_watch.record_baseline_here(issue_number)
 
-	const code = emit_fitted({ issue_number, hold, cost, verdict: reads.verdict }, reads.prep)
+	const code = emit_fitted(
+		{ issue_number, hold, cost, verdict: run_entry.stage_verdict(state, reads.verdict) },
+		reads.prep,
+	)
 
 	// The entry's own read — the split assessment every run answers before its work — printed here so
 	// the reader does not spend a turn fetching it.

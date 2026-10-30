@@ -255,6 +255,11 @@ function is_live_beacon(
 	target: string,
 	probe: (target: string) => number | undefined = run_socket_probe,
 ): boolean | undefined {
+	// A synchronous self-probe blocks accept callbacks. Repeating it fills the socket backlog,
+	// whose ECONNREFUSED would falsely sweep this live writer's records (kit#5426).
+	const own = beacons.get(`${BEACON_SCHEME}${target}`)
+	if (own !== undefined) return own.listening
+
 	const status = probe(target)
 	if (status === BEACON_LIVE_STATUS) return true
 

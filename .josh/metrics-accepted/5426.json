@@ -1,0 +1,7 @@
+{
+	"reason": "Read an owned beacon listener directly to prevent synchronous identity probes exhausting its socket backlog; two production code lines.",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}

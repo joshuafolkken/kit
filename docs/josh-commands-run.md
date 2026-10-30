@@ -548,7 +548,7 @@ It folds `main:sync`, `observations:flush`, `issue:cite` (the closed issue and a
 
 The flush is residual: a run's lines ride its own commit, so it commits only a line appended after that and otherwise prints `clean`. The checkout returns to the default branch first because the flush refuses anywhere else.
 
-**A lane child skips `main:sync` and `observations:flush`**; `main:sync` refuses inside a lane, and its lines merged with its own pull request.
+**Every linked checkout and lane child skips `main:sync` and `observations:flush`**; the checkout keeps its branch, and its ledger lines merged with its own pull request.
 
 ### `josh ship`
 

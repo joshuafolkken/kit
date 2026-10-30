@@ -128,6 +128,14 @@ describe('check_related_section.format_section', () => {
 	})
 })
 
+describe('check_related_section.result_status', () => {
+	it('heads a check that was never started not run, not failed', () => {
+		const section = check_related_section.format_section({ ...result_of(1, 'x'), is_skipped: true })
+
+		expect(section).toBe('\n=== test:related: not run ===\nx\n')
+	})
+})
+
 describe('check_related_section.is_full_requested', () => {
 	it('answers true only when the arguments carry --full', () => {
 		expect(check_related_section.is_full_requested(['node', 'script', '--full'])).toBe(true)

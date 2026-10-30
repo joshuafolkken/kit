@@ -1,3 +1,4 @@
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -27,10 +28,16 @@ function request_for(argv: ReadonlyArray<string>): ReturnType<typeof run_carry_a
 // The suite runs inside whatever session started it, so the headless mark is cleared rather than read.
 beforeEach(() => {
 	vi.stubEnv(run_headless.HEADLESS_ENV_KEY, undefined)
+	vi.spyOn(agent_provider, 'resolve_provider').mockReturnValue({
+		kind: 'provider',
+		provider: 'anthropic',
+		is_default: true,
+	})
 })
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+	vi.restoreAllMocks()
 })
 
 describe('run_carry_args.read_arguments', () => {
@@ -59,6 +66,19 @@ describe('run_carry_args.read_arguments', () => {
 			expect(run_carry_args.USAGE).toContain(flag)
 		}
 	})
+})
+
+describe('run_carry_args scheduler provider', () => {
+	it.each(['anthropic', 'openai'] as const)(
+		'records the calling parent provider %s',
+		(provider) => {
+			vi.mocked(agent_provider.resolve_provider).mockReturnValue({ kind: 'provider', provider })
+
+			expect(request_for(['--begin', INVOCATION, '--owner', OWN_PID])).toMatchObject({
+				claim: { owner: { provider } },
+			})
+		},
+	)
 })
 
 describe('run_carry_args.to_request read and claim', () => {

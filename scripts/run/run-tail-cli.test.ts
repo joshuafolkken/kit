@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const is_child_of_mock = vi.hoisted(() => vi.fn())
+const is_linked_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('#scripts/git/git-worktree', () => ({ git_worktree: { is_linked: is_linked_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
@@ -30,6 +33,7 @@ function argv_calls(): ReadonlyArray<ReadonlyArray<string>> {
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	is_child_of_mock.mockReset().mockReturnValue(false)
+	is_linked_mock.mockReset().mockResolvedValue(false)
 	info_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		info_lines.push(line)
@@ -92,6 +96,13 @@ describe('run_tail_cli.run — a dispatched lane child leaves the ledger to the 
 // joshuafolkken/kit#2979: `josh ship` reaches the report still on the feature branch it merged, and the
 // flush refuses anywhere but the default branch, so a merged run was reported as failed.
 describe('run_tail_cli.run — returns to the default branch before the flush', () => {
+	it('keeps a linked checkout even when a person started the run without a child marker', async () => {
+		is_linked_mock.mockResolvedValue(true)
+
+		expect(await run_tail_cli.run([ISSUE])).toBe(OK)
+		expect(argv_calls()).toStrictEqual([CITE, SCOPE])
+	})
+
 	it('runs main:sync before observations:flush, so the flush never starts on the merged branch', async () => {
 		await run_tail_cli.run([ISSUE])
 

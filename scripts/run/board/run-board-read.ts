@@ -23,6 +23,7 @@ import {
 	type SessionOperations,
 } from './run-board-operation-read'
 import type { ProcessRoots } from './run-board-process-groups'
+import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
@@ -31,6 +32,7 @@ import { run_board_usual, type UsualTimes } from './run-board-usual'
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
 // The run is the running one, or the one that last ended until the next run begins.
 interface LocalRead {
+	scheduler_provider?: QuotaProvider | undefined
 	started_ms: number
 	// Set only once the run has ended; the board then draws its end-of-run screen.
 	ended_ms: number | undefined
@@ -264,6 +266,15 @@ async function span_events_here(
 	}
 }
 
+function span_fields(
+	span: BoardSpan,
+): Pick<LocalRead, 'started_ms' | 'ended_ms' | 'scheduler_provider'> {
+	const times = { started_ms: span.started_ms, ended_ms: span.ended_ms }
+	if (span.scheduler_provider === undefined) return times
+
+	return { ...times, scheduler_provider: span.scheduler_provider === 'openai' ? 'codex' : 'claude' }
+}
+
 // `undefined` when no run has started here. The lane count reads `table`, the redraw's process
 // snapshot, so it agrees with the usage columns.
 async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
@@ -278,8 +289,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 	const lane_states = await lanes_here(lanes, repository, events, span.started_ms)
 
 	return {
-		started_ms: span.started_ms,
-		ended_ms: span.ended_ms,
+		...span_fields(span),
 		scope: run_board_scope.scope_of(span.invocation),
 		...(await span_events_here(events, span, table, carry)),
 		lanes: lanes.map((lane) => lane.issue),

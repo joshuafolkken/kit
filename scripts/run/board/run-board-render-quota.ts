@@ -11,7 +11,7 @@ import { run_board_render_section } from './run-board-render-section'
 // its length ends the row. Each bar carries ┊, how far through its window the clock is, so a bar past
 // it is spending faster than the window refills; ↻ is when the window resets.
 
-const { GAUGE_SHADES, bar_of, painted } = run_board_labels
+const { GAUGE_SHADES, bar_of } = run_board_labels
 const { minute_of, two_digits } = figure_format
 const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
@@ -42,7 +42,8 @@ const COLUMNS = [
 	{ label: '7d', minutes: 10_080 },
 ]
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
-const LEGEND = [LABEL, `${PACE_MARK} pace`, `${RESET_MARK} reset`]
+const SCHEDULER_MARK = '🤖'
+const LEGEND = [LABEL, `${SCHEDULER_MARK} scheduler`, `${PACE_MARK} pace`, `${RESET_MARK} reset`]
 
 // The reset a usage limit holds the run's launches until, and how many children it stopped.
 interface QuotaHold {
@@ -54,6 +55,7 @@ type Shade = (typeof GAUGE_SHADES)[(typeof LEVELS)[number]]
 
 interface QuotaView {
 	quotas?: Quotas | undefined
+	scheduler_provider?: QuotaProvider | undefined
 	now_ms: number
 	hold?: QuotaHold | undefined
 }
@@ -129,9 +131,8 @@ function cell_of(window: QuotaWindow, now_ms: number): string {
 	const shade = GAUGE_SHADES[level]
 	const percent = run_board_machine.percent_text(shown.used_percent)
 	const reset = `${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`
-	const tinted = painted(level === 'normal' ? undefined : shade, percent)
 
-	return padded(`${tinted} ${bar_text(shown.used_percent, pace, shade)}  ${reset}`)
+	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}`)
 }
 
 // Each column's window, `undefined` where the provider reported none that stands in it.
@@ -176,6 +177,28 @@ function hold_text(hold: QuotaHold, now_ms: number): string {
 	return [`${LIMIT_MARK} limit`, resumes, ...parked].join(SEPARATOR)
 }
 
+function providers_of(view: QuotaView): ReadonlyArray<QuotaProvider> {
+	const first = view.scheduler_provider
+
+	return first === undefined
+		? PROVIDERS
+		: [first, ...PROVIDERS.filter((provider) => provider !== first)]
+}
+
+function name_of(provider: QuotaProvider, view: QuotaView): string {
+	if (view.scheduler_provider === undefined) return provider
+
+	const mark = provider === view.scheduler_provider ? SCHEDULER_MARK : '  '
+
+	return `${mark} ${provider}`
+}
+
+function name_cell(provider: QuotaProvider, view: QuotaView): string {
+	const name = name_of(provider, view)
+
+	return `${name}${' '.repeat(NAME_WIDTH - run_board_fit.width_of(name))}`
+}
+
 // Claude's row reads its hold while a usage limit stops the run's launches.
 function row_of(provider: QuotaProvider, view: QuotaView): string {
 	const { hold, now_ms } = view
@@ -184,18 +207,18 @@ function row_of(provider: QuotaProvider, view: QuotaView): string {
 			? hold_text(hold, now_ms)
 			: reading_text(view.quotas?.[provider], now_ms)
 
-	return `${INDENT}${provider.padEnd(NAME_WIDTH)}${body}`
+	return `${INDENT}${name_cell(provider, view)}${body}`
 }
 
 // `claude 42/68`: each column's percent, `—` where none stands.
 function summary_of(view: QuotaView): string {
-	const parts = PROVIDERS.map((provider) => {
+	const parts = providers_of(view).map((provider) => {
 		const windows = placed(view.quotas?.[provider]?.windows ?? [])
 		const percents = windows.map((window) =>
 			window === undefined ? NONE : String(Math.round(current(window, view.now_ms).used_percent)),
 		)
 
-		return `${provider} ${percents.join('/')}`
+		return `${name_of(provider, view).trimStart()} ${percents.join('/')}`
 	})
 
 	return parts.join(SEPARATOR)
@@ -212,7 +235,10 @@ function rule_columns(): Array<{ label: string; start: number }> {
 function usage_part(view: QuotaView): DetailPart | undefined {
 	if (view.quotas === undefined) return undefined
 
-	const lines = PROVIDERS.map((provider) => ({ text: row_of(provider, view), is_detail: false }))
+	const lines = providers_of(view).map((provider) => ({
+		text: row_of(provider, view),
+		is_detail: false,
+	}))
 	const rule = run_board_render_section.columns_rule(LABEL, rule_columns())
 
 	return { head: ['', rule], lines, label: LABEL, summary: summary_of(view) }

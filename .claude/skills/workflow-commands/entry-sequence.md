@@ -30,11 +30,12 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    (`issue-comments.md`), `issue:state`'s state, labels and `human_review`, and `latest:scope`'s
    dependency scope in one report; a `new` entry runs it once filed. The comment stops, the
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
-5. **Print the next action — `pnpm josh run:step <N>`** — and follow it into the command's step list.
-   Before implementing, `pnpm josh ms`, then on `run:prep`'s `latest: required`
-   `pnpm josh latest:if-required` (`latest-gate.md`) — never on every run. `run:step` names every later
-   action in order, each read at the point-of-use document `SKILL.md` lists, never re-narrated here
-   (`residency.md` → "順序の問い").
+5. Honor prep's stop and update verdicts first. **`start: gate` skips `run:step`, planning and implementation**;
+   enter the verification chain. Otherwise run `pnpm josh run:step <N>` and follow its step list.
+   Before implementing, synchronize: **primary checkout → `pnpm josh ms`;
+   linked checkout → `pnpm josh main:merge`**.
+   On `latest: required`, run `pnpm josh latest:if-required` (`latest-gate.md`). Later actions and their
+   point-of-use reads come from `run:step` and `SKILL.md` (`residency.md` → "順序の問い").
 
 **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the
 background, started once and relayed never, and `pnpm josh run:progress --mark` in the same turn as
