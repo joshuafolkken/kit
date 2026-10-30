@@ -1,0 +1,10 @@
+{
+	"reason": "Issue #5452 defines the distributed consultation role boundary and its handoff guidance in existing rule documents.",
+	"date": "2026-10-30",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 959,
+		"prose.long_paragraphs": 1,
+		"prose.excess_bold": 1
+	}
+}
