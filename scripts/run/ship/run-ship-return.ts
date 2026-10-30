@@ -7,6 +7,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_registry, type LaneInfo } from '#scripts/lane/lane-registry'
 import { lane_relaunch } from '#scripts/lane/lane-relaunch'
 import { lane_session_broker } from '#scripts/lane/lane-session-broker'
+import { poll } from '#scripts/lib/poll'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_wake_driver } from '#scripts/run/wake/run-wake-driver'
@@ -141,15 +142,17 @@ async function await_server(
 	previous?: string,
 	polls = SERVING_POLLS,
 ): Promise<string | undefined> {
-	for (let polled = 0; polled < polls; polled += 1) {
-		const session = lane_session_broker.serving_session(lane.directory, lane.issue)
-		if (session !== undefined && session !== previous) return session
+	const found = await poll.poll_for(
+		() => {
+			const session = lane_session_broker.serving_session(lane.directory, lane.issue)
 
-		// eslint-disable-next-line no-await-in-loop -- polling: each check waits on the scan the previous one missed
-		await sleep(SERVING_POLL_MS)
-	}
+			return session === previous ? undefined : session
+		},
+		{ attempts: polls, interval_ms: SERVING_POLL_MS, sleeper: sleep },
+	)
+	if (found === undefined && polls > 0) await sleep(SERVING_POLL_MS)
 
-	return undefined
+	return found
 }
 
 function polls_after(reply: BrokerReply): number {

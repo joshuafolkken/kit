@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { styleText } from 'node:util'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_progress } from '#scripts/run/progress/run-progress'
@@ -133,14 +134,20 @@ function leaver(ports: BoardPorts, screen: Screen, keys: KeyReading): () => void
 async function redraw_forever(ports: BoardPorts, screen: Screen): Promise<void> {
 	const drawn = framed(ports, screen)
 	// The plan is read in the background, so the first frame is drawn without waiting on GitHub.
-	let state = await tick(FRESH_STATE, drawn, 'background')
+	let state = FRESH_STATE
 
-	for (;;) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each redraw waits for the next second
-		await run_board_spin.spin_to_second(state.spots, ports)
-		// eslint-disable-next-line no-await-in-loop -- polling: each redraw folds the state the last one left
-		state = await tick(state, drawn, 'background')
-	}
+	await poll.wait_for(
+		async () => {
+			// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next tick
+			state = await tick(state, drawn, 'background')
+		},
+		{
+			interval_ms: run_board_spin.REDRAW_MS,
+			sleeper: async () => {
+				await run_board_spin.spin_to_second(state.spots, ports)
+			},
+		},
+	)
 }
 
 // A signal leaves through `on_exit`; a failed redraw leaves before its error is printed, so the error

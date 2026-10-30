@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { setTimeout as sleep } from 'node:timers/promises'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -11,6 +10,7 @@ import { detached_launch, type LaunchArgv } from '#scripts/run/detached-launch'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
+import { run_ship_record_wait } from './run-ship-record-wait'
 
 // `josh ship --detach` — hand the post-implementation region to a supervisor that outlives the agent.
 // This starts `josh ship` itself as a detached process, so the agent ends at the hand-off and nothing
@@ -53,8 +53,6 @@ const LAUNCHED = 'launched'
 const BUSY = 'busy'
 const FAILED = 'failed'
 const RESULT_PREFIX = durable_state.PREFIX.SHIP_RESULT
-const RECORD_POLL_MS = 25
-const RECORD_WAIT_ATTEMPTS = 200
 // How long a bare launched pid is believed before the supervisor must have claimed the record: far above
 // a `pnpm josh ship` start-up, far below the lifetime a reused pid could otherwise be believed for.
 const CLAIM_WINDOW_MS = 120_000
@@ -205,22 +203,8 @@ function running_since(repository: string, number: string): number | undefined {
 		: undefined
 }
 
-function is_pending(record: ShipRecord | undefined): boolean {
-	return record !== undefined && record.pid === undefined
-}
-
 async function ready_record(repository: string, number: string): Promise<ShipRecord | undefined> {
-	let record = current_record(repository, number)
-
-	for (let attempt = 0; attempt < RECORD_WAIT_ATTEMPTS; attempt += 1) {
-		if (!is_pending(record)) return record
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(RECORD_POLL_MS)
-		record = current_record(repository, number)
-	}
-
-	return undefined
+	return await run_ship_record_wait.ready_record(() => current_record(repository, number))
 }
 
 async function update_record(
@@ -401,5 +385,5 @@ const run_ship_detach = {
 	supervisor_environment,
 }
 
-export type { DetachRequest, DetachResult }
+export type { DetachRequest, DetachResult, ShipRecord }
 export { run_ship_detach }

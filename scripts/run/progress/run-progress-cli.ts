@@ -4,6 +4,7 @@ import { backlog_ready } from '#scripts/backlog/backlog-ready'
 import { gh_spawn } from '#scripts/gh/gh-spawn'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_progress, type ProgressState } from './run-progress'
@@ -323,6 +324,16 @@ function final_exit(life: string): WatchExit {
 	return run_progress_clock.is_life_ended(life) ? 'ended' : 'bound'
 }
 
+function bounded_exit(
+	options: WatchOptions,
+	life: string,
+	started_ms: number,
+): WatchExit | undefined {
+	return Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)
+		? undefined
+		: final_exit(life)
+}
+
 // The loop both reporting forms share, reading its own liveness record at the top of each pass — the
 // `run-wake-loop.ts` `run_loop` shape. A record gone means `josh followup` removed it at the merge,
 // so the watcher stops at once instead of waiting out its bound; `--wait` also stops at the first
@@ -335,21 +346,23 @@ async function run_ticks(
 ): Promise<WatchExit> {
 	const started_ms = Date.now()
 	let loop = seed_loop(target, started_ms)
+	const result: { exit: WatchExit | undefined } = { exit: undefined }
 
-	while (Date.now() - started_ms < options.max_ms && !run_progress_clock.is_life_ended(life)) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(options.tick_ms)
-		run_progress_clock.ping_life(life)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		loop = await step(options, target, loop)
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const exit = await wait_exit(wait)
-
-		if (exit !== undefined) return exit
-	}
-
-	return final_exit(life)
+	return await poll.wait_for(
+		() => {
+			return result.exit ?? bounded_exit(options, life, started_ms)
+		},
+		{
+			interval_ms: options.tick_ms,
+			sleeper: async (milliseconds) => {
+				await sleep(milliseconds)
+				run_progress_clock.ping_life(life)
+				// eslint-disable-next-line require-atomic-updates -- poll awaits each callback before starting the next step
+				loop = await step(options, target, loop)
+				result.exit = await wait_exit(wait)
+			},
+		},
+	)
 }
 
 async function drive(options: WatchOptions, is_wait: boolean): Promise<number> {
