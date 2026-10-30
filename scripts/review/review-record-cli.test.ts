@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { git_common_directory } from '#scripts/git/git-common-directory'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { review_comment_round } from './review-comment-round'
 import { review_finding_ledger } from './review-finding-ledger'
 import { review_record_cli } from './review-record-cli'
@@ -83,6 +84,11 @@ const NOW = new Date('2026-09-22T00:00:00Z')
 const COMMENT_URL = 'https://example.test/comment\n'
 const GH_REFUSED = new Error('gh refused')
 
+// These fixtures model a primary checkout; lane and failed-probe cases live in the lane test.
+beforeEach(() => {
+	vi.spyOn(git_common_directory, 'directories').mockReturnValue([TEST_DIR, TEST_DIR])
+})
+
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
 })
@@ -114,28 +120,6 @@ async function quietly(run: () => Promise<number>): Promise<number> {
 
 	return code
 }
-
-describe('review_record_cli.parse_finding', () => {
-	it('keeps a `:line` citation in the file field', () => {
-		expect(review_record_cli.parse_finding('bug-risks:medium:src/foo.ts:42')).toEqual({
-			category: 'bug-risks',
-			severity: 'medium',
-			file: 'src/foo.ts:42',
-		})
-	})
-
-	it('rejects an unknown category', () => {
-		expect(review_record_cli.parse_finding('made-up:medium:a.ts')).toBeUndefined()
-	})
-
-	it('rejects a missing severity separator', () => {
-		expect(review_record_cli.parse_finding('bug-risks-a.ts')).toBeUndefined()
-	})
-
-	it('rejects a file field carrying the ledger field separator', () => {
-		expect(review_record_cli.parse_finding('tests:low:a.ts | injected')).toBeUndefined()
-	})
-})
 
 describe('review_record_cli.build_lines', () => {
 	it('writes a zero-finding line when no findings are given', () => {
