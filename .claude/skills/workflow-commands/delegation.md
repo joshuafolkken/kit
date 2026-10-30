@@ -47,6 +47,11 @@ forecast** — where the guard refuses, not a budget. Brief the unit on what was
 the `model` its definition names. A `general-purpose` or `Explore` dispatch that investigates is
 briefed to return `file:line` citations too.
 
+Brief it with the planned change and tests. Ask for the existing function signatures the change
+will call (parameters, return types and needed overloads) and the existing test fixtures its tests
+will use (paths and setup or helper usage), with `file:line` citations beside the conclusion. Ask it
+to state when either does not apply or was not found, never to invent one or paste implementations.
+
 **The main line does not idle while the unit reads** — the reads of files this run will edit go in
 the same message (the `investigator-foreground` row of `pnpm josh rule:list`); then verify the unit's
 cited lines. Independent investigations launch
