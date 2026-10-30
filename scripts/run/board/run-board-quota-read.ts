@@ -5,6 +5,7 @@ import { durable_state } from '#scripts/josh/durable-state'
 import { figure_format } from '#scripts/lib/figure-format'
 import { json_value } from '#scripts/lib/json-value'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
+import { time_instant } from '#scripts/time-runtime/time-instant'
 import { z } from 'zod'
 
 // The usage-limit windows Claude Code and Codex last reported, read off files they already write — no
@@ -45,10 +46,10 @@ interface QuotaWindow {
 	resets_ms: number
 }
 
-// A provider's windows and when the file they were read off was last written.
+// A provider's windows and their event's timestamp, unknown in older logs.
 interface QuotaReading {
 	windows: ReadonlyArray<QuotaWindow>
-	taken_ms: number
+	taken_ms: number | undefined
 }
 
 // Each provider's reading, `undefined` where none could be read.
@@ -69,6 +70,7 @@ const CLAUDE_INFO = z.looseObject({ unifiedWindows: CLAUDE_WINDOWS })
 const CLAUDE_EVENT = z.looseObject({
 	type: z.literal('rate_limit_event'),
 	rate_limit_info: CLAUDE_INFO,
+	timestamp: z.string().nullish().catch(undefined),
 })
 const CODEX_WINDOW = z.looseObject({
 	used_percent: z.number(),
@@ -80,7 +82,10 @@ const CODEX_LIMITS = z.looseObject({
 	secondary: CODEX_WINDOW.nullish(),
 })
 // `rate_limits: null` fails it, so a rollout holding only those reads as none.
-const CODEX_EVENT = z.looseObject({ payload: z.looseObject({ rate_limits: CODEX_LIMITS }) })
+const CODEX_EVENT = z.looseObject({
+	payload: z.looseObject({ rate_limits: CODEX_LIMITS }),
+	timestamp: z.string().nullish().catch(undefined),
+})
 
 type ClaudeWindow = z.infer<typeof CLAUDE_WINDOW>
 type CodexWindow = z.infer<typeof CODEX_WINDOW>
@@ -93,7 +98,7 @@ function claude_window(minutes: number, window: ClaudeWindow | undefined): Array
 	return [{ minutes, used_percent: window.utilization * PERCENT, resets_ms }]
 }
 
-function claude_line(line: string): Array<QuotaWindow> | undefined {
+function claude_line(line: string): QuotaReading | undefined {
 	if (!line.includes(CLAUDE_MARK)) return undefined
 
 	const event = json_value.parse_with(line, CLAUDE_EVENT)
@@ -102,10 +107,13 @@ function claude_line(line: string): Array<QuotaWindow> | undefined {
 
 	const { five_hour, seven_day } = event.rate_limit_info.unifiedWindows
 
-	return [
-		...claude_window(FIVE_HOURS_MINUTES, five_hour),
-		...claude_window(SEVEN_DAYS_MINUTES, seven_day),
-	]
+	return {
+		windows: [
+			...claude_window(FIVE_HOURS_MINUTES, five_hour),
+			...claude_window(SEVEN_DAYS_MINUTES, seven_day),
+		],
+		taken_ms: time_instant.parse_instant(event.timestamp),
+	}
 }
 
 function codex_window(window: CodexWindow | null | undefined): Array<QuotaWindow> {
@@ -116,32 +124,37 @@ function codex_window(window: CodexWindow | null | undefined): Array<QuotaWindow
 	return [{ minutes: window_minutes, used_percent, resets_ms: resets_at * MS_PER_SECOND }]
 }
 
-function codex_line(line: string): Array<QuotaWindow> | undefined {
+function codex_line(line: string): QuotaReading | undefined {
 	if (!line.includes(CODEX_MARK)) return undefined
 
-	const limits = json_value.parse_with(line, CODEX_EVENT)?.payload.rate_limits
+	const event = json_value.parse_with(line, CODEX_EVENT)
 
-	if (limits === undefined) return undefined
+	if (event === undefined) return undefined
 
-	return [...codex_window(limits.primary), ...codex_window(limits.secondary)]
+	const { primary, secondary } = event.payload.rate_limits
+
+	return {
+		windows: [...codex_window(primary), ...codex_window(secondary)],
+		taken_ms: time_instant.parse_instant(event.timestamp),
+	}
 }
 
-// The last line `line_of` reads windows off; none where no line does, a tail's cut first line included.
-function last_windows(
+// Windows and time from the same last event; unrelated later lines never refresh its age.
+function last_reading(
 	text: string,
-	line_of: (line: string) => Array<QuotaWindow> | undefined,
-): Array<QuotaWindow> {
+	line_of: (line: string) => QuotaReading | undefined,
+): QuotaReading | undefined {
 	const lines = text.split('\n').map((line) => line_of(line))
 
-	return lines.findLast((windows) => windows !== undefined) ?? []
+	return lines.findLast((reading) => reading !== undefined)
 }
 
-function claude_windows(text: string): Array<QuotaWindow> {
-	return last_windows(text, claude_line)
+function claude_reading(text: string): QuotaReading | undefined {
+	return last_reading(text, claude_line)
 }
 
-function codex_windows(text: string): Array<QuotaWindow> {
-	return last_windows(text, codex_line)
+function codex_reading(text: string): QuotaReading | undefined {
+	return last_reading(text, codex_line)
 }
 
 async function names_in(directory: string): Promise<Array<string>> {
@@ -222,22 +235,26 @@ async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<stri
 }
 
 // Whether a tail of `bytes` ends the widening: it found a reading, held the whole file, or reached the limit.
-function is_last_tail(windows: ReadonlyArray<QuotaWindow>, text: string, bytes: number): boolean {
-	return windows.length > 0 || Buffer.byteLength(text) < bytes || bytes >= TAIL_LIMIT_BYTES
+function is_last_tail(reading: QuotaReading | undefined, text: string, bytes: number): boolean {
+	return (
+		(reading?.windows.length ?? 0) > 0 ||
+		Buffer.byteLength(text) < bytes ||
+		bytes >= TAIL_LIMIT_BYTES
+	)
 }
 
-// The windows off the widest tail `tail_of` needs to read before `windows_of` finds a reading.
-async function windows_in(
+// The reading off the widest tail needed to find an event with windows.
+async function reading_in(
 	tail_of: (bytes: number) => Promise<string>,
-	windows_of: (text: string) => Array<QuotaWindow>,
+	reading_of: (text: string) => QuotaReading | undefined,
 	bytes = TAIL_BYTES,
-): Promise<Array<QuotaWindow>> {
+): Promise<QuotaReading | undefined> {
 	const text = await tail_of(bytes)
-	const windows = windows_of(text)
+	const reading = reading_of(text)
 
-	if (is_last_tail(windows, text, bytes)) return windows
+	if (is_last_tail(reading, text, bytes)) return reading
 
-	return await windows_in(tail_of, windows_of, bytes * TAIL_GROWTH)
+	return await reading_in(tail_of, reading_of, bytes * TAIL_GROWTH)
 }
 
 const run_board_quota_read = {
@@ -246,11 +263,11 @@ const run_board_quota_read = {
 	TAIL_BYTES,
 	TAIL_LIMIT_BYTES,
 	claude_files,
-	claude_windows,
+	claude_reading,
 	codex_files,
-	codex_windows,
+	codex_reading,
 	read_tail,
-	windows_in,
+	reading_in,
 }
 
 export { run_board_quota_read }
