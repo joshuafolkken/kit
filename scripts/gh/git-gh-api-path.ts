@@ -73,6 +73,16 @@ function pull_comments_api_path(pr_number: string, repo?: string): string {
 	return `${pull_api_path(pr_number, repo)}/comments`
 }
 
+// The files one pull request changes — its own diff, not the merge ref's.
+function pull_files_api_path(pr_number: string, repo?: string): string {
+	return `${pull_api_path(pr_number, repo)}/files`
+}
+
+// The code scanning alerts — what CodeQL raised, each with its rule and its most recent location.
+function code_scanning_alerts_api_path(repo?: string): string {
+	return `${repo_api_path(repo)}/code-scanning/alerts`
+}
+
 // The review history of one pull request. There is no REST counterpart to GraphQL's
 // `reviewDecision`, so the merge gate folds this listing into one instead.
 function pull_reviews_api_path(pr_number: string, repo?: string): string {
@@ -137,6 +147,8 @@ const git_gh_api_path = {
 	pull_api_path,
 	pull_merge_api_path,
 	pull_comments_api_path,
+	pull_files_api_path,
+	code_scanning_alerts_api_path,
 	pull_reviews_api_path,
 	commit_api_path,
 	commit_check_runs_api_path,

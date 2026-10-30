@@ -9,6 +9,9 @@ const overlap_mock = vi.spyOn(run_ship_overlap, 'await_overlap')
 
 // An open pull request, so a merge the sync made is pushed ahead of the gate.
 vi.mock('#scripts/gh/git-gh-pr-read', () => ({ git_gh_pr_read: { pr_get_number: async () => 1 } }))
+vi.mock('#scripts/gh/git-gh-code-scanning', () => ({
+	git_gh_code_scanning: { own_alerts_note: async () => undefined },
+}))
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch: async () => '3221-lane' } }))
 vi.mock('#scripts/git/main-merge', () => ({ main_merge: { merge: merge_mock } }))
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
