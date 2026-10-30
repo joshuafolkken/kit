@@ -230,6 +230,7 @@ describe('process_identity.is_live_beacon — an unanswered probe is unknown, no
 		const target = token.slice(SOCKET_SCHEME.length)
 
 		try {
+			expect(probe_socket(target)).toBe(0)
 			expect(process_identity.is_live_beacon(target, probe_socket)).toBe(true)
 		} finally {
 			process_identity.close_beacon(token)

@@ -1,0 +1,7 @@
+{
+	"reason": "Grant the linked worktree Git directory explicitly while preserving protected Git entries; existing resolver and serializer are reused.",
+	"date": "2026-10-29",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

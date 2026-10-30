@@ -96,6 +96,17 @@ function git_grants(common_directory: string | undefined): ReadonlyArray<Grant> 
 	]
 }
 
+// Codex also protects a linked work tree's own git directory even under a writable common root
+// (codex-cli 0.165.0). FETCH_HEAD and PR body files need an explicit grant there.
+function own_git_grants(cwd: string, common_directory: string | undefined): ReadonlyArray<Grant> {
+	const own = git_common_directory.own(cwd)
+	if (own === undefined || own === common_directory) return []
+
+	const root = realpathSync(own)
+
+	return [[root, WRITE], ...pinned(root, PINNED_ENTRIES)]
+}
+
 // Only the ledger's parent directory is writable outside a lane, never the primary checkout root.
 function ledger_grants(
 	common_directory: string | undefined,
@@ -138,6 +149,7 @@ function lane_grants(cwd: string | undefined, profile: AgentProfile): ReadonlyAr
 
 	return [
 		...git_grants(common_directory),
+		...own_git_grants(cwd, common_directory),
 		...state_grants(common_directory),
 		...ledger_grants(common_directory, profile),
 	]

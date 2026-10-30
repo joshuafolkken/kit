@@ -1,5 +1,6 @@
 import { stripVTControlCharacters } from 'node:util'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { run_board_fit } from './run-board-fit'
 import type { QuotaReading, Quotas } from './run-board-quota-read'
 import { run_board_render_quota, type QuotaView } from './run-board-render-quota'
 
@@ -30,13 +31,6 @@ function rows_of(view: Partial<QuotaView>): Array<string> {
 	return (part?.lines ?? []).map((line) => stripVTControlCharacters(line.text))
 }
 
-// Claude's row, raw, for one 5h window `used` percent full whose reset is `left_ms` away.
-function colored(used: number, left_ms: number): string {
-	const quotas = { claude: reading([window_of(FIVE_HOURS, used, left_ms)]), codex: undefined }
-
-	return usage_part({ quotas, now_ms: NOW_MS })?.lines[0]?.text ?? ''
-}
-
 const QUOTAS: Quotas = {
 	claude: reading([
 		window_of(FIVE_HOURS, 42, 2 * HOUR_MS),
@@ -47,6 +41,34 @@ const QUOTAS: Quotas = {
 
 afterEach(() => {
 	vi.unstubAllEnvs()
+})
+
+function column_at(row: string, value: string): number {
+	return run_board_fit.width_of(row.slice(0, row.indexOf(value)))
+}
+
+describe('run_board_render_quota scheduler', () => {
+	it.each([
+		{ scheduler_provider: 'claude', value: '42%', weekly: '68%' },
+		{ scheduler_provider: 'codex', value: '—', weekly: '45%' },
+	] as const)(
+		'puts scheduler %s first without moving usage columns',
+		({ scheduler_provider, value, weekly }) => {
+			const view = { quotas: QUOTAS, scheduler_provider }
+			const [first = '', second = ''] = rows_of(view)
+			const plain =
+				rows_of({ quotas: QUOTAS }).find((row) => row.includes(scheduler_provider)) ?? ''
+
+			expect(first).toMatch(new RegExp(`^  🤖 ${scheduler_provider} `, 'u'))
+			expect(second).toMatch(/^ {5}(claude|codex) /u)
+			expect(second).not.toContain('🤖')
+			expect(column_at(first, value)).toBe(column_at(plain, value))
+			expect(column_at(first, weekly)).toBe(column_at(plain, weekly))
+			expect(usage_part({ ...view, now_ms: NOW_MS })?.summary).toMatch(
+				new RegExp(`^🤖 ${scheduler_provider} `, 'u'),
+			)
+		},
+	)
 })
 
 describe('run_board_render_quota.usage_part', () => {
@@ -103,20 +125,33 @@ describe('run_board_render_quota.usage_part hold and age', () => {
 })
 
 describe('run_board_render_quota gauge colors', () => {
-	it('leaves a percent under half and under pace plain, and tints one from half or past pace', () => {
-		vi.stubEnv('FORCE_COLOR', '1')
-		const plain = colored(10, 4 * HOUR_MS)
-		const past_pace = colored(40, 4.5 * HOUR_MS)
-		const yellow = colored(55, HOUR_MS)
-		const red = colored(95, 10 * MINUTE_MS)
+	it.each([
+		{ used: 10, remaining: 0.2, shade: 32 },
+		{ used: 40, remaining: 0.9, shade: 33 },
+		{ used: 55, remaining: 0.2, shade: 33 },
+		{ used: 95, remaining: 0.02, shade: 31 },
+	])(
+		'keeps $used% plain while coloring both providers and windows with $shade',
+		({ used, remaining, shade }) => {
+			vi.stubEnv('FORCE_COLOR', '1')
+			const windows = [FIVE_HOURS, SEVEN_DAYS].map((minutes) =>
+				window_of(minutes, used, minutes * MINUTE_MS * remaining),
+			)
+			const quotas = { claude: reading(windows), codex: reading(windows) }
+			const part = usage_part({ quotas, now_ms: NOW_MS })
+			const lines = part?.lines ?? []
 
-		expect(plain).toContain('claude        10%')
-		expect(past_pace).not.toContain('claude        40%')
-		expect(yellow).not.toBe(stripVTControlCharacters(yellow))
-		expect(red).not.toBe(yellow)
-	})
+			expect(lines).toHaveLength(2)
+
+			for (const line of lines) {
+				expect(line.text.split(`${String(used)}% `)).toHaveLength(3)
+
+				expect(line.text.split(`\u{1B}[${String(shade)}m■`).length).toBeGreaterThan(2)
+			}
+		},
+	)
 
 	it('names ⛽, ┊ and ↻ in the legend', () => {
-		expect(LEGEND).toEqual(['⛽ usage', '┊ pace', '↻ reset'])
+		expect(LEGEND).toEqual(['⛽ usage', '🤖 scheduler', '┊ pace', '↻ reset'])
 	})
 })
