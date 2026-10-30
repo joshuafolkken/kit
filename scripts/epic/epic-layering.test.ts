@@ -3,12 +3,9 @@ import path from 'node:path'
 import { import_graph, type FileGraph } from '#scripts/refactor/import-graph'
 import { describe, expect, it } from 'vitest'
 
-// joshuafolkken/kit#2904: the epic code used to live in two directories that imported each other —
-// `scripts/epic/` read `scripts/git/git-epic-*`, and six of those read `scripts/epic/` back, with the
-// GitHub I/O layer itself reading an epic type. The direction is now one-way: the epic domain builds
-// on the git layer, and no git-layer module the epic domain depends on may depend on the epic domain
-// in turn. A module that consumes the epic domain from above (the followup that closes a finished
-// epic) stays allowed, because no epic module reaches it.
+// Dependencies flow from the epic domain to the git layer, so git modules it reaches must not
+// import the epic domain back. Higher-level consumers such as followup remain allowed because
+// the epic domain does not reach them (joshuafolkken/kit#2904).
 
 const ROOT = process.cwd()
 const SCRIPTS = path.join(ROOT, 'scripts')

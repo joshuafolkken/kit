@@ -227,12 +227,9 @@ function turn_key(entry: DatedLine, index: number): string {
 	return entry.message_id
 }
 
-// **The turn a call belongs to, gathered by id but never moved**. A folded
-// turn used to be *placed* where it opened, which both grouped a message's calls and reordered them:
-// a background unit's call landing between two blocks of a parent message was read after the whole
-// parent turn instead of at its own instant. This gathers each message's calls without touching the
-// timeline order — the reading walks the lines in the order `dated_lines_of` sorted them and asks
-// this map only for a call's siblings. A line with no id keys a turn of its own, so its context is
+// Gather each call's turn by id without moving it: a background call between two parent-message
+// blocks must retain its own timeline position. The reading walks lines in `dated_lines_of` order
+// and asks this map only for a call's siblings. A line with no id keys a turn of its own, so its context is
 // its own calls.
 function turns_by_key(entries: ReadonlyArray<DatedLine>): Map<string, Array<IssuedCall>> {
 	const turns = new Map<string, Array<IssuedCall>>()

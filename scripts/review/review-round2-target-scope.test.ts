@@ -183,7 +183,7 @@ function share_unmoved_branch(): void {
 describe('a round-2 target after a merge moved the change base', () => {
 	share_moved_branch()
 
-	// The reproduction itself, asserted on the raw comparison the brief used to hand over verbatim.
+	// The raw comparison exposes why the review scope must follow the branch's own diff.
 	// Both directions are visible in this one value: `shared.ts` is in it and is not in the branch's
 	// diff, and `branch-only.ts` is in the branch's diff and is not in it.
 	it('reproduces both directions in the bare digest comparison', () => {

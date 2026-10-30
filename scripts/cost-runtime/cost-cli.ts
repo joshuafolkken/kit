@@ -12,11 +12,8 @@ import { transcript_cwd } from './transcript-cwd'
 // `josh cost` — what the next turn of a run will cost, read from the active provider's own session
 // usage.
 //
-// Since #2016 this is the `--over` hand-off verdict alone. The readerless report scopes
-// (`--session` / `--issue` / `--all` / `--run` / `--json`) and the `--cap` counterfactual were
-// retired because no rule or decision read them — leaving only the entry judgment `fullrun` /
-// `backlogrun` / `halfrun` / `pre-gate-cut` ask, and the `josh time` run-timing report keeps the
-// hand-off aggregates used to compare the `--cut` break-even.
+// Only the entry judgment requested by workflow and cut commands belongs here (#2016).
+// `josh time` owns the hand-off aggregates for comparing the `--cut` break-even.
 
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh cost (--cut | --over <tokens-per-request>) [--path <dir>]'

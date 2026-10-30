@@ -23,13 +23,9 @@ vi.mock('#scripts/git/git-command', () => ({
 
 const { git_followup_pending } = await import('./git-followup-pending')
 
-// joshuafolkken/kit#1486: the completion notification used to read the local `package.json` and
-// report it as the shipping version. Children no longer bump, so that read now names the *previous*
-// release — the unconfirmed value presented as fact this suite exists to keep out.
-//
-// What the assertions are really about is the two directions in which the replacement can be wrong:
-// a count that is silently understated by this run's own merge, and a count nobody could measure
-// being reported as zero.
+// The local package version does not confirm a release. Completion must count pending changes
+// without understating this run's merge or treating an unreadable count as zero
+// (joshuafolkken/kit#1486).
 
 const BASE_SHA = 'a1b2c3d4e5f6a7b8'
 const CURRENT_VERSION = '1.340.0'

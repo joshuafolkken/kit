@@ -187,8 +187,8 @@ describe('apply_package_json_merges — generated config dependencies', () => {
 const PUBLISHED_PIN = '12.6.0+sha512.abc'
 const PACKAGE_MANAGER_FIELD = 'pnpm@12.7.0'
 
-// pnpm strips `packageManager` when it publishes, so the installed kit carries its pin only in
-// `devEngines`; the consumer used to get the bare `>=12.1.0` range instead (#2710).
+// pnpm strips `packageManager` when publishing, so the installed kit's `devEngines` pin must supply
+// the consumer's package-manager version (#2710).
 describe('resolve_kit_package_manager', () => {
 	it('prefers the packageManager field', () => {
 		const manifest = { packageManager: PACKAGE_MANAGER_FIELD }

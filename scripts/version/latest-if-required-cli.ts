@@ -10,8 +10,8 @@ import { latest_scope_cli } from './latest-scope-cli'
 // `josh latest:if-required` — the dependency update a run owes, in one call.
 //
 // `latest:scope` decides; on `required` the tree is set aside, `josh latest` runs, and the stash is
-// popped by its message. Four procedures used to spell that sequence out, and each copy was one more
-// place to drift from the others. `josh latest` itself stays a fixed `sh -c` chain that takes no
+// popped by its message. Sharing that sequence keeps the entry procedures in agreement.
+// `josh latest` itself stays a fixed `sh -c` chain that takes no
 // arguments, so the conditional form is its own command rather than a flag on it.
 //
 // **Every failure leaves the stash where it is.** A failed update can leave `package.json` half

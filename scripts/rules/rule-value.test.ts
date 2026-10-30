@@ -351,10 +351,8 @@ describe('rule_value.measure — what counts as one turn', () => {
 	})
 })
 
-// **A folded turn is placed for its context, not for its position** (joshuafolkken/kit#1804). One
-// parent message spans time — a text block, then a call — and a background unit drops a call between
-// the two. Read in timeline order the unit's call precedes the parent's; folded to the parent's
-// opening line it followed it, because the fold used to place a turn where it opened.
+// A folded turn belongs at its call's context so an intervening background call keeps its timeline
+// order even when the parent message opens earlier (joshuafolkken/kit#1804).
 const PARENT_MESSAGE_ID = 'msg_parent'
 
 // The parent message's opening block: a thought, no call, carrying the id at t0 so the turn opens

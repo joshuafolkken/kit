@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 // joshuafolkken/kit#2996: a rule number written in several documents drifts the moment one of them
 // changes. Each number has one source in code, one document that states it, and every other document
 // points at that document instead of restating it — so this suite pins both halves: the stating
-// document agrees with the code, and the documents that used to restate it no longer do.
+// document agrees with the code, and every other document points there without restating it.
 
 const WIP_CAP = String(issue_wip.WIP_CAP)
 const FILE_GUIDE = String(split_assess.FILE_GUIDE)
@@ -26,7 +26,7 @@ const OPERATING_RULES = 'prompts/collaboration-workflow/operating-rules.md'
 const OVERVIEW = 'prompts/collaboration-workflow/overview.md'
 const RESIDENCY = 'prompts/collaboration-workflow/residency.md'
 // The review round cap's number is stated in `review.md`; every other document points at its heading.
-// Each phrasing below is one a document has used to restate the cap as a limit, not merely to name
+// Each phrasing below restates the cap as a limit, rather than merely naming
 // "the two rounds" of a review that the cap allows.
 const TWO_REVIEWS = 'two reviews'
 const ROUND_CAP_RESTATEMENTS: ReadonlyArray<string> = [

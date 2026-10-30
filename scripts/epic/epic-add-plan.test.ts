@@ -66,8 +66,7 @@ describe('epic_add_plan.build_plan — no position given', () => {
 		expect(tracked).toStrictEqual([890, 891, 892, 894])
 	})
 
-	// joshuafolkken/kit#1253: the child used to be appended to the declared chain, so it came out
-	// blocked by an issue nobody related it to.
+	// An unrelated child must not inherit the declared chain's blockers (joshuafolkken/kit#1253).
 	it('leaves the declared chain alone and records no relation', () => {
 		const added_child = plan_of(plan({}))
 
@@ -97,8 +96,8 @@ describe('epic_add_plan.build_plan — positioning', () => {
 		expect(inserted.removed).toStrictEqual([{ blocker: 890, blocked: 891 }])
 	})
 
-	// joshuafolkken/kit#1080: `--after` used to splice, so this produced `#890 -> #894 -> #891 -> #892`
-	// and recorded `#894 -> #891` on top of the link the position asked for.
+	// `--after` declares only the requested dependency; it must not splice the child into existing
+	// links and invent a reverse blocker (joshuafolkken/kit#1080).
 	it('branches after the target rather than splicing into the chain', () => {
 		const inserted = plan_of(plan({ position: { kind: 'after', target: 890 } }))
 

@@ -229,7 +229,7 @@ describe('total_blocked_by', () => {
 
 // joshuafolkken/kit#1736: the one field name here `gh --json` never had. A caller that asks for it
 // learns from the listing it already holds whether an issue has blockers, instead of paying a
-// per-issue request to find out — which is what `epic:bundle` used to do for every open issue.
+// per-issue request to find out.
 function mapped_value(field: string, overrides: Record<string, unknown> = {}): unknown {
 	return map(field, overrides)[field]
 }

@@ -4,16 +4,11 @@ import { parse_jsonc } from '#scripts/config-merge/parse-jsonc'
 import { patch_json_key } from '#scripts/config-merge/patch-json-key'
 import { string_array_schema } from '#scripts/lib/schemas'
 
-// kit-family tsconfig presets used to ship with a `.jsonc` extension. Playwright (>= 1.62) appends
-// `.json` to any `extends` entry that does not already end in it and then hard-throws when the
-// resulting path is missing, so `…/tsconfig/base.jsonc` resolved to `…/tsconfig/base.jsonc.json`
-// and the entire E2E suite failed to start. (Before the throw was added the preset was simply never
-// applied, so the mis-resolution was silently wrong there too.) The presets are now shipped as
-// `*.json`; a consumer whose `extends` still points at the old path would never be repaired by the
-// ensure-based merge — an `@joshuafolkken/*` tsconfig entry is already present, so nothing is added
-// — hence the rewrite here. Scoped to `@joshuafolkken/*/tsconfig/*` paths so an unrelated
-// project-local `.jsonc` config is left alone. Removable from kit 2.0.0; a consumer still extended
-// a `.jsonc` preset at joshuafolkken/kit#4187.
+// Playwright appends `.json` to `extends` entries without that suffix, so a `.jsonc` preset path
+// becomes missing and prevents E2E startup. The ensure-based merge cannot repair an existing kit
+// entry, so this rewrite replaces its suffix. Only `@joshuafolkken/*/tsconfig/*` paths qualify;
+// project-local `.jsonc` configs remain untouched. Removable from kit 2.0.0; compatibility is needed
+// for consumers with `.jsonc` preset references (joshuafolkken/kit#4187).
 const LEGACY_PRESET_ENTRY = /@joshuafolkken\/[^/]+\/tsconfig\/[^/]+\.jsonc$/u
 const LEGACY_SUFFIX = '.jsonc'
 const CURRENT_SUFFIX = '.json'

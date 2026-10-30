@@ -198,9 +198,8 @@ describe('propagate_steps.sync_command', () => {
 })
 
 describe('propagate_steps.STEP_COMMANDS', () => {
-	// The four checks used to be re-chained here as a string. They are now single-sourced in
-	// `josh gate` (joshuafolkken/kit#914), so the coverage is asserted against that definition —
-	// a check added to the gate reaches the consumer-side verification without a second edit.
+	// The checks are single-sourced in `josh gate` (joshuafolkken/kit#914), so coverage follows that
+	// definition: a check added to the gate reaches consumer-side verification without a second edit.
 	it('runs the whole gate, not only the type check', () => {
 		expect(propagate_steps.VERIFY_SCRIPT).toBe(`pnpm josh ${GATE_COMMAND}`)
 

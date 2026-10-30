@@ -75,11 +75,8 @@ describe('git_notify.build_notify_config — message and mentions', () => {
 	})
 })
 
-// **Trimming moved up with the expansion, and for the same reason.** This function used to read
-// `raw.trim().replaceAll(…)` — trim first, expand second. Keeping the trim here once the expansion
-// had moved reversed that order, so `--notify-message "…\n"` lost the newline its own escape had just
-// produced. The quoting slack is now removed by `cli_body` before the escape is expanded
-// (`scripts/josh/cli-body.test.ts`), and what arrives here is passed on as it stands.
+// `cli_body` trims quoting slack before expanding escapes. Passing its result through unchanged
+// preserves explicitly requested newlines (`scripts/josh/cli-body.test.ts`).
 describe('git_notify.build_notify_config — the message is passed on as it stands', () => {
 	it('keeps the newlines at either end of the message it was handed', () => {
 		const result = git_notify.build_notify_config({

@@ -147,7 +147,7 @@ function recorded_line(): string | undefined {
 }
 
 describe('--wait — a report reaches the stream without waking the caller', () => {
-	// The regression the Issue was filed on: a report used to end the wait, and the exit was the wake.
+	// A report must keep waiting; only a wake ends the wait.
 	it('reports to the event stream and keeps waiting rather than exiting', async () => {
 		report_once(INTERVAL_MS)
 

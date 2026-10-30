@@ -75,9 +75,8 @@ beforeEach(() => {
 	silence_console()
 })
 
-// joshuafolkken/kit#1486: the line used to be `📦 project version: <v>`, read from the local
-// `package.json`. Children no longer bump, so that number names the previous release rather than what
-// the run ships, and the count of unreleased merges replaces it.
+// The count of unreleased merges describes what the run ships; the local package version names
+// the previous release because children do not bump it (joshuafolkken/kit#1486).
 describe('print_pending_release', () => {
 	it('logs whatever the pending-release module returned', async () => {
 		await git_followup_finish.print_pending_release()
@@ -281,9 +280,8 @@ describe('the progress watcher is ended only by a merged run', () => {
 	})
 })
 
-// joshuafolkken/kit#1539. The tail used to be four bare statements, so whichever of them threw first
-// discarded the ones after it — and the hold release is the last. Three merged runs (#1197, #1537,
-// #1319) ended exactly that way, leaving the checkout locked for the next run.
+// Every tail step must run despite another step's failure so the hold is released for the next run
+// (joshuafolkken/kit#1539, #1197, #1537, #1319).
 describe('finish — one failing step does not discard the rest', () => {
 	const FAILURE = new Error('ENOSPC: no space left on device')
 

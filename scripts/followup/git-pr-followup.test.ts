@@ -142,10 +142,9 @@ function setup_skip_policy_mocks(): void {
 	setup_run_mocks()
 }
 
-// joshuafolkken/kit#1539: the issue number used to reach the notification from the command line
-// alone, and an invocation that omitted it threw after the merge had already landed. The stage that
-// warns about a missing `closes #N` reads the pull request body anyway, so that read is what recovers
-// the number.
+// The pull-request body supplies the notification's issue number when the command omits it, so
+// completion can finish after the merge (joshuafolkken/kit#1539). The missing-closes check already
+// needs that body, so the lookup is shared.
 const CLOSES_KEYWORD = 'closes #1539'
 const BODY_WITHOUT_CLOSES = '## Summary\nNo issue link here'
 

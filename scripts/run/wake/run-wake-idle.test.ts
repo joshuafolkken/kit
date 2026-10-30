@@ -2,10 +2,8 @@ import type { CarryRead, RunCarry } from '#scripts/run/carry/run-carry'
 import { describe, expect, it } from 'vitest'
 import { run_wake, type WakeDecisionInput } from './run-wake'
 
-// joshuafolkken/kit#2417. The decision used to read the carry record alone, so a session was launched
-// whether or not it would find work. These pin the gate every launch now passes: work (or a read that
-// cannot tell) wakes, no work defers, and a deferral that outlives the idle ceiling wakes anyway so the
-// run is still finished by a session rather than left to expire.
+// Launch only for work or an unreadable work state. Empty work defers until the idle ceiling, then
+// wakes a session to finish the run rather than leaving it to expire (joshuafolkken/kit#2417).
 
 const NOW = new Date('2026-09-10T12:00:00.000Z')
 const INVOCATION = 'backlogrun --max 5 --idle 30'

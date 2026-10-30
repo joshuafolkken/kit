@@ -150,7 +150,7 @@ describe('run_checks — a confirmed watch shortens the wait', () => {
 })
 
 describe('run_checks — the swallowed failure stays visible', () => {
-	// Swallowing it silently would hide the reason a run used to stop here.
+	// Report the error so the run's stop has an observable reason.
 	it('says the watch failed and that it fell through', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 

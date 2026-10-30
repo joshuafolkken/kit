@@ -38,9 +38,8 @@ const INLINE_FLAG = '--body'
 const FILE_FLAG = '--body-file'
 // The shortest body a case can carry when what it pins is the route rather than the text.
 const DONE = 'done'
-// What `\nline1\nline2\n` expands to — assembled from its lines rather than written as a literal, so
-// the expected value cannot be read as the same token as the escaped input beside it. The newlines at
-// either end are the ones a downstream `trim` used to eat.
+// Assemble the expansion from lines so the expected value differs visibly from the escaped input.
+// Leading and trailing escaped newlines must survive normalization.
 const EDGE_NEWLINES = ['', 'line1', 'line2', ''].join('\n')
 
 // Every character the measurement in `prompts/collaboration-workflow/shell-body.md` found dangerous,
@@ -115,10 +114,8 @@ describe('cli_body.resolve — the file route', () => {
 	})
 })
 
-// **Trim first, expand second.** `git_notify` used to run `raw.trim().replaceAll(…)` in one
-// expression; moving only the expansion here left a trim downstream of it, and a body written
-// `--notify-message "…\n"` had the newline its own escape had just produced eaten as surrounding
-// whitespace. These two cases are the pair: the quoting slack goes, the escape's newlines stay.
+// Trim before expansion so quoting slack is removed while newlines explicitly requested with an
+// escape survive.
 describe('cli_body.resolve — the order the inline route reads in', () => {
 	it('trims the surrounding whitespace a shell token picks up', () => {
 		expect(

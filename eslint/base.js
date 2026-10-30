@@ -138,10 +138,8 @@ export function create_base_config({ gitignore_path, tsconfig_root_dir }) {
 			plugins: { import: importPlugin },
 			settings: {
 				// joshuafolkken/kit#3599: `import-x/resolver-next` is the key eslint-plugin-import-x
-				// reads. The resolvers used to sit under `import/resolver`, which the plugin ignores —
-				// the rules are only *named* `import/` here, the settings namespace stays the plugin's
-				// own — so every import fell back to the default node resolver, which does not follow
-				// an extensionless `.ts` specifier, and `no-cycle` was green over cycles it never saw.
+				// reads. The settings namespace must match the plugin even though the rules are named
+				// `import/`, so extensionless TypeScript imports resolve and cycle checks can follow them.
 				'import-x/resolver-next': [
 					// `project` roots the resolver's tsconfig where the parser's is. Left out, the
 					// resolver reads the one in `process.cwd()`, so a run started anywhere else resolves

@@ -6,13 +6,9 @@ import { test_e2e_guard } from '#scripts/test/test-e2e-guard'
 import { afterAll, describe, expect, it } from 'vitest'
 import { ci_yml_fixture } from './ci-yml-fixture'
 
-// Which suite CI runs and which suite `pnpm josh test:e2e` runs used to be two different questions.
-// CI asked for a file named `playwright.config.ts` plus an `*.e2e.{ts,js}` under `tests` or
-// `src/routes`; the guard asked for any `*.e2e.{ts,js}` outside `node_modules` and never looked at
-// the config's name. A project that answered one and not the other got `enabled=false`, a skipped
-// `e2e` job, a rollup that counts a skip as a pass, and a merge with the suite never run — which is
-// only a defect at all because joshuafolkken/kit#902 made the CI job the sole E2E signal a `fullrun`
-// reads (joshuafolkken/kit#991).
+// CI and `pnpm josh test:e2e` must detect the same suite: a skipped CI job counts as passing, so
+// disagreement can permit a merge without running E2E. The CI job is the fullrun's sole E2E signal
+// (joshuafolkken/kit#902, joshuafolkken/kit#991).
 //
 // These guards execute the workflow's own script rather than matching substrings in it, because a
 // substring match cannot tell whether two detection rules select the same files. Each fixture is
@@ -23,8 +19,7 @@ const DETECT_STEP_ID = 'check'
 const OUTPUT_FILE_NAME = 'github-output'
 const ENABLED_TRUE = 'enabled=true'
 const PLAYWRIGHT_PACKAGE = path.join('node_modules', '@playwright', 'test')
-// The two paths most rows share: the config spelling CI used to demand, and a spec in the one
-// directory it used to search. Named so a row differs from the others only where it means to.
+// Shared config and spec paths keep each fixture's intended difference explicit.
 const TS_CONFIG = 'playwright.config.ts'
 const ROUTE_SPEC = 'src/routes/home.e2e.ts'
 const { TEMPLATE_CI_YML, RUNTIME_CI_YML, find_job, find_step_by_id, step_run } = ci_yml_fixture
@@ -105,9 +100,8 @@ interface DetectionCase {
 	readonly has_specs: boolean
 }
 
-// Every row is a layout the two rules used to disagree about, or one they have to keep agreeing
-// about. `has_specs` is asserted as well as compared: two rules that were both wrong would agree
-// with each other and say nothing.
+// `has_specs` is asserted as well as compared: two equally wrong detection rules would agree
+// with each other without proving that either selects the suite.
 const DETECTION_CASES: ReadonlyArray<DetectionCase> = [
 	{
 		layout: 'a spec under src/routes',

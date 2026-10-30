@@ -193,9 +193,8 @@ function print_gate_step(result: GateStepResult, is_verbose: boolean): void {
 }
 
 // **One line per failed check, naming the command that reproduces it, printed at the tail just above
-// the verdict**. A red gate used to report every failing check only in its
-// bodies, which is where truncation lands: the run picked one failure at a time across separate gate
-// runs because it could not read the rest. The verdict names *which* checks failed; this names *what
+// the verdict**. Check bodies can be truncated, so the tail must retain every reproduction command
+// to make all failures actionable in one pass. The verdict names *which* checks failed; this names *what
 // to run* for each, and it sits in the same tail window the verdict and the log notice already
 // occupy, so a `tail -40` keeps it. The verdict stays the last line for the reason `josh-verdict.ts`
 // gives.

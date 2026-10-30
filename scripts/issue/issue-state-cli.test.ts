@@ -80,9 +80,8 @@ describe('issue_state_cli.run — a state that was read', () => {
 		expect(info_mock).toHaveBeenCalledWith(expect.stringContaining('state: CLOSED'))
 	})
 
-	// The two reads the documents used to prescribe asked for `state` and for `state,labels`; one
-	// call answers both, and the field names stay the ones `gh issue view --json` gave them so the
-	// REST casing never reaches this file.
+	// One call answers state and labels using `gh issue view --json` field names so REST casing does
+	// not leak into this interface.
 	it('asks for the state and the labels in one read', async () => {
 		classified_mock.mockResolvedValue(READ_CLOSED)
 
@@ -257,9 +256,8 @@ describe('issue_state_cli.parse_request — the inline --repo=<owner/repo> spell
 	})
 })
 
-// joshuafolkken/kit#1355: a token starting with a dash used to be discarded before the numeric check
-// ever saw it, so a misspelled inline flag fell back to the session's repository and printed a
-// confident state for a *different* repository's issue of the same number.
+// A misspelled inline flag must fail before repository fallback can report another repository's
+// issue with the same number (joshuafolkken/kit#1355).
 describe('issue_state_cli.parse_request — a flag nobody recognizes', () => {
 	// One character short of the inline spelling, which is what makes it a typo rather than a
 	// different argument: the value is right there and still nothing reads it.

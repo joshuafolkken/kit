@@ -117,10 +117,8 @@ describe('is_body_only_issue_read', () => {
 		BODY_READ_API_COMMAND,
 		'gh api repos/{owner}/{repo}/issues/1319 --jq .body',
 		'gh api -X GET repos/joshuafolkken/kit/issues/1319',
-		// A `-c` belonging to another command, and a trailing pipe, used to silence the rule for the
-		// whole line. **`gh issue view <N> -c` is refused too, and that is the deliberate side of the
-		// trade**: `-c` is `wc`'s and `grep`'s far more often than `gh`'s, and a run that used the
-		// short flag pays one round trip while every compound line stays guarded.
+		// A pipe or another command's `-c` must not exempt the issue read. Refusing `gh issue view -c`
+		// too keeps compound lines guarded at the cost of one reissue for that short spelling.
 		'gh issue view 1319 --json body --jq .body | wc -c',
 		'gh issue view 1319 && grep -c foo x.ts',
 		'gh issue view 1319 -c',

@@ -208,13 +208,9 @@ describe('time_batch_guard.should_block — writes', () => {
 	})
 })
 
-// The two tests the caller asks before reading a quarter-megabyte of transcript, so a `pnpm josh`
-// invocation costs nothing but the hook's own start. **They are one table because the pair is the
-// content of joshuafolkken/kit#1762**: `is_guarded_call` widened to "could this have gone out beside
-// another call" and admits every write, while `is_read_only_call` is what it used to be and admits
-// none. `scripts/delegation/investigation-reads.ts` asks the second — that guard counts *reading*, so
-// an in-place `sed` stays outside its reach even now that the batching guard can refuse one, and
-// widening the single predicate in place would have moved it silently.
+// Check tool names before reading the transcript, so a `pnpm josh` call pays only for hook startup.
+// The predicates share a table because batching counts writes but investigation counts only reads;
+// an in-place sed belongs to the former alone (joshuafolkken/kit#1762).
 //
 // A chain is labelled by its first segment, so the leading word alone reads two of these as reads —
 // scanning the whole line is what tells the two columns apart.
@@ -248,11 +244,9 @@ describe('time_batch_guard.is_notice_call — the whole-file write alone', () =>
 	})
 })
 
-// joshuafolkken/kit#2164. The guard used to fire once per unbroken run of single-call turns and then go
-// silent — a run that ignored the refusal and kept single-calling was never spoken to again. It now
-// re-fires every `REFIRE_EVERY` further single-call turns the run keeps issuing, so the pressure is
-// steady rather than spent. The instant a case passes for `last_fired` is the one the guard recorded
-// when it first fired, which on the fixture grid is the minute the third turn's call went out.
+// Re-fire every REFIRE_EVERY further single-call turns so ignoring a refusal cannot exhaust the
+// guard. The fixture's last_fired is the third turn's call, when the first refusal occurs
+// (joshuafolkken/kit#2164).
 describe('time_batch_guard.should_block — the re-fire cadence', () => {
 	// The first firing lands during the third turn, so the instant the guard records is that turn's call
 	// minute. `turn n` issues on minute `2n + 1`, so the third turn (index 2) issues on minute 5.

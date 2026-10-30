@@ -222,8 +222,8 @@ describe('telegram_environment_schema', () => {
 	})
 })
 
-// joshuafolkken/kit#1564. Both of these paths used to warn and return, so a notification that
-// reached nobody exited 0 and was indistinguishable from one that arrived.
+// An undelivered notification must fail so its exit status cannot imply delivery
+// (joshuafolkken/kit#1564).
 describe('telegram_notify.send — a notification that reached nobody', () => {
 	it('throws naming the missing variable, never its value', async () => {
 		set_credentials(undefined, CHAT_ID)

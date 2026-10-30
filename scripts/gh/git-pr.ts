@@ -10,13 +10,9 @@ import { git_gh_command } from './git-gh-command'
 import { git_pr_error } from './git-pr-error'
 import { git_pr_messages } from './git-pr-messages'
 
-// **Answers the new pull request's URL, and `undefined` when one already existed.** `pr_create`
-// filters its REST response to `.html_url`, so the address is in hand the moment the call returns —
-// which matters now that nothing waits before reporting it. `pr_get_url`
-// resolves the branch through the `?head=…` listing, and that listing is eventually consistent: read
-// in the same instant the pull request was created it can answer nothing, and `pr_get_url` folds
-// "not there yet" and "the read failed" into the same `undefined`. The five-second sleep used to
-// cover that gap incidentally.
+// Return the new pull request's URL directly from `pr_create`: the branch listing read by
+// `pr_get_url` is eventually consistent and can answer nothing immediately after creation.
+// An existing pull request returns `undefined` because this call did not create it.
 async function create_pr(
 	title: string,
 	body: string,
@@ -53,20 +49,10 @@ async function display_pr_url_if_available(branch_name: string): Promise<void> {
 	}
 }
 
-// **This command stops at "the pull request is open"; it does not wait for the checks**.
-// It used to sleep five seconds and then watch the rollup on a two-minute
-// budget — measured at 119.8 seconds of one 1555-second run, 7.7% of it — and the answer decided
-// nothing: only `timed_out` was read, and only to pick which message to print. What actually blocks
-// a merge is `pnpm josh followup`, whose `wait_for_pr_success` asks a stricter question (CLEAN merge
-// state, every required check green, no standing change request) and starts that wait from scratch
-// the moment this command returns. So the wait here was the same answer, paid for twice.
-//
-// **The conflict read went with it, and its replacement is not here.** `git-conflict.ts` read
-// `mergeStateStatus` right after the watch reported the checks settled, where `BLOCKED` genuinely
-// meant something. Called at *this* point it would fire on every healthy pull request instead:
-// GitHub reports `BLOCKED` as soon as a required check is queued. The conflict is caught in
-// `git-pr-checks-eval.ts` now, where `DIRTY` ends the wait on its first poll — about ten seconds,
-// against the two minutes this watch took to reach the same conclusion.
+// This command stops when the pull request is open. `pnpm josh followup` owns the merge decision
+// and waits for CLEAN state, passing required checks and no standing change request.
+// Conflict diagnosis belongs there too: a newly queued required check makes a healthy PR BLOCKED,
+// while `git-pr-checks-eval.ts` can identify a genuine conflict from DIRTY state.
 async function report_open_pr(branch_name: string, created_url?: string): Promise<void> {
 	git_pr_messages.display_pr_opened_message()
 

@@ -10,13 +10,8 @@ import {
 import { describe, expect, it } from 'vitest'
 import { package_file } from './skill-fixture'
 
-// The canonical workflow document used to be one 169 KB file, and every pointer into it named a
-// section — so consulting one topic meant reading all of them, and paying for all of them on every
-// remaining turn of the session. joshuafolkken/kit#965 split it into one file per topic and left
-// the old path as an index.
-//
-// What can silently rot after a split is the pointers: a renamed topic file leaves a citation
-// resolving to nothing, and nothing else in the suite would notice. This is the guard.
+// Topic files keep workflow reads focused (joshuafolkken/kit#965). Renaming a topic can leave a
+// citation unresolved, so this suite checks the index and pointers together.
 
 const INDEX = 'prompts/collaboration-workflow.md'
 const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu

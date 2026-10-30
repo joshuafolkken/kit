@@ -69,9 +69,7 @@ describe('josh.ts — no command', () => {
 })
 
 describe('josh.ts — help command', () => {
-	// The flag spellings are here because #825 moved the unknown-command path to stderr, and they
-	// used to reach the listing only by falling into it: `josh --help | less` printed the listing
-	// before that move and nothing after it.
+	// Help flags must print the listing on stdout so `josh --help | less` works (#825).
 	it.each(['help', '--help', '-h'])('prints help to stdout for %s', async (help_command) => {
 		process.argv = [...ARGV_BASE, help_command]
 

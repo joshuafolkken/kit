@@ -4,8 +4,8 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { metrics_code_lines } from './metrics-code-lines'
 
-// A real entry point that starts with `#!`: typescript-eslint's single-run inference under `CI=true`
-// used to count its hashbang as code there and as a comment locally (joshuafolkken/kit#3408).
+// A real hashbang entry point verifies that CI single-run inference and local parsing agree about
+// which lines count as code (joshuafolkken/kit#3408).
 const HASHBANG_FILE = path.resolve('tools/metrics/metrics-command.ts')
 
 async function count_with_ci(value: string): Promise<number | undefined> {

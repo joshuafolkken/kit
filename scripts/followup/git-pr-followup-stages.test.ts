@@ -242,9 +242,8 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 	})
 })
 
-// joshuafolkken/kit#1539: a step after the merge is cleanup, and the merge cannot be taken back. Its
-// failure used to end the process, which discarded the steps after it — the working-tree hold release
-// among them — and returned a non-zero exit that `epicrun` and `queue` read as a failed child.
+// Post-merge cleanup must continue through hold release even when one step fails: the merge cannot
+// be taken back, and callers must not classify a merged child as failed (joshuafolkken/kit#1539).
 describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 	const FAILURE = new Error('502 Bad Gateway')
 

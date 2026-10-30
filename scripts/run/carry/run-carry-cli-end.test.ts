@@ -9,10 +9,8 @@ import { run_carry_ended } from './run-carry-ended'
 
 // What `--end` does once per invocation, on the read of a record that is still there.
 //
-// joshuafolkken/kit#2919: `--end` used to flush every lane's ledger lines from the primary checkout in
-// one pull request (joshuafolkken/kit#2492); another run's stash took those lines first and the flush
-// found nothing. Each lane now merges its own lines with its own pull request, so `--end` flushes
-// nothing — and running the flush command at all would be the old route coming back.
+// Each lane merges its own ledger lines with its PR, so `--end` must not flush from a primary checkout
+// whose lines another run can stash (joshuafolkken/kit#2919, #2492).
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },

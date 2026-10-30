@@ -87,7 +87,7 @@ function is_backgrounded_ship(call: GuardedCall): boolean {
 // in either spelling. A child's foreground push is claimed too, because `run-tail` would otherwise answer
 // it with "reissue it backgrounded" — the one reissue this row then refuses — so the child is handed the
 // detached route on its first refusal rather than two contradictory ones. A backgrounded `ship` alone is
-// not refused: `foreground_input` turns it into the foreground call the refusal used to ask for.
+// accepted through `foreground_input` so a detached ship runs with the foreground contract.
 function is_candidate(call: GuardedCall): boolean {
 	if (run_tail_rule.is_push_step_call(call)) return true
 

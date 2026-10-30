@@ -12,7 +12,7 @@ import { capped_print_part } from './capped-print-part'
 //
 // **The cut is #2963's, not a second one.** The parts come from `review_diff_parts.part_texts`, so each
 // file — header included — fits under the cap and the bodies concatenate back to exactly the output.
-// A reader opens them all with the Read tool in one turn, which is the turn the preview used to cost.
+// A reader opens all parts with the Read tool in one turn to avoid repeated fetches.
 //
 // **A fresh directory per call**, unlike the review's per-checkout one: a run fetches several sections
 // in one turn, and a shared directory replaced on every call would delete one call's parts while

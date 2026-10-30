@@ -56,11 +56,8 @@ function run(argv: ReadonlyArray<string>, environment?: PortEnvironment): PortRe
 	}
 }
 
-// #826: the resolver finds `.env` at the project root, where `pnpm run` starts the scripts that
-// substitute this command's output. It replaces the `--env-file-if-exists=.env` tsx flag this
-// command used to carry, which resolved relative to the working directory instead — so running the
-// command from a subdirectory answered with the unseeded port while `playwright.config.ts`, which
-// already uses this resolver, answered with the seeded one. One reader, one file.
+// Resolve `.env` from the project root so calls from subdirectories agree with Playwright and the
+// scripts `pnpm run` starts. Both readers share this resolver and file (#826).
 function main(argv: ReadonlyArray<string>): void {
 	ports.load_environment_file()
 

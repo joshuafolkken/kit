@@ -111,8 +111,8 @@ describe('pretool_guard.foreground_rewrite', () => {
 	})
 })
 
-// joshuafolkken/kit#4101: the row's rewrite used to replace the foreground one, so a ship chained after
-// a piped check ran at the two-minute default and was moved aside.
+// A row rewrite must retain the foreground rewrite, so a ship chained after a piped check keeps
+// its required execution mode and timeout (joshuafolkken/kit#4101).
 describe('pretool_guard.respond — the foreground cap on top of a row rewrite', () => {
 	it("caps a lane child's ship on top of the pipefail rewrite, deciding nothing", async () => {
 		vi.stubEnv(agent_session_role.KEY, 'worker')
