@@ -119,13 +119,14 @@ function resolve_package_import(file, specifier, resolver) {
 }
 
 function resolve_import(file, specifier) {
-	if (specifier.startsWith('.')) {
-		return [resolve_module(path.resolve(path.dirname(file), specifier))]
-	}
+	const relative = specifier.startsWith('.')
+		? [resolve_module(path.resolve(path.dirname(file), specifier))]
+		: []
 
 	// A source may mix import() and require(); including both conditional branches avoids dropping
 	// a loaded module while the lockfile still accounts for third-party dependencies.
 	return [
+		...relative,
 		...resolve_package_import(file, specifier, resolve_es_module),
 		...resolve_package_import(file, specifier, resolve_commonjs_module),
 	]

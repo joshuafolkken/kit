@@ -10,7 +10,8 @@ import { config_fingerprint } from './config-fingerprint.js'
 // result is still valid, and serializing drops every function — so editing a rule's `create` left
 // every entry in every cache file valid and the gate reported the pre-edit verdict for each unchanged
 // file. The fingerprint below is what makes such an edit visible to that hash.
-const RULE_MODULE = path.join('rules', 'naming-convention.js')
+const RULE_FILE = 'naming-convention.js'
+const RULE_MODULE = path.join('rules', RULE_FILE)
 const PENDING_MODULE = path.join('rules', 'comment-why-only.js')
 const PRESET_ENTRY = 'base.js'
 const RULE_SOURCE = 'export const naming_convention_rules = {}\n'
@@ -118,12 +119,14 @@ describe('config_fingerprint.compute_config_fingerprint before a module is wired
 describe('config_fingerprint.compute_config_fingerprint local import forms', () => {
 	it.each([
 		'await import(`./rules/naming-convention.js`)\n',
+		"require('./rules')\n",
 		"import '#rule'\n",
 		"import 'fingerprint-fixture/rule'\n",
 	])('invalidates a rule loaded through %j', (entry) => {
 		const directory = write_preset(
 			wired({
 				[PRESET_ENTRY]: entry,
+				'rules/package.json': JSON.stringify({ main: RULE_FILE }),
 				'package.json': JSON.stringify({
 					name: 'fingerprint-fixture',
 					imports: { '#rule': { import: RULE_SPECIFIER } },

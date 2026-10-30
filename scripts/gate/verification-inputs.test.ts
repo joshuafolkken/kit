@@ -71,6 +71,7 @@ function write_project(config_source = "import './eslint/base.js'\n"): string {
 	writeFileSync(path.join(root, ESLINT_CONFIG), config_source)
 	writeFileSync(path.join(root, 'eslint', 'base.js'), "export * from './rules/wired.js'\n")
 	writeFileSync(path.join(root, 'eslint', 'rules', 'wired.js'), '')
+	writeFileSync(path.join(root, 'eslint', 'rules', PACKAGE_JSON), '{"main":"wired.js"}')
 	writeFileSync(path.join(root, 'eslint', 'rules', 'pending.js'), '')
 
 	return root
@@ -105,6 +106,7 @@ describe('verification_inputs.configures for the eslint config modules', () => {
 describe('verification_inputs.configures for local import forms', () => {
 	it.each([
 		'await import(`./eslint/rules/wired.js`)\n',
+		"require('./eslint/rules')\n",
 		"import '#rule'\n",
 		"import 'lint-fixture/rule'\n",
 	])('reads the rule loaded through %j as configuration', (entry) => {
