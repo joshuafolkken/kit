@@ -2,9 +2,8 @@ import { capped_listing_outcome, listing_outcome } from '#scripts/gh/git-gh-issu
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { close_completed_epics, EPIC_LIST_LIMIT, truncated_epic_list_note } from './epic-close'
 
-// joshuafolkken/kit#1067: an epic past the cut is never checked for completion, and it used to go
-// past in silence — the epic stayed open with nothing saying why, the same absence this file's
-// `undefined`-not-`[]` handling exists to remove.
+// joshuafolkken/kit#1067: an epic beyond the listing cut needs a diagnostic, because its completion
+// cannot be checked. `undefined` must stay distinct from an empty listing for the same reason.
 //
 // Kept out of `epic-close.test.ts` because that suite is already at its file-length ceiling.
 

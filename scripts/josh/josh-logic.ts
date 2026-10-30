@@ -150,13 +150,9 @@ function all_command_names(): Array<string> {
 	return [...Object.keys(COMMAND_MAP), ...Object.keys(ALIASES)]
 }
 
-// `josh <unknown>` answers on stderr with a short line rather than the whole listing. A shell
-// substituting `$(josh port dev)` captures stdout alone, so a name this kit cannot resolve — a typo,
-// a retired command — must leave that stream empty rather than dump the toolkit index there, how #825
-// surfaced. It used to print the full help here; #1928 cut that to one line plus a "did you mean"
-// when a close command exists, so the diagnosis is readable and the stdout contract is unchanged.
-// `josh` and `josh --help` still print the listing to stdout, because there it is the answer rather
-// than the diagnosis.
+// Unknown commands need a short stderr diagnosis and an empty stdout, so shell substitutions such
+// as `$(josh port dev)` cannot capture a help listing as a value (#825, #1928).
+// Bare `josh` and `josh --help` print the listing to stdout because it is their requested answer.
 function format_unknown_command(cmd: string): string {
 	const suggestion = command_suggest.closest_command(cmd, all_command_names())
 	const hint = suggestion === undefined ? '' : ` Did you mean '${suggestion}'?`
@@ -265,10 +261,8 @@ function declared(value: number | (() => number) | undefined): number | undefine
 	return typeof value === 'function' ? value() : value
 }
 
-// **Every command passes through here, so this is where a declared weight is reserved**.
-// A heavy command run directly, outside `josh gate`, used to start its tools
-// without claiming a place. A command under a parent that already holds its cores claims nothing:
-// `core_budget.with_command_reservation` reads the mark that parent set.
+// Every command passes here, so reserving declared weight covers direct calls as well as gates.
+// A parent's reservation mark prevents nested commands from claiming the same cores twice.
 async function dispatch_entry(
 	command: string,
 	entry: CommandEntry,

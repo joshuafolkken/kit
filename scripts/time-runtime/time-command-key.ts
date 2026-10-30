@@ -2,11 +2,8 @@ import { time_spans, type Span } from './time-spans'
 
 // What counts as *the same command* across a run's spans.
 //
-// Two questions need it and used to answer it separately: the failure chain asks whether a call
-// repeats one that just failed, and the per-invocation listing asks which calls belong on one row.
-// Both mean the same thing by "the same command", so the rule sits here rather than in either of
-// them — a second copy is the clone `CLAUDE.md` prohibits, in the one place a drift would make the
-// rework figure and the per-invocation row disagree about which calls were the same command.
+// The failure chain and per-invocation listing need the same command identity so repeat detection
+// and row grouping agree. Sharing that definition prevents their rework figures from drifting.
 //
 // **The josh subcommand wins where there is one.** `Bash: pnpm` alone would put `josh gate` and
 // `josh lint` under one key, so the second would be read as a repeat of the first.

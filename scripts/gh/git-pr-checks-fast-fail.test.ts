@@ -4,17 +4,9 @@ import { describe_pr_failure, evaluate_pr_state } from './git-pr-checks-eval'
 import { CODE_RABBIT, make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
 import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 
-// joshuafolkken/kit#990. `E2E`, `Checks` and `Security Audit` are not on the required list, so a
-// failure in any of them used to decide nothing: GitHub reports the pull request `UNSTABLE` rather
-// than failed, `evaluate_pr_state` answered `pending`, and `followup` polled out its whole
-// 32-minute budget before ending in `Timed out while waiting for PR checks to complete.` — a message
-// naming neither the job nor the cause. Every assertion here is about *when* and *how* the wait
-// ends.
-//
-// **The gate was never weak, and this must not make it looser.** The run never reached `success`, so
-// nothing merged. The two `success` assertions below are therefore as load-bearing as the failure
-// ones: they pin that the speed was not bought by opening a path a failing check could take —
-// kit#753's CodeRabbit escape hatch and kit#902's E2E gate both still hold.
+// GitHub reports failed optional jobs as `UNSTABLE`, so followup must inspect their results to
+// stop promptly with the failing job's name. The success cases preserve the CodeRabbit exception
+// and E2E gate while pinning the failure path (joshuafolkken/kit#990, kit#753, kit#902).
 const E2E = 'E2E'
 const CHECKS = 'Checks'
 const UNSTABLE = 'UNSTABLE'
@@ -50,10 +42,8 @@ describe('evaluate_pr_state — a failing non-required check ends the wait (#990
 	})
 })
 
-// joshuafolkken/kit#1232. `DIRTY` is not CLEAN, so it answered `pending` and the wait ran its whole
-// budget out on a state only a rebase resolves. It is also where the conflict diagnosis that
-// `pnpm josh git` used to carry landed when that command stopped waiting for the checks, so these
-// assertions are what keeps a conflicting pull request from becoming a 32-minute timeout.
+// A `DIRTY` pull request needs conflict resolution rather than more polling, so followup must
+// diagnose it immediately (joshuafolkken/kit#1232).
 describe('evaluate_pr_state — a conflicting pull request ends the wait (#1232)', () => {
 	it('returns failure when the merge state is DIRTY', () => {
 		expect(evaluate_pr_state(make_pr_snapshot({ merge_state_status: DIRTY }))).toBe('failure')

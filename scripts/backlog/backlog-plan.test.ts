@@ -305,8 +305,8 @@ describe('the issues the backlog will not run', () => {
 	})
 })
 
-// joshuafolkken/kit#1668. Both of these used to read as the cap, which a person acts on: "past the
-// cap" says the next ask will offer it. Only one of them is ever going to be offered.
+// Only an item the next ask can offer counts toward the cap; the person acts on that distinction
+// (joshuafolkken/kit#1668).
 describe('the reason an opted-in issue is not in the plan', () => {
 	// joshuafolkken/kit#1668: the epic root is still not offered, and the sentence no longer speaks for
 	// its children — the child below is offered in the same plan that prints this.

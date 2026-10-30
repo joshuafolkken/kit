@@ -37,7 +37,7 @@ const INVOCATION = 'backlogrun --max 5'
 const OTHER_INVOCATION = 'backlogrun --max 10 --idle 30'
 const RETROSPECTIVE = '--retrospective'
 const SUMMARY = '--summary'
-// A start far more than eight hours ago: the age that used to expire a record (joshuafolkken/kit#3687).
+// An old start exercises the absence of age-based expiry (joshuafolkken/kit#3687).
 const LONG_AGO = new Date('2026-09-01T00:00:00.000Z')
 const START = new Date('2026-09-11T00:00:00.000Z')
 // The opening list, pinned: it is what a named-issue `backlogrun` writes to `--begin` at every cut,
@@ -103,8 +103,8 @@ describe('beginning a run', () => {
 })
 
 describe('who a standing record belongs to', () => {
-	// The headline defect of joshuafolkken/kit#1722: the string matched, so the fresh session used to
-	// inherit the dead run's counters and a `started_at` hours old.
+	// A matching string must not make a fresh session inherit a dead run's counters or start time
+	// (joshuafolkken/kit#1722).
 	it('answers standing when the same invocation is typed again, leaving the record alone', async () => {
 		await run_carry_cli.run(['--begin', INVOCATION])
 		const first = run_carry.read_carry(target())
@@ -148,9 +148,8 @@ describe('who a standing record belongs to', () => {
 })
 
 describe('beginning a run over a record that is already there', () => {
-	// joshuafolkken/kit#3687: a record older than eight hours used to be replaced by `--begin`. It has no
-	// expiry now, so an old record no cut handed off stands exactly as a young one does — a person
-	// resumes or ends it, and `--begin` never deletes a run on its age.
+	// Age alone cannot expire a record: without a cut handoff, a person must resume or end it.
+	// `--begin` must preserve an old record just as it preserves a young one (joshuafolkken/kit#3687).
 	it('never replaces a standing record on its age', async () => {
 		run_carry.begin_carry(target(), INVOCATION, run_carry.NO_OWNER, LONG_AGO)
 

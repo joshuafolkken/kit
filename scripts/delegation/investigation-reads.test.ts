@@ -184,9 +184,8 @@ describe('investigation_reads.tally_of — a write the transcript could not desc
 		expect(investigation_reads.tally_of(text).pending).toEqual([resolve(FIRST_FILE)])
 	})
 
-	// Symptom 2. Both tools carry `EDIT_MARKER` and neither is in `BUNDLEABLE_TOOLS`, so their spans
-	// used to arrive naming nothing at all and the subtraction had nothing to subtract. Measured on
-	// PR #1468: `Edit` and `Write` emptied `pending`, these two left the file in it.
+	// Both tools carry `EDIT_MARKER` but are outside `BUNDLEABLE_TOOLS`; their paths must still clear
+	// `pending` (PR #1468).
 	//
 	// Each tool is given the field it really names — `NotebookEdit` sends `notebook_path` — so the case
 	// would fail if that field stopped being read, rather than passing on the other tool's field.

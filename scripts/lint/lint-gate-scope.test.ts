@@ -38,7 +38,7 @@ describe('lint_gate_scope.resolve_gate_scope for unimported modules', () => {
 		expect(lint_gate_scope.resolve_gate_scope([rule], root, NOT_CI).mode).toBe('related')
 	})
 
-	it.each(['eslint/rules/comment-why-only.js', 'eslint/config-fingerprint.test.ts'])(
+	it.each(['eslint/config-fingerprint.test.ts'])(
 		'keeps %j scoped when the config does not import it',
 		(relative) => {
 			expect(scope_of(relative).mode).toBe('related')
@@ -69,6 +69,7 @@ describe('lint_gate_scope.resolve_gate_scope', () => {
 		'prettier/index.js',
 		ESLINT_CONFIG,
 		WIRED_RULE,
+		'eslint/rules/comment-why-only.js',
 		'tsconfig.json',
 		'tsconfig/base.json',
 		'svelte.config.js',

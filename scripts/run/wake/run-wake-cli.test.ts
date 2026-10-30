@@ -388,8 +388,8 @@ describe('josh run:wake — the log exists at the path it names', () => {
 		expect(existsSync(log_target())).toBe(true)
 	})
 
-	// The already-running branch of `--start` prints the same listing and launches nothing, so it is
-	// the path on which the file used to be named without anything ever creating it.
+	// The already-running branch of `--start` must create the file its listing names even though it
+	// launches nothing.
 	it('leaves the log in place for a `--start` that found a supervisor already running', async () => {
 		write_carry(true)
 		run_wake.write_wake(wake_target(), run_wake.fresh_wake(INVOCATION, new Date()))

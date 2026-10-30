@@ -7,8 +7,7 @@ import { read_unwrapped } from './ai-document-fixture'
 // procedure. Matched against the unwrapped text so a line wrap inside a code span cannot hide a marker.
 
 const COMMAND = 'pnpm josh repo:party'
-// The manual `gh api … --jq .owner.login` these documents used to restate. Its absence is what proves
-// the procedure moved to the command rather than being duplicated beside it.
+// The documents must point at the command rather than duplicate its owner lookup procedure.
 const MANUAL_PROCEDURE = '--jq .owner.login'
 
 const CLAUDE = 'CLAUDE.md'

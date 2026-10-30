@@ -38,10 +38,8 @@ const DEPENDENCY_CASES = [
 		body: dependencies_body('#101->#102'),
 		expected: true,
 	},
-	// The existence reader and the link reader answer from one definition since
-	// joshuafolkken/kit#1155, so a line the link reader will not parse is not a declaration here
-	// either — `epic:check` used to call such a body machine-readable while `epic:next` read no links
-	// from it.
+	// Existence and link readers must share the definition of a parseable declaration, so an audit
+	// cannot approve a body from which the scheduler reads no links (joshuafolkken/kit#1155).
 	{
 		label: 'reports none for a chain line carrying a trailing rationale',
 		body: dependencies_body('#101 -> #102 -> #103 (#102 needs the API from #101)'),
@@ -116,8 +114,8 @@ describe('has_machine_readable_declaration', () => {
 		expect(has_machine_readable_declaration(dependencies_body(UNORDERED_DEPENDENCIES))).toBe(true)
 	})
 
-	// Both at once says there is an order and says there is none. `epic:check` used to pass such a
-	// body while reporting only the half that contradicts the other (joshuafolkken/kit#1155).
+	// An ordered declaration and a no-order declaration contradict one another and must fail the
+	// audit together (joshuafolkken/kit#1155).
 	it('refuses a body declaring a chain and the unordered literal at once', () => {
 		const body = dependencies_body(`${SIMPLE_CHAIN}\n\n${UNORDERED_DEPENDENCIES}`)
 

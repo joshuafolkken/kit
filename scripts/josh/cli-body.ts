@@ -61,12 +61,8 @@ function has_value(raw: string | undefined): boolean {
 
 // The inline half, kept apart so `resolve` reads as the one decision it makes: file or not.
 //
-// **Trim first, expand second — the order the inline form has always had.** `git_notify` used to run
-// `raw.trim().replaceAll(…)` in one expression; moving only the expansion up here would leave a trim
-// downstream of it, and a body written `--notify-message "…\n"` would have its own trailing newline
-// eaten as surrounding whitespace. Trimming the raw argument removes quoting slack, which is the only
-// whitespace a shell token picks up by accident; the newlines the escape produces are the author's
-// text and survive it.
+// Trim the raw argument before expanding escapes so quoting slack disappears while the author's
+// escaped newlines survive, including a trailing newline in `--notify-message "…\n"`.
 function resolve_inline(inline: string | undefined): string | undefined {
 	return inline === undefined ? undefined : expand_escaped_newlines(inline.trim())
 }

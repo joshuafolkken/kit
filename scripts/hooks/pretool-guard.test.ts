@@ -129,7 +129,7 @@ describe('combine_outcomes', () => {
 		expect(combine_outcomes([batch_fault, CLEAR], undefined)).toEqual(batch_fault)
 	})
 
-	// joshuafolkken/kit#3877: a later guard's notice or fault used to be dropped on the floor.
+	// Every guard's notice or fault must remain visible (joshuafolkken/kit#3877).
 	it("passes a later guard's notice and fault through when nothing earlier spoke", () => {
 		expect(combine_outcomes([CLEAR, later_notice], undefined)).toEqual(later_notice)
 		expect(combine_outcomes([CLEAR, later_fault], undefined)).toEqual(later_fault)

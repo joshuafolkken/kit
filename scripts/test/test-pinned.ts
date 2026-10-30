@@ -24,7 +24,7 @@ import type { RedProbe } from './test-red-logic'
 
 // `josh test:pinned` (joshuafolkken/kit#4516) — put each changed hunk of a non-test code file back to
 // the merge-base's lines, one at a time, run that file's related tests, and list the hunks no test went
-// red on: the "reverting it stays green" finding a review used to stop a lane on.
+// red on, so reviews can identify changes whose behavior the tests do not pin.
 //
 // **The reverts happen in a detached worktree at HEAD, never the caller's checkout** (`base-tree.ts`).
 // The changed files are copied in from the working tree first, so what is reverted is the change as it

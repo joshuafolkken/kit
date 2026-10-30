@@ -2,10 +2,8 @@ import { json_format } from '#scripts/config-merge/json-format'
 import { hook_command_rewrite } from '#scripts/init/hook-command-rewrite'
 import { json_value } from '#scripts/lib/json-value'
 
-// `josh sync` used to replace a project's `.claude/settings.json` with the distributed file, which
-// deleted every hook and permission the project had added — and `.claude/settings.local.json` is
-// personal, so a team had nowhere to keep a shared one. The merge replaces what kit ships and keeps
-// the rest:
+// The project settings file holds team-shared hooks and permissions, so sync must preserve project
+// additions while replacing the entries kit owns:
 //
 //  - hooks: a handler whose command has one of kit's shapes is kit's — the current ones are replaced
 //    and a retired one is dropped; every other handler is the project's and stays.

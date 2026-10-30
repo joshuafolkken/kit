@@ -13,8 +13,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // A copy rather than a rename because `/tmp` is often another filesystem. A record an old-code
 // process writes to `/tmp` after the copy is not picked up.
 //
-// **A log not written for two weeks is removed.** `/tmp` used to clear them on every boot; the common
-// git directory never does, and a log is the only record here that grows without an owner ending it.
+// A log not written for two weeks is removed because the common git directory persists across
+// reboots, and a log is the only record here that grows without an owner ending it.
 
 const COPIED_MARKER = '.legacy-copied'
 const MARKER_MODE = 0o600

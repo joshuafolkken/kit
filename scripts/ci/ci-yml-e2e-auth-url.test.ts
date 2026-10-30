@@ -9,20 +9,15 @@ const AUTH_URL_VARIABLE = 'BETTER_AUTH_URL'
 // binds, which is the drift the guard exists to catch rather than reproduce.
 const PREVIEW_URL = `http://localhost:${String(ports.resolve_preview_port({}))}`
 const E2E_JOB = 'e2e'
-// The stale reference this guard exists to keep out: the comment used to tell the reader to match
-// a `PREVIEW_PORT` constant in `playwright.config.ts`, which stopped being a fixed 4173 when the
-// port became `PORT_SEED`-derived (kit#818 / #820 / #826). Naming a constant that no longer pins
-// the number sends whoever changes this job looking for an invariant that is not there (#832).
+// The preview port is derived from `PORT_SEED`, so guidance must name that input rather than a
+// fixed `PREVIEW_PORT` constant (kit#818 / #820 / #826 / #832).
 const STALE_CONSTANT_REFERENCE = 'PREVIEW_PORT'
 // What actually holds the number at 4173 in CI: the seed is not committed and not set here.
 const SEED_VARIABLE = 'PORT_SEED'
 const ENV_FILE = '.env'
-// The comment used to name a repository or organization variable as something that would move the
-// port. Neither reaches a step's environment on its own — only an explicit `vars.` expression
-// brings one in, and neither workflow writes any — so the sentence described a setting that
-// cannot have the effect it warned about (joshuafolkken/kit#838). Naming both the mechanism that
-// does work and the reference form that the other one needs is what keeps the correction from
-// being reworded back into the original claim.
+// Repository and organization variables reach a step only through an explicit `vars.` expression.
+// Neither workflow writes one, so guidance must distinguish those variables from the environment
+// setting that controls the port (joshuafolkken/kit#838).
 const WORKING_MECHANISM = 'workflow or job level'
 const VARIABLE_REFERENCE_FORM = 'vars.'
 

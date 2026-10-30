@@ -112,7 +112,7 @@ describe('spelling_diagnostics — the text it checks', () => {
 
 // joshuafolkken/kit#4596: the live runner reads the text from stdin under the file's own name. A
 // project of its own, with this checkout's `node_modules` linked in, pins that the project config —
-// its word list and its ignore list — answers exactly as it does for the path the hook used to pass.
+// its word list and its ignore list — agrees between the stdin and file-path routes.
 // The real path: macOS hands out a temporary directory under a symlink, and cspell's path route
 // reads a file reached through one as outside its working directory.
 const PROJECT = path.join(realpathSync(DIRECTORY), 'live')

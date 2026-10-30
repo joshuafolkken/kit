@@ -135,8 +135,8 @@ afterAll(() => {
 	rmSync(TEMPORARY, { force: true, recursive: true })
 })
 
-// joshuafolkken/kit#4221: a followup refused because the issue changed after the review's brief used to
-// resume past the review, so the relaunched followup was refused again.
+// An issue change after the brief requires resuming at review so the next followup has current
+// review evidence (joshuafolkken/kit#4221).
 describe('josh ship — a restart after a stale review', () => {
 	// joshuafolkken/kit#5003: with an `--unpinned-ok` recorded for this branch where ship reads it.
 	it('reviews a pushed ship again, then follows up', async () => {

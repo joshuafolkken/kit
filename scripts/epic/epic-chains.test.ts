@@ -56,8 +56,8 @@ describe('epic_chains.insert_children — where the child lands', () => {
 	})
 })
 
-// joshuafolkken/kit#1253: the additions used to extend the last declared chain, which recorded a
-// dependency nobody declared — and an epic mixing ordered and unordered children is the normal state.
+// Adding unordered children must preserve declared chains without inventing dependencies
+// (joshuafolkken/kit#1253).
 describe('epic_chains.insert_children — no position given', () => {
 	it('leaves the declaration untouched', () => {
 		expect(chains_of(insert(LINEAR, [894], undefined))).toStrictEqual([[890, 891, 892]])
@@ -333,8 +333,7 @@ describe('epic_chains.insert_children — what a missing task list still refuses
 describe('epic_chains.insert_children — guards the caller happens to duplicate', () => {
 	const TRACKED = [890, 891, 892, 893, 895]
 
-	// The empty-declaration path used to skip the task-list check entirely, so the same input was
-	// accepted or refused depending only on whether anything had been declared yet.
+	// Task-list validation must agree whether or not dependencies are already declared.
 	it('refuses an untracked target even when nothing is declared yet', () => {
 		const outcome = insert([], [894], { kind: 'before', target: 999 }, [890, 891])
 

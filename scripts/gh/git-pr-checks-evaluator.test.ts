@@ -6,9 +6,8 @@ import { describe_pr_failure, evaluate_pr_state } from './git-pr-checks-eval'
 import { make_pr_snapshot } from './git-pr-checks-fixture'
 import { parse_pr_state_snapshot, type PrStateSnapshot } from './git-pr-checks-parse'
 
-// The poll loop used to hard-code the merge gate's verdict. `gh pr checks --watch` asked a weaker
-// question — have the checks finished? — so the watch that replaced it needs its own
-// (joshuafolkken/kit#1028). These assertions are about the seam, not about either verdict.
+// The merge gate and `gh pr checks --watch` ask different questions: merge readiness and check
+// completion. The watch therefore needs its own evaluator (joshuafolkken/kit#1028).
 //
 // **The default is the load-bearing half.** An omitted `evaluator` must still be the merge gate's,
 // because every existing caller omits it and the merge decision is what one of them then makes.

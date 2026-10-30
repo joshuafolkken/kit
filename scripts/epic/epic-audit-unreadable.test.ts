@@ -6,10 +6,8 @@ import { epic_audit_report } from './epic-audit-report'
 import { epic_fetch, type EpicSnapshot } from './epic-fetch'
 import type { IssueReference } from './epic-graph'
 
-// What `epic:audit` does when it cannot read something — a child, or the repository it is standing
-// in. Both used to be reported in a way that read as an answer: a child in another repository came
-// out as a bare `#7`, and a repository name that could not be read turned check 3 off in silence
-// (joshuafolkken/kit#1016).
+// Unread children and repository identity must remain explicit so incomplete data cannot read as
+// an audit answer (joshuafolkken/kit#1016).
 
 const REPO = 'joshuafolkken/kit'
 const THIRD_PARTY_REPO = 'sveltejs/kit'
@@ -80,9 +78,8 @@ describe('epic_audit_report.unreadable_findings', () => {
 	})
 })
 
-// A repository name that could not be read used to become `unknown/unknown`, and check 3's owner
-// filter then dropped every qualified reference the children cited — with no diagnostic. The report
-// came out clean in exactly the state that makes it meaningless, so the command stops instead.
+// Without the repository identity, check 3 cannot filter qualified child references reliably, so
+// the command must stop instead of reporting a clean audit.
 describe('epic_audit_cli.run — the repository name it needs to resolve references against', () => {
 	it('fails rather than auditing with a repository it could not name', async () => {
 		vi.spyOn(git_gh_command, GET_REPO).mockResolvedValue(undefined)

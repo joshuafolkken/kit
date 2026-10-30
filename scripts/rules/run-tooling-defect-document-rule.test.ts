@@ -2,10 +2,9 @@ import { read_unwrapped } from '#scripts/document/ai-document-fixture'
 import { section_reference_resolution } from '#scripts/document/section-reference-fixture'
 import { describe, expect, it } from 'vitest'
 
-// joshuafolkken/kit#3297: a defect in kit's own run tooling stopped a `backlogrun` as if it were another
-// package's, the AI waited for a person to retype a resumable run, and #3255 was parked with
-// `needs-decision` although nothing needed a person. Each rule is written once and every document that
-// used to decide it on its own now points at that single source; both halves are pinned here.
+// Defects in kit's own run tooling follow a different recovery path from another package's defects.
+// Each rule needs one source and pointers from its consumers, so a resumable run cannot be parked
+// for human judgment unnecessarily (joshuafolkken/kit#3297, #3255).
 
 const UPSTREAM_INTERRUPT = 'prompts/collaboration-workflow/upstream-interrupt.md'
 const PARK = '.claude/skills/workflow-commands/backlogrun-park.md'

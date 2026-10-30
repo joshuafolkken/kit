@@ -4,8 +4,8 @@ import { gh_reachability } from './git-gh-reachability'
 // The line this module draws is the one joshuafolkken/kit#1663 filed: a failure worth asking again
 // about, against one that answers the same however often it is asked.
 //
-// joshuafolkken/kit#1690 removed the probe that used to ask it of a second request; the status now
-// comes from the failed request itself, so what is left to pin is the classification.
+// The failed request's own status determines the classification without a second network request
+// (joshuafolkken/kit#1690).
 
 const OK_STATUS = 200
 const NOT_FOUND_STATUS = 404

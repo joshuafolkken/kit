@@ -4,10 +4,8 @@ import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from '.
 
 const ARGV_OFFSET = 2
 
-// `--help` and `-h` ask for the listing as plainly as the bare `help` does. They used to fall
-// through to `handle_unknown`, which reached stdout only because the listing was printed there;
-// routing that path to stderr for #825 would otherwise have left `josh --help` printing nothing a
-// pipe could read.
+// `--help` and `-h` request the listing just as `help` does, so they must reach stdout independently
+// of the unknown-command diagnostic on stderr (#825).
 const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
 // `josh --all` (and `josh --help --all`) lists every command available in this checkout.
 // A bare `--all` in the command slot is a help request, not a command.

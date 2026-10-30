@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 const PLAN_COMMENT = 'prompts/collaboration-workflow/plan-comment.md'
 // joshuafolkken/kit#4188: plan-comment.md stops at Step 3 and points at fullrun-steps.md, so the
-// corrections below its Step 3 are pinned in the single sources it used to restate.
+// corrections below its Step 3 are pinned in those single sources.
 const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const DEPENDENCY_UPDATE = '.claude/skills/dependency-update/SKILL.md'
 const ENTRY_SEQUENCE = '.claude/skills/workflow-commands/entry-sequence.md'

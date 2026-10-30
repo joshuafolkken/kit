@@ -209,8 +209,8 @@ describe('run --join on the background test:pinned', () => {
 	})
 })
 
-// joshuafolkken/kit#4793: an `--unpinned-ok` open launched the check with its reason, so the join
-// accepts the unpinned change with the words the open used to print, and keeps the gate's code.
+// An `--unpinned-ok` reason belongs to the launched check, so join must honor it while preserving
+// the gate's exit code (joshuafolkken/kit#4793).
 
 const REASON = 'the branch only logs'
 

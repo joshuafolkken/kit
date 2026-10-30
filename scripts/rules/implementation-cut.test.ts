@@ -91,7 +91,7 @@ function run_at(now_ms: number): { transcript: string; now_ms: number } {
 	return { transcript: path.join(WORK_DIRECTORY, 'transcript.jsonl'), now_ms }
 }
 
-// A verdict thunk that fails the test if it is ever read — used to prove the cost measurement is gated
+// A verdict thunk fails the test if read, proving the cost measurement is gated
 // behind the cheap tool-name and lane reads, never run on a call this guard does not own.
 function unread_verdict(): CostVerdict {
 	throw new Error('the cost verdict was read for a call the guard does not own')

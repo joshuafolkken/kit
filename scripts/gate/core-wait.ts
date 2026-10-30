@@ -5,11 +5,9 @@ import { core_admission, type LedgerEntry } from './core-admission'
 import { core_weights } from './core-weights'
 import type { MachineBudget } from './machine-capacity'
 
-// **Why a claim waits, and who is waiting** (joshuafolkken/kit#3943). A claim held back by the budget
-// used to wait in silence: the command printed nothing and no board showed it, so a lane stalled on
-// memory pressure read the same as one stuck. The waiting claim records its reason on its marker and
-// says it once on its own output; `run:board` draws every marker still waiting. Everything here is a
-// pure function of the ledger and the budget it is handed.
+// Waiting claims record their reason on a marker and print it once, so budget pressure is
+// distinguishable from a stuck lane. `run:board` draws the waiting markers. All decisions here are
+// pure functions of the supplied ledger and budget (joshuafolkken/kit#3943).
 
 const WAIT_REASONS = ['cores', 'cpu', 'memory', 'pressure'] as const
 

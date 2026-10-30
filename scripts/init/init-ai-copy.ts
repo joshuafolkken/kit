@@ -59,8 +59,8 @@ const BASIC_GITHUB_MAPPINGS = [
 	{ src: RELEASE_CONFIG, dest: RELEASE_CONFIG },
 ]
 
-// Whether the existing file is a workflow that carries no header. A read failure answers "no": the
-// point is to warn, and a warning is not worth failing a command that used to open nothing.
+// Whether the existing file is a workflow that carries no header. A read failure answers "no": a
+// diagnostic warning must not fail the command it accompanies.
 function did_read_unstamped(destination_path: string): boolean {
 	try {
 		return !managed_marker_logic.is_marked(readFileSync(destination_path, 'utf8'))
