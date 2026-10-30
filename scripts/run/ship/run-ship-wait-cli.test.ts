@@ -47,6 +47,16 @@ beforeEach(() => {
 })
 
 describe('run_ship_wait_cli.wait_for', () => {
+	it('does not beat or consume a note when the chunk has no time left', async () => {
+		take_mock.mockReturnValue(NOTE)
+
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, 0)).resolves.toStrictEqual({
+			verdict: VERDICT.PENDING,
+		})
+		expect(beat_mock).not.toHaveBeenCalled()
+		expect(take_mock).not.toHaveBeenCalled()
+	})
+
 	it('returns the stop the supervisor handed back, and stops waiting', async () => {
 		take_mock.mockReturnValueOnce(undefined).mockReturnValueOnce(NOTE)
 

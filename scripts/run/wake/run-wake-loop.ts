@@ -1,4 +1,5 @@
 import { error_text } from '#scripts/lib/error-message'
+import { poll } from '#scripts/lib/poll'
 import type { CarryRead } from '#scripts/run/carry/run-carry'
 import {
 	run_wake,
@@ -211,20 +212,14 @@ async function run_pass(
 // at all, the replaced loop ends here, quietly and before it does anything: the run is not
 // unattended, because the supervisor that took the record over is watching it.
 async function run_loop(target: string, ports: LoopPorts, interval_ms: number): Promise<LoopStop> {
-	let wake = run_wake.read_own_wake(target)
+	return await poll.wait_for(
+		async () => {
+			const wake = run_wake.read_own_wake(target)
 
-	while (wake !== undefined) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		const stop = await run_pass(target, wake, ports)
-
-		if (stop !== undefined) return stop
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await ports.sleep(interval_ms)
-		wake = run_wake.read_own_wake(target)
-	}
-
-	return STOPPED_BY_PERSON
+			return wake === undefined ? STOPPED_BY_PERSON : await run_pass(target, wake, ports)
+		},
+		{ interval_ms, sleeper: ports.sleep },
+	)
 }
 
 const run_wake_loop = {

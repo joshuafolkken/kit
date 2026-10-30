@@ -6,6 +6,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { file_map_stamp, type FileMapStampAccess } from '#scripts/josh/file-map-stamp'
 import { GATE_COMMAND } from '#scripts/josh/josh-command-types'
 import { stamp_file } from '#scripts/josh/stamp-file'
+import { poll } from '#scripts/lib/poll'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { review_tree } from '#scripts/review/review-tree'
 import { detached_launch, type LaunchArgv, type LaunchResult } from '#scripts/run/detached-launch'
@@ -147,12 +148,17 @@ async function wait_for_gate_finish(now: Clock = () => Date.now()): Promise<Gate
 	const started = now()
 	let state = await read_gate_state()
 
-	while (!run_review.is_gate_settled(state) && now() - started < MAX_JOIN_WAIT_MS) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await sleep(POLL_INTERVAL_MS)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		state = await read_gate_state()
-	}
+	await poll.poll_until(
+		() => run_review.is_gate_settled(state) || now() - started >= MAX_JOIN_WAIT_MS,
+		{
+			attempts: Infinity,
+			interval_ms: POLL_INTERVAL_MS,
+			sleeper: async (milliseconds) => {
+				await sleep(milliseconds)
+				state = await read_gate_state()
+			},
+		},
+	)
 
 	return state
 }

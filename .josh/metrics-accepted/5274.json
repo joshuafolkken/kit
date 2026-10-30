@@ -1,0 +1,7 @@
+{
+	"reason": "Preserve the existing polling boundaries while moving run watchers to lib/poll; extract the launch-record wait for boundary tests and document serialized callback updates.",
+	"date": "2026-10-30",
+	"growth": {
+		"scripts.code_lines": 88
+	}
+}

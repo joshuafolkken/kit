@@ -1,4 +1,5 @@
 import { stripVTControlCharacters } from 'node:util'
+import { poll } from '#scripts/lib/poll'
 import type { LocalRead } from './run-board-read'
 import type { BoardPorts } from './run-board-state'
 import { run_board_tick } from './run-board-tick'
@@ -47,14 +48,11 @@ async function push_one(ports: BoardPorts): Promise<boolean> {
 }
 
 async function push_until_ended(ports: BoardPorts, interval_ms: number): Promise<void> {
-	let is_running = await push_one(ports)
-
-	while (is_running) {
-		// eslint-disable-next-line no-await-in-loop -- polling: each push waits out the interval
-		await ports.sleep(interval_ms)
-		// eslint-disable-next-line no-await-in-loop -- polling: each push reads the run afresh
-		is_running = await push_one(ports)
-	}
+	await poll.poll_until(async () => !(await push_one(ports)), {
+		attempts: Infinity,
+		interval_ms,
+		sleeper: ports.sleep,
+	})
 }
 
 const run_board_every = { chat_frame, push_until_ended }

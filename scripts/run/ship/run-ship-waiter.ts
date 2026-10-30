@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { json_value } from '#scripts/lib/json-value'
+import { poll } from '#scripts/lib/poll'
 import { z } from 'zod'
 
 // How a stopped detached ship goes back to the lane session that launched it, rather than to a fresh
@@ -81,12 +82,13 @@ function take(repository: string, issue: string, now: number = Date.now()): stri
 async function await_taken(repository: string, issue: string): Promise<boolean> {
 	const decision = path_of(DECISION_PREFIX, repository, issue)
 
-	for (let waited = 0; waited < SESSION_GAP_MS; waited += OFFER_POLL_MS) {
-		if (stamp_file.read_stamp_text(decision) !== undefined) return true
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the waiter's next poll
-		await sleep(OFFER_POLL_MS)
-	}
+	const is_taken = await poll.poll_until(() => stamp_file.read_stamp_text(decision) !== undefined, {
+		attempts: Math.ceil(SESSION_GAP_MS / OFFER_POLL_MS),
+		interval_ms: OFFER_POLL_MS,
+		sleeper: sleep,
+	})
+	if (is_taken) return true
+	await sleep(OFFER_POLL_MS)
 
 	return !decide(repository, issue, WITHDRAWN)
 }

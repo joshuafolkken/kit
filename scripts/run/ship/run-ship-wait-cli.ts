@@ -2,6 +2,7 @@
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { poll } from '#scripts/lib/poll'
 import { run_ship_detach } from './run-ship-detach'
 import { run_ship_probe } from './run-ship-probe'
 import { run_ship_stage } from './run-ship-stage'
@@ -76,23 +77,21 @@ function settled(repository: string, issue: string): Waited | undefined {
 	return ended(repository, issue)
 }
 
-async function poll(repository: string, issue: string, deadline: number): Promise<Waited> {
-	while (Date.now() < deadline) {
-		run_ship_waiter.beat(repository, issue)
-		const waited = settled(repository, issue)
+async function wait_within(repository: string, issue: string, deadline: number): Promise<Waited> {
+	return await poll.wait_for(
+		() => {
+			if (Date.now() >= deadline) return { verdict: VERDICT.PENDING }
+			run_ship_waiter.beat(repository, issue)
 
-		if (waited !== undefined) return waited
-
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the supervisor's progress
-		await sleep(POLL_MS)
-	}
-
-	return { verdict: VERDICT.PENDING }
+			return settled(repository, issue)
+		},
+		{ interval_ms: POLL_MS, sleeper: sleep },
+	)
 }
 
 // A `pending` chunk keeps the heartbeat for the next one; any other verdict ends the wait for good.
 async function wait_for(repository: string, issue: string, chunk_ms = CHUNK_MS): Promise<Waited> {
-	const waited = await poll(repository, issue, Date.now() + chunk_ms)
+	const waited = await wait_within(repository, issue, Date.now() + chunk_ms)
 
 	if (waited.verdict !== VERDICT.PENDING) run_ship_waiter.leave(repository, issue)
 
