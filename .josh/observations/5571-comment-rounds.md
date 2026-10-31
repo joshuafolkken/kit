@@ -1,0 +1,2 @@
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:33 | 2026-10-31 | #5571 | fixed
+- rf:project-conventions | low | scripts/agent/agent-role-profile.ts:129 | 2026-10-31 | #5571 | fixed

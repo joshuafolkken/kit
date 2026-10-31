@@ -1,0 +1,3 @@
+- rf:performance | low | scripts/test/test-pinned-type-check.ts:44 | 2026-10-30 | #5385
+- rf:comments | low | scripts/test/test-pinned-ledger.ts:22 | 2026-10-30 | #5385
+- rf:project-conventions | low | scripts/lane/lane-ledger-schema.ts:200 | 2026-10-30 | #5385
