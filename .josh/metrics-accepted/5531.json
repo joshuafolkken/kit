@@ -1,0 +1,7 @@
+{
+	"reason": "since-green fallback reasons on summary lines and ship laps, plus run-ship-narrowed.ts narrowing the scoped pair to moved files (#5531)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 206
+	}
+}

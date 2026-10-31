@@ -23,7 +23,13 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+// No green record, so every case reads the whole branch change.
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green } = await import_original()
+	const no_record = { fallback: since_green.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
+})
 vi.mock('./test-related-claim', () => ({ test_related_claim: { with_unit_claim: vi.fn() } }))
 
 const REPOSITORY_ROOT = process.cwd()
