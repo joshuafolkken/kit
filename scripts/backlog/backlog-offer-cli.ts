@@ -5,6 +5,7 @@ import { rule_value_cache } from '#scripts/rules/rule-value-cache'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { z } from 'zod'
+import { backlog_drain_flush } from './backlog-drain-flush'
 import { backlog_next_shared } from './backlog-next-shared'
 import { backlog_offer, type OfferAnswer } from './backlog-offer'
 
@@ -185,7 +186,12 @@ async function mark_drain(verdict: string, answer: string, running: number): Pro
 	if (answer !== EXHAUSTED_ANSWER || running !== NO_RUNNING) return false
 	if (verdict !== WATCH_VERDICT && verdict !== STOP_VERDICT) return false
 
-	return await run_event_stream_emit.emit_once(run_event_stream.EVENT_KIND.DRAIN, DRAIN_TEXT)
+	// The flush finishes before the marker is visible: `backlogrun-replace` reads a drain as replaceable.
+	return await run_event_stream_emit.emit_once(
+		run_event_stream.EVENT_KIND.DRAIN,
+		DRAIN_TEXT,
+		backlog_drain_flush.flush,
+	)
 }
 
 async function decide(values: ParsedValues, counts: OfferCounts): Promise<number> {
