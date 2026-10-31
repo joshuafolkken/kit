@@ -1,0 +1,8 @@
+{
+	"reason": "Mechanical triage module for untriaged backlog candidates plus round-1 review fixes (wider GATE_PATHS, fresh label read before writing)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 96,
+		"ai_cost.on_demand_bytes": 138
+	}
+}
