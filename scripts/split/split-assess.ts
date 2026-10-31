@@ -32,6 +32,11 @@ interface SizeMeasurement {
 // once a lane estimated at 6 files / 250 lines merged at about 23 files / 390 lines (joshuafolkken/kit#5384).
 const FILE_GUIDE = 8
 const LINE_GUIDE = 200
+// The cap, three times the guide: past it a declared reason no longer keeps an Issue as one. A lane
+// declared at 57 files with a reason ran 76 minutes and about 190 files (joshuafolkken/kit#5502).
+const CAP_FACTOR = 3
+const FILE_CAP = FILE_GUIDE * CAP_FACTOR
+const LINE_CAP = LINE_GUIDE * CAP_FACTOR
 
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
@@ -82,6 +87,11 @@ function verdict_for(files: number, lines: number): SplitVerdict {
 	return files > FILE_GUIDE || lines > LINE_GUIDE ? SPLIT_VERDICT : SINGLE_VERDICT
 }
 
+// Strictly greater than, as the guide is: the cap itself still runs as one Issue.
+function is_over_cap(files: number, lines: number): boolean {
+	return files > FILE_CAP || lines > LINE_CAP
+}
+
 function measure(changes: ReadonlyArray<FileChange>): SizeMeasurement {
 	const runtime = non_test_changes(changes)
 	const lines = runtime.reduce((total, change) => total + change.changed_lines, 0)
@@ -126,7 +136,9 @@ function notice(measurement: SizeMeasurement): string | undefined {
 }
 
 const split_assess = {
+	FILE_CAP,
 	FILE_GUIDE,
+	LINE_CAP,
 	LINE_GUIDE,
 	NOTICE_SECTION,
 	QUESTION_SECTION,
@@ -134,6 +146,7 @@ const split_assess = {
 	SPLIT_VERDICT,
 	SINGLE_VERDICT,
 	assess,
+	is_over_cap,
 	notice,
 	parse_numstat,
 	reason,

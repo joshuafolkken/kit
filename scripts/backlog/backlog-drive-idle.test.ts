@@ -14,6 +14,7 @@ const DATED = 4102
 const READY = 4103
 const STALLED = 4104
 const UNTRUSTED = 4105
+const OVER_CAP = 4106
 const IDLE_TEXT = 'idle body'
 
 // The pool as `auto_ok_cli.fetch_opted_in` answers it: each row's author trust already assembled.
@@ -122,6 +123,19 @@ describe('backlog_drive_idle.describe — an author without write access', () =>
 			`(author without write access):\n- #${String(UNTRUSTED)} Issue ${String(UNTRUSTED)}`,
 		)
 		expect(body).not.toContain(`- #${String(READY)}`)
+	})
+})
+
+// joshuafolkken/kit#5502: `backlog:next` holds an issue declared over the size cap until a person
+// splits it, so the notice names it.
+describe('backlog_drive_idle.describe — an estimate over the size cap', () => {
+	it('lists an issue declared over the cap as waiting on a person to split it', () => {
+		const body = `## 背景\n\n- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）\n`
+		const over = issue(OVER_CAP, { body })
+		const text = backlog_drive_idle.describe({ merged: 0, issues: [...POOL, over], now_ms: NOW_MS })
+
+		expect(text).toContain(`(over the size cap):\n- #${String(OVER_CAP)} Issue ${String(OVER_CAP)}`)
+		expect(text).not.toContain(`- #${String(READY)}`)
 	})
 })
 

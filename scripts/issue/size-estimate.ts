@@ -1,3 +1,4 @@
+import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
 import { z } from 'zod'
 import { SPLIT_ROUTE_LABEL } from './issue-labels'
@@ -84,9 +85,44 @@ function over_guide(body: string, route: string | undefined): SizeMeasurement | 
 	return is_excused(body, route) ? undefined : estimate
 }
 
-// The filing refusal for an estimate over the guide. A missing or malformed estimate is `problems`'
-// refusal, not this one.
+// The declared estimate when it is over the cap; a declared reason does not excuse it, only a split
+// filing does (joshuafolkken/kit#5502). `issue:file` and `backlog:next` both judge through it.
+function over_cap(body: string, route: string | undefined): SizeMeasurement | undefined {
+	const estimate = parse(body)
+
+	if (estimate === undefined || route === SPLIT_ROUTE_LABEL) return undefined
+
+	return split_assess.is_over_cap(estimate.files, estimate.lines) ? estimate : undefined
+}
+
+// The filing route a row's labels carry — the split route, or none.
+function route_of(labels: ReadonlyArray<string>): string | undefined {
+	return labels.includes(SPLIT_ROUTE_LABEL) ? SPLIT_ROUTE_LABEL : undefined
+}
+
+// Whether an open Issue is declared over the cap — `backlog:next`, `auto-ok:next` and the idle
+// notice all hold it for a person through this one check.
+function is_issue_over_cap(issue: Pick<OpenIssueData, 'body' | 'labels'>): boolean {
+	const labels = issue.labels?.map((label) => label.name) ?? []
+
+	return over_cap(issue.body ?? '', route_of(labels)) !== undefined
+}
+
+// The counts against the cap, shared by the filing refusal and `backlog:next`'s withheld note.
+function capped(estimate: SizeMeasurement): string {
+	return `size estimate ${String(estimate.files)} file(s) / ${String(estimate.lines)} line(s) exceeds the cap (more than ${String(split_assess.FILE_CAP)} files or ${String(split_assess.LINE_CAP)} lines), which \`${REASON_PREFIX}\` does not excuse`
+}
+
+function cap_refusal(estimate: SizeMeasurement): string {
+	return `${capped(estimate)} — file an ordered epic of \`--route split\` children instead (the mechanical changes first, the child that switches the setting on last); split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+}
+
+// The filing refusal for an estimate over the cap, else over the guide. A missing or malformed
+// estimate is `problems`' refusal, not this one.
 function guide_problem(body: string, route: string | undefined): string | undefined {
+	const over = over_cap(body, route)
+
+	if (over !== undefined) return cap_refusal(over)
 	const estimate = over_guide(body, route)
 
 	return estimate === undefined ? undefined : refusal(estimate)
@@ -98,12 +134,16 @@ function declared_files(body: string): number | undefined {
 }
 
 const size_estimate = {
+	capped,
 	declared_files,
 	declared_size: parse,
 	exceeded,
 	guide_problem,
+	is_issue_over_cap,
+	over_cap,
 	over_guide,
 	problems,
+	route_of,
 }
 
 export { size_estimate }
