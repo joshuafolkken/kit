@@ -116,7 +116,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 
 <!-- /usage -->
 
-**Output / exit codes:** stdout is one token (`--json`: the record on one line). `began`, `resumed`, `driving`, `carried`, `counted`, `ended` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+**Output / exit codes:** stdout: one token (`--json`: the record, one line). `began`, `resumed`, `driving`, `carried`, `counted`, `ended` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:carry` in detail".
 
