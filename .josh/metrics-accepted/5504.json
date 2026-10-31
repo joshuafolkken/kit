@@ -1,0 +1,7 @@
+{
+	"reason": "lane:await and backlog:drive resolve an omitted --owner from the session pid (#5504)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 4
+	}
+}

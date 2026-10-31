@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { agent_model_alias } from './agent-model-alias'
 import {
 	agent_provider,
 	type AgentEnvironment,
@@ -335,7 +336,7 @@ function resolve_review(round: number, environment: AgentEnvironment = process.e
 }
 
 function describe(profile: AgentProfile): string {
-	return `provider=${profile.provider} role=${profile.role} model=${profile.model} effort=${profile.effort}`
+	return `provider=${profile.provider} role=${profile.role} model=${profile.model}${agent_model_alias.suffix_of(profile.model)} effort=${profile.effort}`
 }
 
 // The run-log line a review launch writes, so each round's model is on record beside its round.

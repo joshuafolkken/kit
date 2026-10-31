@@ -64,9 +64,9 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete',
 		category: 'AI tools',
-		reference: ['--owner <pid> [options]', 'automation', ['network']],
+		reference: ['[--owner <pid>] [options]', 'automation', ['network']],
 		usage: {
-			examples: [{ arguments: '--owner "$PPID" [--max <n>] [--idle <minutes>] [--only]' }],
+			examples: [{ arguments: '[--max <n>] [--idle <minutes>] [--only]' }],
 		},
 	},
 	'backlog:plan': {

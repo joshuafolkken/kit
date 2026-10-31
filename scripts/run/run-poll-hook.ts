@@ -34,7 +34,7 @@ const STATE_READS: ReadonlySet<string> = new Set([
 
 const POLL_REASON =
 	'⛔ poll: this `backlogrun` session repeats a state read with nothing decided in between, on every ' +
-	'occurrence. Wait on `pnpm josh backlog:drive`, or `pnpm josh lane:await <N...> --owner "$PPID"` in ' +
+	'occurrence. Wait on `pnpm josh backlog:drive`, or `pnpm josh lane:await <N...>` in ' +
 	'the background, and end the turn; its exit is the wake.'
 
 // The flags that make a state-read command write: `run:carry --filed` twice is two filings, and

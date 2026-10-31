@@ -85,6 +85,16 @@ describe('lane_breakdown_implement.of — run:review and ship', () => {
 			[OTHER_BASH, 1],
 		])
 	})
+
+	// joshuafolkken/kit#5585: `ship:evidence` runs the command it wraps, so it is not ship time.
+	it('counts ship:evidence by the command it wraps, not as ship', () => {
+		const calls = [bash(11, 10, 'pnpm josh ship:evidence 1 -- pnpm josh test:pinned')]
+
+		expect(kinds_of(calls)).toStrictEqual([
+			[REMAINDER, 41],
+			['test', 10],
+		])
+	})
 })
 
 describe('lane_breakdown_implement.of — kinds', () => {

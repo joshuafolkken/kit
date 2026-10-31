@@ -87,6 +87,11 @@ describe('run_poll_hook.poll_reason — a repeated state read', () => {
 		expect(run_poll_hook.POLL_REASON).toContain('backlog:drive')
 		expect(run_poll_hook.POLL_REASON).toContain('lane:await')
 	})
+
+	// joshuafolkken/kit#5504: the consultation guard refuses `$PPID`, so the wait it names omits `--owner`.
+	it('names a wait the consultation guard lets through', () => {
+		expect(run_poll_hook.POLL_REASON).not.toContain('$PPID')
+	})
 })
 
 describe('run_poll_hook.poll_reason — calls it leaves alone', () => {
