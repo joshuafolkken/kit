@@ -54,9 +54,6 @@ const MAX_CUTS = 6
 const END_COMMAND = 'pnpm josh run:carry --end'
 const RESUME_COMMAND = 'pnpm josh run:carry --resume'
 const READ_COMMAND = 'pnpm josh run:carry --json'
-// The shell variable that names the parent loop's own long-lived process, quoted so the reader can
-// paste the printed command as it stands.
-const OWNER_ARGUMENT = '--owner "$PPID"'
 
 interface RunCarry {
 	scheduler_provider?: AgentProvider | undefined
@@ -254,7 +251,7 @@ function read_carry(target: string): CarryRead {
 // The identity to record for a pid the caller declared. `read_start` is what makes the pair an
 // identity rather than a number; injected in tests so the sandbox branch is exercised without
 // changing the machine's process capabilities. The transcript is the calling session's own — the
-// declared pid is that session's process (`--owner "$PPID"`).
+// declared pid is that session's process.
 function owner_of(
 	pid: number,
 	read: (owner_pid: number) => string | undefined = process_identity.read_start,
@@ -470,12 +467,10 @@ function busy_message(carry: RunCarry): string {
 }
 
 // The adoption command, shared by the standing refusal and the judgment wake's hand-off.
-// **`--owner "$PPID"` is part of the command, not an optional extra.** An adoption made without it
-// leaves the record declaring no owner, and from then on every second parent reads it as not provably
-// live and is answered `standing` rather than `busy` — the ownership defense degrading silently
-// through the very message that recommends the command.
+// It names no `--owner`: the command takes the session's own pid from its environment, so the
+// adoption still declares an owner without a `$PPID` expansion a shell guard refuses.
 function claim_command(invocation: string): string {
-	return `${RESUME_COMMAND} "${invocation}" ${OWNER_ARGUMENT}`
+	return `${RESUME_COMMAND} "${invocation}"`
 }
 
 // The record's owner is gone and no cut handed it off — the crashed run, and the same command

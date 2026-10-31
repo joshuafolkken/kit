@@ -96,17 +96,17 @@ Runs after every successful `run:hold` claim, and in a `backlogrun`'s once-per-r
 Carry one invocation’s budget across its own session cuts.
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"
-pnpm josh run:carry --json                                                                              # read the record back in a resumed session
-pnpm josh run:carry --cut --owner "$PPID"                                                               # hand the record off before a cut
-pnpm josh run:carry --retrospective --summary "0 filed; dropped #2240 already merged" --owner "$PPID"   # close the end-of-run retrospective
-pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"                                       # adopt a record no cut handed off
-pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind parked #2118"             # end + push
+pnpm josh run:carry --begin "backlogrun --max 5"
+pnpm josh run:carry --json                                                                    # read the record back in a resumed session
+pnpm josh run:carry --cut                                                                     # hand the record off before a cut
+pnpm josh run:carry --retrospective --summary "0 filed; dropped #2240 already merged"         # close the end-of-run retrospective
+pnpm josh run:carry --resume "backlogrun --max 5"                                             # adopt a record no cut handed off
+pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind parked #2118"   # end + push
 ```
 
 **Options:**
 
-- `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
+- `--owner <pid>` — the long-lived process spending the budget; omitted, the `CLAUDE_PID` of the calling Claude session (none elsewhere, e.g. Codex). Read by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
 - `--done <issue>` — shrinks a named-issue run's `remaining` list.
 - `--merged <issue>` — names the merged issue and counts it once against `merged_issues`, so a merge `run:merge` already recorded is not counted twice.
 - `--filed` / `--cut` — increments, never totals.
@@ -572,7 +572,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
-- `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.
+- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
 - `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 

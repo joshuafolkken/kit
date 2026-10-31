@@ -1,5 +1,6 @@
 import { bounded_pool } from '#scripts/lib/bounded-pool'
 import { cli_flags, type PositiveSetting } from '#scripts/lib/cli-flags'
+import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import type { Verdict } from './eval-judge'
 import type { Scenario } from './eval-scenario'
@@ -140,26 +141,36 @@ function skipped_verdict(scenario: Scenario, tally: UnreachableTally): Verdict {
 	}
 }
 
+async function no_wait(): Promise<void> {
+	await Promise.resolve()
+}
+
 async function run_with_retry(
 	scenario: Scenario,
 	deps: RunnerDependencies,
 	tally: UnreachableTally,
 ): Promise<Verdict> {
-	let verdict = await deps.run_once(scenario)
-	let attempt = 0
+	const progress = { verdict: await deps.run_once(scenario) }
 
-	while (attempt < INCONCLUSIVE_RETRIES && is_retryable(verdict, tally)) {
-		attempt += 1
-		deps.log(
-			`  … ${scenario.name} produced no measurement; waiting ${String(RETRY_PAUSE_MS / MS_PER_SECOND)}s, then retrying`,
-		)
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		await deps.pause(RETRY_PAUSE_MS)
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		verdict = await deps.run_once(scenario)
-	}
+	await poll.poll_until(
+		async () => {
+			if (!is_retryable(progress.verdict, tally)) return true
+			deps.log(
+				`  … ${scenario.name} produced no measurement; waiting ${String(RETRY_PAUSE_MS / MS_PER_SECOND)}s, then retrying`,
+			)
+			await deps.pause(RETRY_PAUSE_MS)
+			Object.assign(progress, { verdict: await deps.run_once(scenario) })
 
-	return verdict
+			return false
+		},
+		{
+			attempts: INCONCLUSIVE_RETRIES,
+			interval_ms: 0,
+			sleeper: no_wait,
+		},
+	)
+
+	return progress.verdict
 }
 
 async function run_scenario(

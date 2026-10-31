@@ -39,3 +39,18 @@ overrides:
   # major without reintroducing the advisory. The devalue, postcss and nanoid floors were removed once
   # their parents' ranges exceeded them (joshuafolkken/kit#3091).
   vite: ^8.0.16 # OSV — vite 8.0.8 → 8.0.16
+  # kit-only:start — `josh init` / `josh sync` drop this region: the override needs the patch below,
+  # which is not published (joshuafolkken/kit#5500).
+  # The fix is only in the next major, which ESLint and its plugins do not yet accept (user-approved
+  # 2026-10-31, joshuafolkken/kit#5500). Remove it, with the patch below, once eslint-plugin-import-x
+  # declares minimatch 11 (joshuafolkken/kit#5507).
+  minimatch: ^11.0.1 # OSV GHSA-g3hv-75wg-m249 — minimatch 10.2.6 → 11.0.1
+  # kit-only:end
+
+# kit-only:start — not distributed: `patches/` is not published.
+# minimatch 11 removed `makeRe`, which import-x's `no-internal-modules` imports at load time; the patch
+# matches with `Minimatch#match` instead (joshuafolkken/kit#5500). Remove it with the minimatch override
+# once import-x declares minimatch 11 (joshuafolkken/kit#5507).
+patchedDependencies:
+  eslint-plugin-import-x@4.17.1: patches/eslint-plugin-import-x@4.17.1.patch
+# kit-only:end

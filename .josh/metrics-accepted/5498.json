@@ -1,0 +1,7 @@
+{
+	"reason": "unit baseline 1.6s came from single-file test:unit reruns while diagnosing #5505, not from a gate; the whole suite is unchanged",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 13
+	}
+}

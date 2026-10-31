@@ -132,6 +132,9 @@ words:
   - newbot
   - userinfobot
   - lefthook
+  # In kit's distributed `pnpm-workspace.yaml`, inside a region `josh sync` drops before writing it
+  # (joshuafolkken/kit#5500); the cspell guard reads the file as kit ships it.
+  - minimatch
   - mischeck
   - multicriteria
   - narratively

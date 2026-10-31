@@ -91,7 +91,7 @@ describe('run_ship_wait_cli.wait_for — the current attempt', () => {
 	})
 
 	it('passes once the attempt is past a commit it skipped as already shipped', async () => {
-		started_mock.mockReturnValue(['round-2'])
+		started_mock.mockReturnValue(['followup'])
 
 		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE)).resolves.toStrictEqual({
 			verdict: VERDICT.PASSED,
@@ -124,6 +124,17 @@ describe('run_ship_wait_cli.CHUNK_MS — the wait is the keep-alive (#5344)', ()
 })
 
 describe('run_ship_wait_cli.wait_for — a commit in progress', () => {
+	it('keeps the heartbeat while gate and round 2 run before a new commit', async () => {
+		done_mock.mockReturnValue(new Set(['commit']))
+		started_mock.mockReturnValue(['gate', 'round-2'])
+
+		await expect(run_ship_wait_cli.wait_for(ROOT, ISSUE, SHORT_CHUNK_MS)).resolves.toStrictEqual({
+			verdict: VERDICT.PENDING,
+		})
+		expect(beat_mock).toHaveBeenCalledWith(ROOT, ISSUE)
+		expect(leave_mock).not.toHaveBeenCalled()
+	})
+
 	it('keeps waiting while the attempt has started its commit but not finished it', async () => {
 		done_mock.mockReturnValue(new Set(['review', 'gate']))
 		started_mock.mockReturnValue(['review', 'gate', 'commit'])

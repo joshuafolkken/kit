@@ -188,7 +188,7 @@ describe('run_parent_cut_hook.parent_cut_reason — priced on the newest request
 
 describe('run_parent_cut_hook.PARENT_CUT_REASON', () => {
 	it('names the hand-off command and the procedure', () => {
-		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('pnpm josh run:carry --cut')
+		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('(`pnpm josh run:carry --cut`,')
 		expect(run_parent_cut_hook.PARENT_CUT_REASON).toContain('backlogrun-progress.md')
 	})
 

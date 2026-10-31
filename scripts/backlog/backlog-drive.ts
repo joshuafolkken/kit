@@ -17,6 +17,7 @@
 // without a process, a network or a clock.
 
 import { issue_cite } from '#scripts/issue/issue-cite'
+import { poll } from '#scripts/lib/poll'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_token } from '#scripts/run/merge/run-merge-token'
 import { backlog_drive_adopt } from './backlog-drive-adopt'
@@ -406,19 +407,20 @@ async function run_loop(
 	config: LoopConfig,
 	ports: LoopPorts,
 ): Promise<DriveEnd> {
-	const first: LoopRun = { state, started_ms: ports.now().getTime(), offered_ms: -Infinity }
-	let step = await loop_step(first, config, ports)
+	const progress = { run: { state, started_ms: ports.now().getTime(), offered_ms: -Infinity } }
+	const end = await poll.wait_for(
+		async () => {
+			const step = await loop_step(progress.run, config, ports)
+			if (step.kind === 'next') Object.assign(progress, { run: step.run })
 
-	while (step.kind === 'next') {
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		await ports.sleep(config.poll_ms)
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		step = await loop_step(step.run, config, ports)
-	}
+			return step.kind === 'end' ? step.end : undefined
+		},
+		{ interval_ms: config.poll_ms, sleeper: ports.sleep },
+	)
 
-	if (step.end.reason === STOP_VERDICT) await ports.finish(step.end)
+	if (end.reason === STOP_VERDICT) await ports.finish(end)
 
-	return step.end
+	return end
 }
 
 const backlog_drive = {

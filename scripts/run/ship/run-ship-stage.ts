@@ -187,10 +187,8 @@ const DONE_BY: Record<Stage, (done: ReadonlySet<string>, state: ShipState) => bo
 	// moved is the followup's to merge again.
 	[STAGE.SYNC]: (done, state) => state.is_merged || (done.has(STAGE.SYNC) && is_shipped(state)),
 	[STAGE.COMMIT]: (done, state) => state.is_merged || (done.has(STAGE.COMMIT) && is_shipped(state)),
-	// The round-2 pass reads the pushed fix delta, so its record is honored only
-	// while that push still stands — new work pushed on top reruns it.
-	[STAGE.ROUND_TWO]: (done, state) =>
-		state.is_merged || (done.has(STAGE.ROUND_TWO) && is_shipped(state)),
+	// The final review precedes the push. Its own tree stamp decides reuse after a stop.
+	[STAGE.ROUND_TWO]: (_done, state) => state.is_merged,
 	// A recorded followup still needs the shipped state: a record left by a merged ship whose report
 	// failed must not pass over the followup of new, not-yet-pushed work on the same issue.
 	[STAGE.FOLLOWUP]: (done, state) =>

@@ -1,3 +1,4 @@
+import { poll } from '#scripts/lib/poll'
 import { git_gh_command } from './git-gh-command'
 import { git_pr_checks, type PrStateSnapshot } from './git-pr-checks'
 
@@ -48,16 +49,26 @@ async function try_merge(branch_name: string, snapshot: PrStateSnapshot): Promis
 }
 
 async function merge_checked(input: CheckedMerge): Promise<void> {
-	let snapshot = input.checked ?? (await input.wait_for_green())
+	const progress = { snapshot: input.checked ?? (await input.wait_for_green()) }
 
-	for (let move = 0; move < MAX_HEAD_MOVES; move += 1) {
-		// eslint-disable-next-line no-await-in-loop -- each merge names the head the wait before it passed
-		if (await try_merge(input.branch_name, snapshot)) return
+	const is_merged = await poll.poll_until(
+		async () => {
+			if (await try_merge(input.branch_name, progress.snapshot)) return true
 
-		console.info(HEAD_MOVED_NOTE)
-		// eslint-disable-next-line no-await-in-loop -- the new head has to pass before it is merged
-		snapshot = await input.wait_for_green()
-	}
+			console.info(HEAD_MOVED_NOTE)
+			Object.assign(progress, { snapshot: await input.wait_for_green() })
+
+			return false
+		},
+		{
+			attempts: MAX_HEAD_MOVES,
+			interval_ms: 0,
+			sleeper: async () => {
+				await Promise.resolve()
+			},
+		},
+	)
+	if (is_merged) return
 
 	throw new Error(HEAD_KEPT_MOVING_MESSAGE)
 }

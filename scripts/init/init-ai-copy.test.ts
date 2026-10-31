@@ -69,6 +69,7 @@ vi.mock('./init-logic', () => ({
 		get_ai_copy_directories: vi.fn().mockReturnValue(['prompts']),
 		merge_workspace_yaml: merge_workspace_mock,
 		carry_npmrc_settings: (template: string) => template,
+		drop_kit_only_regions: (template: string) => template,
 	},
 }))
 vi.mock('./init-paths', () => ({

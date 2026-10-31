@@ -5,6 +5,7 @@ import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { cutoff_of } from '#scripts/git/listing-cutoff'
+import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_plan } from './lane-plan'
@@ -31,6 +32,7 @@ const record_yield = vi.spyOn(lane_yield, 'record_yield')
 const release = vi.spyOn(run_hold_cli, 'run')
 const error = vi.spyOn(console, 'error')
 const info = vi.spyOn(console, 'info')
+const budgets = vi.spyOn(line_budget, 'budgets_for')
 
 // The plans live under the repository the spy below hands each test afresh.
 const directory = path.join(ROOT, 'lane')
@@ -54,6 +56,7 @@ function holding(later_body: string): Awaited<ReturnType<typeof auto_ok_cli.fetc
 
 beforeEach(() => {
 	vi.clearAllMocks()
+	budgets.mockResolvedValue([])
 	error.mockImplementation(vi.fn())
 	info.mockImplementation(vi.fn())
 	record_yield.mockResolvedValue(undefined)
@@ -99,6 +102,49 @@ describe('lane:plan --probe', () => {
 		expect(await lane_plan_cli.run([String(LATER), HELD, PROBE], directory)).toBe(FAILURE)
 		expect(info).toHaveBeenCalledWith('wait')
 	})
+})
+
+describe('lane:plan line headroom', () => {
+	it.each([20, 0, -1])(
+		'warns with %s lines left without changing the clear verdict',
+		async (headroom) => {
+			fetch_opted_in.mockResolvedValue(holding(''))
+			budgets.mockResolvedValue([
+				{
+					file_path: path.resolve(directory, FREE_FILE),
+					limit: 300,
+					budget: { code_lines: 300 - headroom, limit: 300, headroom, is_near_limit: true },
+				},
+			])
+
+			expect(await lane_plan_cli.run([String(LATER), FREE_FILE], directory)).toBe(SUCCESS)
+			expect(error).toHaveBeenCalledWith(`near cap: ${FREE_FILE} (${String(headroom)} lines left)`)
+			expect(info).toHaveBeenCalledWith('clear')
+			expect(budgets).toHaveBeenCalledWith([path.resolve(directory, FREE_FILE)], directory)
+		},
+	)
+
+	it('does not warn with 21 lines left or an unavailable budget', async () => {
+		fetch_opted_in.mockResolvedValue(holding(''))
+		budgets.mockResolvedValue([
+			{
+				file_path: FREE_FILE,
+				limit: 300,
+				budget: { code_lines: 279, limit: 300, headroom: 21, is_near_limit: true },
+			},
+			{ file_path: 'new.ts', limit: undefined, budget: undefined },
+		])
+
+		expect(await lane_plan_cli.run([String(LATER), FREE_FILE, 'new.ts'], directory)).toBe(SUCCESS)
+		expect(error).not.toHaveBeenCalled()
+	})
+})
+
+it('does not run line counting for a probe', async () => {
+	fetch_opted_in.mockResolvedValue(holding(''))
+	await lane_plan_cli.run([String(LATER), FREE_FILE, PROBE], directory)
+
+	expect(budgets).not.toHaveBeenCalled()
 })
 
 describe('lane_plan_check.yield_at_entry', () => {
