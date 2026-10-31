@@ -2,21 +2,22 @@ import { disposition, type Disposition } from './disposition-logic'
 import { review_finding_text } from './review-finding-text'
 import { review_record_cli } from './review-record-cli'
 
-// `josh disposition --batch <findings-file>` — every finding left after the review round cap, routed
-// at once. A line is a `review:record` positional, `<category>:<severity>:<file>[:<line>] — <sentence>`,
-// marked `confirmed ` first when the run has stated its failure scenario in concrete inputs and state —
-// the one judgement `disposition` leaves to the run. The branch follows `prompts/review.md` →
-// "Three-way disposition after the cap": a confirmed finding that reaches a runtime path is fixed in
-// place, or filed when it cannot close there; anything else is dropped with a note the PR body carries.
+// `josh disposition --batch <findings-file>` — every finding the run did not fix in place after the
+// review round cap, routed at once. A line is a `review:record` positional,
+// `<category>:<severity>:<file>[:<line>] — <sentence>`, marked `confirmed ` first when the run has
+// stated its failure scenario in concrete inputs and state — the one judgement `disposition` leaves to
+// the run. Branch 1 (fix in place) is a size call this cannot see, so it is made before the file is
+// written; the rest follows `prompts/review.md` → "Three-way disposition after the cap": a confirmed
+// finding that reaches a runtime path is filed, anything else dropped with a note the PR body carries.
 
 const CONFIRMED_MARK = 'confirmed '
 const LINE_SUFFIX = /:\d+(?:-\d+)?$/u
 const HEADER = ['| finding | disposition | confirmed | branch |', '| --- | --- | --- | --- |']
 const LEGEND =
-	'fix: close it in place, or file it (`--route review-cap`) when it cannot close there'
+	'file: `pnpm josh issue:file … --route review-cap`; list only findings not fixed in place'
 const DROP_HEADING = 'Drop notes for the PR body:'
 
-type Branch = 'fix' | 'drop'
+type Branch = 'file' | 'drop'
 
 interface BatchFinding {
 	spec: string
@@ -66,7 +67,7 @@ function parse(text: string): ParseResult {
 }
 
 function branch_of(finding: BatchFinding): Branch {
-	return finding.is_confirmed && finding.disposition === disposition.RUNTIME ? 'fix' : 'drop'
+	return finding.is_confirmed && finding.disposition === disposition.RUNTIME ? 'file' : 'drop'
 }
 
 function drop_reason(finding: BatchFinding): string {

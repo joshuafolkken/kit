@@ -6,12 +6,13 @@ import { review_record_cli } from './review-record-cli'
 // table, and drafts the drop note the PR body carries for each finding it drops.
 
 const RUNTIME_LINE = 'bug-risks:medium:scripts/foo.ts:42 — the loop skips the last entry'
-const INERT_LINE = 'comments:low:.editorconfig — a stale comment'
+const INERT_PATH = '.editorconfig'
+const INERT_LINE = `comments:low:${INERT_PATH} — a design preference`
 const FINDINGS_FILE = [
 	`confirmed ${RUNTIME_LINE}`,
 	'',
 	RUNTIME_LINE.replace('medium', 'low'),
-	INERT_LINE,
+	`comments:low:${INERT_PATH}:3 — a design preference`,
 ].join('\n')
 
 function findings_of(result: ParseResult): ReadonlyArray<BatchFinding> {
@@ -51,11 +52,11 @@ describe('disposition_batch.parse', () => {
 })
 
 describe('disposition_batch.branch_of', () => {
-	it('fixes a confirmed runtime finding and drops the rest', () => {
+	it('files a confirmed runtime finding and drops the rest', () => {
 		const findings = findings_of(disposition_batch.parse(FINDINGS_FILE))
 
 		expect(findings.map((finding) => disposition_batch.branch_of(finding))).toEqual([
-			'fix',
+			'file',
 			'drop',
 			'drop',
 		])
@@ -70,9 +71,9 @@ describe('disposition_batch.drop_note', () => {
 		expect(parsed?.finding).toEqual({
 			category: 'comments',
 			severity: 'low',
-			file: '.editorconfig',
+			file: INERT_PATH,
 		})
-		expect(parsed?.description).toBe('dropped (non-runtime): a stale comment')
+		expect(parsed?.description).toBe('dropped (non-runtime): a design preference')
 	})
 
 	it('names an unconfirmed runtime finding as unconfirmed', () => {
@@ -86,8 +87,8 @@ describe('disposition_batch.render', () => {
 	it('prints one table row per finding and a note per dropped one', () => {
 		const output = disposition_batch.render(findings_of(disposition_batch.parse(FINDINGS_FILE)))
 
-		expect(output).toContain('| bug-risks:medium:scripts/foo.ts:42 | runtime | yes | fix |')
-		expect(output).toContain('| comments:low:.editorconfig | non-runtime | no | drop |')
+		expect(output).toContain('| bug-risks:medium:scripts/foo.ts:42 | runtime | yes | file |')
+		expect(output).toContain('| comments:low:.editorconfig:3 | non-runtime | no | drop |')
 		expect(output.match(/^- /gmu)).toHaveLength(2)
 	})
 
