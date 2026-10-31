@@ -12,6 +12,7 @@ const WORKSPACE_PREFIX = 'kit-merge-conflicts-'
 const MAIN = 'main'
 const OURS = 'ours'
 const THEIRS = 'theirs'
+const LATER = 'later'
 const SHARED_FILE = 'shared.ts'
 const ADDED_FILE = '4348-comment-rounds.md'
 const ROUND_CONTENT = 'round 1\n'
@@ -86,19 +87,50 @@ describe('git_merge_conflicts.working_tree_conflicts — clean merges', () => {
 	)
 })
 
+function first_line_as(line: string): string {
+	return `${line}${BASE_LINES.slice(BASE_LINES.indexOf('\n'))}`
+}
+
+// `later` changes the line `theirs` changed once more, as the default branch moves on during a merge.
+async function later_changes_it_again(): Promise<void> {
+	await git(fixture.workspace, ['switch', '-c', LATER, THEIRS])
+	await write(SHARED_FILE, first_line_as('two'))
+	await commit_all(LATER)
+	await git(fixture.workspace, ['switch', OURS])
+}
+
+// Both branches change the first line; `ours` commits its change, begins merging `theirs`, and leaves
+// a resolution unlike either side uncommitted, as a resumed lane meets it.
+async function resolve_merge_of_theirs(): Promise<void> {
+	await write(SHARED_FILE, BASE_LINES)
+	await commit_all('lines')
+	await theirs_commits(SHARED_FILE, first_line_as('one'))
+	await later_changes_it_again()
+	await write(SHARED_FILE, first_line_as('uno'))
+	await commit_all(OURS)
+	await git(fixture.workspace, ['merge', '--no-commit', '--strategy', 'ours', THEIRS])
+	await write(SHARED_FILE, first_line_as('one and uno'))
+}
+
 describe('git_merge_conflicts.working_tree_conflicts — a merge in progress', () => {
 	it(
 		'answers no conflict for a resolution left uncommitted in a merge of the other branch',
 		async () => {
-			await write(SHARED_FILE, BASE_LINES)
-			await commit_all('lines')
-			await theirs_commits(SHARED_FILE, BASE_LINES.replace('first', 'one'))
-			await write(SHARED_FILE, BASE_LINES.replace('first', 'uno'))
-			await commit_all(OURS)
-			await git(fixture.workspace, ['merge', '--no-commit', '--strategy', 'ours', THEIRS])
-			await write(SHARED_FILE, BASE_LINES.replace('first', 'one and uno'))
+			await resolve_merge_of_theirs()
 
 			expect(conflicts([SHARED_FILE])).toStrictEqual([])
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'lists the resolved line where the other branch has changed it again since the merge began',
+		async () => {
+			await resolve_merge_of_theirs()
+
+			expect(
+				git_merge_conflicts.working_tree_conflicts(LATER, [SHARED_FILE], fixture.workspace),
+			).toStrictEqual([SHARED_FILE])
 		},
 		TIMEOUT_MS,
 	)
