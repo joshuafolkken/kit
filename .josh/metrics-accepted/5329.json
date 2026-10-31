@@ -1,0 +1,8 @@
+{
+	"reason": "Drain-time observations:flush path (#5329): flush module, cwd-aware josh runner, emit_once pre-append step so the flush lands before the drain marker",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 47,
+		"ai_cost.on_demand_bytes": 271
+	}
+}

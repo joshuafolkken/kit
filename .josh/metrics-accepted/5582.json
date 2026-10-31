@@ -1,0 +1,7 @@
+{
+	"reason": "#5582: the ship conflict probe routes its merge base through changed_paths_sync.through_merge (an import and one call)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 2
+	}
+}
