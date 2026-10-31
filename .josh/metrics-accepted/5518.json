@@ -1,0 +1,7 @@
+{
+	"reason": "#5518 holds only the untriaged candidate: offer/drive/board carry the judgment flag; review fixes add the not-due check",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 59
+	}
+}
