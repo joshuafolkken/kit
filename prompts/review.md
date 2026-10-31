@@ -151,6 +151,9 @@ is. **The default exit is branch 3, and branch 2 has to be earned**. "It might m
    a Low that does not reach the user, a design preference, an unproven suspicion. **The note is not optional**:
    one line naming the finding and why it was dropped.
 
+Two or more findings remain → `pnpm josh disposition --batch <file>` prints each one's branch and
+the drop notes for the PR body (`docs/josh-commands-backlog.md` → `josh disposition`).
+
 Findings that reduce to one root judgement are filed as one Issue with a section per symptom
 (`## 現象 1` / `## 現象 2`).
 

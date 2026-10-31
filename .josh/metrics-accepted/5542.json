@@ -1,0 +1,9 @@
+{
+	"reason": "review.md gains the pointer line to disposition --batch (#5542)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 92,
+		"rules.lines": 3,
+		"ai_cost.on_demand_bytes": 190
+	}
+}

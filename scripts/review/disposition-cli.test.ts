@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { disposition_cli } from './disposition-cli'
 
@@ -24,6 +27,60 @@ describe('disposition_cli.run', () => {
 
 		expect(disposition_cli.run([CODE_FILE])).toBe(0)
 		expect(write).toHaveBeenCalledWith('runtime\n')
+
+		vi.restoreAllMocks()
+	})
+})
+
+// joshuafolkken/kit#5542: `--batch <findings-file>` prints the routing table; a bare path stays the
+// single-finding call it was.
+const BATCH_FLAG = '--batch'
+const UNPARSED_LINE = 'not a finding'
+
+function findings_file(content: string): string {
+	const directory = mkdtempSync(path.join(tmpdir(), 'disposition-batch-'))
+	const file = path.join(directory, 'findings.txt')
+
+	writeFileSync(file, content)
+
+	return file
+}
+
+describe('disposition_cli.run --batch', () => {
+	it('prints the routing table for a findings file', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const file = findings_file(`comments:low:${INERT_FILE} — a stale comment\n`)
+
+		expect(disposition_cli.run([BATCH_FLAG, file])).toBe(0)
+		expect(String(write.mock.calls[0]?.[0])).toContain('| non-runtime | no | drop |')
+
+		vi.restoreAllMocks()
+	})
+
+	it('is a usage error with no findings file', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG])).toBe(1)
+
+		vi.restoreAllMocks()
+	})
+
+	it('refuses a line outside the review:record grammar', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG, findings_file(`${UNPARSED_LINE}\n`)])).toBe(1)
+		expect(String(error.mock.calls[0]?.[0])).toContain(UNPARSED_LINE)
+
+		vi.restoreAllMocks()
+	})
+
+	it('keeps a bare path the single-finding call', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+		expect(disposition_cli.run([INERT_FILE])).toBe(0)
+		expect(write).toHaveBeenCalledWith('non-runtime\n')
 
 		vi.restoreAllMocks()
 	})
