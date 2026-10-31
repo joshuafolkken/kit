@@ -254,7 +254,7 @@ const PASSING_CALL_GUIDANCE: ReadonlyArray<readonly [string, string]> = [
 	['`sonnet` for routine work, `opus` for judgment', agent_model.AGENT_MODEL_REASON],
 	['in the same message', investigator_foreground.INVESTIGATOR_FOREGROUND_REASON],
 ]
-const REVIEW_MODEL_ALIAS = 'the alias of the `model=` id the brief prints'
+const REVIEW_MODEL_ALIAS = 'the alias the brief prints beside its `model=` id'
 
 describe(`${DELEGATION_DOC} — condenses the hook-delivered rules to their rows`, () => {
 	const unwrapped = read_unwrapped(DELEGATION_DOC)

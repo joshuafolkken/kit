@@ -17,7 +17,9 @@ test('the review brief hands orchestration the resolved reviewer profile', () =>
 		rubric_path: RUBRIC_PATH,
 	})
 
-	expect(brief).toContain('provider=anthropic role=reviewer model=claude-opus-5-5 effort=medium')
+	expect(brief).toContain(
+		'provider=anthropic role=reviewer model=claude-opus-5-5 (opus) effort=medium',
+	)
 })
 
 test('the review brief hands orchestration the OpenAI reviewer profile', () => {
