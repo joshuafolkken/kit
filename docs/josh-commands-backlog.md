@@ -857,7 +857,7 @@ Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog
 Drive backlogrun through offer, launch and merge; restore this run’s lanes and report when complete.
 
 ```bash
-pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
+pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 ```
 
 <!-- /usage -->

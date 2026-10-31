@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { git_common_directory } from '#scripts/git/git-common-directory'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import { run_liveness } from '#scripts/run/run-liveness'
 import { run_ship_detach } from '#scripts/run/ship/run-ship-detach'
@@ -356,7 +357,16 @@ describe('parse_arguments', () => {
 		})
 	})
 
-	it('reads issues alone with no owner', () => {
+	// joshuafolkken/kit#5504: an omitted `--owner` is the pid the calling session exports.
+	it('reads an omitted owner from the session environment', () => {
+		vi.spyOn(agent_session_environment, 'own_session_pid').mockReturnValue(55_250)
+
+		expect(lane_await.parse_arguments([ISSUE])).toStrictEqual({ issues: [ISSUE], owner: 55_250 })
+	})
+
+	it('reads issues alone with no owner where the session exports none', () => {
+		vi.spyOn(agent_session_environment, 'own_session_pid').mockReturnValue(undefined)
+
 		expect(lane_await.parse_arguments([ISSUE])).toStrictEqual({ issues: [ISSUE], owner: undefined })
 	})
 
