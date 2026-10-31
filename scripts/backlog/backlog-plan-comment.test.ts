@@ -22,7 +22,7 @@ vi.mock('#scripts/issue/issue-read', () => ({
 const { backlog_plan_comment } = await import('./backlog-plan-comment')
 
 // joshuafolkken/kit#4923: joshuafolkken/kit#4910's plan comment named files a running lane held, its
-// body named none, so dispatch let it run and the lane waited 23 minutes in `lane:plan`.
+// body named none, so dispatch let it run and the lane waited in `lane:plan`.
 
 const { REPO } = backlog_fixture
 const RUNNING = 4911

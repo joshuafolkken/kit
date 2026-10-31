@@ -66,6 +66,29 @@ describe('unverified shell argument expansion', () => {
 	})
 })
 
+// joshuafolkken/kit#5497: the bare `epic` subcommand records decisions, adds children and files an
+// epic — operations like every `epic:*` — and `rule:list` is the read `delegation.md` asks for.
+describe('josh epic operations and rule:list', () => {
+	it.each([
+		'pnpm josh epic --decide 5392 5389 --decision-file .git/josh/decision-5389.md',
+		'pnpm josh epic --add 5392 5389',
+		'pnpm josh epic "Bring every lane under 30 minutes" 5502 5503',
+		'pnpm josh epic:check 5392',
+		'pnpm josh rule:list',
+	])('passes the operation %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+
+	it.each([
+		'pnpm josh epics 5392',
+		'pnpm josh gate',
+		'pnpm josh rule:other',
+		'pnpm josh rule:list-all',
+	])('still refuses %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
 describe('operational shell reads and records', () => {
 	it.each([
 		'printf "example > app.ts"',

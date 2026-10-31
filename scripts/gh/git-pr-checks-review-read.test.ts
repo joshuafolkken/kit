@@ -25,7 +25,7 @@ import { should_never_read_review_decision } from './git-pr-checks-watch'
 // **How many REST requests one poll of the merge gate costs, measured rather than reasoned about.**
 //
 // joshuafolkken/kit#1028 replaced one GraphQL call with four REST reads, and `wait_for_pr_success`
-// repeats them every ten seconds for up to 32 minutes — about 800 requests for one `followup`, which
+// repeats them throughout the CI wait for each `followup`, which
 // a `queue` or an `epicrun` runs back to back. The counts below are the whole point of
 // joshuafolkken/kit#1043, so they are asserted as numbers: a fifth read added anywhere fails here
 // rather than showing up as a rate limit weeks later.

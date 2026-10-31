@@ -14,6 +14,7 @@ const stamps = vi.hoisted(() => ({
 	remove_stamp: vi.fn(),
 	stamp_path: vi.fn((prefix: string) => `stamps/${prefix}x`),
 	write_text_stamp: vi.fn(),
+	write_stamp: vi.fn(),
 }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
@@ -67,7 +68,6 @@ const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
 const SPAWN_NOTE = 'spawn failed'
-const PROFILE_NOTE = 'bad model'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 
 function commands(): ReadonlyArray<string> {
@@ -194,9 +194,9 @@ describe('run_ship_review_steps.review_stage — a reviewer error stops it', () 
 	})
 
 	it('stops when the reviewer profile is rejected', async () => {
-		review_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
+		review_in_mock.mockReturnValue({ kind: 'rejected', note: 'bad model' })
 
-		expect(await stage()).toHaveProperty('out', expect.stringContaining(PROFILE_NOTE))
+		expect(await stage()).toHaveProperty('out', expect.stringContaining('bad model'))
 		expect(launch).not.toHaveBeenCalled()
 	})
 })

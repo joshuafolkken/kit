@@ -87,9 +87,7 @@ const ENV: Record<string, string> = unit_environment(process.env)
 
 // **The packages most test files load are pre-bundled into one file each** (joshuafolkken/kit#4301).
 // An isolated file starts a fresh module graph, so each of them re-imports these from their many
-// source files: measured with `--experimental.importDurations`, execa and zod alone cost about 70ms
-// and 50ms per file across 700 and 900 isolated files — the top two import costs of the suite.
-// A bundled copy loads several times faster (execa 35ms → 9ms, zod 27ms → 10ms natively).
+// source files. Bundling reduces the repeated module-loading cost across the suite.
 const OPTIMIZED_DEPENDENCIES: ReadonlyArray<string> = [
 	'execa',
 	'zod',

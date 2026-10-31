@@ -1,5 +1,5 @@
 // **Each check prints only its last lines; its whole output is in the log** (joshuafolkken/kit#5204).
-// A `test:related` over hundreds of files printed past 140 KB, past the tool result's size limit, and
+// A `test:related` over hundreds of files printed past the tool result's size limit, and
 // the run typed the same `check:related` again behind a `grep` only to read the verdict. The end of a
 // section is where a check's own verdict and its failures land, so a passed check keeps its last 5
 // lines and a failed one its last 40; `--full` prints the whole output as before.

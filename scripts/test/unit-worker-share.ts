@@ -8,13 +8,9 @@ import { unit_run_marker } from './unit-run-marker'
 // `josh gate` at once each concluded "11 cores, take 7 workers" and put 42 workers on 11 cores. The
 // pre-push hook once passed no cap at all; it now runs the suite through `test_unit_guard.run_guarded_unit`,
 // the same guard `josh test:unit` uses, so the share below applies there too.
-// Measured on the machine this was found on — load average 14.97 in the field, and 209 in a deliberate
-// reproduction of six concurrent suites, against 22 once the share below was applied.
 //
-// **What it fixes, and what it does not.** Six concurrent copies of the full suite produced ten
-// `Test timed out in 10000ms` failures across six runs; at the share this module hands out, the same
-// six runs produced **none**. It is the *second* multiplicand of those timeouts — the first
-// was a live `git fetch` inside two test files, which is fixed in `test-network-guard.ts` and its
+// **Concurrent suites need a share to avoid oversubscription** (joshuafolkken/kit#1515, which records
+// the load averages). Oversubscription compounds timeouts; the other cause of those timeouts was a live `git fetch` inside two test files, which is fixed in `test-network-guard.ts` and its
 // callers, and which no worker count would have repaired: that one failed on an idle machine at one
 // worker.
 //
