@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown prints the calls behind each row (#5539)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 121
+	}
+}

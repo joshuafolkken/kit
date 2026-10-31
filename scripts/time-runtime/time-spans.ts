@@ -28,8 +28,8 @@ const { NO_CALL, UNKNOWN_CALL, UNKNOWN_TOOL, to_tool_call } = time_tool_call
 // ending at a tool result is that tool's execution, one ending at a user prompt is human wait.
 // Classifying by pairs instead would double-count parallel tool calls and leave the three shares
 // summing to something other than the elapsed time — the property that makes two runs comparable.
-// Measured against three sessions restored by hand: 49.6 / 73.3 / 54.6 minutes, every share within
-// 0.4 points of the hand figure.
+// Measured against three sessions restored by hand, every share within 0.4 points of the hand
+// figure.
 
 const ASSISTANT_TYPE = 'assistant'
 const USER_TYPE = 'user'

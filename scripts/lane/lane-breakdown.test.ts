@@ -114,6 +114,13 @@ describe('lane_breakdown.of — #4970', () => {
 
 		expect(names).toStrictEqual(new Set(expected))
 	})
+
+	// joshuafolkken/kit#5539: the window the start to plan's longest calls are read in.
+	it('keeps the start to plan span', () => {
+		const spans = breakdown?.plan?.map(({ from_ms, to_ms }) => [from_ms, to_ms])
+
+		expect(spans).toStrictEqual([[START, START + 10 * MINUTE_MS]])
+	})
 })
 
 // joshuafolkken/kit#5296: the ship review's event line says why it ran or was skipped.
