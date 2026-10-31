@@ -85,6 +85,8 @@ interface FrameParts {
 	thanks?: ReadonlyArray<string> | undefined
 	legend: ReadonlyArray<string>
 	footer: ReadonlyArray<string>
+	// The column every rule runs on to: where the lane rows' titles end; none where no lane row is drawn.
+	rule_width?: number | undefined
 }
 
 // One thing that gives way: a part as a whole, the processes' details, one note (the oldest shown),
