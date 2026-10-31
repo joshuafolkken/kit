@@ -39,7 +39,6 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[run_step.HUMAN_REVIEW, reference('needs-human-review.md', '`needs-human-review`')],
 	[run_step.UPDATE_DEPS, reference('latest-gate.md', 'The dependency update')],
 	['followup', reference('followup.md', 'Run `pnpm josh followup`')],
-	['review:round2', reference('prompts/review.md', 'Review round cap')],
 	['run:merge', reference(PROGRESS, "Running a named epic's children")],
 	['backlog:next', reference('backlogrun-steps.md', 'The loop')],
 	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
