@@ -102,6 +102,23 @@ describe('josh epic operations and rule:list', () => {
 	})
 })
 
+// joshuafolkken/kit#5614: `auto-ok:judge` lists issues and records a judgement as an Issue comment
+// and label — the `judge` hand-back of `backlog:drive` a consultation session has to answer.
+describe('josh auto-ok operations', () => {
+	it.each([
+		'pnpm josh auto-ok:judge',
+		'pnpm josh auto-ok:judge --apply 5614 --lane',
+		'pnpm josh auto-ok:judge --apply 5614 --solo',
+		'pnpm josh auto-ok:judge --decline 5614 --reason "needs a human decision"',
+	])('passes the auto-ok operation %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+
+	it.each(['pnpm josh auto-okay', 'pnpm josh auto-ok'])('refuses the near miss %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
 describe('operational shell reads and records', () => {
 	it.each([
 		'printf "example > app.ts"',

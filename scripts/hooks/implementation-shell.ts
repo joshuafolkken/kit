@@ -28,7 +28,7 @@ const GIT_READS: ReadonlySet<string> = new Set([
 	'rev-parse',
 ])
 const OPERATIONS =
-	/^(?:issue:|lane:|epic(?::|$)|run:|doc:|review:|backlog:|report:|observations:|oracle:|cost$|delegate$|repo:party$|rule:list$|notify$|disposition$)/u
+	/^(?:issue:|lane:|auto-ok:|epic(?::|$)|run:|doc:|review:|backlog:|report:|observations:|oracle:|cost$|delegate$|repo:party$|rule:list$|notify$|disposition$)/u
 const GH_ACTIONS: ReadonlySet<string> = new Set([
 	'view',
 	'list',
