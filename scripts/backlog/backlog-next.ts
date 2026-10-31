@@ -164,6 +164,7 @@ function report(result: EpicNextResult, context: PoolContext): number {
 
 	if (tokens[0] === VERDICT_TOKENS.wait) warn_wait_causes(result, context)
 	backlog_next_size.warn_over_guide(tokens, context)
+	backlog_next_size.warn_over_cap(context)
 	for (const token of tokens) console.info(token)
 
 	return SUCCESS_EXIT_CODE
@@ -185,7 +186,8 @@ function running_of(
 // The two halves as one result. The epic half is already classified by `epic:next`; the standalone
 // half is classified here; the verdict is decided from the merge, so a backlog with a runnable epic
 // child and nothing else says `run` exactly as one with a runnable standalone issue does.
-// `untrusted` is the epic children an author without write access filed (joshuafolkken/kit#4633).
+// `untrusted` is the epic children an author without write access filed (joshuafolkken/kit#4633), and
+// those declared over the size cap (joshuafolkken/kit#5502).
 function epic_half(
 	views: ReadonlyArray<EpicView>,
 	context: PoolContext,
@@ -289,10 +291,13 @@ async function resolve(context: PoolContext): Promise<EpicNextResult | undefined
 		return undefined
 	}
 
-	const untrusted = await auto_ok_author.untrusted_child_keys(
-		reads.flatMap((read) => read.snapshot.children),
-		context.repo,
-	)
+	const children = reads.flatMap((read) => read.snapshot.children)
+	// A child over the size cap is held for a person exactly as an untrusted author's is
+	// (joshuafolkken/kit#5502).
+	const untrusted = new Set([
+		...(await auto_ok_author.untrusted_child_keys(children, context.repo)),
+		...backlog_next_size.held_children(children),
+	])
 	// The defect priority and the ranking keys are applied here rather than when printing, so
 	// `backlog:plan` shows the order the run takes. The
 	// ranking goes last: its sort is stable, so the defect order survives as its final key.
