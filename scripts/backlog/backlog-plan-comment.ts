@@ -15,7 +15,7 @@ import { backlog_overlap, type Declared } from './backlog-overlap'
 //
 // **A plan posted as a comment declares paths too.** joshuafolkken/kit#4910's body named none of the
 // files its plan comment did, so dispatch saw no overlap with joshuafolkken/kit#4911 and
-// joshuafolkken/kit#4907, and the lane sat in `lane:plan`'s `wait` for 23 minutes
+// joshuafolkken/kit#4907, and the lane sat in `lane:plan`'s `wait`
 // (joshuafolkken/kit#4923). Only a `run:planned` issue is read, so an unplanned pool costs no request,
 // and only a trusted author's comment counts — the same trust `issue:read` applies. A plan is the
 // comment carrying the consumers section `issue:plan` refuses a plan without; the latest one wins.

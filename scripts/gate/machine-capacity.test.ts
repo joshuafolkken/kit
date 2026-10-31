@@ -27,7 +27,8 @@ const AVAILABLE_MB = 4000
 const LEDGER_MEMORY_MB = 2400
 const LEDGER_CORES = 4
 const PAGE_BYTES = 4096
-// 256 + 512 pages of 4 KB: 3 MB swapped since boot; 5 MB compressed since boot.
+// Counters since boot, swap in pages of hw.pagesize and the compressor in bytes, so the parser must
+// turn both into whole MB.
 const DARWIN_LEVEL = 'kern.memorystatus_level: 58'
 const DARWIN_SYSCTL = [
 	DARWIN_LEVEL,
@@ -204,8 +205,8 @@ describe('machine_capacity.swapped_between', () => {
 	})
 })
 
-// joshuafolkken/kit#3943: the level counted compressible pages as free, so 5.2 GB of reservations
-// were admitted while the compressor held 5.9 GB and churned 3.3 GB every three seconds.
+// joshuafolkken/kit#3943: compressible pages must not count as free while the compressor churns,
+// or reservations admit more work into memory pressure.
 const NORMAL = 1
 const WARNING = 2
 const SWAPPED_MB = 100

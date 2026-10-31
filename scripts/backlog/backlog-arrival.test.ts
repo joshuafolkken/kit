@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { backlog_arrival, type ArrivalPorts } from './backlog-arrival'
 
-// joshuafolkken/kit#2503: #2493 was opted in with `auto-ok` while children were in flight and started
-// 10.5 minutes later, picked up by the stall detector. The probe wakes the parent within a minute.
+// joshuafolkken/kit#2503: newly opted-in work must wake the parent while children are in flight,
+// rather than wait for the stall detector to discover it.
 
 const START_MS = 1_000_000
 const MINUTE_MS = backlog_arrival.PROBE_INTERVAL_MS

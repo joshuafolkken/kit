@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { busy_average, type BusySample } from './busy-average'
 import type { MachineReading } from './machine-capacity'
 
-// joshuafolkken/kit#4238: one 250 ms reading of a CPU near saturation swings across the admission
+// joshuafolkken/kit#4238: one reading of a CPU near saturation swings across the admission
 // threshold, so a claim judged on each reading alone is admitted on a momentary dip. A waiting claim
 // judges on the mean of its last few seconds instead.
 

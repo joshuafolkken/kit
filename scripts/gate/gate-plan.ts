@@ -394,8 +394,8 @@ function direct_unit_weight(
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
 }
 
-// The related files one vitest worker clears in about 30 seconds: `tools/test/unit-durations.json`'s
-// median file takes 105 ms (2077 files), and 30 000 ÷ 105 ≈ 285 (joshuafolkken/kit#5135).
+// Related suites give each worker about half a minute of files at the recorded median file duration,
+// so small suites avoid unnecessary workers (joshuafolkken/kit#5135 records the arithmetic).
 const FILES_PER_WORKER = 285
 
 // The cores a narrowed `josh test:related` reserves once its scope is known: one worker for each

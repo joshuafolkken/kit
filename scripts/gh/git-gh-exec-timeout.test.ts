@@ -54,8 +54,8 @@ function reject_as_timed_out(stderr: string): void {
 
 // joshuafolkken/kit#1065: every GitHub access kit makes funnels through this layer, and none of its
 // entries bounded a request. A hung `gh` therefore held its caller open forever — `josh propagate`'s
-// single-threaded runner most visibly, and `followup`, which makes roughly 573 requests across a
-// 32-minute CI wait and freezes on the first one that never answers.
+// single-threaded runner most visibly, and `followup`, whose repeated CI reads freeze on the first
+// request that never answers.
 const OVERRIDE_TIMEOUT_MS = 5000
 
 describe('the request budget — the default every entry carries', () => {

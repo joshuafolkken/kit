@@ -4,7 +4,7 @@ import { gate_skip } from './gate-skip'
 import { gate_test_fixture } from './gate-test-fixture'
 
 // joshuafolkken/kit#1328: the gate wrote down which tree it was green on and never read it back, so
-// a second run over an unedited tree spent 47–50 seconds reaching a conclusion already on disk.
+// a second run over an unedited tree repeated work whose conclusion was already on disk.
 //
 // What the assertions here are really about is that a file map is a **diff**, so everything it says
 // stays true while the branch it is measured against moves underneath it. Two shapes of that, and
