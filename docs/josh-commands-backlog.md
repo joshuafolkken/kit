@@ -749,9 +749,11 @@ pnpm josh backlog:next --exclude 1630   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
+Read-only, except for the mechanical triage of the triage gate below. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
 
-**Triage gate**: a candidate carrying neither `run:solo` nor `run:lane` is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
+**Triage gate**: an untriaged candidate (neither `run:solo` nor `run:lane`) without `bug`, or a `bug` naming no verification-gate path (`GATE_PATHS` in `scripts/backlog/backlog-auto-triage.ts`), gets `run:lane` and a comment naming the missing condition, and is offered as triaged.
+
+Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 

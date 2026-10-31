@@ -127,13 +127,16 @@ function segment_is_unsafe(segment: string, root: string): boolean {
 	)
 }
 
+// A single-quoted span expands nothing, so a finding quoting `code` in it is text, not a substitution.
 function input_is_unverified(command: string): boolean {
+	const expanded = time_shell.literal_blanked(command)
+
 	return (
 		command.trim() === '' ||
 		time_shell.has_heredoc(command) ||
-		SUBSTITUTION.test(command) ||
-		ENV_ASSIGNMENT.test(command) ||
-		command.includes('$')
+		SUBSTITUTION.test(expanded) ||
+		ENV_ASSIGNMENT.test(expanded) ||
+		expanded.includes('$')
 	)
 }
 

@@ -11,7 +11,12 @@ import { parse_json_array_or_undefined } from '#scripts/git/parse-json-array'
 import { defect_rate, type DefectRate } from '#scripts/issue/defect-rate'
 import { defect_rate_cli } from '#scripts/issue/defect-rate-cli'
 import { issue_cite } from '#scripts/issue/issue-cite'
-import { NOT_BEFORE_LABEL, RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
+import {
+	BUG_LABEL,
+	NOT_BEFORE_LABEL,
+	RUN_LANE_LABEL,
+	RUN_SOLO_LABEL,
+} from '#scripts/issue/issue-labels'
 import { lane_await } from '#scripts/lane/lane-await'
 import { vi } from 'vitest'
 
@@ -85,15 +90,28 @@ const AT_BASELINE: DefectRate = {
 	is_capped: false,
 }
 
+// An untriaged issue is a `bug` naming a verification-gate path, the one kind
+// `backlog_auto_triage` leaves for the judgment rather than labelling `run:lane` itself.
+const UNTRIAGED_BODY = 'Breaks `scripts/gate/`.'
+
 // The labels an issue is read with: `run:lane` added where the case left it judged.
 function triaged_labels(
 	number: number,
 	labels: ReadonlyArray<string>,
 	untriaged: ReadonlyArray<number>,
 ): ReadonlyArray<string> {
-	if (untriaged.includes(number) || labels.includes(RUN_SOLO_LABEL)) return labels
+	if (untriaged.includes(number)) return [...labels, BUG_LABEL]
+	if (labels.includes(RUN_SOLO_LABEL)) return labels
 
 	return [...labels, RUN_LANE_LABEL]
+}
+
+function triaged_body(
+	number: number,
+	body: string | undefined,
+	untriaged: ReadonlyArray<number>,
+): string | undefined {
+	return untriaged.includes(number) ? (body ?? UNTRIAGED_BODY) : body
 }
 
 function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): OpenIssueData {
@@ -102,9 +120,11 @@ function triaged_row(row: OpenIssueData, untriaged: ReadonlyArray<number>): Open
 		(row.labels ?? []).map((label) => label.name),
 		untriaged,
 	)
+	const labels = names.map((name) => ({ name }))
+	const body = triaged_body(row.number, row.body, untriaged)
 
 	// Filed by the owner unless the case says otherwise, so the pickup's trust check asks no network.
-	return { author_association: OWNER_ASSOCIATION, ...row, labels: names.map((name) => ({ name })) }
+	return { author_association: OWNER_ASSOCIATION, ...row, labels, body }
 }
 
 // The shape a `number,state,labels,blockedBy,body` read answers with — `blockedBy` is a connection
@@ -130,7 +150,7 @@ function gh_child(input: ChildInput, untriaged: ReadonlyArray<number> = []): str
 		number: input.number,
 		state: input.state ?? 'OPEN',
 		labels: child_labels(input, untriaged),
-		body: input.body,
+		body: triaged_body(input.number, input.body, untriaged),
 		author_association: input.author_association ?? OWNER_ASSOCIATION,
 		blockedBy: blocked_by_of(input),
 	})
