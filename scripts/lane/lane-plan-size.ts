@@ -18,6 +18,9 @@ import type { LanePlan } from './lane-plan'
 // `lines actual / declared median` (`DEFAULT_LINES_RATIO` without one) past the line guide (200 declared lines at 1.8 split). Both
 // stand down once the lane has filed a split child: the lines axis reads the declaration alone, and the
 // hunks the tree already holds would otherwise refuse every re-plan the ship's `unplanned` stop asks for.
+// The lines axis also stands down on a re-plan of a cleared plan (joshuafolkken/kit#5600): the
+// declaration was judged when the plan cleared, and a plan cleared before #5568 would be refused on
+// every re-plan. A yielded plan the entry probe recorded never met the bar, so it still does.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -101,11 +104,16 @@ function lines_over(declared: number, lines_ratio: number | undefined): MeasureO
 	return measured > limit ? { reason: 'lines', declared, limit, measured } : undefined
 }
 
-function measure_over(declared: Declared, signals: PlanSignals): MeasureOver | undefined {
+function measure_over(
+	declared: Declared,
+	signals: PlanSignals,
+	recorded: LanePlan | undefined,
+): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
 	const { hunks, lines_ratio } = signals
+	const lines = recorded?.cleared === true ? undefined : lines_over(declared.lines, lines_ratio)
 
-	return hunks_over(declared.files, hunks) ?? lines_over(declared.lines, lines_ratio)
+	return hunks_over(declared.files, hunks) ?? lines
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.
@@ -118,7 +126,10 @@ function oversize(
 	const declared = declared_of(plan.issue, issues)
 	if (declared === undefined) return undefined
 
-	return files_over(plan, declared.files, recorded?.paths ?? []) ?? measure_over(declared, signals)
+	return (
+		files_over(plan, declared.files, recorded?.paths ?? []) ??
+		measure_over(declared, signals, recorded)
+	)
 }
 
 function bar_tail(): string {
