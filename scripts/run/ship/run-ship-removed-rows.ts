@@ -1,16 +1,23 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { git_branch } from '#scripts/git/git-branch'
 import { git_command } from '#scripts/git/git-command'
+import { acceptance_map } from '#scripts/review/acceptance-map'
 import { removed_tests } from '#scripts/review/removed-tests'
-import { removed_tests_check } from '#scripts/review/removed-tests-check'
+import { removed_tests_check, type TitleChanges } from '#scripts/review/removed-tests-check'
 import { run_ship_body_draft } from './run-ship-body-draft'
 
 // **The tests a change removed, shown where a run passes before `josh ship`** — the end of a green
 // `josh test:related`. Their disposition rows were first asked at the ship's preflight, after the
 // pre-detach checks had run, and every lane that renamed a test stopped there and shipped again
-// (joshuafolkken/kit#4563). The removed titles are `removed_tests_check.read()`'s, and the pending
+// (joshuafolkken/kit#4563). The removed titles are `removed_tests_check.changes()`'s, and the pending
 // rows go into the branch's ship body draft, so the run only replaces each ending; the preflight still
 // refuses a row left pending.
+//
+// **The same pass meets each pending acceptance row a test the change added names by its criterion's
+// identifier** (`acceptance_map.with_test_rows`, joshuafolkken/kit#5541), so neither list is copied
+// into the body by hand. Both only fill what is pending: a row the run wrote is never replaced.
+
+const NO_CHANGES: TitleChanges = { removed: [], added: [] }
 
 async function draft_of_branch(): Promise<string | undefined> {
 	const issue_number = git_branch.issue_from_branch(await git_command.branch())
@@ -26,8 +33,26 @@ async function body_of(draft: string | undefined): Promise<string> {
 
 // An unreadable base lists nothing here — the preflight refuses on it — and outside a repository it
 // keeps the branch, which git could not answer, from being asked at all.
-async function removed_titles(): Promise<ReadonlyArray<string>> {
-	return (await removed_tests_check.read()) ?? []
+async function title_changes(): Promise<TitleChanges> {
+	return (await removed_tests_check.changes()) ?? NO_CHANGES
+}
+
+function is_unchanged(changes: TitleChanges): boolean {
+	return changes.removed.length === 0 && changes.added.length === 0
+}
+
+async function write_rows(
+	draft: string,
+	body: string,
+	removed: ReadonlyArray<string>,
+	added: ReadonlyArray<string>,
+): Promise<void> {
+	const filled = acceptance_map.with_test_rows(
+		removed_tests.with_pending_rows(body, removed),
+		added,
+	)
+
+	if (filled !== body) await writeFile(draft, filled)
 }
 
 function where(draft: string | undefined): string {
@@ -44,16 +69,15 @@ function notice(titles: ReadonlyArray<string>, draft: string | undefined): strin
 }
 
 async function surface(): Promise<void> {
-	const removed = await removed_titles()
+	const changes = await title_changes()
 
-	if (removed.length === 0) return
+	if (is_unchanged(changes)) return
 	const draft = await draft_of_branch()
 	const body = await body_of(draft)
-	const titles = removed_tests.undisposed(removed, body)
+	const titles = removed_tests.undisposed(changes.removed, body)
 
-	if (titles.length === 0) return
-	if (draft !== undefined) await writeFile(draft, removed_tests.with_pending_rows(body, titles))
-	console.info(notice(titles, draft))
+	if (draft !== undefined) await write_rows(draft, body, titles, changes.added)
+	if (titles.length > 0) console.info(notice(titles, draft))
 }
 
 const run_ship_removed_rows = { surface }

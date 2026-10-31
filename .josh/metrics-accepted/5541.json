@@ -1,0 +1,9 @@
+{
+	"reason": "#5541 adds acceptance-row prefill from added test titles and the removed/added title changes read",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 50,
+		"ai_cost.on_demand_bytes": 306,
+		"prose.long_paragraphs": 1
+	}
+}
