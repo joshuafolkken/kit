@@ -54,6 +54,7 @@ const ALIASES: Record<string, string> = {
 	tmd: 'time:density',
 	rtr: 'retrospective',
 	ca: 'cost:audit',
+	cit: 'ci:timing',
 	rvf: 'review:findings',
 	rvs: 'review:stops',
 	ruv: 'rule:value',

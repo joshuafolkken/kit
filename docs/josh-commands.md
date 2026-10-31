@@ -907,6 +907,21 @@ When the update moved `@playwright/test`, it installs the browsers (`JOSH_PLAYWR
 
 Detail: `docs/maintainers/josh-commands-rationale.md` → "`josh latest:update` in detail".
 
+### `josh ci:timing`
+
+<!-- usage: ci:timing -->
+
+Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit.
+
+```bash
+pnpm josh ci:timing 5544                 # a pull request, or a branch name
+pnpm josh ci:timing 18912345678 --json   # a run id, machine-readable
+```
+
+<!-- /usage -->
+
+A number from 100,000,000 up is a run id, a smaller one a pull request; unfinished prints `—`; no run exits 1.
+
 ## AI tools
 
 Helpers for AI-assisted development workflows.
