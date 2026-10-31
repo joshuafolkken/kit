@@ -1,3 +1,4 @@
+import { epic_triage } from '#scripts/epic/epic-triage'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type CarryRead } from '#scripts/run/carry/run-carry'
@@ -18,6 +19,7 @@ const ERROR_PREFIX = 'error '
 const WINDOW_MINUTES = 5
 const WINDOW_MS = WINDOW_MINUTES * MS_PER_MINUTE
 const WINDOW_VERDICT = 'window'
+const { TRIAGE_VERDICT } = epic_triage
 
 function driver_args(invocation: string): ReadonlyArray<string> | undefined {
 	const rebuilt = run_invocation.rebuild(invocation)
@@ -202,6 +204,24 @@ async function run_driver(
 	return await run_driver(target, args, wait, remaining - 1)
 }
 
+// **Triage waits for the launched parent while it plans** (joshuafolkken/kit#5516): `josh backlogrun`
+// hands this supervisor the record before its parent plans, and labelling the pool is that plan's
+// work — a session woken for the same `triage` would label the same issues beside it. The pause keeps
+// the re-drive from polling the tracker in a tight loop.
+async function deferred_triage(
+	result: JoshResult | undefined,
+	wait: Pause,
+	is_parent_planning: () => boolean,
+): Promise<JoshResult | undefined> {
+	if (result === undefined || !is_verdict(result, [TRIAGE_VERDICT]) || !is_parent_planning()) {
+		return result
+	}
+
+	await wait(RERUN_PAUSE_MS)
+
+	return undefined
+}
+
 // **A result handed to a session is said on the stream first.** The driver has stopped asking, so
 // without it the board keeps the `handing off` this pass wrote and a run waiting on a session's
 // judgment reads as one still getting ready.
@@ -211,7 +231,15 @@ async function announced(result: DriveResult): Promise<DriveResult> {
 	return result
 }
 
-async function drive(target: string, wait: Pause = pause): Promise<DriveResult> {
+function never_planning(): boolean {
+	return false
+}
+
+async function drive_with(
+	target: string,
+	wait: Pause,
+	is_parent_planning: () => boolean,
+): Promise<DriveResult> {
 	const read = run_carry.read_carry(target)
 	if (read.kind !== 'carried') return { kind: 'failed', note: 'The carry record changed.' }
 
@@ -224,9 +252,21 @@ async function drive(target: string, wait: Pause = pause): Promise<DriveResult> 
 
 	await run_event_setup.emit(run_event_setup.STAGE.HANDING_OFF)
 
-	return await announced(
-		read_result(await run_driver(target, args, wait, RERUN_LIMIT), target, read.carry.invocation),
+	const result = await deferred_triage(
+		await run_driver(target, args, wait, RERUN_LIMIT),
+		wait,
+		is_parent_planning,
 	)
+
+	return await announced(read_result(result, target, read.carry.invocation))
+}
+
+async function drive(
+	target: string,
+	wait: Pause = pause,
+	is_parent_planning: () => boolean = never_planning,
+): Promise<DriveResult> {
+	return await drive_with(target, wait, is_parent_planning)
 }
 
 export const run_wake_driver = { RERUN_LIMIT, WINDOW_MS, drive, driver_args, driver_result }

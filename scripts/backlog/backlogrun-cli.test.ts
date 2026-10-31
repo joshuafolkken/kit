@@ -3,6 +3,7 @@ import type { LaunchResult } from '#scripts/run/detached-launch'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import type { SupervisorLiveness } from '#scripts/run/run-stranded'
 import { describe, expect, it, vi } from 'vitest'
+import type { PreflightResult } from './backlog-preflight'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
 import type { StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
@@ -57,6 +58,7 @@ function harness(
 		replacement: vi.fn(async () => SAME),
 		stranded: vi.fn(async (): Promise<ReplaceVerdict | undefined> => undefined),
 		start: vi.fn(() => started),
+		preflight: vi.fn((): PreflightResult => ({ kind: 'standing' })),
 		start_supervisor: vi.fn((): LaunchResult => SUPERVISED),
 		stop: vi.fn(async () => STOPPED),
 		restart: vi.fn(async () => 0),
@@ -102,6 +104,16 @@ describe('backlogrun_cli.run starting the supervisor', () => {
 		expect(ports.start_supervisor).toHaveBeenCalledExactlyOnceWith(GIT_DIRECTORY, 'anthropic')
 		expect(ports.start).toHaveBeenCalledBefore(vi.mocked(ports.start_supervisor))
 		expect(lines).toStrictEqual([STARTED_LINE, SUPERVISED_LINE])
+	})
+
+	// joshuafolkken/kit#5516: the supervisor's first pass meets a record already handed off.
+	it('hands the record off after the launch and before the supervisor starts', async () => {
+		const { ports } = harness(false)
+
+		await backlogrun_cli.run(['5516'], ports)
+		expect(ports.preflight).toHaveBeenCalledExactlyOnceWith(expect.anything(), GIT_DIRECTORY)
+		expect(ports.start).toHaveBeenCalledBefore(vi.mocked(ports.preflight))
+		expect(ports.preflight).toHaveBeenCalledBefore(vi.mocked(ports.start_supervisor))
 	})
 
 	it('says a supervisor that did not start and still shows the board', async () => {

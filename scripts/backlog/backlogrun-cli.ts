@@ -8,6 +8,7 @@ import { run_board_cli } from '#scripts/run/board/run-board-cli'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { run_wake_cli } from '#scripts/run/wake/run-wake-cli'
+import { backlog_preflight, type PreflightResult } from './backlog-preflight'
 import { backlogrun_args, type ArgumentsResult, type BacklogrunArguments } from './backlogrun-args'
 import { backlogrun_launch, type LaunchTarget, type StartResult } from './backlogrun-launch'
 import { backlogrun_replace, type ReplaceVerdict } from './backlogrun-replace'
@@ -38,6 +39,7 @@ interface BacklogrunPorts {
 	replacement: (invocation: string, git_directory: string) => Promise<ReplaceVerdict>
 	stranded: (git_directory: string) => Promise<ReplaceVerdict | undefined>
 	start: (args: BacklogrunArguments, target: LaunchTarget) => StartResult
+	preflight: (args: BacklogrunArguments, git_directory: string) => PreflightResult
 	start_supervisor: (git_directory: string, provider: AgentProvider) => LaunchResult
 	stop: (git_directory: string) => Promise<StopReport>
 	restart: (git_directory: string) => Promise<number>
@@ -57,6 +59,7 @@ const LIVE_PORTS: BacklogrunPorts = {
 		await backlogrun_replace.decide(invocation, git_directory),
 	stranded: async (git_directory) => await backlogrun_replace.stranded(git_directory),
 	start: (args, target) => backlogrun_launch.start(args.invocation, args.provider, target),
+	preflight: (args, git_directory) => backlog_preflight.preflight({ ...args, git_directory }),
 	start_supervisor: run_wake_cli.start_for_launch,
 	stop: async (git_directory) => await backlogrun_stop.stop(git_directory),
 	restart: async (git_directory) => await backlogrun_restart.restart(git_directory),
@@ -84,6 +87,9 @@ function launched_note(result: Extract<StartResult, { kind: 'launched' }>): stri
 	return `backlogrun: started (pid ${String(pid)}${session_part}); log ${log_path}`
 }
 
+// **The record is handed off before the supervisor starts** (`backlog-preflight.ts`), so its first
+// pass drives at once while the parent plans beside the lanes.
+//
 // **The supervisor is started here, beside the parent, never from the parent's own shell**: Claude
 // Code removes its token from what its Bash tool starts, so only this process can hand a token-only
 // credential on to the sessions the supervisor wakes (joshuafolkken/kit#3804). A supervisor that does
@@ -115,6 +121,7 @@ async function launch(
 	if (result.kind === 'failed') return refuse(`backlogrun: could not start: ${result.note}`, ports)
 
 	ports.write(launched_note(result))
+	ports.preflight(args, git_directory)
 	ports.write(supervisor_note(ports.start_supervisor(git_directory, args.provider)))
 
 	return await ports.show_board()
