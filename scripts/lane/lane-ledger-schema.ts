@@ -182,6 +182,7 @@ const test_related_schema = z.object({
 	reuse_elapsed_ms: z.number().optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
+	issue: z.number().optional(),
 	scope: z.string(),
 	changed: z.number(),
 	synced: z.number(),
@@ -189,6 +190,8 @@ const test_related_schema = z.object({
 	readers: z.number(),
 	test_files: z.number().optional(),
 	trigger_files: z.array(z.string()).optional(),
+	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
+	over_cap: z.number().optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
