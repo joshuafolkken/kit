@@ -3,6 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
+import { execa } from 'execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_pinned_type_check } from './test-pinned-type-check'
@@ -122,9 +123,27 @@ describe('test_pinned_type_check.is_red with tsc', () => {
 			await expect(test_pinned_type_check.is_red({ parent, tree }, ['unread.ts'])).resolves.toBe(
 				false,
 			)
-			await expect(test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])).resolves.toBe(
-				true,
+			const is_red = await test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])
+			const probe = await execa(
+				path.join(tree, 'node_modules', '.bin', 'tsc'),
+				['-p', 'tsconfig.josh-pinned.json'],
+				{
+					cwd: tree,
+					reject: false,
+					all: true,
+				},
 			)
+
+			expect(
+				is_red,
+				JSON.stringify([
+					process.cwd(),
+					probe.exitCode,
+					probe.shortMessage,
+					probe.all,
+					process.env['PATH'],
+				]),
+			).toBe(true)
 		} finally {
 			await rm(parent, { recursive: true, force: true })
 		}

@@ -2,6 +2,6 @@
 	"reason": "session_pid / own_session_pid helpers and run:carry owner fallback (#5498)",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 9
+		"scripts.code_lines": 18
 	}
 }
