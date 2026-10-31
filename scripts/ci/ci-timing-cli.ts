@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { error_text } from '#scripts/lib/error-message'
 import { ci_timing, type RunTiming, type TimingAnswer } from './ci-timing'
 import { ci_timing_table } from './ci-timing-table'
 
@@ -37,6 +38,17 @@ function print_answer(answer: TimingAnswer, is_json: boolean): number {
 	return SUCCESS_EXIT_CODE
 }
 
+// gh's own failure (a 404 for a number GitHub does not know, say) becomes one line, not a stack trace.
+async function answer_of(argument: string, is_json: boolean): Promise<number> {
+	try {
+		return print_answer(await ci_timing.timing_of(argument), is_json)
+	} catch (error) {
+		console.error(`ci:timing ${argument} — ${error_text.message_of(error)}`)
+
+		return FAILURE_EXIT_CODE
+	}
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const positionals = argv.filter((token) => token !== JSON_FLAG)
 	const [argument] = positionals
@@ -47,7 +59,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return print_answer(await ci_timing.timing_of(argument), argv.includes(JSON_FLAG))
+	return await answer_of(argument, argv.includes(JSON_FLAG))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

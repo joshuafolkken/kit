@@ -61,6 +61,14 @@ describe('ci_timing_cli.run', () => {
 		expect(output.err()).toBe('ci:timing empty — no GitHub Actions run found')
 	})
 
+	it("exits non-zero with gh's message, not a stack trace, when the lookup fails", async () => {
+		timing_of.mockRejectedValue(new Error('gh: Not Found (HTTP 404)'))
+		const output = capture()
+
+		await expect(ci_timing_cli.run(['5546'])).resolves.toBe(1)
+		expect(output.err()).toBe('ci:timing 5546 — gh: Not Found (HTTP 404)')
+	})
+
 	it('prints the usage without exactly one target', async () => {
 		const output = capture()
 

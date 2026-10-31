@@ -1,7 +1,7 @@
 {
-	"reason": "ci:timing adds a new command (resolver, table, CLI) replacing three hand-composed gh api calls #5544",
+	"reason": "ci:timing (#5544): review fix catches gh's 404 into one line and strips REST run fields from --json, with tests for both",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 184
+		"scripts.code_lines": 193
 	}
 }

@@ -15,7 +15,8 @@ const RUNS_PER_PAGE = 20
 
 const pull_schema = z.looseObject({ head: z.looseObject({ ref: z.string() }) })
 
-const run_schema = z.looseObject({
+// A plain object, so `--json` re-emits only these fields, not REST's whole run (repository, actor, …).
+const run_schema = z.object({
 	id: z.number(),
 	name: z.string().nullish(),
 	conclusion: z.string().nullish(),

@@ -61,6 +61,14 @@ describe('ci_timing.timing_of a run id', () => {
 
 		await expect(ci_timing.timing_of(String(RUN_ID))).resolves.toStrictEqual(TIMED)
 	})
+
+	it("drops the REST run's other fields, so --json carries the trimmed run alone", async () => {
+		const rest_run = { ...RUN, repository: { full_name: 'o/r' }, actor: { login: 'a' } }
+
+		answer({ [`${REPO}/actions/runs/${String(RUN_ID)}`]: rest_run, [JOBS_PATH]: JOBS_PAGE })
+
+		await expect(ci_timing.timing_of(String(RUN_ID))).resolves.toStrictEqual(TIMED)
+	})
 })
 
 describe('ci_timing.timing_of a branch or a pull request', () => {
