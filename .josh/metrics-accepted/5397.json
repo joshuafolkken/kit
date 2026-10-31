@@ -1,0 +1,7 @@
+{
+	"reason": "Run round 2 beside the gate before opening the PR and warn on planned files near their effective line cap. Preserve both stage failures and reuse final review only on its completed, exact reviewed file map and base, using existing stamp and review mechanisms.",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 75
+	}
+}

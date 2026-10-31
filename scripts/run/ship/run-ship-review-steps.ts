@@ -8,6 +8,7 @@ import { review_round_reuse, type ReuseAnswer } from '#scripts/review/review-rou
 import { review_round2 } from '#scripts/review/review-round2'
 import { review_stop_log } from '#scripts/review/review-stop-log'
 import { run_review } from '#scripts/run/review/run-review'
+import { run_ship_final_review } from './run-ship-final-review'
 import { run_ship_review, type RoundOutcome, type ScoredVerdict } from './run-ship-review'
 import { run_ship_review_reason } from './run-ship-review-reason'
 import { run_ship_reviewer, type Round } from './run-ship-reviewer'
@@ -30,7 +31,7 @@ import type { StepResult } from './run-ship-sync'
 // **Round 1's local fixes and round 2 stay inside the supervisor**. A round-1
 // reviewer that fixed its local Mediums in place changed the tree the background gate read, so that
 // join drains the gate rather than judging it — the ship's gate stage re-runs on the fixed tree. After
-// the commit, `round_two_stage` asks `review:round2 --record <N>` whether the fix delta owes a
+// sync and round 1, `round_two_stage` asks `review:round2 --record <N>` whether the fix delta owes a
 // second round, and on `required` runs it through the same commands the chain does: the scoped pair
 // `review:brief` requires, `review:brief --round 2`, a fresh reviewer session, attest and record.
 //
@@ -61,7 +62,7 @@ const FIXED_JOIN_NOTE =
 	'the round-1 gate read the tree before the review fixes — drained, not judged; the gate re-runs once the tree is fixed.'
 const ROUND_TWO_SKIPPED_NOTE = 'round 2 not due — nothing left to verify; shipping on.'
 const ROUND_ONE_RECORDED_NOTE =
-	'round 1 already recorded — reused, not reviewed again; round 2 decides on the fix delta after the commit.'
+	'round 1 already recorded — reused, not reviewed again; round 2 decides on the fix delta before the commit.'
 
 // The scoped pair's precondition, met by the supervisor itself rather than stopped on,
 // single-sourced with the preflight and gate stages.
@@ -125,10 +126,8 @@ async function join_gate(slots: ReadonlyArray<ReviewSlot>): Promise<JoshResult> 
 	return { code: SUCCESS_EXIT_CODE, out: joined.out }
 }
 
-// **A passing round 2 is recorded on the issue, not in the tree**: it ran after the commit and reads
-// only, so no commit of the run's follows it, and a line appended now would be pushed onto the open
-// pull request by `pnpm josh followup` — restarting the CI the round ran beside. A blocking round 2
-// on a pushed, clean tree goes to the issue as well (`review-record-comment.ts`).
+// A passing round 2 records on the issue so it cannot move the tree the parallel gate reads.
+// Blocking findings stop both stages before the commit (`review-record-comment.ts`).
 function record_flags(round: Round, outcome: RoundOutcome): ReadonlyArray<string> {
 	return round === ROUND_TWO && outcome.is_passing ? [COMMENT_FLAG] : []
 }
@@ -367,13 +366,13 @@ async function review_stage(
 	return after_interaction(first, second)
 }
 
-// The round-2 verification pass, after the commit so it runs beside CI: due only when the round-1 fix
+// The round-2 verification pass, after sync and beside the gate: due only when the round-1 fix
 // delta says so, then scoped pair → brief → fresh reviewer → attest → record.
 //
 // **The decision is read as JSON and recorded in the lane ledger before it is acted on**, so
 // `josh lane:stats` can count the period's round-2 runs and skips by their reason code
 // (joshuafolkken/kit#4064). Output it cannot parse stops the ship rather than guessing a verdict.
-async function round_two_stage(issue: string): Promise<StepResult> {
+async function execute_round_two_stage(issue: string): Promise<StepResult> {
 	const decision = await josh(round_two_decision(issue))
 
 	if (decision.code !== SUCCESS_EXIT_CODE) return tagged(CAUSE.CHECK, decision)
@@ -401,6 +400,10 @@ async function round_two_stage(issue: string): Promise<StepResult> {
 		attest_phase,
 		async () => await record_and_route(issue, ROUND_TWO, run_ship_review.round_two_outcome),
 	])
+}
+
+async function round_two_stage(issue: string): Promise<StepResult> {
+	return await run_ship_final_review.run(issue, async () => await execute_round_two_stage(issue))
 }
 
 const run_ship_review_steps = { review_stage, round_two_stage }
