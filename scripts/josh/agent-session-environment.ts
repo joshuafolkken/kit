@@ -17,8 +17,24 @@
 // one literal, so the list a child must not inherit and the selection that reads it cannot drift.
 const SESSION_ID_KEY = 'CLAUDE_CODE_SESSION_ID'
 
-// The pid of the agent session's own process, which a run hold records as its owner.
+// The pid of the agent session's own process, which a run hold and a carry record name as their owner.
 const AGENT_PID_KEY = 'CLAUDE_PID'
+
+// The agent session's own process, which Claude Code exports to every command it runs. Absent or
+// malformed is no pid at all, never a guess at an ancestor: a wrong owner read as gone frees a live
+// run, which is the one failure an owner exists to prevent.
+function session_pid(environment: EnvironmentSource = process.env): number | undefined {
+	const pid = Number(environment[AGENT_PID_KEY])
+
+	return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined
+}
+
+// The session pid only where the caller is that Claude session itself, for an owner nobody named. A
+// launch strips `SESSION_ID_KEY` (`removed_environment`) but passes `CLAUDE_PID` on, so a Codex
+// session or a supervisor started from a Claude session would otherwise name its launcher as owner.
+function own_session_pid(environment: EnvironmentSource = process.env): number | undefined {
+	return environment[SESSION_ID_KEY] === undefined ? undefined : session_pid(environment)
+}
 
 const PARENT_SESSION_KEYS: ReadonlyArray<string> = [
 	'CLAUDE_CODE_MESSAGING_SOCKET',
@@ -183,8 +199,10 @@ const agent_session_environment = {
 	PROXY_CERTIFICATE_KEY,
 	PROXY_KEYS,
 	SESSION_ID_KEY,
+	own_session_pid,
 	removed_environment,
 	removed_proxy_environment,
+	session_pid,
 }
 
 export { agent_session_environment }

@@ -8,8 +8,8 @@ run — each command prints its own answer, and the route the parent follows is 
 
 ## The carry record across a cut
 
-**Count into the record rather than into your head** — `--merged <N> --owner "$PPID"` at every child's
-merge, `--filed 1 --owner "$PPID"` at every Issue the run files, and `--cut --owner "$PPID"`
+**Count into the record rather than into your head** — `--merged <N>` at every child's
+merge, `--filed 1` at every Issue the run files, and `--cut`
 immediately before the cut. `--merged` names the merged issue, never a count
 (`scripts/run/carry/run-carry-args.ts`): `run:merge` records the same issue, so a merge counted on both
 paths counts once. Every other counter is an increment. A count that does not name the record's owning

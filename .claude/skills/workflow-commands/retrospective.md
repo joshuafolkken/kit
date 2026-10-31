@@ -46,7 +46,7 @@ with `pnpm josh issue:file`, which scouts — an **open** candidate covering it 
 invocation approves" is that judgement's single source.** Every brake still counts these filings: the
 ten-per-origin ceiling (with no origin, counted with the invocation's other no-origin filings), the WIP cap, `--max` and the `pnpm josh cost --cut` session budget.
 
-**Close with `pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID"`.** It marks the
+**Close with `pnpm josh run:carry --retrospective --summary "<result>"`.** It marks the
 carry record so `run:step` prints `stop` from then on; the mark survives a session cut and is removed at
 `pnpm josh run:carry --end`, so one invocation runs it exactly once. **`--summary` is required** — it is
 written as a `retrospective` event, so a zero-filing retrospective differs from one that never ran; name

@@ -201,7 +201,7 @@ function drain_action(input: StepInput): StepAction {
 // It is the existing merge-time cut, so the ownership check and the cut cap
 // apply unchanged, and the supervisor's driver adopts the in-flight lanes from their `child-launch`
 // events.
-const HAND_OFF_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
+const HAND_OFF_COMMAND = 'pnpm josh run:carry --cut'
 
 // After a dispatch the parent waits for its child — where waiting is free. A session the completion
 // does not re-invoke could only wait by polling, each poll a model call over its whole context, so a

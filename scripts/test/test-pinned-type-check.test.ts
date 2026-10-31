@@ -14,6 +14,7 @@ const INFO = 'parent/josh-pinned.tsbuildinfo'
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 // A graph where only `READER` imports `FILE`.
@@ -112,6 +113,9 @@ async function strict_tree(parent: string): Promise<string> {
 describe('test_pinned_type_check.is_red with tsc', () => {
 	it('reads a type error red and an unread local green', async () => {
 		const parent = mkdtempSync(path.join(tmpdir(), 'josh-type-check-tsc-'))
+
+		// joshuafolkken/kit#5505: a color-forcing environment, as a detached ship's gate, must not hide it.
+		vi.stubEnv('FORCE_COLOR', '1')
 
 		try {
 			const tree = await strict_tree(parent)

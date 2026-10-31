@@ -16,8 +16,8 @@ const HAND_OFF_STEPS = 2
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
-const CUT_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
-const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}" --owner "$PPID"`
+const CUT_COMMAND = 'pnpm josh run:carry --cut'
+const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}"`
 const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", then hand the loop back with ${CUT_COMMAND}`
 const scratch = { directory: '', target: '' }
 
@@ -193,13 +193,16 @@ test('tells an epic judgment session how to advance the named carry', () => {
 
 	expect(result).toMatchObject({ kind: 'judgment' })
 	if (result.kind !== 'judgment') return
-	expect(result.material).toContain('run:carry --done <epic-number> --owner "$PPID"')
+	expect(result.material).toContain('run:carry --done <epic-number> before')
 	expect(result.material).toContain('Follow backlogrun-steps.md named epic procedure')
 })
 
 test.each([
 	['launch #2500\nresume: --owner 1', CUT_COMMAND],
-	['retrospective\nresume: --owner 1', 'pnpm josh run:carry --retrospective --summary'],
+	[
+		'retrospective\nresume: --owner 1',
+		'pnpm josh run:carry --retrospective --summary "<result>", ',
+	],
 	['merge human-review #2500\nresume: --owner 1', 'needs-human-review.md'],
 	[EPIC_OUTPUT, 'Named issues run first, in order'],
 ])('claims the carry record, then names the next move for a judgment branch: %j', (out, next) => {
