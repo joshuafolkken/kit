@@ -1090,6 +1090,8 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 
 A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body, so a candidate whose plan names a running lane's file is held back before dispatch and a path its body only cites holds nothing.
 
+A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
+
 **Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
