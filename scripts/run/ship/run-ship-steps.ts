@@ -32,6 +32,7 @@ interface Step {
 	stage: Stage
 	header: string
 	run: (args: ShipArguments, state: ShipState) => Promise<StepResult>
+	beside?: Step
 }
 
 const { STAGE } = run_ship_stage
@@ -142,9 +143,8 @@ const MERGE_STEPS: ReadonlyArray<Step> = [
 
 // `--review` puts the supervised round-1 review in front of the gate: it launches the gate itself, so
 // the gate stage that follows reuses that tree's green record unless the round changed the tree. It
-// also puts the round-2 pass between the commit
-// and the followup, so the PR opens between the rounds and round 2 runs beside CI — a no-op when
-// round 1 left no fix delta.
+// also joins round 2 beside the gate, before the commit opens the PR — a no-op when round 1
+// left no fix delta. Sync and round 1 finish first, so neither can move the review's checkout.
 const REVIEW_STEP: Step = {
 	stage: STAGE.REVIEW,
 	header: run_ship.REVIEW_HEADER,
@@ -164,7 +164,11 @@ const ROUND_TWO_STEP: Step = {
 function steps(args: ShipArguments): ReadonlyArray<Step> {
 	if (!args.is_review) return [PREFLIGHT_STEP, SYNC_STEP, ...COMMIT_STEPS, ...MERGE_STEPS]
 
-	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...COMMIT_STEPS, ROUND_TWO_STEP, ...MERGE_STEPS]
+	const reviewed_commit = COMMIT_STEPS.map((step) =>
+		step.stage === STAGE.GATE ? { ...step, beside: ROUND_TWO_STEP } : step,
+	)
+
+	return [PREFLIGHT_STEP, SYNC_STEP, REVIEW_STEP, ...reviewed_commit, ...MERGE_STEPS]
 }
 
 const run_ship_steps = { PREFLIGHT_STEP, steps }

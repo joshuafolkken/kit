@@ -17,7 +17,7 @@ import type { Cause } from './run-ship-stop-cause'
 // and push belong to the detached ship (`scripts/rules/lane-background.ts`), so a `josh git -y` here could never
 // run. The rounds are the supervisor's too: under `--review` it reuses a round 1 recorded on a tree
 // unmoved or moved only where round 2 reads, reviews only the delta from that record otherwise, and asks `review:round2` itself after the
-// commit (`run-ship-review-steps.ts`), so the whole change is never reviewed again as round 1.
+// gate (`run-ship-review-steps.ts`), so the whole change is never reviewed again as round 1.
 //
 // **The re-run carries the stopped ship's own options.** A preflight that stopped on missing live
 // evidence asks for `--body-file`, and `followup` delivers the body from it; a command naming only
@@ -84,8 +84,8 @@ function detach_again(resume: ShipResume): string {
 }
 
 // Before round 2 the re-run takes the stopped ship's own shape: `--review` only when it carried it. A
-// reviewing ship reviews only the fix delta from its recorded round 1 and decides round 2 after the
-// commit; a ship started
+// reviewing ship reviews only the fix delta from its recorded round 1 and decides round 2 beside the
+// gate; a ship started
 // without `--review` was re-detached after round 2, which is final, so it reviews nothing.
 function detach_as_started(resume: ShipResume): string {
 	const command = resume.is_review ? review_command(resume) : ship_command(COMMAND.DETACH, resume)
