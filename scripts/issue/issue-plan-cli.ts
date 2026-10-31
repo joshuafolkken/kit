@@ -4,6 +4,7 @@ import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_body_or_comment } from '#scripts/issue/issue-body-or-comment'
 import { PLANNED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_plan_notify } from '#scripts/issue/issue-plan-notify'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { cli_body } from '#scripts/josh/cli-body'
 import { cli_flags } from '#scripts/lib/cli-flags'
@@ -22,13 +23,14 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const ARGV_OFFSET = 2
 const USAGE =
-	'Usage: josh issue:plan <issue-number> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]'
+	'Usage: josh issue:plan <issue-number> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]'
 
 interface PlanRequest {
 	issue_number: string
 	plan: string
 	title: string | undefined
 	is_planned: boolean
+	is_notified: boolean
 	repo: string | undefined
 }
 
@@ -36,6 +38,7 @@ const OPTIONS = {
 	'body-file': { type: 'string' },
 	title: { type: 'string' },
 	planned: { type: 'boolean' },
+	'no-notify': { type: 'boolean' },
 	repo: { type: 'string' },
 } as const
 
@@ -73,8 +76,10 @@ function parse_request(argv: ReadonlyArray<string>): PlanRequest | undefined {
 
 	if (issue_number === undefined || [title, repo].includes('')) return undefined
 	const is_planned = parsed.values.planned === true
+	const is_notified = is_planned && parsed.values['no-notify'] !== true
+	const flags = { issue_number, title, is_planned, is_notified, repo }
 
-	return with_plan({ issue_number, title, is_planned, repo }, parsed.values['body-file'])
+	return with_plan(flags, parsed.values['body-file'])
 }
 
 // A file-read failure surfaces as an `Error` naming the resolved path, printed as-is; `undefined` is
@@ -117,8 +122,12 @@ async function record_plan(request: PlanRequest): Promise<boolean> {
 	const posted = await issue_body_or_comment.post(issue_number, request.plan, repo)
 
 	console.info(`${posted.destination}: ${posted.url}`)
+	if (!request.is_planned) return true
+	const is_applied = await apply_planned_label(issue_number, repo)
 
-	return request.is_planned ? await apply_planned_label(issue_number, repo) : true
+	if (is_applied && request.is_notified) await issue_plan_notify.send(request)
+
+	return is_applied
 }
 
 // A refused write prints as one line, like a file-read failure, rather than escaping as a stack trace.

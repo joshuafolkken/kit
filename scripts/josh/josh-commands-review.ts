@@ -117,6 +117,22 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'diff:summary': {
+		script: 'scripts/review/diff-summary-cli.ts',
+		description:
+			'Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole',
+		category: 'AI tools',
+		reference: ['[<base>]', 'automation', ['files']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ one row per file, then `full output: <path>` (the diff, in the git directory)',
+				},
+				{ arguments: 'HEAD', note: '→ the same, against a named base' },
+			],
+		},
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',

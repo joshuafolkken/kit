@@ -45,8 +45,10 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Record a plan: normalize the title, fill a blank body or comment, apply run:planned',
 		category: 'AI tools',
+		// `--planned` sends the `planning` Telegram (issue-plan-notify.ts), which reads `.env`.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: [
-			'<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]',
+			'<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]',
 			'automation',
 			['network'],
 		],
@@ -67,7 +69,11 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--planned'],
 					description:
-						'apply `run:planned` once the plan is posted, so the next entry skips planning.',
+						'apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).',
+				},
+				{
+					names: ['--no-notify'],
+					description: 'with `--planned`, skip the `planning` Telegram.',
 				},
 				{
 					names: ['--repo <owner/name>'],

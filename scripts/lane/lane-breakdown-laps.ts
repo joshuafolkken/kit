@@ -21,10 +21,22 @@ interface Placed {
 	part: Stage
 }
 
+// A gate the ship reused rather than started (joshuafolkken/kit#5567), counted per stage (`counted`).
+const REUSED_NOTE = '(reused)'
+
+// A scoped pair's rerun names its run count; a gate's reason stands alone (joshuafolkken/kit#5567).
+function rerun_note(entry: ShipLapEntry): ReadonlyArray<string> {
+	if (entry.rerun === undefined) return []
+
+	return [entry.runs === undefined ? entry.rerun : `run ${String(entry.runs)}: ${entry.rerun}`]
+}
+
 // Which run of the ship's scoped pair a lap was and why it ran again (joshuafolkken/kit#5538), and why
 // a check read the whole branch (joshuafolkken/kit#5531), after the step's name.
 function lap_name(entry: ShipLapEntry): string {
-	const run = entry.rerun === undefined ? [] : [`run ${String(entry.runs)}: ${entry.rerun}`]
+	if (entry.reused_tree !== undefined) return `${entry.step} ${REUSED_NOTE}`
+
+	const run = rerun_note(entry)
 	const whole = entry.fallback === undefined ? [] : [`whole branch: ${entry.fallback}`]
 	const notes = [...run, ...whole]
 
@@ -77,6 +89,24 @@ function grouped(
 	return groups
 }
 
+// A stage's reused laps under one row carrying their count, `josh gate (reused ×2)`, before
+// `lane_breakdown.ranked` sums each name's time into one row.
+function counted(parts: ReadonlyArray<Stage>): Array<Stage> {
+	const reuses = new Map<string, number>()
+
+	for (const { name } of parts) {
+		if (name.endsWith(REUSED_NOTE)) reuses.set(name, (reuses.get(name) ?? 0) + 1)
+	}
+
+	return parts.map((part) => {
+		const count = reuses.get(part.name)
+
+		return count === undefined
+			? part
+			: { ...part, name: `${part.name.slice(0, -REUSED_NOTE.length)}(reused ×${String(count)})` }
+	})
+}
+
 function between_of(
 	calls: ReadonlyArray<ToolCall>,
 	segments: ReadonlyArray<Segment>,
@@ -101,7 +131,7 @@ function of(
 	const laps = new Map(
 		[...grouped(placed, breakdown.ship)].map(([stage, parts]) => [
 			stage,
-			lane_breakdown.ranked(parts),
+			lane_breakdown.ranked(counted(parts)),
 		]),
 	)
 	const between = between_of(calls, breakdown.ship)
