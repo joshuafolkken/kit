@@ -10,13 +10,17 @@ import { review_readers_scan } from './review-readers-scan'
 // constant on a code file's removed line (the declaration reading is `review-readers-scan.ts`'s), a `josh x:y` command
 // on any removed line, and a `.md` file's `#` heading. **A word the diff still writes is not removed**: an
 // identifier or command any added line carries, a heading an added `.md` line still titles, and a command
-// the registry still holds.
+// the registry still holds. **A renamed declaration is removed unless an added line declares it again**
+// (joshuafolkken/kit#5540): a hunk whose removed lines declare a name its added lines do not, beside
+// one they declare anew, renamed it, and the old name an added comment or a local still carries as a
+// token is stale all the same.
 
 type TermKind = 'name' | 'constant' | 'command' | 'heading'
 
 interface Term {
 	kind: TermKind
 	word: string
+	renamed_to?: string
 }
 
 interface Reference {
@@ -32,6 +36,7 @@ interface Report {
 
 const CODE_FILE = /\.(?:ts|js)$/u
 const MARKDOWN_EXTENSION = '.md'
+const MARKDOWN_FILE = /\.md$/u
 const COMMAND = /\bjosh\s+(?<command>[a-z][\w-]*:[\w:-]+)/gu
 const UPPER_CASE = /^[A-Z][A-Z\d_]*[A-Z\d]$/u
 const HEADING = /^#{1,6} (?<text>.+)$/u
@@ -70,9 +75,30 @@ function headings(lines: ReadonlyArray<string>): Array<string> {
 	return texts.filter((text): text is string => text !== undefined && text !== '')
 }
 
+function declared_in(lines: ReadonlyArray<string>): Array<string> {
+	return review_readers_scan.declarations(lines.join('\n')).map((entry) => entry.name)
+}
+
+// The old names paired, in order, with the names the same hunk's added lines declare in their place.
+function renamed_terms(hunk: Hunk): Array<Term> {
+	const before = declared_in(hunk.old_lines)
+	const after = declared_in(hunk.new_lines ?? [])
+	const gone = before.filter((name) => !after.includes(name))
+	const fresh = after.filter((name) => !before.includes(name))
+
+	return gone.flatMap((word, index): Array<Term> => {
+		const renamed_to = fresh[index]
+
+		if (renamed_to === undefined) return []
+
+		return [{ kind: UPPER_CASE.test(word) ? 'constant' : 'name', word, renamed_to }]
+	})
+}
+
 function hunk_terms(hunk: Hunk): Array<Term> {
 	const lines = hunk.old_lines
-	const code = CODE_FILE.test(hunk.file) ? code_terms(lines.join('\n')) : []
+	const is_code = CODE_FILE.test(hunk.file)
+	const code = is_code ? [...code_terms(lines.join('\n')), ...renamed_terms(hunk)] : []
 	const titled = hunk.file.endsWith(MARKDOWN_EXTENSION) ? to_terms('heading', headings(lines)) : []
 
 	return [...code, ...command_terms(lines), ...titled]
@@ -81,19 +107,30 @@ function hunk_terms(hunk: Hunk): Array<Term> {
 interface Kept {
 	tokens: ReadonlySet<string>
 	titles: ReadonlySet<string>
+	declared: ReadonlySet<string>
 	registered: ReadonlySet<string>
+}
+
+function added_lines(hunks: ReadonlyArray<Hunk>, extension: RegExp): Array<string> {
+	return hunks.filter((hunk) => extension.test(hunk.file)).flatMap((hunk) => hunk.new_lines ?? [])
 }
 
 function kept_of(hunks: ReadonlyArray<Hunk>, registered: ReadonlySet<string>): Kept {
 	const added = hunks.flatMap((hunk) => hunk.new_lines ?? [])
-	const markdown = hunks.filter((hunk) => hunk.file.endsWith(MARKDOWN_EXTENSION))
-	const titles = headings(markdown.flatMap((hunk) => hunk.new_lines ?? []))
+	const titles = headings(added_lines(hunks, MARKDOWN_FILE))
+	const declared = declared_in(added_lines(hunks, CODE_FILE))
 	const tokens = added.flatMap((line) => [...line.matchAll(TOKEN)].map((match) => match[0]))
 
-	return { tokens: new Set(tokens), titles: new Set(titles), registered }
+	return {
+		tokens: new Set(tokens),
+		titles: new Set(titles),
+		declared: new Set(declared),
+		registered,
+	}
 }
 
 function is_removed(term: Term, kept: Kept): boolean {
+	if (term.renamed_to !== undefined) return !kept.declared.has(term.word)
 	if (term.kind === 'heading') return !kept.titles.has(term.word)
 	if (term.kind === 'command' && kept.registered.has(term.word)) return false
 
@@ -121,13 +158,14 @@ function is_prose(hit: Hit): boolean {
 }
 
 function reference_lines(reference: Reference): Array<string> {
-	const { kind, word } = reference.term
+	const { kind, word, renamed_to } = reference.term
+	const label = renamed_to === undefined ? word : `${word} (renamed to ${renamed_to})`
 
-	if (reference.has_failed) return [`search failed: ${kind} ${word}`]
+	if (reference.has_failed) return [`search failed: ${kind} ${label}`]
 
 	return reference.hits
 		.filter((hit) => is_prose(hit))
-		.map((hit) => `${hit.path}:${hit.line} ${kind} ${word}`)
+		.map((hit) => `${hit.path}:${hit.line} ${kind} ${label}`)
 }
 
 function exit_code_of(references: ReadonlyArray<Reference>, lines: ReadonlyArray<string>): number {

@@ -950,6 +950,20 @@ It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claud
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
 
+### `josh review:selfcheck`
+
+<!-- usage: review:selfcheck -->
+
+Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command.
+
+```bash
+pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+```
+
+<!-- /usage -->
+
+Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it.
+
 ### `josh disposition`
 
 <!-- usage: disposition -->

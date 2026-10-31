@@ -2,8 +2,8 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { prose_stale_cli } from './prose-stale-cli'
-import { prose_stale_scan } from './prose-stale-scan'
+import { prose_stale_read } from './prose-stale-read'
+import { prose_stale_scan, type Reference } from './prose-stale-scan'
 
 // joshuafolkken/kit#5287, with real git: the diff read from a base to the working tree (an uncommitted
 // edit and a deleted file both count) and the search over the prose paths, as `josh prose:stale` runs them.
@@ -56,14 +56,21 @@ afterEach(async () => {
 	await git_fixture_workspace.close_workspace(fixture)
 })
 
-describe('prose_stale_cli.references against real git', () => {
+async function found_references(): Promise<Array<Reference>> {
+	return await prose_stale_read.references(
+		fixture.root,
+		await prose_stale_read.read_hunks(fixture.root, BASE),
+	)
+}
+
+describe('prose_stale_read.references against real git', () => {
 	it(
 		'lists the prose that names an uncommitted removal and a deleted file’s heading, not the code',
 		async () => {
 			await write(CODE, '')
 			await rm(path.join(fixture.root, GONE_DOC))
 
-			const found = await prose_stale_cli.references(fixture.root, BASE)
+			const found = await found_references()
 
 			expect(prose_stale_scan.report(found).text).toBe(
 				'docs/a.md:1 heading Old heading\ndocs/a.md:1 name old_name\nscripts/b.ts:1 name old_name',
@@ -75,7 +82,7 @@ describe('prose_stale_cli.references against real git', () => {
 	it(
 		'answers ok when the working tree still matches the base',
 		async () => {
-			const found = await prose_stale_cli.references(fixture.root, BASE)
+			const found = await found_references()
 
 			expect(prose_stale_scan.report(found)).toEqual({ text: 'ok', exit_code: 0 })
 		},
