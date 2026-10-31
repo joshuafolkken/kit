@@ -161,6 +161,8 @@ describe('review_interaction.refusal_message', () => {
 
 		expect(message).toContain(`Issue: ${session_cite.issue(ISSUE)}`)
 		expect(message).toContain('pnpm josh review:brief --interaction')
-		expect(message).toContain('pnpm josh review:record --interaction')
+		expect(message).toContain(
+			'pnpm josh review:record --from-slot --interaction --issue <N> [<n>=<disposition> ...]',
+		)
 	})
 })
