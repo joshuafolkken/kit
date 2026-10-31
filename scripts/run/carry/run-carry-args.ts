@@ -1,6 +1,5 @@
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
-import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
@@ -194,9 +193,9 @@ function marked(owner: CarryOwner): CarryOwner {
 }
 
 function session_owner(): CarryOwner {
-	const pid = agent_session_environment.own_session_pid()
+	const owner = run_carry.session_owner()
 
-	return pid === undefined ? run_carry.NO_OWNER : marked(run_carry.owner_of(pid))
+	return owner.pid === undefined ? owner : marked(owner)
 }
 
 // **`--owner` is what makes liveness answerable at all.** The process that runs this command is a
