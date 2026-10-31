@@ -86,6 +86,24 @@ describe('git_merge_conflicts.working_tree_conflicts — clean merges', () => {
 	)
 })
 
+describe('git_merge_conflicts.working_tree_conflicts — a merge in progress', () => {
+	it(
+		'answers no conflict for a resolution left uncommitted in a merge of the other branch',
+		async () => {
+			await write(SHARED_FILE, BASE_LINES)
+			await commit_all('lines')
+			await theirs_commits(SHARED_FILE, BASE_LINES.replace('first', 'one'))
+			await write(SHARED_FILE, BASE_LINES.replace('first', 'uno'))
+			await commit_all(OURS)
+			await git(fixture.workspace, ['merge', '--no-commit', '--strategy', 'ours', THEIRS])
+			await write(SHARED_FILE, BASE_LINES.replace('first', 'one and uno'))
+
+			expect(conflicts([SHARED_FILE])).toStrictEqual([])
+		},
+		TIMEOUT_MS,
+	)
+})
+
 describe('git_merge_conflicts.working_tree_conflicts — conflicts', () => {
 	it(
 		'lists an uncommitted change to the line the other branch changed differently',
