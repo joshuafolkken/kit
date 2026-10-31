@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/test/test-pinned.ts:234 | 2026-10-31 | #5503
+- rf:comments | low | scripts/test/test-pinned-reach.ts:13 | 2026-10-31 | #5503
+- rf:bug-risks | low | scripts/test/test-pinned-record.ts:26 | 2026-10-31 | #5503

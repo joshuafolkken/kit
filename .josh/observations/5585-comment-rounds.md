@@ -1,0 +1,3 @@
+- rf:bug-risks | low | scripts/rules/lane-background.ts:62 | 2026-10-31 | #5585
+- rf:bug-risks | low | scripts/run/ship/run-ship-evidence-cli.ts:43 | 2026-10-31 | #5585
+- rf:comments | low | .claude/skills/workflow-commands/chain-rule.md:56 | 2026-10-31 | #5585

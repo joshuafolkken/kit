@@ -1,0 +1,2 @@
+- rf:bug-risks | low | scripts/lane/lane-breakdown-calls.ts:49 | 2026-10-31 | #5539
+- rf:bug-risks | low | scripts/lane/lane-transcript-calls.ts:96 | 2026-10-31 | #5539

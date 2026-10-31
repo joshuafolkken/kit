@@ -1,0 +1,3 @@
+- rf:project-conventions | low | .claude/skills/workflow-commands/chain-rule.md:87 | 2026-10-31 | #5543
+- rf:tests | low | scripts/run/run-transcript-fixture.ts:85 | 2026-10-31 | #5543
+- rf:bug-risks | low | scripts/run/run-step.ts:161 | 2026-10-31 | #5543

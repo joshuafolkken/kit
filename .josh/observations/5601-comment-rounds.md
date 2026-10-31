@@ -1,0 +1,1 @@
+- rf:bug-risks | low | scripts/lane/lane-plan-size.ts:106 | 2026-10-31 | #5601
