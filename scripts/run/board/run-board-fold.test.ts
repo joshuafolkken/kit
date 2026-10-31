@@ -233,6 +233,41 @@ describe('run_board_render_section.keyed', () => {
 
 		expect(done?.key).toBe('done')
 	})
+
+	// joshuafolkken/kit#5520: an open section's rule counts its rows, an epic's own line not among them.
+	it('counts the rows a labeled section holds on its rule', () => {
+		const epic = { text: '    📁 10', row: undefined }
+		const [queued] = keyed('queued', [section(QUEUED, 'queued', [epic, ...rows(3, 'pending')])])
+
+		expect(queued?.head).toStrictEqual(heading_lines(`${QUEUED} 3`))
+	})
+})
+
+describe('run_board_fold.fold_parts open counted', () => {
+	it('keeps the count after the label on an open rule, as wide as the rule it leads', () => {
+		const head = heading_lines(`${QUEUED} 3`)
+		const marked = opened({ head, lines: rows(3, 'pending'), label: QUEUED, key: 'queued' })
+
+		expect(marked.startsWith(`▾ ${QUEUED} 3 ─`)).toBe(true)
+		expect(width_of(marked)).toBe(width_of(head.at(-1) ?? ''))
+	})
+})
+
+describe('run_board_fold.bounded rule width', () => {
+	it('runs every rule, open or folded, on to the frame’s rule width', () => {
+		const lines = bounded({ ...below_parts(), rule_width: WIDE }, { folded: new Set(['queued']) })
+
+		expect(lines.filter((line) => line.includes('─')).map((line) => width_of(line))).toStrictEqual([
+			WIDE,
+			WIDE,
+		])
+	})
+
+	it('leaves a rule already past the rule width as it is', () => {
+		const lines = bounded({ ...below_parts(), rule_width: 1 }, {})
+
+		expect(lines).toStrictEqual(run_board_fit.whole(below_parts()))
+	})
 })
 
 describe('run_board_fold.KEYS_LINE', () => {

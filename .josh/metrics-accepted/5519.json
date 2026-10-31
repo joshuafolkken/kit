@@ -1,0 +1,7 @@
+{
+	"reason": "#5519: parallel pass launches (settled together, per-issue pending claims, one stash holder), an issue-named no-child refusal so one launch ends only its own lane's stage, and the time-to-first-lane span in lane:stats and run:board add code lines; guard_startup is machine load from concurrent lanes, no guard changed",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 91
+	}
+}

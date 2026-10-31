@@ -54,20 +54,55 @@ function plan_section(
 	return [{ head: heading_lines(heading), lines, label: heading }]
 }
 
-// The sections a person folds with the key named `key`.
-function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<PlanSection> {
-	return sections.map((section) => ({ ...section, key }))
+// The issue rows among a section's lines — an epic's own line is none.
+function row_count(lines: ReadonlyArray<PlanLine>): number {
+	return lines.filter((line) => line.row !== undefined).length
 }
 
-// An unfolded section's rule led by ▾ in place of its first rule characters, so every column label after
-// its own still stands over its cells; a section drawn under a blank line alone gets a rule of its own.
+// A label saying how many its section holds: `⏳ queued 10`.
+function counted(label: string, count: number): string {
+	return `${label} ${String(count)}`
+}
+
+function counted_head(section: PlanSection): Array<string> {
+	const { label, lines } = section
+
+	return heading_lines(label === undefined ? undefined : counted(label, row_count(lines)))
+}
+
+// The sections a person folds with the key named `key`, each rule saying how many rows it holds.
+function keyed(key: SectionKey, sections: ReadonlyArray<PlanSection>): Array<PlanSection> {
+	return sections.map((section) => ({ ...section, key, head: counted_head(section) }))
+}
+
+// A head whose rule runs on to `width`, the column the lane rows' titles end in
+// (joshuafolkken/kit#5520); a head drawn under a blank line alone stays as it is.
+function widened(head: ReadonlyArray<string>, width: number): Array<string> {
+	const rule = head.at(-1) ?? ''
+
+	if (rule === '') return [...head]
+
+	const fill = RULE.repeat(Math.max(0, width - run_board_fit.width_of(rule)))
+
+	return [...head.slice(0, -1), `${rule}${fill}`]
+}
+
+// An unfolded section's rule led by ▾ in place of its first rule characters, the one it gives up drawn
+// where the rule after its label starts, so what follows the label — its count, every column label —
+// still stands where it did; a section drawn under a blank line alone gets a rule of its own.
 function open_head(head: ReadonlyArray<string>, label: string): Array<string> {
 	const rule = head.at(-1) ?? ''
 	const lead = `${RULE_LEAD} ${label} `
 
 	if (!rule.startsWith(lead)) return ['', `${OPEN_MARK} ${label} `.padEnd(RULE_WIDTH, RULE)]
 
-	return [...head.slice(0, -1), `${OPEN_MARK} ${label} ${RULE}${rule.slice(lead.length)}`]
+	const rest = rule.slice(lead.length)
+	const at = Math.max(0, rest.indexOf(RULE))
+
+	return [
+		...head.slice(0, -1),
+		`${OPEN_MARK} ${label} ${rest.slice(0, at)}${RULE}${rest.slice(at)}`,
+	]
 }
 
 // A folded section's one line: `▸ ⏳ queued ── 3 ───`, ending on a rule however long its summary.
@@ -107,12 +142,15 @@ function done_section(
 const run_board_render_section = {
 	ROW_INDENT,
 	columns_rule,
+	counted,
 	done_section,
 	folded_head,
 	heading_lines,
 	keyed,
 	open_head,
 	plan_section,
+	row_count,
+	widened,
 }
 
 export { run_board_render_section }

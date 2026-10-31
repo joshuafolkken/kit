@@ -11,7 +11,7 @@ const { gone_branch } = await import('./gone-branch')
 
 const read = vi.mocked(git_spawn.read)
 // joshuafolkken/kit#2942: the fetch is the one call that reaches the remote, so it goes through the
-// bounded spawn — an unbounded one waited 37 minutes on a dead connection.
+// bounded spawn — an unbounded one waited without end on a dead connection.
 const read_remote = vi.mocked(git_spawn.read_remote)
 const DEFAULT_BRANCH = 'main'
 const FOR_EACH_REF = 'for-each-ref'

@@ -100,7 +100,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/event/run-event-overrun.ts', 7],
 	['run/event/run-event-plan.ts', 1],
 	['run/event/run-event-scope.ts', 1],
-	['run/event/run-event-setup.ts', 3],
+	['run/event/run-event-setup.ts', 4],
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
 	['run/merge/run-merge-cli.ts', 6],

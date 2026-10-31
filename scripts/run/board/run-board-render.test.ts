@@ -170,7 +170,7 @@ describe('run_board_render.render sections', () => {
 		const epic = { kind: 'epic' as const, epic: 10, title: 'Epic ten', rows: children }
 		const layout = { ...EMPTY_LAYOUT, queued: [epic, { kind: 'row' as const, row: long }] }
 		const lines = lines_of(header({ layout }))
-		const queued_rule = rule('⏳ queued')
+		const queued_rule = rule('⏳ queued 3')
 
 		expect(lines.slice(lines.indexOf(queued_rule), -2)).toStrictEqual([
 			queued_rule,
