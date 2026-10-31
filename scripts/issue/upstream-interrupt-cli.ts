@@ -115,10 +115,13 @@ async function stash(interrupt: Interrupt): Promise<boolean> {
 	}
 }
 
+// `--found-during` names the finder to `issue:file`, so `--blocks-finder` records it — not the lane or
+// branch Issue — as blocked, and the filing cap counts against it.
 function filing_argv(interrupt: Interrupt): ReadonlyArray<string> {
 	const argv = [interrupt.title, '--body-file', interrupt.body_file, '--route', 'interrupt']
+	const finder = ['--found-during', interrupt.finder]
 
-	return [...argv, '--repo', interrupt.repo, ...blocks_finder_flag(interrupt)]
+	return [...argv, '--repo', interrupt.repo, ...finder, ...blocks_finder_flag(interrupt)]
 }
 
 // The filed Issue as `owner/repo#N`, the qualified form the backlink heading requires. A refused
@@ -174,6 +177,21 @@ async function saved(body: string): Promise<string> {
 	await writeFile(file_path, body)
 
 	return file_path
+}
+
+// The body is copied out of the tree before the stash: `stash:push` sets untracked files aside, so a
+// body written in the checkout would be gone before the filing reads it. Every later step, and the
+// printed re-run, reads the copy.
+async function kept_body(interrupt: Interrupt): Promise<Interrupt | undefined> {
+	try {
+		const body_file = await saved(await readFile(interrupt.body_file, 'utf8'))
+
+		return { ...interrupt, body_file }
+	} catch (error) {
+		stopped('body', error_text.message_of(error), command_of(interrupt))
+
+		return undefined
+	}
 }
 
 async function comment(interrupt: Interrupt, body: string): Promise<boolean> {
@@ -237,11 +255,11 @@ async function interrupt_by_party(interrupt: Interrupt): Promise<boolean> {
 		return false
 	}
 
-	if (!(await stash(interrupt))) return false
+	const kept = await kept_body(interrupt)
 
-	return party === repo_party.FIRST_PARTY
-		? await first_party(interrupt)
-		: await third_party(interrupt)
+	if (kept === undefined || !(await stash(kept))) return false
+
+	return party === repo_party.FIRST_PARTY ? await first_party(kept) : await third_party(kept)
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {

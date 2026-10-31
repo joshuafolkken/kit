@@ -1,5 +1,5 @@
 import { mkdtempSync } from 'node:fs'
-import { writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -31,6 +31,21 @@ await writeFile(BODY_FILE, DRAFT)
 
 function argv_for(repo: string, extra: ReadonlyArray<string> = []): ReadonlyArray<string> {
 	return [FINDER, TITLE, REPO_FLAG, repo, BODY_FILE_FLAG, BODY_FILE, ...extra]
+}
+
+function body_argv(body_file: string): ReadonlyArray<string> {
+	return [FINDER, TITLE, REPO_FLAG, FIRST_PARTY_REPO, BODY_FILE_FLAG, body_file]
+}
+
+// A body written into the tree the stash sets aside: its own directory, so a test that removes it
+// leaves the shared body file alone.
+async function tree_body_file(): Promise<string> {
+	const directory = mkdtempSync(path.join(tmpdir(), 'upstream-interrupt-tree-'))
+	const body_file = path.join(directory, 'body.md')
+
+	await writeFile(body_file, DRAFT)
+
+	return body_file
 }
 
 function stdout_lines(): ReadonlyArray<string> {
@@ -96,11 +111,13 @@ describe('josh upstream:interrupt filing and backlink', () => {
 		expect(vi.mocked(issue_file_cli.file_issue)).toHaveBeenCalledWith([
 			TITLE,
 			BODY_FILE_FLAG,
-			BODY_FILE,
+			expect.not.stringMatching(BODY_FILE),
 			'--route',
 			'interrupt',
 			REPO_FLAG,
 			FIRST_PARTY_REPO,
+			'--found-during',
+			FINDER,
 			BLOCKS_FINDER_FLAG,
 		])
 	})
@@ -111,6 +128,35 @@ describe('josh upstream:interrupt filing and backlink', () => {
 		expect(vi.mocked(git_gh_command.issue_comment)).toHaveBeenCalledWith(FINDER, posted_body())
 		expect(posted_body()).toContain('## Upstream issues\n\n- joshuafolkken/kit#9001')
 		expect(posted_body()).toContain(`pnpm josh stash:pop "${STASH_MESSAGE}"`)
+	})
+})
+
+describe('josh upstream:interrupt body file', () => {
+	it('files the body even when the stash sets the body file aside', async () => {
+		const body_file = await tree_body_file()
+		const filed_bodies: Array<string> = []
+
+		vi.mocked(stash_push_cli.set_aside).mockImplementation(async () => {
+			await rm(body_file)
+
+			return 'stashed'
+		})
+		vi.mocked(issue_file_cli.file_issue).mockImplementation(async (argv) => {
+			filed_bodies.push(await readFile(String(argv[2]), 'utf8'))
+
+			return FILED_URL
+		})
+		await upstream_interrupt_cli.run(body_argv(body_file))
+
+		expect(filed_bodies).toStrictEqual([DRAFT])
+	})
+
+	it('sets nothing aside when the body file cannot be read', async () => {
+		const code = await upstream_interrupt_cli.run(body_argv(path.join(BODY_DIRECTORY, 'none.md')))
+
+		expect(code).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(stash_push_cli.set_aside)).not.toHaveBeenCalled()
+		expect(stderr_text()).toContain('stopped at body')
 	})
 })
 
