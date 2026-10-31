@@ -124,7 +124,9 @@ function did_skip_copy_if_absent(
 function read_workspace_template(source_path: string, destination_path: string): string {
 	const npmrc = file_reader.read_file_or_empty(path.join(path.dirname(destination_path), '.npmrc'))
 
-	return init_logic.carry_npmrc_settings(readFileSync(source_path, 'utf8'), npmrc)
+	const distributed = init_logic.drop_kit_only_regions(readFileSync(source_path, 'utf8'))
+
+	return init_logic.carry_npmrc_settings(distributed, npmrc)
 }
 
 function merge_existing_workspace_yaml(source_path: string, destination_path: string): void {
