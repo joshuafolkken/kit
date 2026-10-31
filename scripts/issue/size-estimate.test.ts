@@ -15,6 +15,7 @@ function estimate(files: number, lines: number): string {
 	return `- 規模見積もり: 約 ${String(files)} ファイル / ${String(lines)} 行（テスト除く）`
 }
 
+const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 const UNDER_GUIDE = body_with(estimate(8, 200))
 const OVER_GUIDE = body_with(estimate(30, 900))
 
@@ -73,9 +74,9 @@ describe('size_estimate.guide_problem', () => {
 	})
 
 	it('refuses an estimate over the guide on both axes', () => {
-		const problem = size_estimate.guide_problem(OVER_GUIDE, undefined)
+		const problem = size_estimate.guide_problem(body_with(estimate(12, 300)), undefined)
 
-		expect(problem).toContain('30 file(s) / 900 line(s)')
+		expect(problem).toContain('12 file(s) / 300 line(s)')
 		expect(problem).toContain('more than 8 files or 200 lines')
 		expect(problem).toContain('split-assessment.md → "The question"')
 	})
@@ -109,7 +110,7 @@ describe('size_estimate.over_guide', () => {
 	})
 
 	it('passes an estimate over the guide with a reason declared', () => {
-		const body = body_with(estimate(30, 900), '- 分割しない理由: 1 コミットで入れないと壊れる')
+		const body = body_with(estimate(12, 300), REASON)
 
 		expect(size_estimate.guide_problem(body, undefined)).toBeUndefined()
 	})
@@ -122,5 +123,48 @@ describe('size_estimate.over_guide', () => {
 
 	it('leaves a missing estimate to the lint', () => {
 		expect(size_estimate.guide_problem(body_with(), undefined)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5502: past three times the guide a declared reason no longer excuses a filing.
+describe('size_estimate cap', () => {
+	it('passes 24 files / 600 lines with a reason declared', () => {
+		const body = body_with(estimate(24, 600), REASON)
+
+		expect(size_estimate.guide_problem(body, undefined)).toBeUndefined()
+		expect(size_estimate.over_cap(body, undefined)).toBeUndefined()
+	})
+
+	it('refuses 25 files with a reason declared', () => {
+		const body = body_with(estimate(25, 600), REASON)
+		const problem = size_estimate.guide_problem(body, undefined)
+
+		expect(problem).toContain('exceeds the cap (more than 24 files or 600 lines)')
+		expect(problem).toContain('--route split')
+	})
+
+	it('refuses 601 lines with a reason declared', () => {
+		const body = body_with(estimate(24, 601), REASON)
+
+		expect(size_estimate.over_cap(body, undefined)).toEqual({
+			files: 24,
+			lines: 601,
+			verdict: 'split',
+		})
+	})
+
+	it('passes a split child over the cap', () => {
+		expect(size_estimate.guide_problem(OVER_GUIDE, SPLIT_ROUTE)).toBeUndefined()
+		expect(size_estimate.over_cap(OVER_GUIDE, SPLIT_ROUTE)).toBeUndefined()
+	})
+})
+
+describe('size_estimate.is_issue_over_cap', () => {
+	it('reads the route from the labels', () => {
+		const labels = [{ name: SPLIT_ROUTE }]
+
+		expect(size_estimate.is_issue_over_cap({ body: OVER_GUIDE })).toBe(true)
+		expect(size_estimate.is_issue_over_cap({ body: OVER_GUIDE, labels })).toBe(false)
+		expect(size_estimate.is_issue_over_cap({ body: UNDER_GUIDE })).toBe(false)
 	})
 })

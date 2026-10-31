@@ -4,6 +4,7 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_any_label, NEEDS_DECISION_LABEL, RUN_STALLED_LABEL } from '#scripts/issue/issue-labels'
 import { issue_not_before } from '#scripts/issue/issue-not-before'
+import { size_estimate } from '#scripts/issue/size-estimate'
 import { telegram_notify } from '#scripts/notify/telegram-notify'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
@@ -23,6 +24,7 @@ const BLOCKED_ANSWER = 'blocked'
 const DECISION_HEADING = `Waiting on a decision (${NEEDS_DECISION_LABEL}):`
 const STALLED_HEADING = `Stalled mechanically (${RUN_STALLED_LABEL}):`
 const UNTRUSTED_HEADING = 'Waiting on a person to vouch for the body (author without write access):'
+const OVER_CAP_HEADING = 'Waiting on a person to split it (over the size cap):'
 const IDLE_HEAD = 'No child running and nothing left to dispatch.'
 const IDLE_RECOVERY =
 	'Decide the parked issues, fix and release the stalled ones, or start the next run with `backlogrun`.'
@@ -79,6 +81,13 @@ function untrusted_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
 		.map((issue) => cited(issue))
 }
 
+// `backlog:next` holds one declared over the size cap until a person splits it (joshuafolkken/kit#5502).
+function over_cap_lines(issues: ReadonlyArray<OpenIssueData>): Array<string> {
+	return issues
+		.filter((issue) => size_estimate.is_issue_over_cap(issue))
+		.map((issue) => cited(issue))
+}
+
 function dated_lines(issues: ReadonlyArray<OpenIssueData>, now_ms: number): Array<string> {
 	const lines: Array<string> = []
 
@@ -102,6 +111,7 @@ function remaining_lines(reading: IdleReading): Array<string> {
 		...section(DECISION_HEADING, labelled_lines(reading.issues, NEEDS_DECISION_LABEL)),
 		...section(STALLED_HEADING, labelled_lines(reading.issues, RUN_STALLED_LABEL)),
 		...section(UNTRUSTED_HEADING, untrusted_lines(reading.issues)),
+		...section(OVER_CAP_HEADING, over_cap_lines(reading.issues)),
 		...section('Waiting on a date:', dated_lines(reading.issues, reading.now_ms)),
 	]
 
