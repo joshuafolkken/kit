@@ -26,7 +26,8 @@ function default_branch_reference(options: GitSyncOptions): string {
 	return git_spawn_sync.read(check, options) === undefined ? default_branch : remote_reference
 }
 
-// While a merge is in progress, the later of the base of `HEAD` and the base of `MERGE_HEAD`.
+// While a merge is in progress, the later of the base of `HEAD` and the base of `MERGE_HEAD`; also
+// the merge base `git_merge_conflicts.working_tree_conflicts` probes against (joshuafolkken/kit#5582).
 function through_merge(base: string, reference: string, options: GitSyncOptions): string {
 	const incoming = git_spawn_sync.read(git_diff_reads.incoming_base_arguments(reference), options)
 
@@ -58,6 +59,6 @@ function read_changed_paths(cwd?: string): ReadonlyArray<string> {
 	return [tracked, untracked].flatMap((raw = '') => changed_paths.to_paths(raw))
 }
 
-const changed_paths_sync = { read_changed_paths }
+const changed_paths_sync = { read_changed_paths, through_merge }
 
 export { changed_paths_sync }
