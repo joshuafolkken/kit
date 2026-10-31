@@ -40,7 +40,9 @@ describe('review_record_interaction.report_due', () => {
 	it('records first and runs the pass only where none ran beside the round', () => {
 		const line = review_record_interaction.due_line(ISSUE)
 
-		expect(line).toContain('record it with `pnpm josh review:record --interaction --issue 4835')
+		expect(line).toContain(
+			'record it with `pnpm josh review:record --from-slot --interaction --issue 4835 [<n>=<disposition> ...]`',
+		)
 		expect(line).toContain('if no interaction reviewer ran beside this round, first open its brief')
 	})
 

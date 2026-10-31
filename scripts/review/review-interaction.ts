@@ -79,7 +79,7 @@ const MISSING_REASON =
 	'This change touches the run tooling, and no interaction review is recorded for its issue — the pass that looks for the existing features a change breaks, which `/code-review` does not (joshuafolkken/kit#4276).'
 
 const REMEDY =
-	'Run it from `pnpm josh review:brief --interaction`, then record it with `pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]` — a clean pass is a call with no findings — and reissue the merge.'
+	'Run it from `pnpm josh review:brief --interaction`, then record the findings its reviewer wrote with `pnpm josh review:submit --interaction` by `pnpm josh review:record --from-slot --interaction --issue <N> [<n>=<disposition> ...]` and reissue the merge.'
 
 function refusal_message(issue: number): string {
 	return [MISSING_REASON, `Issue: ${session_cite.issue(issue)}`, REMEDY].join('\n')
