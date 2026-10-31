@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { disposition_batch } from './disposition-batch'
+import { disposition_batch_filing } from './disposition-batch-filing'
 import { disposition } from './disposition-logic'
 
 // `josh disposition <path...>` — the machine half of the three-way review disposition.
@@ -24,28 +25,35 @@ function reason_line(paths: ReadonlyArray<string>): string {
 		: `reaches through: ${reaching.join(', ')}`
 }
 
-function run_batch(path: string | undefined): number {
-	if (path === undefined) {
-		console.error(USAGE)
+function refuse(message: string): number {
+	console.error(message)
 
-		return FAILURE_EXIT_CODE
-	}
+	return FAILURE_EXIT_CODE
+}
+
+// `<findings-file> [--found-during <N>]`; the issue is needed once a finding routes to `file`.
+function run_batch(argv: ReadonlyArray<string>): number {
+	const [path] = argv
+
+	if (path === undefined) return refuse(USAGE)
 
 	const result = disposition_batch.parse(readFileSync(path, 'utf8'))
 
 	if ('invalid' in result) {
-		console.error(`not in the review:record grammar:\n${result.invalid.join('\n')}`)
-
-		return FAILURE_EXIT_CODE
+		return refuse(`not in the review:record grammar:\n${result.invalid.join('\n')}`)
 	}
 
-	process.stdout.write(`${disposition_batch.render(result.findings)}\n`)
+	const filing = disposition_batch_filing.filing_lines(result.findings, argv)
+
+	if (filing === undefined) return refuse(disposition_batch_filing.MISSING_FOUND_DURING)
+
+	process.stdout.write(`${[disposition_batch.render(result.findings), ...filing].join('\n')}\n`)
 
 	return 0
 }
 
 function run(argv: ReadonlyArray<string>): number {
-	if (argv[0] === BATCH_FLAG) return run_batch(argv[1])
+	if (argv[0] === BATCH_FLAG) return run_batch(argv.slice(1))
 
 	if (argv.length === 0) {
 		console.error(USAGE)
