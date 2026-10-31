@@ -1,0 +1,7 @@
+{
+	"reason": "New agent-model-alias module so the review brief prints the Agent alias beside its model id (#5571)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}
