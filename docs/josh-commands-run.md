@@ -966,11 +966,12 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:dispat
 Block until any of the named in-flight lane children completes; prints which one finished.
 
 ```bash
-pnpm josh lane:await 1749 1750                   # block until either lane completes
-pnpm josh lane:await 1749 1750 --owner "$PPID"   # reclaim the carry record for a resumed conversation first
+pnpm josh lane:await 1749 1750   # reclaim a resumed conversation’s carry record, then block until either lane completes
 ```
 
 <!-- /usage -->
+
+Omitted, `--owner` is the `CLAUDE_PID` of the calling Claude session (none elsewhere, e.g. Codex).
 
 `--owner <pid>` names the waiting session's process. When the carry record belongs to the same conversation under an earlier process — a restart resumed it in a new one — the record is moved to this pid before the wait, so a wait longer than the conversation's quiet window cannot read as a crash to `run:wake`. Any other record is left alone.
 

@@ -211,7 +211,7 @@ describe('lane_dispatch.describe — the wait it hands the parent', () => {
 
 		const message = lane_dispatch.describe(await lane_dispatch.dispatch_child(ISSUE), ISSUE)
 
-		expect(message).toContain(`lane:await ${ISSUE} --owner "$PPID"\` in the background`)
+		expect(message).toContain(`lane:await ${ISSUE}\` in the background`)
 		expect(message).not.toContain('poll')
 	})
 })

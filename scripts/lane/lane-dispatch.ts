@@ -431,7 +431,7 @@ function log_sentence(outcome: Dispatched, issue: string): string {
 		return ` Its output is NOT being kept — ${outcome.notes.join(NOTE_SEPARATOR)} — so ${outcome.log_path} will not grow and the process trace is the only answer: ${poll}.`
 	}
 
-	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue} --owner "$PPID"\` in the background and end the turn; once that output falls silent, ${poll}.`
+	return ` It writes to ${outcome.log_path}. Wait on it with \`pnpm josh lane:await ${issue}\` in the background and end the turn; once that output falls silent, ${poll}.`
 }
 
 // Whether this dispatch resumed the disconnected child's session or started fresh — the report the
