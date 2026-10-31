@@ -65,7 +65,7 @@ describe('epic_label_age.age_text', () => {
 		expect(epic_label_age.age_text({ kind: 'at', at: TEN_MINUTES_AGO }, NOW)).toBe(TEN_MINUTES_TEXT)
 	})
 
-	// The `Stale \`in-progress\`` row of `backlogrun-progress.md`: past 90 minutes the session is gone.
+	// The `Stale \`in-progress\`` row of `backlogrun-progress.md`: past its threshold the session is gone.
 	it('calls a label held past the threshold stale', () => {
 		expect(epic_label_age.age_text({ kind: 'at', at: TWO_HOURS_AGO }, NOW)).toBe(
 			'in-progress for 120 min — stale',

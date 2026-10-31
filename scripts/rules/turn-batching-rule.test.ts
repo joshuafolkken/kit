@@ -9,11 +9,10 @@ import { time_batch_guard } from '#scripts/time-runtime/time-batch-guard'
 import { describe, expect, it } from 'vitest'
 import { rule_list } from './rule-list'
 
-// joshuafolkken/kit#1304: measured on four merged runs, a `fullrun` issued between 1.00 and 1.13 tool
-// calls per round trip — independent reads and edits went out one per turn. On #1295 the 34 `Edit`
-// calls and the 32 small read-only `Bash` calls executed for about 54 seconds between them while the
-// 66 turns they sat in cost 600–850, so the run's floor was set by the round trips rather than by
-// the work.
+// joshuafolkken/kit#1304: measured on merged runs, a `fullrun` issued about one tool call per round
+// trip — independent reads and edits went out one per turn. On #1295 the calls themselves executed
+// quickly while the turns they sat in cost far more, so the run's floor was set by the round trips
+// rather than by the work.
 //
 // joshuafolkken/kit#1524 took the rule out of `CLAUDE.md`: its trigger can be named as one tool
 // call, so it is delivered at that call instead of carried on every turn. **What pins it is

@@ -1,0 +1,7 @@
+{
+	"reason": "test:pinned per-hunk test-file cap (#5503): the cap split, its ledger count, the breakdown label and the usage line, with their tests",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

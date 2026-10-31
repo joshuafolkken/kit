@@ -194,7 +194,8 @@ const test_related_schema = z.object({
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
 // answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
 // report) and its wall time. `issue` is the lane it ran in, absent outside a lane. `rewired` counts the
-// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
+// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), and `over_cap` the
+// ones whose file reaches more test files than the cap (joshuafolkken/kit#5503), absent on older rows.
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
@@ -211,6 +212,7 @@ const test_pinned_schema = z.object({
 	issue: z.number().optional(),
 	held: z.number(),
 	rewired: z.number().optional(),
+	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
 	elapsed_ms: z.number(),
 	origin: pinned_origin_schema.optional(),
