@@ -35,13 +35,13 @@ tests and the round cap are unchanged.
    prints from `pnpm josh test:pinned` (each unchecked place is listed in its `full output:` log) (`docs/josh-commands.md` → "`josh test:pinned`"), and check a pinning test's fixture reaches its branch (no assert on a string the code
    never draws, no comparison against a literal copy).
 2. **Prose matches the code** — grep docs, prompts and comments for the old wording of every behavior,
-   constant, command and heading you changed, moved or removed (`pnpm josh prose:stale` finds the
-   removed ones), `"the table above"` and rewritten sentences included.
+   constant, command and heading you changed, moved or removed (`pnpm josh review:selfcheck` → `q2`),
+   `"the table above"` and rewritten sentences included.
 3. **Failure is not a negative answer** — every timeout, non-zero exit or `gh` failure on a touched
    path returns something a caller can tell apart from `false`, `undefined` or "nothing found".
 4. **Every caller moved with it** — grep every reference to a changed function, list or command, and
    update each sibling path (the other CLI, the registry, the consumer side) in the same change.
-   The readers outside the diff: `pnpm josh review:brief` → `## Readers outside the diff`.
+   The readers outside the diff: `pnpm josh review:selfcheck` → `q4`.
 5. **The Issue is met on HEAD** — the premises you relied on hold on the current tree, and each
    acceptance criterion is checked against the diff.
 6. **State is read fresh** — for every record, stamp, snapshot, memo or ledger a decision reads, name
@@ -58,8 +58,8 @@ tests and the round cap are unchanged.
    change runs in — kit and a consumer, and a predecessor that died midway leaving its record behind.
 10. **Commands your prose tells a reader to run are run** — for every command a refusal, hint or
     document you added or changed tells a reader to run, run it as written from a cwd other than the
-    root, with an absolute path, a relative path and an empty input, and check each result — in a
-    scratch copy (`mktemp -d`) when it writes, deletes, files or pushes, never on the lane's files.
+    root, with an absolute path, a relative path and an empty input (`pnpm josh review:selfcheck` →
+    `q10`), and check each result — in a scratch copy (`mktemp -d`) when it writes, deletes, files or pushes, never on the lane's files.
 
 The brief lists `Removed tests` → each needs a `## 消えたテストの処置` row in the PR body, or the
 merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本文の消えたテストの処置".

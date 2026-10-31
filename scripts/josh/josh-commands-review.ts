@@ -102,6 +102,21 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'review:selfcheck': {
+		script: 'scripts/review/selfcheck-cli.ts',
+		description:
+			'Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command',
+		category: 'AI tools',
+		reference: ['', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)',
+				},
+			],
+		},
+	},
 	'review:round2': {
 		script: 'scripts/review/review-round2-cli.ts',
 		description: 'Say whether the second /code-review round is due, or may be skipped entirely',

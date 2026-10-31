@@ -42,10 +42,9 @@ vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
 
 	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
 })
-// The claim walks no import graph here; what it claims is `test-related.claim.test.ts`.
-vi.mock('./test-pinned-reach', () => ({
-	test_pinned_reach: { reached_test_count: vi.fn() },
-}))
+// The claim and the reach cap walk no import graph here; what they claim and cap is
+// `test-related.claim.test.ts` and `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
