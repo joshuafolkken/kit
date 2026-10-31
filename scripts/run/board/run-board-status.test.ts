@@ -11,8 +11,8 @@ import { run_board_lane_state } from './run-board-lane-state'
 import type { Phase } from './run-board-phase'
 import { run_board_status, type ItemStatus, type OpenRead } from './run-board-status'
 
-// joshuafolkken/kit#3430: what each child of a run is doing, and the run's own activity, read off the
-// event stream and the open lanes — no GitHub read.
+// joshuafolkken/kit#3430: what each child of a run is doing, read off the event stream and the open
+// lanes — no GitHub read. The run's own activity is `run-board-status-activity.test.ts`.
 
 const KIND = run_event_stream.EVENT_KIND
 const T0 = '2026-10-08T09:00:00.000Z'
@@ -344,37 +344,5 @@ describe('run_board_status settled tracks', () => {
 
 		expect(settled?.state).not.toBe('running')
 		expect(settled?.track).toStrictEqual(reached)
-	})
-})
-
-describe('run_board_status.activity_of', () => {
-	// joshuafolkken/kit#3689: the run's activity is its newest event and whether it stopped — no wait
-	// window, so a waiting run's header is drawn from the same two facts as a working one's.
-	it('reads the newest event’s time and nothing about a wait', () => {
-		const events = [
-			event_at(1, T0, KIND.CHILD_LAUNCH, LAUNCH_3409),
-			event_at(2, T2, KIND.MERGE, MERGE_3409),
-		]
-
-		expect(run_board_status.activity_of(events)).toStrictEqual({
-			setup: undefined,
-			setup_ms: undefined,
-			last_event_ms: Date.parse(T2),
-			latest: { text: MERGE_3409, at_ms: Date.parse(T2) },
-			idle_ms: Date.parse(T2),
-			is_stopped: false,
-			lane_events: new Map(),
-			pr_checks: new Map(),
-		})
-	})
-
-	it('reads a stop naming no child as the run itself ending, past trailing trace events', () => {
-		const events = [
-			event_at(1, T0, KIND.STOP, 'backlog drained'),
-			event_at(2, T1, KIND.HEARTBEAT, 'still here'),
-		]
-
-		expect(run_board_status.activity_of(events).is_stopped).toBe(true)
-		expect(run_board_status.activity_of([]).last_event_ms).toBeUndefined()
 	})
 })

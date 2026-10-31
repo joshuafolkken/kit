@@ -18,6 +18,9 @@ const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
 const MERGE = 'followup → merge'
+const FIRST_LANE = 'start → first lane'
+const SETUP_KIND = 'setup'
+const STARTING_TEXT = 'starting session'
 const CUT_TEXT = `#${String(ISSUE)} cut (implementation)`
 const OUTAGE_TEXT = `#${String(ISSUE)} outage (re-dispatchable)`
 const OUTAGE_KIND = 'outage'
@@ -194,12 +197,25 @@ describe('lane_gap_stats.table -- followup → merge', () => {
 	})
 })
 
+describe('lane_gap_stats.table -- start → first lane', () => {
+	it('times each session start until its first lane opening', () => {
+		const events = [
+			event(SETUP_KIND, STARTING_TEXT, 300),
+			event(SETUP_KIND, `opening lane #${String(ISSUE)}`, 258),
+			event(SETUP_KIND, `opening lane #${String(OTHER)}`, 200),
+			event(SETUP_KIND, STARTING_TEXT, 100),
+		]
+
+		expect(row_of([], events, FIRST_LANE)).toBe(`| ${FIRST_LANE} | 2 | 42 | 42 | 1 |`)
+	})
+})
+
 describe('lane_gap_stats.table -- the period', () => {
 	it('prints every gap with zero counts for an empty period', () => {
 		const lines = lane_gap_stats.table([], WINDOW).split('\n')
 
 		expect(lines[0]).toBe(HEADER)
-		expect(lines).toHaveLength(7)
+		expect(lines).toHaveLength(8)
 	})
 
 	it('leaves out a gap that started before the period', () => {

@@ -1,5 +1,6 @@
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
+import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { lane_ledger, type LedgerEntry, type MergeEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
@@ -22,6 +23,9 @@ import { lane_stop_stats } from './lane-stop-stats'
 //   wait `josh lane:net` takes out (`lane-net-time.ts`, joshuafolkken/kit#5216).
 // - `followup → merge`: the ship's last `followup` stage before the merge until the parent wrote the
 //   `merge` line, the step that releases the slot. A merge with no `followup` stage has no start.
+// - `start → first lane`: a `backlogrun` session's `starting session` until its first `opening lane`
+//   (`run_event_setup.first_lane_spans`, joshuafolkken/kit#5519) — the start-up a run waits through
+//   before any lane works.
 //
 // A start nothing ended is counted under `not ended`, kept out of the seconds.
 
@@ -31,6 +35,7 @@ const OUTAGE = 'outage → relaunch'
 const PARK = 'park → offer'
 const YIELD = 'yield → redispatch'
 const MERGE = 'followup → merge'
+const FIRST_LANE = 'start → first lane'
 const FOLLOWUP_STAGE = 'followup'
 const IMPLEMENTATION_CUT = `cut (${agent_role_profile.IMPLEMENTATION_PHASE})`
 const { NOT_MEASURED, is_dispatch, is_merge, is_number, is_stage } = lane_stage_stats
@@ -149,6 +154,7 @@ function table(
 		gap_row(PARK, park_spans(entries, events), window),
 		gap_row(YIELD, lane_net_time.yield_spans(entries, events), window),
 		gap_row(MERGE, merge_spans(entries), window),
+		gap_row(FIRST_LANE, run_event_setup.first_lane_spans(events), window),
 	].join('\n')
 }
 
