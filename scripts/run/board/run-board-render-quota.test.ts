@@ -38,13 +38,12 @@ function raw_row(observation: QuotaReading, now_ms: number): string {
 	return part?.lines[0]?.text ?? ''
 }
 
-const QUOTAS: Quotas = {
-	claude: reading([
-		window_of(FIVE_HOURS, 42, 2 * HOUR_MS),
-		window_of(SEVEN_DAYS, 68, 3 * 24 * HOUR_MS),
-	]),
-	codex: reading([window_of(SEVEN_DAYS, 45, 10 * 24 * HOUR_MS)]),
-}
+const CLAUDE = reading([
+	window_of(FIVE_HOURS, 42, 2 * HOUR_MS),
+	window_of(SEVEN_DAYS, 68, 3 * 24 * HOUR_MS),
+])
+const CODEX = reading([window_of(SEVEN_DAYS, 45, 10 * 24 * HOUR_MS)])
+const QUOTAS: Quotas = { claude: CLAUDE, codex: CODEX }
 
 afterEach(() => {
 	vi.unstubAllEnvs()
@@ -59,7 +58,7 @@ function expect_percent_columns(row: string, used: number): void {
 	const last_column = run_board_fit.width_of(row.slice(0, last_percent))
 
 	expect(column_at(row, `${String(used)}%`) + String(used).length).toBe(18)
-	expect(last_column + String(used).length).toBe(57)
+	expect(last_column + String(used).length).toBe(63)
 }
 
 describe('run_board_render_quota twenty-step bars', () => {
@@ -78,7 +77,7 @@ describe('run_board_render_quota twenty-step bars', () => {
 		const rows = rows_of({ quotas })
 
 		expect(column_at(head, '5h')).toBe(15)
-		expect(column_at(head, '7d')).toBe(54)
+		expect(column_at(head, '7d')).toBe(60)
 
 		for (const row of rows) {
 			expect(row.split(bar)).toHaveLength(3)
@@ -142,10 +141,10 @@ describe('run_board_render_quota.usage_part', () => {
 		expect(part?.summary).toBe('claude 42/68 · codex —/45')
 		expect(stripVTControlCharacters(part?.head.join('\n') ?? '')).toContain('5h')
 		expect(claude).toBe(
-			'  claude        42% ■■■■■■■■────┊───────  ↻ 14:00      68% ■■■■■■■■■■■┊■■──────  ↻ Sun 12:00',
+			'  claude        42% ■■■■■■■■────┊───────  ↻ 14:00            68% ■■■■■■■■■■■┊■■──────  ↻ Sun 12:00',
 		)
 		expect(codex).toBe(
-			'  codex          —                                     45% ┊■■■■■■■■───────────  ↻ 11/08',
+			'  codex          —                                           45% ┊■■■■■■■■───────────  ↻ 11/08',
 		)
 	})
 
@@ -153,7 +152,7 @@ describe('run_board_render_quota.usage_part', () => {
 		const quotas = { claude: undefined, codex: reading([window_of(THIRTY_DAYS, 7, HOUR_MS)]) }
 		const [claude, codex] = rows_of({ quotas })
 
-		expect(claude).toBe('  claude         —                                      —')
+		expect(claude).toBe(`  claude         —${' '.repeat(44)}—`)
 		expect(codex).toMatch(/↻ 13:00 *30d$/u)
 		expect(codex).toContain(' 7% ')
 	})
@@ -163,6 +162,44 @@ describe('run_board_render_quota.usage_part', () => {
 		const [claude] = rows_of({ quotas })
 
 		expect(claude).toMatch(/ 0% .*↻ 16:00/u)
+	})
+})
+
+describe('run_board_render_quota.usage_part tasks left', () => {
+	const PER_TASK = { [FIVE_HOURS]: 6, [SEVEN_DAYS]: 6 }
+
+	it('puts ≈ the tasks left after each reset in a fixed column, the 7d column unmoved', () => {
+		const quotas = { claude: { ...CLAUDE, per_task: PER_TASK }, codex: CODEX }
+		const [claude, codex] = rows_of({ quotas }) as [string, string]
+
+		expect(claude).toBe(
+			'  claude        42% ■■■■■■■■────┊───────  ↻ 14:00      ≈9    68% ■■■■■■■■■■■┊■■──────  ↻ Sun 12:00  ≈5',
+		)
+		expect(column_at(claude, '68%')).toBe(column_at(codex, '45%'))
+		expect(usage_part({ quotas, now_ms: NOW_MS })?.summary).toBe('claude 42/68 ≈9/5 · codex —/45')
+	})
+
+	it('leaves the column blank and the summary as it was where no spend is told', () => {
+		const told = reading([window_of(FIVE_HOURS, 42, HOUR_MS), window_of(SEVEN_DAYS, 68, HOUR_MS)])
+		const quotas = { claude: { ...told, per_task: { [SEVEN_DAYS]: 8 } }, codex: QUOTAS.codex }
+		const [claude = ''] = rows_of({ quotas })
+		const part = usage_part({ quotas, now_ms: NOW_MS })
+
+		expect(claude).toMatch(/↻ 13:00 {12}68% .*≈4$/u)
+		expect(part?.summary).toBe('claude 42/68 ≈—/4 · codex —/45')
+	})
+
+	it('counts a window whose reset has passed from empty, and none for a spend of zero', () => {
+		const passed = {
+			...reading([window_of(FIVE_HOURS, 80, -HOUR_MS)]),
+			per_task: { [FIVE_HOURS]: 30 },
+		}
+		const zero = { ...reading([window_of(FIVE_HOURS, 10, HOUR_MS)]), per_task: { [FIVE_HOURS]: 0 } }
+
+		expect(rows_of({ quotas: { claude: passed, codex: zero } })).toEqual([
+			expect.stringMatching(/ 0% .*↻ 16:00 {6}≈3/u),
+			expect.not.stringContaining('≈'),
+		])
 	})
 })
 
@@ -242,6 +279,6 @@ describe('run_board_render_quota gauge colors', () => {
 	)
 
 	it('names ⛽, ┊ and ↻ in the legend', () => {
-		expect(LEGEND).toEqual(['⛽ usage', '🤖 scheduler', '┊ pace', '↻ reset'])
+		expect(LEGEND).toEqual(['⛽ usage', '🤖 scheduler', '┊ pace', '↻ reset', '≈ tasks left'])
 	})
 })

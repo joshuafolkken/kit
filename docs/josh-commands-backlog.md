@@ -749,9 +749,11 @@ pnpm josh backlog:next --exclude 1630   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
+Read-only, except for the mechanical triage of the triage gate below. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
 
-**Triage gate**: while any candidate carries neither `run:solo` nor `run:lane`, it prints `triage` and no numbers, naming the untriaged issues on stderr.
+**Triage gate**: an untriaged candidate (neither `run:solo` nor `run:lane`) without `bug`, or a `bug` naming no verification-gate path (`GATE_PATHS` in `scripts/backlog/backlog-auto-triage.ts`), gets `run:lane` and a comment naming the missing condition, and is offered as triaged.
+
+Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
@@ -833,7 +835,7 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 This section is the single source of the mapping from `backlog:next`'s answer to a budget word:
 
-- issue numbers → `candidates`; `none` → `exhausted`; `stop` → `parked`; `triage` → `untriaged`
+- issue numbers → `candidates`, with a trailing `triage` line → `candidates` that owe the judgment (`is_judgment_owed` in `--json`); `none` → `exhausted`; `stop` → `parked`; `triage` alone → `untriaged`
 - `wait` → `blocked` with children in flight, `exhausted` without
 - `retry` → `blocked` below three consecutive asks, `unreadable` at the third
 - `error`, or exit 1 with empty stdout → `unreadable`, never `none`
@@ -856,7 +858,7 @@ pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 
 <!-- /usage -->
 
-An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags.
+An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
 
 A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 

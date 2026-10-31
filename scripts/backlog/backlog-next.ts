@@ -18,6 +18,7 @@ import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
+import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_next_size } from './backlog-next-size'
@@ -361,9 +362,8 @@ async function gate_solo(result: EpicNextResult, context: PoolContext): Promise<
 	return gated.result
 }
 
-// An untriaged candidate withholds every candidate. Checked before the
-// `run:solo` gate, which cannot be applied to an issue whose label is not recorded yet; the numbers go
-// to standard error, the one token to standard output.
+// The `triage` answer when no triaged candidate is left to offer beside an untriaged one: the numbers
+// go to standard error, the one token to standard output.
 function report_triage(context: PoolContext, untriaged: ReadonlyArray<EpicChild>): number {
 	warn_epic_gap(context)
 	console.error(epic_triage.message(untriaged, context.repo))
@@ -372,21 +372,51 @@ function report_triage(context: PoolContext, untriaged: ReadonlyArray<EpicChild>
 	return SUCCESS_EXIT_CODE
 }
 
-function untriaged_of(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
-	if (result.verdict !== 'run') return []
+// This repository's candidates without the untriaged ones, which wait for their judgment alone.
+function without_untriaged(result: EpicNextResult, repo: string): EpicNextResult {
+	const candidates = result.candidates.map((bucket) =>
+		bucket.repo === repo
+			? { ...bucket, children: bucket.children.filter((child) => epic_triage.is_triaged(child)) }
+			: bucket,
+	)
 
-	return epic_triage.untriaged(epic_report.candidates_for_repo(result, repo))
+	return { ...result, candidates }
+}
+
+function has_offer(result: EpicNextResult, repo: string): boolean {
+	return result.verdict === 'run' && epic_report.candidates_for_repo(result, repo).length > 0
+}
+
+// **An untriaged candidate holds only itself.** The `run:solo` gate cannot be applied to an issue whose
+// label is not recorded yet, so it is gated without it: the triaged candidates are offered as before and
+// a trailing `triage` token asks for the judgment beside them. A judgment that records `run:solo` stops
+// the next offer through the gate's own rule. With nothing triaged left to offer the answer is
+// `triage` alone.
+async function report_held(
+	result: EpicNextResult,
+	context: PoolContext,
+	untriaged: ReadonlyArray<EpicChild>,
+): Promise<number> {
+	const gated = await gate_solo(without_untriaged(result, context.repo), context)
+
+	if (!has_offer(gated, context.repo)) return report_triage(context, untriaged)
+
+	report(gated, context)
+	console.error(epic_triage.held_message(untriaged, context.repo))
+	console.info(VERDICT_TOKENS.triage)
+
+	return SUCCESS_EXIT_CODE
 }
 
 async function answer_pool(context: PoolContext): Promise<number> {
-	const result = await resolve(context)
+	const resolved = await resolve(context)
 
-	if (result === undefined) return FAILURE_EXIT_CODE
-	if (is_transport_failure(result)) return report_retry(context)
+	if (resolved === undefined) return FAILURE_EXIT_CODE
+	if (is_transport_failure(resolved)) return report_retry(context)
 
-	const untriaged = untriaged_of(result, context.repo)
+	const { result, untriaged } = await backlog_auto_triage.untriaged_of(resolved, context.repo)
 
-	if (untriaged.length > 0) return report_triage(context, untriaged)
+	if (untriaged.length > 0) return await report_held(result, context, untriaged)
 
 	return report(await gate_solo(result, context), context)
 }

@@ -106,8 +106,8 @@ function is_offerable(reading: ReadyReading): boolean {
 // The baseline is the whole runnable pool, free lane or not: an issue that was waiting for a lane is not
 // new when one frees, and the child's merge that freed it already wakes the parent.
 //
-// A baseline read during a `triage` answer names none of the issues it withheld, so every one of them
-// would arrive once they were judged — the whole-pool wake. It is read as a baseline that did not answer.
+// A baseline read during a `triage` answer — alone, or trailing the triaged candidates — leaves out the
+// held issue, so it would arrive once judged. It is read as a baseline that did not answer.
 async function read_baseline(ports: ReadyPorts): Promise<ReadonlySet<string> | undefined> {
 	try {
 		const issues = await ports.ready_issues()

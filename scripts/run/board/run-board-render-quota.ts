@@ -9,7 +9,9 @@ import { run_board_render_section } from './run-board-render-section'
 // The `⛽ usage` section (joshuafolkken/kit#5395): Claude's and Codex's usage-limit windows, one row
 // each, under fixed `5h` and `7d` columns. A window of another length stands in the nearer column and
 // its length ends the row. Each bar carries ┊, how far through its window the clock is, so a bar past
-// it is spending faster than the window refills; ↻ is when the window resets.
+// it is spending faster than the window refills; ↻ is when the window resets. ≈ after it is how many
+// more tasks like the recent ones fit in what is left (joshuafolkken/kit#5508), its column kept blank
+// where none could be told so the 7d column stays put.
 
 const { GAUGE_SHADES, bar_of } = run_board_labels
 const { minute_of, two_digits } = figure_format
@@ -25,8 +27,13 @@ const YELLOW_PERCENT = 50
 const RED_PERCENT = 90
 const INDENT = '  '
 const NAME_WIDTH = 13
-const CELL_WIDTH = 39
+const CELL_WIDTH = 45
+// `↻ Sun 12:00`, the widest reset.
+const RESET_WIDTH = 11
 const FIRST_COLUMN = INDENT.length + NAME_WIDTH
+const COUNT_MARK = '≈'
+// The widest count the column holds.
+const MAX_COUNT = 999
 const NONE = '—'
 // `—` under a percent's last digit.
 const NONE_CELL = `  ${NONE}`
@@ -43,7 +50,13 @@ const COLUMNS = [
 ]
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const SCHEDULER_MARK = '🤖'
-const LEGEND = [LABEL, `${SCHEDULER_MARK} scheduler`, `${PACE_MARK} pace`, `${RESET_MARK} reset`]
+const LEGEND = [
+	LABEL,
+	`${SCHEDULER_MARK} scheduler`,
+	`${PACE_MARK} pace`,
+	`${RESET_MARK} reset`,
+	`${COUNT_MARK} tasks left`,
+]
 
 // The reset a usage limit holds the run's launches until, and how many children it stopped.
 interface QuotaHold {
@@ -120,19 +133,36 @@ function reset_text(reset_ms: number, now_ms: number): string {
 	return `${two_digits(date.getMonth() + 1)}/${two_digits(date.getDate())}`
 }
 
-function padded(text: string): string {
-	return `${text}${' '.repeat(Math.max(0, CELL_WIDTH - run_board_fit.width_of(text)))}`
+function padded(text: string, width: number = CELL_WIDTH): string {
+	return `${text}${' '.repeat(Math.max(0, width - run_board_fit.width_of(text)))}`
 }
 
-function cell_of(window: QuotaWindow, now_ms: number): string {
+// How many more tasks spending `per_task` fit in what is left of `window`, none where untold.
+function count_of(window: QuotaWindow, now_ms: number, per_task?: number): number | undefined {
+	if (per_task === undefined || per_task <= 0) return undefined
+
+	const left = PERCENT - current(window, now_ms).used_percent
+
+	return Math.min(MAX_COUNT, Math.max(0, Math.floor(left / per_task)))
+}
+
+function per_task_in(reading: QuotaReading | undefined, window: QuotaWindow): number | undefined {
+	return reading?.per_task?.[window.minutes]
+}
+
+function count_text(count: number | undefined): string {
+	return count === undefined ? '' : `${COUNT_MARK}${String(count)}`
+}
+
+function cell_of(window: QuotaWindow, now_ms: number, per_task?: number): string {
 	const shown = current(window, now_ms)
 	const pace = pace_of(shown, now_ms)
-	const level = level_of(shown.used_percent, pace)
-	const shade = GAUGE_SHADES[level]
+	const shade = GAUGE_SHADES[level_of(shown.used_percent, pace)]
 	const percent = run_board_machine.percent_text(shown.used_percent)
-	const reset = `${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`
+	const reset = padded(`${RESET_MARK} ${reset_text(shown.resets_ms, now_ms)}`, RESET_WIDTH)
+	const count = count_text(count_of(window, now_ms, per_task))
 
-	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}`)
+	return padded(`${percent} ${bar_text(shown.used_percent, pace, shade)}  ${reset}  ${count}`)
 }
 
 // Each column's window, `undefined` where the provider reported none that stands in it.
@@ -158,7 +188,9 @@ function stale_text(reading: QuotaReading, now_ms: number): string | undefined {
 function cells_text(reading: QuotaReading | undefined, now_ms: number): string {
 	const windows = placed(reading?.windows ?? [])
 	const cells = windows.map((window) =>
-		window === undefined ? padded(NONE_CELL) : cell_of(window, now_ms),
+		window === undefined
+			? padded(NONE_CELL)
+			: cell_of(window, now_ms, per_task_in(reading, window)),
 	)
 
 	return [...cells, ...lengths_of(reading?.windows ?? [])].join('').trimEnd()
@@ -212,15 +244,34 @@ function row_of(provider: QuotaProvider, view: QuotaView): string {
 	return `${INDENT}${name_cell(provider, view)}${body}`
 }
 
-// `claude 42/68`: each column's percent, `—` where none stands.
+function percents_text(reading: QuotaReading | undefined, now_ms: number): string {
+	const percents = placed(reading?.windows ?? []).map((window) =>
+		window === undefined ? NONE : String(Math.round(current(window, now_ms).used_percent)),
+	)
+
+	return percents.join('/')
+}
+
+// ` ≈9/5`: each column's count, `—` where none is told; nothing where no column tells one.
+function counts_text(reading: QuotaReading | undefined, now_ms: number): string {
+	const counts = placed(reading?.windows ?? []).map((window) =>
+		window === undefined ? undefined : count_of(window, now_ms, per_task_in(reading, window)),
+	)
+
+	if (counts.every((count) => count === undefined)) return ''
+
+	const texts = counts.map((count) => (count === undefined ? NONE : String(count)))
+
+	return ` ${COUNT_MARK}${texts.join('/')}`
+}
+
+// `claude 42/68 ≈9/5`: each column's percent, `—` where none stands, then its count.
 function summary_of(view: QuotaView): string {
 	const parts = providers_of(view).map((provider) => {
-		const windows = placed(view.quotas?.[provider]?.windows ?? [])
-		const percents = windows.map((window) =>
-			window === undefined ? NONE : String(Math.round(current(window, view.now_ms).used_percent)),
-		)
+		const reading = view.quotas?.[provider]
+		const name = name_of(provider, view).trimStart()
 
-		return `${name_of(provider, view).trimStart()} ${percents.join('/')}`
+		return `${name} ${percents_text(reading, view.now_ms)}${counts_text(reading, view.now_ms)}`
 	})
 
 	return parts.join(SEPARATOR)

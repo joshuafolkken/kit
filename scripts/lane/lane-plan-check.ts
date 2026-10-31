@@ -9,6 +9,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_yield, type YieldAt } from './lane-yield'
 
 // The check `josh lane:plan <issue> <path>...` runs (`lane-plan-cli.ts`) — record the files a lane child
@@ -27,10 +28,14 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // yield, no release. **`run:entry` gives the lane back at the entry** in a lane child, before any
 // reading, on the paths dispatch gated on (`yield_at_entry`), so a holder that planned them since
 // dispatch takes the lane back before the investigation the later `lane:plan` would have thrown away.
+//
+// **A plan grown past twice its Issue's declared size answers `split`** and is not recorded
+// (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const YIELD_EXIT_CODE = 2
+const SPLIT_EXIT_CODE = 3
 const RELEASE_FLAG = '--release'
 const RUNNING = new Set([IN_PROGRESS_LABEL])
 const UNREAD = 'unread'
@@ -119,10 +124,30 @@ function unread(): number {
 }
 
 // The overlap check alone, writing nothing — what `--probe` answers and `check_plan` acts on.
-async function probe(plan: LanePlan, directory: string): Promise<Probe> {
-	const issues = await opted_in()
-
+function probe(
+	plan: LanePlan,
+	issues: ReadonlyArray<OpenIssueData> | undefined,
+	directory: string,
+): Probe {
 	return issues === undefined ? UNREAD : clash_among(plan, running_of(issues), directory)
+}
+
+// A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
+function oversize_of(
+	plan: LanePlan,
+	issues: ReadonlyArray<OpenIssueData> | undefined,
+	directory: string,
+): Oversize | undefined {
+	return issues === undefined
+		? undefined
+		: lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory))
+}
+
+function split(plan: LanePlan, over: Oversize): number {
+	console.error(lane_plan_size.refusal_text(plan.issue, over))
+	console.info('split')
+
+	return SPLIT_EXIT_CODE
 }
 
 async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
@@ -140,8 +165,12 @@ async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
 
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
+	const issues = await opted_in()
+	const over = oversize_of(plan, issues, directory)
+
+	if (over !== undefined) return split(plan, over)
 	lane_plan.record(plan, directory)
-	const found = await probe(plan, directory)
+	const found = probe(plan, issues, directory)
 
 	if (found === UNREAD) return unread()
 
@@ -152,7 +181,11 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
-	const found = await probe(plan, directory)
+	const issues = await opted_in()
+	const over = oversize_of(plan, issues, directory)
+
+	if (over !== undefined) return split(plan, over)
+	const found = probe(plan, issues, directory)
 
 	if (found === UNREAD) return unread()
 	if (found === undefined) return clear_answer()
@@ -213,6 +246,7 @@ async function yield_at_entry(issue: number, directory: string = process.cwd()):
 }
 
 const lane_plan_check = {
+	SPLIT_EXIT_CODE,
 	YIELD_EXIT_CODE,
 	check_plan,
 	placed,

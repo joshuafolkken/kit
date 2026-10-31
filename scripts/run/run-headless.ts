@@ -59,16 +59,6 @@ async function read_carry_here(): Promise<CarryRead | undefined> {
 		: run_carry.read_carry(run_carry.carry_path(repository))
 }
 
-/**
- * Whether this session is a headless parent that would end its run by ending the turn: marked, not a
- * lane child, with lanes still in flight and no cut handed the record off.
- */
-async function must_keep_waiting(source: EnvironmentSource = process.env): Promise<boolean> {
-	if (!is_headless_parent(source) || !(await lane_registry.has_lanes_in_flight())) return false
-
-	return is_driving(await read_carry_here())
-}
-
 // The live record itself, whoever owns it — the run's scope (`--only`, the named list) is the run's,
 // not the session's, so the readers that narrow the pool to it need no ownership test.
 async function current_carry(): Promise<RunCarry | undefined> {
@@ -118,6 +108,21 @@ async function is_backlog_parent(
 	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
 ): Promise<boolean> {
 	return (await driving_carry(source, ancestry)) !== undefined
+}
+
+/**
+ * Whether this session is a headless parent that would end its run by ending the turn: marked, not a
+ * lane child, with lanes still in flight and a record it drives itself. **The launched parent beside
+ * the supervisor that drives its record holds none** (joshuafolkken/kit#5516): its turn-end strands
+ * nothing, and its `--cut` would be refused against the supervisor's live ownership.
+ */
+async function must_keep_waiting(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<boolean> {
+	if (!is_headless_parent(source) || !(await lane_registry.has_lanes_in_flight())) return false
+
+	return await is_backlog_parent(source, ancestry)
 }
 
 const run_headless = {

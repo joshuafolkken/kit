@@ -927,6 +927,8 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 
 The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
 
+The launch begins the run's carry record and hands it to the supervisor before the agent plans, so the first lane opens without waiting for the plan; the agent's own `run:carry --begin` answers `driving`, and it reports the plan and settles `needs-decision` beside the lanes.
+
 To default to Codex, add `JOSH_AGENT_PROVIDER=openai` to the project's `.env`. Provider selection is `--agent claude|codex` first, then the exported `JOSH_AGENT_PROVIDER`, then `.env`, then Claude Code (`anthropic`).
 
 The environment accepts `anthropic|openai`; an unset or blank value selects Claude, and other values are refused with a reason unless `--agent` overrides them. Codex uses the existing OpenAI role profiles. Changing this setting only affects a new launch: showing an existing run or `--restart` keeps its recorded provider.
