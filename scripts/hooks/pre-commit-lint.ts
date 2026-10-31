@@ -44,8 +44,8 @@ const TOOL_ARGUMENTS: Readonly<Record<string, ReadonlyArray<string>>> = {
 
 // **Each tool claims its place in the core budget** (joshuafolkken/kit#3944): lefthook starts the three
 // in parallel, and off the ledger every other lane's admission saw them only as foreign load. Each is
-// one process over the staged files — eslint over 40 of them took 16.9s of CPU over 14.0s of wall at
-// 1,225 MB, the one-process shape the whole-tree scan's weight already names.
+// one process over the staged files — the one-process shape the whole-tree scan's weight already
+// names.
 // The key is the one `CORE_WEIGHTS` and `MEMORY_MB` both declare the tool under.
 const TOOL_BUDGETS: Readonly<Record<string, 'spell_check' | 'format' | 'eslint_scan'>> = {
 	cspell: 'spell_check',

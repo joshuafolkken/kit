@@ -225,8 +225,8 @@ function is_reissued_refusal(now_ms: number, delivered_at_ms: number): boolean {
 
 // **Fires on every threshold crossing rather than once per run**. Once per run
 // silenced the row for the rest of a process the moment its first refusal landed — and a `busy` /
-// `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched to
-// 282,747 tokens with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
+// `failed` / `unready` verdict, or an edit reissued unchanged, left the context to grow unwatched far
+// past the threshold with the cut never taken. `decide` re-asks on every over-threshold edit; the reissue
 // window keeps that from wedging a run whose cut came back `busy` / `failed`, and a run that cannot
 // cut at all never reaches here — `can_cut_sync` keeps the trigger silent for it. `delivered_at_ms` is this
 // row's own last refusal, written by `fire_once` only when a refusal actually fired, so a passed

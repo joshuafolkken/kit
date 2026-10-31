@@ -8,7 +8,7 @@ import { investigation_reads } from './investigation-reads'
 
 // Refuse the second whole-file `Read` of a path whose content has not changed since the run last read
 // it. Left alone, a run re-reads the same unchanged path again and again, and each round trip pays
-// ~17 seconds to return text the run already holds. The remedy is the one `investigation-guard.ts`
+// a model turn to return text the run already holds. The remedy is the one `investigation-guard.ts`
 // applies: intervene in the `PreToolUse` decision rather than describe the rule in prose.
 //
 // **It is unchanged content that is caught, never a repeat read.** The transcript says *when* the run
