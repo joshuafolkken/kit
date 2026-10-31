@@ -8,7 +8,10 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
 import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
+import { test_declared_logic } from '#scripts/test/test-declared-logic'
+import { lane_ledger_write } from './lane-ledger-write'
 import { lane_plan, type LanePlan } from './lane-plan'
+import { lane_plan_signals } from './lane-plan-signals'
 import { lane_plan_size, type Oversize } from './lane-plan-size'
 import { lane_yield, type YieldAt } from './lane-yield'
 
@@ -30,7 +33,9 @@ import { lane_yield, type YieldAt } from './lane-yield'
 // dispatch takes the lane back before the investigation the later `lane:plan` would have thrown away.
 //
 // **A plan grown past twice its Issue's declared size answers `split`** and is not recorded
-// (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check.
+// (joshuafolkken/kit#5533, `lane-plan-size.ts`), ahead of the overlap check; so does one whose probed
+// hunks or projected lines outgrow it, the axis named in the refusal and noted on the ledger
+// (joshuafolkken/kit#5568).
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -133,14 +138,15 @@ function probe(
 }
 
 // A plan grown past twice its Issue's declaration is refused before it is recorded (`lane-plan-size.ts`).
-function oversize_of(
+async function oversize_of(
 	plan: LanePlan,
 	issues: ReadonlyArray<OpenIssueData> | undefined,
 	directory: string,
-): Oversize | undefined {
-	return issues === undefined
-		? undefined
-		: lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory))
+): Promise<Oversize | undefined> {
+	if (issues === undefined || !lane_plan_size.declares(plan.issue, issues)) return undefined
+	const signals = await lane_plan_signals.signals_of(plan.issue)
+
+	return lane_plan_size.oversize(plan, issues, lane_plan.read(plan.issue, directory), signals)
 }
 
 function split(plan: LanePlan, over: Oversize): number {
@@ -148,6 +154,22 @@ function split(plan: LanePlan, over: Oversize): number {
 	console.info('split')
 
 	return SPLIT_EXIT_CODE
+}
+
+// The refusal goes on the ledger with its axis, so `lane:stats` counts the notices by reason; the
+// lines are the projection the lines axis measured, else none.
+async function noted_split(plan: LanePlan, over: Oversize): Promise<number> {
+	const files = plan.paths.filter((file) => !test_declared_logic.is_test_file(file)).length
+	const lines = over.reason === 'lines' ? over.measured : 0
+
+	await lane_ledger_write.record_split_notice({
+		issue: plan.issue,
+		files,
+		lines,
+		reason: over.reason,
+	})
+
+	return split(plan, over)
 }
 
 async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
@@ -166,9 +188,9 @@ async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await opted_in()
-	const over = oversize_of(plan, issues, directory)
+	const over = await oversize_of(plan, issues, directory)
 
-	if (over !== undefined) return split(plan, over)
+	if (over !== undefined) return await noted_split(plan, over)
 	lane_plan.record(plan, directory)
 	const found = probe(plan, issues, directory)
 
@@ -182,7 +204,7 @@ async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
 async function probe_answer(plan: LanePlan, directory: string): Promise<number> {
 	const issues = await opted_in()
-	const over = oversize_of(plan, issues, directory)
+	const over = await oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return split(plan, over)
 	const found = probe(plan, issues, directory)

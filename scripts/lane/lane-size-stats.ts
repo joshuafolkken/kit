@@ -30,13 +30,23 @@ function merged_sizes(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow):
 		.filter((size): size is SizeEntry => size !== undefined)
 }
 
-function ratio_cell(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): string {
+function ratio_of(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): number | undefined {
 	const ratios = sizes
 		.filter((size) => size.declared[axis] > 0)
 		.map((size) => size.actual[axis] / size.declared[axis])
-	const median = lane_stats.median(ratios)
+
+	return lane_stats.median(ratios)
+}
+
+function ratio_cell(sizes: ReadonlyArray<SizeEntry>, axis: 'files' | 'lines'): string {
+	const median = ratio_of(sizes, axis)
 
 	return median === undefined ? lane_stats.MISSING : median.toFixed(DECIMALS)
+}
+
+// The period's `lines actual / declared median`, read by `josh lane:plan` (joshuafolkken/kit#5568).
+function lines_ratio(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): number | undefined {
+	return ratio_of(merged_sizes(entries, window), 'lines')
 }
 
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
@@ -53,6 +63,6 @@ function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string
 	].join('\n')
 }
 
-const lane_size_stats = { table }
+const lane_size_stats = { lines_ratio, table }
 
 export { lane_size_stats }
