@@ -19,21 +19,27 @@ const { early_launch, early_prepare, early_push } = vi.hoisted(() => ({
 	early_push: vi.fn<() => Promise<number>>(),
 }))
 
-const { branch, brief_run, brief_run_to, interaction_status, launch_pinned, write_text_stamp } =
-	vi.hoisted(() => ({
-		branch: vi.fn<() => Promise<string>>(),
-		brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
-		brief_run_to: vi.fn<(argv: ReadonlyArray<string>, emit: Emit) => Promise<number>>(),
-		interaction_status: vi.fn<(issue: number) => Promise<InteractionStatus>>(),
-		launch_pinned: vi.fn<(root: string, reason?: string) => { kind: string }>(),
-		write_text_stamp: vi.fn<(target: string, text: string) => string>(),
-	}))
+const { branch, brief_run, brief_run_to, interaction_status, launch_pinned } = vi.hoisted(() => ({
+	branch: vi.fn<() => Promise<string>>(),
+	brief_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<number>>(),
+	brief_run_to: vi.fn<(argv: ReadonlyArray<string>, emit: Emit) => Promise<number>>(),
+	interaction_status: vi.fn<(issue: number) => Promise<InteractionStatus>>(),
+	launch_pinned: vi.fn<(root: string, reason?: string) => { kind: string }>(),
+}))
+
+const { remove_stamp, write_text_stamp } = vi.hoisted(() => ({
+	remove_stamp: vi.fn<(target: string) => void>(),
+	write_text_stamp: vi.fn<(target: string, text: string) => string>(),
+}))
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
-vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { write_text_stamp } }))
+vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: { remove_stamp, write_text_stamp } }))
 vi.mock('#scripts/lane/lane-session-broker', () => ({
 	lane_session_broker: {
-		review_paths: (_root: string, slot: ReviewSlot) => ({ brief: `/briefs/brief-${slot}.md` }),
+		review_paths: (_root: string, slot: ReviewSlot) => ({
+			brief: `/briefs/brief-${slot}.md`,
+			findings: `/briefs/findings-${slot}.txt`,
+		}),
 	},
 }))
 vi.mock('#scripts/review/review-brief-cli', () => ({
@@ -124,6 +130,7 @@ beforeEach(() => {
 beforeEach(() => {
 	early_launch.mockReset()
 	early_prepare.mockReset().mockResolvedValue(false)
+	remove_stamp.mockReset()
 })
 
 afterEach(() => {
@@ -163,6 +170,18 @@ describe('run:review where the interaction review is due', () => {
 		expect(await run_review_cli.run([UNPINNED_OK, REASON])).toBe(0)
 		expect(launch_pinned.mock.lastCall?.slice(0, 2)).toStrictEqual([expect.any(String), REASON])
 		expect(output.stdout.join('')).toBe(PATH_LINES)
+	})
+})
+
+// joshuafolkken/kit#5549: a reviewer that ends without `review:submit` must leave
+// `review:record --from-slot` nothing to record, not the previous round's findings.
+describe('run:review and the review:submit slots', () => {
+	it('clears each briefed slot’s findings so --from-slot never records a stale round', async () => {
+		expect(await run_review_cli.run([])).toBe(0)
+		expect(remove_stamp.mock.calls).toStrictEqual([
+			['/briefs/findings-code.txt'],
+			['/briefs/findings-interaction.txt'],
+		])
 	})
 })
 
