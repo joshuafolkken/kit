@@ -1067,6 +1067,8 @@ The label is the josh commands a Bash call chains, else its first 60 characters 
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
 
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs`, and none when no run capped a file (`lane-breakdown-related.ts`).
+
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).

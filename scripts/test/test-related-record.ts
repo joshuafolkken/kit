@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import type { TestRelatedRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { lane_paths } from '#scripts/lane/lane-paths'
 import type { TestReuse } from './test-related-reuse'
 import { related_scope, type RelatedScope } from './test-related-scope'
 import { unit_count_file } from './unit-count-file'
@@ -32,6 +33,8 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
+	// The changed files past the reach cap, narrowed to their direct importers (`test-related-cap.ts`).
+	over_cap?: ReadonlyArray<string>
 }
 
 interface RunResult {
@@ -143,15 +146,19 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
+		...(input.over_cap !== undefined && { over_cap: input.over_cap.length }),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
 	return result.test_files === undefined ? record : { ...record, test_files: result.test_files }
 }
 
-// Best-effort, as every ledger write is.
+// Best-effort, as every ledger write is. `issue` is the lane it ran in, which `josh lane:breakdown`
+// reads its rows by (joshuafolkken/kit#5532).
 async function record_run(input: RunInput, result: RunResult, ledger?: string): Promise<void> {
-	await lane_ledger_write.record_test_related(record_of(input, result), ledger)
+	const issue = lane_paths.issue_here()
+
+	await lane_ledger_write.record_test_related({ ...record_of(input, result), issue }, ledger)
 }
 
 const test_related_record = { record_of, record_run, with_test_count }
