@@ -627,7 +627,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 
 <!-- usage: review:submit -->
 
-Write a ship reviewer's findings, read from stdin, where the ship reads them.
+Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them.
 
 ```bash
 pnpm josh review:submit < findings.txt                 # the /code-review slot
@@ -641,7 +641,8 @@ pnpm josh review:submit --none                         # a review with no findin
 
 <!-- /usage -->
 
-The reviewer `josh ship --review` launches pipes its findings here, one `review:record` line each. The command writes them to the slot's findings file, where the ship reads them, so the reviewer never copies a path. A line outside the grammar is refused, and nothing is written.
+A ship's reviewer, or the `reviewer` agent `run:review` briefs, pipes its findings here, one `review:record` line each.
+The command writes them to the slot's findings file, where the ship or [`josh review:record --from-slot`](josh-commands-automation.md#josh-reviewrecord) reads them, so no path or finding is copied by hand. A line outside the grammar is refused, and nothing is written.
 
 ### `josh ship:wait`
 

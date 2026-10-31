@@ -49,7 +49,7 @@ const BASE_INPUT: WrapupInput = {
 	notify_config: { target: 'issue', message: 'done', mentions: [] },
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
-	managed_notes: [],
+	report_notes: [],
 	checked: {
 		rollup: [],
 		merge_state_status: 'CLEAN',

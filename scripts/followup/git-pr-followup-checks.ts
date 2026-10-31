@@ -109,11 +109,13 @@ async function watch_before_polling(
 // A skipped or fallen-through watch keeps `DEFAULT_STABLE_READS`, and a check that turned red is still
 // caught: the poll evaluates the full merge gate and throws on failure before any stable read counts.
 // `observe` is shown each poll's snapshot, the watch's included — the run's `pr-checks` line
-// (joshuafolkken/kit#3770).
+// (joshuafolkken/kit#3770). `reran` collects the jobs the rerun below restarted, for the completion
+// notification's check report (joshuafolkken/kit#5545).
 interface RunChecksInput {
 	branch_name: string
 	is_skip_watch: boolean
 	observe?: SnapshotObserver
+	reran?: Array<string>
 }
 
 async function wait_for_checks(input: RunChecksInput): Promise<PrStateSnapshot> {
@@ -146,6 +148,7 @@ async function rejudge_after_rerun(
 	if (!is_checks_failure(error)) throw error
 	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
 	if (rerun.length === 0) throw error
+	input.reran?.push(...rerun)
 
 	return await wait_for_checks(input)
 }

@@ -846,6 +846,8 @@ This section is the single source of the mapping from `backlog:next`'s answer to
 
 At the drain — a `watch` verdict over an `exhausted` answer with `--running 0` — it marks a `drain` event on the event stream (once per drain, best-effort), so the next `run:step` fires the retrospective before the idle watch. A watch opened while children still merge is unmarked.
 
+Before a fresh marker it runs `main:sync` and `observations:flush` in the primary checkout (git effect); a failure prints one `observations:flush skipped:` line and the offer goes on.
+
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:offer` in detail".
 
 ### `josh backlog:drive`
@@ -990,12 +992,17 @@ The diff is saved in the worktree's git directory, so `git status` never lists i
 Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime).
 
 ```bash
-pnpm josh disposition <path...>   # → runtime | non-runtime
+pnpm josh disposition <path...>                 # → runtime | non-runtime
+pnpm josh disposition --batch <findings-file>   # → branch table + drop notes
 ```
 
 <!-- /usage -->
 
 `runtime` means any non-inert path, per `review-level.ts`'s inert set; only "is the defect confirmed" is left to a person. Reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
+
+`--batch` reads one `review:record` positional per line — the findings not fixed in place — prefixed `confirmed ` when the failure scenario is stated. It prints a row per finding with its branch (`file` for a confirmed runtime finding, else `drop`).
+
+Each dropped finding's PR-body note follows, itself a `review:record` positional. A line outside the grammar exits 1, named.
 
 ### `josh review:attest`
 

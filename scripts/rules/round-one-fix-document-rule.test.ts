@@ -34,7 +34,7 @@ describe('chain-rule — a lane child records and ships after a round-1 fix', ()
 	// review to run alone in ship, so step 0 names the second reviewer and its record.
 	it('step 0 runs two reviewers on two briefs and records the second as the interaction pass', () => {
 		expect(lane_step()).toContain(
-			'on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>`',
+			'on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>`',
 		)
 	})
 
