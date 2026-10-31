@@ -22,7 +22,7 @@ const SECONDS_UNIT = '秒'
 const SECONDS_PER_MINUTE = 60
 const NONE = 0
 // A template placeholder value — the `<...>` guidance a filed Issue replaces. It is not an estimate, but a
-// value that only opens with `<` (an upper bound such as `<1 min`) is one, so the placeholder must close with `>` too.
+// value that only opens with `<` (an upper bound on a duration) is one, so the placeholder must close with `>` too.
 const PLACEHOLDER = /^<.*>$/u
 
 // Whether the body declares a run-time-shortening aim under its background heading.
@@ -76,7 +76,7 @@ function weekly_hits(rate: string | undefined): number {
 }
 
 // The minutes one hit saves: the first number the gain states in seconds or minutes — a range written
-// with one closing unit ("3-6 min") reads its upper bound. `0` when it states none.
+// with one closing unit after both numbers reads its upper bound. `0` when it states none.
 function minutes_per_hit(gain = ''): number {
 	const groups = DURATION.exec(gain)?.groups
 	if (groups === undefined) return NONE

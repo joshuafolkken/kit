@@ -9,7 +9,7 @@ import type { ItemState } from './run-board-status'
 // and keeps the running rows longest; a frame with no pane is drawn whole, footer and all.
 // joshuafolkken/kit#4042: the finished rows fold from the oldest into their own section's count.
 
-const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, note, rule } = run_board_render_fixture
+const { EMPTY_LAYOUT, MINUTE, NOW, STARTED, header, note } = run_board_render_fixture
 const FOOTER = ['', 'footer']
 const WIDE = 500
 
@@ -76,7 +76,7 @@ describe('run_board_render.render in a short pane', () => {
 
 		expect(has(lines, 'Issue 4')).toBe(false)
 		expect(kept.map((text) => has(lines, text))).toStrictEqual([true, true, true, true, true])
-		expect(lines[newest - 1]).toBe(rule('✅ done'))
+		expect(lines[newest - 1]).toMatch(/^── ✅ done 3 ─+$/u)
 		expect(lines[newest + 1]).toBe('    ✅ 2 more  🚫 1')
 		expect(has(lines, '  more')).toBe(false)
 	})

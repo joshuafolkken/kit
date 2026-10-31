@@ -8,13 +8,13 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 //
 // **It is a `PreToolUse` hook, and that is the point of the Issue.** The live density line rides
 // `PostToolUse`, where the round trip has already been spent and all that is left is to describe it.
-// Three runs measured after that line shipped came in at 1.10–1.12 calls per round trip, unchanged —
-// so what is added here intervenes in the decision instead of reporting on it.
+// Runs measured after that line shipped showed the calls per round trip unchanged — so what is added
+// here intervenes in the decision instead of reporting on it.
 //
 // **What the transcript holds is the turns already closed, and nothing usable about the one in hand.**
 // Claude Code writes one line per content block and starts the first tool as soon as that block parses,
-// so a turn's later `tool_use` lines do not exist yet — measured on a live session, they arrive 1.4 to
-// 15 seconds afterwards. The decision is therefore made from closed history alone.
+// so a turn's later `tool_use` lines do not exist yet — on a live session they arrive only afterwards.
+// The decision is therefore made from closed history alone.
 //
 // **The shell is `hook-decision.ts`, shared with the investigation guard**:
 // the payload schema, the deny envelope, the switch, the `.env` load, the stamp that makes a refusal

@@ -1,0 +1,7 @@
+{
+	"reason": "run:board rules end at the lane title column and carry section counts while open (#5520); render_no_run split into its own file with a colocated test",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 78
+	}
+}

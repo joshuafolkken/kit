@@ -8,7 +8,7 @@ import { git_spawn } from './git-spawn'
 import { SSH_COMMAND_VARIABLE } from './git-ssh-keepalive'
 
 // joshuafolkken/kit#2942: `josh main:sync` ran `git fetch --prune` over a dead ssh connection and did
-// not return for 37 minutes, stalling the unattended backlog driver behind it. The stand-in for that
+// not return, stalling the unattended backlog driver behind it. The stand-in for that
 // connection is an ssh command that never answers: it records git's pid and its own, then sleeps far
 // past the budget, so a fetch without a timeout would sit out the whole sleep.
 

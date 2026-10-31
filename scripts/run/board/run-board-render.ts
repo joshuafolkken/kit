@@ -25,6 +25,7 @@ import { run_board_render_found } from './run-board-render-found'
 import { run_board_render_icon } from './run-board-render-icon'
 import { run_board_render_lanes, type LaneCells } from './run-board-render-lanes'
 import { run_board_render_lead } from './run-board-render-lead'
+import { run_board_render_none } from './run-board-render-none'
 import { run_board_render_notes } from './run-board-render-notes'
 import { run_board_render_processes } from './run-board-render-processes'
 import { run_board_render_quota } from './run-board-render-quota'
@@ -42,13 +43,13 @@ import type { Thanks } from './run-board-thanks-csv'
 // at the foot names the symbols, so a row carries only what differs between rows. Every word is
 // English whatever the session language: one set of words reads the same on every board.
 
-const { FILED_KIND_ICONS, KIND_BLANK, STATE_ICONS, WAITS_ICON, WORDS, clock_of } = run_board_labels
+const { FILED_KIND_ICONS, KIND_BLANK, STATE_ICONS, WAITS_ICON, WORDS } = run_board_labels
 const { time_of, time_width } = run_board_render_time
 const { state_icon } = run_board_render_icon
 const { NOTE_LIMIT } = run_board_render_notes
 const { lane_cells_of, lanes_section, number_text } = run_board_render_lanes
 const { indent_of, lead_of: lane_lead_of, running_fresh } = run_board_render_lead
-const { ELLIPSIS, TITLE_LIMIT, WHOLE, columns_cut, fitted, reason_text, row_overrun, title_of } =
+const { ELLIPSIS, TITLE_LIMIT, WHOLE, fitted, fitted_limit, reason_text, row_overrun, title_of } =
 	run_board_render_title
 const { width_of } = run_board_fit
 const { padded } = run_board_fresh
@@ -73,9 +74,6 @@ interface BoardView extends FrameBounds {
 	thanks?: Thanks | undefined
 	link?: Link | undefined
 }
-
-// When the reads off this machine last failed, and why.
-type ReadFailure = Pick<BoardHeader, 'read_error' | 'read_failed_ms'>
 
 // What every row of one frame is drawn with: the header, how wide the time column is, so a
 // `2°05′30″` and a `42″` end in the same column, and the lane cells after a row's lead where its
@@ -174,10 +172,6 @@ function head_text(row: BoardRow, frame: RowFrame): string {
 	return joined([lead, time])
 }
 
-function same(reference: string): string {
-	return reference
-}
-
 // A row up to what was filed during it: its head, then its tail where it draws one.
 function tailed_head(row: BoardRow, frame: RowFrame): string {
 	return joined([head_text(row, frame), ...run_board_render_tail.tail_of(row, frame.header)])
@@ -191,27 +185,13 @@ function room_after(indent: string, head: string, frame: RowFrame): number | und
 	return frame.columns - width_of(`${indent}${head}${GAP}`)
 }
 
-// What was filed during a done row, in `room`: a pane too narrow for it cuts its end on an ellipsis
-// rather than the title, so the time column stays where every other row has it
-// (joshuafolkken/kit#4922). The cut text's references are left unlinked, so no hyperlink escape is cut
-// in two.
-function found_fitted(room: number | undefined, row: BoardRow, header: BoardHeader): string {
-	const found = run_board_render_found.found_text(row, header)
-
-	if (found === '' || room === undefined || width_of(found) <= room) return found
-
-	const unlinked = run_board_render_found.found_text(row, { ...header, link: same })
-
-	return columns_cut(unlinked, Math.max(1, room))
-}
-
 // Every row carries its state's icon, or the icon of what it waits on; a running row ends on its tail
 // (`run-board-render-tail.ts`), a done row on what was filed during it (`run-board-render-found.ts`),
 // and a row with nothing after its padded columns ends where its text does.
 function row_text(indent: string, row: BoardRow, frame: RowFrame): string {
 	const { header } = frame
 	const head = tailed_head(row, frame)
-	const found = found_fitted(room_after(indent, head, frame), row, header)
+	const found = run_board_render_found.found_fitted(room_after(indent, head, frame), row, header)
 	const notes = [waits_of(row, header, frame.is_conditioned), reason_text(row, frame.reason_cut)]
 
 	return `${indent}${joined([head, found, ...notes]).trimEnd()}`
@@ -241,7 +221,8 @@ function row_draw(
 // A row drawn with lane cells keeps its head on one line, its title giving up their columns where the
 // pane is narrow. A row that draws a tail keeps its whole line, giving up the columns its section's
 // rows give up together (joshuafolkken/kit#4226). A done row keeps its title's width and cuts the end of
-// what was filed during it instead (`found_fitted`), unless that end is squeezed out.
+// what was filed during it instead (`run-board-render-found.ts` found_fitted), unless that end is
+// squeezed out.
 function row_fit(indent: string, row: BoardRow, frame: RowFrame): RowFit {
 	const is_tailed = run_board_render_tail.tail_of(row, frame.header).length > 0
 
@@ -344,10 +325,29 @@ function queued_section(layout: BoardLayout, frame: RowFrame): Array<PlanSection
 	)
 }
 
+// The column the lane rows' titles end in as drawn, cut as `fitted` cuts them, where every rule ends
+// (joshuafolkken/kit#5520), kept within the pane; none without a lane row.
+function rule_width(rows: ReadonlyArray<BoardRow>, frame: RowFrame): number | undefined {
+	const ends = rows.map((row) => {
+		const fit = row_fit(indent_of(row), row, frame)
+		const draw = row_draw(indent_of(row), row, frame, fit)
+		const title_limit = fitted_limit(row, frame.columns, draw, fit) ?? TITLE_LIMIT
+
+		return width_of(`${indent_of(row)}${head_text(row, { ...frame, title_limit })}`)
+	})
+
+	if (ends.length === 0) return undefined
+
+	return Math.min(Math.max(...ends), frame.columns ?? Infinity)
+}
+
 // The rows above the findings: the run's own, the earlier run's lanes still holding a place, then the
 // ones waiting on a person's decision — a child parked on one and an untouched plan row alike
 // (joshuafolkken/kit#4099).
-function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSection> {
+function active_sections(
+	layout: BoardLayout,
+	frame: RowFrame,
+): Pick<FrameParts, 'plan' | 'rule_width'> {
 	const people = run_board_layout.people_of(layout)
 	const lead = run_board_layout.lanes_drawn(layout)
 	const decision = `${STATE_ICONS.human} ${WORDS.decision}`
@@ -360,7 +360,9 @@ function active_sections(layout: BoardLayout, frame: RowFrame): Array<PlanSectio
 		frame.header,
 	)
 
-	return [...lanes, ...rows_section(decision, people, frame)]
+	const plan = [...lanes, ...rows_section(decision, people, frame)]
+
+	return { plan, rule_width: rule_width(lead, { ...lane_frame, shared }) }
 }
 
 // The plan's rest under the findings, the 🔗 waiting rows giving way before them.
@@ -368,7 +370,7 @@ function plan_parts(
 	header: BoardHeader,
 	notes: ReadonlyArray<BoardNote>,
 	size: TerminalSize | undefined,
-): Pick<FrameParts, 'below' | 'plan'> {
+): Pick<FrameParts, 'below' | 'plan' | 'rule_width'> {
 	const { layout } = header
 
 	if (layout === undefined) return { plan: [] }
@@ -379,7 +381,7 @@ function plan_parts(
 	const waiting = `${WAITS_ICON} ${WORDS.waiting}`
 
 	return {
-		plan: active_sections(layout, frame),
+		...active_sections(layout, frame),
 		below: [
 			...keyed('queued', queued_section(layout, frame)),
 			...keyed('waiting', rows_section(waiting, layout.unreached, conditioned, 'waiting')),
@@ -405,28 +407,11 @@ function render(view: BoardView): Array<string> {
 	return bounded(parts, view)
 }
 
-// No run read here — or the reads failed, which the line says, and why, in place of `no run`: a read
-// that failed cannot tell whether a run is there.
-function render_no_run(
-	now_ms: number,
-	bounds: FrameBounds = {},
-	failure: ReadFailure = {},
-): Array<string> {
-	const { read_failed_ms, read_error } = failure
-	const warning = run_board_header.warning_of(WORDS.read, read_failed_ms, read_error)
-	const said = warning === undefined ? WORDS.no_run : undefined
-	const parts = ['■ backlogrun', said, clock_of(now_ms), warning]
-	const above = [parts.filter((part) => part !== undefined).join(GAP)]
-	const notes = { head: [], lines: [], hidden: 0 }
-
-	return bounded({ above, plan: [], notes, legend: [], footer: bounds.footer ?? [] }, bounds)
-}
-
 const run_board_render = {
 	NOTE_LIMIT,
 	TITLE_LIMIT,
 	render,
-	render_no_run,
+	render_no_run: run_board_render_none.render_no_run,
 }
 
 export { run_board_render }

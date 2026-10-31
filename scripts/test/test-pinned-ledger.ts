@@ -37,11 +37,12 @@ function origin_of(raw: string | undefined): PinnedOrigin | undefined {
 	return parsed.success ? parsed.data : undefined
 }
 
-// The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire; and what
-// started it, `manual` when unnamed.
+// The hunks a run did not probe: `held` the cache answered, `rewired` left out as a rewire, `over_cap`
+// over the test-file cap; and what started it, `manual` when unnamed.
 interface Skipped {
 	held: number
 	rewired: number
+	over_cap?: number
 	origin?: PinnedOrigin | undefined
 }
 
@@ -54,6 +55,7 @@ async function record(
 		issue: lane_paths.issue_here(),
 		held: skipped.held,
 		rewired: skipped.rewired,
+		over_cap: skipped.over_cap ?? 0,
 		probes: [...probes],
 		elapsed_ms,
 		origin: skipped.origin ?? MANUAL_ORIGIN,
@@ -79,5 +81,5 @@ async function record_discarded(
 
 const test_pinned_ledger = { BACKGROUND_ORIGIN, origin_of, record, record_discarded, time_of }
 
-export type { PinnedOrigin, ProbeTime }
+export type { PinnedOrigin, ProbeTime, Skipped }
 export { test_pinned_ledger }

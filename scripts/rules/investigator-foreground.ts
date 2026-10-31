@@ -15,8 +15,7 @@ import { implementation_cut } from './implementation-cut'
 //
 // **The background launch is the cost, not the dispatch.** The subagent tool launches in the
 // background by default, so a main line with nothing else to do ends its turn on "waiting for the
-// reply", and the finished result sits in the queue until a later turn — measured at 4 of 33 such
-// dispatches over 7 days, 658 seconds idle, up to 287 in one plan. A foreground dispatch returns the
+// reply", and the finished result sits idle in the queue until a later turn. A foreground dispatch returns the
 // result in the same turn; the edit-target reads that keep the main line busy go in the same message,
 // where they run beside it.
 //
@@ -31,7 +30,7 @@ import { implementation_cut } from './implementation-cut'
 // reissue it was refused into passes on the refused call's body instead (joshuafolkken/kit#4903).
 //
 // **The build is a fact of the session, not of the tail** (joshuafolkken/kit#4966). Each tell is
-// recorded once against the transcript, so a stand-down outlives the 256 KiB window the tells are read
+// recorded once against the transcript, so a stand-down outlives the tail window the tells are read
 // from. A boolean `false` the parsed input dropped is a tell too: the transcript keeps what the model
 // wrote, so a dispatch this row refused that wrote it there is one the field never reached.
 //

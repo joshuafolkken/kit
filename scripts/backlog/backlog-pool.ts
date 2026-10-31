@@ -9,6 +9,7 @@ import { epic_outside_blocker } from '#scripts/epic/epic-outside-blocker'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { git_next_issues } from '#scripts/issue/git-next-issues'
 import { EPIC_LABEL, has_any_label, PARKED_LABELS } from '#scripts/issue/issue-labels'
+import { size_estimate } from '#scripts/issue/size-estimate'
 
 // The candidate pool `josh backlog:next` answers from.
 //
@@ -63,10 +64,12 @@ function waits_outside(issue: OpenIssueData, running: ReadonlySet<string>, repo:
 }
 
 // An issue whose author lacks write access waits on a person too: only they can vouch for its body.
+// So does one declared over the size cap: only a person splits it (joshuafolkken/kit#5502).
 function is_stuck(issue: OpenIssueData, running: ReadonlySet<string>, repo: string): boolean {
 	return (
 		!auto_ok_author.is_author_trusted(issue) ||
 		has_any_label(issue.labels, DECISION_LABELS) ||
+		size_estimate.is_issue_over_cap(issue) ||
 		waits_outside(issue, running, repo)
 	)
 }

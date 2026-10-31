@@ -43,9 +43,9 @@ describe('read_set_pricing.dollars_per_run', () => {
 		expect(read_set_pricing.dollars_per_run(TEN_THOUSAND)).toBe(expected)
 	})
 
-	// The whole point of the column: 10k tokens read at the entry cost about a quarter of a dollar over
-	// a run, because they ride every request. Order-of-magnitude rather than a spuriously exact figure
-	// — it was near half a dollar at the 0.1x cache-read rate the epic #2280 measurement was priced at.
+	// The whole point of the column: tokens read at the entry ride every request, so they cost real
+	// money over a run. Order-of-magnitude rather than a spuriously exact figure, since the price moves
+	// with the cache-read rate (epic #2280).
 	it('lands 10k entry-read tokens near a quarter of a dollar for a full-size run', () => {
 		const dollars = read_set_pricing.dollars_per_run(TEN_THOUSAND)
 

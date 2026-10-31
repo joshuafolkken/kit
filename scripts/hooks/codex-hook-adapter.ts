@@ -16,9 +16,10 @@ const POSTTOOL_MODE = 'posttool'
 const MODE_ARGUMENT_INDEX = 2
 const PATCH_FILE_PATTERN = /^\*\*\* (?:Add|Delete|Update) File: (.+)$/gmu
 const PATCH_MOVE_PATTERN = /^\*\*\* Move to: (.+)$/gmu
-// One canonical formatter can spend at most 75 seconds across its bounded process fallbacks. Start
-// at most two together and no later work, so every formatter that starts retains the 15-second
-// margin inside the Codex hook's 90-second timeout. Remaining files are left to the verification gate.
+// One canonical formatter's bounded process fallbacks take most of the Codex hook's timeout (the
+// `timeout` of this hook in `.codex/hooks.json`). Start
+// at most two together and no later work, so every formatter that starts keeps a margin inside that
+// timeout. Remaining files are left to the verification gate.
 const MAX_PARALLEL_FORMATS = 2
 // One patch can touch several files, each returning its own unfixed-lint block; a blank line between
 // them keeps the blocks readable when they are joined into the single envelope below.
