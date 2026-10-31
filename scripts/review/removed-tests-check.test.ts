@@ -36,6 +36,8 @@ const ROOT = mkdtempSync(path.join(tmpdir(), 'josh-removed-tests-'))
 const BOARD_AT_BASE =
 	"describe('board', () => {\n\tit('kept', () => {})\n\tit('dropped', () => {})\n})\n"
 const BOARD_NOW = "describe('board', () => {\n\tit('kept', () => {})\n})\n"
+const BOARD_GROWN = "describe('board', () => {\n\tit('kept', () => {})\n\tit('new', () => {})\n})\n"
+const REMOVED = ['board > dropped', 'whole file']
 const GONE_AT_BASE = "it('whole file', () => {})\n"
 const AT_BASE: Readonly<Record<string, string>> = {
 	[`${BASE}:${KEPT_FILE}`]: BOARD_AT_BASE,
@@ -59,10 +61,7 @@ beforeEach(() => {
 
 describe('removed_tests_check.read — the tests the change removed', () => {
 	it('lists a test dropped from a kept file and every test of a deleted one', async () => {
-		await expect(removed_tests_check.read()).resolves.toStrictEqual([
-			'board > dropped',
-			'whole file',
-		])
+		await expect(removed_tests_check.read()).resolves.toStrictEqual(REMOVED)
 		expect(held_mock).toHaveBeenCalledWith(BASE, [KEPT_FILE, DELETED_FILE])
 	})
 
@@ -77,6 +76,24 @@ describe('removed_tests_check.read — the tests the change removed', () => {
 		base_mock.mockResolvedValue(undefined)
 
 		await expect(removed_tests_check.read()).resolves.toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5541: the titles the change added, which meet the draft's acceptance rows.
+describe('removed_tests_check.changes — the titles the change removed and added', () => {
+	it('lists a test added to a kept file beside the removed ones', async () => {
+		writeFileSync(path.join(ROOT, KEPT_FILE), BOARD_GROWN)
+
+		await expect(removed_tests_check.changes()).resolves.toStrictEqual({
+			removed: REMOVED,
+			added: ['board > new'],
+		})
+	})
+
+	it('answers nothing when the base cannot be resolved', async () => {
+		base_mock.mockResolvedValue(undefined)
+
+		await expect(removed_tests_check.changes()).resolves.toBeUndefined()
 	})
 })
 
