@@ -281,6 +281,26 @@ The local park record is what the `lane-park` guard reads, so a child that parke
 
 **Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
 
+### `josh upstream:interrupt`
+
+<!-- usage: upstream:interrupt -->
+
+Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation.
+
+```bash
+pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md
+```
+
+**Options:**
+
+- `--repo <owner/repo>` — the upstream repository. Required.
+- `--body-file <path>` — the upstream issue body. Required.
+- `--blocks-finder` — passed to `issue:file`: the finder is recorded as blocked by the filing.
+
+<!-- /usage -->
+
+A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
+
 ### `josh run:liveness`
 
 <!-- usage: run:liveness -->
@@ -1102,6 +1122,8 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body, so a candidate whose plan names a running lane's file is held back before dispatch and a path its body only cites holds nothing.
 
 A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
+
+So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. Each `split` writes a `split-notice` with its reason to the lane ledger.
 
 **Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 

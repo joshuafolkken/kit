@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
 import { repo_party } from '#scripts/discovery/repo-party'
 import { epic_bundle_cli } from '#scripts/epic/epic-bundle-cli'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
@@ -49,7 +47,6 @@ import { size_estimate } from './size-estimate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE =
 	'Usage: josh issue:file "<title>" --body-file <path> [--route <tier-a|split|interrupt|review-cap>] [--label <name>]… [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]'
 const UNKNOWN_REPO_MESSAGE =
@@ -313,16 +310,16 @@ async function is_source_clear(filing: Filing): Promise<boolean> {
 	return false
 }
 
-async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<number> {
+async function send(filing: Filing, labels: ReadonlyArray<string>): Promise<string | undefined> {
 	const url = await create(filing, labels)
 
-	if (url === undefined) return FAILURE_EXIT_CODE
+	if (url === undefined) return undefined
 	console.info(url)
 	await record(url, filing, labels)
 	await link_release(url, filing)
 	await place(url, filing.target)
 
-	return SUCCESS_EXIT_CODE
+	return url
 }
 
 // The holds that end the filing whatever the body says, read first: the filing cap reads the local
@@ -352,19 +349,19 @@ async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string>
 	return (await is_scout_clear(filing)) ? labels : undefined
 }
 
-async function file(filing: Filing): Promise<number> {
+async function file(filing: Filing): Promise<string | undefined> {
 	const party_problem = party_refusal(filing.target)
 
 	if (party_problem !== undefined) {
 		console.error(party_problem)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
-	if (!(await is_run_clear(filing))) return FAILURE_EXIT_CODE
+	if (!(await is_run_clear(filing))) return undefined
 	const labels = await labels_in_one_pass(filing)
 
-	return labels === undefined ? FAILURE_EXIT_CODE : await send(filing, labels)
+	return labels === undefined ? undefined : await send(filing, labels)
 }
 
 async function filing_of(args: FileArguments): Promise<Filing | string> {
@@ -378,13 +375,15 @@ async function filing_of(args: FileArguments): Promise<Filing | string> {
 	return { args, body, target: args.repo ?? current, current }
 }
 
-async function run(argv: ReadonlyArray<string>): Promise<number> {
+// The filed Issue's URL, or `undefined` once any step refused — every refusal already printed. The
+// caller that sequences a filing (`upstream:interrupt`) reads the URL from here, not from stdout.
+async function file_issue(argv: ReadonlyArray<string>): Promise<string | undefined> {
 	const args = issue_file.parse(argv)
 
 	if (args === undefined) {
 		console.error(USAGE)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	const filing = await filing_of(args)
@@ -392,26 +391,24 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (typeof filing === 'string') {
 		console.error(filing)
 
-		return FAILURE_EXIT_CODE
+		return undefined
 	}
 
 	return await file(filing)
 }
 
-// `process.exitCode` rather than `process.exit()`, so the report on standard output drains first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
+async function run(argv: ReadonlyArray<string>): Promise<number> {
+	return (await file_issue(argv)) === undefined ? FAILURE_EXIT_CODE : SUCCESS_EXIT_CODE
 }
 
 const issue_file_cli = {
 	FRESH_ISSUE_POLL,
 	THIRD_PARTY_MESSAGE,
 	UNKNOWN_PARTY_MESSAGE,
+	file_issue,
 	record,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export { issue_file_cli }
 export type { Filing }

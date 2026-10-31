@@ -53,3 +53,11 @@ describe('lane_size_stats.table', () => {
 		expect(row([])).toBe(EMPTY_ROW)
 	})
 })
+
+// joshuafolkken/kit#5568: the lines median `lane:plan` projects a declaration with.
+describe('lane_size_stats.lines_ratio', () => {
+	it('answers the median lines ratio of the merged lanes, none on an empty period', () => {
+		expect(lane_size_stats.lines_ratio([size(1, 4, 300), merge(1)], WINDOW)).toBe(3)
+		expect(lane_size_stats.lines_ratio([], WINDOW)).toBeUndefined()
+	})
+})
