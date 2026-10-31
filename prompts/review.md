@@ -170,8 +170,9 @@ Branch 2 only:
   filing-time fold"). `pnpm josh issue:file` asks the fold question on the run's second filing and holds
   a `fold`; the first filing asks nothing.
 
-  1. Before the current Issue closes, file it tagged `route:review-cap`:
-     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap --found-during <N>`
+  1. Before the current Issue closes, run the `issue:file` line `disposition --batch <file> --found-during <N>`
+     printed, its drafted body read first (no batch: write the body, same line):
+     `pnpm josh issue:file "<title>" --body-file <body-file> --route review-cap --label run:lane --found-during <N>`
      (`--found-during` leaves the deferral note on the current Issue the ship reviewer reads). It lints
      the body, applies the declared labels, runs the duplicate scan and `epic:bundle`
      (`docs/josh-commands-backlog.md` → `josh issue:file`). A security finding declares its

@@ -74,6 +74,17 @@ describe('disposition_cli.run --batch', () => {
 		vi.restoreAllMocks()
 	})
 
+	// joshuafolkken/kit#5583: a finding routed to `file` drafts a body that cites the review's issue.
+	it('refuses a file-routed finding without --found-during', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const file = findings_file(`confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`)
+
+		expect(disposition_cli.run([BATCH_FLAG, file])).toBe(1)
+		expect(String(error.mock.calls[0]?.[0])).toContain('--found-during')
+
+		vi.restoreAllMocks()
+	})
+
 	it('keeps a bare path the single-finding call', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
