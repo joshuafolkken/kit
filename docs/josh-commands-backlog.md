@@ -964,6 +964,23 @@ pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck:
 
 Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it.
 
+### `josh diff:summary`
+
+<!-- usage: diff:summary -->
+
+Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole.
+
+```bash
+pnpm josh diff:summary        # → one row per file, then `full output: <path>` (the diff, in the git directory)
+pnpm josh diff:summary HEAD   # → the same, against a named base
+```
+
+<!-- /usage -->
+
+From `<base>` (default: the change base) to the working tree, tracked files only — `git add -N` a new file to list it. Ranges are new-side lines; declarations are the top-level ones a hunk sits under or a changed line writes.
+
+The diff is saved in the worktree's git directory, so `git status` never lists it. No change prints one line, not a table. Exits 2 when the base or the diff could not be read.
+
 ### `josh disposition`
 
 <!-- usage: disposition -->

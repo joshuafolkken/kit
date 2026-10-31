@@ -135,6 +135,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
 | `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
+| `josh diff:summary` | `[<base>]` | automation | files | Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole |
 | `josh disposition` | `<path...>` | automation | none | Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime) |
 | `josh doc:read` | `<file>` | automation | none | Read a whole document safely: print it, or point at the Read tool when over the Bash cap |
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
