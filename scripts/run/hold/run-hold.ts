@@ -168,13 +168,11 @@ function read_hold(target: string, now: Date = new Date()): HoldRead {
 type Environment = Readonly<Record<string, string | undefined>>
 type SessionOwner = Pick<RunHold, 'owner_pid' | 'owner_start'>
 
-// The agent session's own process, which Claude Code exports to every command it runs. Absent or
-// malformed is no owner at all, never a guess at an ancestor: a wrong owner read as gone frees a live
-// run's tree, which is the one failure this guard exists to prevent.
+// The agent session's own process (`agent_session_environment.session_pid`); none is no owner at all.
 function session_owner(environment: Environment = process.env): SessionOwner {
-	const pid = Number(environment[agent_session_environment.AGENT_PID_KEY])
+	const pid = agent_session_environment.session_pid(environment)
 
-	if (!Number.isSafeInteger(pid) || pid <= 0) return {}
+	if (pid === undefined) return {}
 
 	return { owner_pid: pid, owner_start: process_identity.read_start(pid) }
 }

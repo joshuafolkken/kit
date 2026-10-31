@@ -34,6 +34,22 @@ describe('visible shell write scope', () => {
 	})
 })
 
+// joshuafolkken/kit#5498: the documented `run:carry` spelling carries no `$`, so it passes, while any
+// command expanding a variable stays refused — the session pid comes from the command, not the shell.
+describe('variable expansion beside the run:carry spelling', () => {
+	it.each(['echo $PPID', 'pnpm josh run:carry --cut --owner "$PPID"'])('refuses %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+
+	it.each([
+		'pnpm josh run:carry --begin "backlogrun --max 5"',
+		'pnpm josh run:carry --resume "backlogrun --max 5"',
+		'pnpm josh run:carry --cut',
+	])('lets %s through', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+})
+
 describe('unverified shell argument expansion', () => {
 	it.each([
 		'git diff --out{put,put}=app.ts',
