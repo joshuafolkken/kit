@@ -60,6 +60,17 @@ function probe_text(probe: PinnedProbe): string {
 	return `${probe.file}${tests} ${lane_breakdown.minutes_text(probe.elapsed_ms)}${pinned_by}`
 }
 
+// The skipped hunks' counts, each named only when non-zero: `rewired` (joshuafolkken/kit#5235) and
+// `over cap` (joshuafolkken/kit#5503).
+function skipped_counts(rewired: number, over_cap: number): Array<string> {
+	const named: Array<[number, string]> = [
+		[rewired, 'rewired'],
+		[over_cap, 'over cap'],
+	]
+
+	return named.filter(([count]) => count > 0).map(([count, label]) => `${String(count)} ${label}`)
+}
+
 // The detail the pre-detach line carries, or `''` when no probe ran inside it.
 function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 	if (rows.length === 0) return ''
@@ -68,9 +79,10 @@ function detail_text(rows: ReadonlyArray<TestPinnedEntry>): string {
 		.toSorted((left, right) => right.elapsed_ms - left.elapsed_ms)
 	const held = rows.reduce((sum, row) => sum + row.held, 0)
 	const rewired = rows.reduce((sum, row) => sum + (row.rewired ?? 0), 0)
-	const total = held + rewired + probes.length
+	const over_cap = rows.reduce((sum, row) => sum + (row.over_cap ?? 0), 0)
+	const total = held + rewired + over_cap + probes.length
 	const head = `test:pinned ${String(total)} hunks, ${String(held)} cached, ${String(probes.length)} probed`
-	const counts = rewired === 0 ? [head] : [head, `${String(rewired)} rewired`]
+	const counts = [head, ...skipped_counts(rewired, over_cap)]
 
 	return ` (${[...counts, ...probes.slice(0, MAX_SHOWN).map((probe) => probe_text(probe))].join(', ')})`
 }

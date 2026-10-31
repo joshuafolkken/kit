@@ -2,7 +2,7 @@ import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { review_brief } from '#scripts/review/review-brief'
 import { review_stamps } from '#scripts/review/review-stamps'
 
-// Whether `josh gate` already has the answer it is about to spend 47–50 seconds computing again.
+// Reuse a verified answer for the same tree to avoid repeating the gate's work.
 //
 // `record_green_gate` writes the digest of every changed file the four checks were green on, and
 // `josh review:brief` reads it back to print `Already verified`. The gate reads it too, so a second

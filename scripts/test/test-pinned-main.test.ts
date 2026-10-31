@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PinnedReport } from './test-pinned-logic'
+import { test_pinned_logic, type PinnedReport } from './test-pinned-logic'
 import { test_pinned_main } from './test-pinned-main'
 
 const { run } = vi.hoisted(() => ({
@@ -99,10 +99,15 @@ describe('test_pinned_main.main', () => {
 			expect(output.stderr.join('')).toContain('Usage: josh test:pinned')
 		},
 	)
+})
 
-	it('prints the usage clean on --help', async () => {
+describe('test_pinned_main.main --help', () => {
+	it('prints the usage clean, naming the test-file cap as its own reason', async () => {
 		expect(await test_pinned_main.main(['--help'])).toBe(0)
 		expect(run).not.toHaveBeenCalled()
+		expect(output.stderr.join('')).toContain(
+			`\n  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,\n`,
+		)
 	})
 })
 

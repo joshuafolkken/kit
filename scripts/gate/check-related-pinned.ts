@@ -13,7 +13,7 @@ import type { PinnedSummary } from '#scripts/test/test-pinned-record'
 
 const SHIP_HINT =
 	'Pin each unpinned place above with a test that turns red without it, or give the first ship its reason: `pnpm josh ship "<title> #<N>" --review … --unpinned-ok "<reason>"`.'
-// The wait's bound keeps the four checks plus it under a foreground Bash call's 600-second cap, so the
+// The wait's bound keeps the checks within the foreground tool's budget, so the
 // verdict line is never cut off; a check past it is left running for the ship's pre-detach. The checks'
 // longest path is `lint:related` then `test:related` (`check-related-order.ts`).
 const WAIT_MS = 240_000

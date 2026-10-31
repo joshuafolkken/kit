@@ -8,7 +8,7 @@ import { backlog_drive_restore } from './backlog-drive-restore'
 // **A lane the drive did not launch is still the run's to collect** (joshuafolkken/kit#4373). The loop
 // held only the lanes it was seeded with and the ones it launched, so a child the parent dispatched
 // itself with `lane:launch` — an interrupt in a named run — finished, merged and was never handed to
-// `run:merge`: no `merge` event and no collected lane until `run:carry --end`, 91 minutes later. The
+// `run:merge`: no `merge` event and no collected lane until `run:carry --end`. The
 // stop was `run_pass` collecting only `state.in_flight` (`backlog-drive.ts`), seeded once at start
 // (`backlog-drive-cli.ts` `seeded_lanes`). Adopted, a child that ends with its pull request unmerged
 // is classified `failed` by `run:merge` (`run-merge.ts` `unfinished_outcome`), which puts it on the

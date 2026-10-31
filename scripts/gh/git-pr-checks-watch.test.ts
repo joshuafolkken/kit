@@ -103,6 +103,14 @@ const CODERABBIT_FAILING = settled([
 	{ name: SONAR_QUBE, status: 'pass' },
 	{ name: CODE_RABBIT, status: 'fail' },
 ])
+const BLOCKING_FAILURE_WITH_PENDING = settled([
+	{ name: 'CodeQL', status: 'fail' },
+	{ name: E2E, status: 'pending' },
+])
+const CODERABBIT_FAILING_WITH_PENDING = settled([
+	{ name: CODE_RABBIT, status: 'fail' },
+	{ name: E2E, status: 'pending' },
+])
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -131,6 +139,12 @@ describe('evaluate_checks_settled — the weaker question the watch asks', () =>
 
 	it('fails on a check that failed, as the watch process did', () => {
 		expect(evaluate_checks_settled(ONE_FAILING)).toBe('failure')
+	})
+
+	// joshuafolkken/kit#5389: the merge gate already refuses on this red, so waiting out the pending
+	// E2E only delays the same verdict.
+	it('fails on a blocking failure in one poll while another check is pending', () => {
+		expect(evaluate_checks_settled(BLOCKING_FAILURE_WITH_PENDING)).toBe('failure')
 	})
 
 	// **An empty rollup keeps waiting rather than failing.** `followup` starts the watch right after
@@ -163,6 +177,11 @@ describe('evaluate_checks_settled — CodeRabbit is not waited on', () => {
 	// `failure`, which is what `git-pr-followup.ts` swallows and falls through on.
 	it('still fails on a CodeRabbit check that failed', () => {
 		expect(evaluate_checks_settled(CODERABBIT_FAILING)).toBe('failure')
+	})
+
+	// A non-blocking red keeps the old order: it does not end the watch while E2E is still running.
+	it('keeps waiting on a failed CodeRabbit while another check is pending', () => {
+		expect(evaluate_checks_settled(CODERABBIT_FAILING_WITH_PENDING)).toBe('pending')
 	})
 
 	// A rollup holding nothing but CodeRabbit falls back to the whole rollup, so a lone CodeRabbit
@@ -203,6 +222,12 @@ describe('evaluate_checks_settled — CodeRabbit put back on the required list',
 		const reloaded = await import('./git-pr-checks-watch')
 
 		expect(reloaded.evaluate_checks_settled(CODERABBIT_PENDING)).toBe('pending')
+	})
+
+	it('fails on a failed CodeRabbit in one poll while another check is pending', async () => {
+		const reloaded = await import('./git-pr-checks-watch')
+
+		expect(reloaded.evaluate_checks_settled(CODERABBIT_FAILING_WITH_PENDING)).toBe('failure')
 	})
 })
 

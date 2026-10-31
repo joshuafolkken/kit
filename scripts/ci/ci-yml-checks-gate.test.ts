@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { ci_yml_fixture, type WorkflowStep } from './ci-yml-fixture'
 
 // joshuafolkken/kit#1216: the `Checks` job ran cspell → prettier → eslint → tsc → vitest one after
-// another inside a single job, so 78–162 seconds of a run's wall clock was spent waiting on steps
+// another inside a single job, so the run waited on steps
 // that share no state — and it sat on the critical path between the pull request opening and the
 // merge. `josh gate` already runs exactly those checks concurrently and reports every failure in
 // one pass, so the job runs that instead of restating the five tool invocations.

@@ -62,7 +62,7 @@ describe('backlog_budget.decide — the defaults', () => {
 	})
 })
 
-// joshuafolkken/kit#3691: one 60-second interval, however much of the watch is left.
+// joshuafolkken/kit#3691: the re-ask interval must not grow with the remaining watch budget.
 describe('backlog_budget — the ask interval a watch names', () => {
 	it.each([backlog_budget.DEFAULT_IDLE_MS, LAST_MINUTE_MS])(
 		'tells a watching run to ask again at the one 60-second interval (%d ms left)',
