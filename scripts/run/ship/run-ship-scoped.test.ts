@@ -20,6 +20,12 @@ const lap_mock = vi.hoisted(() =>
 		await Promise.resolve()
 	}),
 )
+const LEDGER = vi.hoisted(() => 'lane-ledger.jsonl')
+const reused_ledger_mock = vi.hoisted(() =>
+	vi.fn(async () => {
+		await Promise.resolve()
+	}),
+)
 const read_tree_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<{ files: Record<string, string>; base: string }> => ({
 		files: {},
@@ -41,8 +47,9 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 vi.mock('#scripts/gate/gate-skip', () => ({ gate_skip: { reusable_green_gate: reusable_mock } }))
 vi.mock('#scripts/lane/lane-ledger-write', () => ({
-	lane_ledger_write: { record_ship_lap: lap_mock },
+	lane_ledger_write: { record_ship_lap: lap_mock, target: async () => LEDGER },
 }))
+vi.mock('#scripts/gate/gate-ledger', () => ({ gate_ledger: { record_reused: reused_ledger_mock } }))
 vi.mock(import('./run-ship-synced-scope'), async (import_original) => {
 	const original = await import_original()
 
@@ -59,6 +66,7 @@ const { run_ship_scoped } = await import('./run-ship-scoped')
 const { run_ship_narrowed } = await import('./run-ship-narrowed')
 const { run_ship_lap } = await import('./run-ship-lap')
 const { run_ship_pair_runs } = await import('./run-ship-pair-runs')
+const { run_ship_gate_runs } = await import('./run-ship-gate-runs')
 
 // joshuafolkken/kit#2946: the scoped pair the preflight, the review rounds and the gate stage all meet
 // rather than stop on — only the checks with no green record for this tree run.
@@ -76,6 +84,16 @@ function commands(): ReadonlyArray<string> {
 function forget_ship_memory(): void {
 	run_ship_narrowed.forget()
 	run_ship_pair_runs.forget()
+	run_ship_gate_runs.forget()
+	lap_mock.mockClear()
+	reused_ledger_mock.mockClear()
+	reusable_mock.mockReset().mockReturnValue(undefined)
+}
+
+function gate_laps(): ReadonlyArray<object> {
+	return lap_mock.mock.calls
+		.map(([lap]) => lap)
+		.filter((lap) => (lap as { step: string }).step === run_ship_lap.STEP.GATE)
 }
 
 // What a check that ran green leaves: a record for the tree, so a later pair finds nothing stale.
@@ -99,7 +117,6 @@ beforeEach(() => {
 	read_sync_mock.mockReset().mockResolvedValue(undefined)
 	record_mock.mockReset()
 	unmoved_mock.mockReset().mockReturnValue(true)
-	lap_mock.mockClear()
 	forget_ship_memory()
 })
 
@@ -319,6 +336,33 @@ describe('run_ship_scoped.scoped_gate', () => {
 
 		expect(await run_ship_scoped.scoped_gate()).toStrictEqual({ code: FAILED, out: 'lint red' })
 		expect(commands()).toStrictEqual([LINT])
+	})
+})
+
+// joshuafolkken/kit#5567: a tree the gate would only reuse starts no gate, and a gate that runs names why.
+describe('run_ship_scoped.scoped_gate — reuse and reruns', () => {
+	it('starts no josh gate in the commit stage on the tree the gate stage left green', async () => {
+		await run_ship_lap.within('5567', 'gate', run_ship_scoped.scoped_gate)
+		reusable_mock.mockReturnValue({})
+		await run_ship_lap.within('5567', 'commit', run_ship_scoped.scoped_gate)
+
+		const hash = run_ship_gate_runs.tree_hash({ files: {}, base: 'base' })
+
+		expect(commands()).toStrictEqual(['gate'])
+		expect(gate_laps()).toMatchObject([
+			{ stage: 'gate', rerun: 'no-record' },
+			{ stage: 'commit', reused_tree: hash },
+		])
+		expect(reused_ledger_mock).toHaveBeenCalledExactlyOnceWith(LEDGER, 0)
+	})
+
+	it('runs josh gate again once a merge moved the base, and names the merge on the lap', async () => {
+		await run_ship_lap.within('5567', 'gate', run_ship_scoped.scoped_gate)
+		read_tree_mock.mockResolvedValue({ files: {}, base: 'merged' })
+		await run_ship_lap.within('5567', 'commit', run_ship_scoped.scoped_gate)
+
+		expect(commands()).toStrictEqual(['gate', 'gate'])
+		expect(gate_laps()).toMatchObject([{ stage: 'gate' }, { stage: 'commit', rerun: 'merge' }])
 	})
 })
 

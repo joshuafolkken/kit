@@ -38,6 +38,8 @@ const unplanned_notice_schema = z.object({
 // check read the whole branch change (`since-green.ts`, joshuafolkken/kit#5531). `runs` counts the times
 // this ship process ran the scoped pair's checks, this one included, and `rerun` names why a run after
 // the first ran again (`run-ship-pair-runs.ts`, joshuafolkken/kit#5538) — both absent on a lap that ran none.
+// On a `josh gate` lap `rerun` names why the gate ran and `reused_tree` the tree hash of a gate the ship
+// reused rather than started (`run-ship-gate-runs.ts`, joshuafolkken/kit#5567).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -48,6 +50,7 @@ const ship_lap_schema = z.object({
 	fallback: z.string().optional(),
 	runs: z.number().optional(),
 	rerun: z.string().optional(),
+	reused_tree: z.string().optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's
