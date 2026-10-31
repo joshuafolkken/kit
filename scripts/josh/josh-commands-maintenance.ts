@@ -85,6 +85,19 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '', note: 'verify when the lockfile or its policy moved' }],
 		},
 	},
+	'ci:timing': {
+		script: 'scripts/ci/ci-timing-cli.ts',
+		description:
+			"Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit",
+		category: 'Maintenance',
+		reference: ['<pr|branch|run-id> [--json]', 'developer', ['network']],
+		usage: {
+			examples: [
+				{ arguments: '5544', note: 'a pull request, or a branch name' },
+				{ arguments: '18912345678 --json', note: 'a run id, machine-readable' },
+			],
+		},
+	},
 	'command:derive': {
 		script: 'tools/document/command-derive.ts',
 		description:

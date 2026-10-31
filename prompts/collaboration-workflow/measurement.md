@@ -6,13 +6,7 @@
 
 ## 記録の読み方
 
-- CI のジョブとステップ: Actions の記録を読む。
-
-  ```bash
-  gh api --method GET "repos/<owner>/<repo>/actions/runs?branch=<branch>&per_page=5" --jq '.workflow_runs[] | [.id, .name, .conclusion, .run_started_at, .updated_at] | @tsv'
-  gh api --method GET "repos/<owner>/<repo>/actions/runs/<run_id>/jobs?per_page=100" --jq '.jobs[] | [.name, .started_at, .completed_at] | @tsv'
-  gh api --method GET "repos/<owner>/<repo>/actions/runs/<run_id>/jobs?per_page=100" --jq '.jobs[] | select(.name == "<job>") | .steps[] | [.name, .started_at, .completed_at] | @tsv'
-  ```
+- CI のジョブとステップ: `pnpm josh ci:timing <pr|branch|run-id>`（最新コミットの各 run の job・step ごとの秒と結論、`--json` も可、`docs/josh-commands.md`）。
 
 - 手元の gate とチェックごとの所要時間: `pnpm josh lane:stats --period <days>`（gate の記録、`docs/josh-commands-run.md`）。
 

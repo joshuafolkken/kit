@@ -91,6 +91,7 @@ Run `pnpm josh command:derive` to regenerate.
 | --- | --- | --- | --- | --- |
 | `josh audit` · `josh a` | — | developer | processes | Run security audit |
 | `josh audit:provision` | — | automation | files, network | Install the pinned osv-scanner when the audit cannot find one (no-op if present) |
+| `josh ci:timing` | `<pr\|branch\|run-id> [--json]` | developer | network | Print the job and step durations and conclusions of a run id's GitHub Actions run, or of every run on a pull request's or a branch's latest commit |
 | `josh command:derive` · `josh cdv` · **kit only** | — | maintainer | files | Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings |
 | `josh doctor` · `josh dr` | `[--fix]` | developer | files | Diagnose PATH shadowing of the global josh and show the discovered repository map (--fix reclaims a stale shim) |
 | `josh latest` · `josh u` | — | developer | files, network, processes | Update dependencies, run security audit, then update pnpm |
