@@ -14,7 +14,7 @@ vi.mock('./gate-tree', () => ({ gate_tree: { read_gate_tree: vi.fn() } }))
 const mocked_tree = vi.mocked(gate_tree.read_gate_tree)
 
 // joshuafolkken/kit#1511: `fullrun #1503` started `josh gate` and review round 1 on a tree neither
-// `lint:related` nor `test:related` had ever been green on, and paid 282 seconds — 31% of the run —
+// `lint:related` nor `test:related` had ever been green on, wasting work
 // picking the consequences up one finding at a time afterwards.
 //
 // **The records are written to an explicit temp path, never the real one.** The scoped records are

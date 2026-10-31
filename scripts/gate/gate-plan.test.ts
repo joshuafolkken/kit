@@ -199,9 +199,8 @@ describe('gate_plan.resolve_unit_worker_cap', () => {
 		)
 	})
 
-	// joshuafolkken/kit#1515: the reserve table is a measurement of one gate on an idle machine, and
-	// six lanes each reading it put 42 workers on 11 cores at a load average of 14.97. Six concurrent
-	// suites produced ten `Test timed out in 10000ms` failures; at the share below they produced none.
+	// joshuafolkken/kit#1515: independently sizing concurrent suites from an idle-machine table
+	// oversubscribes the host and causes timeouts; each suite needs a share of the same machine.
 	it('divides the machine when other unit runs are in flight', () => {
 		expect(gate_plan.resolve_unit_worker_cap(MEASURED_CORES, LANE_COUNT)).toBe(1)
 		expect(gate_plan.resolve_unit_worker_cap(MEASURED_CORES, 2)).toBe(5)

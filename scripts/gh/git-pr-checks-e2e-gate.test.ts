@@ -146,7 +146,7 @@ describe('a skipped E2E job is a defined pass, not a stalled gate', () => {
 //
 // And it would cost a repository that does not use this workflow its whole merge budget. With no
 // `E2E` context reported at all the required entry resolves to `missing`, which is never `pass`, so
-// the evaluation stays `pending` until the 32-minute wait times out with nothing actually wrong.
+// the evaluation stays `pending` until the merge wait times out with nothing actually wrong.
 // A project that wants it required opts in through `JOSH_REQUIRED_CHECKS` instead.
 describe('E2E is deliberately not a required check', () => {
 	// Emptied rather than left alone, so the default is what is asserted.

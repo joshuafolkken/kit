@@ -62,12 +62,11 @@ const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
 // warning for hours after the pressure passed, so a hold on warning never lifts. What is pressured right
 // now shows in the free figure and the swap and compressor traffic; the verdict adds only critical.
 const PRESSURE_HOLD = 4
-// The swap traffic across one window that reads as pressure — 64 MB a second paged to disk. A machine
+// Swap pressure needs sustained traffic across a window. A machine
 // that swapped once still pages a few megabytes back in as old pages are touched.
 const SWAP_PRESSURE_MB = 16
-// The compressor traffic across one window that reads as pressure. An idle machine compresses nothing
-// across a window; the 2026-10-16 thrash compressed about 240,000 16 KB pages every three seconds, about
-// 310 MB a window, with no swap figure to show for it.
+// Compressor traffic also signals pressure: compression can thrash without any swap traffic
+// to show for it (joshuafolkken/kit#3943).
 const COMPRESSION_PRESSURE_MB = 64
 const SYSCTL_ARGUMENTS = [
 	LEVEL_NAME,
