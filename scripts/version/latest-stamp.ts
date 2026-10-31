@@ -4,10 +4,10 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // When `josh latest` last finished in this checkout, and whether that is recent enough to skip.
 //
 // `josh latest` is a network-bound chain — pnpm update, every dependency, `ranges`, `pnpm audit` — that
-// took 60–120 seconds at the head of every `fullrun` / `halfrun` and of every child a batch ran, and
-// running it several times in one day barely changes its answer. `queue` and `epicrun` had already
-// hoisted it to the head of a batch by hand; what had no rule at all was a standalone run, which is
-// its own batch head and therefore updated dependencies every single time.
+// ran at the head of every `fullrun` / `halfrun` and of every child a batch ran
+// (joshuafolkken/kit#1215), and running it several times in one day barely changes its answer.
+// `queue` and `epicrun` had already hoisted it to the head of a batch by hand; what had no rule at
+// all was a standalone run, which is its own batch head and therefore updated dependencies every single time.
 //
 // **The condition is elapsed time, not judgement.** "The deps are probably still fresh" is a call
 // made under time pressure, and time pressure resolves it toward `skip` exactly when a stale

@@ -18,7 +18,7 @@ import { time_spans, type Span } from '#scripts/time-runtime/time-spans'
 // that never completed, and that is what `is_unfinished` reads.
 
 // The window past which a run with no transcript activity is treated as idle rather than working —
-// the same 30 minutes `run:liveness` uses for its own silent window, so the two agree on "stalled".
+// the same value `run:liveness` uses for its own silent window, so the two agree on "stalled".
 const SILENT_MINUTES = 30
 const SILENT_WINDOW_MS = SILENT_MINUTES * MS_PER_MINUTE
 const COST_DECIMALS = 2

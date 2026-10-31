@@ -160,8 +160,8 @@ function shares_target(left: ReadonlyArray<string>, right: ReadonlyArray<string>
 // what kept the guard silent for a whole run. `extend` below does not merely decline to count such a
 // pair: it *flushes* the sequence and restarts it at the conflicting call, so a stretch of single-call
 // turns all editing one file could never take `sequence.length` past 1, and the refusal at
-// `time-batch-guard.ts` — which needs 2 — could never fire however long the stretch ran. Measured on
-// `fullrun #1503`: 17 such stretches, 108 seconds, and zero refusals in two hours.
+// `time-batch-guard.ts` — which needs 2 — could never fire however long the stretch ran
+// (`fullrun #1503`).
 //
 // **Read-after-read keeps the old reading deliberately.** Two reads of one file can genuinely depend
 // — a `grep` that finds a line number and a `sed -n` that prints around it — so the proxy still earns
