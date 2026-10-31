@@ -29,6 +29,12 @@ function is_setup(event: RunEvent): boolean {
 	return event.kind === KIND.SETUP
 }
 
+// A launch that returned without a child (`run_event_setup.no_child`): it ends its own lane's stage,
+// and prepares nothing a person waits on.
+function is_refusal(event: RunEvent): boolean {
+	return is_setup(event) && event.text.startsWith(STAGE.NO_CHILD)
+}
+
 function has_launched(events: ReadonlyArray<RunEvent>): boolean {
 	return events.some((event) => event.kind === KIND.CHILD_LAUNCH)
 }
@@ -42,9 +48,9 @@ function has_started(events: ReadonlyArray<RunEvent>): boolean {
 
 // A lane is opening while the stage naming its issue is newer than the run's newest position: the
 // launch it leads to, or whatever the run did instead, ends it. A stage that names no issue — a
-// hand-off between two children — prepares nothing a person waits on.
+// hand-off between two children — or a refusal prepares nothing a person waits on.
 function is_opening(events: ReadonlyArray<RunEvent>, stage: RunEvent): boolean {
-	if (run_event_scope.issue_named(stage) === undefined) return false
+	if (run_event_scope.issue_named(stage) === undefined || is_refusal(stage)) return false
 
 	const position = events.findLast((event) => !run_event_stream.TRACE_KINDS.has(event.kind))
 
@@ -84,22 +90,26 @@ function is_step_for(event: RunEvent, issue: number): boolean {
 	return is_setup(event) || !run_event_stream.TRACE_KINDS.has(event.kind)
 }
 
-// A stage that names no issue: a hand-off to the driver, a hand-back to a session, or a launch that
-// returned without a child. A lane's launch runs inside one driver pass, so a newer one of these says
-// that launch has returned.
+// A stage that names no issue: a hand-off to the driver or a hand-back to a session. A pass's launches
+// all return before either, so a newer one of these says every launch has returned.
 function is_run_stage(event: RunEvent): boolean {
 	return is_setup(event) && run_event_scope.issue_named(event) === undefined
 }
 
+// A stage of `issue`'s lane itself, not the refusal that ended it.
+function is_lane_stage(event: RunEvent, issue: number): boolean {
+	return is_setup(event) && names(event, issue) && !is_refusal(event)
+}
+
 // The stage `issue`'s own lane is at: the newest stage naming it, until the run does anything else for
-// that issue — its launch, or whatever ended the attempt — or writes a stage naming none, which is all
-// a launch that left no child puts on the stream: the driver says so itself, since a refusal it waits
-// out is followed by no hand-off. Read per issue, so two lanes opened side by side each stand at their
-// own stage whatever the other has reached.
+// that issue — its launch, its refusal (the driver writes that itself, since a refusal it waits out is
+// followed by no hand-off), or whatever ended the attempt — or writes a stage naming none. Read per
+// issue, so two lanes opened side by side each stand at their own stage whatever the other has
+// reached, a refusal of the other included.
 function lane_stage(events: ReadonlyArray<RunEvent>, issue: number): LaneStage | undefined {
 	const step = events.findLast((event) => is_run_stage(event) || is_step_for(event, issue))
 
-	if (step === undefined || !is_setup(step) || !names(step, issue)) return undefined
+	if (step === undefined || !is_lane_stage(step, issue)) return undefined
 
 	return { text: step.text, at_ms: Date.parse(step.at) }
 }

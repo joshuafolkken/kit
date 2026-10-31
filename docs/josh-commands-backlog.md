@@ -755,7 +755,7 @@ Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
-**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
+**Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
@@ -857,6 +857,8 @@ pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 <!-- /usage -->
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags.
+
+A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 

@@ -9,8 +9,9 @@ import { epic_graph, type EpicChild } from './epic-graph'
 
 const CLOSED = 'CLOSED'
 
-// How many open issues of the pool wait on each child. Only the pool is counted: it is every issue the
-// caller may run, and an issue outside it is not one this ranking can start sooner.
+// How many open issues of the pool wait on each child, directly or down a chain. Only the pool is
+// counted: it is every issue the caller may run, and an issue outside it is not one this ranking can
+// start sooner.
 function dependents_of(pool: ReadonlyArray<EpicChild>): ReadonlyMap<string, number> {
 	return issue_rank.count_dependents(
 		pool

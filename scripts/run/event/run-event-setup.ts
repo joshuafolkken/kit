@@ -1,6 +1,6 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { error_text } from '#scripts/lib/error-message'
-import { run_event_stream } from './run-event-stream'
+import { run_event_stream, type RunEvent } from './run-event-stream'
 import { run_event_stream_emit } from './run-event-stream-emit'
 
 // The stages a run passes between `josh backlogrun` and its first child, and those of a later hand-back
@@ -24,7 +24,8 @@ const STAGE = {
 	// its end is the supervisor's next hand-off, which replaces this.
 	SESSION: 'judgment session running',
 	// The driver's launch of a lane returned without a child: no lane was free to open, or a step after
-	// the open failed. It names no issue, so the lane's own stage ends here whatever the driver does next.
+	// the open failed. Written through `no_child`, naming its issue, so it ends that lane's stage alone
+	// while the pass's other launches run on (joshuafolkken/kit#5519).
 	NO_CHILD: 'no child launched',
 } as const
 
@@ -47,6 +48,11 @@ function installing(issue: string): string {
 // The lane is ready and its child is about to be dispatched; the child's own `child-launch` follows.
 function dispatching(issue: string): string {
 	return `${DISPATCHING} ${issue_cite.plain(issue)}`
+}
+
+// The launch for `issue` returned without a child.
+function no_child(issue: string): string {
+	return `${STAGE.NO_CHILD} ${issue_cite.plain(issue)}`
 }
 
 // Best-effort, as every append to this stream is: a stage that could not be written is a board that
@@ -77,6 +83,43 @@ function emit_to(target: string, text: string, at: Date): void {
 	append_stage(() => target, text, at)
 }
 
+// A session's start until its first lane opening (joshuafolkken/kit#5519); `end_ms` is unset while
+// none has opened.
+interface FirstLaneSpan {
+	from_ms: number
+	end_ms: number | undefined
+}
+
+function is_stage(event: RunEvent, prefix: string): boolean {
+	return event.kind === run_event_stream.EVENT_KIND.SETUP && event.text.startsWith(prefix)
+}
+
+// Only an opening before the session's next start is its own: a restarted session times itself anew.
+function first_lane_span(start: RunEvent, later: ReadonlyArray<RunEvent>): FirstLaneSpan {
+	const next_start = later.findIndex((event) => is_stage(event, STAGE.STARTING))
+	const session = next_start === -1 ? later : later.slice(0, next_start)
+	const opening = session.find((event) => is_stage(event, OPENING))
+
+	return {
+		from_ms: Date.parse(start.at),
+		end_ms: opening === undefined ? undefined : Date.parse(opening.at),
+	}
+}
+
+// Every session the stream started, timed to its first lane — read by `run:board` and `lane:stats`.
+function first_lane_spans(events: ReadonlyArray<RunEvent>): Array<FirstLaneSpan> {
+	return events.flatMap((event, index) =>
+		is_stage(event, STAGE.STARTING) ? [first_lane_span(event, events.slice(index + 1))] : [],
+	)
+}
+
+// The newest session's time to its first lane, `undefined` until a lane opened.
+function first_lane_ms(events: ReadonlyArray<RunEvent>): number | undefined {
+	const span = first_lane_spans(events).at(-1)
+
+	return span?.end_ms === undefined ? undefined : span.end_ms - span.from_ms
+}
+
 const run_event_setup = {
 	LANE_STAGE,
 	STAGE,
@@ -84,7 +127,10 @@ const run_event_setup = {
 	emit,
 	emit_in,
 	emit_to,
+	first_lane_ms,
+	first_lane_spans,
 	installing,
+	no_child,
 	opening_lane,
 }
 

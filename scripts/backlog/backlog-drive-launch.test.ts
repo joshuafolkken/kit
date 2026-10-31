@@ -70,6 +70,18 @@ describe('backlog_drive_launch.launch', () => {
 		expect(launched_with()).toStrictEqual([MESSAGE, undefined])
 	})
 
+	// joshuafolkken/kit#5519: a pass launches side by side, before either lane has popped the stash.
+	it('gives the stash to one of two lanes launched at once', async () => {
+		vi.spyOn(git_stash, 'list').mockResolvedValue([LATEST])
+
+		await Promise.all([
+			backlog_drive_launch.launch(FIRST, OWNER),
+			backlog_drive_launch.launch(SECOND, OWNER),
+		])
+
+		expect(launched_with().filter((stash) => stash === MESSAGE)).toHaveLength(1)
+	})
+
 	it('refuses before reading the stash when the driver lost its owner', async () => {
 		const list = vi.spyOn(git_stash, 'list').mockResolvedValue([LATEST])
 
@@ -101,7 +113,7 @@ describe('backlog_drive_launch.launch setup stage', () => {
 		vi.mocked(lane_launch_cli.launch_ready_lane).mockResolvedValue({ kind })
 
 		await expect(backlog_drive_launch.launch(FIRST, OWNER)).resolves.toBe(kind)
-		expect(run_event_setup.emit).toHaveBeenLastCalledWith(run_event_setup.STAGE.NO_CHILD)
+		expect(run_event_setup.emit).toHaveBeenLastCalledWith(`no child launched #${FIRST}`)
 	})
 
 	it('says nothing once the driver lost its owner', async () => {

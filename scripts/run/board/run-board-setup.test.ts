@@ -208,18 +208,36 @@ describe('run_board_setup.lane_stage', () => {
 	})
 })
 
-// A launch that leaves no child writes nothing naming the issue, so a stage naming none ends the lane's.
+// A launch's lane stage ends at a stage naming no issue, or at the refusal naming its own.
 describe('run_board_setup.lane_stage after the launch returned', () => {
 	const INSTALLING_278 = run_event_setup.installing('278')
 
 	it.each([
 		['a hand-back to a session', STAGE.JUDGING],
 		['the next hand-off', STAGE.HANDING_OFF],
-		['a launch that left no child', STAGE.NO_CHILD],
+		['a launch that left no child', run_event_setup.no_child('278')],
 	])('ends the lane’s stage at %s', (_step, stage) => {
 		const events = stream(setup(OPENING_278), setup(INSTALLING_278), setup(stage))
 
 		expect(run_board_setup.lane_stage(events, 278)).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#5519: launches run side by side, so one refusal must not end another lane's stage.
+	it('keeps another lane’s stage past one launch that left no child', () => {
+		const events = stream(
+			setup(OPENING_278),
+			setup(OPENING_279),
+			setup(run_event_setup.no_child('278')),
+		)
+
+		expect(run_board_setup.lane_stage(events, 278)).toBeUndefined()
+		expect(run_board_setup.lane_stage(events, 279)?.text).toBe(OPENING_279)
+	})
+
+	it('reads no stage off a refusal written after a launch', () => {
+		const events = stream(LAUNCH_278, setup(OPENING_279), setup(run_event_setup.no_child('279')))
+
+		expect(run_board_setup.read(events)).toStrictEqual(IDLE)
 	})
 
 	it('reads the stage of a lane opened after a hand-off', () => {

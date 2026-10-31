@@ -43,9 +43,10 @@ function compare_newest_first(first: OpenIssueData, second: OpenIssueData): numb
 }
 
 // A row's blockers by number. **Lossy across repositories**: a blocker elsewhere sharing a number
-// with a row here counts as one of its dependents. The listings this ranks are one repository's own,
-// and `backlog:next` re-ranks its offer from the qualified graph (`backlog-rank.ts`), so the cost is a
-// display row placed one slot off rather than a run started early.
+// with a row here counts as one of its dependents, and so does every row upstream of it, since the
+// count is transitive. The listings this ranks are one repository's own, and `backlog:next` re-ranks
+// its offer from the qualified graph (`backlog-rank.ts`), so the cost is runnable rows reordered rather
+// than a run started early.
 function dependency_row(issue: OpenIssueData): DependencyRow {
 	return {
 		key: String(issue.number),
