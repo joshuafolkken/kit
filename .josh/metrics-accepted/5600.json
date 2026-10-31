@@ -1,0 +1,7 @@
+{
+	"reason": "#5600: lane:plan skips the lines axis on a re-plan of a recorded plan (+9 code lines)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

@@ -48,6 +48,16 @@ function signalled(
 	return lane_plan_size.oversize(plan_of(files(1)), issues, undefined, { ...QUIET, ...signals })
 }
 
+function replanned(
+	issues: ReadonlyArray<OpenIssueData>,
+	signals: Partial<PlanSignals>,
+	is_cleared = true,
+): Oversize | undefined {
+	const recorded = { ...plan_of(files(1)), cleared: is_cleared }
+
+	return lane_plan_size.oversize(plan_of(files(2)), issues, recorded, { ...QUIET, ...signals })
+}
+
 function text_of(over: Oversize | undefined): string {
 	return over === undefined ? '' : lane_plan_size.refusal_text(ISSUE, over)
 }
@@ -120,6 +130,23 @@ describe('lane_plan_size.oversize on the hunks and lines axes', () => {
 
 	it('stands the hunks axis down once the lane filed a split child', () => {
 		expect(signalled(declared(8, 100), { hunks: 17, split_filed: true })).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5600: a cleared plan's declaration was judged when it cleared, so its re-plan skips the lines axis.
+describe('lane_plan_size.oversize on a re-plan of a recorded plan', () => {
+	it('skips the lines axis for a cleared plan', () => {
+		expect(replanned(declared(4, 200), { lines_ratio: 1.8 })).toBeUndefined()
+	})
+
+	it('still answers lines for a yielded plan that never cleared', () => {
+		expect(replanned(declared(4, 200), { lines_ratio: 1.8 }, false)).toMatchObject({
+			reason: 'lines',
+		})
+	})
+
+	it('still answers hunks for a cleared plan', () => {
+		expect(replanned(declared(8, 100), { hunks: 17 })).toMatchObject({ reason: 'hunks' })
 	})
 })
 

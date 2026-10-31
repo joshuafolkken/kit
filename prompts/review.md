@@ -11,8 +11,8 @@ Review policy: the level, the round count, and what happens to a finding after t
 
 ## When to run
 
-When: `CLAUDE.md` → "Pre-commit Self-Review"; inside a workflow, round 1 runs before the commit and
-round 2 beside CI (`.claude/skills/workflow-commands/chain-rule.md`). Launch the `reviewer` agent
+When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, round 1 runs before the commit, round 2
+in `ship --review` (`.claude/skills/workflow-commands/chain-rule.md`). Launch a `reviewer` agent
 type (round 2: `reviewer-verification`), never nested, with the model `pnpm josh review:brief` prints.
 Before the reviewer returns its findings → `pnpm josh review:lint` (`.claude/agents/reviewer.md`).
 

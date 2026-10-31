@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { parseArgs } from 'node:util'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND, PROBE_TIMEOUT_MS } from '#scripts/lib/timeouts'
 import {
@@ -144,7 +145,8 @@ function is_valid(raw: RawAwaitArguments): boolean {
 	)
 }
 
-// The issues to wait on and the waiting session's pid, or `undefined` for anything else.
+// The issues to wait on and the waiting session's pid — omitted, the pid the session exports
+// (`agent_session_environment.own_session_pid`) — or `undefined` for anything else.
 function parse_arguments(rest: ReadonlyArray<string>): AwaitArguments | undefined {
 	const raw = read_await_args(rest)
 
@@ -152,7 +154,10 @@ function parse_arguments(rest: ReadonlyArray<string>): AwaitArguments | undefine
 
 	const { owner } = raw.values
 
-	return { issues: raw.positionals, owner: owner === undefined ? undefined : Number(owner) }
+	return {
+		issues: raw.positionals,
+		owner: owner === undefined ? agent_session_environment.own_session_pid() : Number(owner),
+	}
 }
 
 function make_initial_state(is_settled: boolean): AwaitState {
