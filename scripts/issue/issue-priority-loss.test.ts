@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PRIORITY_HIGH_LABEL } from './issue-labels'
 import { issue_priority } from './issue-priority'
 
-// joshuafolkken/kit#4960: cause-loss lines summing to 30 minutes or more set the high floor.
+// joshuafolkken/kit#4960: cause-loss lines summing to the threshold or more set the high floor.
 
 const BASE = ['enhancement']
 const NORMAL_LINE = '- 優先度: 通常'

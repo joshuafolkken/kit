@@ -13,7 +13,7 @@ import { tail_commands } from './tail-commands'
 // **Ship reruns the scoped pair on the fixed tree.** `chain-rule.md` → "A lane child" says the round's
 // fixes take no `check:related` unless a brief follows: `josh ship`'s pre-detach checks the tree the
 // fixes left. The #5168 lane fixed two findings between its brief and `run:review --join` and ran
-// `check:related` after each, 12 of its 70 minutes, because the sentence was prose with no delivery.
+// `check:related` after each, a sizeable share of its run, because the sentence was prose with no delivery.
 //
 // **The material is the run's own calls, read in order off the transcript tail.** The brief is a
 // `run:review` in its writing mode, the fix an `Edit` / `Write` after it, and the round closes at

@@ -84,7 +84,7 @@ describe('stop_rules.stop_outcome — a held lane waiting on a resumed subagent'
 })
 
 // joshuafolkken/kit#4803: the #4744 child, told only to "wait in the foreground", hand-wrote a loop over
-// the subagent's `.output` that never saw it finish and ran to its 300-second cap.
+// the subagent's `.output` that never saw it finish and ran to its cap.
 const COMMAND_ID = 'bxj18z032'
 
 function command_launch_line(id: string): string {

@@ -7,8 +7,8 @@ import { capped_print_part } from './capped-print-part'
 
 // Prints a command's output whole when it fits under the Bash output cap, and as part files when it
 // does not. Past `BASH_MAX_OUTPUT_LENGTH` Claude Code saves the output and
-// hands back a 2 KB preview, and the run spends a turn reading the saved file — 224 overflows and 132
-// re-reads over one day's sessions, `doc:section` and `issue:read` the two most frequent `josh` sources.
+// hands back a short preview, and the run spends a turn reading the saved file — `doc:section` and
+// `issue:read` the most frequent `josh` sources of those overflows.
 //
 // **The cut is #2963's, not a second one.** The parts come from `review_diff_parts.part_texts`, so each
 // file — header included — fits under the cap and the bodies concatenate back to exactly the output.

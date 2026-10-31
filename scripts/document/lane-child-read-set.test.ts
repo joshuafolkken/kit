@@ -9,32 +9,20 @@ import { lane_child_read_set } from './lane-child-read-set'
 // off `fullrun`'s own figures, so it cannot drift away from them. The saving is measured against a
 // `fullrun` that also read what the child reaches beyond it (joshuafolkken/kit#3172): `pre-gate-cut.md`
 // left `fullrun`'s path for the child's alone, and `fullrun` stopped being charged for the whole of
-// `backlogrun-progress.md`, so the old 35KB margin over a bare `fullrun` measured that over-count, not
-// the trim. 17KB is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
-// decision documents and `progress-watcher.md`. Lowered from 22KB in joshuafolkken/kit#3174, which cut
-// the SKILL.md sections the child skipped out of the document for every entry: the saving moved from
-// the trim into the shared read, so the child reads less in absolute terms while the margin narrows.
-// Lowered from 18KB in joshuafolkken/kit#3566, which moved history out of `latest-gate.md` and
-// `progress-watcher.md`: the documents the child skips got smaller, so skipping them saves less.
-// Lowered from 17KB in joshuafolkken/kit#3871, which condensed the skill files — `progress-watcher.md`
-// among the skipped documents — for the same reason. Lowered from 16KB in joshuafolkken/kit#3928,
-// which stripped the rationale pointers and preambles from the skipped documents too.
+// `backlogrun-progress.md`, so a margin over a bare `fullrun` measured that over-count, not the trim.
+// The required saving is what the trim itself saves: the SKILL.md sections, `latest-gate.md`, the two
+// decision documents and `progress-watcher.md`. The pinned saving is lowered whenever the skipped
+// documents shrink for every entry (joshuafolkken/kit#3174, #3566, #3871 and #3928): skipping a smaller document saves less
+// while the child reads less in absolute terms.
 
 const ROOT = process.cwd()
 const FULLRUN = 'fullrun'
 const BYTES_PER_KB = 1024
 const REQUIRED_SAVING_BYTES = 15 * BYTES_PER_KB
 const MAX_INITIAL_TOKENS = 24_000
-// Raised from 30k when joshuafolkken/kit#2119 added two delivered-rule rows (the scout and the
-// per-run filing cap) to `rule-delivery.md`, which the child reads whole. Raised again to 40k in
-// joshuafolkken/kit#2289: `pre-gate-cut.md` joined the point-of-use set, so the ~9.8k tokens a lane
-// child *already* read at the pre-gate cut but the count omitted now appear in this total. The
-// increase is a correction of an under-count, not new reading. Lowered to 22k in joshuafolkken/kit#2357
-// when `backlogrun-steps.md` left the child's point-of-use set: the child never opened the scheduler's
-// step list, so its ~16k tokens were an over-count the total no longer carries. The #2021 acceptance
-// criterion the trim exists for is the 35KB saving vs `fullrun`, which is pinned above and only widens.
-// Lowered to 14k in joshuafolkken/kit#3399 when `rule-delivery.md`'s rule table moved behind
-// `pnpm josh rule:list`: the child no longer reads the table whole, and the total measured 13.6k.
+// The total counts every document the child really opens, at the entry and at its points of use, so
+// it moves only when that set does (joshuafolkken/kit#2119, #2289, #2357 and #3399 each moved it);
+// the saving vs `fullrun` the trim exists for (#2021) is pinned above.
 const MAX_TOTAL_TOKENS = 14_000
 const NOTHING = 0
 

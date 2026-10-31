@@ -22,10 +22,10 @@ const { CLOSED_CEILING_LINE, CLOSED_UNREADABLE_LINE, read_recently_closed, warn_
 // questions every `new` entry point asks first: has this already been filed, and which epic does it
 // belong to.
 //
-// Both were assembled by hand every time, differently every time: a measured `fullrun new` spent
-// 7 minutes 32 seconds — 22% of the run — listing epics, reading their children and searching for
+// Both were assembled by hand every time, differently every time: a measured `fullrun new` spent a
+// large share of the run listing epics, reading their children and searching for
 // duplicates before implementation began, and the session that measured it went on to file work that
-// two open issues already covered, one of them filed three minutes earlier by another session.
+// two open issues already covered, one of them filed shortly before by another session.
 //
 // The epic half is `epic:bundle`'s decision, called rather than restated. The duplicate half is a
 // signal that command deliberately does not have, and it lives in `issue-scout.ts`.

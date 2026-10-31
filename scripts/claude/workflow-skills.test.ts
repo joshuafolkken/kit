@@ -433,8 +433,8 @@ describe.each([
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard
 // on *how much* of it stays. A rule that cites a canonical section has its procedure there, so the
 // resident text is a trigger and a pointer — and a trigger that grew past this cap has had its
-// procedure pasted back beside the pointer, which is how `CLAUDE.md` reached 585 bytes of headroom
-// with the procedures already moved out.
+// procedure pasted back beside the pointer, which is how `CLAUDE.md` ran out of headroom with the
+// procedures already moved out.
 //
 // The cap is not a style preference. It is set just above the largest rule that legitimately needs
 // most of its text resident — the cross-package interrupt, whose every sentence changes what an

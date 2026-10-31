@@ -7,7 +7,7 @@ import { shell_segments } from './shell-segments'
 // The trigger and the decision behind the `run-tail` row of `delivered-rules.ts`.
 //
 // **Two stops, one cause.** A `pnpm josh git -y` issued in the **foreground** with a tool timeout
-// above the harness's 600-second cap is detached at the cap with nothing reading the output file
+// above the harness's foreground cap is detached at the cap with nothing reading the output file
 // afterwards; and a push that ends the turn leaves the merge waiting until a person asks. Both hand
 // the deciding of when to look back to something that is never going to decide it.
 //

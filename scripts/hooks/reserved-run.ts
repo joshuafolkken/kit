@@ -21,7 +21,7 @@ import { execa } from 'execa'
 // the reservation these two conservative numbers stand for lives at the one place a person reads them.
 //
 // **The memory is read off the command, not left at zero** (joshuafolkken/kit#4582): a lane wrapped a
-// four-worker typed eslint here and the 12 GB it held was admitted beside four other lanes. The
+// four-worker typed eslint here and the memory it held was admitted beside four other lanes. The
 // wrapped command's tool and worker count give its `MEMORY_MB` (`command-memory.ts`); `--memory <MB>`
 // overrides that estimate.
 
@@ -96,7 +96,7 @@ function shell_word(argument: string): string {
 
 // What the claim carries to the ledger: the command named on the waiting line, and the memory it
 // holds — the explicit `--memory`, else the estimate read off the command (`command-memory.ts`), else
-// none, the 0 MB a command the table does not know counted before.
+// none, which is what a command the table does not know counts.
 function reservation_options(parsed: ReservedCommand): {
 	command: string
 	memory_mb: number | undefined

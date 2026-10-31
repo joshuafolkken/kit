@@ -351,7 +351,7 @@ describe('git_command.pull_fast_forward', () => {
 	})
 
 	// joshuafolkken/kit#2942: `josh main:sync` pulls through this, and an unbounded network call there
-	// waited 37 minutes on a dead connection while the backlog driver stood behind it.
+	// waited on a dead connection while the backlog driver stood behind it.
 	it('bounds the pull with the remote budget', async () => {
 		const { git_command } = await import('./git-command')
 		const { PUSH_TIMEOUT_MS } = await import('./git-push-transport')

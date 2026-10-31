@@ -142,7 +142,7 @@ describe('lefthook/base.yml pre-push dependency barrier (kit#813)', () => {
 	})
 })
 
-// kit#1334: the hook ran the whole unit suite 40 seconds after `josh gate` had printed it green on
+// kit#1334: the hook ran the whole unit suite right after `josh gate` had printed it green on
 // the same tree. The wrapper is what can read that record; a bare `vitest run` has nothing to read
 // it with, which is the state this pair of assertions exists to keep the config out of.
 describe('lefthook/base.yml pre-push unit command (kit#1334)', () => {
