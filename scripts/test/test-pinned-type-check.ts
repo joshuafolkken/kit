@@ -70,11 +70,16 @@ function config_text(scope: ReadonlyArray<string>, build_info: string): string {
 	return `${JSON.stringify(config, undefined, '\t')}\n`
 }
 
-// Whether `scope` reads a type error in the tree as it stands. A tsc that cannot start reads no error.
-// `--pretty false` keeps a color-forcing environment from splitting `TYPE_ERROR` with escape codes
-// (joshuafolkken/kit#5505).
-async function is_red(tree: BaseTree, scope: ReadonlyArray<string>): Promise<boolean> {
-	if (scope.length === 0) return false
+// The scoped check's outcome: `ran` is whether tsc started and exited on its own, so a tsc that
+// could not start or was killed is told from a clean pass (joshuafolkken/kit#5505).
+interface TypeCheck {
+	ran: boolean
+	red: boolean
+}
+
+// Type-checks `scope` in the tree as it stands. `--pretty false` keeps a color-forcing environment
+// from splitting `TYPE_ERROR` with escape codes (joshuafolkken/kit#5505).
+async function check(tree: BaseTree, scope: ReadonlyArray<string>): Promise<TypeCheck> {
 	const build_info = path.join(tree.parent, BUILD_INFO)
 
 	await writeFile(path.join(tree.tree, CONFIG_NAME), config_text(scope, build_info))
@@ -88,9 +93,18 @@ async function is_red(tree: BaseTree, scope: ReadonlyArray<string>): Promise<boo
 		},
 	)
 
-	return TYPE_ERROR.test(result.all)
+	return { ran: result.exitCode !== undefined, red: TYPE_ERROR.test(result.all) }
 }
 
-const test_pinned_type_check = { config_text, is_red, scope_of, CONFIG_NAME }
+// Whether `scope` reads a type error in the tree as it stands. A tsc that cannot start reads no error.
+async function is_red(tree: BaseTree, scope: ReadonlyArray<string>): Promise<boolean> {
+	if (scope.length === 0) return false
+
+	const outcome = await check(tree, scope)
+
+	return outcome.red
+}
+
+const test_pinned_type_check = { check, config_text, is_red, scope_of, CONFIG_NAME }
 
 export { test_pinned_type_check }
