@@ -3,7 +3,6 @@ import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { import_graph, type ImportGraph } from '#scripts/lint/import-graph'
-import { execa } from 'execa'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { test_pinned_reach } from './test-pinned-reach'
 import { test_pinned_type_check } from './test-pinned-type-check'
@@ -15,6 +14,7 @@ const INFO = 'parent/josh-pinned.tsbuildinfo'
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 // A graph where only `READER` imports `FILE`.
@@ -114,6 +114,9 @@ describe('test_pinned_type_check.is_red with tsc', () => {
 	it('reads a type error red and an unread local green', async () => {
 		const parent = mkdtempSync(path.join(tmpdir(), 'josh-type-check-tsc-'))
 
+		// joshuafolkken/kit#5505: a color-forcing environment, as a detached ship's gate, must not hide it.
+		vi.stubEnv('FORCE_COLOR', '1')
+
 		try {
 			const tree = await strict_tree(parent)
 
@@ -123,27 +126,9 @@ describe('test_pinned_type_check.is_red with tsc', () => {
 			await expect(test_pinned_type_check.is_red({ parent, tree }, ['unread.ts'])).resolves.toBe(
 				false,
 			)
-			const is_red = await test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])
-			const probe = await execa(
-				path.join(tree, 'node_modules', '.bin', 'tsc'),
-				['-p', 'tsconfig.josh-pinned.json'],
-				{
-					cwd: tree,
-					reject: false,
-					all: true,
-				},
+			await expect(test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])).resolves.toBe(
+				true,
 			)
-
-			expect(
-				is_red,
-				JSON.stringify([
-					process.cwd(),
-					probe.exitCode,
-					probe.shortMessage,
-					probe.all,
-					process.env['PATH'],
-				]),
-			).toBe(true)
 		} finally {
 			await rm(parent, { recursive: true, force: true })
 		}
