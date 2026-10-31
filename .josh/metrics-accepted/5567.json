@@ -1,0 +1,7 @@
+{
+	"reason": "#5567: ship records why josh gate ran or which tree it reused (run-ship-gate-runs.ts), counted by lane:breakdown; round-1 fixes add the reused gate-ledger row and the rerun note",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 77
+	}
+}

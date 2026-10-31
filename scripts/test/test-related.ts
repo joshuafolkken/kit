@@ -11,6 +11,7 @@ import { direct_importers } from './direct-importers'
 import { pure_files_entries } from './pure-files-entries'
 import { test_no_base } from './test-no-base'
 import { test_read_map, type ReadMap } from './test-read-map'
+import { test_related_cap, type CappedImporters } from './test-related-cap'
 import { test_related_moved, type ChangeReading } from './test-related-moved'
 import { test_related_red, type RedReading, type RelatedInput } from './test-related-red'
 import { test_related_reuse } from './test-related-reuse'
@@ -225,18 +226,17 @@ function naming_moved(root: string, change: ChangeReading): ReadonlySet<string> 
 	)
 }
 
-// A file every test imports narrows to its direct importers unless `is_whole`: the gate's unit leg, and
-// the gate's reuse of it, keep the whole suite for it (`gate_labels.KEEP_WHOLE_SUITE_FLAG`).
+// A file every test imports, or one past the reach cap, narrows to its direct importers (`capped`)
+// unless the run keeps the whole suite: the gate's unit leg, and the gate's reuse of it, pass
+// `test_related_cap.NO_CAP` (`gate_labels.KEEP_WHOLE_SUITE_FLAG`).
 async function scope_of(
 	root: string,
 	change: ChangeReading,
-	is_whole: boolean,
+	capped: CappedImporters,
 ): Promise<RelatedScope> {
 	const recorded = await recorded_files(change)
 	const naming = naming_moved(root, change)
 	const pure_entries = await pure_files_entries.read_moved(root, change.changed)
-	const narrowed = is_whole ? [] : (change.changed ?? [])
-	const importers = await direct_importers.every_test_importers(root, narrowed)
 
 	return related_scope.resolve_scope({
 		root,
@@ -244,9 +244,19 @@ async function scope_of(
 		recorded,
 		naming_moved: naming,
 		pure_entries,
-		every_test_importers: importers,
+		every_test_importers: capped.importers,
 		is_present: existsSync,
 	})
+}
+
+async function capped_of(
+	root: string,
+	change: ChangeReading,
+	is_whole: boolean,
+): Promise<CappedImporters> {
+	const files = change.is_unmoved === true ? [] : (change.changed ?? [])
+
+	return await test_related_cap.capped_importers(root, files, is_whole)
 }
 
 // **Whether a set of changed files can reach any test**, answered by the decision this command
@@ -261,7 +271,7 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 
 	if (change.map === undefined) return true
 
-	const scope = await scope_of(root, change, true)
+	const scope = await scope_of(root, change, test_related_cap.NO_CAP)
 
 	return scope.mode !== 'none'
 }
@@ -269,13 +279,13 @@ async function reaches_tests(root: string, paths: ReadonlyArray<string>): Promis
 async function resolve_change(
 	root: string,
 	change: ChangeReading,
-	is_whole: boolean,
+	capped: CappedImporters,
 ): Promise<RelatedScope> {
 	const { UNMOVED_REASON } = related_scope
 
 	if (change.is_unmoved === true) return { mode: 'none', files: [], reason: UNMOVED_REASON }
 
-	return await scope_of(root, change, is_whole)
+	return await scope_of(root, change, capped)
 }
 
 function owed_of(red: RedReading | undefined): ReadonlyArray<string> {
@@ -290,7 +300,8 @@ async function read_run_input(
 ): Promise<RelatedInput> {
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
-	const scope = await resolve_change(root, change, is_whole)
+	const capped = await capped_of(root, change, is_whole)
+	const scope = await resolve_change(root, change, capped)
 	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
 
 	const { changed, synced = [], since_map = [], branch } = change
@@ -304,24 +315,36 @@ async function read_run_input(
 		branch,
 		owed: owed_of(red),
 		reuse,
+		over_cap: capped.over_cap,
 	}
 }
 
-// A non-code argument is resolved through the map, and a file every test imports through its
-// importers, rather than handed to vitest, so only the other code arguments can be ones vitest was not
-// given.
+function is_narrowed_argument(
+	root: string,
+	argument: string,
+	over_cap: ReadonlyArray<string>,
+): boolean {
+	if (direct_importers.is_every_test_import(root, argument)) return true
+
+	return over_cap.includes(path.relative(root, path.resolve(argument)))
+}
+
+// A non-code argument is resolved through the map, and a file every test imports or one past the reach
+// cap through its importers, rather than handed to vitest, so only the other code arguments can be
+// ones vitest was not given.
 function report_unhanded(
 	root: string,
 	command_arguments: ReadonlyArray<string>,
-	scope: RelatedScope,
+	input: RelatedInput,
 ): void {
+	const over_cap = input.over_cap ?? []
+
 	changed_file_scope.report_unusable_arguments(
 		command_arguments.filter(
 			(argument) =>
-				related_scope.is_relatable(argument) &&
-				!direct_importers.is_every_test_import(root, argument),
+				related_scope.is_relatable(argument) && !is_narrowed_argument(root, argument, over_cap),
 		),
-		scope,
+		input.scope,
 		related_scope.COMMAND_LABEL,
 	)
 }
@@ -353,7 +376,8 @@ async function run_related_tests(given: ReadonlyArray<string>): Promise<number> 
 	const is_whole = given.includes(KEEP_WHOLE_SUITE_FLAG)
 	const input = await read_run_input(root, command_arguments, is_whole, before)
 
-	report_unhanded(root, command_arguments, input.scope)
+	report_unhanded(root, command_arguments, input)
+	test_related_cap.report_over_cap(input.over_cap ?? [])
 
 	return await test_related_run.run_and_vouch(input, command_arguments, before)
 }

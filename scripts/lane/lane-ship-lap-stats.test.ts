@@ -50,6 +50,13 @@ describe('lane_ship_lap_stats.table', () => {
 		expect(rows_of(entries)).toStrictEqual([[GATE_JOSH_GATE_ROW, '4.0', '9.0', '3']])
 	})
 
+	// joshuafolkken/kit#5567: a reused gate started nothing, so its zero stays out of the median.
+	it('leaves a reused gate out of the median and the runs', () => {
+		const entries = [{ ...lap(GATE, JOSH_GATE, 0), reused_tree: 'abc' }, lap(GATE, JOSH_GATE, 2)]
+
+		expect(rows_of(entries)).toStrictEqual([[GATE_JOSH_GATE_ROW, '2.0', '2.0', '1']])
+	})
+
 	it("orders the rows by the stages' running order, a stage's steps longest first", () => {
 		const entries = [
 			lap('commit', 'josh git', 1),

@@ -1,0 +1,7 @@
+{
+	"reason": "test:related reach cap: new test-related-cap module, over_cap ledger field, lane:breakdown line and the review's fixes (#5532)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 120
+	}
+}
