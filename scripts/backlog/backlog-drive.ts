@@ -16,6 +16,7 @@
 // **Everything it touches is a port**, the pattern `run-wake-loop.ts` set, so the sequencing is pinned
 // without a process, a network or a clock.
 
+import { epic_triage } from '#scripts/epic/epic-triage'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { poll } from '#scripts/lib/poll'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
@@ -46,6 +47,7 @@ const KNOWN_VERDICTS: ReadonlySet<string> = new Set([
 const NO_RETRIES = 0
 const EXHAUSTED_ANSWER = 'exhausted'
 const JUDGE_REASON = 'judge'
+const TRIAGE_TOKEN = epic_triage.TRIAGE_VERDICT
 // The `hold` reason a pass held by a Claude usage limit records.
 const USAGE_LIMIT_REASON = 'usage-limit'
 const { launch_all } = backlog_drive_launch_pass
@@ -61,6 +63,9 @@ interface OfferRead extends HeldWaiting {
 	// Whether a drain here owes the retrospective: the opt-in switch is on and it has not run yet. Absent
 	// reads as not owed, so a drain with the switch off keeps the idle watch.
 	is_retrospective_owed?: boolean
+	// Whether `backlog:next` held an untriaged candidate back from this `run`: the lanes open first and
+	// the pass then hands `triage` back, so the judgment session runs beside them.
+	is_judgment_owed?: boolean | undefined
 	is_finish?: boolean | undefined
 }
 
@@ -300,6 +305,20 @@ async function run_offered(
 	return await launch_all(issues, state, ports)
 }
 
+// A `run` that held an untriaged candidate back ends the pass with `triage` once its lanes are open — a
+// pass the launch itself ended keeps that end, and the next offer owes the judgment again.
+async function run_then_judge(
+	read: OfferRead,
+	state: DriveState,
+	ports: DrivePorts,
+): Promise<PassResult> {
+	const result = await run_offered(read.issues, state, ports)
+
+	if (result.kind !== 'continue' || read.is_judgment_owed !== true) return result
+
+	return ended(TRIAGE_TOKEN, result.state, TRIAGE_TOKEN)
+}
+
 // Every offer answers the memory hold afresh: one that is not `run` leaves nothing held for memory.
 async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResult> {
 	const read = await ports.offer(state)
@@ -308,7 +327,7 @@ async function ask_offer(state: DriveState, ports: DrivePorts): Promise<PassResu
 
 	const next = { ...state, retries: read.retries, is_memory_held: false }
 
-	if (read.verdict === RUN_VERDICT) return await run_offered(read.issues, next, ports)
+	if (read.verdict === RUN_VERDICT) return await run_then_judge(read, next, ports)
 	if (await backlog_drive_judge.is_owed(read, ports)) return ended(JUDGE_REASON, next, JUDGE_REASON)
 
 	const idle = await backlog_drive_idle.noticed(on_verdict(read, next), read, ports)

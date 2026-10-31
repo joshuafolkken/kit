@@ -255,8 +255,8 @@ const STAGE_ICONS: Readonly<Partial<Record<string, string>>> = {
 }
 
 // What a queued or waiting row leads with (joshuafolkken/kit#4288), in place of ⏳: 📂 a path a
-// running issue holds, 📋 the declared order, ✋ a pool held for a judgment, ❓ an issue nobody has
-// judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
+// running issue holds, 📋 the declared order, ✋ an unblocked issue held for its judgment, ❓ a
+// blocked issue nobody has judged, 🧍 a `run:solo` issue waiting for the running lanes, 🙅 a row behind it (#4294; 🚧 is a
 // held check's) and 🔒 a row a running `run:solo` issue holds (#4391), chosen on the same rule as
 // every row icon, and 🪫 the account's Claude usage limit until it resets (#4796). The rest are the
 // board's own, shared rather than copied.
