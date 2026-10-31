@@ -36,10 +36,10 @@ interface WrapupInput {
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
 	should_merge: boolean
-	// The managed config-file report, which reaches the completion report on the Issue as well as the
-	// completion notification. Empty on a run that changed nothing `josh sync`
-	// distributes, and an empty one adds no line.
-	managed_notes: ReadonlyArray<string>
+	// The managed config-file report and the check report (`followup-check-report.ts`), which reach
+	// the completion report on the Issue as well as the completion notification, after the
+	// `--notify-message` text. Empty on a run with nothing to report, and an empty one adds no line.
+	report_notes: ReadonlyArray<string>
 	// A pull request merged before this run is not merged again, and a tail whose completion report is
 	// already on the issue does not post it twice (`git-followup-merged.ts`).
 	is_merged?: boolean | undefined
@@ -56,14 +56,14 @@ function build_notify_body(input: {
 	notify_config: GitNotifyConfig
 	issue_number: string | undefined
 	pr_url: string | undefined
-	managed_notes: ReadonlyArray<string>
+	report_notes: ReadonlyArray<string>
 }): string {
 	return git_notify.build_completion_comment_body({
 		message: input.notify_config.message,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
 		mentions: input.notify_config.mentions,
-		notes: input.managed_notes,
+		notes: input.report_notes,
 	})
 }
 
@@ -91,7 +91,7 @@ async function post_completion_notification(input: {
 	issue_number: string | undefined
 	notify_config: GitNotifyConfig | undefined
 	pr_url: string | undefined
-	managed_notes: ReadonlyArray<string>
+	report_notes: ReadonlyArray<string>
 }): Promise<void> {
 	if (input.notify_config === undefined) return
 
@@ -99,7 +99,7 @@ async function post_completion_notification(input: {
 		notify_config: input.notify_config,
 		issue_number: input.issue_number,
 		pr_url: input.pr_url,
-		managed_notes: input.managed_notes,
+		report_notes: input.report_notes,
 	})
 	const { target } = input.notify_config
 
@@ -128,7 +128,7 @@ async function notify_step(input: WrapupInput): Promise<void> {
 				issue_number: input.issue_number,
 				notify_config: input.notify_config,
 				pr_url: input.pr_url,
-				managed_notes: input.managed_notes,
+				report_notes: input.report_notes,
 			})
 		},
 	})

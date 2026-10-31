@@ -54,6 +54,18 @@ describe('run_checks — a stalled job is rerun once', () => {
 		expect(wait).toHaveBeenCalledTimes(2)
 	})
 
+	// joshuafolkken/kit#5545: the rerun names reach the completion notification's check report.
+	it('records the rerun jobs in the collector it was handed', async () => {
+		const reran: Array<string> = []
+
+		wait.mockRejectedValueOnce(new Error(CHECKS_FAILURE)).mockResolvedValueOnce(SNAPSHOT)
+		rerun.mockResolvedValue(RERUN_NAMES)
+
+		await run_checks({ branch_name: BRANCH_NAME, is_skip_watch: true, reran })
+
+		expect(reran).toStrictEqual(RERUN_NAMES)
+	})
+
 	it('fails as before when the rerun failed again, without a second rerun', async () => {
 		wait.mockRejectedValue(new Error(CHECKS_FAILURE))
 		rerun.mockResolvedValue(RERUN_NAMES)

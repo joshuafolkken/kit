@@ -154,6 +154,16 @@ describe('git_notify.build_completion_comment_body — the run’s own notes', (
 		expect(body).toContain(HIT_LINE)
 	})
 
+	// joshuafolkken/kit#5545: the check report `followup` drafts follows the `--notify-message` text,
+	// which stays the body's first line.
+	it('keeps the message first and the check report after it', () => {
+		const report = ['Checks:', '- E2E — re-run once, judged flaky; green on the re-run']
+		const lines = git_notify.build_completion_comment_body({ ...BASE, notes: report }).split('\n')
+
+		expect(lines[0]).toBe(`✅ ${COMPLETION_MESSAGE}`)
+		expect(lines.slice(-report.length)).toStrictEqual(report)
+	})
+
 	// The equality is the assertion: a run with nothing to note produces the byte-for-byte body it
 	// produced before this field existed, blank separator included.
 	it('adds nothing at all when there is nothing to note', () => {

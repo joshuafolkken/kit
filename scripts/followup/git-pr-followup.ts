@@ -12,6 +12,7 @@ import {
 	type TelegramSendInput,
 	type TelegramTaskType,
 } from '#scripts/notify/telegram-notify'
+import { followup_check_report } from './followup-check-report'
 import { followup_checks_event } from './followup-checks-event'
 import { followup_ci_path } from './followup-ci-path'
 import { followup_coderabbit_retrigger, type Settled } from './followup-coderabbit-retrigger'
@@ -235,16 +236,17 @@ async function run_comment_scans(
 // diff read this cheap is not what a measurement of `followup` is looking for; its cost lands inside
 // `checks-wait`, where it is indistinguishable from noise.
 //
-// **The managed report comes back beside the notes as well as inside them**, because the two have
-// different destinations: every note reaches the completion notification, and this one alone also
-// reaches the completion report posted to the Issue. Returning it twice is
+// The report is the managed config-file report and the check report (#5545). **It comes back beside
+// the notes as well as inside them**, because the two have different destinations: every note reaches
+// the completion notification, and the report alone also reaches the completion report posted to
+// the Issue. Returning it twice is
 // what lets `run_stages` hand each destination what belongs to it without re-deriving the answer.
 //
 // **The snapshot travels on to the merge**, which names its head, and the same wait is what the merge
 // goes back to when that head moved before it (#4036).
 interface ReviewChecks {
 	notes: Array<string>
-	managed: Array<string>
+	report: Array<string>
 	snapshot?: PrStateSnapshot
 }
 
@@ -258,6 +260,7 @@ function wait_for_green_of(
 		return await run_checks({
 			branch_name: input.branch_name,
 			is_skip_watch: input.is_skip_watch,
+			reran: log.reran,
 			observe: followup_coderabbit_wait.all(
 				followup_checks_event.observer_of(issue_number, context.pr_url),
 				followup_coderabbit_wait.observer_of(log.coderabbit),
@@ -296,19 +299,21 @@ async function run_review_checks(
 	log: StageLog,
 	issue_number: string | undefined,
 ): Promise<ReviewChecks> {
-	if (input.is_merged === true) return { notes: [], managed: [] }
+	if (input.is_merged === true) return { notes: [], report: [] }
 
 	git_followup_stages.hold_issue(log, issue_number)
 	const managed = await git_pr_managed_config.handle_managed_config_changes({
 		should_merge: input.should_merge,
 	})
-	const { snapshot, notes } = await wait_for_review_green(input, context, issue_number, log)
-	const check_notes = [...notes, ...read_coderabbit_skip_notes(snapshot)]
+	const settled = await wait_for_review_green(input, context, issue_number, log)
+	const { snapshot } = settled
+	const check_notes = [...settled.notes, ...read_coderabbit_skip_notes(snapshot)]
 
 	log_skip_notes(check_notes)
 	const scan_notes = await run_comment_scans(input, context, log)
+	const report = [...managed, ...followup_check_report.lines({ ...settled, reran: log.reran })]
 
-	return { notes: [...managed, ...check_notes, ...scan_notes], managed, snapshot }
+	return { notes: [...report, ...check_notes, ...scan_notes], report, snapshot }
 }
 
 // **A tail re-run after a merge does not report twice**: where the issue
@@ -352,7 +357,7 @@ async function run_stages(input: FollowupInput, log: StageLog): Promise<string |
 			notify_config: input.notify_config,
 			pr_url: context.pr_url,
 			should_merge: input.should_merge,
-			managed_notes: checks.managed,
+			report_notes: checks.report,
 			is_merged: input.is_merged,
 			is_completion_recorded: notify.is_recorded,
 			send_completion: notify.send,
