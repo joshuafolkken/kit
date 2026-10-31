@@ -504,7 +504,7 @@ Rows match by an identifier built from the criterion's text, so a reworded crite
 
 **Behavior:** waits for CI (every 10 s, a 32-minute budget, `JOSH_CI_TIMEOUT_SECONDS`), merges, then closes completed epics and the Issue, removes `in-progress` and flushes the ledger. A person's unacknowledged update stops it unmerged ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)). Give the call its longest timeout.
 
-**Check report:** a green run's completion notification lists under `Checks:` each failed check left in the green snapshot (`required` / `not required`), each job re-run as flaky and each retriggered rate-limited CodeRabbit review. A red run writes no list; `--notify-message` names its failures.
+**Check report:** a green run's completion notification lists under `Checks:` each failed check left in the green snapshot (`required` / `not required`), each job re-run as flaky and each retriggered rate-limited CodeRabbit review. A red run or a merged-PR re-run writes no list; `--notify-message` names its failures.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
