@@ -6,9 +6,9 @@ import { ESLint } from 'eslint'
 
 // The code-line count `josh metrics` totals, asked of eslint's own `max-lines` exactly as
 // `line_budget` asks it, but **in process and with every other rule filtered out**.
-// The CLI probe `josh lines` spawns runs the project's whole rule set over
-// the files, because the CLI has no way to run one rule; the API's `ruleFilter` makes the same count
-// cheap enough for the gate to run it.
+// The CLI probe `josh lines` spawns runs the project's whole rule set over the files, because the
+// CLI has no way to run one rule; the API's `ruleFilter` makes the same count cheap enough for the
+// gate to run it.
 //
 // **It reads one line lower than `josh lines` on a file that starts with `#!`.** `line-budget.ts`
 // records why the API counts a hashbang as a comment where the CLI counts it as code, and why a

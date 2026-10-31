@@ -24,7 +24,7 @@
 //   term across the whole set leaves 2.12, but that ASCII is markdown scaffolding embedded in
 //   Japanese — punctuation, bullets, table pipes, identifiers in backticks — which tokenizes far
 //   denser than prose; the same figure rises monotonically as the wide fraction falls (2.08 → 2.27 →
-//   2.97). And the resident baseline's growth per `CLAUDE.md` byte reads 1.8–2.6, but other
+//   2.97). And `CLAUDE.md` bytes per token of resident-baseline growth read 1.8–2.6, but other
 //   resident surfaces grew in those same commits, so that reading attributes their tokens to
 //   `CLAUDE.md`'s bytes and is biased dense by construction.
 //

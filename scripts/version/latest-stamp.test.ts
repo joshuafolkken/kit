@@ -5,8 +5,8 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { latest_stamp, type LatestStamp } from './latest-stamp'
 
 // joshuafolkken/kit#1215: `josh latest` ran at the head of every run and spent network time to
-// answer the same thing several times a day. The record here is what turns "should I
-// update?" from a judgement into an elapsed-time reading.
+// answer the same thing several times a day. The record here is what turns "should I update?" from
+// a judgement into an elapsed-time reading.
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'josh-latest-stamp-test-'))
 const NOW = new Date('2026-09-02T12:00:00.000Z')

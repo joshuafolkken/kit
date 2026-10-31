@@ -28,10 +28,10 @@ import { time_hook_transcript } from './time-hook-transcript'
 // there too: `time_density.last_turn_calls` withholds the count when the tail's final line does not
 // parse, because that line belongs to the turn the count is about.
 
-// How much of the transcript's end is read. The file grows to several megabytes over a long run, and
-// reading all of it on every edit would
-// put the run's own history in front of every write. A quarter of a megabyte is far more than the ten
-// round trips the reading needs and is read in a couple of milliseconds.
+// How much of the transcript's end is read. The file grows to several megabytes over a long run,
+// and reading all of it on every edit would put the run's own history in front of every write. A
+// quarter of a megabyte is far more than the ten round trips the reading needs and is read in a
+// couple of milliseconds.
 const TAIL_BYTES = 262_144
 const FILE_START = 0
 // **One record per session, keyed on the transcript the payload named**, rather than per checkout the

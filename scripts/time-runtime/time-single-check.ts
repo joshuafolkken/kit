@@ -4,8 +4,8 @@ import { time_shell } from './time-shell'
 //
 // Run #1379 issued eight of these — six of them in the fix phase, each its own round trip — and
 // shortly after the last one `josh gate` ran lint, the type check, the spell check and the unit
-// tests over the same tree. Three repeated an earlier
-// call **with the same arguments**, and every one of those three followed an edit.
+// tests over the same tree. Three repeated an earlier call **with the same arguments**, and every
+// one of those three followed an edit.
 //
 // **The arguments are part of the identity, and that is the whole reason this module exists.**
 // `time-command-key.ts` keys a call by its josh subcommand, because a span keeps no input — which is

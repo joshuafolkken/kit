@@ -7,7 +7,8 @@ import { stamp_file } from '#scripts/josh/stamp-file'
 // ran at the head of every `fullrun` / `halfrun` and of every child a batch ran
 // (joshuafolkken/kit#1215), and running it several times in one day barely changes its answer.
 // `queue` and `epicrun` had already hoisted it to the head of a batch by hand; what had no rule at
-// all was a standalone run, which is its own batch head and therefore updated dependencies every single time.
+// all was a standalone run, which is its own batch head and therefore updated dependencies every
+// single time.
 //
 // **The condition is elapsed time, not judgement.** "The deps are probably still fresh" is a call
 // made under time pressure, and time pressure resolves it toward `skip` exactly when a stale
