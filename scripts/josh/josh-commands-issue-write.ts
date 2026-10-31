@@ -3,6 +3,7 @@ import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types
 const REPO = '--repo <owner/repo>'
 const BODY_FILE = '--body-file <path>'
 const EVIDENCE_FILE = '--evidence-file <path>'
+const BLOCKS_FINDER = '--blocks-finder'
 const EVIDENCE_REFERENCE = `<issue> ${EVIDENCE_FILE}`
 
 // The commands that write to an issue — comment, plan, already-done, measured and file — split out of
@@ -134,7 +135,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'issue:file': {
-		script: 'scripts/issue/issue-file-cli.ts',
+		script: 'scripts/issue/issue-file-main.ts',
 		description:
 			'File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle',
 		category: 'AI tools',
@@ -187,9 +188,34 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 						"a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).",
 				},
 				{
-					names: ['--blocks-finder'],
+					names: [BLOCKS_FINDER],
 					description:
 						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.',
+				},
+			],
+		},
+	},
+	'upstream:interrupt': {
+		script: 'scripts/issue/upstream-interrupt-main.ts',
+		description:
+			'Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation',
+		category: 'AI tools',
+		reference: [
+			`<finder> <title> ${REPO} ${BODY_FILE} [--blocks-finder]`,
+			'automation',
+			['git', 'network', 'notifications'],
+		],
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
+		usage: {
+			examples: [
+				{ arguments: '2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md' },
+			],
+			flags: [
+				{ names: [REPO], description: 'the upstream repository. Required.' },
+				{ names: [BODY_FILE], description: 'the upstream issue body. Required.' },
+				{
+					names: [BLOCKS_FINDER],
+					description: 'passed to `issue:file`: the finder is recorded as blocked by the filing.',
 				},
 			],
 		},

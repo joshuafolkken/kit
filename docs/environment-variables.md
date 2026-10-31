@@ -4,7 +4,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 
 Only these load `.env` themselves, and only when it exists:
 
-- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`.
+- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`, `josh upstream:interrupt`.
 - **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh issue:already-done` and `josh issue:measured`, which release the hold.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:plan`, `josh lane:adopt`, `josh lane:sample`, `josh lane:stats`, `josh lane:value`, `josh lane:net`, `josh lane:breakdown`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh latest:update`, `josh port`, `josh session:lang`.

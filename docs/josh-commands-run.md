@@ -281,6 +281,26 @@ The local park record is what the `lane-park` guard reads, so a child that parke
 
 **Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
 
+### `josh upstream:interrupt`
+
+<!-- usage: upstream:interrupt -->
+
+Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation.
+
+```bash
+pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md
+```
+
+**Options:**
+
+- `--repo <owner/repo>` — the upstream repository. Required.
+- `--body-file <path>` — the upstream issue body. Required.
+- `--blocks-finder` — passed to `issue:file`: the finder is recorded as blocked by the filing.
+
+<!-- /usage -->
+
+A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
+
 ### `josh run:liveness`
 
 <!-- usage: run:liveness -->
