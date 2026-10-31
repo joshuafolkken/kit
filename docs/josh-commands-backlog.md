@@ -755,7 +755,7 @@ Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
-**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
+**Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
