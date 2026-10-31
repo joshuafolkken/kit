@@ -188,3 +188,33 @@ describe('init_logic_workspace.merge_workspace_yaml — missing build approvals'
 		expect(init_logic_workspace.merge_workspace_yaml(existing, KIT_TEMPLATE)).toBe(existing)
 	})
 })
+
+describe('init_logic_workspace.drop_kit_only_regions', () => {
+	it('drops a fenced entry inside a block and keeps the entries around it', () => {
+		const template =
+			'overrides:\n  a: ^1\n  # kit-only:start — why\n  # note\n  b: ^2\n  # kit-only:end\n  c: ^3\n'
+
+		expect(init_logic_workspace.drop_kit_only_regions(template)).toBe(
+			'overrides:\n  a: ^1\n  c: ^3\n',
+		)
+	})
+
+	it('drops a fenced top-level key without leaving a run of blank lines', () => {
+		const template = 'a: 1\n\n# kit-only:start\npatched:\n  x: y\n# kit-only:end\n\nb: 2\n'
+
+		expect(init_logic_workspace.drop_kit_only_regions(template)).toBe('a: 1\n\nb: 2\n')
+	})
+
+	it('drops every fenced region, each ending at its own end marker', () => {
+		const template =
+			'# kit-only:start\na: 1\n# kit-only:end\nb: 2\n# kit-only:start\nc: 3\n# kit-only:end\n'
+
+		expect(init_logic_workspace.drop_kit_only_regions(template)).toBe('b: 2\n')
+	})
+
+	it('returns a template without regions unchanged', () => {
+		const template = 'a: 1\n# kit-only\n'
+
+		expect(init_logic_workspace.drop_kit_only_regions(template)).toBe(template)
+	})
+})

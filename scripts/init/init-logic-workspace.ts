@@ -154,6 +154,15 @@ function carry_npmrc_setting(template: string, npmrc: string, setting: MovedNpmr
 	return template.replace(line_pattern, () => `${setting.workspace_key}: ${value}`)
 }
 
+// Lines kit's own install needs but a consumer must not receive, fenced by `# kit-only:start` and
+// `# kit-only:end` — e.g. an override that only works with a patch kit does not publish (#5500).
+const KIT_ONLY_REGION_PATTERN =
+	/^[ \t]*# kit-only:start\b.*\n(?:.*\n)*?[ \t]*# kit-only:end\b.*\n/gmu
+
+function drop_kit_only_regions(template: string): string {
+	return template.replaceAll(KIT_ONLY_REGION_PATTERN, '').replaceAll(/\n{3,}/gu, '\n\n')
+}
+
 function carry_npmrc_settings(template: string, npmrc: string): string {
 	let result = template
 
@@ -177,6 +186,11 @@ function merge_workspace_yaml(existing: string, template: string): string {
 	return append_user_blocks(cleaned, new_keys, template)
 }
 
-const init_logic_workspace = { carry_npmrc_settings, merge_workspace_yaml, template_build_values }
+const init_logic_workspace = {
+	carry_npmrc_settings,
+	drop_kit_only_regions,
+	merge_workspace_yaml,
+	template_build_values,
+}
 
 export { init_logic_workspace }
