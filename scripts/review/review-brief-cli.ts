@@ -161,8 +161,8 @@ function record_round_one(
 //
 // **Whether this is a resume is read first**: `record_target` drops the
 // previous nonce's records, so asked afterwards the finished review would always read as absent. The
-// findings file is the ship's, keyed on `PROJECT_ROOT` as the ship keys it; a review run outside the
-// ship writes none, so it never reads as a resume and keeps the whole change.
+// findings file is keyed on `PROJECT_ROOT`, written by the ship's reviewer or by `review:submit`; a
+// clean round in it narrows the next brief as a resume, wherever that round ran.
 //
 // **The narrowing is measured from the tree that review was briefed on**, and only when that record
 // was written by the brief the pointer names: one left by an earlier brief is not the tree the

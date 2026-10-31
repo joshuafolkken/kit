@@ -69,7 +69,8 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'review:submit': {
 		script: 'scripts/review/review-submit-cli.ts',
-		description: "Write a ship reviewer's findings, read from stdin, where the ship reads them",
+		description:
+			"Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them",
 		category: 'AI tools',
 		reference: ['[--interaction] < findings | [--interaction] --none', 'automation', ['files']],
 		usage: {
