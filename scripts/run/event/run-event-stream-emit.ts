@@ -94,6 +94,15 @@ async function emit(kind: string, text: string, at: Date = new Date()): Promise<
 	}
 }
 
+// The stream `emit_once` appends to, or undefined when there is none or its newest event is already `kind`.
+async function fresh_target(kind: string): Promise<string | undefined> {
+	const target = await stream_target()
+
+	if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return undefined
+
+	return target
+}
+
 /**
  * Append one event unless the newest event on the stream already carries this kind — so a marker a loop
  * re-checks every poll is written once per episode rather than once per poll.
@@ -105,12 +114,21 @@ async function emit(kind: string, text: string, at: Date = new Date()): Promise<
  * effect — the stall detector sends one notification per stall — fires that
  * effect exactly when the marker was fresh. A skipped duplicate and a swallowed failure both read
  * `false`: neither is a fresh episode.
+ *
+ * `before_append` runs only on a fresh episode and is awaited before the marker becomes visible, for an
+ * effect a reader of the marker must see finished — the drain flush (joshuafolkken/kit#5329).
  */
-async function emit_once(kind: string, text: string): Promise<boolean> {
+async function emit_once(
+	kind: string,
+	text: string,
+	before_append?: () => Promise<void>,
+): Promise<boolean> {
 	try {
-		const target = await stream_target()
+		const target = await fresh_target(kind)
 
-		if (target === undefined || run_event_stream.read_last(target)?.kind === kind) return false
+		if (target === undefined) return false
+
+		await before_append?.()
 
 		return run_event_stream.append(target, kind, text, now_iso()).appended
 	} catch (error) {
