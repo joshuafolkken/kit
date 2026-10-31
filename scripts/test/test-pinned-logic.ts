@@ -9,6 +9,10 @@ import { related_scope } from './test-related-scope'
 // is `test-pinned.ts`; an added file's hunks are its functions (`test-pinned-functions.ts`).
 
 const DEFAULT_MAX_HUNKS = 20
+// The most test files one hunk's probe runs (joshuafolkken/kit#5503): past it a hub's one-line change
+// runs hundreds to prove it green, so the hunk is `unchecked`. 150 sits just over the ledger's p90
+// and above `WIDE_REACH`, so the staged range stays probed.
+const MAX_TEST_FILES = 150
 const HEADER = /^@@ -\d+(?:,\d+)? \+(?<start>\d+)(?:,(?<count>\d+))? @@/u
 const FILE_HEADER = '+++ b/'
 const SECTION_HEADER = 'diff --git '
@@ -26,6 +30,7 @@ const UNPARSED_REASON = 'an added file, and typescript is not installed to read 
 const NO_RUNNER_REASON = 'vitest is not installed to run its related tests'
 const STOPPED_REASON = 'vitest stopped before any test ran with it reverted'
 const CUT_REASON = 'not probed: the run stopped at the first unpinned hunk'
+const OVER_CAP_REASON = `over the ${String(MAX_TEST_FILES)}-test-file cap`
 const STOPPED_VERDICT: RedVerdict = 'stopped'
 const SETTLED_VERDICTS: ReadonlySet<RedVerdict> = new Set<RedVerdict>(['red', STOPPED_VERDICT])
 
@@ -65,6 +70,8 @@ interface HunkOutcome {
 	// Hunks a `--first-unpinned` run did not probe once one was unpinned (joshuafolkken/kit#5153): the
 	// run fails already, so the rest wait for the next run.
 	cut?: ReadonlyArray<Hunk>
+	// Hunks whose file reaches more than `MAX_TEST_FILES` test files, never probed (joshuafolkken/kit#5503).
+	over_cap?: ReadonlyArray<Hunk>
 	// Whether every checked hunk had a verdict — false when a cache-only read found one the cache no
 	// longer holds (joshuafolkken/kit#5078).
 	is_held?: boolean
@@ -193,6 +200,23 @@ function split(hunks: ReadonlyArray<Hunk>, max_hunks: number): HunkSplit {
 	return { checked: hunks.slice(0, max_hunks), unchecked: hunks.slice(max_hunks) }
 }
 
+// The hunks split at the per-hunk test-file cap, each keeping its order; a file `reach` lacks counts as
+// 0, so it is checked.
+function capped(
+	hunks: ReadonlyArray<Hunk>,
+	reach: ReadonlyMap<string, number>,
+	max_tests = MAX_TEST_FILES,
+): HunkSplit {
+	function is_over(hunk: Hunk): boolean {
+		return (reach.get(hunk.file) ?? 0) > max_tests
+	}
+
+	return {
+		checked: hunks.filter((hunk) => !is_over(hunk)),
+		unchecked: hunks.filter((hunk) => is_over(hunk)),
+	}
+}
+
 // The probes, the ones whose file reaches the fewest tests first (joshuafolkken/kit#5153), so a run
 // that stops at its first unpinned hunk reaches it soonest; a file `reach` lacks counts as 0, and
 // equal counts keep their order.
@@ -263,6 +287,7 @@ function place_of(hunk: Hunk, why: string): UncheckedPlace {
 function unchecked_places(report: PinnedReport): Array<UncheckedPlace> {
 	return [
 		...report.unchecked.map((hunk) => place_of(hunk, unchecked_reason(report))),
+		...(report.over_cap ?? []).map((hunk) => place_of(hunk, OVER_CAP_REASON)),
 		...report.stopped.map((hunk) => place_of(hunk, STOPPED_REASON)),
 		...(report.cut ?? []).map((hunk) => place_of(hunk, CUT_REASON)),
 		...report.unparsed.map((file) => ({ place: file, why: UNPARSED_REASON })),
@@ -321,11 +346,13 @@ const test_pinned_logic = {
 	all_hunks,
 	DEFAULT_MAX_HUNKS,
 	by_reach,
+	capped,
 	format,
 	has_unchecked,
 	is_target,
 	is_unpinned,
 	location,
+	MAX_TEST_FILES,
 	outcome,
 	parse_hunks,
 	report_parts,
