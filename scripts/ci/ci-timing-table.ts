@@ -1,8 +1,7 @@
 import { z } from 'zod'
 
 // The job and step durations of one GitHub Actions run, built from the jobs endpoint's answer
-// (`ci-timing.ts` reads it) — the rows `josh ci:timing` prints, so the three hand-composed `gh api`
-// calls `measurement.md` once asked for are not retyped per measurement (joshuafolkken/kit#5544).
+// (`ci-timing.ts` reads it) — the rows `josh ci:timing` prints.
 
 const MS_PER_SECOND = 1000
 const STEP_INDENT = '  '
