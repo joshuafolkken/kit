@@ -63,10 +63,10 @@ interface ParsedArguments {
 	}
 }
 
-// Absent owner is "no owner declared", which the carry guard reads as not provably foreign; a present
-// but malformed pid invalidates the invocation rather than silently counting unguarded.
+// Absent owner is the calling session (`run_carry.session_owner`); a present but malformed pid
+// invalidates the invocation rather than silently counting unguarded.
 function to_owner(raw: string | undefined): CarryOwner | undefined {
-	if (raw === undefined) return run_carry.NO_OWNER
+	if (raw === undefined) return run_carry.session_owner()
 
 	// The same count shape `run-carry-args.ts` reads an owner pid under.
 	const pid = cli_flags.to_count(raw)

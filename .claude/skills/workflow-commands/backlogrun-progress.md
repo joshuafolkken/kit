@@ -11,7 +11,7 @@ then `pnpm josh lane:await <N...> --owner "$PPID"` in the background — and eve
 command:
 
 ```bash
-next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>)
+next=$(pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --output <path>)
 ```
 
 **`pnpm josh run:merge <N>` is the only reading of how a child ended** — never

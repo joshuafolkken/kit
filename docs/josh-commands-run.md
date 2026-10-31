@@ -463,14 +463,14 @@ checkout) are unchanged.
 Collapse a backlogrun merge event into one call: confirm the child, do the post-merge steps, offer the next child.
 
 ```bash
-pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>   # prints the next child number, or a verdict
-pnpm josh run:merge <N> --owner "$PPID"                                                  # backlog offer (no epic)
+pnpm josh run:merge <N> --epic <E> --repo <owner/repo> --output <path>   # prints the next child number, or a verdict
+pnpm josh run:merge <N>                                                  # backlog offer (no epic)
 ```
 
 **Options:**
 
 - `--epic <E>` / `--repo <owner/repo>` — offer the epic's next children; omit both for the opted-in backlog.
-- `--owner <pid>` — the parent's process, so the carry count respects the ownership guard.
+- `--owner <pid>` — the parent's process, so the carry count respects the ownership guard; omitted, the calling session.
 - `--output <path>` — the transcript the outage and usage-limit splits read; absent, they are off.
 - `--driver` — the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.
 
