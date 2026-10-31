@@ -134,6 +134,9 @@ describe('test_pinned_type_check.check with tsc', () => {
 			await expect(
 				test_pinned_type_check.check({ parent, tree }, ['wrong.ts']),
 			).resolves.toStrictEqual({ ran: true, red: true })
+			await expect(test_pinned_type_check.is_red({ parent, tree }, ['wrong.ts'])).resolves.toBe(
+				true,
+			)
 		} finally {
 			await rm(parent, { recursive: true, force: true })
 		}
