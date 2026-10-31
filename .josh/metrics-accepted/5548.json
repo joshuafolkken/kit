@@ -1,8 +1,8 @@
 {
-	"reason": "#5548 adds issue:plan planning notification and epic --promote --title (new module + tests); kickoff.md quotes the Next line, environment-variables.md lists issue:plan",
+	"reason": "#5548 adds issue:plan planning notification (with a plan-summary fallback) and epic --promote --title; kickoff.md quotes the Next line",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 83,
-		"ai_cost.on_demand_bytes": 83
+		"scripts.code_lines": 85,
+		"ai_cost.on_demand_bytes": 73
 	}
 }

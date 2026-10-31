@@ -24,16 +24,23 @@ interface PlanNotice {
 	repo: string | undefined
 }
 
-// The section's first top-level items, as written; fenced lines never count.
+// The change section up to its first sub-heading.
+function section_body(section: ReadonlyArray<string>): ReadonlyArray<string> {
+	const lines = markdown_section.fence_free_lines(section.join('\n'))
+	const end = lines.findIndex((line) => ANY_HEADING.test(line.trim()))
+
+	return end === -1 ? lines : lines.slice(0, end)
+}
+
+// The section's first top-level items, as written; fenced lines never count. A plan without the
+// section gives its own first items, so the message never shrinks to the `Next:` line alone.
 function summary_of(plan: string): ReadonlyArray<string> {
-	const raw = markdown_section.section_lines_matching(plan, (line) =>
+	const section = markdown_section.section_lines_matching(plan, (line) =>
 		CHANGE_HEADING.test(line.trim()),
 	)
-	const lines = markdown_section.fence_free_lines(raw.join('\n'))
-	const end = lines.findIndex((line) => ANY_HEADING.test(line.trim()))
-	const items = (end === -1 ? lines : lines.slice(0, end)).map(
-		(line) => TOP_LEVEL_ITEM.exec(line)?.groups?.['text'],
-	)
+	const lines =
+		section.length === 0 ? markdown_section.fence_free_lines(plan) : section_body(section)
+	const items = lines.map((line) => TOP_LEVEL_ITEM.exec(line)?.groups?.['text'])
 
 	return items.filter((item) => item !== undefined).slice(0, SUMMARY_ITEMS)
 }
@@ -60,7 +67,6 @@ async function values_of(notice: PlanNotice): Promise<CliValues> {
 async function send(notice: PlanNotice): Promise<void> {
 	try {
 		await telegram_test.send_values(await values_of(notice))
-		console.info('notify: planning')
 	} catch (error) {
 		console.error(`⚠️  issue:plan could not send the planning notification: ${String(error)}`)
 	}

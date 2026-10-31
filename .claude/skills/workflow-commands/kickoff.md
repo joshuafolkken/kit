@@ -23,10 +23,10 @@
   made with `pnpm josh epic`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
 
-  Telegram for the `kickoff new` paths: `pnpm josh notify --task-type planning --issue-url "<issue-url>"
+  Telegram for the multi-issue split path: `pnpm josh notify --task-type planning --issue-url "<issue-url>"
   --body-file <path>`. `--task-type` sets the icon (`planning` 📋 / `completion` ✅ /
   `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️); `--repo-name` and `--issue-title` are
-  auto-fetched. The Issue URL must be included. `issue:plan --planned` sends its own.
+  auto-fetched. The Issue URL must be included.
 
 **`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
 the tree (`working-tree-hold.md`).
@@ -47,7 +47,7 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     "<title>" --body-file <body-file>` plus the labels the words typed after `new` name
     ("Words typed after `new`", below; body per `prompts/collaboration-workflow/issue-template.md`) —
     its duplicate scan runs first, and a candidate covering the same work stops the run (`SKILL.md` →
-    `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does. (4) Telegram. (5)
+    `issue-scout.md`). Capture `<N>`. (3) Post the plan as `kickoff #<N>` does — its `--planned` sends the Telegram. (4)
     **Stop**.
   - **Multi-issue split path**: (1) Per deliverable, `pnpm josh issue:file "<sub-title>" --body-file
     <body-file> --route split` plus the labels the words after `new` name (duplicate scan

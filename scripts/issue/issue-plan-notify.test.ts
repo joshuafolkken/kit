@@ -52,8 +52,14 @@ describe('issue_plan_notify.summary_of — the plan summary the notification car
 		expect(issue_plan_notify.summary_of('## 変更\n- only')).toEqual(['only'])
 	})
 
-	it('is empty for a plan without a change section', () => {
-		expect(issue_plan_notify.summary_of('### 確認\n- a check')).toEqual([])
+	it('falls back to the first top-level items of a plan without a change section', () => {
+		const plan = '## 方針\n- one\n  - detail\n## 手順\n1. two\n- three\n- four'
+
+		expect(issue_plan_notify.summary_of(plan)).toEqual(['one', 'two', 'three'])
+	})
+
+	it('is empty for a plan with no list items', () => {
+		expect(issue_plan_notify.summary_of('## 方針\nprose only')).toEqual([])
 	})
 })
 
