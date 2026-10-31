@@ -336,9 +336,12 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope.
 
 ```bash
 pnpm josh run:prep <N>
+pnpm josh run:prep <N> --summary   # the work summary skeleton
 ```
 
 <!-- /usage -->
+
+`--summary` prints only the work summary's skeleton from the body: `## 現象` as Now, `## 期待結果` as Change, each `## 受け入れ条件` item as Check with an empty `- test:` under it. A missing section prints its heading alone; a body whose author is not trusted carries `issue:read`'s untrusted-body heading.
 
 Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
@@ -1063,6 +1066,8 @@ Under `implement` and `start to plan`, each line is one call group, at most thre
 The label is the josh commands a Bash call chains, else its first 60 characters past a leading `cd`; a reviewer's pass (`round 1`, `interaction`, `round 2`), and its level when the prompt opens with one; any other subagent's type; any other tool's name.
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
+
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs`, and none when no run capped a file (`lane-breakdown-related.ts`).
 
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
