@@ -1,3 +1,4 @@
+import type { GateTree } from '#scripts/gate/gate-tree'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SyncReading } from './run-ship-synced-scope'
 
@@ -11,7 +12,9 @@ const read_sync_mock = vi.hoisted(() =>
 	vi.fn(async (): Promise<SyncReading | undefined> => undefined),
 )
 const record_mock = vi.hoisted(() => vi.fn())
-const unmoved_mock = vi.hoisted(() => vi.fn(() => true))
+const unmoved_mock = vi.hoisted(() =>
+	vi.fn<(before: GateTree, after: GateTree) => boolean>(() => true),
+)
 const lap_mock = vi.hoisted(() =>
 	vi.fn<(lap: object) => Promise<void>>(async () => {
 		await Promise.resolve()
@@ -55,6 +58,7 @@ vi.mock(import('./run-ship-synced-scope'), async (import_original) => {
 const { run_ship_scoped } = await import('./run-ship-scoped')
 const { run_ship_narrowed } = await import('./run-ship-narrowed')
 const { run_ship_lap } = await import('./run-ship-lap')
+const { run_ship_pair_runs } = await import('./run-ship-pair-runs')
 
 // joshuafolkken/kit#2946: the scoped pair the preflight, the review rounds and the gate stage all meet
 // rather than stop on — only the checks with no green record for this tree run.
@@ -69,17 +73,81 @@ function commands(): ReadonlyArray<string> {
 	return josh_run_mock.mock.calls.map((call) => (call[0] as ReadonlyArray<string>).join(' '))
 }
 
+function forget_ship_memory(): void {
+	run_ship_narrowed.forget()
+	run_ship_pair_runs.forget()
+}
+
+// What a check that ran green leaves: a record for the tree, so a later pair finds nothing stale.
+function stale_until_run(): Array<string> {
+	return josh_run_mock.mock.calls.length === 0 ? [LINT, TEST] : []
+}
+
+async function side_by_side(): Promise<void> {
+	await Promise.all([
+		run_ship_lap.within('5538', 'gate', run_ship_scoped.scoped_pair),
+		run_ship_lap.within('5538', 'round-2', run_ship_scoped.scoped_pair),
+	])
+}
+
 beforeEach(() => {
 	josh_run_mock.mockReset().mockResolvedValue({ code: OK, out: '' })
 	missing_mock.mockReset().mockReturnValue([])
 	rerecord_mock.mockClear()
-	read_tree_mock.mockClear()
+	read_tree_mock.mockReset()
 	settle_mock.mockReset().mockReturnValue(undefined)
 	read_sync_mock.mockReset().mockResolvedValue(undefined)
 	record_mock.mockReset()
 	unmoved_mock.mockReset().mockReturnValue(true)
 	lap_mock.mockClear()
-	run_ship_narrowed.forget()
+	forget_ship_memory()
+})
+
+// joshuafolkken/kit#5538: round 2 beside the gate stage met the pair on one tree at once, so both ran
+// it; one at a time, the later pair reads the earlier one's records.
+describe('run_ship_scoped.scoped_pair — two stages side by side', () => {
+	it('runs the pair once when the tree did not move', async () => {
+		missing_mock.mockImplementation(stale_until_run)
+
+		await side_by_side()
+
+		expect(commands()).toStrictEqual([LINT, TEST])
+		expect(lap_mock.mock.calls.map((call) => call[0])).not.toContainEqual(
+			expect.objectContaining({ rerun: expect.any(String) as string }),
+		)
+	})
+
+	it('runs it again only when the tree moved, and records why on the lap', async () => {
+		missing_mock.mockReturnValue([LINT, TEST])
+		unmoved_mock.mockReturnValue(false)
+
+		await side_by_side()
+
+		expect(commands()).toStrictEqual([LINT, TEST, LINT, TEST])
+		expect(lap_mock.mock.calls.map((call) => call[0])).toMatchObject([
+			{ stage: 'gate', runs: 1 },
+			{ stage: 'round-2', runs: 2, rerun: run_ship_pair_runs.REASON.MOVED },
+		])
+	})
+
+	it('reads a rerun against the tree a pair that ran nothing last met', async () => {
+		missing_mock.mockReturnValueOnce([LINT]).mockReturnValueOnce([]).mockReturnValue([LINT])
+		unmoved_mock.mockImplementation((before, after) => before.base === after.base)
+		read_tree_mock
+			.mockResolvedValueOnce({ files: {}, base: 'first' })
+			.mockResolvedValueOnce({ files: {}, base: 'first' })
+			.mockResolvedValue({ files: {}, base: 'moved' })
+
+		for (const stage of ['gate', 'sync', 'round-2']) {
+			// eslint-disable-next-line no-await-in-loop -- each pair meets the tree the one before it left
+			await run_ship_lap.within('5538', stage, run_ship_scoped.scoped_pair)
+		}
+
+		expect(lap_mock.mock.calls.at(-1)?.[0]).toMatchObject({
+			runs: 2,
+			rerun: run_ship_pair_runs.REASON.NO_RECORD,
+		})
+	})
 })
 
 // joshuafolkken/kit#4985: a pair stale only because a merge moved the base, over files that share

@@ -69,7 +69,11 @@ describe('run_ship_lap.timed — the fallback note', () => {
 		await run_ship_lap.within(
 			ISSUE,
 			STAGE,
-			async () => await run_ship_lap.timed(STEP, async () => 'out', { sink, note_of: () => 'hub' }),
+			async () =>
+				await run_ship_lap.timed(STEP, async () => 'out', {
+					sink,
+					note_of: () => ({ fallback: 'hub' }),
+				}),
 		)
 
 		expect(laps[0]?.fallback).toBe('hub')
@@ -81,10 +85,28 @@ describe('run_ship_lap.timed — the fallback note', () => {
 		await run_ship_lap.within(
 			ISSUE,
 			STAGE,
-			async () =>
-				await run_ship_lap.timed(STEP, async () => 'out', { sink, note_of: () => undefined }),
+			async () => await run_ship_lap.timed(STEP, async () => 'out', { sink, note_of: () => ({}) }),
 		)
 
 		expect(laps[0]).not.toHaveProperty('fallback')
+	})
+})
+
+// joshuafolkken/kit#5538: which run of the scoped pair a lap was, and why it ran again.
+describe('run_ship_lap.timed — the rerun note', () => {
+	it('records the run count and the rerun reason the note carries', async () => {
+		const { laps, sink } = sink_of()
+
+		await run_ship_lap.within(
+			ISSUE,
+			STAGE,
+			async () =>
+				await run_ship_lap.timed(STEP, async () => 'out', {
+					sink,
+					note_of: () => ({ runs: 2, rerun: 'moved' }),
+				}),
+		)
+
+		expect(laps[0]).toMatchObject({ runs: 2, rerun: 'moved' })
 	})
 })

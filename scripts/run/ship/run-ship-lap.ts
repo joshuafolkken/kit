@@ -37,21 +37,21 @@ async function within<T>(issue: string, stage: string, run: () => Promise<T>): P
 	return await scope.run({ issue: Number(issue), stage }, run)
 }
 
-function lap_of(
-	current: LapScope,
-	step: string,
-	started_ms: number,
-	fallback: string | undefined,
-): ShipLapRecord {
-	const lap = { ...current, step, elapsed_ms: performance.now() - started_ms }
+// What a step's own result adds to its lap: why a check read the whole branch, and which run of the
+// scoped pair it was and why it ran again (`run-ship-scoped.ts`).
+type LapNote = Pick<ShipLapRecord, 'fallback' | 'rerun' | 'runs'>
 
-	return fallback === undefined ? lap : { ...lap, fallback }
+function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {
+	return { ...current, step, elapsed_ms: performance.now() - started_ms, ...note }
 }
 
-// `note_of` reads a lap's `fallback` off the step's own result (`run-ship-scoped.ts`).
+function no_note(): LapNote {
+	return {}
+}
+
 interface LapOptions<T> {
 	sink?: LapSink
-	note_of?: (result: T) => string | undefined
+	note_of?: (result: T) => LapNote
 }
 
 // A step that threw still cost the stage its time, so it is timed either way; the append is
@@ -59,27 +59,27 @@ interface LapOptions<T> {
 async function timed<T>(
 	step: string,
 	run: () => Promise<T>,
-	{ sink = to_ledger, note_of }: LapOptions<T> = {},
+	{ sink = to_ledger, note_of = no_note }: LapOptions<T> = {},
 ): Promise<T> {
 	const current = scope.getStore()
 
 	if (current === undefined) return await run()
 
 	const started_ms = performance.now()
-	const noted: { fallback?: string | undefined } = {}
+	const noted: { note: LapNote } = { note: {} }
 
 	try {
 		const result = await run()
 
-		noted.fallback = note_of?.(result)
+		noted.note = note_of(result)
 
 		return result
 	} finally {
-		await sink(lap_of(current, step, started_ms, noted.fallback))
+		await sink(lap_of(current, step, started_ms, noted.note))
 	}
 }
 
 const run_ship_lap = { STEP, timed, within }
 
-export type { LapOptions, LapSink }
+export type { LapNote, LapOptions, LapSink }
 export { run_ship_lap }
