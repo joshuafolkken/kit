@@ -131,6 +131,15 @@ describe('lane_breakdown_laps.of — ship stages', () => {
 		])
 	})
 
+	// joshuafolkken/kit#5531: a minutes-long pair tells why it read the whole branch.
+	it('names why a lap read the whole branch', () => {
+		const entries = [{ ...lap(SCOPED_PAIR, 4, 12), fallback: 'no-record, hub' }]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[SHIP_GATE, [[`${SCOPED_PAIR} (whole branch: no-record, hub)`, 4]]],
+		])
+	})
+
 	it("leaves out another lane's laps and a lap ended between ship stages", () => {
 		expect(minutes_of([lap(JOSH_GATE, 3, 15, OTHER_ISSUE), lap('push', 1, 18)])).toStrictEqual([])
 	})

@@ -37,27 +37,49 @@ async function within<T>(issue: string, stage: string, run: () => Promise<T>): P
 	return await scope.run({ issue: Number(issue), stage }, run)
 }
 
+function lap_of(
+	current: LapScope,
+	step: string,
+	started_ms: number,
+	fallback: string | undefined,
+): ShipLapRecord {
+	const lap = { ...current, step, elapsed_ms: performance.now() - started_ms }
+
+	return fallback === undefined ? lap : { ...lap, fallback }
+}
+
+// `note_of` reads a lap's `fallback` off the step's own result (`run-ship-scoped.ts`).
+interface LapOptions<T> {
+	sink?: LapSink
+	note_of?: (result: T) => string | undefined
+}
+
 // A step that threw still cost the stage its time, so it is timed either way; the append is
 // best-effort (`lane-ledger-write.ts`), so it never replaces the step's own error.
 async function timed<T>(
 	step: string,
 	run: () => Promise<T>,
-	sink: LapSink = to_ledger,
+	{ sink = to_ledger, note_of }: LapOptions<T> = {},
 ): Promise<T> {
 	const current = scope.getStore()
 
 	if (current === undefined) return await run()
 
 	const started_ms = performance.now()
+	const noted: { fallback?: string | undefined } = {}
 
 	try {
-		return await run()
+		const result = await run()
+
+		noted.fallback = note_of?.(result)
+
+		return result
 	} finally {
-		await sink({ ...current, step, elapsed_ms: performance.now() - started_ms })
+		await sink(lap_of(current, step, started_ms, noted.fallback))
 	}
 }
 
 const run_ship_lap = { STEP, timed, within }
 
-export type { LapSink }
+export type { LapOptions, LapSink }
 export { run_ship_lap }
