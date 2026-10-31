@@ -21,6 +21,9 @@ answer wrongly (a false green or a false red) **on every run**? All three, and t
 the other lanes for one reason only: a batch run on broken verification leaves nobody's result
 trustworthy.**
 
+`backlog:next` labels `run:lane` itself where the first two conditions fail
+(`docs/josh-commands-backlog.md` → "`josh backlog:next`").
+
 **A wrong answer that only comes some of the time — a flaky test, a timeout under load — is not a solo
 run.** It carries `run:lane` and `priority:critical`, so it leads the next offer while the other lanes
 keep running: a flake costs another lane one rerun, less than every lane stopped until it merges.
