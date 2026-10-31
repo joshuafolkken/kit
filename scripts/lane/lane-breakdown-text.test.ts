@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
-import type { ShipLapEntry, StageEntry, TestPinnedEntry } from './lane-ledger'
+import type { ShipLapEntry, StageEntry, TestPinnedEntry, TestRelatedEntry } from './lane-ledger'
 
 // joshuafolkken/kit#4995: the breakdown reads as one bullet per stage on the lane's Issue and as one
 // line at the head of the investigation's prompt, the implementation's kinds beside it.
@@ -171,6 +171,31 @@ describe('lane_breakdown_text.report_of', () => {
 		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [entry])
 
 		expect(report.discarded).toBe('background test:pinned probes discarded 1, 2.0 min')
+		read.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5532: the lane's test:related files past the reach cap have a line of their own.
+describe('lane_breakdown_text — test:related over cap', () => {
+	it('reads the over cap files off the ledger and writes them before the waits taken out', () => {
+		const read = vi.spyOn(lane_breakdown_implement, 'read').mockReturnValue([])
+		const entry: TestRelatedEntry = {
+			kind: 'test-related',
+			at: AT,
+			issue: ISSUE,
+			scope: 'related',
+			changed: 1,
+			synced: 0,
+			since_map: 0,
+			readers: 0,
+			over_cap: 2,
+			elapsed_ms: MINUTE_MS,
+		}
+		const report = lane_breakdown_text.report_of(ISSUE, REPORT.breakdown, [entry])
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			'; test:related 2 over cap, in 1 of 1 runs; waits taken out',
+		)
 		read.mockRestore()
 	})
 })

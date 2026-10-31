@@ -3,6 +3,7 @@ import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
 import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown-implement'
 import { lane_breakdown_laps, type Laps } from './lane-breakdown-laps'
 import { lane_breakdown_pinned } from './lane-breakdown-pinned'
+import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { LedgerEntry } from './lane-ledger'
 
@@ -22,6 +23,8 @@ interface Report {
 	pinned?: string
 	// The discarded `run:review` background probes' line, `''` when none (joshuafolkken/kit#5262).
 	discarded?: string
+	// The `test:related` files past the reach cap, `''` when none (joshuafolkken/kit#5532).
+	related?: string
 	// The followup's CI wait's last check to settle, `''` when none was recorded (joshuafolkken/kit#5295).
 	critical?: string
 	// Each ship stage's laps, and the Bash between ship stages, longest first (joshuafolkken/kit#5294).
@@ -107,10 +110,11 @@ function entries_of(report: Report): Array<Entry> {
 	const slept = `${SLEPT} ${lane_breakdown.minutes_text(breakdown.slept_ms)}`
 	const excluded = `${EXCLUDED} ${lane_breakdown.minutes_text(breakdown.excluded_ms)}, ${yielded}, ${slept}`
 
-	const discarded =
-		report.discarded === undefined || report.discarded === '' ? [] : [report.discarded]
+	const notes = [report.discarded, report.related].filter(
+		(text): text is string => text !== undefined && text !== '',
+	)
 
-	const tail = [...discarded, excluded].map((text) => ({ text, laps: [], calls: [] }))
+	const tail = [...notes, excluded].map((text) => ({ text, laps: [], calls: [] }))
 
 	return [...breakdown.stages.map((stage) => stage_entry(stage, report)), ...tail]
 }
@@ -139,6 +143,7 @@ function report_of(
 		laps: lane_breakdown_laps.of(entries, issue, breakdown, calls),
 		pinned: lane_breakdown_pinned.detail_text(rows),
 		discarded: lane_breakdown_pinned.discarded_text(entries, issue),
+		related: lane_breakdown_related.over_cap_text(entries, issue),
 		critical: lane_ci_path_stats.last_check_text(entries, issue),
 		plan_calls: lane_breakdown_implement.plan_calls(calls, breakdown),
 	}
