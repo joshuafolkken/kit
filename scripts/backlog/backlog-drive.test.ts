@@ -257,6 +257,25 @@ describe('backlog_drive.run_pass — triage', () => {
 		})
 		expect(result.state.in_flight).toStrictEqual([FIRST_CHILD])
 	})
+
+	// joshuafolkken/kit#5518: the triaged candidates start while the judgment runs.
+	it('launches the offered lanes, then hands triage back in the same pass', async () => {
+		const owed = { ...offer('run', [OFFERED]), is_judgment_owed: true }
+		const { ports, calls } = harness({ offers: [owed] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(calls).toStrictEqual(['offer', `launch ${OFFERED}`])
+		expect(result.kind === 'end' && result.end.token).toBe('triage')
+		expect(result.state.in_flight).toStrictEqual([OFFERED])
+	})
+
+	it('keeps a refused launch as the end of a pass that owes the judgment', async () => {
+		const owed = { ...offer('run', [OFFERED]), is_judgment_owed: true }
+		const { ports } = harness({ offers: [owed], failed_launches: [OFFERED] })
+		const result = await backlog_drive.run_pass(state(), true, ports)
+
+		expect(result.kind === 'end' && result.end.reason).toBe('launch')
+	})
 })
 
 describe('backlog_drive.run_loop', () => {

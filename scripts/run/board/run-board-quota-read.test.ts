@@ -18,6 +18,7 @@ const EARLIER = '2026-10-28T03:00:00Z'
 const NULL_TIME: unknown = JSON.parse(NONE)
 const INVALID_TIME = 'invalid'
 const UNKNOWN_TIME_TEST = 'keeps windows with unknown time for %s'
+const ASSISTANT = '{"type":"assistant"}'
 
 function claude_line(five_hour: number, seven_day?: number, timestamp?: unknown): string {
 	const windows = {
@@ -40,6 +41,10 @@ function codex_window(used_percent: number, window_minutes: number): string {
 	return JSON.stringify({ used_percent, window_minutes, resets_at: RESET_S })
 }
 
+function primary_line(used_percent: number): string {
+	return codex_line(`{"primary":${codex_window(used_percent, 300)}}`)
+}
+
 // A tail as long as asked, so the file reads as longer than it.
 function full_tail(bytes: number): string {
 	return 'x'.repeat(bytes)
@@ -55,7 +60,7 @@ async function written(file: string, seconds: number): Promise<string> {
 
 describe('run_board_quota_read.claude_reading', () => {
 	it('reads the last rate_limit_event, both windows in percent', () => {
-		const text = [claude_line(0.1, 0.2), '{"type":"assistant"}', claude_line(0.42, 0.68)].join('\n')
+		const text = [claude_line(0.1, 0.2), ASSISTANT, claude_line(0.42, 0.68)].join('\n')
 
 		expect(claude_reading(text)).toEqual({
 			windows: [
@@ -64,6 +69,10 @@ describe('run_board_quota_read.claude_reading', () => {
 			],
 			taken_ms: undefined,
 		})
+	})
+
+	it('reads a window in whole percents, with no floating-point remainder', () => {
+		expect(claude_reading(claude_line(0.07))?.windows[0]?.used_percent).toBe(7)
 	})
 
 	it('reads a window the event leaves out as none, and a broken or cut line as no event', () => {
@@ -146,6 +155,21 @@ describe('run_board_quota_read.codex_reading time', () => {
 	})
 })
 
+describe('run_board_quota_read first readings', () => {
+	const { claude_first, codex_first } = run_board_quota_read
+
+	it("reads a file head's first event, past a line its byte limit cut", () => {
+		const text = [claude_line(0.1), claude_line(0.42), claude_line(0.5).slice(0, 20)].join('\n')
+		const rollout = [codex_line(NONE), primary_line(3), primary_line(9)].join('\n')
+
+		expect(claude_first(text)?.windows[0]?.used_percent).toBe(10)
+		expect(codex_first(rollout)?.windows).toEqual([
+			{ minutes: 300, used_percent: 3, resets_ms: RESET_MS },
+		])
+		expect(claude_first(ASSISTANT)).toBeUndefined()
+	})
+})
+
 // A lane log runs megabytes of tool output past its last `rate_limit_event`.
 describe('run_board_quota_read.reading_in', () => {
 	const { TAIL_BYTES, TAIL_LIMIT_BYTES, reading_in } = run_board_quota_read
@@ -212,5 +236,18 @@ describe('run_board_quota_read files', () => {
 
 		expect(found.map((file) => file.path)).toEqual([yesterday, today])
 		expect(await codex_files(NOW_MS, path.join(root, 'missing'))).toEqual([])
+	})
+})
+
+describe('run_board_quota_read.read_head', () => {
+	it("reads a file's first bytes, and the whole of a shorter one", async () => {
+		const root = mkdtempSync(path.join(tmpdir(), 'quota-head-'))
+		const file = path.join(root, 'head.log')
+
+		await writeFile(file, 'abcdef')
+
+		expect(await run_board_quota_read.read_head(file, 3)).toBe('abc')
+		expect(await run_board_quota_read.read_head(file)).toBe('abcdef')
+		await rm(root, { recursive: true, force: true })
 	})
 })

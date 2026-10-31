@@ -26,6 +26,16 @@ describe('backlog_offer.answer_of — issue numbers become candidates', () => {
 			answer: 'candidates',
 			issues: ['12', '13'],
 			retries: NO_RETRIES,
+			is_judgment_owed: false,
+		})
+	})
+
+	it('maps issue numbers then a trailing triage to candidates that owe the judgment', () => {
+		expect(offer_of(['12', TOKENS.triage], SOME_RUNNING, ONE_RETRY)).toStrictEqual({
+			answer: 'candidates',
+			issues: ['12'],
+			retries: NO_RETRIES,
+			is_judgment_owed: true,
 		})
 	})
 

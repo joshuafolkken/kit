@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { run_board_quota_held, type QuotaPorts, type QuotaSource } from './run-board-quota-held'
-import { run_board_quota_read, type QuotaFile } from './run-board-quota-read'
+import { run_board_quota_read, type QuotaFile, type QuotaReading } from './run-board-quota-read'
 
 const { QUOTA_INTERVAL_MS, quota_reader } = run_board_quota_held
 const WINDOW = { minutes: 300, used_percent: 42, resets_ms: 1000 }
@@ -11,6 +11,13 @@ const EMPTY_FILE = 'empty.log'
 const TAKEN_MS = 5
 const TAKEN = '2026-10-29T03:00:00Z'
 const LATER = '2026-10-30T03:00:00Z'
+const SPENT_FILES: Readonly<Record<string, readonly [number, number]>> = {
+	a_log: [40, 46],
+	b_log: [30, 32],
+	c_log: [20, 23],
+	running_log: [10, 30],
+}
+const RUNNING_FILE = 'running_log'
 
 type Found = QuotaFile | Array<QuotaFile> | Error | undefined
 
@@ -27,7 +34,13 @@ function listed(found: Exclude<Found, Error>): Array<QuotaFile> {
 	return Array.isArray(found) ? found : [found]
 }
 
-// read_tail returns the path, so a file named EMPTY_FILE holds no reading.
+function reading_at(used_percent: number): QuotaReading {
+	return { windows: [{ ...WINDOW, used_percent }], taken_ms: TAKEN_MS }
+}
+
+// read_tail and read_head return the path, so a file named EMPTY_FILE holds no reading, and a file
+// SPENT_FILES names held its first percent at the head and its second at the tail; every file but
+// RUNNING_FILE is done.
 function source_of(file: () => Found): QuotaSource {
 	return {
 		find: async () => {
@@ -38,7 +51,9 @@ function source_of(file: () => Found): QuotaSource {
 			return listed(found)
 		},
 		reading_of: (text) =>
-			text === EMPTY_FILE ? undefined : { windows: [WINDOW], taken_ms: TAKEN_MS },
+			text === EMPTY_FILE ? undefined : reading_at(SPENT_FILES[text]?.[1] ?? WINDOW.used_percent),
+		first_of: (text) => reading_at(SPENT_FILES[text]?.[0] ?? WINDOW.used_percent),
+		is_done: (tail) => tail !== RUNNING_FILE,
 	}
 }
 
@@ -49,9 +64,10 @@ function fixture_of(): Fixture {
 		codex: { path: CODEX_FILE, mtime_ms: 20 },
 	}
 	const read_tail = vi.fn(async (file: string): Promise<string> => file)
+	const read_head = vi.fn(async (file: string): Promise<string> => file)
 	const sources = { claude: source_of(() => files.claude), codex: source_of(() => files.codex) }
 
-	return { clock, files, read_tail, ports: { sources, read_tail, now: () => clock.ms } }
+	return { clock, files, read_tail, ports: { sources, read_tail, read_head, now: () => clock.ms } }
 }
 
 function codex_event(timestamp?: string): string {
@@ -167,7 +183,7 @@ describe('run_board_quota_held.quota_reader', () => {
 })
 
 describe('run_board_quota_held.quota_reader — a newest file holding no reading', () => {
-	it('reads an older file when the newest holds no reading, and marks the older one', async () => {
+	it('reads an older file when the newest holds no reading, opening neither again unchanged', async () => {
 		const { clock, files, read_tail, ports } = fixture_of()
 
 		files.claude = [
@@ -180,14 +196,14 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 
 		expect(first.claude).toEqual({ windows: [WINDOW], taken_ms: TAKEN_MS })
 
-		read_tail.mockClear()
+		files.codex = { path: CODEX_FILE, mtime_ms: 30 }
 		clock.ms = QUOTA_INTERVAL_MS
 		await read()
 
 		await vi.waitFor(() => {
-			expect(read_tail).toHaveBeenCalledWith(EMPTY_FILE, run_board_quota_read.TAIL_BYTES)
+			expect(read_tail).toHaveBeenCalledTimes(4)
 		})
-		expect(read_tail).not.toHaveBeenCalledWith(CLAUDE_FILE, expect.any(Number))
+		expect(read_tail).toHaveBeenLastCalledWith(CODEX_FILE, run_board_quota_read.TAIL_BYTES)
 	})
 
 	it('reads a provider none of whose files holds a reading as none', async () => {
@@ -198,5 +214,34 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 		const quotas = await quota_reader(ports)()
 
 		expect(quotas.claude).toBeUndefined()
+	})
+})
+
+describe('run_board_quota_held.quota_reader — spend per task', () => {
+	it("carries each window's median spend over the newest files on the newest reading", async () => {
+		const { files, ports } = fixture_of()
+
+		files.claude = ['a_log', 'b_log', 'c_log', EMPTY_FILE].map((file, index) => ({
+			path: file,
+			mtime_ms: 50 - index,
+		}))
+
+		const { claude, codex } = await quota_reader(ports)()
+
+		expect(claude).toEqual({ ...reading_at(46), per_task: { [WINDOW.minutes]: 3 } })
+		expect(codex).not.toHaveProperty('per_task')
+	})
+
+	it('leaves out the spend of a file still being written', async () => {
+		const { files, ports } = fixture_of()
+
+		files.claude = [
+			{ path: RUNNING_FILE, mtime_ms: 50 },
+			{ path: 'a_log', mtime_ms: 40 },
+		]
+
+		const { claude } = await quota_reader(ports)()
+
+		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 6 })
 	})
 })
