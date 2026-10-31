@@ -1,0 +1,7 @@
+{
+	"reason": "report-format and chain-rule now point the live-evidence section at josh ship:evidence (#5597)",
+	"date": "2026-10-31",
+	"growth": {
+		"ai_cost.on_demand_bytes": 272
+	}
+}
