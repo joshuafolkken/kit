@@ -232,3 +232,4 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh stash:push` | `<message>` | automation | git | Stash the working tree, untracked files included, leaving the observation ledger |
 | `josh time` · `josh tm` · **kit only** | `[options]` | maintainer | none | Report where a run's wall clock went: model wait, tool execution, human wait |
 | `josh time:density` · `josh tmd` · **kit only** | `[--lanes <n>] [--path <dir>]` | maintainer | none | Report tool calls per round trip across the recent lane sessions |
+| `josh upstream:interrupt` | `<finder> <title> --repo <owner/repo> --body-file <path> [--blocks-finder]` | automation | git, network, notifications | Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation |
