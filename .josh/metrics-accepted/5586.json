@@ -1,0 +1,7 @@
+{
+	"reason": "run_carry.session_owner gives run:merge the calling session as its default owner (#5586)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 6
+	}
+}

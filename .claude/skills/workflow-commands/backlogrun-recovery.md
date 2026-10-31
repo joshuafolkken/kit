@@ -31,7 +31,7 @@ unit parked it, then stopped: leave the label on and count nothing. Otherwise, w
 1. **Stash the half-finished work** — `pnpm josh stash:push "backlogrun: stopped unit for #<N>"` — and
    record it on the Issue; it is popped with `pnpm josh stash:pop "backlogrun: stopped unit for #<N>"`.
 2. **Classify and act in one call** — `pnpm josh run:merge <N> --output <path>` (`--epic <E> --repo
-   <owner/repo> --owner "$PPID"` for a named epic), **the same composite a returned child takes**. It
+   <owner/repo>` for a named epic), **the same composite a returned child takes**. It
    tells an `outage` (re-dispatched with its session resumed, uncounted, bounded by
    `CONSECUTIVE_OUTAGE_LIMIT`) from an `abandoned` child (parked `run:stalled` and counted), and drops
    the stale `in-progress` itself.
