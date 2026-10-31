@@ -1,0 +1,7 @@
+{
+	"reason": "Stage budgets for lane:breakdown and run:board (#5563): a new budget module and its callers",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 60
+	}
+}
