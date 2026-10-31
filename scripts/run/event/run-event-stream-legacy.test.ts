@@ -58,6 +58,7 @@ describe('run_event_stream — a line of the retired idle kind', () => {
 			is_stopped: false,
 			lane_events: new Map(),
 			pr_checks: new Map(),
+			first_lane_ms: undefined,
 		})
 	})
 

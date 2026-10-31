@@ -3,20 +3,25 @@ import { lane_launch_admission } from './lane-launch-admission'
 import type { LaunchContext, LaunchOutcome } from './lane-launch-cli'
 
 type Claim = ReturnType<typeof core_budget.claim>
-const pending: { value: { issue: string; claim: Claim } | undefined } = { value: undefined }
+// One waiting claim per issue: the driver launches a pass's lanes side by side
+// (joshuafolkken/kit#5519), so one issue's claim must not release another's.
+const pending = new Map<string, Claim>()
 
 function keep(issues: ReadonlyArray<string>): void {
-	if (pending.value === undefined || issues.includes(pending.value.issue)) return
+	for (const [issue, claim] of pending) {
+		if (issues.includes(issue)) continue
 
-	core_budget.release(pending.value.claim)
-	pending.value = undefined
+		core_budget.release(claim)
+		pending.delete(issue)
+	}
 }
 
 function claim_for(issue: string): Claim {
-	keep([issue])
-	pending.value ??= { issue, claim: core_budget.claim(0, lane_launch_admission.options_of(issue)) }
+	const claim = pending.get(issue) ?? core_budget.claim(0, lane_launch_admission.options_of(issue))
 
-	return pending.value.claim
+	pending.set(issue, claim)
+
+	return claim
 }
 
 // A wait is not a failed launch or a running child: the driver keeps collecting children and
@@ -29,7 +34,7 @@ async function launch(
 
 	if (handle === undefined) return { kind: 'waiting' }
 
-	pending.value = undefined
+	pending.delete(context.issue)
 
 	return await lane_launch_admission.run_reserved(context, run, handle)
 }

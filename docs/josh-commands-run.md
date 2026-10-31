@@ -744,7 +744,7 @@ The header is three lines — the first two in three columns, the third a spinne
               ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board; a colon is a time of day), a progress bar and per-state counts.
+The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board; a colon is a time of day), a progress bar and per-state counts. `🛫`: start to first lane.
 
 The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
