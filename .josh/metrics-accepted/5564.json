@@ -1,0 +1,10 @@
+{
+	"reason": "run:prep --summary: skeleton module, CLI flag with author-trust marking (review round 1 fix), pointer in report-format.md",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 53,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 165,
+		"prose.excess_bold": 1
+	}
+}

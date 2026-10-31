@@ -336,9 +336,12 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope.
 
 ```bash
 pnpm josh run:prep <N>
+pnpm josh run:prep <N> --summary   # the work summary skeleton
 ```
 
 <!-- /usage -->
+
+`--summary` prints only the work summary's skeleton from the body: `## 現象` as Now, `## 期待結果` as Change, each `## 受け入れ条件` item as Check with an empty `- test:` under it. A missing section prints its heading alone; a body whose author is not trusted carries `issue:read`'s untrusted-body heading.
 
 Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
