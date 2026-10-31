@@ -1004,6 +1004,10 @@ pnpm josh disposition --batch <findings-file>   # → branch table + drop notes
 
 Each dropped finding's PR-body note follows, itself a `review:record` positional. A line outside the grammar exits 1, named.
 
+With `--found-during <N>`, each `file` finding gets an `issue:lint`-clean body at `.josh/tmp/review-cap-<N>-<k>.md` and a printed `pnpm josh issue:file … --route review-cap --label run:lane --found-during <N>` line; nothing is filed. A `file` finding without `--found-during` exits 1.
+
+The body is declared non-bug: the origin pull request is not traced yet. Reclassify it once traced.
+
 ### `josh review:attest`
 
 <!-- usage: review:attest -->

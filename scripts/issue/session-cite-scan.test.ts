@@ -45,6 +45,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['init/start-setup-pr.ts', 1],
 	['observations/observations-flush-landing.ts', 1],
 	['propagate/propagate-steps.ts', 1],
+	['review/disposition-batch-filing.ts', 1],
 	['review/review-finding-ledger.ts', 1],
 	['run/merge/run-merge-steps.ts', 1],
 	// The causing-lane line a refused filing prints to be pasted into the Issue body, whose shape
