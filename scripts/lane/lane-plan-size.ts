@@ -3,7 +3,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { split_assess } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
-import type { LanePlan } from './lane-plan'
+import { lane_plan, type LanePlan } from './lane-plan'
 
 // The size bar `josh lane:plan` holds a plan to (joshuafolkken/kit#5533): a plan whose files outgrow
 // twice the size estimate its Issue declares is refused, not recorded, and the lane splits the rest
@@ -20,7 +20,9 @@ import type { LanePlan } from './lane-plan'
 // hunks the tree already holds would otherwise refuse every re-plan the ship's `unplanned` stop asks for.
 // The lines axis also stands down on a re-plan of a cleared plan (joshuafolkken/kit#5600): the
 // declaration was judged when the plan cleared, and a plan cleared before #5568 would be refused on
-// every re-plan. A yielded plan the entry probe recorded never met the bar, so it still does.
+// every re-plan. So does a re-plan of a sized plan — one that met the bar and was recorded before an
+// unread listing or a yield (joshuafolkken/kit#5605). A yielded plan the entry probe recorded never met
+// the bar, so it still does.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -111,7 +113,7 @@ function measure_over(
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
 	const { hunks, lines_ratio } = signals
-	const lines = recorded?.cleared === true ? undefined : lines_over(declared.lines, lines_ratio)
+	const lines = lane_plan.is_sized(recorded) ? undefined : lines_over(declared.lines, lines_ratio)
 
 	return hunks_over(declared.files, hunks) ?? lines
 }

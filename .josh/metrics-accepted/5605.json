@@ -1,0 +1,7 @@
+{
+	"reason": "#5605 records a met size bar on lane:plan (sized field, is_sized helper, sized_of guard for undeclared issues)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 15
+	}
+}

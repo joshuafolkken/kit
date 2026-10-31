@@ -24,6 +24,7 @@ const HOLDER = 5162
 const LATER = 5171
 const HELD = 'scripts/test/vitest-failure-summary.ts'
 const FREE_FILE = 'scripts/followup/followup-job-rerun.ts'
+const ONE_FILE = 'scripts/lane/one.ts'
 const SUCCESS = 0
 const FAILURE = 1
 const LISTING_LIMIT = 100
@@ -157,7 +158,7 @@ it('does not run line counting for a probe', async () => {
 
 // joshuafolkken/kit#5533: a plan past twice its declared files answers `split` and is never recorded.
 describe('lane:plan size bar', () => {
-	const grown = [FREE_FILE, 'scripts/lane/one.ts', 'scripts/lane/two.ts']
+	const grown = [FREE_FILE, ONE_FILE, 'scripts/lane/two.ts']
 
 	it.each([[[]], [[PROBE]]])(
 		'answers `split` with no record for a plan over the bar (flags %j)',
@@ -200,6 +201,75 @@ describe('lane:plan size bar on the probed hunks', () => {
 			reason: 'hunks',
 		})
 		expect(String(error.mock.calls.at(-1)?.[0])).toContain('split (hunks)')
+	})
+})
+
+// joshuafolkken/kit#5605: a plan that met the size bar keeps it met across an unread or yielded re-plan,
+// while a plan the entry probe yielded on never met it, so its first `lane:plan` judges the lines axis.
+const LINED = '## 背景\n\n- 規模見積もり: 約 2 ファイル / 160 行（テスト除く）\n'
+
+describe('lane:plan size bar across a re-plan of a cleared plan', () => {
+	const added = [FREE_FILE, ONE_FILE]
+
+	beforeEach(() => {
+		signals_of.mockResolvedValue({ ...QUIET, lines_ratio: 1.8 })
+		lane_plan.record(
+			{ issue: LATER, paths: [FREE_FILE], planned_at: '2001-01-01T00:00:00.000Z', cleared: true },
+			directory,
+		)
+	})
+
+	it('does not answer `split (lines)` on the run after an unread re-plan of a cleared plan', async () => {
+		fetch_opted_in.mockResolvedValueOnce({ kind: 'unreadable' })
+		fetch_opted_in.mockResolvedValue(holding(LINED))
+
+		expect(await lane_plan_cli.run([String(LATER), ...added], directory)).toBe(FAILURE)
+		expect(await lane_plan_cli.run([String(LATER), ...added], directory)).toBe(SUCCESS)
+		expect(info).not.toHaveBeenCalledWith('split')
+	})
+
+	it('records a yielded re-plan of a cleared plan as sized', async () => {
+		fetch_opted_in.mockResolvedValue(holding(LINED))
+
+		const code = await lane_plan_cli.run([String(LATER), FREE_FILE, HELD], directory)
+
+		expect(code).toBe(lane_plan_cli.YIELD_EXIT_CODE)
+		expect(lane_plan.read(LATER, directory)).toMatchObject({ sized: true, yielded: true })
+	})
+})
+
+describe('lane:plan size bar with no recorded plan', () => {
+	beforeEach(() => {
+		signals_of.mockResolvedValue({ ...QUIET, lines_ratio: 1.8 })
+	})
+
+	it('keeps a plan that met the bar and yielded at the summary from `split (lines)` on its re-plan', async () => {
+		signals_of.mockResolvedValueOnce({ ...QUIET, lines_ratio: 1 })
+		fetch_opted_in.mockResolvedValue(holding(LINED))
+		const plan = [String(LATER), FREE_FILE, HELD]
+
+		expect(await lane_plan_cli.run(plan, directory)).toBe(lane_plan_cli.YIELD_EXIT_CODE)
+		expect(lane_plan.read(LATER, directory)).toMatchObject({ sized: true, yielded: true })
+		expect(await lane_plan_cli.run(plan, directory)).toBe(lane_plan_cli.YIELD_EXIT_CODE)
+		expect(info).not.toHaveBeenCalledWith('split')
+	})
+
+	it('does not record `sized` for an Issue that declares no size', async () => {
+		fetch_opted_in.mockResolvedValue(holding(''))
+
+		await lane_plan_cli.run([String(LATER), FREE_FILE, HELD], directory)
+
+		expect(lane_plan.read(LATER, directory)?.sized).toBeUndefined()
+	})
+
+	it('judges the lines axis on the first `lane:plan` after an entry-probe yield', async () => {
+		fetch_opted_in.mockResolvedValue(holding(`${LINED}\nFix \`${HELD}:12\`.`))
+
+		expect(await lane_plan_check.yield_at_entry(LATER, directory)).toBe(true)
+		expect(await lane_plan_cli.run([String(LATER), FREE_FILE], directory)).toBe(
+			lane_plan_check.SPLIT_EXIT_CODE,
+		)
+		expect(String(error.mock.calls.at(-1)?.[0])).toContain('split (lines)')
 	})
 })
 

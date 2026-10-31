@@ -185,20 +185,31 @@ async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
 	}
 }
 
+// A plan the size bar judged and passed is recorded `sized`, so a yield after it keeps the bar met for the
+// next run (joshuafolkken/kit#5605). An unread listing or an Issue that declares no size judged nothing,
+// so the plan keeps what `placed` carried.
+function sized_of(plan: LanePlan, issues: ReadonlyArray<OpenIssueData> | undefined): LanePlan {
+	const is_judged = issues !== undefined && lane_plan_size.declares(plan.issue, issues)
+
+	return is_judged ? { ...plan, sized: true } : plan
+}
+
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
 	await warn_near_cap(plan, directory)
 	const issues = await opted_in()
 	const over = await oversize_of(plan, issues, directory)
 
 	if (over !== undefined) return await noted_split(plan, over)
-	lane_plan.record(plan, directory)
-	const found = probe(plan, issues, directory)
+	const sized = sized_of(plan, issues)
+
+	lane_plan.record(sized, directory)
+	const found = probe(sized, issues, directory)
 
 	if (found === UNREAD) return unread()
 
 	return found === undefined
-		? clear(plan, directory)
-		: await give_back(plan, found, directory, 'summary')
+		? clear(sized, directory)
+		: await give_back(sized, found, directory, 'summary')
 }
 
 // `--probe`'s answer: the same tokens and exit codes as the plan's, with nothing written.
@@ -221,12 +232,17 @@ async function probe_answer(plan: LanePlan, directory: string): Promise<number> 
 // A lane that plans again — after a yield, or to add a file — keeps the place in line its first plan
 // took: a fresh time would hand the files it already holds to a lane that planned after it. A yield
 // stays marked until the plan clears, so a check the listing could not answer keeps the plan its lane
-// yielded on.
+// yielded on, and a met size bar stays met.
 function placed(plan: LanePlan, directory: string): LanePlan {
 	const recorded = lane_plan.read(plan.issue, directory)
 	if (recorded === undefined) return plan
 
-	return { ...plan, planned_at: recorded.planned_at, yielded: recorded.yielded }
+	return {
+		...plan,
+		planned_at: recorded.planned_at,
+		yielded: recorded.yielded,
+		sized: lane_plan.is_sized(recorded),
+	}
 }
 
 // The paths `issue` declares in the scope dispatch gated on — its recorded plan, else its plan comment,
