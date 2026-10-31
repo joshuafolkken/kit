@@ -38,8 +38,8 @@ async function within<T>(issue: string, stage: string, run: () => Promise<T>): P
 }
 
 // What a step's own result adds to its lap: why a check read the whole branch, and which run of the
-// scoped pair it was and why it ran again (`run-ship-scoped.ts`).
-type LapNote = Pick<ShipLapRecord, 'fallback' | 'rerun' | 'runs'>
+// scoped pair it was and why it ran again (`run-ship-scoped.ts`), and the tree a gate reused.
+type LapNote = Pick<ShipLapRecord, 'fallback' | 'rerun' | 'reused_tree' | 'runs'>
 
 function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {
 	return { ...current, step, elapsed_ms: performance.now() - started_ms, ...note }

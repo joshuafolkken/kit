@@ -145,6 +145,27 @@ describe('lane_breakdown_laps.of — ship stages', () => {
 	})
 })
 
+// joshuafolkken/kit#5567: a gate the ship reused is counted on one row, apart from a gate that ran.
+describe('lane_breakdown_laps.of — a reused josh gate', () => {
+	it('counts the stage reuses on one row beside the gate that ran', () => {
+		const entries = [
+			{ ...lap(JOSH_GATE, 0, 12), reused_tree: 'abc' },
+			{ ...lap(JOSH_GATE, 0, 13), reused_tree: 'def' },
+			{ ...lap(JOSH_GATE, 2, 14), rerun: 'merge' },
+		]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[
+				SHIP_GATE,
+				[
+					[`${JOSH_GATE} (merge)`, 2],
+					[`${JOSH_GATE} (reused ×2)`, 0],
+				],
+			],
+		])
+	})
+})
+
 // joshuafolkken/kit#5538: a scoped pair that ran again says which run it was and why.
 describe('lane_breakdown_laps.of — a scoped pair run again', () => {
 	it('names the run count and the rerun reason beside why it read the whole branch', () => {
