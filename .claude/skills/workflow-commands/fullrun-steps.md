@@ -68,8 +68,10 @@ decides the release scope (`release:scope`) in one round trip, joining each unde
 the clean path `run:tail` runs inside `pnpm josh ship`** as its report step, so it is a standalone call
 only where a second round kept the ship region separate. It folds only bookkeeping — the
 release ask below stays the single source of what `required` means and the Tier-C publish boundary; a
-`backlogrun` child still leaves `observations:flush`, `issue:cite` and the release ask to the batch's
-own end.
+`backlogrun` child leaves `observations:flush` to each drain marker in
+`backlog:offer` (`scripts/backlog/backlog-offer-cli.ts`): before the marker is written it synchronizes
+the primary checkout to the default branch and awaits the flush, ahead of the retrospective; a failure
+prints one line and keeps the batch ending. `issue:cite` and the release ask remain the batch's own end.
 
 Once the merge is done, `pnpm josh release:scope` says whether a release is owed — `required`, `skip`
 or `unknown`, and `unknown` is never read as `skip`. On `required` the completion summary closes with

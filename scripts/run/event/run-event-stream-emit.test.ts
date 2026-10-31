@@ -127,6 +127,24 @@ describe('run_event_stream_emit.emit_once — one marker per episode', () => {
 	})
 })
 
+// joshuafolkken/kit#5329: the drain flush finishes before the marker a replacing `backlogrun` reads.
+describe('run_event_stream_emit.emit_once — the step before the marker', () => {
+	it('awaits the step before appending, on a fresh episode only', async () => {
+		git_directories_mock.mockResolvedValue([WORKTREE, fresh_repository()])
+		const target = await run_event_stream_emit.stream_target()
+		const markers_seen: Array<number> = []
+		const before_append = vi.fn(async () => {
+			if (target !== undefined) markers_seen.push(run_event_stream.read_events(target).length)
+		})
+
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT, before_append)
+		await run_event_stream_emit.emit_once(DRAIN, DRAIN_TEXT, before_append)
+
+		expect(markers_seen).toStrictEqual([0])
+		expect(await drain_events()).toHaveLength(1)
+	})
+})
+
 describe('run_event_stream_emit.emit_once — the drain marker past trace events', () => {
 	// A filing and a note land after the drain marker, and the watching loop must not read either as a
 	// new episode — or `run:step` would fire the retrospective again.

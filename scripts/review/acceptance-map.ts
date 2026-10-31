@@ -34,6 +34,10 @@ const ROW_PATTERN = new RegExp(
 	String.raw`^[-*]\s+${BACKTICK}(?<id>${ID_PREFIX}[0-9a-f]{${String(ID_HEX_LENGTH)}})${BACKTICK}(?:\s.*)?\s(?<kind>${MET}|${DEFERRED}):\s*(?<rest>\S.*)$`,
 	'u',
 )
+const PENDING_ROW_PATTERN = new RegExp(
+	String.raw`^[-*]\s+${BACKTICK}(?<id>${ID_PREFIX}[0-9a-f]{${String(ID_HEX_LENGTH)}})${BACKTICK}.*\s${PENDING_SUFFIX}$`,
+	'u',
+)
 // A deferral names the split-off issue first, then why it was deferred.
 const DEFERRAL_PATTERN = /^(?<issue>(?:[\w.-]+\/[\w.-]+)?#\d+)\s+\S/u
 const ROW_FORMAT = `under ${MAP_HEADING}, one line per acceptance criterion: \`- \`<id>\` <criterion> — ${MET}: <test name, file:line or command output>\` or \`- \`<id>\` <criterion> — ${DEFERRED}: #<split-off issue> <reason>\``
@@ -164,6 +168,25 @@ function skeleton(issue_body: string | undefined): string | undefined {
 	return [MAP_HEADING, '', ...rows].join('\n')
 }
 
+function met_line(line: string, titles: ReadonlyArray<string>): string {
+	const id = PENDING_ROW_PATTERN.exec(line.trim())?.groups?.['id']
+	const title = id === undefined ? undefined : titles.find((candidate) => candidate.includes(id))
+
+	if (title === undefined) return line
+
+	return `${line.trimEnd().slice(0, -PENDING.length)}${MET}: ${BACKTICK}${title}${BACKTICK}`
+}
+
+// **A pending row whose criterion a test title names by its identifier is met by that test**, so the
+// run copies no criterion into the body by hand (joshuafolkken/kit#5541). A row with no such title
+// stays pending, and a row already filled in is never rewritten.
+function with_test_rows(body: string, titles: ReadonlyArray<string>): string {
+	return body
+		.split('\n')
+		.map((line) => met_line(line, titles))
+		.join('\n')
+}
+
 function has_map(pr_body = ''): boolean {
 	return markdown_section.has_unfenced_line(pr_body, MAP_HEADING)
 }
@@ -200,6 +223,7 @@ const acceptance_map = {
 	ROW_FORMAT,
 	rows_of,
 	skeleton,
+	with_test_rows,
 }
 
 export type { Criterion, Deferral, MapComparison }
