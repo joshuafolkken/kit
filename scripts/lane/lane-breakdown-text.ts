@@ -6,6 +6,7 @@ import { lane_breakdown_pinned } from './lane-breakdown-pinned'
 import { lane_breakdown_related } from './lane-breakdown-related'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import type { LedgerEntry } from './lane-ledger'
+import { lane_stage_budget, type BudgetStage } from './lane-stage-budget'
 
 // A lane's breakdown in words (joshuafolkken/kit#4995): the stages longest first, the implementation's
 // tool-call kinds beside it, and the waits taken out last. `josh lane:breakdown` prints it, the overrun
@@ -43,6 +44,26 @@ interface Entry {
 
 function part_text(part: Stage): string {
 	return `${part.name} ${lane_breakdown.minutes_text(part.ms)}`
+}
+
+// The lane budget a stage counts against (`lane-stage-budget.ts`), `undefined` for one with none.
+function budget_of(name: string): BudgetStage | undefined {
+	const stages: Record<string, BudgetStage | undefined> = {
+		[lane_breakdown.PLAN_STAGE]: 'plan',
+		[lane_breakdown.IMPLEMENT_STAGE]: 'implement',
+		[lane_breakdown.FOLLOWUP_STAGE]: 'followup',
+	}
+	const ship = lane_breakdown.is_ship_stage(name) ? 'ship' : undefined
+
+	return stages[name] ?? ship
+}
+
+// What a stage ran past its budget, `''` within it or with none (joshuafolkken/kit#5563).
+function over_text(stage: Stage): string {
+	const budget = budget_of(stage.name)
+	const over = budget === undefined ? undefined : lane_stage_budget.over_minutes(budget, stage.ms)
+
+	return over === undefined ? '' : `, over budget +${String(over)} min`
 }
 
 // A kind's minutes, and the backgrounded subagent calls it counted at no time.
@@ -98,7 +119,7 @@ function stage_entry(stage: Stage, report: Report): Entry {
 	const laps = report.laps?.get(stage.name) ?? []
 
 	return {
-		text: `${part_text(stage)}${suffix_of(stage.name, report)}`,
+		text: `${part_text(stage)}${over_text(stage)}${suffix_of(stage.name, report)}`,
 		laps: laps.map((lap) => part_text(lap)),
 		calls: calls_of(stage.name, report),
 	}

@@ -107,7 +107,7 @@ describe('lane_overrun.investigate — the breakdown of an overrun', () => {
 	it('leads the prompt with the breakdown', async () => {
 		await lane_overrun.investigate(ISSUE)
 
-		expect(launched_prompt()).toMatch(/^Net time by stage, longest first: implement 51\.0 min /u)
+		expect(launched_prompt()).toMatch(/^Net time by stage, longest first: implement 51\.0 min, /u)
 	})
 
 	it('carries the longest stage on the start note', async () => {
