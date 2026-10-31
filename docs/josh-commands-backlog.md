@@ -275,7 +275,8 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 - `--body-file <path>` — the plan, from a file or stdin (`-`): a blank body takes it, else a comment.
 - `--title <title>` — replace the issue title first.
-- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning.
+- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).
+- `--no-notify` — with `--planned`, skip the `planning` Telegram.
 - `--repo <owner/name>` — write to that repository's issue.
 
 <!-- /usage -->
@@ -539,6 +540,7 @@ pnpm josh epic --decide 893 894 --decision-file why.md
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
+- `--title <title>` — with `--promote`: rename the issue first.
 - `--before <M>` — with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
 - `--after <M>` — with `--add`: start after `#M`; branches when `#M` already has a successor, extends when it is a tail.
 - `--order-before <M>` / `--order-after <M>` — with `--add`: move the task-list row only; write no `blocked-by` relation.
@@ -553,7 +555,7 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 
@@ -963,6 +965,23 @@ pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck:
 <!-- /usage -->
 
 Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it.
+
+### `josh diff:summary`
+
+<!-- usage: diff:summary -->
+
+Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole.
+
+```bash
+pnpm josh diff:summary        # → one row per file, then `full output: <path>` (the diff, in the git directory)
+pnpm josh diff:summary HEAD   # → the same, against a named base
+```
+
+<!-- /usage -->
+
+From `<base>` (default: the change base) to the working tree, tracked files only — `git add -N` a new file to list it. Ranges are new-side lines; declarations are the top-level ones a hunk sits under or a changed line writes.
+
+The diff is saved in the worktree's git directory, so `git status` never lists it. No change prints one line, not a table. Exits 2 when the base or the diff could not be read.
 
 ### `josh disposition`
 

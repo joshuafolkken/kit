@@ -45,6 +45,10 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					description: 'backlink when the split originated in another repository.',
 				},
 				{
+					names: ['--title <title>'],
+					description: 'with `--promote`: rename the issue first.',
+				},
+				{
 					names: ['--before <M>'],
 					description:
 						'with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.',
