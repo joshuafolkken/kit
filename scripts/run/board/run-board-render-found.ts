@@ -1,4 +1,5 @@
 import { run_event_overrun, type OverrunNote } from '#scripts/run/event/run-event-overrun'
+import { run_board_fit } from './run-board-fit'
 import type { Found } from './run-board-found'
 import type { BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
@@ -152,6 +153,24 @@ function is_still(row: BoardRow, header: BoardHeader): boolean {
 	return row.state === 'merged' && found_text(row, header).includes(OVERRUN_MARK)
 }
 
-const run_board_render_found = { found_text, is_still }
+function same(reference: string): string {
+	return reference
+}
+
+// What was filed during a done row, in `room`: a pane too narrow for it cuts its end on an ellipsis
+// rather than the title, so the time column stays where every other row has it
+// (joshuafolkken/kit#4922). The cut text's references are left unlinked, so no hyperlink escape is cut
+// in two.
+function found_fitted(room: number | undefined, row: BoardRow, header: BoardHeader): string {
+	const found = found_text(row, header)
+
+	if (found === '' || room === undefined || run_board_fit.width_of(found) <= room) return found
+
+	const unlinked = found_text(row, { ...header, link: same })
+
+	return run_board_render_title.columns_cut(unlinked, Math.max(1, room))
+}
+
+const run_board_render_found = { found_fitted, found_text, is_still }
 
 export { run_board_render_found }
