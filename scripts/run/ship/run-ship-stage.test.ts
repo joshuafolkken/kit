@@ -117,15 +117,14 @@ describe('run_ship_stage.is_done — followup and report', () => {
 	})
 })
 
-// joshuafolkken/kit#2489: the round-2 pass reads the pushed fix delta, so a resumed ship repeats it
-// unless its record still stands on that push.
+// The final review's exact tree stamp decides reuse, including before the push.
 describe('run_ship_stage.is_done — the round-2 pass', () => {
 	it('runs with no record on a shipped tree', () => {
 		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, NONE, SHIPPED)).toBe(false)
 	})
 
-	it('passes over a recorded pass while the push still stands', () => {
-		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, new Set([STAGE.ROUND_TWO]), SHIPPED)).toBe(true)
+	it('consults the reviewed tree even when a pass and push are recorded', () => {
+		expect(run_ship_stage.is_done(STAGE.ROUND_TWO, new Set([STAGE.ROUND_TWO]), SHIPPED)).toBe(false)
 	})
 
 	it('reruns a recorded pass once the state no longer corroborates it', () => {

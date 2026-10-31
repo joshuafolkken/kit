@@ -1,0 +1,7 @@
+{
+	"reason": "#5389: the watch asks blocking failures before pending checks (one extracted function)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

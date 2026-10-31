@@ -10,6 +10,7 @@ import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_group } from './run-ship-group'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
 import { run_ship_lap } from './run-ship-lap'
@@ -134,13 +135,6 @@ async function emit_phase(
 	)
 }
 
-// A green stage that found nothing to do ends `skipped` rather than `done` (joshuafolkken/kit#5296).
-function settled_phase(section: ShipSection): Phase {
-	if (section.code !== SUCCESS_EXIT_CODE) return PHASE.FAILED
-
-	return section.is_skipped === true ? PHASE.SKIPPED : PHASE.DONE
-}
-
 // The record is written best-effort, as the event stream is: a record that could not be written costs
 // a resumed ship only the state re-read, never the stage that just succeeded.
 function record(target: string | undefined, write: (path: string) => void): void {
@@ -159,7 +153,7 @@ async function settle(
 	context: ShipContext,
 	section: ShipSection,
 ): Promise<void> {
-	const phase = settled_phase(section)
+	const phase = run_ship_group.settled_phase(section)
 
 	await emit_phase(args, context, { stage: step.stage, phase, reason: section.reason })
 
@@ -260,12 +254,14 @@ async function ship_stage(
 	context: ShipContext,
 	sections: Array<ShipSection>,
 ): Promise<ShipOutcome | undefined> {
-	const section = await run_stage(step, args, context)
+	const failed = await run_ship_group.run(
+		step,
+		async (current) => await run_stage(current, args, context),
+		sections,
+	)
 
-	sections.push(section)
-
-	if (section.code !== SUCCESS_EXIT_CODE) {
-		return { sections: await stopped(sections, args, step, context), is_handed_over: false }
+	if (failed !== undefined) {
+		return { sections: await stopped(sections, args, failed.step, context), is_handed_over: false }
 	}
 
 	if (step.stage !== STAGE.SYNC) return undefined

@@ -55,6 +55,7 @@ beforeEach(() => {
 function step_for(stage: string, args: ShipArguments = ARGS): Step {
 	const found = run_ship_steps
 		.steps({ ...args, is_review: true })
+		.flatMap((step) => (step.beside === undefined ? [step] : [step, step.beside]))
 		.find((step) => step.stage === stage)
 
 	if (found === undefined) throw new Error(`no step for ${stage}`)
@@ -83,10 +84,10 @@ describe('run_ship_steps.steps — the order a change ships in', () => {
 			STAGE.REVIEW,
 			STAGE.GATE,
 			STAGE.COMMIT,
-			STAGE.ROUND_TWO,
 			STAGE.FOLLOWUP,
 			STAGE.REPORT,
 		])
+		expect(step_for(STAGE.GATE).beside?.stage).toBe(STAGE.ROUND_TWO)
 	})
 
 	// joshuafolkken/kit#5067: the sync pushes its merge ahead of the gate, so the merge still waits on

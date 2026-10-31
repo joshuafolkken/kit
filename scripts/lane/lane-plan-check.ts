@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { backlog_overlap, type Clash } from '#scripts/backlog/backlog-overlap'
 import { backlog_plan_comment } from '#scripts/backlog/backlog-plan-comment'
@@ -5,6 +6,7 @@ import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { has_any_label, IN_PROGRESS_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { session_cite } from '#scripts/issue/session-cite'
+import { line_budget } from '#scripts/lines/line-budget'
 import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 import { lane_plan, type LanePlan } from './lane-plan'
 import { lane_yield, type YieldAt } from './lane-yield'
@@ -32,6 +34,7 @@ const YIELD_EXIT_CODE = 2
 const RELEASE_FLAG = '--release'
 const RUNNING = new Set([IN_PROGRESS_LABEL])
 const UNREAD = 'unread'
+const NEAR_CAP_HEADROOM = 20
 
 // What the overlap check found: the clash, none, or a listing it could not read.
 type Probe = Clash | typeof UNREAD | undefined
@@ -122,7 +125,21 @@ async function probe(plan: LanePlan, directory: string): Promise<Probe> {
 	return issues === undefined ? UNREAD : clash_among(plan, running_of(issues), directory)
 }
 
+async function warn_near_cap(plan: LanePlan, directory: string): Promise<void> {
+	const paths = plan.paths.map((file) => path.resolve(directory, file))
+	const budgets = await line_budget.budgets_for(paths, directory)
+
+	for (const { file_path, budget } of budgets) {
+		if (budget === undefined || budget.headroom > NEAR_CAP_HEADROOM) continue
+
+		console.error(
+			`near cap: ${path.relative(directory, file_path)} (${String(budget.headroom)} lines left)`,
+		)
+	}
+}
+
 async function check_plan(plan: LanePlan, directory: string): Promise<number> {
+	await warn_near_cap(plan, directory)
 	lane_plan.record(plan, directory)
 	const found = await probe(plan, directory)
 
