@@ -15,7 +15,7 @@ const DUE_HEAD = 'Interaction review now due'
 
 // An interaction reviewer that already ran beside round 1 is only recorded, never run twice.
 function due_line(issue: number): string {
-	return `${DUE_HEAD}: this round’s change touches the run tooling and no interaction pass is recorded. Before \`josh ship\`, record it with \`pnpm josh review:record --interaction --issue ${String(issue)} [<finding> ...]\` — if no interaction reviewer ran beside this round, first open its brief with \`pnpm josh review:brief --interaction\` and run that \`reviewer\` — so a finding is fixed in this lane rather than stopping the ship.`
+	return `${DUE_HEAD}: this round’s change touches the run tooling and no interaction pass is recorded. Before \`josh ship\`, record it with \`pnpm josh review:record --from-slot --interaction --issue ${String(issue)} [<n>=<disposition> ...]\` — if no interaction reviewer ran beside this round, first open its brief with \`pnpm josh review:brief --interaction\` and run that \`reviewer\` — so a finding is fixed in this lane rather than stopping the ship.`
 }
 
 async function report_due(issue: number, root: string): Promise<void> {

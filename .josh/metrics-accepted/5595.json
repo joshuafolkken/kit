@@ -1,0 +1,7 @@
+{
+	"reason": "The interaction-review record step now names the --from-slot form, one byte longer than the hand-copied form it replaces",
+	"date": "2026-10-31",
+	"growth": {
+		"ai_cost.on_demand_bytes": 1
+	}
+}
