@@ -10,7 +10,7 @@ import { make_pr_snapshot, SONAR_QUBE } from './git-pr-checks-fixture'
 import type { PrStateSnapshot } from './git-pr-checks-parse'
 
 // joshuafolkken/kit#1077. `attempt_pr_success_poll` called the fetcher with no `catch`, so one failed
-// read during a 32-minute merge-gate wait rejected out of the loop and ended `followup` — and the
+// read during a merge-gate wait rejected out of the loop and ended `followup` — and the
 // whole run then had to be paid for again. The decision recorded on the issue was to re-read on the
 // next poll, with two properties held: a read that failed is never treated as an answer, and
 // consecutive failures are capped.

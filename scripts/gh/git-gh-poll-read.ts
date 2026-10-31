@@ -11,7 +11,7 @@ import { git_gh_exec } from './git-gh-exec'
 // **Never a pull request's detail**: GitHub computes its `mergeable_state` lazily, under an unchanged
 // ETag, so a 304 would keep a stale state (joshuafolkken/kit#4589).
 //
-// **`pnpm josh followup` reads the same pull request every 10 seconds** while its checks run, and
+// **`pnpm josh followup` repeatedly reads the same pull request** while its checks run, and
 // every lane waiting on its merge does so at once. A `304 Not Modified` does not count against the
 // rate limit, so a poll that finds nothing changed costs only its pull detail read.
 //

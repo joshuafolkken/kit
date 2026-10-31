@@ -73,7 +73,7 @@ const SCANNER_REMOVED = {
 	[agent_session_environment.PROXY_CERTIFICATE_KEY]: undefined,
 }
 
-// joshuafolkken/kit#2436: under a supply-chain scanner's loopback proxy, one 30-second stall made the
+// joshuafolkken/kit#2436: under a supply-chain scanner's loopback proxy, one stalled request made the
 // proxy refuse every later api.github.com connection of that `followup` run, so the merge gate's
 // retries could only fail. GitHub requests now bypass a proxy this machine stood up on loopback.
 describe('git_gh_exec — a loopback proxy is not handed to gh', () => {

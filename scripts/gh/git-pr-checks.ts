@@ -16,13 +16,12 @@ import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './gi
 const SECONDS_TO_MS = 1000
 const CHECK_WAIT_INTERVAL_MS = 10_000
 // The wait has to outlast what the CI it is watching is allowed to take, or it gives up on a run
-// that is still legitimately progressing — which is what 180 seconds did to every consumer whose
+// that is still legitimately progressing — which happened to consumers whose
 // suite includes E2E: `followup` became a command that needed `JOSH_CI_TIMEOUT_SECONDS` set by hand
 // on every invocation and, when that was forgotten, exited red beside a CI that was still running.
 // The budget is therefore read off the distributed `templates/workflows/ci.yml` rather than picked
-// as a round number: its longest chain is `e2e` (25 minutes) behind the `playwright-image` job it
-// needs (2), so 27 minutes is the longest run that workflow permits, and five minutes of
-// runner-queue headroom goes on top. A unit test walks the `needs` graph of the distributed
+// as a round number: its longest chain includes `e2e` and the `playwright-image` job it needs,
+// with runner-queue headroom on top. A unit test walks the `needs` graph of the distributed
 // workflows and fails if any declared budget outgrows this value; a job that declares no cap is a
 // gap the number cannot promise to cover rather than a reason to inflate it. Waiting longer costs
 // nothing on a fast project: polling returns as soon as the checks settle, and a failed check throws
@@ -30,7 +29,7 @@ const CHECK_WAIT_INTERVAL_MS = 10_000
 const DEFAULT_TIMEOUT_SECONDS = 1920
 
 // The poll loop sleeps between attempts and not after the last one, so spanning a budget takes one
-// more attempt than the budget holds intervals: without the `+ 1` a 60-second setting waited 50.
+// more attempt than the budget holds intervals; otherwise the wait ends one interval early.
 function compute_max_attempts(timeout_seconds: number, interval_ms: number): number {
 	return Math.ceil(timeout_seconds / (interval_ms / SECONDS_TO_MS)) + 1
 }
@@ -56,7 +55,7 @@ const WATCH_CONFIRMED_STABLE_READS = 1
 
 // **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
 // a rate limit or one request over its budget is the kind of failure the *next* poll answers — and
-// ending a 32-minute wait on one of them costs the whole run again, so the fetch catches them rather
+// ending a merge wait on one of them costs the whole run again, so the fetch catches them rather
 // than rejecting straight out of the loop.
 //
 // **The cap is what keeps "ask again" from becoming "wait out the budget in silence".** Three
@@ -298,7 +297,8 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 // **Three requests, and a fourth only where it can change the answer.** The pull request detail and
 // the two commit listings are read every poll because `mergeable_state` and the rollup both move
 // while CI runs; the review listing is read when the predicate says this poll's verdict turns on it.
-// A `followup` that waits out its whole 32-minute budget went from about 800 requests to about 600.
+// Reading the review only when it can change the verdict keeps a long wait's request count down
+// (joshuafolkken/kit#1043).
 async function default_fetch_pr_state(
 	branch_name: string,
 	should_read_review_decision: ReviewDecisionPredicate = should_always_read_review_decision,

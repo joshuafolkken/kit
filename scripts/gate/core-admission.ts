@@ -165,8 +165,8 @@ function fits_in_order({ own, ahead, running }: Placement, budget: MachineBudget
 }
 
 // **A host-wide swap stall holds the oldest claim too** (joshuafolkken/kit#4451). Running alone skipped
-// the memory test, so a lone gate started a 2.4 GB lint into a stall with 1.7 GB free and swapped it
-// for 830 s. Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
+// the memory test, so a lone gate started lint into a stall and prolonged it.
+// Only both together hold: traffic alone is this machine's daily norm (#4313), and a claim
 // heavier than free memory on a calm machine would wait for room that never comes.
 function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): boolean {
 	const needed_mb = sum_load([...running, own]).memory_mb
@@ -176,8 +176,8 @@ function is_swap_stalled({ own, running }: Placement, budget: MachineBudget): bo
 
 // **The wait cap does not release a swap-stall hold, for any claim** (joshuafolkken/kit#4451): the cap
 // exists so a wedged sibling cannot stall the machine for good, but a stall ends when its traffic stops
-// or its memory is free, so the hold cannot outlive it. Released at the cap, a 2.4 GB lint started into
-// the stall it waited on and swapped for the same 830 s — and holding only a lone claim let a gate's
+// or its memory is free, so the hold cannot outlive it. Released at the cap, lint started into
+// the stall it waited on and prolonged it — and holding only a lone claim let a gate's
 // later claims start into the stall at their own caps, after which the lint was no longer alone.
 function is_swap_held(
 	key: string,
