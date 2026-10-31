@@ -283,6 +283,14 @@ function blanked(command: string): string | undefined {
 	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) => ' '.repeat(span.length))
 }
 
+// Only the text the shell never expands is blanked — a single-quoted span and an escaped character —
+// so a `` ` `` or `$` left here is one the shell acts on, and a double-quoted span stays as written.
+function literal_blanked(command: string): string {
+	return command.replaceAll(QUOTED_SPAN_PATTERN, (span) =>
+		span.startsWith(DOUBLE_QUOTE) ? span : ' '.repeat(span.length),
+	)
+}
+
 function discarded_commands(command: string): Array<string> {
 	const plain = unquoted(command)
 
@@ -435,6 +443,7 @@ const time_shell = {
 	josh_commands_of,
 	josh_signatures_of,
 	leading_word,
+	literal_blanked,
 	unquoted,
 	without_heredoc_bodies,
 }
