@@ -64,9 +64,10 @@ async function row_of(issue: number, local: LocalRead, plan: BoardPlan): Promise
 describe('run_board_tick.tick — why a waiting row waits', () => {
 	const POOL = plan_of([child(UNTRIAGED, []), child(HELD)])
 
-	it('draws an untriaged row and the row it holds back, each with its own reason', async () => {
-		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {4}❓ {13}3727$/u)
-		expect(await row_of(HELD, LOCAL, POOL)).toMatch(/^ {4}✋ 3727 {8}3714$/u)
+	// joshuafolkken/kit#5518: the untriaged row holds only itself.
+	it('draws ✋ on the untriaged row alone, the judged row beside it held by nothing', async () => {
+		expect(await row_of(UNTRIAGED, LOCAL, POOL)).toMatch(/^ {4}✋ {13}3727$/u)
+		expect(await row_of(HELD, LOCAL, POOL)).not.toMatch(/✋/u)
 	})
 
 	it('draws next free lane from the count the local read carries', async () => {

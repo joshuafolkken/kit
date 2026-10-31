@@ -181,8 +181,8 @@ function labels_of(args: FileArguments, body: string, is_auto_ok = false): Reado
 }
 
 // Why an `auto-ok` filing with neither `run:lane` nor `run:solo` is refused, or `undefined` when it is
-// not. The offer paths withhold every candidate while one opted-in Issue is
-// untriaged, so a run's own filing without the judgement stopped every lane. No default is applied:
+// not. The offer paths hold an untriaged opted-in Issue back until it is judged — `epic:next --lanes`
+// every candidate with it — so a run's own filing without the judgement stalls. No default is applied:
 // `run:solo` is the answer that keeps a verification defect from running beside others, and only a
 // reading of the Issue gives it (`backlogrun-lanes.md`).
 function triage_problem(labels: ReadonlyArray<string>): string | undefined {

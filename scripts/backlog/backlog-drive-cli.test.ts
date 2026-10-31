@@ -184,6 +184,13 @@ describe('backlog_drive_cli output — the offer’s cause', () => {
 
 		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.waiting).toStrictEqual([4496])
 	})
+
+	// joshuafolkken/kit#5518: an offer that held an untriaged candidate back owes the judgment.
+	it('reads the judgment an offer owes beside its candidates', () => {
+		const offer = { verdict: 'run', issues: ['12'], retries: 0, is_judgment_owed: true }
+
+		expect(backlog_drive_cli.to_offer(JSON.stringify({ offer }))?.is_judgment_owed).toBe(true)
+	})
 })
 
 describe('backlog_drive_cli output — the rest', () => {

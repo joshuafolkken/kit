@@ -10,9 +10,11 @@ import type { EpicChild } from './epic-graph'
 // `backlog:drive` without any agent reading it. `run:lane` records the other answer, so an issue with
 // neither label is one nobody has judged — and such an issue may be one that must run alone.
 //
-// **One untriaged candidate withholds every candidate**, not just itself: whether the others may start
-// depends on whether it is `run:solo`, which is exactly what is not known yet. The answer is the
+// **On `epic:next --lanes` one untriaged candidate withholds every candidate**: whether the others may
+// start depends on whether it is `run:solo`, which is exactly what is not known yet. The answer is the
 // `triage` verdict, which `backlog:drive` hands back to the parent rather than acting on.
+// **`backlog:next` holds only the untriaged candidate**: it offers the triaged ones and asks for the
+// judgment beside them, since a `run:solo` judgment stops the next offer by the gate's own rule.
 //
 // **Both offer paths call `untriaged`**: `backlog:next` (the pool drain) and `epic:next --lanes`
 // (a named epic's children, `epic-lane-offer.ts`) — the same pairing `epic_solo` keeps.
@@ -20,6 +22,8 @@ import type { EpicChild } from './epic-graph'
 type TriageVerdict = 'triage'
 
 const TRIAGE_VERDICT: TriageVerdict = 'triage'
+const JUDGE_STEP =
+	'Read each one, record its blocked-by order and one of the two labels with a comment saying why'
 
 // Read off a bare label list too, so `josh issue:file` refuses an untriaged `auto-ok` filing by the
 // same answer the offer paths withhold it by.
@@ -36,17 +40,37 @@ function untriaged(children: ReadonlyArray<EpicChild>): ReadonlyArray<EpicChild>
 	return children.filter((child) => !is_triaged(child))
 }
 
-// Names every untriaged number, so the parent reading standard error knows which issues to judge.
-function message(children: ReadonlyArray<EpicChild>, repo: string): string {
+// The untriaged numbers and the labels they lack, the opening both messages share.
+function lacking_labels(children: ReadonlyArray<EpicChild>, repo: string): string {
 	const numbers = children.map((child) => issue_cite.plain(child.number)).join(', ')
 
+	return `${numbers} carry neither \`${RUN_SOLO_LABEL}\` nor \`${RUN_LANE_LABEL}\` in ${repo}`
+}
+
+// Names every untriaged number, so the parent reading standard error knows which issues to judge.
+function message(children: ReadonlyArray<EpicChild>, repo: string): string {
 	return issue_citation.linkify(
-		`Untriaged: ${numbers} carry neither \`${RUN_SOLO_LABEL}\` nor \`${RUN_LANE_LABEL}\` in ${repo}, so nothing is offered until each is judged. Read each one, record its blocked-by order and one of the two labels with a comment saying why, then ask again.`,
+		`Untriaged: ${lacking_labels(children, repo)}, so nothing is offered until each is judged. ${JUDGE_STEP}, then ask again.`,
 		repo,
 	)
 }
 
-const epic_triage = { TRIAGE_VERDICT, has_triage_label, is_triaged, message, untriaged }
+// Names the untriaged numbers `backlog:next` held back while it offered the triaged candidates.
+function held_message(children: ReadonlyArray<EpicChild>, repo: string): string {
+	return issue_citation.linkify(
+		`Held: ${lacking_labels(children, repo)}, so each waits for its judgment while the triaged candidates are offered. ${JUDGE_STEP}.`,
+		repo,
+	)
+}
+
+const epic_triage = {
+	TRIAGE_VERDICT,
+	has_triage_label,
+	held_message,
+	is_triaged,
+	message,
+	untriaged,
+}
 
 export type { TriageVerdict }
 export { epic_triage }

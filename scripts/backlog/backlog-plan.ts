@@ -92,8 +92,8 @@ function join_row(reference: string, note: string): string {
 // A `run:solo` child is marked beside its number, so a person reading the plan sees which issues
 // `backlog:next` will start alone before the run starts.
 const SOLO_MARK = `[${RUN_SOLO_LABEL}]`
-// A child with neither `run:solo` nor `run:lane` is one `backlog:next` withholds everything for until
-// it is judged, so the plan says which ones before the run asks.
+// A child with neither `run:solo` nor `run:lane` is one `backlog:next` holds back until it is judged,
+// so the plan says which ones before the run asks.
 const UNTRIAGED_MARK = '[untriaged]'
 
 function mark_of(child: EpicChild): string | undefined {

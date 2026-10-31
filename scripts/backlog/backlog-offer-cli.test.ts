@@ -255,4 +255,11 @@ describe('backlog_offer_cli.run --json — the cause', () => {
 
 		expect(info_lines.at(-1)).toContain('"cause":"chain","waiting":[4496,4497]')
 	})
+
+	// joshuafolkken/kit#5518: a trailing `triage` reaches the driver as the judgment it owes.
+	it('prints the judgment owed by candidates offered beside a held one', async () => {
+		await answer_for({ code: OK, out: '12\ntriage' }, 'run', [...RUNNING, '--json'])
+
+		expect(info_lines.at(-1)).toContain('"is_judgment_owed":true')
+	})
 })
