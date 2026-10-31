@@ -1,0 +1,7 @@
+{
+	"reason": "Per-task usage spend for the board's tasks-left column (#5508): a spend module with its done-file check, held wiring that reads each file's head and the render column; the review's fix leaves out files still being written",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 127
+	}
+}
