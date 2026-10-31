@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -36,6 +36,11 @@ describe('disposition_cli.run', () => {
 // single-finding call it was.
 const BATCH_FLAG = '--batch'
 const UNPARSED_LINE = 'not a finding'
+// An issue number no review cites, so the git-ignored draft it writes collides with nothing.
+const FOUND_DURING = 999_999
+const FOUND_DURING_FLAG = '--found-during'
+const FILE_ROUTED_LINE = `confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`
+const DRAFTED_BODY = `.josh/tmp/review-cap-${String(FOUND_DURING)}-1.md`
 
 function findings_file(content: string): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'disposition-batch-'))
@@ -74,17 +79,6 @@ describe('disposition_cli.run --batch', () => {
 		vi.restoreAllMocks()
 	})
 
-	// joshuafolkken/kit#5583: a finding routed to `file` drafts a body that cites the review's issue.
-	it('refuses a file-routed finding without --found-during', () => {
-		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-		const file = findings_file(`confirmed bug-risks:medium:${CODE_FILE} — a null deref\n`)
-
-		expect(disposition_cli.run([BATCH_FLAG, file])).toBe(1)
-		expect(String(error.mock.calls[0]?.[0])).toContain('--found-during')
-
-		vi.restoreAllMocks()
-	})
-
 	it('keeps a bare path the single-finding call', () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
@@ -94,6 +88,29 @@ describe('disposition_cli.run --batch', () => {
 		expect(write).toHaveBeenCalledWith('non-runtime\n')
 
 		vi.restoreAllMocks()
+	})
+})
+
+// joshuafolkken/kit#5583: a finding routed to `file` drafts a body that cites the review's issue.
+describe('disposition_cli.run --batch with a file-routed finding', () => {
+	it('refuses it without --found-during', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(disposition_cli.run([BATCH_FLAG, findings_file(FILE_ROUTED_LINE)])).toBe(1)
+		expect(String(error.mock.calls[0]?.[0])).toContain(FOUND_DURING_FLAG)
+
+		vi.restoreAllMocks()
+	})
+
+	it('prints the issue:file line with --found-during', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const file = findings_file(FILE_ROUTED_LINE)
+
+		expect(disposition_cli.run([BATCH_FLAG, file, FOUND_DURING_FLAG, String(FOUND_DURING)])).toBe(0)
+		expect(String(write.mock.calls[0]?.[0])).toContain('pnpm josh issue:file')
+
+		vi.restoreAllMocks()
+		rmSync(DRAFTED_BODY, { force: true })
 	})
 })
 

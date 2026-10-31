@@ -1,8 +1,8 @@
 {
-	"reason": "disposition --batch drafts review-cap issue bodies and their issue:file lines (#5583): a new module, its CLI wiring, and one line in review.md branch 2",
+	"reason": "disposition --batch drafts review-cap issue bodies (#5583): the filing module and its tests",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 101,
+		"scripts.code_lines": 114,
 		"rules.lines": 1,
 		"ai_cost.on_demand_bytes": 137
 	}

@@ -12,6 +12,9 @@ import { disposition_batch, type BatchFinding } from './disposition-batch'
 
 const BODY_DIRECTORY = '.josh/tmp'
 const FOUND_DURING_FLAG = '--found-during'
+const SECURITY_CATEGORY = 'security:'
+// A `'` inside a single-quoted shell word: close the quote, an escaped quote, reopen.
+const ESCAPED_QUOTE = String.raw`'\''`
 const MISSING_FOUND_DURING =
 	'a finding routes to `file`: pass `--found-during <N>`, the issue whose review found it'
 const FILE_HEADING = `File commands (bodies drafted under ${BODY_DIRECTORY}/ — read each before filing):`
@@ -30,6 +33,14 @@ function title_of(finding: BatchFinding, issue: number): string {
 	return `Resolve review-cap finding ${finding.spec} deferred from ${cite(issue)}`
 }
 
+// A security finding declares what it bypasses instead of a priority, so `issue:file` applies the
+// high floor `issue-template.md` → H gives it; any other finding runs at the normal priority.
+function priority_line(finding: BatchFinding): string {
+	return finding.spec.startsWith(SECURITY_CATEGORY)
+		? `- セキュリティ: ${finding.description}`
+		: '- 優先度: 通常'
+}
+
 function background_lines(finding: BatchFinding, issue: number): ReadonlyArray<string> {
 	return [
 		'## 背景',
@@ -37,7 +48,7 @@ function background_lines(finding: BatchFinding, issue: number): ReadonlyArray<s
 		'- 種別: 非不具合',
 		'- 目的: 機能改善',
 		'- 人の判断: 不要',
-		'- 優先度: 通常',
+		priority_line(finding),
 		'- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）',
 		'',
 		`${cite(issue)} のレビューで確かめた所見 \`${finding.spec}\`。ラウンド上限のため、その場では直さずに持ち越した。`,
@@ -65,10 +76,16 @@ function body_of(finding: BatchFinding, issue: number): string {
 	].join('\n')
 }
 
+// Single-quoted, so a finding path carrying `$(`, a backtick or `"` stays literal when pasted.
+function shell_quoted(text: string): string {
+	return `'${text.split("'").join(ESCAPED_QUOTE)}'`
+}
+
 function command_of(filing: Filing, issue: number): string {
 	const flags = `--route review-cap --label run:lane --found-during ${String(issue)}`
+	const body_file = shell_quoted(filing.body_path)
 
-	return `pnpm josh issue:file "${filing.title}" --body-file ${filing.body_path} ${flags}`
+	return `pnpm josh issue:file ${shell_quoted(filing.title)} --body-file ${body_file} ${flags}`
 }
 
 function body_path_of(directory: string, issue: number, index: number): string {
@@ -103,15 +120,18 @@ function found_during_of(argv: ReadonlyArray<string>): number | undefined {
 function filing_lines(
 	findings: ReadonlyArray<BatchFinding>,
 	argv: ReadonlyArray<string>,
+	directory: string = BODY_DIRECTORY,
 ): ReadonlyArray<string> | undefined {
 	const filed = findings.filter((finding) => disposition_batch.branch_of(finding) === 'file')
+
 	if (filed.length === 0) return []
 
 	const issue = found_during_of(argv)
 
 	if (issue === undefined) return undefined
 
-	const commands = write_filings(filed, issue).map((filing) => command_of(filing, issue))
+	const filings = write_filings(filed, issue, directory)
+	const commands = filings.map((filing) => command_of(filing, issue))
 
 	return ['', FILE_HEADING, ...commands]
 }
