@@ -1,5 +1,6 @@
 import { agent_provider, type AgentProvider } from '#scripts/agent/agent-provider'
 import { git_command } from '#scripts/git/git-command'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -258,6 +259,14 @@ function owner_of(
 	transcript: string | undefined = run_carry_conversation.own_transcript(),
 ): CarryOwner {
 	return { pid, start: read(pid), transcript }
+}
+
+// The calling session as owner — the pid the session exports, so no caller spells `$PPID`; with
+// none exported, no owner is declared.
+function session_owner(): CarryOwner {
+	const pid = agent_session_environment.own_session_pid()
+
+	return pid === undefined ? NO_OWNER : owner_of(pid)
 }
 
 function fresh_carry(invocation: string, owner: CarryOwner, now: Date): RunCarry {
@@ -543,6 +552,7 @@ const run_carry = {
 	remaining_of,
 	repository_directory,
 	retrospective_done_of,
+	session_owner,
 	standing_message,
 	unknown_message,
 	unreadable_message,

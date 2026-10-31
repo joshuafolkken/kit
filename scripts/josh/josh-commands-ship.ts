@@ -20,10 +20,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		usage: {
 			examples: [
 				{
-					arguments: '<N> --epic <E> --repo <owner/repo> --owner "$PPID" --output <path>',
+					arguments: '<N> --epic <E> --repo <owner/repo> --output <path>',
 					note: 'prints the next child number, or a verdict',
 				},
-				{ arguments: '<N> --owner "$PPID"', note: 'backlog offer (no epic)' },
+				{ arguments: '<N>', note: 'backlog offer (no epic)' },
 			],
 			flags: [
 				{
@@ -32,7 +32,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				},
 				{
 					names: [OWNER],
-					description: "the parent's process, so the carry count respects the ownership guard.",
+					description:
+						"the parent's process, so the carry count respects the ownership guard; omitted, the calling session.",
 				},
 				{
 					names: [OUTPUT],
