@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { z } from 'zod'
 
 // One lane session's transcript reduced to its tool calls: each `tool_use` an `assistant` line carries,
@@ -77,7 +78,6 @@ interface CallInput {
 
 const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
 const GENERAL_PURPOSE = 'general-purpose'
-const LEVEL_LINE = /^(?:low|medium|high|xhigh|max)$/u
 // The words each pass's prompt carries: the interaction brief's path or block, the round-2 prompt's lead.
 const PASS_MARKERS: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
 	[['review-brief-interaction-', '## Interaction review'], 'interaction'],
@@ -93,11 +93,12 @@ function named(value: unknown): string | undefined {
 	return value === '' ? undefined : string_or_undefined(value)
 }
 
-// The level a review brief opens with, `undefined` for a prompt that opens otherwise.
+// The level a review brief or a reviewer launch prompt opens with, `undefined` for a prompt that opens
+// otherwise.
 function level_of(prompt: string): string | undefined {
 	const [first = ''] = prompt.split('\n', 1)
 
-	return LEVEL_LINE.test(first.trim()) ? first.trim() : undefined
+	return review_prompt_level.level_of(first.trim())
 }
 
 function pass_of(prompt: string): string | undefined {

@@ -3,6 +3,7 @@ import { review_attest, type ReviewSlot } from '#scripts/review/review-attest'
 import { review_finding_ledger } from '#scripts/review/review-finding-ledger'
 import { review_finding_text } from '#scripts/review/review-finding-text'
 import { review_prior_findings } from '#scripts/review/review-prior-findings'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { review_record_cli } from '#scripts/review/review-record-cli'
 
 // The pure half of `josh ship --review`: the one-line prompts the supervised reviewers are launched
@@ -159,9 +160,10 @@ function issue_read_instruction(issue: string): string {
 const IN_SESSION_CLAUSE =
 	'Review it yourself in this session — you carry no Skill or Agent tool, so never launch a second reviewer.'
 
+// Each opening leads with the brief's level, so a transcript tells the review's level (joshuafolkken/kit#5555).
 function round_one_opening(brief_path: string): string {
 	return [
-		`Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
+		`${review_prompt_level.opening(brief_path)}Review this checkout as a /code-review: read the review brief at ${brief_path} and follow it exactly —`,
 		'the level on its first line, the rubric it names, the checkout it pins and its review:attest step.',
 		IN_SESSION_CLAUSE,
 	].join(' ')
@@ -228,7 +230,7 @@ function verification_prompt(
 	findings_path?: string,
 ): string {
 	return [
-		`Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
+		`${review_prompt_level.opening(brief_path)}Review this checkout as a /code-review — the round-2 verification pass over the round-1 fixes: read the`,
 		`review brief at ${brief_path} and follow it exactly — the level on its first line, the rubric it`,
 		'names, the checkout it pins and its review:attest step. Do not edit any file.',
 		IN_SESSION_CLAUSE,
