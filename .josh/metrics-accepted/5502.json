@@ -1,0 +1,9 @@
+{
+	"reason": "The size cap (#5502) adds the over_cap judgement to size_estimate, holds over-cap rows in backlog:next and auto-ok:next, names them in the idle notice, and states the cap in split-assessment.md and the backlog doc",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 79,
+		"ai_cost.on_demand_bytes": 48,
+		"prose.excess_bold": 2
+	}
+}

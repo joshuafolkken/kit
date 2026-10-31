@@ -7,7 +7,7 @@ import {
 	DEFAULT_TIMEOUT_SECONDS,
 } from './git-pr-checks'
 
-// #851: the old 180-second default expired before any consumer whose CI includes E2E could finish,
+// #851: the merge wait must outlast consumer CI that includes E2E,
 // so the wait is derived from what the distributed workflows themselves permit rather than from a
 // round number. Deriving it here keeps the two from drifting — raising a declared budget past this
 // wait fails the suite instead of silently re-creating the timeout the default exists to prevent.
@@ -28,7 +28,7 @@ const WATCHED_WORKFLOWS: ReadonlyArray<string> = [
 ]
 
 // A job cannot start before everything it needs has finished, so a run is as long as the longest
-// chain through the `needs` graph — `e2e`'s 25 minutes behind `playwright-image`'s 2, not 25 alone.
+// chain through the `needs` graph, including both `e2e` and its `playwright-image` prerequisite.
 // The in-progress set makes a malformed cyclic workflow return instead of recursing forever. A job
 // that declares no `timeout-minutes` contributes 0: GitHub's implicit 6-hour limit is longer than
 // any wait worth having, so an uncapped job is outside what this derivation can promise rather than
@@ -74,7 +74,7 @@ describe('DEFAULT_TIMEOUT_SECONDS', () => {
 	})
 
 	// Without this the guard fails open: deleting the cap it is derived from drops the chain to a
-	// smaller number, both budget assertions keep passing, and the permitted run becomes 6 hours.
+	// smaller number, both budget assertions keep passing, and GitHub's implicit limit takes over.
 	it('still finds the cap the budget is derived from', () => {
 		const e2e_minutes = ci_yml_fixture.job_timeout_minutes(ci_yml_fixture.e2e_template_job())
 

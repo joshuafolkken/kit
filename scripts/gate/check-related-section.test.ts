@@ -28,7 +28,7 @@ const PASSED_DROPPED_LINE = '… 55 earlier line(s) in the log'
 const FIRST_LINE = '\nline 1\n'
 // The size past which Claude Code saves a tool result instead of showing it (`BASH_MAX_OUTPUT_LENGTH`).
 const TOOL_RESULT_BYTES = 8000
-// joshuafolkken/kit#5168: the `test:related` that printed 142.8 KB ran 877 files.
+// joshuafolkken/kit#5168: large related suites must leave a readable verdict in the tool result.
 const RELATED_FILE_COUNT = 877
 
 function numbered_output(count: number): string {

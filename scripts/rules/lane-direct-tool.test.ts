@@ -115,7 +115,7 @@ describe('is_lane_direct_tool', () => {
 	})
 })
 
-// joshuafolkken/kit#4582: a four-worker typed eslint held 12 GB through `reserved-run` and `sh -c`.
+// joshuafolkken/kit#4582: a four-worker typed eslint ran unchecked through `reserved-run` and `sh -c`.
 describe('is_lane_direct_tool — multi-worker eslint and shell scripts', () => {
 	it.each([
 		['a reserved four-worker eslint', `${RESERVED_ESLINT} --concurrency 4`],

@@ -6,7 +6,7 @@ import { git_gh_poll_read } from './git-gh-poll-read'
 import { check_runs_pages, PR_HEAD_SHA, REPO_NAME_PATH } from './git-gh-pr-fixture'
 import { git_gh_pr_rollup } from './git-gh-pr-rollup'
 
-// joshuafolkken/kit#4550: every lane waiting on its merge read its pull request every 10 seconds, each
+// joshuafolkken/kit#4550: every lane waiting on its merge repeatedly read its pull request, and each
 // read counted against the rate limit whether or not anything had changed.
 
 const PATH = `${REPO_NAME_PATH}/pulls/972`

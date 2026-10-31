@@ -18,10 +18,8 @@ import type { DrivePorts, DriveState, PassResult } from './backlog-drive'
 // yellow. The kernel's warning is no hold (joshuafolkken/kit#4199): macOS keeps it long after the
 // pressure passed, so a run held on it never resumed.
 //
-// **The 🧠 resume bar stays at yellow (70%) on measurement** (joshuafolkken/kit#4529). Across the
-// 2026-10-22 run on an 18 GB machine (106 one-minute samples, 24 after the whole-suite and vitest-worker
-// cuts merged) 🧠 never reached 70%, peaking at 67%; every memory hold, 1.3 minutes in all, came with a
-// swap burst. 💾 is what holds a lane, so a lower 🧠 bar would admit nothing sooner and only risk swap.
+// **The 🧠 resume bar stays at yellow** (joshuafolkken/kit#4529): observed memory holds came with
+// swap bursts. 💾 is what holds a lane, so a lower 🧠 bar would admit nothing sooner and only risk swap.
 //
 // **A figure that could not be read is no limit**, as in the gate's core budget: a machine without
 // `sysctl` dispatches as it did before memory was read.

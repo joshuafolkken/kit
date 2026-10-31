@@ -14,23 +14,23 @@ const BODY_FROM_STDIN = '-'
 // `gh` would hold the caller open with no upper bound — most visibly in `josh propagate`, whose
 // runner is single-threaded and would process no further consumer at all.
 //
-// **It is a request's budget, not a step's.** `STEP_TIMEOUT_MS` (30 minutes, `propagate-steps.ts`)
-// covers a consumer's whole unit suite and a `pnpm add`; one REST call has no business borrowing
-// that number. The value is read off what the callers actually do instead:
+// **It is a request's budget, not a step's.** `STEP_TIMEOUT_MS` in `propagate-steps.ts` covers a
+// consumer's whole unit suite and a `pnpm add`; one REST call must not borrow that budget.
+// The value is read off what the callers actually do instead:
 //
-// - `CHECK_WAIT_INTERVAL_MS` is 10 seconds — the merge gate's poll cadence. A request still in
-//   flight six polls later is not slow, it is stuck.
-// - `PR_CHECKS_WATCH_TIMEOUT_MS` is 120 seconds: `followup`'s look-ahead, which bounds its own
+// - `CHECK_WAIT_INTERVAL_MS` defines the merge gate's poll cadence. A request still in
+//   flight across repeated polls must not block the loop indefinitely.
+// - `PR_CHECKS_WATCH_TIMEOUT_MS` bounds `followup`'s look-ahead and its own
 //   *sleeps* rather than the wall clock, so each poll's requests sit on top of it. A request allowed
 //   to outlast that whole window would make the budget meaningless; half of it keeps one request
 //   from dominating the look-ahead.
-// - the readers that override it ask for 5 seconds (`repo-setting.ts`) and 20
-//   (`propagate-publish.ts`, `epic-cross-repo.ts`). Sixty is deliberately the most generous of them,
+// - the readers that override it (`repo-setting.ts`, `propagate-publish.ts`, `epic-cross-repo.ts`)
+//   use tighter budgets. This default is deliberately more generous,
 //   because this entry also serves `--paginate` requests — several HTTP round trips inside one
-//   spawn — which a 5-second budget would break.
+//   spawn — which the tightest override would break.
 //
-// The aggregate is not what this bounds and must not be read as one: `followup` makes roughly 573
-// requests across a 32-minute wait, and what caps that wait is its own attempt count. All this
+// The aggregate is not what this bounds and must not be read as one: `followup` makes repeated
+// requests while waiting, and what caps that wait is its own attempt count. All this
 // guarantees is that no single request holds it forever.
 //
 // **What a timed-out read costs its caller is decided by that caller, and two are worth naming.**
@@ -64,7 +64,7 @@ function to_timeout_option(timeout_ms?: number): { timeout: number } {
 // **`gh` dials GitHub directly, never through a proxy this machine stood up on loopback**.
 // A package-manager wrapper writes one into the environment of everything
 // its invocation spawns, and it exists to inspect package downloads — api.github.com crosses it
-// without inspection, so the hop buys nothing and can fail on its own: one 30-second stall makes the
+// without inspection, so the hop buys nothing and can fail on its own: one stalled request makes the
 // wrapper refuse every later GitHub connection of that `followup`, and the retries in the poll loop
 // can then only ever fail. The loopback test and
 // the list of spellings are the agent-session launcher's, shared rather than

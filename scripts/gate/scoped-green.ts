@@ -101,7 +101,7 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 
 // **An unreadable record reads as an absent one, and that is the safe direction.** `read` swallows a
 // malformed or foreign file and answers `undefined`, so the two cases are indistinguishable here —
-// and the consequence of treating one as the other is a single 14-second scoped run, against the
+// and the consequence of treating one as the other is a single scoped run, against the
 // alternative of briefing a review on a tree nothing has checked.
 function describes_tree(
 	check: ScopedCheck,

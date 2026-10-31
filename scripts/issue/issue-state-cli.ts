@@ -11,8 +11,7 @@ import { issue_state, type IssueState } from './issue-state'
 //
 // The numbers are read concurrently and reported together because the callers that need more than
 // one need them all: `diag`'s ranking table reads a state per row, and one process start plus one
-// round trip per row cost 1.6 seconds each — about 8 seconds of a five-row table spent on nothing
-// but the states.
+// round trip per row add up, across a table, to time spent on nothing but the states.
 //
 // It replaces the two reads the workflow documents told an agent to type — `gh issue view <N> --json
 // state --jq .state` and `gh issue view <N> --json state,labels --jq …` — with one call that answers

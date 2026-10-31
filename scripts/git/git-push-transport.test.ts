@@ -86,7 +86,7 @@ function first_push_options(): unknown {
 }
 
 // joshuafolkken/kit#1251: the push path was the one unbounded network call in this directory, and a
-// hang there cost about 9 minutes 50 seconds of a 72-minute run before it was killed by hand.
+// hang there stalled a run until it was killed by hand.
 describe('the push spawn is bounded and kept alive', () => {
 	it('passes the timeout budget to execa', async () => {
 		await git_push_transport.push([])

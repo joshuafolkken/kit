@@ -1,7 +1,7 @@
 import type { MachineReading } from './machine-capacity'
 
 // **The busy cores a waiting claim admits against are the mean of its last few seconds of readings**
-// (joshuafolkken/kit#4238). One reading covers a 250 ms window, and a CPU near saturation swings across
+// (joshuafolkken/kit#4238). A CPU near saturation swings across
 // the threshold from one window to the next, so a claim judged on each reading alone would be admitted
 // on a dip into load that is still there. A claim's readings are its own: each poll of one wait adds
 // one, and its first poll judges on the one it has.

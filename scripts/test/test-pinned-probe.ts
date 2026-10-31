@@ -4,7 +4,12 @@ import { base_tree, type BaseTree } from '#scripts/git/base-tree'
 import { direct_importers } from './direct-importers'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_pinned_cache_logic, type Recheck } from './test-pinned-cache-logic'
-import { test_pinned_ledger, type PinnedOrigin, type ProbeTime } from './test-pinned-ledger'
+import {
+	test_pinned_ledger,
+	type PinnedOrigin,
+	type ProbeTime,
+	type Skipped,
+} from './test-pinned-ledger'
 import { test_pinned_logic, type Hunk } from './test-pinned-logic'
 import { test_pinned_pool } from './test-pinned-pool'
 import { test_pinned_stage, type Staged, type StagePlan } from './test-pinned-stage'
@@ -230,10 +235,12 @@ async function pooled(
 }
 
 // `held` counts the hunks the cache answered, `rewired` the ones left out as a rewire
-// (`test-pinned-rewire.ts`); `is_first_unpinned` starts no probe once one is unpinned.
+// (`test-pinned-rewire.ts`), `over_cap` the ones over the test-file cap; `is_first_unpinned` starts
+// no probe once one is unpinned.
 interface CheckOptions {
 	held?: number
 	rewired?: number
+	over_cap?: number
 	is_first_unpinned?: boolean
 	origin?: PinnedOrigin | undefined
 }
@@ -242,6 +249,15 @@ interface CheckOptions {
 interface Checked {
 	verdicts: Array<RedProbe>
 	staged: Staged
+}
+
+function skipped_of(options: CheckOptions): Skipped {
+	return {
+		held: options.held ?? 0,
+		rewired: options.rewired ?? 0,
+		over_cap: options.over_cap ?? 0,
+		origin: options.origin,
+	}
 }
 
 // The probes, checked over as many trees as the worker budget allows; `paths` are copied into each.
@@ -259,9 +275,7 @@ async function checked_on(
 	const halt = options.is_first_unpinned === true ? { is_set: false } : undefined
 	const verdicts = await pooled(paths, probes, { on_verdict, times, staged, halt })
 
-	const skipped = { held: options.held ?? 0, rewired: options.rewired ?? 0, origin: options.origin }
-
-	await test_pinned_ledger.record(skipped, times, Date.now() - started)
+	await test_pinned_ledger.record(skipped_of(options), times, Date.now() - started)
 
 	return { verdicts, staged }
 }

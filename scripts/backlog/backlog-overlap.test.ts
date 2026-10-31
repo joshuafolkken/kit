@@ -124,8 +124,8 @@ describe('backlog_overlap.path_clash', () => {
 	})
 })
 
-// joshuafolkken/kit#4926: joshuafolkken/kit#4916 waited 27 minutes on joshuafolkken/kit#4910 for
-// `docs/josh-commands-run.md` alone, an overlap the lane's sync with main resolves.
+// joshuafolkken/kit#4926: documentation overlap alone must not block a lane when syncing with main
+// resolves it.
 describe('backlog_overlap — a document under docs/', () => {
 	it('holds no candidate back on a docs Markdown file or directory both declare', () => {
 		const selection = separate([
@@ -225,8 +225,7 @@ describe('backlog_rank.select — the overlap separation', () => {
 	})
 })
 
-// joshuafolkken/kit#4270: lanes `lane:pause --all` stopped held five issues back for 1 h 40 min with
-// no word of why.
+// joshuafolkken/kit#4270: a pause must explain why its stopped lanes still hold issues back.
 const PAUSED_AT = '2026-10-20T01:28:00.000Z'
 
 function holder_lane(state: LaneStateRecord['state'], changed_by: string): LaneRecords {

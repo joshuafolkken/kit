@@ -74,8 +74,8 @@ describe('core_admission.describe_overflow — the summary line past the budget'
 	})
 })
 
-// joshuafolkken/kit#4451: a lone gate's first claim skipped the memory test and started a 2.4 GB lint
-// into a host-wide swap stall with 1.7 GB free.
+// joshuafolkken/kit#4451: even a lone gate must respect a host-wide swap stall when its claim
+// needs more memory than is free.
 describe('core_admission.is_admitted — the oldest claim under a swap stall', () => {
 	const STALL_FREE_MB = 1700
 	const BESIDE_FREE_MB = 3400
