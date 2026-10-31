@@ -30,6 +30,11 @@ function claude_line(five_hour: number, seven_day?: number, timestamp?: unknown)
 	return JSON.stringify({ type: 'rate_limit_event', rate_limit_info: info, timestamp })
 }
 
+// A stream-json line Claude Code stamps, as its `assistant` and `user` lines are.
+function timed(timestamp: string): string {
+	return JSON.stringify({ type: 'assistant', timestamp })
+}
+
 // A rollout's `token_count` line as Codex writes it, `rate_limits` given as its JSON text.
 function codex_line(rate_limits: string, timestamp: unknown = TAKEN): string {
 	const head = JSON.stringify({ timestamp, type: 'event_msg' }).slice(0, -1)
@@ -97,6 +102,36 @@ describe('run_board_quota_read.claude_reading', () => {
 
 		expect(parsed?.windows).toHaveLength(1)
 		expect(parsed?.taken_ms).toBeUndefined()
+	})
+})
+
+// Claude Code's `rate_limit_event` carries no `timestamp` (joshuafolkken/kit#5509).
+describe('run_board_quota_read.claude_reading time from nearby lines', () => {
+	const HEADER = `=== ${EARLIER} · started by process 1 · claude ===`
+	const LATER = '{"type":"user","timestamp":"2026-10-30T03:00:00Z"}'
+
+	it('reads the nearest timed line before a timestamp-less event', () => {
+		const text = [HEADER, timed(EARLIER), timed(TAKEN), ASSISTANT, claude_line(0.42), LATER]
+
+		expect(claude_reading(text.join('\n'))?.taken_ms).toBe(TAKEN_MS)
+	})
+
+	it("reads the launcher header's time where no JSON line before the event is timed", () => {
+		const text = ['', HEADER, ASSISTANT, claude_line(0.42), LATER].join('\n')
+
+		expect(claude_reading(text)?.taken_ms).toBe(Date.parse(EARLIER))
+	})
+
+	it('keeps the time unknown where nothing before the event is timed', () => {
+		const text = [ASSISTANT, claude_line(0.42), LATER, HEADER].join('\n')
+
+		expect(claude_reading(text)?.taken_ms).toBeUndefined()
+	})
+
+	it("prefers the event's own timestamp over the lines before it", () => {
+		const text = [timed(EARLIER), claude_line(0.42, undefined, TAKEN)].join('\n')
+
+		expect(claude_reading(text)?.taken_ms).toBe(TAKEN_MS)
 	})
 })
 

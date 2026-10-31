@@ -30,12 +30,20 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(() => 'since its last green run'), read_moved_parts: vi.fn() },
-}))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const original = await import_original()
+
+	return {
+		since_green: {
+			...original.since_green,
+			describe: vi.fn(() => 'since its last green run'),
+			read_verdict: vi.fn(),
+		},
+	}
+})
 
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
-const mocked_moved = vi.mocked(since_green.read_moved_parts)
+const mocked_moved = vi.mocked(since_green.read_verdict)
 
 // Real paths, because the CLI drops a path the tree does not hold.
 const REPOSITORY_ROOT = process.cwd()
@@ -78,7 +86,7 @@ const OWN_ARGUMENTS = [
 ]
 
 function moved(changed: ReadonlyArray<string>, synced: ReadonlyArray<string>): void {
-	mocked_moved.mockResolvedValue({ changed: [...changed], synced: [...synced] })
+	mocked_moved.mockResolvedValue({ parts: { changed: [...changed], synced: [...synced] } })
 }
 
 function with_split_and_map(): void {

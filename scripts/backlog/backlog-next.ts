@@ -18,6 +18,7 @@ import { issue_not_before } from '#scripts/issue/issue-not-before'
 import { issue_not_before_label } from '#scripts/issue/issue-not-before-label'
 import { session_cite } from '#scripts/issue/session-cite'
 import { issue_citation } from '#scripts/rules/issue-citation'
+import { backlog_auto_triage } from './backlog-auto-triage'
 import { backlog_defect_priority } from './backlog-defect-priority'
 import { backlog_gate_scope, type OptedIn, type PoolContext } from './backlog-gate-scope'
 import { backlog_next_size } from './backlog-next-size'
@@ -371,12 +372,6 @@ function report_triage(context: PoolContext, untriaged: ReadonlyArray<EpicChild>
 	return SUCCESS_EXIT_CODE
 }
 
-function untriaged_of(result: EpicNextResult, repo: string): ReadonlyArray<EpicChild> {
-	if (result.verdict !== 'run') return []
-
-	return epic_triage.untriaged(epic_report.candidates_for_repo(result, repo))
-}
-
 // This repository's candidates without the untriaged ones, which wait for their judgment alone.
 function without_untriaged(result: EpicNextResult, repo: string): EpicNextResult {
 	const candidates = result.candidates.map((bucket) =>
@@ -414,12 +409,12 @@ async function report_held(
 }
 
 async function answer_pool(context: PoolContext): Promise<number> {
-	const result = await resolve(context)
+	const resolved = await resolve(context)
 
-	if (result === undefined) return FAILURE_EXIT_CODE
-	if (is_transport_failure(result)) return report_retry(context)
+	if (resolved === undefined) return FAILURE_EXIT_CODE
+	if (is_transport_failure(resolved)) return report_retry(context)
 
-	const untriaged = untriaged_of(result, context.repo)
+	const { result, untriaged } = await backlog_auto_triage.untriaged_of(resolved, context.repo)
 
 	if (untriaged.length > 0) return await report_held(result, context, untriaged)
 

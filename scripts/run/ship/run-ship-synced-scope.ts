@@ -12,6 +12,7 @@ import { test_read_map, type ReadMap } from '#scripts/test/test-read-map'
 import { related_scope } from '#scripts/test/test-related-scope'
 import { test_related_synced, type SyncedSplit } from '#scripts/test/test-related-synced'
 import { whole_suite_files } from '#scripts/test/whole-suite-files'
+import { run_ship_narrowed } from './run-ship-narrowed'
 
 // **A scoped pair whose records went stale only because a merge with the default branch moved the base
 // re-runs nothing when that merge shares nothing with this branch's change** (joshuafolkken/kit#4985).
@@ -139,40 +140,51 @@ async function overlap_of(
 	return [...both, ...split.shared, ...unsplit, ...check_overlap(checks, synced, split, map)]
 }
 
-async function unshared_sync(
-	checks: ReadonlyArray<SyncedCheck>,
+// What a merge-only staleness reads: the stale checks, what the merge brought in, and where it meets
+// this branch's change — the files the pair is narrowed to (`run-ship-narrowed.ts`) when any.
+interface SyncReading {
+	checks: ReadonlyArray<SyncedCheck>
+	synced: ReadonlyArray<string>
+	overlap: ReadonlyArray<string>
+}
+
+function checks_of(scripts: ReadonlyArray<string>): ReadonlyArray<SyncedCheck> {
+	return CHECKS.filter((check) => scripts.includes(check.script))
+}
+
+// `undefined` when the stale records moved by more than a merge, and the pair runs as before.
+async function read_sync(
 	tree: GateTree,
-): Promise<ReadonlyArray<string> | undefined> {
+	scripts: ReadonlyArray<string>,
+): Promise<SyncReading | undefined> {
+	const checks = checks_of(scripts)
 	const synced = await synced_files(checks, tree)
 	const branch = synced === undefined ? undefined : await branch_change()
 
 	if (synced === undefined || branch === undefined) return undefined
 
-	const overlap = await overlap_of(checks, synced, branch)
-
-	return overlap.length === 0 ? synced : undefined
+	return { checks, synced, overlap: await overlap_of(checks, synced, branch) }
 }
 
-function reason(scripts: ReadonlyArray<string>, synced: ReadonlyArray<string>): string {
+function reason(checks: ReadonlyArray<SyncedCheck>, synced: ReadonlyArray<string>): string {
 	return (
-		`scoped pair: ${scripts.join(' and ')} not re-run — the ${String(synced.length)} file(s) ` +
-		"the merge with the default branch brought in share no file or test with this branch's change."
+		`scoped pair: ${checks.map((check) => check.script).join(' and ')} not re-run — the ` +
+		`${String(synced.length)} file(s) the merge with the default branch brought in share no file ` +
+		"or test with this branch's change."
 	)
 }
 
 // The line a settled pair prints, after re-recording each stale check green on this tree so the gate
-// and the brief read it as checked — or `undefined`, and the pair runs as before.
-async function settle(tree: GateTree, scripts: ReadonlyArray<string>): Promise<string | undefined> {
-	const checks = CHECKS.filter((check) => scripts.includes(check.script))
-	const synced = await unshared_sync(checks, tree)
+// and the brief read it as checked — or `undefined` where the merge meets the branch.
+function settle(reading: SyncReading, tree: GateTree): string | undefined {
+	if (reading.overlap.length > 0) return undefined
 
-	if (synced === undefined) return undefined
+	run_ship_narrowed.record(reading.checks, tree)
 
-	for (const check of checks) scoped_green.record_green(check.stamp, tree)
-
-	return reason(scripts, synced)
+	return reason(reading.checks, reading.synced)
 }
 
-const run_ship_synced_scope = { settle }
+const run_ship_synced_scope = { checks_of, read_sync, settle }
 
+export type { SyncedCheck, SyncReading }
 export { run_ship_synced_scope }

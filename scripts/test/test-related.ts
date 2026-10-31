@@ -4,6 +4,7 @@ import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { scoped_green } from '#scripts/gate/scoped-green'
+import { since_green, type FallbackReason } from '#scripts/gate/since-green'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { direct_importers } from './direct-importers'
@@ -115,19 +116,19 @@ async function is_green_narrowable(is_whole: boolean): Promise<boolean> {
 // moved file — code or not — reaches the tests reading it as data through the map, whose
 // entries hold no module that started reading it after the map's tree; the change since that tree
 // joins the list — a code file of it only when it names a moved file (`naming_moved`) — so such a
-// module runs the tests importing it. Nothing moved runs nothing; no map,
-// or one git can no longer diff against, answers `undefined`, which reads the whole branch change.
+// module runs the tests importing it. Nothing moved runs nothing; no map, or one git can no longer
+// diff against, answers its fallback reason (`since-green.ts`), which reads the whole branch change.
 async function since_green_change(
 	root: string,
 	map: ReadMap | undefined,
 	is_whole: boolean,
 	red: RedReading | undefined,
-): Promise<ChangeReading | undefined> {
+): Promise<ChangeReading | FallbackReason> {
 	const reading = (await is_green_narrowable(is_whole))
 		? await test_related_red.narrowing(red)
-		: undefined
+		: { fallback: since_green.FALLBACK.HUB }
 
-	if (reading === undefined) return undefined
+	if ('fallback' in reading) return reading.fallback
 
 	const { parts, moved, failed } = reading
 
@@ -141,7 +142,7 @@ async function since_green_change(
 		map,
 	)
 
-	if (change.map === undefined) return undefined
+	if (change.map === undefined) return since_green.FALLBACK.NO_READ_MAP
 
 	process.stdout.write(`${test_related_red.describe(reading)}\n`)
 
@@ -156,7 +157,9 @@ async function whole_change(
 ): Promise<ChangeReading> {
 	const since = await since_green_change(root, map, is_whole, red)
 
-	if (since !== undefined) return since
+	if (typeof since !== 'string') return since
+
+	process.stdout.write(`${since_green.fallback_line(gate_labels.UNIT_LABEL, since)}\n`)
 
 	return map === undefined ? { changed: await branch_change(), map } : await map_change(root, map)
 }
