@@ -54,7 +54,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Collapse a backlogrun loop-head event into one call: read backlog:next, ask backlog:budget, return the verdict and any issues to start',
 		category: 'AI tools',
-		reference: ['[options]', 'automation', ['files', 'network', 'processes']],
+		reference: ['[options]', 'automation', ['files', 'git', 'network', 'processes']],
 		usage: {
 			examples: [{ arguments: '--started "$started" --active "$active" --running 2 --retries 1' }],
 		},
