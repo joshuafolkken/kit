@@ -43,8 +43,8 @@ const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh ship:wait <N>'
 const NO_REPOSITORY_NOTE = 'not inside a git repository'
 
-const { COMMIT, ROUND_TWO, FOLLOWUP, REPORT } = run_ship_stage.STAGE
-const PAST_COMMIT: ReadonlySet<string> = new Set([ROUND_TWO, FOLLOWUP, REPORT])
+const { COMMIT, FOLLOWUP, REPORT } = run_ship_stage.STAGE
+const PAST_COMMIT: ReadonlySet<string> = new Set([FOLLOWUP, REPORT])
 
 // Past the commit in the current attempt: the record's `done` outlives a stop after the commit, so a
 // re-ship after a followup stop would read as committed before its own gate and review ran. `started`
