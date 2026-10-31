@@ -614,11 +614,14 @@ pnpm josh review:record --issue 2325                                            
 pnpm josh review:record --issue 2325 --comment                                            # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325                                              # the merge gate: was it recorded?
 pnpm josh review:record --issue 2325 --interaction                                        # the interaction review’s pass — a `- ri:` line
+pnpm josh review:record --from-slot --issue 2325 2=filed:#7                               # the findings the reviewer wrote with review:submit — each `fixed` unless its line is given another
 ```
 
 <!-- /usage -->
 
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
+
+`--from-slot` records what the reviewer wrote with [`josh review:submit`](josh-commands-run.md#josh-reviewsubmit) (`--interaction`: that slot), each finding `fixed` unless a positional `<n>=<disposition>` gives its 1-based line another. A slot nobody wrote, or an `<n>` past its last line, is refused.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 

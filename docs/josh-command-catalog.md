@@ -71,7 +71,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
 | `josh review:findings` · `josh rvf` | — | developer | files | Count review findings by category from the observation ledger |
-| `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file>[ — <reason>] ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
+| `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file>[ — <reason>] ...] \| --from-slot --issue <N> [--comment \| --interaction] [<n>=<disposition> ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
 | `josh review:stops` · `josh rvs` | `[--period <days>]` | developer | none | List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence |
 
 ## Versioning
@@ -198,7 +198,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:lint` | `[--round <1\|2>] (reads stdin)` | automation | none | Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh review:selfcheck` | — | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
-| `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a ship reviewer's findings, read from stdin, where the ship reads them |
+| `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
