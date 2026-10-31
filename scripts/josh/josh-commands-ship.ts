@@ -171,6 +171,21 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'ship:evidence': {
+		script: 'scripts/run/ship/run-ship-evidence-cli.ts',
+		description:
+			'Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code)',
+		category: 'AI tools',
+		reference: ['<N> -- <command...>', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '<N> -- pnpm josh <command>',
+					note: 'the run picks which command is the evidence; the format is written for it',
+				},
+			],
+		},
+	},
 	'run:event': {
 		script: 'scripts/run/event/run-event-cli.ts',
 		description:
