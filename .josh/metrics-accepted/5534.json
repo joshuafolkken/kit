@@ -1,0 +1,7 @@
+{
+	"reason": "#5534: single-quote-aware expansion check (literal_blanked) so review findings with backticks reach review:submit",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

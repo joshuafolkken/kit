@@ -34,6 +34,19 @@ describe('visible shell write scope', () => {
 	})
 })
 
+// joshuafolkken/kit#5534: only a single-quoted span is literal; an expansion beside it still refuses.
+describe('expansion outside a single-quoted span', () => {
+	it.each([
+		'echo \'text\' "`custom-editor app.ts`"',
+		"echo 'it'$(custom-editor app.ts)",
+		"echo 'it'`custom-editor app.ts`",
+		"echo 'a' FOO=1",
+		"echo 'a' $PPID",
+	])('refuses an expansion beside quoted text: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
 // joshuafolkken/kit#5498: the documented `run:carry` spelling carries no `$`, so it passes, while any
 // command expanding a variable stays refused — the session pid comes from the command, not the shell.
 describe('variable expansion beside the run:carry spelling', () => {
@@ -107,6 +120,8 @@ describe('operational shell reads and records', () => {
 		'git diff -- "*.ts"',
 		"git diff -- 'app[12].ts'",
 		'printf "{plan,record} * ? [literal]"',
+		"printf '%s' 'run `josh gate` with $(cmd) and FOO=1'",
+		"echo 'cost \\$5' \\`literal",
 	])('allows a visible read or record write: %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})
