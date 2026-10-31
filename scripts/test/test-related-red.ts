@@ -4,7 +4,7 @@ import { gate_labels } from '#scripts/gate/gate-labels'
 import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
-import { since_green } from '#scripts/gate/since-green'
+import { since_green, type FallbackReason } from '#scripts/gate/since-green'
 import { file_map_stamp } from '#scripts/josh/file-map-stamp'
 import { review_stamps } from '#scripts/review/review-stamps'
 import type { RunInput } from './test-related-record'
@@ -88,17 +88,29 @@ async function read_red(before: GateTree | undefined): Promise<RedReading | unde
 	return reading_of(parts, { failed, owed: marked(blobs, OWED_MARK) })
 }
 
+type Narrowing = RedReading | { fallback: FallbackReason }
+
+// A red record still standing that could not narrow — its base moved, or it named no failed file —
+// is the cause a fallback reports: a green run removes it.
+function green_fallback(fallback: FallbackReason): FallbackReason {
+	return review_stamps.test_related_red_stamp.read() === undefined
+		? fallback
+		: since_green.FALLBACK.AFTER_RED
+}
+
 // **A red record, where one stands, narrows before the green one**: it is the later of the two, and
-// its failed files join what moved since it.
-async function narrowing(red: RedReading | undefined): Promise<RedReading | undefined> {
+// its failed files join what moved since it. Neither narrowing answers why (`since-green.ts`).
+async function narrowing(red: RedReading | undefined): Promise<Narrowing> {
 	if (red !== undefined) return red
 
-	const parts = await since_green.read_moved_parts(
+	const verdict = await since_green.read_verdict(
 		review_stamps.test_related_stamp,
 		gate_labels.UNIT_LABEL,
 	)
 
-	return reading_of(parts, { failed: [], owed: [] })
+	if ('fallback' in verdict) return { fallback: green_fallback(verdict.fallback) }
+
+	return { parts: verdict.parts, moved: moved_paths.union_of(verdict.parts), failed: [], owed: [] }
 }
 
 // **The named files must account for the whole red**: an unhandled error fails the run from a file
