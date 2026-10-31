@@ -59,8 +59,13 @@ interface Segment extends LaneSpan {
 	stage: string
 }
 
+// A ship stage's name, or the Bash between ship stages.
+function is_ship_stage(name: string): boolean {
+	return name.startsWith(SHIP_LEAD) || name === BETWEEN_STAGE
+}
+
 function is_ship(segment: Segment): boolean {
-	return segment.stage.startsWith(SHIP_LEAD) || segment.stage === BETWEEN_STAGE
+	return is_ship_stage(segment.stage)
 }
 
 interface Marker {
@@ -243,6 +248,7 @@ const lane_breakdown = {
 	PLAN_STAGE,
 	PRE_DETACH_STAGE,
 	covered_ms,
+	is_ship_stage,
 	longest_of,
 	minutes_text,
 	of,

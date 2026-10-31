@@ -4,7 +4,7 @@
  *
  * Usage: tsx scripts/epic/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
  *                                                       [--origin <owner/repo#N>]
- *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags]
+ *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags] [--title <title>]
  *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  *                                                      [--decision-file <path|->]
  *        tsx scripts/epic/epic.ts --remove <E> <M> <N> ... [--decision-file <path|->]
@@ -23,7 +23,7 @@ const ARGV_OFFSET = 2
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
-	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS}`,
+	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
 	'       josh epic --add <E> <N1> <N2> ... [--before <M> | --after <M>] [--decision-file <path|->]',
 	'       josh epic --add <E> <N1> <N2> ... [--order-before <M> | --order-after <M>] [--decision-file <path|->]',
 	'       josh epic --remove <E> <M> <N> ... [--decision-file <path|->]',
@@ -47,6 +47,7 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
+		title: parsed.title,
 	})
 }
 

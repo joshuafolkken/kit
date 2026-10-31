@@ -1,0 +1,8 @@
+{
+	"reason": "lane:plan hunks and lines split axes (#5568)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 145,
+		"ai_cost.on_demand_bytes": 1
+	}
+}
