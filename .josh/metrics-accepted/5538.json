@@ -1,0 +1,7 @@
+{
+	"reason": "Queue the ship's scoped pair so round 2 beside the gate does not run it twice, and record the rerun count and reason on its lap (#5538)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

@@ -4,8 +4,9 @@ import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { run_ship_lap } from './run-ship-lap'
+import { run_ship_lap, type LapNote } from './run-ship-lap'
 import { run_ship_narrowed } from './run-ship-narrowed'
+import { run_ship_pair_runs } from './run-ship-pair-runs'
 import { run_ship_synced_scope, type SyncReading } from './run-ship-synced-scope'
 
 // The scoped pair `josh ship` meets itself rather than stops on, shared by every stage that needs a
@@ -112,6 +113,10 @@ async function stale_pair(tree: GateTree, scripts: ReadonlyArray<string>): Promi
 
 	if (settled !== undefined) return printed(settled)
 
+	const rerun = run_ship_pair_runs.begin(tree)
+
+	if (rerun !== undefined) printed(rerun)
+
 	return await narrowed_or_bare(tree, scripts, sync)
 }
 
@@ -129,29 +134,36 @@ async function settled_pair(): Promise<JoshResult> {
 	// Nothing stale ran nothing, so the records already vouch for the tree read.
 	if (scripts.length === 0) {
 		run_ship_narrowed.remember(tree)
+		run_ship_pair_runs.met(tree, SUCCESS_EXIT_CODE)
 
 		return { code: SUCCESS_EXIT_CODE, out: '' }
 	}
 
 	const result = await stale_pair(tree, scripts)
 
+	run_ship_pair_runs.met(tree, result.code)
 	if (result.code === SUCCESS_EXIT_CODE && (await is_still(tree))) run_ship_narrowed.remember(tree)
 
 	return result
 }
 
-function fallback_note(result: JoshResult): string | undefined {
+function pair_note(result: JoshResult): LapNote {
 	const reasons = since_green.fallbacks_of(result.out)
+	const run = run_ship_pair_runs.current()
 
-	return reasons.length === 0 ? undefined : reasons.join(', ')
+	return reasons.length === 0 ? run : { ...run, fallback: reasons.join(', ') }
 }
 
 // Timed as one lap in whichever ship stage asked for it (`run-ship-lap.ts`), with why a check read the
-// whole branch change, when one did.
+// whole branch change, when one did, and which run of this ship's pair it was. One pair at a time
+// (`run-ship-pair-runs.ts`): round 2 beside the gate waits for the gate's pair rather than racing it.
 async function scoped_pair(): Promise<JoshResult> {
-	return await run_ship_lap.timed(run_ship_lap.STEP.SCOPED_PAIR, settled_pair, {
-		note_of: fallback_note,
-	})
+	return await run_ship_pair_runs.one_at_a_time(
+		async () =>
+			await run_ship_lap.timed(run_ship_lap.STEP.SCOPED_PAIR, settled_pair, {
+				note_of: pair_note,
+			}),
+	)
 }
 
 async function gate(): Promise<JoshResult> {
