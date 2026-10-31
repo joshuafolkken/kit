@@ -147,6 +147,33 @@ it('does not run line counting for a probe', async () => {
 	expect(budgets).not.toHaveBeenCalled()
 })
 
+// joshuafolkken/kit#5533: a plan past twice its declared files answers `split` and is never recorded.
+describe('lane:plan size bar', () => {
+	const declared = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
+	const grown = [FREE_FILE, 'scripts/lane/one.ts', 'scripts/lane/two.ts']
+
+	it.each([[[]], [[PROBE]]])(
+		'answers `split` with no record for a plan over the bar (flags %j)',
+		async (flags) => {
+			fetch_opted_in.mockResolvedValue(holding(declared))
+
+			const code = await lane_plan_cli.run([String(LATER), ...grown, ...flags], directory)
+
+			expect(code).toBe(lane_plan_check.SPLIT_EXIT_CODE)
+			expect(info).toHaveBeenCalledWith('split')
+			expect(String(error.mock.calls.at(-1)?.[0])).toContain('Split off: scripts/lane/two.ts')
+			expect(lane_plan.read(LATER, directory)).toBeUndefined()
+		},
+	)
+
+	it('records and clears a plan within the bar', async () => {
+		fetch_opted_in.mockResolvedValue(holding(declared))
+
+		expect(await lane_plan_cli.run([String(LATER), ...grown.slice(0, 2)], directory)).toBe(SUCCESS)
+		expect(info).toHaveBeenCalledWith('clear')
+	})
+})
+
 describe('lane_plan_check.yield_at_entry', () => {
 	it('gives the lane back, noted at the entry, when its body cites a file a holder planned', async () => {
 		fetch_opted_in.mockResolvedValue(holding(`Fix \`${HELD}:12\`.`))

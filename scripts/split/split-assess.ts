@@ -37,6 +37,10 @@ const LINE_GUIDE = 200
 const CAP_FACTOR = 3
 const FILE_CAP = FILE_GUIDE * CAP_FACTOR
 const LINE_CAP = LINE_GUIDE * CAP_FACTOR
+// The growth bar `lane:plan` holds a plan to: twice the declared file count. Plans run 1.5 times their
+// declaration at the median; the two lanes past twice it ran their implement step at twice the median
+// (joshuafolkken/kit#5533).
+const PLAN_GROWTH_FACTOR = 2
 
 const SPLIT_VERDICT: SplitVerdict = 'split'
 const SINGLE_VERDICT: SplitVerdict = 'single'
@@ -141,6 +145,7 @@ const split_assess = {
 	LINE_CAP,
 	LINE_GUIDE,
 	NOTICE_SECTION,
+	PLAN_GROWTH_FACTOR,
 	QUESTION_SECTION,
 	REASON_PREFIX,
 	SPLIT_VERDICT,
