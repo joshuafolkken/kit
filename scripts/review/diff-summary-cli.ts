@@ -19,7 +19,11 @@ const FAILED_EXIT = 2
 const MAX_ARGUMENTS = 1
 // `process.argv` holds the runtime and the script before the command's own arguments.
 const FIRST_ARGUMENT = 2
+// Unquoted paths, so a non-ASCII file name starts its own row instead of folding into the one above
+// (the reason `git-diff-reads.ts`'s `NO_PATH_QUOTING` gives).
 const DIFF_ARGUMENTS: ReadonlyArray<string> = [
+	'-c',
+	'core.quotePath=false',
 	'diff',
 	'--no-color',
 	'--no-ext-diff',
@@ -43,7 +47,7 @@ async function save(diff: string): Promise<string> {
 }
 
 async function summarize(base: string): Promise<string> {
-	const diff = await git_spawn.read([...DIFF_ARGUMENTS, base])
+	const diff = await git_spawn.read([...DIFF_ARGUMENTS, base, '--'])
 
 	return diff_summary.report(diff, base, await save(diff))
 }

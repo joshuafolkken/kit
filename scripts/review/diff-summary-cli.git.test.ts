@@ -10,6 +10,8 @@ import { diff_summary_cli } from './diff-summary-cli'
 const TIMEOUT_MS = 30_000
 const FILE = 'a.ts'
 const SAVED_PREFIX = 'full output: '
+const NON_ASCII_FILE = '日本語.md'
+const CHANGED_TEXT = 'const a = 2\n'
 
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -48,7 +50,7 @@ describe('diff_summary_cli.run against real git', () => {
 	it(
 		'saves the full diff under the git directory, unseen by git status',
 		async () => {
-			await writeFile(path.join(fixture.root, FILE), 'const a = 2\n')
+			await writeFile(path.join(fixture.root, FILE), CHANGED_TEXT)
 			const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
 			expect(await diff_summary_cli.run(['HEAD'])).toBe(0)
@@ -59,6 +61,24 @@ describe('diff_summary_cli.run against real git', () => {
 			expect(path.dirname(saved)).toBe(git_directory)
 			expect(await readFile(saved, 'utf8')).toContain('+const a = 2')
 			expect(await git(fixture.root, ['status', '--porcelain'])).toBe(` M ${FILE}`)
+		},
+		TIMEOUT_MS,
+	)
+})
+
+describe('diff_summary_cli.run rows against real git', () => {
+	it(
+		'gives a non-ASCII path its own row rather than folding it into the row above',
+		async () => {
+			await writeFile(path.join(fixture.root, FILE), CHANGED_TEXT)
+			await writeFile(path.join(fixture.root, NON_ASCII_FILE), 'one\n')
+			await git(fixture.root, ['add', NON_ASCII_FILE])
+			const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+			await diff_summary_cli.run(['HEAD'])
+
+			expect(printed(info)).toContain(`| \`${NON_ASCII_FILE}\` | +1 | -0 | 1 | 1 | — |`)
+			expect(printed(info)).toContain(`| \`${FILE}\` | +1 | -1 | 1 | 1 | a |`)
 		},
 		TIMEOUT_MS,
 	)
