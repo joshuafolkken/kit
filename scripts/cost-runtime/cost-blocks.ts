@@ -15,10 +15,9 @@ import { z } from 'zod'
 // are each written exactly once and must not be deduplicated.
 //
 // **Thinking arrives here empty, and that is not a defect.** Claude Code writes a `thinking` block
-// with its `signature` but with `thinking` set to `''` — 118 blocks, 0 bytes, in the transcript this
-// was measured on, and the same in every other session checked. The thinking count therefore comes
-// from `usage.output_tokens_details.thinking_tokens`, which is a real API-reported number rather
-// than an estimate.
+// with its `signature` but with `thinking` set to `''`, in every session checked. The thinking
+// count therefore comes from `usage.output_tokens_details.thinking_tokens`, which is a real
+// API-reported number rather than an estimate.
 
 const CONTENT_ITEM_SCHEMA = z.object({ text: z.string().nullish() })
 const RESULT_CONTENT_SCHEMA = z.union([z.string(), z.array(CONTENT_ITEM_SCHEMA)])

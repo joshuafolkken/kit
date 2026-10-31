@@ -90,8 +90,8 @@ const DATE_SUFFIX = /-\d{8}$/u
 // The `[1m]` marker is the 1M-context beta, and stripping it to the base rate is confirmed correct,
 // not an approximation. The published price list — platform.claude.com "Long context pricing", read
 // 2026-10-12 — states that Claude 4.6 and later models other than Haiku 5.5 "include the full 1M
-// token context window at standard pricing (a 900k-token request is billed at the same per-token
-// rate as a 9k-token request)". The one model with an input-size band is priced from the request's
+// token context window at standard pricing": a request is billed at the same per-token rate
+// whatever its size. The one model with an input-size band is priced from the request's
 // own size by `billed_model`, not from the marker. (Fast mode is a separate premium, but it is
 // signalled by `speed: "fast"` rather than by the context marker, so it is not this marker's
 // concern.)

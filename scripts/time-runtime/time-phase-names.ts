@@ -71,7 +71,7 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 // transcript was read at all, rather than on a marker.
 //
 // **They are withheld on exactly the terms the three transcript category rows are**
-// — no span read at all. `wait` printing `0.0 min` where nothing was read
+// — no span read at all. `wait` printing a zero where nothing was read
 // asserts that nobody waited, and the run that produces it is the one a reader is least able to check.
 // Keying every one of them off the same criterion is also what keeps `wait` + `wait-outside` equal to
 // the `human wait` category row: they are withheld together or printed together, never some of each.
@@ -79,7 +79,7 @@ const PHASE_ORDER: ReadonlyArray<PhaseName> = [
 // **`wait-outside` is in this set rather than detected on the run's edges**,
 // which is where it differs from `pre-run` and `post-run`. Its zero is not a claim about an unchecked
 // half, because those two rows report the same two boundaries in their own right — a reader seeing
-// `pre-run  not detected` beside `wait-outside  0.0 min` already knows that edge was never found, and
+// `pre-run  not detected` beside a zero `wait-outside` already knows that edge was never found, and
 // a third row saying so would restate it at the price of the invariant above.
 const SPAN_BACKED_PHASES: ReadonlySet<PhaseName> = new Set([
 	WAIT_PHASE,

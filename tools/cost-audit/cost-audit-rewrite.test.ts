@@ -6,7 +6,7 @@ const MODEL = 'claude-opus-5-5'
 const MINUTE_MS = 60_000
 const CONTEXT = 66_000
 const APPENDED = 20_000
-// Opus 5.5 writes the 5-minute cache at 1.25x its $4 input rate: $5 per million tokens.
+// Opus 5.5 writes the short-TTL cache at 1.25x its $4 input rate: $5 per million tokens.
 const REWRITE_USD = 0.33
 
 function request(minute: number, read: number, write: number): UsageRecord {
