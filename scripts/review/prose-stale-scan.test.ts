@@ -8,6 +8,9 @@ const DOC = 'docs/a.md'
 const NONE: ReadonlySet<string> = new Set()
 const OLD_COMMAND = 'old:command'
 const OLD_LIMIT_LINE = 'const OLD_LIMIT = 3'
+const OTHER_CODE = 'scripts/b.ts'
+const OLD_FUNCTION_LINE = 'function old_name(): void {'
+const NEW_FUNCTION_LINE = 'function new_name(): void {'
 const NAME: Term = { kind: 'name', word: 'old_name' }
 const CONSTANT: Term = { kind: 'constant', word: 'OLD_LIMIT' }
 const COMMAND: Term = { kind: 'command', word: OLD_COMMAND }
@@ -29,7 +32,7 @@ const TAKEN = [
 	{ name: 'a direct export', file: CODE, line: 'export function old_name(): void {', term: NAME },
 	{ name: 'an export list entry', file: CODE, line: 'export { old_name }', term: NAME },
 	// A namespace object's member: its removed lines are a plain `function` and a `\told_name,` entry.
-	{ name: 'a top-level declaration', file: CODE, line: 'function old_name(): void {', term: NAME },
+	{ name: 'a top-level declaration', file: CODE, line: OLD_FUNCTION_LINE, term: NAME },
 	{ name: 'an UPPER_CASE constant', file: CODE, line: OLD_LIMIT_LINE, term: CONSTANT },
 	{
 		name: 'a josh command in prose',
@@ -67,7 +70,7 @@ describe('prose_stale_scan.stale_terms — a word the diff still writes is kept'
 	it('drops an identifier an added line in any file carries', () => {
 		const moved = [
 			hunk(CODE, ['export { old_space }']),
-			hunk('scripts/b.ts', [], ['export { old_space, extra }']),
+			hunk(OTHER_CODE, [], ['export { old_space, extra }']),
 		]
 
 		expect(terms(moved)).toEqual([])
@@ -96,7 +99,42 @@ describe('prose_stale_scan.stale_terms — a word the diff still writes is kept'
 	it('keeps a word an added line carries only inside a longer token', () => {
 		const prefixed = hunk(CODE, [OLD_LIMIT_LINE], ['const OLD_LIMIT_MS = 3'])
 
-		expect(terms([prefixed])).toEqual([CONSTANT])
+		expect(terms([prefixed])).toEqual([{ ...CONSTANT, renamed_to: 'OLD_LIMIT_MS' }])
+	})
+})
+
+describe('prose_stale_scan.stale_terms — a renamed declaration', () => {
+	const RENAMED = { kind: 'name', word: 'old_name', renamed_to: 'new_name' }
+
+	it('takes the old name even when an added comment still carries it as a token', () => {
+		const renamed = hunk(CODE, [OLD_FUNCTION_LINE], ['// formerly old_name', NEW_FUNCTION_LINE])
+
+		expect(terms([renamed])).toEqual([RENAMED])
+	})
+
+	it('pairs a renamed UPPER_CASE constant as a constant', () => {
+		const renamed = hunk(CODE, [OLD_LIMIT_LINE], ['const NEW_LIMIT = 3'])
+
+		expect(terms([renamed])).toEqual([
+			{ kind: 'constant', word: 'OLD_LIMIT', renamed_to: 'NEW_LIMIT' },
+		])
+	})
+
+	it('keeps the old name an added line in another file declares again', () => {
+		const moved = [
+			hunk(CODE, [OLD_FUNCTION_LINE], [NEW_FUNCTION_LINE]),
+			hunk(OTHER_CODE, [], [OLD_FUNCTION_LINE]),
+		]
+
+		expect(terms(moved)).toEqual([])
+	})
+
+	it('reports a hit of the old name with the name it became', () => {
+		const reference = { term: RENAMED, hits: [hit(DOC, 'old_name')], has_failed: false }
+
+		expect(prose_stale_scan.report([reference as Reference]).text).toBe(
+			'docs/a.md:3 name old_name (renamed to new_name)',
+		)
 	})
 })
 

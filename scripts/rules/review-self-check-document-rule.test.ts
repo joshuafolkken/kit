@@ -126,7 +126,7 @@ describe('the self-check question 1 and josh test:pinned', () => {
 	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
 		const step = read_unwrapped(CHAIN_RULE)
 
-		expect(step).toContain("its `--join`'s `test:pinned` lines answer the self-check")
+		expect(step).toContain('self-check"; 1: `--join`\'s `test:pinned`')
 		expect(step).toContain(
 			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
 		)
