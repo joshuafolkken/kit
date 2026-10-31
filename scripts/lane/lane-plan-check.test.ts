@@ -38,7 +38,8 @@ const info = vi.spyOn(console, 'info')
 const budgets = vi.spyOn(line_budget, 'budgets_for')
 const signals_of = vi.spyOn(lane_plan_signals, 'signals_of')
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
-const QUIET = { hunks: 0, lines_ratio: undefined, split_filed: false }
+const QUIET = { hunk_files: [], lines_ratio: undefined, split_filed: false }
+const PROBED = 'scripts/lane/probed.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
 
 // The plans live under the repository the spy below hands each test afresh.
@@ -186,7 +187,7 @@ describe('lane:plan size bar', () => {
 describe('lane:plan size bar on the probed hunks', () => {
 	it('notes a `split` on the probed hunks with its reason, and `--probe` notes nothing', async () => {
 		fetch_opted_in.mockResolvedValue(holding(DECLARED))
-		signals_of.mockResolvedValue({ ...QUIET, hunks: 3 })
+		signals_of.mockResolvedValue({ ...QUIET, hunk_files: [PROBED, PROBED, PROBED] })
 		const plan = [String(LATER), FREE_FILE]
 
 		expect(await lane_plan_cli.run([...plan, PROBE], directory)).toBe(

@@ -1,6 +1,7 @@
 import type { OpenIssueData } from '#scripts/git/git-schemas'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
+import { run_ship_planned } from '#scripts/run/ship/run-ship-planned'
 import { split_assess } from '#scripts/split/split-assess'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import { lane_plan, type LanePlan } from './lane-plan'
@@ -23,12 +24,16 @@ import { lane_plan, type LanePlan } from './lane-plan'
 // every re-plan. So does a re-plan of a sized plan — one that met the bar and was recorded before an
 // unread listing or a yield (joshuafolkken/kit#5605). A yielded plan the entry probe recorded never met
 // the bar, so it still does.
+//
+// **The hunks axis counts only the hunks outside the recorded plan's files** (joshuafolkken/kit#5601):
+// those files already passed the files axis, so more edits inside them grow no new deliverable, and a
+// re-plan that adds one document would otherwise be refused on the hunks it already planned.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
-// What `lane:plan` measured beside the plan (`lane-plan-signals.ts`).
+// What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk.
 interface PlanSignals {
-	hunks: number
+	hunk_files: ReadonlyArray<string>
 	lines_ratio: number | undefined
 	split_filed: boolean
 }
@@ -93,6 +98,14 @@ function files_over(
 	return { reason: 'files', declared, limit, kept, split_off: files.slice(limit), tests }
 }
 
+// Matched as the ship's `unplanned` stop matches them: a claim ending in `/` holds every file under it.
+function unplanned_hunks(
+	hunk_files: ReadonlyArray<string>,
+	recorded: LanePlan | undefined,
+): number {
+	return run_ship_planned.unplanned_of(recorded?.paths ?? [], hunk_files).length
+}
+
 function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
 	const limit = declared * split_assess.PLAN_GROWTH_FACTOR
 
@@ -112,10 +125,11 @@ function measure_over(
 	recorded: LanePlan | undefined,
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
-	const { hunks, lines_ratio } = signals
-	const lines = lane_plan.is_sized(recorded) ? undefined : lines_over(declared.lines, lines_ratio)
+	const lines = lane_plan.is_sized(recorded)
+		? undefined
+		: lines_over(declared.lines, signals.lines_ratio)
 
-	return hunks_over(declared.files, hunks) ?? lines
+	return hunks_over(declared.files, unplanned_hunks(signals.hunk_files, recorded)) ?? lines
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.
@@ -148,7 +162,7 @@ function files_text(issue: number, over: FilesOver): string {
 
 function measure_bar(over: MeasureOver): string {
 	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
+		return `change holds ${String(over.measured)} hunks outside the recorded plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
 	}
 
 	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)}-line guide`

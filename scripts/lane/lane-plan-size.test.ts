@@ -11,7 +11,13 @@ const ISSUE = 5533
 const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 70 行（テスト除く）\n'
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
-const QUIET: PlanSignals = { hunks: 0, lines_ratio: undefined, split_filed: false }
+const UNPLANNED = 'scripts/lane/unplanned.ts'
+const QUIET: PlanSignals = { hunk_files: [], lines_ratio: undefined, split_filed: false }
+
+// `count` probed hunks, all in `file`.
+function hunks(count: number, file = UNPLANNED): Pick<PlanSignals, 'hunk_files'> {
+	return { hunk_files: Array.from({ length: count }, () => file) }
+}
 
 function issue_with(body: string): Array<OpenIssueData> {
 	return [{ number: ISSUE, title: 'lane', createdAt: PLANNED_AT, labels: [], body }]
@@ -98,7 +104,7 @@ describe('lane_plan_size.oversize', () => {
 
 describe('lane_plan_size.oversize on the hunks and lines axes', () => {
 	it('answers hunks for 17 probed hunks against a declaration of 8 files', () => {
-		expect(signalled(declared(8, 100), { hunks: 17 })).toMatchObject({
+		expect(signalled(declared(8, 100), hunks(17))).toMatchObject({
 			reason: 'hunks',
 			limit: 16,
 			measured: 17,
@@ -106,7 +112,7 @@ describe('lane_plan_size.oversize on the hunks and lines axes', () => {
 	})
 
 	it('passes 16 probed hunks against a declaration of 8 files', () => {
-		expect(signalled(declared(8, 100), { hunks: 16 })).toBeUndefined()
+		expect(signalled(declared(8, 100), hunks(16))).toBeUndefined()
 	})
 
 	it('answers lines for 200 declared lines at a ratio of 1.8', () => {
@@ -129,7 +135,7 @@ describe('lane_plan_size.oversize on the hunks and lines axes', () => {
 	})
 
 	it('stands the hunks axis down once the lane filed a split child', () => {
-		expect(signalled(declared(8, 100), { hunks: 17, split_filed: true })).toBeUndefined()
+		expect(signalled(declared(8, 100), { ...hunks(17), split_filed: true })).toBeUndefined()
 	})
 })
 
@@ -155,13 +161,37 @@ describe('lane_plan_size.oversize on a re-plan of a recorded plan', () => {
 	})
 
 	it('still answers hunks for a cleared plan', () => {
-		expect(replanned(declared(8, 100), { hunks: 17 })).toMatchObject({ reason: 'hunks' })
+		expect(replanned(declared(8, 100), hunks(17))).toMatchObject({ reason: 'hunks' })
+	})
+})
+
+// joshuafolkken/kit#5601: the recorded plan's files passed the files axis, so their hunks do not count again.
+describe('lane_plan_size.oversize on the hunks of a re-plan', () => {
+	const planned = files(1)[0] ?? ''
+
+	it('passes 3 hunks inside the one planned file of a 1-file declaration', () => {
+		expect(replanned(declared(1, 15), hunks(3, planned))).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a code file outside the plan', () => {
+		expect(
+			replanned(declared(1, 15), { hunk_files: [planned, UNPLANNED, UNPLANNED, UNPLANNED] }),
+		).toMatchObject({ reason: 'hunks', limit: 2, measured: 3 })
+	})
+
+	it('passes 3 hunks under a directory the recorded plan claims', () => {
+		const directory = 'scripts/lane/'
+		const recorded = plan_of([directory])
+		const signals = { ...QUIET, ...hunks(3) }
+		const plan = plan_of([directory, 'docs/x.md'])
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
 	})
 })
 
 describe('lane_plan_size.refusal_text', () => {
 	it.each([
-		['hunks', { hunks: 17 }, '17 hunks (tests excluded), over 16'],
+		['hunks', hunks(17), "17 hunks outside the recorded plan's files (tests excluded), over 16"],
 		['lines', { lines_ratio: 1.8 }, 'about 360'],
 	])('names the %s axis and its measure', (reason, signals, measure) => {
 		const text = text_of(signalled(declared(8, 200), signals))

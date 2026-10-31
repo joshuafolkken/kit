@@ -9,7 +9,8 @@ import { lane_stats } from './lane-stats'
 
 // What `josh lane:plan` measures beside the plan for its size bar (joshuafolkken/kit#5568,
 // `lane-plan-size.ts`): the hunks the tree already changed against its base, counted as `josh
-// test:pinned` counts them (modified source files, tests excluded) — none before the first edit, so a
+// test:pinned` counts them (modified source files, tests excluded), one file name per hunk so the bar
+// can leave out the files a recorded plan holds — none before the first edit, so a
 // re-plan or the ship's probe is where it bites — the recent lines ratio
 // `lane:stats` prints, and whether this lane already filed a split child. A diff or ledger it cannot
 // read counts as nothing, so an unmeasured axis never refuses.
@@ -25,8 +26,8 @@ const DIFF_ARGUMENTS = [
 	'--dst-prefix=b/',
 ]
 
-function counted_hunks(diff: string): number {
-	return test_pinned_logic.parse_hunks(diff).length
+function hunk_files(diff: string): Array<string> {
+	return test_pinned_logic.parse_hunks(diff).map((hunk) => hunk.file)
 }
 
 async function diff_of(base: string): Promise<string> {
@@ -37,10 +38,10 @@ async function diff_of(base: string): Promise<string> {
 	}
 }
 
-async function hunks_of(): Promise<number> {
+async function hunks_of(): Promise<Array<string>> {
 	const base = await change_base.resolved_through_merge()
 
-	return base === undefined ? 0 : counted_hunks(await diff_of(base))
+	return base === undefined ? [] : hunk_files(await diff_of(base))
 }
 
 async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
@@ -51,14 +52,14 @@ async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
 
 function signals_from(
 	issue: number,
-	hunks: number,
+	hunks: ReadonlyArray<string>,
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,
 ): PlanSignals {
 	const window = lane_stats.window_of(RATIO_PERIOD_DAYS, now_ms)
 
 	return {
-		hunks,
+		hunk_files: hunks,
 		lines_ratio: lane_size_stats.lines_ratio(entries, window),
 		split_filed: split_resolution.split_issues(entries).has(issue),
 	}
@@ -70,6 +71,6 @@ async function signals_of(issue: number): Promise<PlanSignals> {
 	return signals_from(issue, hunks, entries, Date.now())
 }
 
-const lane_plan_signals = { counted_hunks, signals_from, signals_of }
+const lane_plan_signals = { hunk_files, signals_from, signals_of }
 
 export { lane_plan_signals }
