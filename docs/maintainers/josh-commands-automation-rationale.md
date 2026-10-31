@@ -108,6 +108,8 @@ Fail when a pull request adds any new SonarCloud issue — of any type or severi
 
 **Behavior:** merging is the default. The CI wait polls every 10 s with a 32-minute budget (`JOSH_CI_TIMEOUT_SECONDS` overrides); any non-success conclusion ends it immediately naming the failure, and a merge conflict (`DIRTY`) ends it on the first poll. CodeRabbit is exempt from the wait, and a skipped check is noted in the completion Telegram. On a merged run only, it closes any completed epic (now cascading up nested epics, so a completed parent closes too), confirms the Issue closed — closing it with a comment when GitHub did not apply `closes #N` — removes `in-progress`, flushes the observation ledger, ends the progress watcher, and lists up to five next-run candidate issues. Give the tool call its longest timeout — the wait can outlast a single call and `&` backgrounding does not survive. Every CI poll and the step right before the merge also check the run's issue: a person's update the run has not acknowledged stops it unmerged, printing the update ([`josh issue:ack`](../josh-commands-backlog.md#josh-issueack)); the blocking `gh pr checks --watch` phase before the polls is not interrupted.
 
+The completion notification's `Checks:` list follows the `--notify-message` text in both the Issue comment and the Telegram. A green run with nothing to list adds none; a red run, or a re-run on a merged PR, writes none, so `--notify-message` names the failures by hand.
+
 **Stage timing:** one `followup stage: <name> <seconds>` row per stage, then `followup stages total:`.
 
 - A failed run prints it up to the stage that threw, named `interrupted`; the `telegram-and-merge`
