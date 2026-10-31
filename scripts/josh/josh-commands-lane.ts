@@ -121,10 +121,9 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 		default_script_arguments: ['await'],
 		usage: {
 			examples: [
-				{ arguments: '1749 1750', note: 'block until either lane completes' },
 				{
-					arguments: '1749 1750 --owner "$PPID"',
-					note: 'reclaim the carry record for a resumed conversation first',
+					arguments: '1749 1750',
+					note: 'reclaim a resumed conversation’s carry record, then block until either lane completes',
 				},
 			],
 		},

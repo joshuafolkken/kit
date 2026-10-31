@@ -60,6 +60,14 @@ describe('run_step_section — the one table of governing sections', () => {
 		expect(console.info).not.toHaveBeenCalled()
 	})
 
+	it('prints the chain after a review round, and keeps no row for the round-2 ask ship now runs', () => {
+		const ship_review = { kind: 'command' as const, line: 'pnpm josh ship --review' }
+
+		expect(run_step_section.print_for(ship_review, false)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## Run the review-to-merge chain/u)
+		expect(run_step_section.GOVERNING_SECTIONS.has('review:round2')).toBe(false)
+	})
+
 	it('prints the entry read, the split assessment, verbatim', () => {
 		expect(run_step_section.print_section(run_step_section.ENTRY)).toBe(SUCCESS)
 		expect(String(vi.mocked(console.info).mock.calls[0]?.[0])).toMatch(/^## The question/u)
