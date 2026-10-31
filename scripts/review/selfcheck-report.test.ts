@@ -37,6 +37,14 @@ describe('selfcheck_report.report', () => {
 		expect(verdict(sections)).toContain('(q4: 1 readers to read)')
 	})
 
+	it('notes the edited names past the cap, which were never searched', () => {
+		const sections = { ...CLEAN, readers: { ...CLEAN.readers, omitted: 5 } }
+
+		expect(selfcheck_report.report(sections).text).toContain(
+			'… and 5 more edited names, not searched',
+		)
+	})
+
 	it('fails on a stale mention or a failed command, counting each', () => {
 		const sections = {
 			...CLEAN,
@@ -56,7 +64,7 @@ describe('selfcheck_report.report on a failed search', () => {
 		const failed_reader = { ...READER, hits: [], has_failed: true }
 		const sections = {
 			...CLEAN,
-			readers: { ...CLEAN.readers, readers: [failed_reader], has_failed: true },
+			readers: { ...CLEAN.readers, readers: [failed_reader] },
 		}
 		const { text, exit_code } = selfcheck_report.report(sections)
 

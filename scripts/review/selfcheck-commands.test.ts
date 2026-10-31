@@ -81,7 +81,7 @@ describe('selfcheck_commands.tokenize', () => {
 })
 
 describe('selfcheck_commands.probes', () => {
-	it('runs a command with a path from the root, a subdirectory, absolute, relative and empty', () => {
+	it('runs a command with a path from the root, a subdirectory, absolute and empty', () => {
 		const tokens = selfcheck_commands.tokenize(SECTION_COMMAND)
 		const found = selfcheck_commands.probes(tokens, runner().runner)
 		const scripts = path.join(TREE, 'scripts')
@@ -90,7 +90,6 @@ describe('selfcheck_commands.probes', () => {
 			[ROOT_PROBE, TREE, DOC_PATH],
 			[SUBDIRECTORY_PROBE, scripts, DOC_PATH],
 			['absolute path', scripts, path.join(TREE, DOC_PATH)],
-			['relative path', scripts, `../${DOC_PATH}`],
 			['empty input', TREE, ''],
 		])
 	})
@@ -108,7 +107,7 @@ describe('selfcheck_commands.run', () => {
 
 		await selfcheck_commands.run([SECTION_COMMAND], fake)
 
-		expect(calls).toHaveLength(5)
+		expect(calls).toHaveLength(4)
 		expect(calls.every((call) => call.cwd.startsWith(TREE) && !call.cwd.startsWith(ROOT))).toBe(
 			true,
 		)
@@ -124,7 +123,7 @@ describe('selfcheck_commands.run', () => {
 		})
 		const { lines, failed } = await selfcheck_commands.run([SECTION_COMMAND], fake)
 
-		expect(failed).toBe(4)
+		expect(failed).toBe(3)
 		expect(lines[0]).toBe(`fail root: pnpm josh ${SECTION_COMMAND} → exit 0 — at main (a.ts:1:2)`)
 		expect(lines.some((line) => line.startsWith('fail empty input'))).toBe(false)
 	})

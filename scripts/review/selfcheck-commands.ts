@@ -5,8 +5,8 @@ import type { Hunk } from '#scripts/test/test-pinned-logic'
 
 // The self-check's "Commands your prose tells a reader to run are run" (`prompts/review.md`) as one
 // pass (joshuafolkken/kit#5540): each backticked `pnpm josh …` an added line writes, run in a scratch
-// tree from the root, from a subdirectory, with its path arguments absolute and relative, and with its
-// positional arguments empty. **Only a command whose registry side effects stay inside the tree runs**
+// tree from the root, from a subdirectory, with its path arguments absolute, and with its positional
+// arguments empty. **Only a command whose registry side effects are `none` or `files` runs in the tree**
 // (`none`, `files`); one that touches git refs, the network, processes or a release is listed as
 // skipped, since a worktree copy shares its refs and remote with the lane. The tree is the caller's —
 // `selfcheck-cli.ts` builds it — so nothing here can reach the lane's files.
@@ -77,20 +77,20 @@ function is_flag(argument: string): boolean {
 	return argument.startsWith(FLAG_PREFIX)
 }
 
-function path_probes(name: string, args: ReadonlyArray<string>, runner: Runner): Array<Probe> {
+// No cwd-relative probe: `pnpm josh` runs from the package root, so a path resolves from there
+// wherever it is typed — the subdirectory probe already runs the root-relative form.
+function absolute_probe(name: string, args: ReadonlyArray<string>, runner: Runner): Probe {
 	const { tree, is_path } = runner
-	const cwd = path.join(tree, SUBDIRECTORY)
 	const absolute = args.map((argument) =>
 		is_path(argument) ? path.join(tree, argument) : argument,
 	)
-	const relative = args.map((argument) =>
-		is_path(argument) ? path.relative(cwd, path.join(tree, argument)) : argument,
-	)
 
-	return [
-		{ label: 'absolute path', cwd, args: [name, ...absolute], is_empty_input: false },
-		{ label: 'relative path', cwd, args: [name, ...relative], is_empty_input: false },
-	]
+	return {
+		label: 'absolute path',
+		cwd: path.join(tree, SUBDIRECTORY),
+		args: [name, ...absolute],
+		is_empty_input: false,
+	}
 }
 
 function empty_probe(name: string, args: ReadonlyArray<string>, tree: string): Array<Probe> {
@@ -101,7 +101,7 @@ function empty_probe(name: string, args: ReadonlyArray<string>, tree: string): A
 	return [{ label: 'empty input', cwd: tree, args: [name, ...emptied], is_empty_input: true }]
 }
 
-// Every probe one command earns; the path pair only when an argument names a file in the tree.
+// Every probe one command earns; the absolute one only when an argument names a file in the tree.
 function probes(tokens: ReadonlyArray<string>, runner: Runner): Array<Probe> {
 	const [name = '', ...args] = tokens
 	const has_path = args.some((argument) => runner.is_path(argument))
@@ -110,7 +110,7 @@ function probes(tokens: ReadonlyArray<string>, runner: Runner): Array<Probe> {
 	return [
 		{ label: 'root', cwd: runner.tree, args: tokens, is_empty_input: false },
 		{ label: 'subdirectory cwd', cwd: subdirectory, args: tokens, is_empty_input: false },
-		...(has_path ? path_probes(name, args, runner) : []),
+		...(has_path ? [absolute_probe(name, args, runner)] : []),
 		...empty_probe(name, args, runner.tree),
 	]
 }

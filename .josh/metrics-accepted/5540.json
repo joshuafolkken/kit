@@ -2,7 +2,7 @@
 	"reason": "New josh review:selfcheck command (#5540): its CLI, scan and report modules add code lines; chain-rule.md and prompts/review.md gain one pointer per self-check question it answers",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 331,
+		"scripts.code_lines": 335,
 		"ai_cost.on_demand_bytes": 22,
 		"prose.long_paragraphs": 1
 	}

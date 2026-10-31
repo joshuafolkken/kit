@@ -31,7 +31,15 @@ function lines_of(reader: Readers): Array<string> {
 }
 
 function reader_lines(read: ReadersRead): Array<string> {
-	return read.readers.flatMap((reader) => lines_of(reader))
+	const omitted =
+		read.omitted > 0 ? [`… and ${String(read.omitted)} more edited names, not searched`] : []
+
+	return [...read.readers.flatMap((reader) => lines_of(reader)), ...omitted]
+}
+
+// `read` fails whole only on a throw; one reader's search that could not answer fails it too.
+function readers_failed(read: ReadersRead): boolean {
+	return read.has_failed || read.readers.some((reader) => reader.has_failed)
 }
 
 function block(heading: string, lines: ReadonlyArray<string>): string {
@@ -43,7 +51,9 @@ function stale_count(stale: Sections['stale']): number {
 }
 
 function exit_code_of(sections: Sections): number {
-	if (sections.stale.exit_code === FAILED_EXIT || sections.readers.has_failed) return FAILED_EXIT
+	const is_unanswered = sections.stale.exit_code === FAILED_EXIT || readers_failed(sections.readers)
+
+	if (is_unanswered) return FAILED_EXIT
 
 	return stale_count(sections.stale) + sections.commands.failed > 0 ? FOUND_EXIT : 0
 }
