@@ -14,6 +14,9 @@ const ORDERED_FLAG = '--ordered'
 const RATIONALE_FLAG = '--rationale-file'
 const ORIGIN_FLAG = '--origin'
 const PROMOTE_FLAG = '--promote'
+// `--promote`'s rename of the promoted issue — the split path's English title, applied in the same call
+// rather than by a separate `gh api` PATCH.
+const TITLE_FLAG = '--title'
 const ADD_FLAG = '--add'
 // `--reconcile <E>`: bring the epic's declaration and its recorded relations back into agreement.
 // It takes no value flags — the epic number is the whole subject.
@@ -36,7 +39,10 @@ const CREATE_FORM: FormFlags = {
 	switches: [ORDERED_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
 }
-const PROMOTE_FORM: FormFlags = { ...CREATE_FORM, switches: [PROMOTE_FLAG, ORDERED_FLAG] }
+const PROMOTE_FORM: FormFlags = {
+	switches: [PROMOTE_FLAG, ORDERED_FLAG],
+	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
+}
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
 const CHECK_FORM: FormFlags = { switches: [] }
 const ADD_FORM: FormFlags = {
@@ -55,14 +61,15 @@ interface CreateArguments {
 	origin?: string | undefined
 }
 
-// `--promote <N> <N1> <N2> …`: the issue to promote, then its children. No title — the issue already
-// has one, and the discussion in it is usually the split rationale.
+// `--promote <N> <N1> <N2> …`: the issue to promote, then its children. The title is optional — the
+// issue already has one, and `--title` renames it; the discussion in it is usually the split rationale.
 interface PromoteArguments {
 	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
 	rationale_path?: string | undefined
 	origin?: string | undefined
+	title?: string | undefined
 }
 
 // The flags a creation and a promotion share, read the same way for both.
@@ -122,11 +129,15 @@ function parse_reconcile_arguments(argv: ReadonlyArray<string>): ReconcileArgume
 
 // The promoted issue and its children. The number after `--promote` is the epic; everything else
 // positional is a child. Refused when the epic would also be listed as its own child, which would
-// have it block itself under `--ordered`.
+// have it block itself under `--ordered`. A blank `--title` is refused rather than dropped: the caller
+// meant to rename the issue.
 function to_promote_arguments(parsed: EpicArgv): PromoteArguments | undefined {
 	const subject = epic_cli_argv.read_epic_children(parsed)
+	const title = read_flag_value(parsed, TITLE_FLAG)?.trim()
 
-	return subject === undefined ? undefined : { ...subject, ...read_batch_flags(parsed) }
+	if (subject === undefined || title === '') return undefined
+
+	return { ...subject, ...read_batch_flags(parsed), title }
 }
 
 function parse_promote_arguments(argv: ReadonlyArray<string>): PromoteArguments | undefined {

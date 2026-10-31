@@ -25,6 +25,8 @@ const SECONDS_40 = 40 * SECOND
 const MINUTES_61_SECONDS_5 = 61 * MINUTE + 5 * SECOND
 // A long phase exercises the wider duration field.
 const LONG_PHASE = 125 * MINUTE
+// The long phase's row ends on its activity, then what it ran past the ship budget.
+const LONG_END = /Long {2,}👀 3′00″ {2}over budget \+115′$/u
 const EVENT: LaneEvent = { phase: 'review', words: 'ship review', at_ms: NOW - 3 * MINUTE }
 
 function running(number: number, title = `Issue ${String(number)}`): BoardRow {
@@ -248,7 +250,7 @@ describe('run_board_render.render tail column', () => {
 		const lines = lines_of(board({ layout, activity: { ...board().activity, lane_events } }))
 
 		expect(column_of(lines, 'Long', '👀 3′00″')).toBe(column_of(lines, 'Short', '👀 3′00″'))
-		expect(lines.find((line) => line.includes('Long'))).toMatch(/Long {2,}👀 3′00″$/u)
+		expect(lines.find((line) => line.includes('Long'))).toMatch(LONG_END)
 		expect(column_of(lines, 'Long', '2°05′00″')).toBe(column_of(lines, 'Short', PHASE_TIME) - 2)
 	})
 

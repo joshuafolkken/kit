@@ -158,6 +158,17 @@ describe('epic_cli.parse_promote_arguments — the flags', () => {
 		expect(parsed?.origin).toBe(ORIGIN_REFERENCE)
 		expect(parsed?.children).toEqual([101])
 	})
+
+	it('reads --title as the rename of the promoted issue, not as a child', () => {
+		const parsed = epic_cli.parse_promote_arguments([PROMOTE, EPIC, CHILD, '--title', TITLE])
+
+		expect(parsed?.title).toBe(TITLE)
+		expect(parsed?.children).toEqual([101])
+	})
+
+	it('refuses a blank --title rather than dropping the rename', () => {
+		expect(epic_cli.parse_promote_arguments([PROMOTE, EPIC, CHILD, '--title', ' '])).toBeUndefined()
+	})
 })
 
 describe('epic_cli.is_addition', () => {

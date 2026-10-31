@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
 import { lane_breakdown_text, type Report } from './lane-breakdown-text'
 import type { ShipLapEntry, StageEntry, TestPinnedEntry, TestRelatedEntry } from './lane-ledger'
@@ -35,7 +36,8 @@ const REPORT: Report = {
 }
 
 const IMPLEMENT_TEXT =
-	'implement 51.0 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
+	'implement 51.0 min, over budget +39 min (editing & thinking 41.0 min, gate 10.0 min, 2 backgrounded calls, their waits in editing & thinking)'
+const PLAN_TEXT = 'start to plan 10.0 min, over budget +7 min'
 const EXCLUDED_TEXT =
 	'waits taken out (park, outage, usage limit, yield, host sleep) 3.0 min, of which yield wait 1.0 min, of which host sleep 1.0 min'
 
@@ -45,7 +47,7 @@ describe('lane_breakdown_text.comment', () => {
 			'Net time by stage, longest first, 62 min of net time (`pnpm josh lane:breakdown 4970`):',
 			'',
 			`- ${IMPLEMENT_TEXT}`,
-			'- start to plan 10.0 min',
+			`- ${PLAN_TEXT}`,
 			`- ${EXCLUDED_TEXT}`,
 		])
 	})
@@ -54,7 +56,7 @@ describe('lane_breakdown_text.comment', () => {
 describe('lane_breakdown_text.line', () => {
 	it('writes the stages on one line', () => {
 		expect(lane_breakdown_text.line(REPORT)).toBe(
-			`Net time by stage, longest first: ${IMPLEMENT_TEXT}; start to plan 10.0 min; ${EXCLUDED_TEXT}.`,
+			`Net time by stage, longest first: ${IMPLEMENT_TEXT}; ${PLAN_TEXT}; ${EXCLUDED_TEXT}.`,
 		)
 	})
 
@@ -250,5 +252,43 @@ describe('lane_breakdown_text.report_of — ship laps', () => {
 
 		expect(lane_breakdown_text.line(report)).toContain('ship gate 3.0 min [josh gate 2.0 min]')
 		read.mockRestore()
+	})
+})
+
+// joshuafolkken/kit#5563: a stage past its share of a 30-minute lane says by how much; one within it
+// carries nothing.
+function report_with(stages: Report['breakdown']['stages']): Report {
+	return { ...REPORT, breakdown: { ...REPORT.breakdown, stages } }
+}
+
+describe('lane_breakdown_text — stage budget', () => {
+	it('writes the minutes an implement of 20 min ran past its budget', () => {
+		const report = report_with([{ name: 'implement', ms: 20 * MINUTE_MS }])
+
+		expect(lane_breakdown_text.line(report)).toContain(': implement 20.0 min, over budget +8 min (')
+	})
+
+	it('writes nothing beside a stage within its budget', () => {
+		const report = report_with([
+			{ name: lane_breakdown.PLAN_STAGE, ms: 3 * MINUTE_MS },
+			{ name: 'ship gate', ms: 9 * MINUTE_MS },
+			{ name: lane_breakdown.FOLLOWUP_STAGE, ms: 5 * MINUTE_MS },
+		])
+
+		expect(lane_breakdown_text.line(report)).not.toContain('over budget')
+	})
+
+	it('checks the ship followup against its own budget, not the ship one', () => {
+		const report = report_with([{ name: lane_breakdown.FOLLOWUP_STAGE, ms: 6 * MINUTE_MS }])
+
+		expect(lane_breakdown_text.line(report)).toContain(
+			': ship followup 6.0 min, over budget +1 min',
+		)
+	})
+
+	it('checks a ship stage against the whole ship budget', () => {
+		const report = report_with([{ name: 'ship gate', ms: 11 * MINUTE_MS }])
+
+		expect(lane_breakdown_text.line(report)).toContain(': ship gate 11.0 min, over budget +1 min;')
 	})
 })
