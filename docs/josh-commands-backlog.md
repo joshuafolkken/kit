@@ -275,7 +275,8 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 - `--body-file <path>` — the plan, from a file or stdin (`-`): a blank body takes it, else a comment.
 - `--title <title>` — replace the issue title first.
-- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning.
+- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).
+- `--no-notify` — with `--planned`, skip the `planning` Telegram.
 - `--repo <owner/name>` — write to that repository's issue.
 
 <!-- /usage -->
@@ -539,6 +540,7 @@ pnpm josh epic --decide 893 894 --decision-file why.md
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
+- `--title <title>` — with `--promote`: rename the issue first.
 - `--before <M>` — with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
 - `--after <M>` — with `--add`: start after `#M`; branches when `#M` already has a successor, extends when it is a tail.
 - `--order-before <M>` / `--order-after <M>` — with `--add`: move the task-list row only; write no `blocked-by` relation.
@@ -553,7 +555,7 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 

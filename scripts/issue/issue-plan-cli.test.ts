@@ -32,6 +32,10 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	},
 }))
 
+const { send_notice } = vi.hoisted(() => ({ send_notice: vi.fn<() => Promise<void>>() }))
+
+vi.mock('#scripts/issue/issue-plan-notify', () => ({ issue_plan_notify: { send: send_notice } }))
+
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
 const COMMENT_URL = 'https://github.com/o/r/issues/7#issuecomment-1'
 const CONSUMERS_SECTION = `${plan_consumers_section.HEADING}\n- なし（the plan adds no concept）\n`
@@ -42,6 +46,7 @@ const OTHER_REPO = 'joshuafolkken/kit'
 const BODY_FILE_FLAG = '--body-file'
 const TITLE_FLAG = '--title'
 const PLANNED_FLAG = '--planned'
+const NO_NOTIFY_FLAG = '--no-notify'
 const FILLED_BODY = '## Background'
 
 // The issue read `issue_body_or_comment` makes: the body, filed by the owner.
@@ -138,6 +143,35 @@ describe('issue_plan_cli.run — --title and --planned act only when given', () 
 
 		expect(code).toBe(1)
 		expect(errors.join('\n')).toContain(PLANNED_LABEL)
+	})
+})
+
+describe('issue_plan_cli.run — --planned sends the planning notification', () => {
+	it('notifies with the plan, the title and the repository once the label is applied', async () => {
+		const argv = ['7', BODY_FILE_FLAG, PLAN_FILE, TITLE_FLAG, TITLE, PLANNED_FLAG]
+
+		expect(await issue_plan_cli.run([...argv, `--repo=${OTHER_REPO}`])).toBe(0)
+
+		expect(send_notice).toHaveBeenCalledWith(
+			expect.objectContaining({ issue_number: '7', plan: PLAN, title: TITLE, repo: OTHER_REPO }),
+		)
+	})
+
+	it.each([
+		{ name: NO_NOTIFY_FLAG, argv: ['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG, NO_NOTIFY_FLAG] },
+		{ name: 'no --planned', argv: ['7', BODY_FILE_FLAG, PLAN_FILE] },
+	])('does not notify under $name', async ({ argv }) => {
+		expect(await issue_plan_cli.run(argv)).toBe(0)
+
+		expect(send_notice).not.toHaveBeenCalled()
+	})
+
+	it('does not notify when run:planned could not be applied', async () => {
+		issue_add_label.mockResolvedValue(false)
+
+		await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG])
+
+		expect(send_notice).not.toHaveBeenCalled()
 	})
 })
 
