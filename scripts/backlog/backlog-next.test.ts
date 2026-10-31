@@ -58,6 +58,21 @@ beforeEach(() => {
 	streams.reset()
 })
 
+// joshuafolkken/kit#5516: the first offer is made before the parent settles `needs-decision`.
+describe('the first offer beside the plan', () => {
+	it('passes over a standalone issue parked for a person and offers the next one', async () => {
+		backlog_fixture.stub_backlog({
+			opted_in: [
+				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER, [AUTO_OK_LABEL, NEEDS_DECISION]),
+				issue(NEW_ISSUE_NUMBER, CREATED_LATER),
+			],
+		})
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(NEW_ISSUE_NUMBER))
+	})
+})
+
 describe('the candidate table', () => {
 	it('offers a runnable child of an epic whose root carries auto-ok', async () => {
 		backlog_fixture.stub_backlog({

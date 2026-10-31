@@ -65,6 +65,7 @@ record is the parent loop's; a lane never touches it**. Count with `--merged <N>
 | It answers | What the run does |
 | --- | --- |
 | `began` | Report the plan and run the decision pass, then run what the bare `pnpm josh run:step` prints — an empty plan or a `none` from `backlog:next` included, which the driver's idle watch ends, never the session |
+| `driving` | The supervisor already holds the record — "The plan, beside the first child" |
 | `resumed` | Take the budget from `--json`, report the plan again, read `backlogrun-progress.md` → "Resuming after a cut" |
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
@@ -81,15 +82,19 @@ a child number or `complete` continues; only `stop` or a failure records `pnpm j
 **A person keeps control** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun --stop` stops
 it (`docs/josh-commands.md` → "`josh backlogrun`").
 
-## The plan, before the first child starts
+## The plan, beside the first child
 
-**Report the plan before anything is dispatched. The plan is one command's output** — `pnpm josh
-backlog:plan`, from the pool `backlog:next` answers from. Report all four sections (Ready now, Waiting,
-Waiting on a person, Out of scope) in the session language, with any truncated-listing `⚠`.
+Under `josh backlogrun` the first lane opens while the plan is reported (`--begin` answers
+`driving`); a run typed in a session reports it before its hand-off.
 
-### Resolve what the plan can resolve, before starting
+**The plan is one command's output** — `pnpm josh backlog:plan`, from the pool `backlog:next` answers
+from. Report all four sections (Ready now, Waiting, Waiting on a person, Out of scope) in the session
+language, with any truncated-listing `⚠`.
 
-**Settle every `needs-decision` issue the plan listed in one pass**, from one `pnpm josh issue:read <N>
+### Resolve what the plan can resolve
+
+**Settle every `needs-decision` issue the plan listed in one pass** — after the first offer is fine,
+since a labelled issue is never offered — from one `pnpm josh issue:read <N>
 <N> …` call (`issue-comments.md`):
 
 - **An answer already in the issue** — record it as a comment and **remove the label** with `pnpm josh run:park <N> --clear` (Tier A).
@@ -102,7 +107,7 @@ Waiting on a person, Out of scope) in the session language, with any truncated-l
 - **`priority:critical` / `priority:high`** are applied at filing by `pnpm josh issue:file` from the
   body's `- 優先度:` declaration (`issue-template.md`); **only a person removes them**.
 - **Report `pnpm josh backlog:plan --waves`** with the plan, never an order derived by hand; then start
-  the loop, leaving whatever is still labelled parked.
+  the loop (under `driving`, end the turn), leaving whatever is still labelled parked.
 
 **`needs-decision`, `run:solo` and `run:lane` are the only workflow labels a run applies by hand** —
 never `needs-human-review` (`needs-human-review.md`), the priority labels only through
@@ -118,7 +123,7 @@ section the row names:
 
 | Handed back | What the session does | Read |
 | --- | --- | --- |
-| `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve, before starting" above |
+| `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve" above |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` | `docs/josh-commands-backlog.md` → "`josh auto-ok:judge`" |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
 | `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |

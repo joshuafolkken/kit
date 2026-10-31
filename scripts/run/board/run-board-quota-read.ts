@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises'
+import { open, readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
 import { durable_state } from '#scripts/josh/durable-state'
@@ -46,10 +46,12 @@ interface QuotaWindow {
 	resets_ms: number
 }
 
-// A provider's windows and their event's timestamp, unknown in older logs.
+// A provider's windows and their event's timestamp, unknown in older logs; `per_task` is each
+// window's recent spend per task by its length in minutes, where one could be told.
 interface QuotaReading {
 	windows: ReadonlyArray<QuotaWindow>
 	taken_ms: number | undefined
+	per_task?: Readonly<Record<number, number>> | undefined
 }
 
 // Each provider's reading, `undefined` where none could be read.
@@ -95,7 +97,8 @@ function claude_window(minutes: number, window: ClaudeWindow | undefined): Array
 
 	const resets_ms = window.resetsAt * MS_PER_SECOND
 
-	return [{ minutes, used_percent: window.utilization * PERCENT, resets_ms }]
+	// A whole percent, as Claude reports it: `0.07 * 100` reads 7.000000000000001 otherwise.
+	return [{ minutes, used_percent: Math.round(window.utilization * PERCENT), resets_ms }]
 }
 
 function claude_line(line: string): QuotaReading | undefined {
@@ -139,22 +142,32 @@ function codex_line(line: string): QuotaReading | undefined {
 	}
 }
 
-// Windows and time from the same last event; unrelated later lines never refresh its age.
-function last_reading(
+function readings_in(
 	text: string,
 	line_of: (line: string) => QuotaReading | undefined,
-): QuotaReading | undefined {
-	const lines = text.split('\n').map((line) => line_of(line))
-
-	return lines.findLast((reading) => reading !== undefined)
+): Array<QuotaReading> {
+	return text
+		.split('\n')
+		.map((line) => line_of(line))
+		.filter((reading) => reading !== undefined)
 }
 
+// Windows and time from the same last event; unrelated later lines never refresh its age.
 function claude_reading(text: string): QuotaReading | undefined {
-	return last_reading(text, claude_line)
+	return readings_in(text, claude_line).at(-1)
 }
 
 function codex_reading(text: string): QuotaReading | undefined {
-	return last_reading(text, codex_line)
+	return readings_in(text, codex_line).at(-1)
+}
+
+// The first event's reading, which a file's head is read for.
+function claude_first(text: string): QuotaReading | undefined {
+	return readings_in(text, claude_line)[0]
+}
+
+function codex_first(text: string): QuotaReading | undefined {
+	return readings_in(text, codex_line)[0]
 }
 
 async function names_in(directory: string): Promise<Array<string>> {
@@ -234,6 +247,20 @@ async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<stri
 	return time_density_hook.read_tail(file, bytes)
 }
 
+// The first `bytes` of `file`; only the bytes read are decoded.
+async function read_head(file: string, bytes: number = TAIL_BYTES): Promise<string> {
+	const handle = await open(file, 'r')
+
+	try {
+		const buffer = Buffer.alloc(bytes)
+		const { bytesRead: read } = await handle.read(buffer, 0, bytes, 0)
+
+		return buffer.subarray(0, read).toString('utf8')
+	} finally {
+		await handle.close()
+	}
+}
+
 // Whether a tail of `bytes` ends the widening: it found a reading, held the whole file, or reached the limit.
 function is_last_tail(reading: QuotaReading | undefined, text: string, bytes: number): boolean {
 	return (
@@ -263,9 +290,12 @@ const run_board_quota_read = {
 	TAIL_BYTES,
 	TAIL_LIMIT_BYTES,
 	claude_files,
+	claude_first,
 	claude_reading,
 	codex_files,
+	codex_first,
 	codex_reading,
+	read_head,
 	read_tail,
 	reading_in,
 }

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentProfile } from '#scripts/agent/agent-role-profile'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { poll } from '#scripts/lib/poll'
@@ -75,6 +76,10 @@ function ports_for(
 	profile: AgentProfile,
 	is_code_stale: () => Promise<boolean> = async () => false,
 ): LoopPorts {
+	function is_planning(): boolean {
+		return backlogrun_launch.running_parent(context.git_directory) !== undefined
+	}
+
 	return {
 		is_code_stale,
 		read_carry: () => run_carry.read_carry(context.carry_target),
@@ -84,7 +89,7 @@ function ports_for(
 		hand_off: () => {
 			run_wake_handoff.hand_off(context.carry_target)
 		},
-		drive: async () => await run_wake_driver.drive(context.carry_target),
+		drive: async () => await run_wake_driver.drive(context.carry_target, poll.sleep, is_planning),
 		wake: (invocation, session_id, material) =>
 			wake_session(context, invocation, profile, { id: session_id, material }),
 		sleep: poll.sleep,

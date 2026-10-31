@@ -38,6 +38,16 @@ describe('split-assessment.md carries the heading a filing refusal names', () =>
 	})
 })
 
+// joshuafolkken/kit#5533: the question states `lane:plan`'s growth bar as the factor the code holds.
+describe('split-assessment.md states the lane:plan growth bar', () => {
+	it('names the factor with lane:plan in the question section', () => {
+		const document = read_repo_file(SPLIT_ASSESSMENT)
+
+		expect(split_assess.PLAN_GROWTH_FACTOR).toBe(2)
+		expect(document).toContain('`lane:plan` answers `split` past\ntwice the declared files')
+	})
+})
+
 describe('split:assess is a registered decision oracle', () => {
 	it('is on the oracle list with the split | single vocabulary', () => {
 		const oracle = decision_oracle.find_oracle(COMMAND)

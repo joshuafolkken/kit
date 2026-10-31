@@ -96,6 +96,34 @@ describe('shell implementation authority', () => {
 	})
 })
 
+// joshuafolkken/kit#5534: a finding quotes code in backticks, which a single-quoted argument leaves
+// as text, so the reviewer's findings path stays open while any other destination stays refused.
+const FINDING = "printf '%s\\n' 'Run `josh followup` before $(merge) with FOO=1'"
+const REVIEWER = 'reviewer'
+
+describe('review findings piped through a single-quoted argument', () => {
+	it.each([FINDING, `${FINDING} 'second; rm x\nline | tee ${RUNTIME_FILE}'`])(
+		'allows piping a finding with backticks to review:submit: %s',
+		(finding) => {
+			vi.stubEnv(agent_session_role.KEY, REVIEWER)
+
+			expect(
+				implementation_authority.reason(shell_payload(`${finding} | pnpm josh review:submit`)),
+			).toBeUndefined()
+		},
+	)
+
+	it.each([
+		`${FINDING} > ${RUNTIME_FILE}`,
+		`${FINDING} | tee ${RUNTIME_FILE}`,
+		`${FINDING} | custom-editor ${RUNTIME_FILE}`,
+	])('still refuses the same finding written elsewhere: %s', (command) => {
+		vi.stubEnv(agent_session_role.KEY, REVIEWER)
+
+		expect(implementation_authority.reason(shell_payload(command))).toContain(REFUSED)
+	})
+})
+
 describe('operational shell authority', () => {
 	it.each([
 		'rg implementation scripts',
