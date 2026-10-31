@@ -1142,6 +1142,8 @@ A plan over twice the files its `- 規模見積もり:` declares (tests excluded
 
 So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. A re-plan of a plan that met the size bar, or cleared, skips the lines check. Each `split` writes a `split-notice` with its reason to the lane ledger.
 
+The hunks count skips a file the recorded plan already lists, so a re-plan within its files never answers `split` on hunks.
+
 **Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
