@@ -1,0 +1,7 @@
+{
+	"reason": "new josh ship:evidence command (#5585): run-ship-evidence module and CLI",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 114
+	}
+}
