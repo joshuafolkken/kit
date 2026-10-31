@@ -50,6 +50,13 @@ describe('followup_check_report.lines — reruns and retriggers', () => {
 		])
 	})
 
+	it('reports a job rerun in two waits once', () => {
+		expect(followup_check_report.lines({ ...QUIET, reran: [RERUN_JOB, RERUN_JOB] })).toStrictEqual([
+			'Checks:',
+			`- ${RERUN_JOB} — re-run once, judged flaky; green on the re-run`,
+		])
+	})
+
 	it('answers no line at all, header included, on a run with nothing to report', () => {
 		expect(followup_check_report.lines(QUIET)).toStrictEqual([])
 	})

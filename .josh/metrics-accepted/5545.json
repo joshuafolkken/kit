@@ -1,8 +1,9 @@
 {
-	"reason": "#5545: followup drafts the check report itself (new followup-check-report module); the new followup doc paragraph keeps the section's bold-label convention",
+	"reason": "#5545: followup drafts the check report itself (new followup-check-report module and its wiring); the new followup doc paragraph keeps the section's bold-label convention",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 54,
+		"scripts.code_lines": 56,
+		"ai_cost.on_demand_bytes": 16,
 		"prose.excess_bold": 1
 	}
 }

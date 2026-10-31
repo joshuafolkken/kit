@@ -1,3 +1,4 @@
+import { CODERABBIT_CHECK_NAME, FAILURE_MESSAGE_PREFIX } from '#scripts/gh/git-pr-checks-eval'
 import { DISTRIBUTED_SKILL_FILE } from '#scripts/managed-marker/managed-config-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
@@ -70,6 +71,10 @@ vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { flush_ledger_step: vi.fn() },
 }))
 
+vi.mock('./followup-job-rerun', () => ({
+	followup_job_rerun: { rerun_failed_jobs: vi.fn() },
+}))
+
 // The real one resolves the tip with `git fetch origin main`, which the network guard refuses and
 // which nothing here asserts on.
 vi.mock('./git-followup-pending', () => ({
@@ -86,6 +91,7 @@ const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
 const { git_pr_ai_review } = await import('#scripts/gh/git-pr-ai-review')
 const { telegram_notify } = await import('#scripts/notify/telegram-notify')
 const { epic_close } = await import('#scripts/epic/epic-close')
+const { followup_job_rerun } = await import('./followup-job-rerun')
 
 const PR_URL = 'https://github.com/owner/repo/pull/1'
 const CHECKED_SHA = 'c0ffee1'
@@ -174,6 +180,46 @@ describe('followup — a diff that changes a distributed file', () => {
 		await git_pr_followup.run(BASE_INPUT)
 
 		expect(issue_comment_body()).toContain(EXPECTED_HIT)
+	})
+})
+
+// joshuafolkken/kit#5545: the check report `followup` drafts reaches both destinations too.
+describe('followup — a check report', () => {
+	const REPORT_LINE = `- ${CODERABBIT_CHECK_NAME} — failed (not required)`
+
+	beforeEach(() => {
+		given_changed([UNDISTRIBUTED_FILE])
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockResolvedValue({
+			rollup: [{ name: CODERABBIT_CHECK_NAME, status: 'fail' }],
+			merge_state_status: undefined,
+			review_decision: undefined,
+			head_sha: CHECKED_SHA,
+		})
+	})
+
+	it('names the failed check in the completion notification', async () => {
+		await git_pr_followup.run(BASE_INPUT)
+
+		expect(notify_body()).toContain(REPORT_LINE)
+	})
+
+	it('names the same check in the completion report on the Issue', async () => {
+		await git_pr_followup.run(BASE_INPUT)
+
+		expect(issue_comment_body()).toContain(REPORT_LINE)
+	})
+
+	it('names the job the check wait reran as flaky', async () => {
+		const job = 'Detect E2E'
+
+		vi.mocked(git_pr_checks.wait_for_pr_success).mockRejectedValueOnce(
+			new Error(`${FAILURE_MESSAGE_PREFIX} (failed checks: ${job}).`),
+		)
+		vi.mocked(followup_job_rerun.rerun_failed_jobs).mockResolvedValue([job])
+
+		await git_pr_followup.run(BASE_INPUT)
+
+		expect(issue_comment_body()).toContain(`- ${job} — re-run once`)
 	})
 })
 

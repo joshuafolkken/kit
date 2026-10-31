@@ -6,8 +6,10 @@ import {
 import { CHECK_STATUS_FAIL, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
 
 // The completion notification's check report, drafted by `followup` itself rather than retyped into
-// `--notify-message` from the printed check list (joshuafolkken/kit#5545): one line per check that
-// failed on the merged head, ran again as flaky, or was a rate-limited CodeRabbit review retriggered.
+// `--notify-message` from the printed check list (joshuafolkken/kit#5545): one line per check left
+// failed in the green snapshot, job run again as flaky, or rate-limited CodeRabbit review
+// retriggered. A red wait throws before any report is built, so it reaches here only as a
+// non-blocking failure — CodeRabbit's today (`is_blocking_failure`).
 // A run with nothing to report answers no line at all, header included, so the ordinary
 // completion report is unchanged.
 const REPORT_HEADER = 'Checks:'
@@ -37,7 +39,10 @@ function failed_lines(snapshot: PrStateSnapshot | undefined): Array<string> {
 }
 
 function reran_lines(reran: ReadonlyArray<string>): Array<string> {
-	return reran.map((name) => `- ${name} — re-run once, judged flaky; green on the re-run`)
+	// A job flaky in both the first wait and the one after a retrigger is reported once.
+	return [...new Set(reran)].map(
+		(name) => `- ${name} — re-run once, judged flaky; green on the re-run`,
+	)
 }
 
 function retrigger_lines(is_retriggered: boolean): Array<string> {

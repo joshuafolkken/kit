@@ -7,7 +7,8 @@
 
 `pnpm josh followup` は Required チェックだけを待つが、Workers Builds（Cloudflare デプロイ）など**非 Required チェックの失敗もユーザーに報告する**。
 
-- 失敗した check（required / not required の区別付き）・flaky として再実行したジョブ・CodeRabbit rate limit の再トリガは、`pnpm josh followup` が完了通知に 1 行 1 check で書く。一覧に加えて書くこと（修正内容・原因）があれば `--notify-message` に書く。**完了コメントに失敗を隠してはならない**
+- 緑の `pnpm josh followup` → 一覧は `followup` が完了通知に書く（`docs/josh-commands-automation.md` → "`josh followup`"）。修正内容・原因は `--notify-message`
+- 赤の run・マージ済み PR の再実行 → 印字された失敗を全件、修正内容か「名前・原因・未解決」で `--notify-message` に書く。読み直しは `gh api repos/{owner}/{repo}/commits/<sha>/check-runs`（`gh pr checks` はクラウドで 403）。**完了コメントに失敗を隠してはならない**
 - ユーザーへの報告でも失敗を「成功」として扱わない
 
 ### git-rules — コミット・共有状態・index・PR
