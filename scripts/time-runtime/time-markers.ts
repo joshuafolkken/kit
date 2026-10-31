@@ -27,9 +27,9 @@ import { json_value } from '#scripts/lib/json-value'
 // the fork's own transcript, where it returns instantly (it only loads the skill text). The review's
 // real wall clock is the fork's own `Read`/`grep` spans. Those spans carry no marker of their own, so
 // they inherit the marker of the parent span they run inside — the `Agent` call (`time-overlap.ts`).
-// Left unmarked that parent deletes the phase rather than moving it, leaving a ~0 ms `review`. So the
-// `Agent` launch is marked here, and the `Skill(code-review)` marker stays for older transcripts in
-// which the main line loaded the skill itself.
+// Left unmarked that parent deletes the phase rather than moving it, leaving an empty `review`. So
+// the `Agent` launch is marked here, and the `Skill(code-review)` marker stays for older
+// transcripts in which the main line loaded the skill itself.
 //
 // **The launch is recognized by its prompt carrying both `/code-review` and `review:attest`.** The
 // first is the instruction to invoke the review skill; the second is the attestation step the launch

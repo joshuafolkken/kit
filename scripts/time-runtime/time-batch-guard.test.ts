@@ -52,8 +52,8 @@ describe('time_batch_guard.should_block — the run of single-call turns', () =>
 	})
 
 	// **The turn being interrupted is not read, because it cannot be.** Claude Code starts a turn's
-	// first tool 1.4–15 seconds before the turn's later `tool_use` lines are written, so an open turn
-	// that will batch is indistinguishable from one that will not. This case pins the consequence
+	// first tool before the turn's later `tool_use` lines are written, so an open turn that will
+	// batch is indistinguishable from one that will not. This case pins the consequence
 	// rather than pretending otherwise: the call is refused either way — once — and the reason says so.
 	it('refuses without regard to how many calls the open turn will go on to issue', () => {
 		const text = transcript(

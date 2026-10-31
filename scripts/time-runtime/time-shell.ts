@@ -15,10 +15,9 @@ import { json_value } from '#scripts/lib/json-value'
 // session and says nothing: `git`, `gh` and `pnpm` are different work with different costs.
 //
 // **The first word is not always the command.** Most calls here open with `cd <path> &&`, and taking
-// the literal first word put `Bash: cd` at the top of every table — 82 calls and 12.1 minutes of one
-// measured session, naming the one part of the command that did no work. So the chain is split into
-// segments and each segment walked past its leading `VAR=…` assignments and its wrappers, to the
-// first word that is a command.
+// the literal first word put `Bash: cd` at the top of every table, naming the one part of the
+// command that did no work. So the chain is split into segments and each segment walked past its
+// leading `VAR=…` assignments and its wrappers, to the first word that is a command.
 //
 // **A prefix is skipped word by word, not segment by segment.** Reading only each segment's first
 // word left `FOO=1 pnpm test` reported as `Bash: FOO=1` and `time pnpm build` as `Bash: time` — the

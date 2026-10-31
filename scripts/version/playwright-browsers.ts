@@ -24,7 +24,7 @@ const INSTALL_LOCATION_RE = /Install location: +(\S.*)/gu
 const COMPLETE_MARKER = 'INSTALLATION_COMPLETE'
 
 // Chromium alone, as the CI fallback installs: a bare `playwright install` fetches chromium, firefox
-// and webkit — roughly 1 GB — for the single chromium project kit scaffolds.
+// and webkit for the single chromium project kit scaffolds.
 const DEFAULT_BROWSERS: ReadonlyArray<string> = ['chromium']
 
 // The version actually installed, not the range in `package.json`: the browsers follow the resolved
