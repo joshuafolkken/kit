@@ -9,25 +9,24 @@
   4. **Record the plan** — written to a file in the session language (`JOSH_SESSION_LANG`, default
      `ja`), then `pnpm josh issue:plan <N> --body-file <path> --title "<title>" --planned`: it renames
      the issue, writes the plan into the body when it is blank and its author has write access (a
-     comment otherwise), and applies `run:planned`, so the next command's `run:entry` starts at the implementation. A target named in front of the reference
+     comment otherwise), applies `run:planned`, so the next command's `run:entry` starts at the
+     implementation, and sends the `planning` Telegram (`docs/josh-commands-backlog.md` → "`josh issue:plan`"). A target named in front of the reference
      adds `--repo <owner/name>`. Before writing the plan, run `pnpm josh plan:consumers
      <identifier...>` on what it adds or changes and finish the `### 影響を受ける既存の利用者` draft it
      prints; `issue:plan` refuses a plan without it (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
-  5. Send the Telegram notification, its last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>` →
-     **stop** (do not implement).
+  5. Report the plan, the Telegram's last line `Next: halfrun #<N> | prrun #<N> | fullrun #<N>`, then **stop** (do not implement).
 
-  **Two or more separately-mergeable deliverables** take the split path instead of a plan: rename `#N`
-  to the step-2 title (`gh api -X PATCH repos/{owner}/{repo}/issues/<N> -f title="<title>"` — neither
-  `issue:plan` nor `epic --promote` runs here to apply it), create the children as in `kickoff new`,
-  then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
-  ... [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion or a container), or
-  keep `#N` as a child and create a new epic with `pnpm josh epic`. That branch is Tier A: choose and
+  **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
+  children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
+  ... --title "<title>" [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion
+  or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
+  made with `pnpm josh epic`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
 
-  Telegram: `pnpm josh notify --task-type planning --issue-url "<issue-url>" --body=$'-
-  <bullet1>\n- <bullet2>\n...'`. `--task-type` sets the icon (`planning` 📋 / `completion` ✅ /
+  Telegram for the `kickoff new` paths: `pnpm josh notify --task-type planning --issue-url "<issue-url>"
+  --body-file <path>`. `--task-type` sets the icon (`planning` 📋 / `completion` ✅ /
   `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️); `--repo-name` and `--issue-title` are
-  auto-fetched. The Issue URL must be included.
+  auto-fetched. The Issue URL must be included. `issue:plan --planned` sends its own.
 
 **`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
 the tree (`working-tree-hold.md`).
