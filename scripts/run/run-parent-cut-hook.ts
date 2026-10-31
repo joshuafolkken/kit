@@ -54,7 +54,7 @@ const THRESHOLD_TEXT = '`pnpm josh cost --cut`'
 const PARENT_CUT_REASON =
 	'⛔ backlogrun parent hand-off: this session drives a `backlogrun` and its recent context ' +
 	`crossed the ${THRESHOLD_TEXT} threshold between merges. Take the hand-off now: open no new lane, ` +
-	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:carry --cut --owner "$PPID"`, then ' +
+	'follow `backlogrun-progress.md` → "The hand-off" (`pnpm josh run:carry --cut`, then ' +
 	'`pnpm josh run:wake` unless `capped`) and end the turn. Reissue this call once done or if it ' +
 	'cannot be taken.'
 

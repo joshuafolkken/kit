@@ -1,4 +1,5 @@
 import { agent_provider } from '#scripts/agent/agent-provider'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { run_headless } from '#scripts/run/run-headless'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
@@ -14,6 +15,7 @@ const ISSUE = '2989'
 const REASON = 'needs a decision'
 const SUMMARY = 'nothing to change'
 const OWN_PID = String(process.pid)
+const SESSION_ID = 'own-session'
 const UNSAFE_ISSUE = '99999999999999999999'
 const RETROSPECTIVE_FLAG = '--retrospective'
 const SUMMARY_FLAG = '--summary'
@@ -25,9 +27,11 @@ function request_for(argv: ReadonlyArray<string>): ReturnType<typeof run_carry_a
 	return run_carry_args.to_request(parsed)
 }
 
-// The suite runs inside whatever session started it, so the headless mark is cleared rather than read.
+// The suite runs inside whatever session started it, so the headless mark and the session pid are
+// cleared rather than read.
 beforeEach(() => {
 	vi.stubEnv(run_headless.HEADLESS_ENV_KEY, undefined)
+	vi.stubEnv(agent_session_environment.AGENT_PID_KEY, undefined)
 	vi.spyOn(agent_provider, 'resolve_provider').mockReturnValue({
 		kind: 'provider',
 		provider: 'anthropic',
@@ -193,6 +197,27 @@ describe('run_carry_args.to_request counting group', () => {
 		expect(request_for(['--done', '0'])).toBeUndefined()
 		expect(request_for(['--done', '012'])).toBeUndefined()
 		expect(request_for(['--done', UNSAFE_ISSUE])).toBeUndefined()
+	})
+})
+
+describe('run_carry_args.to_request omitted owner', () => {
+	it('names the session the environment exports, on a claim and on a count', () => {
+		vi.stubEnv(agent_session_environment.AGENT_PID_KEY, OWN_PID)
+		vi.stubEnv(agent_session_environment.SESSION_ID_KEY, SESSION_ID)
+
+		expect(request_for(['--resume', INVOCATION])).toStrictEqual({
+			kind: 'claim',
+			claim: { invocation: INVOCATION, owner: run_carry.owner_of(process.pid), is_adoption: true },
+		})
+		expect(request_for(['--cut'])).toMatchObject({ owner: run_carry.owner_of(process.pid) })
+	})
+
+	// A Codex session or a supervisor a Claude session launched inherits its launcher's pid, not its id.
+	it('names no owner from a pid inherited without the session id', () => {
+		vi.stubEnv(agent_session_environment.AGENT_PID_KEY, OWN_PID)
+		vi.stubEnv(agent_session_environment.SESSION_ID_KEY, undefined)
+
+		expect(request_for(['--cut'])).toMatchObject({ owner: run_carry.NO_OWNER })
 	})
 })
 

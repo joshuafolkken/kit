@@ -178,6 +178,7 @@ describe('run_step.next_action — the hand-off at a child launch', () => {
 		)
 
 		expect(action).toEqual({ kind: 'command', line: run_step.HAND_OFF_COMMAND })
+		expect(run_step.HAND_OFF_COMMAND).toBe('pnpm josh run:carry --cut')
 	})
 
 	it.each<Partial<StepInput>>([

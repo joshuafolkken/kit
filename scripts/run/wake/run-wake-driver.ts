@@ -57,11 +57,11 @@ function details_tail(details: string): string {
 // wake, so until the session adopts it with `--resume` every count it writes — `--merged`, `--done`,
 // the closing `--cut` — is refused as advancing a handed-off budget, and the supervisor, seeing no
 // claim, ends the run as a failed wake.
-const HAND_BACK = 'then hand the loop back with pnpm josh run:carry --cut --owner "$PPID"'
+const HAND_BACK = 'then hand the loop back with pnpm josh run:carry --cut'
 const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	[
 		'retrospective',
-		`run what pnpm josh run:step prints (retrospective.md), close it with pnpm josh run:carry --retrospective --summary "<result>" --owner "$PPID", ${HAND_BACK}`,
+		`run what pnpm josh run:step prints (retrospective.md), close it with pnpm josh run:carry --retrospective --summary "<result>", ${HAND_BACK}`,
 	],
 	[
 		'merge human-review',
@@ -85,7 +85,7 @@ function handoff_material(
 ): string {
 	const context = details === '' ? '' : `\nDetails: ${details_tail(details)}`
 	const epic = verdict.startsWith('epic #')
-		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> --owner "$PPID" before continuing to the next named item.'
+		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> before continuing to the next named item.'
 		: ''
 
 	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict, invocation)}${context}`

@@ -71,16 +71,22 @@ function config_text(scope: ReadonlyArray<string>, build_info: string): string {
 }
 
 // Whether `scope` reads a type error in the tree as it stands. A tsc that cannot start reads no error.
+// `--pretty false` keeps a color-forcing environment from splitting `TYPE_ERROR` with escape codes
+// (joshuafolkken/kit#5505).
 async function is_red(tree: BaseTree, scope: ReadonlyArray<string>): Promise<boolean> {
 	if (scope.length === 0) return false
 	const build_info = path.join(tree.parent, BUILD_INFO)
 
 	await writeFile(path.join(tree.tree, CONFIG_NAME), config_text(scope, build_info))
-	const result = await execa(path.join(tree.tree, TSC_BIN), ['-p', CONFIG_NAME], {
-		cwd: tree.tree,
-		reject: false,
-		all: true,
-	})
+	const result = await execa(
+		path.join(tree.tree, TSC_BIN),
+		['-p', CONFIG_NAME, '--pretty', 'false'],
+		{
+			cwd: tree.tree,
+			reject: false,
+			all: true,
+		},
+	)
 
 	return TYPE_ERROR.test(result.all)
 }

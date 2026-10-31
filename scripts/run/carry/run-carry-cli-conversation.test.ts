@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { process_identity_fixture } from '#scripts/josh/process-identity-fixture'
+import { run_headless } from '#scripts/run/run-headless'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_carry } from './run-carry'
 import { run_carry_cli } from './run-carry-cli'
@@ -61,6 +62,8 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	vi.stubEnv('HOME', scratch)
 	vi.stubEnv('CLAUDE_CODE_SESSION_ID', SESSION_ID)
+	// A headless session running the suite would mark the owner headless and skip the conversation.
+	vi.stubEnv(run_headless.HEADLESS_ENV_KEY, undefined)
 	git_directories.mockResolvedValue([WORKTREE, REPOSITORY])
 	write_transcript()
 	run_carry.end_carry(target())

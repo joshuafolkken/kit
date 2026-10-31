@@ -62,8 +62,7 @@ and output path; fill a missing path with `pnpm josh lane:output <N> <path>`:
 - **A lane nobody can poll** (`unreadable`, or `open` with no path) — **the cut does not happen**: name
   it in the progress comment and re-ask at the next merge. **Never assume idle.** A `stranded` lane is
   closed by `pnpm josh lane:prune`.
-- **Every in-flight lane records a path** — count everything, run `pnpm josh run:carry --cut --owner
-  "$PPID"`, post the progress comment naming every lane and its path with `pnpm josh run:board`, and end
+- **Every in-flight lane records a path** — count everything, run `pnpm josh run:carry --cut`, post the progress comment naming every lane and its path with `pnpm josh run:board`, and end
   the turn; the `run:wake` driver polls the lanes.
 - **`--cut` answers `capped`** (`MAX_CUTS`) — **do not `run:wake` or hand off**;
   carry this session on and re-ask at the next merge.

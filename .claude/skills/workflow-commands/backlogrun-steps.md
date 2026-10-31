@@ -52,12 +52,13 @@ hand-off"), which keeps the invocation string, `--only` and the named list; it r
 `--json` (`docs/josh-commands-run.md` → "`josh run:carry`").
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5 --idle 30" --owner "$PPID"
-pnpm josh run:carry --json                                                   # read it back in a resumed session
-pnpm josh run:wake --start                                                   # same turn as --begin; `running` under `josh backlogrun`
+pnpm josh run:carry --begin "backlogrun --max 5 --idle 30"
+pnpm josh run:carry --json                                   # read it back in a resumed session
+pnpm josh run:wake --start                                   # same turn as --begin; `running` under `josh backlogrun`
 ```
 
-**Always pass `--owner "$PPID"`**, before the plan, in the same turn as the first `pnpm josh ms`. **The
+**Begin it before the plan**, in the same turn as the first `pnpm josh ms`; the owner is the session pid
+the agent exports (`--owner <pid>` only where it exports none). **The
 record is the parent loop's; a lane never touches it**. Count with `--merged <N>` and `--filed 1`;
 **`--cut` is the session's last write**.
 
@@ -75,8 +76,7 @@ batched with it**, and `pnpm josh run:wake --stop` in the same turn. **A run tha
 
 **A driver hand-off of `epic #N` is a named epic**: settle it by `backlogrun-progress.md` → "Running a
 named epic's children", never the root as a standalone `fullrun`, then ask `pnpm josh epic:next <E>` —
-a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>
---owner "$PPID"`.
+a child number or `complete` continues; only `stop` or a failure records `pnpm josh run:carry --done <E>`.
 
 **A person keeps control** — `pnpm josh run:wake --list` reads it, `pnpm josh backlogrun --stop` stops
 it (`docs/josh-commands.md` → "`josh backlogrun`").
@@ -112,8 +112,8 @@ never `needs-human-review` (`needs-human-review.md`), the priority labels only t
 
 **The loop is computed, not walked by hand** — the `run:wake` supervisor runs `pnpm josh backlog:drive`
 (`docs/josh-commands-backlog.md` → "`josh backlog:drive`"). A session reaches this section only when
-the `Driver result:` line hands a branch back: claim with `pnpm josh run:carry --resume "<invocation>"
---owner "$PPID"`, act on the row, then `pnpm josh run:carry --cut --owner "$PPID"`. Read only the one
+the `Driver result:` line hands a branch back: claim with `pnpm josh run:carry --resume "<invocation>"`,
+act on the row, then `pnpm josh run:carry --cut`. Read only the one
 section the row names:
 
 | Handed back | What the session does | Read |
