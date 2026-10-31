@@ -1,0 +1,7 @@
+{
+	"reason": "#5499 filters Claude quota logs by their last launch header's provider",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}

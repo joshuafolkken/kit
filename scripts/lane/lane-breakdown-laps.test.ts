@@ -145,6 +145,26 @@ describe('lane_breakdown_laps.of — ship stages', () => {
 	})
 })
 
+// joshuafolkken/kit#5538: a scoped pair that ran again says which run it was and why.
+describe('lane_breakdown_laps.of — a scoped pair run again', () => {
+	it('names the run count and the rerun reason beside why it read the whole branch', () => {
+		const entries = [
+			{ ...lap(SCOPED_PAIR, 4, 12), runs: 2, rerun: 'moved', fallback: 'hub' },
+			{ ...lap(SCOPED_PAIR, 3, 14), runs: 1 },
+		]
+
+		expect(minutes_of(entries)).toStrictEqual([
+			[
+				SHIP_GATE,
+				[
+					[`${SCOPED_PAIR} (run 2: moved; whole branch: hub)`, 4],
+					[SCOPED_PAIR, 3],
+				],
+			],
+		])
+	})
+})
+
 // joshuafolkken/kit#5319: the gate's own checks sit under the ship gate beside its laps.
 describe('lane_breakdown_laps.of — the checks of the gate', () => {
 	it("puts each check of the lane's gate under the ship stage it ended in, longest first", () => {

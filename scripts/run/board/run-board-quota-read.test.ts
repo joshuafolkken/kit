@@ -1,5 +1,5 @@
 import { mkdtempSync } from 'node:fs'
-import { mkdir, rm, utimes, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -58,6 +58,25 @@ function full_tail(bytes: number): string {
 async function written(file: string, seconds: number): Promise<string> {
 	await mkdir(path.dirname(file), { recursive: true })
 	await writeFile(file, '')
+	await utimes(file, seconds, seconds)
+
+	return file
+}
+
+// A lane log's launch header as `detached_launch` writes it, with the profile suffix naming `provider`.
+function header(provider: string): string {
+	return `=== ${EARLIER} · started by process 1 · claude · provider=${provider} role=worker model=m effort=medium ===`
+}
+
+const ANTHROPIC = header('anthropic')
+const OPENAI = header('openai')
+
+async function launched(
+	file: string,
+	seconds: number,
+	lines: ReadonlyArray<string>,
+): Promise<string> {
+	await writeFile(file, `\n${lines.join('\n')}\n`)
 	await utimes(file, seconds, seconds)
 
 	return file
@@ -233,7 +252,8 @@ describe('run_board_quota_read.reading_in', () => {
 	})
 })
 
-describe('run_board_quota_read files', () => {
+// A fresh directory per test, removed after it; read through the returned getter.
+function temporary_root(): () => string {
 	let root = ''
 
 	beforeEach(() => {
@@ -244,15 +264,76 @@ describe('run_board_quota_read files', () => {
 		await rm(root, { recursive: true, force: true })
 	})
 
-	function lane_log(name: number): string {
-		return path.join(root, `josh-lane-dispatch-${String(name)}.log`)
-	}
+	return () => root
+}
+
+function lane_log(root: string, name: number): string {
+	return path.join(root, `josh-lane-dispatch-${String(name)}.log`)
+}
+
+describe('run_board_quota_read.claude_files by provider', () => {
+	const root_of = temporary_root()
+
+	it('passes over logs whose last launch ran Codex, so an older Claude log still reads', async () => {
+		const root = root_of()
+		const claude = await launched(lane_log(root, 1), 100, [ANTHROPIC, claude_line(0.42, 0.68)])
+
+		await launched(lane_log(root, 2), 200, [OPENAI])
+		await launched(lane_log(root, 3), 300, [OPENAI])
+		await launched(lane_log(root, 4), 400, [OPENAI])
+		const found = await claude_files(root)
+		const text = await readFile(claude, 'utf8')
+
+		expect(found.map((file) => file.path)).toEqual([claude])
+		expect(claude_reading(text)?.windows.map((window) => window.used_percent)).toEqual([42, 68])
+	})
+
+	it("judges a relaunched log by its last header's provider", async () => {
+		const root = root_of()
+		const to_claude = await launched(lane_log(root, 1), 100, [OPENAI, ANTHROPIC])
+
+		await launched(lane_log(root, 2), 200, [ANTHROPIC, OPENAI])
+		const found = await claude_files(root)
+
+		expect(found.map((file) => file.path)).toEqual([to_claude])
+	})
+
+	it('keeps a log whose header predates the provider suffix as Claude', async () => {
+		const root = root_of()
+		const legacy = `=== ${EARLIER} · started by process 1 · claude ===`
+		const unnamed = await launched(lane_log(root, 1), 100, [legacy])
+		const found = await claude_files(root)
+
+		expect(found.map((file) => file.path)).toEqual([unnamed])
+	})
+})
+
+describe('run_board_quota_read.claude_files bound', () => {
+	const root_of = temporary_root()
+
+	it('reads no further than the newest nine lane logs for their provider', async () => {
+		const root = root_of()
+		const codex = Array.from({ length: 9 }, async (_, index) => {
+			await launched(lane_log(root, index + 2), 200 + index, [OPENAI])
+		})
+
+		await launched(lane_log(root, 1), 100, [ANTHROPIC])
+		await Promise.all(codex)
+
+		expect(await claude_files(root)).toEqual([])
+	})
+})
+
+describe('run_board_quota_read files', () => {
+	const root_of = temporary_root()
 
 	it('finds the three newest lane logs newest first, and none in a missing directory', async () => {
-		await written(lane_log(1), 100)
-		const older = await written(lane_log(2), 200)
-		const newer = await written(lane_log(3), 300)
-		const newest = await written(lane_log(4), 400)
+		const root = root_of()
+
+		await written(lane_log(root, 1), 100)
+		const older = await written(lane_log(root, 2), 200)
+		const newer = await written(lane_log(root, 3), 300)
+		const newest = await written(lane_log(root, 4), 400)
 
 		await written(path.join(root, 'josh-other-5.log'), 500)
 		const found = await claude_files(root)
@@ -262,6 +343,7 @@ describe('run_board_quota_read files', () => {
 	})
 
 	it('finds the newest rollout files of today and yesterday, never older days', async () => {
+		const root = root_of()
 		const sessions = path.join(root, 'sessions', '2026', '10')
 		const yesterday = await written(path.join(sessions, '28', 'rollout-a.jsonl'), 200)
 		const today = await written(path.join(sessions, '29', 'rollout-c.jsonl'), 100)

@@ -1,5 +1,6 @@
-import { open, readdir, stat } from 'node:fs/promises'
+import { open, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
 import { durable_state } from '#scripts/josh/durable-state'
 import { figure_format } from '#scripts/lib/figure-format'
@@ -30,6 +31,8 @@ const TAIL_GROWTH = 8
 const TAIL_LIMIT_BYTES = TAIL_BYTES * TAIL_GROWTH * TAIL_GROWTH
 // The newest files a provider's reading is looked for in, newest first.
 const FILES_TRIED = 3
+// The newest lane logs read for their launch's provider, bounding the reads when Codex ran them all.
+const LOGS_SCANNED = FILES_TRIED * FILES_TRIED
 const MS_PER_DAY = MINUTES_PER_DAY * MINUTES_PER_HOUR * MS_PER_SECOND
 const CLAUDE_MARK = '"rate_limit_event"'
 const CODEX_MARK = '"rate_limits":{'
@@ -37,8 +40,11 @@ const CODEX_PREFIX = 'rollout-'
 const CODEX_SUFFIX = '.jsonl'
 const LOG_SUFFIX = '.log'
 const TIMESTAMP_MARK = '"timestamp"'
-// `detached_launch.log_header`'s shape — `=== <time> · started by process <pid> · <command> ===`.
+// `detached_launch.log_header`'s shape — `=== <time> · started by process <pid> · <command>[ · <profile>] ===`.
 const LAUNCH_HEADER = /^=== (?<stamp>\S+) · started by process /u
+// Every launch header of a log, and the `provider=<p>` of the profile suffix a header may carry.
+const LAUNCH_HEADERS = /^=== \S+ · started by process .*$/gmu
+const HEADER_PROVIDER = / · provider=(?<provider>\S+)/u
 const { two_digits } = figure_format
 
 type QuotaProvider = 'claude' | 'codex'
@@ -233,19 +239,49 @@ async function files_in(
 	return files.flat()
 }
 
+function sorted(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
+	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms)
+}
+
 // The `FILES_TRIED` newest of `files`, newest first.
 function newest(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
-	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms).slice(0, FILES_TRIED)
+	return sorted(files).slice(0, FILES_TRIED)
 }
 
 function is_lane_log(name: string): boolean {
 	return name.startsWith(durable_state.PREFIX.LANE_DISPATCH) && name.endsWith(LOG_SUFFIX)
 }
 
-// The newest lane children's logs in the run-state directory. A Codex child logs under the same
-// name and writes no `rate_limit_event`, so the newest log alone may hold no reading.
+// The provider a log's last launch header names; `undefined` where it names none.
+function last_provider(text: string): string | undefined {
+	const header = text.match(LAUNCH_HEADERS)?.at(-1) ?? ''
+
+	return HEADER_PROVIDER.exec(header)?.groups?.['provider']
+}
+
+// Whether a log's last launch ran Claude: a header naming no provider predates the profile suffix,
+// when every lane child was Claude's.
+function is_claude_launch(text: string): boolean {
+	const provider = last_provider(text)
+
+	return provider === undefined || provider === agent_provider.ANTHROPIC_PROVIDER
+}
+
+async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
+	try {
+		return is_claude_launch(await readFile(file.path, 'utf8')) ? [file] : []
+	} catch {
+		return []
+	}
+}
+
+// The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
+// the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
 async function claude_files(root: string = durable_state.root()): Promise<Array<QuotaFile>> {
-	return newest(await files_in(root, is_lane_log))
+	const scanned = sorted(await files_in(root, is_lane_log)).slice(0, LOGS_SCANNED)
+	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
+
+	return claude.flat().slice(0, FILES_TRIED)
 }
 
 function is_rollout(name: string): boolean {
