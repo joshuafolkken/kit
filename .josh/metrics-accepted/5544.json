@@ -2,6 +2,6 @@
 	"reason": "ci:timing (#5544): review fix catches gh's 404 into one line and strips REST run fields from --json, with tests for both",
 	"date": "2026-10-31",
 	"growth": {
-		"scripts.code_lines": 193
+		"scripts.code_lines": 194
 	}
 }
