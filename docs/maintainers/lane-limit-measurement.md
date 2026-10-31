@@ -240,12 +240,17 @@ is not giving the decision what it needs.
 
 ## Whether the split notice led to a split
 
-Under the round-2 table, `lane:stats` prints one row: how many lanes got the split notice in the period
+Under the round-2 table, `lane:stats` prints how many lanes got a split notice in the period
 (`noticed lanes`), and how many of those filed a split child (`split`), whenever it was filed.
 
-The first showing of the notice writes a `split-notice` entry with the Issue and the measured files and
-lines (`split-early-notice.ts`); `josh issue:file --route split` from a lane writes a `split-filed`
-entry (`split-resolution.ts`).
+The `all` row counts each lane once. The rows below it count by `reason`: `files`, `hunks` and
+`lines` for the axis `josh lane:plan` answered `split` on (`lane-plan-size.ts`), and `diff` for the
+measured-diff notice.
+
+The first showing of the diff notice writes a `split-notice` entry with the Issue and the measured
+files and lines (`split-early-notice.ts`). Each `split` from `lane:plan` writes one that also carries
+its `reason`. `josh issue:file --route split` from a lane writes a `split-filed` entry
+(`split-resolution.ts`).
 
 ## Why a free lane stayed empty
 
