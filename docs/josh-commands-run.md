@@ -772,7 +772,7 @@ A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
-- `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment while it offers the triaged rows.
+- `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
 - `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and waits …" from.
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
