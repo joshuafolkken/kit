@@ -20,10 +20,10 @@ function file_diff(file: string, starts: ReadonlyArray<number>): Array<string> {
 	return [`diff --git a/${file} b/${file}`, `--- a/${file}`, `+++ b/${file}`, ...hunks]
 }
 
-const DIFF = [
-	...file_diff('scripts/lane/one.ts', [1, 9]),
-	...file_diff('scripts/lane/one.test.ts', [1]),
-].join('\n')
+const SOURCE = 'scripts/lane/one.ts'
+const DIFF = [...file_diff(SOURCE, [1, 9]), ...file_diff('scripts/lane/one.test.ts', [1])].join(
+	'\n',
+)
 
 function sized(issue: number, declared_lines: number, actual_lines: number): Array<LedgerEntry> {
 	return [
@@ -38,13 +38,13 @@ function sized(issue: number, declared_lines: number, actual_lines: number): Arr
 	]
 }
 
-describe('lane_plan_signals.counted_hunks', () => {
-	it('counts the hunks of the files a declaration counts, not of the tests', () => {
-		expect(lane_plan_signals.counted_hunks(DIFF)).toBe(2)
+describe('lane_plan_signals.hunk_files', () => {
+	it('names the file of each hunk a declaration counts, not of the tests', () => {
+		expect(lane_plan_signals.hunk_files(DIFF)).toStrictEqual([SOURCE, SOURCE])
 	})
 
-	it('counts none on an empty diff', () => {
-		expect(lane_plan_signals.counted_hunks('')).toBe(0)
+	it('names none on an empty diff', () => {
+		expect(lane_plan_signals.hunk_files('')).toStrictEqual([])
 	})
 })
 
@@ -52,8 +52,8 @@ describe('lane_plan_signals.signals_from', () => {
 	it('reads the period lines ratio and no split child off a ledger of merged sizes', () => {
 		const entries = [...sized(1, 100, 150), ...sized(2, 100, 250)]
 
-		expect(lane_plan_signals.signals_from(ISSUE, 3, entries, NOW)).toStrictEqual({
-			hunks: 3,
+		expect(lane_plan_signals.signals_from(ISSUE, ['a.ts'], entries, NOW)).toStrictEqual({
+			hunk_files: ['a.ts'],
 			lines_ratio: 2,
 			split_filed: false,
 		})
@@ -62,8 +62,8 @@ describe('lane_plan_signals.signals_from', () => {
 	it('answers no ratio on an empty ledger, and a split child the lane filed', () => {
 		const filed: LedgerEntry = { kind: 'split-filed', at: RECENT, issue: ISSUE, child: '#9' }
 
-		expect(lane_plan_signals.signals_from(ISSUE, 0, [filed], NOW)).toStrictEqual({
-			hunks: 0,
+		expect(lane_plan_signals.signals_from(ISSUE, [], [filed], NOW)).toStrictEqual({
+			hunk_files: [],
 			lines_ratio: undefined,
 			split_filed: true,
 		})

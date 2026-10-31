@@ -1,0 +1,7 @@
+{
+	"reason": "#5601: the hunks axis names each hunk's file and skips the recorded plan's files (unplanned_hunks)",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
