@@ -226,6 +226,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:wake` | `[options]` | automation | processes, notifications | Wake the next session of a cut backlogrun from outside the conversation |
 | `josh run:watcher:guard` | — | automation | none | Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently |
 | `josh ship` | `"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> \| --notify-message-file <path>] \| --log <N>` | automation | git, network | Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step |
+| `josh ship:evidence` | `<N> -- <command...>` | automation | files, processes | Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code) |
 | `josh ship:wait` | `<N>` | automation | files, processes | Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned \| passed \| ended \| pending) |
 | `josh split:assess` | `[--json]` | automation | none | Measure the branch change size (tests excluded) and answer the split assessment size question: split \| single |
 | `josh stash:pop` | `<message>` | automation | git | Pop the stash matching this message, not whichever a shared stack has on top |

@@ -31,7 +31,8 @@ const COMMAND_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
 	[/\bjosh check:related\b/u, 'check:related'],
 	[/\bjosh gate\b/u, 'gate'],
 	[/\bjosh run:review\b/u, 'run:review'],
-	[/\bjosh ship(?::wait)?\b/u, 'ship / ship:wait'],
+	// Not `\b`: it holds before the `:` of `ship:evidence`, whose wrapped command is its own kind.
+	[/\bjosh ship(?::wait)?(?![\w:-])/u, 'ship / ship:wait'],
 	[/\bjosh test(?::[\w-]+)?\b/u, 'test'],
 	[/\bjosh (?:lint|cspell)(?::[\w-]+)?\b/u, 'lint / cspell'],
 ]

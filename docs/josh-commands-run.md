@@ -660,6 +660,21 @@ A stop in the gate or review round 1 returns to the lane session waiting here; w
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` in detail".
 
+### `josh ship:evidence`
+
+<!-- usage: ship:evidence -->
+
+Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code).
+
+```bash
+pnpm josh ship:evidence <N> -- pnpm josh <command>   # the run picks which command is the evidence; the format is written for it
+```
+
+<!-- /usage -->
+
+The command runs with `NO_COLOR`; its invocation is written as a code span and the last 40 lines of its combined output in a fence, at the end of the draft's `## 実機証跡` section, the shape `josh ship`'s preflight reads.
+A draft is required: `josh run:prep <N>` writes it.
+
 ### `josh run:report`
 
 <!-- usage: run:report -->
