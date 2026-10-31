@@ -16,17 +16,17 @@
 
 1. **起票する** — `pnpm josh issue:file "<title>" --body-file <path> --route interrupt --label priority:high --blocks-finder`。上限は効かない（`wip-cap.md` →「割り込み起票 — 上限が効かない側」の条件 2）
 2. **止まらずに直す** — 壊れた機構を迂回せず、検証ゲートも緩めない。`backlogrun` の中では割り込みを次の子にし、着地後に塞がれていた子へ戻る（プールでは `priority:high` が先頭、epic の下では `wip-cap.md` の手順 3 で挿入、名前指定のランでは `pnpm josh lane:launch <N>` で自分で dispatch）。バッチの外では `wip-cap.md` の手順 4 どおり、打つべき `fullrun #<N>` を報告して止まる
-3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、手渡し済み・所有者が死んだ記録・監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>" --owner "$PPID"` を打つ。`pnpm josh run:wake --list` が監督プロセスを示し、ログに次の子の dispatch が現れることを確かめて報告する
+3. **再開できるなら自分で再開し、動くことを確かめる** — 修正のマージ後、手渡し済み・所有者が死んだ記録・監督プロセスの停止（`warning` Telegram）には `pnpm josh run:wake --start`、`run:carry` の `standing` には `pnpm josh run:carry --resume "<invocation>"` を打つ。`pnpm josh run:wake --list` が監督プロセスを示し、ログに次の子の dispatch が現れることを確かめて報告する
 4. **人に打ち直しを求めるのは再開の手段が無いときだけ** — `mismatch`（別の起動の記録）、別の生きた所有者の `busy`。新しい承認を宣言するのは人だけ
 5. **`needs-decision` を付けない**（`.claude/skills/workflow-commands/backlogrun-park.md` → "Only a person's judgement carries `needs-decision`"）
 
 手順:
 
-1. **現在の作業を退避する**: `pnpm josh stash:push "upstream-interrupt: paused #<N>"`（WIP コミットでも可）
-2. **進行中の Issue に状況を書く**: `pnpm josh issue:comment <N> --body-file <path>` で、stash したこと、中断理由（どの別パッケージのどんな問題か）、新 Issue へのリンク（`## Upstream issues` 見出しの下に `owner/repo#N` 形式、→「起票元へのバックリンク」）
-3. **対象パッケージのリポジトリに Issue を作成する（確認なし）**: `pnpm josh issue:file "<root-cause title>" --body-file <body-file> --route tier-a --repo <owner>/<repo>`（joshuafolkken/kit#1083）。検査・分類ラベル・重複探し・`epic:bundle` はコマンドが行う（`docs/josh-commands-backlog.md` → `josh issue:file`）。根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
-4. **`confirmation` Telegram を送って停止する**: 上流 Issue の URL と何が止まっているかを書く（→ `rule-delivery.md` → "stop-notify"）
-5. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
+1. **本文を書く**: 根本原因・再現・期待結果を `prompts/collaboration-workflow/issue-template.md` の Step 1 のテンプレで書き、`## Origin` 節に起票元 Issue を `owner/repo#N` 形式で書く
+2. **1 コマンドで止まる（確認なし）**: `pnpm josh upstream:interrupt <N> "<root-cause title>" --repo <owner>/<repo> --body-file <path> [--blocks-finder]`。退避・`issue:file --route interrupt` での起票・起票元への `## Upstream issues` バックリンク・`confirmation` Telegram をこの順に行う（`docs/josh-commands-run.md` → `josh upstream:interrupt`）
+   - 失敗した手順で止まり、打ち直すコマンドを出す
+   - third-party なら起票せず、本文を `## Upstream candidate` の下書きとして起票元に残す（→「第三者リポジトリへの書き込みは Tier C」）
+3. **元の作業を再開する**: 上流の修正がマージされた、またはユーザーが先送りを明示判断した後に、バックリンクにある `pnpm josh stash:pop "upstream-interrupt: paused #<N>"` で復元する（`operating-rules.md` → "no-self-staging"）。上流 Issue を割り込みで実装するかもユーザーが決める
 
 ### first-party の Issue・PR への書き込みは確認不要
 
@@ -44,7 +44,7 @@
 
 - **判定は `pnpm josh repo:party [<owner/repo>]` が答える**: `first-party` / `third-party` / `unknown`（unknown は third-party 扱いしない）。fork や contribute しているだけの org リポジトリも third-party
 - **third-party への書き込みは種別を問わず Tier C**: Issue・コメント・PR・Discussion・レビュー、既存 Issue のクローズ・編集も、その turn のユーザーの明示指示なしに行わない。正しい診断も許可ではない
-- third-party と判明したら: (1) 自分たちの側の Issue に証拠込みで所見を `## Upstream candidate` 見出しで記録する（`## Upstream issues` は使わない）。(2) 報告本文の下書きをその Issue 内に用意する。(3) 対象プロジェクト名と報告内容を書いた `confirmation` Telegram を送って停止する
+- third-party と判明したら: (1) 自分たちの側の Issue に証拠込みで所見を `## Upstream candidate` 見出しで記録する（`## Upstream issues` は使わない）。(2) 報告本文の下書きをその Issue 内に用意する。(3) 対象プロジェクト名と報告内容を書いた `confirmation` Telegram を送って停止する。(1)〜(3) は `pnpm josh upstream:interrupt` が third-party の `--repo` で行う
 - 下書きの前に揃える証拠: 自プロジェクトの外で成立する最小再現（無ければ「プロジェクト組み込みの再現しかない」と明記）、全主張の検証、既存 Issue の検索
 
 ### 検証ゲートを緩めることも「回避策」である

@@ -62,3 +62,19 @@ describe('unit_count_file.read_count — the caller side', () => {
 		expect(unit_count_file.read_count(target)).toBeUndefined()
 	})
 })
+
+describe('unit_count_file — individual success evidence', () => {
+	it('hands reported file paths to the caller beside its count', async () => {
+		const target = path.join(scratch, 'passed')
+		const files = ['unit.test.ts']
+
+		await unit_count_file.write_files(files, target)
+		expect(unit_count_file.read_files(target)).toEqual(files)
+	})
+	it.each(['{}', '[1]', 'broken'])('refuses malformed evidence: %s', (content) => {
+		const target = path.join(scratch, 'malformed')
+
+		writeFileSync(`${target}.files`, content)
+		expect(unit_count_file.read_files(target)).toEqual([])
+	})
+})

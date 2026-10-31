@@ -394,8 +394,8 @@ function direct_unit_weight(
 	return Math.max(unit_worker_share.MIN_WORKERS, workers) + unit_worker_share.MAIN_PROCESS_CORES
 }
 
-// The related files one vitest worker clears in about 30 seconds: `tools/test/unit-durations.json`'s
-// median file takes 105 ms (2077 files), and 30 000 ÷ 105 ≈ 285 (joshuafolkken/kit#5135).
+// Related suites give each worker about half a minute of files at the recorded median file duration,
+// so small suites avoid unnecessary workers (joshuafolkken/kit#5135 records the arithmetic).
 const FILES_PER_WORKER = 285
 
 // The cores a narrowed `josh test:related` reserves once its scope is known: one worker for each
@@ -479,10 +479,8 @@ function resolve_gate_plan(
 // this line to tell where a gate run's output begins — it is the one line the gate prints before any
 // check body exists — so the printer and the detector build it from the same strings, exactly as they
 // already do for the verdict.
-// **The machine is described as shared only when it is.** A solo gate prints exactly the line it
-// always printed — which is what keeps `josh time`'s detector, and every reader used to the old
-// output, unaffected — while a narrowed one says why it is narrow, so a lane owner reading a slow
-// gate is not left deriving the reason from a worker count that looks wrong.
+// A narrowed gate explains its shared-machine allocation so a lane owner can understand the worker
+// count; a solo gate needs no sharing diagnostic.
 function format_machine(available_cores: number, concurrent_runs: number): string {
 	const cores = `${String(available_cores)} cores`
 

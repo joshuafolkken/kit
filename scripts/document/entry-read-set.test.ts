@@ -195,9 +195,8 @@ describe('entry_read_set — backlogrun reads its child files at the point of us
 })
 
 describe('entry_read_set — chain-rule.md is point-of-use (joshuafolkken/kit#1856)', () => {
-	// chain-rule.md governs the /code-review → followup chain, which binds after the first edit, so it
-	// left the entry read of the four entries that used to list it and joined the point-of-use set. A
-	// named guard rather than the dynamic loop, so the reduction is pinned by the document it is about.
+	// chain-rule.md governs the /code-review → followup chain after the first edit, so it belongs in
+	// the point-of-use set. A named guard pins that document independently of the dynamic loop.
 	it('classifies chain-rule.md as a point-of-use document', () => {
 		expect([...entry_read_set.POINT_OF_USE_FILES]).toContain(CHAIN_RULE)
 	})
@@ -444,9 +443,8 @@ describe('entry_read_set.costed', () => {
 		expect(report.scoped.tokens - own.tokens).toBe(per_reference.tokens)
 	})
 
-	// The whole point of the measurement: the sections a `fullrun` entry cites are a fraction of the
-	// files it used to open for them. Equal figures would mean the reference scan had stopped
-	// resolving and every pointer was being charged at its file.
+	// Section references must cost less than their whole files; equal figures would mean the scan
+	// charges every pointer at its file instead of resolving sections.
 	it('charges the referenced sections far less than the files they sit in', () => {
 		const report = entry_read_set.costed(ROOT, SECTION_CITER)
 		const cited = entry_read_set.total(report.sections.map((section) => section.cost))

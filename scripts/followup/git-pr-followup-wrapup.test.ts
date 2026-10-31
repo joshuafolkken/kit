@@ -56,7 +56,7 @@ const BASE_INPUT: WrapupInput = {
 	notify_config: NOTIFY_CONFIG,
 	pr_url: 'https://github.com/owner/repo/pull/7',
 	should_merge: true,
-	managed_notes: [],
+	report_notes: [],
 	checked: CHECKED,
 	wait_for_green: vi.fn(),
 	send_completion: vi.fn().mockResolvedValue(undefined),
@@ -343,13 +343,13 @@ function notes_passed(): ReadonlyArray<string> | undefined {
 
 describe('run_wrapup — the managed config-file report', () => {
 	it('hands the report to the completion comment body', async () => {
-		await run_wrapup({ managed_notes: [REPORT_LINE] })
+		await run_wrapup({ report_notes: [REPORT_LINE] })
 
 		expect(notes_passed()).toEqual([REPORT_LINE])
 	})
 
 	it('hands over an empty report unchanged, so the comment gains no section', async () => {
-		await run_wrapup({ managed_notes: [] })
+		await run_wrapup({ report_notes: [] })
 
 		expect(notes_passed()).toEqual([])
 	})

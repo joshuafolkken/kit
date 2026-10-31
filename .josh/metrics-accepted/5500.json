@@ -1,0 +1,7 @@
+{
+	"reason": "#5500: drop kit-only regions of pnpm-workspace.yaml from what josh init / sync distribute, so the minimatch override and the unpublished import-x patch stay kit-local",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

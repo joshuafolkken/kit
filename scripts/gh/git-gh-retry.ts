@@ -3,9 +3,8 @@ import { get_exit_code, has_timed_out } from '#scripts/git/git-execa-error'
 import { error_text } from '#scripts/lib/error-message'
 import { gh_failure } from './git-gh-failure'
 
-// One REST request asked again, a bounded number of times, when GitHub failed it transiently
-// (joshuafolkken/kit#4717). A single 502 on `review:record --comment` used to stop a whole ship stage
-// and cost a relaunched session that changed nothing; the same request seconds later succeeds.
+// Bounded retries keep a transient GitHub failure from stopping a ship stage that needs no code
+// change (joshuafolkken/kit#4717).
 //
 // **Transient is a 5xx or a request that got no answer at all** — a dropped connection writes no
 // error document, so its status is `undefined`. A 4xx is the request's own fault and answers the same

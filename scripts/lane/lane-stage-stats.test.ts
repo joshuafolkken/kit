@@ -116,7 +116,7 @@ describe('lane_stage_stats.table — the implementation, from dispatch to the fi
 	const { IMPLEMENT } = lane_stage_stats
 
 	it('times it to the start of the first stage of the same issue', () => {
-		// Dispatched 30 minutes ago; the preflight ended 19 minutes ago after running one minute.
+		// A dispatch before preflight exposes whether the initial wait is included.
 		const entries = [dispatch(30), stage('preflight', 1, 19), stage('gate', 5, 10)]
 
 		expect(row_of(entries, IMPLEMENT)).toStrictEqual(['10.0', '10.0', '1'])

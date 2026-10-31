@@ -42,7 +42,7 @@ const TICK_SECONDS = 30
 //
 // **A decline deliberately does not move the report clock** — the first child to appear is reported at
 // once rather than waiting out an interval the repository spent idle. Without a cooldown, though, that
-// same property re-reads GitHub every 30 seconds for the watcher's whole life, and a batch stacks one
+// same property re-reads GitHub on every poll for the watcher's whole life, and a batch stacks one
 // fresh watcher per child, so the listings accumulate into secondary-rate-limit territory and would
 // themselves start producing the unreadable listings this branch exists to handle. Two minutes keeps
 // "reported at once" true to within a fraction of the twenty-minute interval and takes the call count

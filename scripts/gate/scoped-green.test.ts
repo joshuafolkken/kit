@@ -14,7 +14,7 @@ vi.mock('./gate-tree', () => ({ gate_tree: { read_gate_tree: vi.fn() } }))
 const mocked_tree = vi.mocked(gate_tree.read_gate_tree)
 
 // joshuafolkken/kit#1511: `fullrun #1503` started `josh gate` and review round 1 on a tree neither
-// `lint:related` nor `test:related` had ever been green on, and paid 282 seconds — 31% of the run —
+// `lint:related` nor `test:related` had ever been green on, wasting work
 // picking the consequences up one finding at a time afterwards.
 //
 // **The records are written to an explicit temp path, never the real one.** The scoped records are
@@ -31,6 +31,7 @@ const FAILED_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const NO_ARGUMENTS: ReadonlyArray<string> = []
 const SHIP_HANDOVER = 'pnpm josh ship --detach --review'
+const TEST_BLOBS = { [CHANGED_FILE]: 'input-fingerprint' }
 
 function tree_of(digest: string = DIGEST): Record<string, string> {
 	return { [CHANGED_FILE]: digest }
@@ -300,6 +301,19 @@ describe('is_unmoved', () => {
 })
 
 describe('record_if_green', () => {
+	it('preserves individual test inputs only after an unmoved successful run', async () => {
+		const target = path.join(DIRECTORY, 'test-inputs.json')
+
+		await scoped_green.record_if_green(review_stamps.test_related_stamp, {
+			before: BEFORE,
+			exit_code: SUCCESS_EXIT_CODE,
+			target,
+			blobs: TEST_BLOBS,
+		})
+
+		expect(review_stamps.test_related_stamp.read(target)?.blobs).toEqual(TEST_BLOBS)
+	})
+
 	it('writes the record when a green run left the tree where it found it', async () => {
 		const target = path.join(DIRECTORY, 'green.json')
 
@@ -335,6 +349,7 @@ describe('record_if_green — what withholds the record', () => {
 			before: BEFORE,
 			exit_code: FAILED_EXIT_CODE,
 			target,
+			blobs: TEST_BLOBS,
 		})
 
 		expect(review_stamps.lint_related_stamp.read(target)).toBeUndefined()

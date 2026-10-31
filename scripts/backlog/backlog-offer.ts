@@ -45,6 +45,9 @@ interface OfferAnswer {
 	cause?: string
 	// The issues a `chain` / `gate` cause waited on, recorded with the hold.
 	waiting?: ReadonlyArray<number> | undefined
+	// Whether `backlog:next` held an untriaged candidate back while offering the triaged ones — its
+	// trailing `triage` line — so the judgment session is started beside the lanes.
+	is_judgment_owed?: boolean
 }
 
 // The verdict words that map to one answer regardless of context. `wait` and `retry` are the two that
@@ -86,6 +89,12 @@ function is_numbers(tokens: ReadonlyArray<string>): boolean {
 	return tokens.length > 0 && tokens.every((token) => issue_number_shape.is_issue_number(token))
 }
 
+// The tokens before a trailing `triage` line: `backlog:next` names the triaged candidates it offers and
+// then the judgment it still owes for the untriaged one it held back.
+function without_triage(tokens: ReadonlyArray<string>): ReadonlyArray<string> {
+	return tokens.at(-1) === TOKENS.triage ? tokens.slice(0, -1) : tokens
+}
+
 // What `backlog:next`'s stderr says a blocked wait was for: the `run:solo` gate's notice first, then
 // the waiting issues' causes, or nothing when it names neither.
 function blocked_cause(error: string): Pick<OfferAnswer, 'cause' | 'waiting'> {
@@ -112,8 +121,12 @@ function answer_of(read: NextRead, running: number, retries: number): OfferAnswe
 		return { answer: 'unreadable', issues: [], retries: NO_RETRIES }
 	}
 
-	if (is_numbers(read.tokens)) {
-		return { answer: 'candidates', issues: read.tokens, retries: NO_RETRIES }
+	const numbers = without_triage(read.tokens)
+
+	if (is_numbers(numbers)) {
+		const is_judgment_owed = numbers.length < read.tokens.length
+
+		return { answer: 'candidates', issues: numbers, retries: NO_RETRIES, is_judgment_owed }
 	}
 
 	const token = read.tokens[0] ?? ''

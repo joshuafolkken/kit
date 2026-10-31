@@ -98,18 +98,14 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		reference: ['<operation> [arguments...]', 'automation', ['files']],
 		usage: {
 			examples: [
-				{ arguments: '--begin "backlogrun --max 5" --owner "$PPID"' },
+				{ arguments: '--begin "backlogrun --max 5"' },
 				{ arguments: '--json', note: 'read the record back in a resumed session' },
-				{ arguments: '--cut --owner "$PPID"', note: 'hand the record off before a cut' },
+				{ arguments: '--cut', note: 'hand the record off before a cut' },
 				{
-					arguments:
-						'--retrospective --summary "0 filed; dropped #2240 already merged" --owner "$PPID"',
+					arguments: '--retrospective --summary "0 filed; dropped #2240 already merged"',
 					note: 'close the end-of-run retrospective',
 				},
-				{
-					arguments: '--resume "backlogrun --max 5" --owner "$PPID"',
-					note: 'adopt a record no cut handed off',
-				},
+				{ arguments: '--resume "backlogrun --max 5"', note: 'adopt a record no cut handed off' },
 				{
 					arguments: '--end --stopped "epic #2126: everything is blocked behind parked #2118"',
 					note: 'end + push',
@@ -119,7 +115,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: [OWNER],
 					description:
-						'the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.',
+						'the long-lived process spending the budget; omitted, the `CLAUDE_PID` of the calling Claude session (none elsewhere, e.g. Codex). Read by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.',
 				},
 				{ names: ['--done <issue>'], description: "shrinks a named-issue run's `remaining` list." },
 				{
@@ -264,9 +260,9 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/run-prep-main.ts',
 		description: 'Bundle a run’s pre-edit reads: body, comments, state, dependency scope',
 		category: 'AI tools',
-		reference: ['<issue>', 'automation', ['network']],
+		reference: ['<issue> [--summary]', 'automation', ['network']],
 		is_bundled: true,
-		usage: { examples: [ISSUE] },
+		usage: { examples: [ISSUE, { arguments: '<N> --summary', note: 'the work summary skeleton' }] },
 	},
 	// The entry sequence a lane opened on, folded into one call: claim the tree,
 	// read the budget, gather the issue reads and decide the pre-implementation step. `run:hold`,

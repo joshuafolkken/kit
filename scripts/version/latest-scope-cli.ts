@@ -38,7 +38,7 @@ function format_hours(hours: number): string {
 }
 
 // The age and the window both, because the answer is only readable beside the threshold that
-// produced it — a bare "3.2 hours ago" says nothing about why that was enough.
+// produced it — a bare age says nothing about why that was enough.
 function describe_stamp(stamp: LatestStamp, max_age_hours: number, is_fresh: boolean): string {
 	const age = format_hours(latest_stamp.hours_since(stamp))
 	const window = format_hours(max_age_hours)

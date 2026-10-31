@@ -2,6 +2,7 @@ import path from 'node:path'
 import { input_fingerprint } from '#scripts/gate/input-fingerprint'
 import { file_reader } from '#scripts/lib/read-file'
 import type ts from 'typescript'
+import { import_test_inputs } from './import-test-inputs'
 import { type_only_imports } from './type-only-imports'
 
 // What a file's lint verdict reads besides the file itself: every file its imports reach, followed
@@ -46,6 +47,8 @@ interface ProjectConfig {
 }
 
 interface ImportGraph {
+	// Absent on older graph providers; undefined means an unknown input, never reusable.
+	test_inputs?: ((file: string) => ReadonlyArray<string> | undefined) | undefined
 	closure: (file: string) => ReadonlyArray<string>
 	closure_hash: (file: string) => string
 	imports: (file: string, content?: string) => ReadonlyArray<string>
@@ -291,26 +294,6 @@ function closure(context: GraphContext, file: string): Array<string> {
 		.map((dependency) => dependency.file)
 }
 
-// The text of each string literal `file` holds, a template's spans included: where a file names one it
-// starts rather than imports — the CLI a test spawns.
-function strings(typescript: TypeScript, file: string): Array<string> {
-	const content = file_reader.read_if_readable(file) ?? ''
-	const source = typescript.createSourceFile(file, content, typescript.ScriptTarget.Latest)
-	const found: Array<string> = []
-
-	function visit(node: ts.Node): void {
-		if (typescript.isStringLiteralLike(node) || typescript.isTemplateLiteralToken(node)) {
-			found.push(node.text)
-		}
-
-		typescript.forEachChild(node, visit)
-	}
-
-	visit(source)
-
-	return found
-}
-
 // The project's own files `file` imports directly; a package's are left out. `content` reads another
 // text of the file in its place — its version at another revision — resolved from where it sits now.
 function imports(context: GraphContext, file: string, content?: string): Array<string> {
@@ -371,15 +354,34 @@ function importers(
 	return reached
 }
 
+function project_module(
+	context: GraphContext,
+	specifier: string,
+	file: string,
+): Dependency | undefined {
+	const dependency = resolve_module(context, specifier, file)
+	if (dependency === undefined) return undefined
+	const relative = path.relative(context.root, dependency.file)
+
+	return relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative) ? undefined : dependency
+}
+
 function graph_of(context: GraphContext): ImportGraph {
 	return {
+		// Type-checker suffixes need not select the source the runner executes.
+		test_inputs:
+			context.options.moduleSuffixes === undefined
+				? import_test_inputs.create(context.typescript, (specifier, file) =>
+						project_module(context, specifier, file),
+					)
+				: undefined,
 		closure: (file) => closure(context, file),
 		closure_hash: (file) => closure_hash(context, file),
 		imports: (file, content) => imports(context, file, content),
 		importers: (files, universe) => importers(context, files, universe, direct_dependencies),
 		runtime_importers: (files, universe) =>
 			importers(context, files, universe, runtime_dependencies),
-		strings: (file) => strings(context.typescript, file),
+		strings: (file) => type_only_imports.strings(context.typescript, file),
 	}
 }
 
@@ -389,14 +391,13 @@ async function create(root: string): Promise<ImportGraph | undefined> {
 	if (typescript === undefined) return undefined
 	const parsed = parsed_config(typescript, root)
 	if (parsed === undefined) return undefined
-	const { options } = parsed
 
 	return graph_of({
 		root,
 		typescript,
-		options,
-		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, options),
-		ambient: ambient_of({ typescript, options }, root, parsed),
+		options: parsed.options,
+		resolution_cache: typescript.createModuleResolutionCache(root, (name) => name, parsed.options),
+		ambient: ambient_of({ typescript, options: parsed.options }, root, parsed),
 		dependencies: new Map(),
 		runtime_dependencies: new Map(),
 		content_hashes: new Map(),

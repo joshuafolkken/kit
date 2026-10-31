@@ -1,5 +1,6 @@
-import { readdir, stat } from 'node:fs/promises'
+import { open, readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { codex_home_source } from '#scripts/agent/codex-home-source'
 import { durable_state } from '#scripts/josh/durable-state'
 import { figure_format } from '#scripts/lib/figure-format'
@@ -30,12 +31,20 @@ const TAIL_GROWTH = 8
 const TAIL_LIMIT_BYTES = TAIL_BYTES * TAIL_GROWTH * TAIL_GROWTH
 // The newest files a provider's reading is looked for in, newest first.
 const FILES_TRIED = 3
+// The newest lane logs read for their launch's provider, bounding the reads when Codex ran them all.
+const LOGS_SCANNED = FILES_TRIED * FILES_TRIED
 const MS_PER_DAY = MINUTES_PER_DAY * MINUTES_PER_HOUR * MS_PER_SECOND
 const CLAUDE_MARK = '"rate_limit_event"'
 const CODEX_MARK = '"rate_limits":{'
 const CODEX_PREFIX = 'rollout-'
 const CODEX_SUFFIX = '.jsonl'
 const LOG_SUFFIX = '.log'
+const TIMESTAMP_MARK = '"timestamp"'
+// `detached_launch.log_header`'s shape — `=== <time> · started by process <pid> · <command>[ · <profile>] ===`.
+const LAUNCH_HEADER = /^=== (?<stamp>\S+) · started by process /u
+// Every launch header of a log, and the `provider=<p>` of the profile suffix a header may carry.
+const LAUNCH_HEADERS = /^=== \S+ · started by process .*$/gmu
+const HEADER_PROVIDER = / · provider=(?<provider>\S+)/u
 const { two_digits } = figure_format
 
 type QuotaProvider = 'claude' | 'codex'
@@ -46,10 +55,13 @@ interface QuotaWindow {
 	resets_ms: number
 }
 
-// A provider's windows and their event's timestamp, unknown in older logs.
+// A provider's windows and when they were observed; `per_task` is each window's recent spend per task
+// by its length in minutes, where one could be told. Codex's event carries its own `timestamp`; Claude
+// Code's `rate_limit_event` carries none, so its time is the nearest timed line before it.
 interface QuotaReading {
 	windows: ReadonlyArray<QuotaWindow>
 	taken_ms: number | undefined
+	per_task?: Readonly<Record<number, number>> | undefined
 }
 
 // Each provider's reading, `undefined` where none could be read.
@@ -86,6 +98,7 @@ const CODEX_EVENT = z.looseObject({
 	payload: z.looseObject({ rate_limits: CODEX_LIMITS }),
 	timestamp: z.string().nullish().catch(undefined),
 })
+const TIMED_LINE = z.looseObject({ timestamp: z.string() })
 
 type ClaudeWindow = z.infer<typeof CLAUDE_WINDOW>
 type CodexWindow = z.infer<typeof CODEX_WINDOW>
@@ -95,7 +108,8 @@ function claude_window(minutes: number, window: ClaudeWindow | undefined): Array
 
 	const resets_ms = window.resetsAt * MS_PER_SECOND
 
-	return [{ minutes, used_percent: window.utilization * PERCENT, resets_ms }]
+	// A whole percent, as Claude reports it: `0.07 * 100` reads 7.000000000000001 otherwise.
+	return [{ minutes, used_percent: Math.round(window.utilization * PERCENT), resets_ms }]
 }
 
 function claude_line(line: string): QuotaReading | undefined {
@@ -139,22 +153,58 @@ function codex_line(line: string): QuotaReading | undefined {
 	}
 }
 
-// Windows and time from the same last event; unrelated later lines never refresh its age.
-function last_reading(
+function readings_in(
 	text: string,
 	line_of: (line: string) => QuotaReading | undefined,
-): QuotaReading | undefined {
-	const lines = text.split('\n').map((line) => line_of(line))
-
-	return lines.findLast((reading) => reading !== undefined)
+): Array<QuotaReading> {
+	return text
+		.split('\n')
+		.map((line) => line_of(line))
+		.filter((reading) => reading !== undefined)
 }
 
+function json_ms(line: string): number | undefined {
+	if (!line.includes(TIMESTAMP_MARK)) return undefined
+
+	return time_instant.parse_instant(json_value.parse_with(line, TIMED_LINE)?.timestamp)
+}
+
+// The time a line carries: the launcher's header's, or a JSON line's own `timestamp`.
+function line_ms(line: string): number | undefined {
+	const stamp = LAUNCH_HEADER.exec(line)?.groups?.['stamp']
+
+	return stamp === undefined ? json_ms(line) : time_instant.parse_instant(stamp)
+}
+
+// The nearest time among `lines` before `index`; the header heads the log, so it is reached last.
+function time_before(lines: ReadonlyArray<string>, index: number): number | undefined {
+	const timed = lines.slice(0, index).findLast((line) => line_ms(line) !== undefined)
+
+	return timed === undefined ? undefined : line_ms(timed)
+}
+
+// Windows and time from the same last event; unrelated later lines never refresh its age.
 function claude_reading(text: string): QuotaReading | undefined {
-	return last_reading(text, claude_line)
+	const lines = text.split('\n')
+	const index = lines.findLastIndex((line) => claude_line(line) !== undefined)
+	const reading = claude_line(lines[index] ?? '')
+
+	if (reading === undefined || reading.taken_ms !== undefined) return reading
+
+	return { ...reading, taken_ms: time_before(lines, index) }
 }
 
 function codex_reading(text: string): QuotaReading | undefined {
-	return last_reading(text, codex_line)
+	return readings_in(text, codex_line).at(-1)
+}
+
+// The first event's reading, which a file's head is read for.
+function claude_first(text: string): QuotaReading | undefined {
+	return readings_in(text, claude_line)[0]
+}
+
+function codex_first(text: string): QuotaReading | undefined {
+	return readings_in(text, codex_line)[0]
 }
 
 async function names_in(directory: string): Promise<Array<string>> {
@@ -189,19 +239,49 @@ async function files_in(
 	return files.flat()
 }
 
+function sorted(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
+	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms)
+}
+
 // The `FILES_TRIED` newest of `files`, newest first.
 function newest(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
-	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms).slice(0, FILES_TRIED)
+	return sorted(files).slice(0, FILES_TRIED)
 }
 
 function is_lane_log(name: string): boolean {
 	return name.startsWith(durable_state.PREFIX.LANE_DISPATCH) && name.endsWith(LOG_SUFFIX)
 }
 
-// The newest lane children's logs in the run-state directory. A Codex child logs under the same
-// name and writes no `rate_limit_event`, so the newest log alone may hold no reading.
+// The provider a log's last launch header names; `undefined` where it names none.
+function last_provider(text: string): string | undefined {
+	const header = text.match(LAUNCH_HEADERS)?.at(-1) ?? ''
+
+	return HEADER_PROVIDER.exec(header)?.groups?.['provider']
+}
+
+// Whether a log's last launch ran Claude: a header naming no provider predates the profile suffix,
+// when every lane child was Claude's.
+function is_claude_launch(text: string): boolean {
+	const provider = last_provider(text)
+
+	return provider === undefined || provider === agent_provider.ANTHROPIC_PROVIDER
+}
+
+async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
+	try {
+		return is_claude_launch(await readFile(file.path, 'utf8')) ? [file] : []
+	} catch {
+		return []
+	}
+}
+
+// The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
+// the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
 async function claude_files(root: string = durable_state.root()): Promise<Array<QuotaFile>> {
-	return newest(await files_in(root, is_lane_log))
+	const scanned = sorted(await files_in(root, is_lane_log)).slice(0, LOGS_SCANNED)
+	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
+
+	return claude.flat().slice(0, FILES_TRIED)
 }
 
 function is_rollout(name: string): boolean {
@@ -234,6 +314,20 @@ async function read_tail(file: string, bytes: number = TAIL_BYTES): Promise<stri
 	return time_density_hook.read_tail(file, bytes)
 }
 
+// The first `bytes` of `file`; only the bytes read are decoded.
+async function read_head(file: string, bytes: number = TAIL_BYTES): Promise<string> {
+	const handle = await open(file, 'r')
+
+	try {
+		const buffer = Buffer.alloc(bytes)
+		const { bytesRead: read } = await handle.read(buffer, 0, bytes, 0)
+
+		return buffer.subarray(0, read).toString('utf8')
+	} finally {
+		await handle.close()
+	}
+}
+
 // Whether a tail of `bytes` ends the widening: it found a reading, held the whole file, or reached the limit.
 function is_last_tail(reading: QuotaReading | undefined, text: string, bytes: number): boolean {
 	return (
@@ -263,9 +357,12 @@ const run_board_quota_read = {
 	TAIL_BYTES,
 	TAIL_LIMIT_BYTES,
 	claude_files,
+	claude_first,
 	claude_reading,
 	codex_files,
+	codex_first,
 	codex_reading,
+	read_head,
 	read_tail,
 	reading_in,
 }

@@ -24,7 +24,7 @@ import { process_linux } from './process-linux'
 const PS_COMMAND = '/bin/ps'
 const LISTING_ARGUMENTS = ['-A', '-ww', '-o', 'pid=,command=']
 const ENVIRONMENT_FLAG = '-E'
-// `ps -E` over every process runs to hundreds of kilobytes; the default 1 MiB would cut it short.
+// `ps -E` includes every process's environment, so the buffer must accommodate a full listing.
 const LISTING_BUFFER_BYTES = 67_108_864
 const PID_LINE = /^\s*(?<pid>\d+) (?<command>.*)$/u
 const APPLICATION_BUNDLE = '.app/Contents/'

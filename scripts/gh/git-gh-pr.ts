@@ -213,13 +213,6 @@ async function read_merge_state(
 	}
 }
 
-// The wait goes **between** attempts and never after the last one — the convention `poll.wait_between`
-// and `git-pr-checks.ts`'s own `sleep_before_next_attempt` both hold to. Without the guard a merge
-// whose read-back never succeeds delays its own failure report by a whole interval.
-async function sleep_between_read_backs(attempt: number): Promise<void> {
-	if (attempt < MERGE_READ_BACK_ATTEMPTS - 1) await poll.sleep(MERGE_READ_BACK_INTERVAL_MS)
-}
-
 // Whether the merge is actually there, asked only after the request failed.
 //
 // **The read-back is retried, because the outage that killed the merge request is the one most
@@ -236,14 +229,11 @@ async function has_merge_landed(
 	pr_number: number,
 	merge_error: unknown,
 ): Promise<boolean> {
-	for (let attempt = 0; attempt < MERGE_READ_BACK_ATTEMPTS; attempt += 1) {
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		const is_merged = await read_merge_state(branch_name, pr_number)
-		if (is_merged !== undefined) return is_merged
-
-		// eslint-disable-next-line no-await-in-loop -- a retry runs only after the previous attempt has answered
-		await sleep_between_read_backs(attempt)
-	}
+	const is_merged = await poll.poll_for(
+		async () => await read_merge_state(branch_name, pr_number),
+		{ attempts: MERGE_READ_BACK_ATTEMPTS, interval_ms: MERGE_READ_BACK_INTERVAL_MS },
+	)
+	if (is_merged !== undefined) return is_merged
 
 	throw new Error(MERGE_UNCONFIRMED_MESSAGE, { cause: merge_error })
 }

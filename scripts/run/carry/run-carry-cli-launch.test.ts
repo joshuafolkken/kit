@@ -98,6 +98,33 @@ describe('run:carry --begin under a launch', () => {
 	})
 })
 
+// joshuafolkken/kit#5516: the launch already handed the record to the supervisor.
+function handed_off(): void {
+	run_carry.apply_change(target(), run_carry.fresh_carry(INVOCATION, { pid: 1 }, LAUNCHED), {
+		cuts: 1,
+	})
+}
+
+describe('run:carry --begin from the launched parent', () => {
+	it('answers driving and leaves the record handed off', async () => {
+		handed_off()
+		vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(process.pid)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await run_carry_cli.run(BEGIN)).toBe(0)
+		expect(info).toHaveBeenCalledWith('driving')
+		expect(run_carry.read_carry(target())).toMatchObject({ carry: { is_handed_off: true } })
+	})
+
+	it('still resumes the record for a session the launch did not start', async () => {
+		handed_off()
+		vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(undefined)
+
+		expect(await run_carry_cli.run(BEGIN)).toBe(0)
+		expect(run_carry.read_carry(target())).toMatchObject({ carry: { is_handed_off: false } })
+	})
+})
+
 describe('run:carry --begin setup stage', () => {
 	it('says the run is planning once it has begun', async () => {
 		await run_carry_cli.run(BEGIN)

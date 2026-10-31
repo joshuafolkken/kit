@@ -160,7 +160,7 @@ Steps 1 and 2 each end the filing on a refusal. Steps 3–7 run as one pass: eac
    A `- セキュリティ: <経路>` or `- 原因の park: #<N>` line sets that floor, and so do `- 原因の損失:` lines summing to 30 minutes or more (`josh issue:priority <N>` re-applies it after a recurrence); `- 原因のレーン:` only ranks, and no reduction percentage is asked for or judged. A malformed one is refused; a body with no declaration is filed at the floor.
    A malformed `- 実施可能条件:`, `- 実施可能日:`, `- 規模見積もり:` or `- 計測宣言:` refusal ends in a line ready to paste. A refused `--found-during <N>` filing whose body declares no causing lane ends in `- 原因のレーン: <分> 分（#<N>）`, filled from [`josh lane:net <N>`](josh-commands-run.md#josh-lanenet) once the ledger holds that lane's dispatch and merge.
    A `- 種別: 不具合` body with `- 原因: 不明（<理由>）` is refused without a `## 再現` holding a backticked command and its fenced output; a `- 原因: #<PR>` bug owes none.
-   A `- 規模見積もり:` over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`.
+   A `- 規模見積もり:` over the split guide on either axis ([`josh split:assess`](#josh-splitassess)'s) is refused too, unless the filing is `--route split` or declares `- 分割しない理由: <理由>`; over the cap (three times the guide) only `--route split` passes.
 4. For another repository, confirm `## Origin` names the originating issue (`owner/repo#N` or a URL). Refuse when it does not. Then, for any target, read the number a `- 実施可能条件: #<PR> のマージ後 <K> マージ` line cites there and refuse when it is an issue rather than a pull request, naming the merged pull request that closed it (this repository only); an unreadable number passes.
    The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, is not read: it waits on the pull request that closes the issue, for a follow-up filed before that pull request exists.
 5. Print the `auto-ok` decision: the body's `- 人の判断: 不要` applies it and `- 人の判断: 要` does not; some labels and `--no-auto-ok` withhold it. An opted-in issue with neither `run:lane` nor `run:solo` is refused.
@@ -275,7 +275,8 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 - `--body-file <path>` — the plan, from a file or stdin (`-`): a blank body takes it, else a comment.
 - `--title <title>` — replace the issue title first.
-- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning.
+- `--planned` — apply `run:planned` once the plan is posted, so the next entry skips planning; send the `planning` Telegram (change items, `Next:`).
+- `--no-notify` — with `--planned`, skip the `planning` Telegram.
 - `--repo <owner/name>` — write to that repository's issue.
 
 <!-- /usage -->
@@ -539,6 +540,7 @@ pnpm josh epic --decide 893 894 --decision-file why.md
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
+- `--title <title>` — with `--promote`: rename the issue first.
 - `--before <M>` — with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
 - `--after <M>` — with `--add`: start after `#M`; branches when `#M` already has a successor, extends when it is a tail.
 - `--order-before <M>` / `--order-after <M>` — with `--add`: move the task-list row only; write no `blocked-by` relation.
@@ -553,7 +555,7 @@ It satisfies all four mechanical requirements by construction: `epic` label, tas
 
 #### `josh epic --promote` — turn an existing issue into an epic
 
-Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
+Appends the epic's sections to the issue's body, taking the same `--ordered` / `--rationale-file` / `--origin` options; `--title` renames it. Re-running is refused. Promote a request, discussion or container; when the issue is itself a deliverable, keep it as a child and create a new epic.
 
 #### `josh epic --add` — insert children into an existing epic
 
@@ -749,13 +751,15 @@ pnpm josh backlog:next --exclude 1630   # skip the issue just merged
 
 <!-- /usage -->
 
-Read-only. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
+Read-only, except for the mechanical triage of the triage gate below. stdout is bare issue numbers to start, or `wait`, `stop`, `triage`, `retry`, `error` or `none`; empty with exit 1 if a listing could not be read. Explanations go to stderr.
 
-**Triage gate**: while any candidate carries neither `run:solo` nor `run:lane`, it prints `triage` and no numbers, naming the untriaged issues on stderr.
+**Triage gate**: an untriaged candidate (neither `run:solo` nor `run:lane`) without `bug`, or a `bug` naming no verification-gate path (`GATE_PATHS` in `scripts/backlog/backlog-auto-triage.ts`), gets `run:lane` and a comment naming the missing condition, and is offered as triaged.
+
+Any other untriaged candidate is held alone, named on stderr. The triaged candidates pass the `run:solo` gate without it and print as usual, then a trailing `triage` line asks for the judgment; with none of them left to offer, it prints `triage` alone. A judgment recording `run:solo` stops the next offer by that gate.
 
 **Defect priority**: while the defect rate is above its baseline, defects go to the front of the runnable numbers and new mechanisms to the back, among ranking ties.
 
-**Ranking**: `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of issues it blocks; standalone numbers are cut to five.
+**Ranking**: a body declaring `- 実施順: 最後` goes last; otherwise `priority:critical`, then `priority:high`, then a verification-path defect, then larger lost minutes (`- 原因の損失:` lines summed, else `- 原因のレーン:`), then the number of open issues waiting on it down a chain (transitively), then the declared weekly gain (`## 期待効果`); standalone numbers are cut to five.
 
 **`run:solo` gate**: a `run:solo` issue runs alone — `wait` while it or other lanes run, and a `run:solo` candidate further down cuts the list.
 
@@ -833,7 +837,7 @@ pnpm josh backlog:offer --started "$started" --active "$active" --running 2 --re
 
 This section is the single source of the mapping from `backlog:next`'s answer to a budget word:
 
-- issue numbers → `candidates`; `none` → `exhausted`; `stop` → `parked`; `triage` → `untriaged`
+- issue numbers → `candidates`, with a trailing `triage` line → `candidates` that owe the judgment (`is_judgment_owed` in `--json`); `none` → `exhausted`; `stop` → `parked`; `triage` alone → `untriaged`
 - `wait` → `blocked` with children in flight, `exhausted` without
 - `retry` → `blocked` below three consecutive asks, `unreadable` at the third
 - `error`, or exit 1 with empty stdout → `unreadable`, never `none`
@@ -858,7 +862,9 @@ pnpm josh backlog:drive --owner "$PPID" [--max <n>] [--idle <minutes>] [--only]
 
 <!-- /usage -->
 
-An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags.
+An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
+
+A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 
 A watch with no child running sends one `💤` Telegram per idle episode (merged count, `needs-decision` issues, issues waiting on a not-before date); the next dispatch ends the episode.
 
@@ -947,6 +953,37 @@ It drops the ones an added line still writes (an added `.md` heading, for a head
 It searches `.md` files and the comment lines under `prompts/`, `docs/`, `.claude/` and `scripts/` (`CHANGELOG.md` left out). A heading is searched quoted, the way a `→ "Heading"` pointer names it.
 
 Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 when the base or a search could not be read — a failed search is never `ok`.
+
+### `josh review:selfcheck`
+
+<!-- usage: review:selfcheck -->
+
+Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command.
+
+```bash
+pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+```
+
+<!-- /usage -->
+
+Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it.
+
+### `josh diff:summary`
+
+<!-- usage: diff:summary -->
+
+Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole.
+
+```bash
+pnpm josh diff:summary        # → one row per file, then `full output: <path>` (the diff, in the git directory)
+pnpm josh diff:summary HEAD   # → the same, against a named base
+```
+
+<!-- /usage -->
+
+From `<base>` (default: the change base) to the working tree, tracked files only — `git add -N` a new file to list it. Ranges are new-side lines; declarations are the top-level ones a hunk sits under or a changed line writes.
+
+The diff is saved in the worktree's git directory, so `git status` never lists it. No change prints one line, not a table. Exits 2 when the base or the diff could not be read.
 
 ### `josh disposition`
 

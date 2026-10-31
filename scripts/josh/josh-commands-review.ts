@@ -69,7 +69,8 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 	},
 	'review:submit': {
 		script: 'scripts/review/review-submit-cli.ts',
-		description: "Write a ship reviewer's findings, read from stdin, where the ship reads them",
+		description:
+			"Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them",
 		category: 'AI tools',
 		reference: ['[--interaction] < findings | [--interaction] --none', 'automation', ['files']],
 		usage: {
@@ -99,6 +100,37 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 					arguments: '',
 					note: '→ `file:line kind word` per reference, or `ok` (exit 1 / 0; 2 on a failure)',
 				},
+			],
+		},
+	},
+	'review:selfcheck': {
+		script: 'scripts/review/selfcheck-cli.ts',
+		description:
+			'Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command',
+		category: 'AI tools',
+		reference: ['', 'automation', ['files', 'processes']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)',
+				},
+			],
+		},
+	},
+	'diff:summary': {
+		script: 'scripts/review/diff-summary-cli.ts',
+		description:
+			'Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole',
+		category: 'AI tools',
+		reference: ['[<base>]', 'automation', ['files']],
+		usage: {
+			examples: [
+				{
+					arguments: '',
+					note: '→ one row per file, then `full output: <path>` (the diff, in the git directory)',
+				},
+				{ arguments: 'HEAD', note: '→ the same, against a named base' },
 			],
 		},
 	},

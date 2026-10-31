@@ -65,6 +65,9 @@ beforeEach(() => {
 		changed: [MOVED_SOURCE],
 		synced: [],
 	})
+	vi.spyOn(since_green, 'read_verdict').mockResolvedValue({
+		parts: { changed: [MOVED_SOURCE], synced: [] },
+	})
 })
 
 afterAll(() => {
@@ -164,10 +167,22 @@ describe('test_related_red.read_red', () => {
 describe('test_related_red.narrowing', () => {
 	it('narrows by the green record when no red one stands', async () => {
 		await expect(test_related_red.narrowing(undefined)).resolves.toMatchObject({ failed: [] })
-		expect(since_green.read_moved_parts).toHaveBeenCalledWith(
+		expect(since_green.read_verdict).toHaveBeenCalledWith(
 			review_stamps.test_related_stamp,
 			gate_labels.UNIT_LABEL,
 		)
+	})
+
+	it.each([
+		{ red: stored(OTHER_BASE), expected: since_green.FALLBACK.AFTER_RED },
+		{ red: undefined, expected: since_green.FALLBACK.NO_RECORD },
+	])('answers $expected when the green record falls back', async ({ red, expected }) => {
+		vi.spyOn(review_stamps.test_related_red_stamp, 'read').mockReturnValue(red)
+		vi.spyOn(since_green, 'read_verdict').mockResolvedValue({
+			fallback: since_green.FALLBACK.NO_RECORD,
+		})
+
+		await expect(test_related_red.narrowing(undefined)).resolves.toEqual({ fallback: expected })
 	})
 })
 

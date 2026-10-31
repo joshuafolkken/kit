@@ -84,43 +84,57 @@ describe('run_headless.is_cut_capped', () => {
 })
 
 describe('run_headless.must_keep_waiting', () => {
-	it('holds a headless parent with lanes in flight and a live record', async () => {
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
+	beforeEach(() => {
+		read_carry.mockReturnValue(OWNED)
+	})
+
+	it('holds a headless parent with lanes in flight and a live record it owns', async () => {
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(true)
 	})
 
 	it('holds a named epic session while its child lane is in flight', async () => {
 		read_carry.mockReturnValue({
 			kind: 'carried',
-			carry: carry({ invocation: 'backlogrun #2501 --only' }),
+			carry: carry({ invocation: 'backlogrun #2501 --only', owner_pid: SESSION_PID }),
 		})
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(true)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(true)
 	})
 
 	it('lets a headless parent with no lanes in flight stop', async () => {
 		lanes_in_flight.mockResolvedValue(false)
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 
 	it('never holds an attached session', async () => {
-		expect(await run_headless.must_keep_waiting(ATTACHED)).toBe(false)
+		expect(await run_headless.must_keep_waiting(ATTACHED, own_ancestry)).toBe(false)
 	})
 
 	it('never holds a lane child that inherited the mark', async () => {
-		expect(await run_headless.must_keep_waiting(HEADLESS_CHILD)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS_CHILD, own_ancestry)).toBe(false)
 	})
 
 	it('lets a parent whose cut handed the record off stop', async () => {
 		read_carry.mockReturnValue(HANDED_OFF)
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 
 	it('lets a parent whose run ended stop', async () => {
 		read_carry.mockReturnValue({ kind: 'none' })
 
-		expect(await run_headless.must_keep_waiting(HEADLESS)).toBe(false)
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5516: the supervisor adopts the record the launcher handed off and opens lanes
+// while the launched parent plans, so that parent's turn-end strands nothing.
+describe('run_headless.must_keep_waiting — beside the supervisor', () => {
+	it('lets the launched parent stop while the supervisor drives its record', async () => {
+		read_carry.mockReturnValue({ kind: 'carried', carry: carry({ owner_pid: SUCCESSOR_PID }) })
+
+		expect(await run_headless.must_keep_waiting(HEADLESS, own_ancestry)).toBe(false)
 	})
 })
 

@@ -23,8 +23,8 @@ import { security_policy } from './security-policy'
  *
  * The consumer's `.claude/settings.json` gets three further passes. The keys kit sets only for its
  * own sessions are removed (see claude-kit-only-settings.ts). The kit plugin's marketplace and
- * `enabledPlugins` declaration is injected, because the skills that used to be copied now ship as the
- * `kit` plugin and load from that declaration. And its hook commands are
+ * `enabledPlugins` declaration is injected, because skills ship as the `kit` plugin and load from
+ * that declaration. And its hook commands are
  * rewritten from `pnpm josh` to the published bundle invoked directly with node,
  * so a consumer's guarded call does not pay a `pnpm` launch it never needed.
  * Keeping both on this one function is the same guarantee as the workflow passes — a copy path that

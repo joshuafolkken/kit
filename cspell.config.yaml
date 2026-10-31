@@ -2,6 +2,9 @@ version: "0.2"
 import:
   - "./cspell/index.yaml"
 words:
+  # `josh review:selfcheck`, the self-check's questions 2, 4 and 10 run as one command (#5540).
+  - selfcheck
+  - uncomputable
   - textconv
   - fsmonitor
   # awk's `getline` and `nextfile`, which reach outside the pipe or leave it early, so an `awk` filter using one is not rewritten (#5266).

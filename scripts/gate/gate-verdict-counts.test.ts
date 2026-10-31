@@ -16,9 +16,8 @@ vi.mock('./type-check-step', () => ({
 	},
 }))
 
-// The last line of `josh gate`, at the granularity a `basic` project's user reads it at: every check
-// exits 0, and what tells a gate that checked something from one that checked nothing is the body each
-// check printed. The verdict used to be the planned number of checks whichever it was.
+// For a `basic` project, zero exit codes alone cannot distinguish checked work from skips. The
+// verdict must count the work reported by each check rather than the number of planned commands.
 
 const { verification_gate } = await import('./verification-gate')
 const GATE_STEPS = await verification_gate.build_gate_steps('/project')

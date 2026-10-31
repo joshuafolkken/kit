@@ -6,7 +6,7 @@ import { run_cut, type CutState } from './run-cut'
 // The implementation cut a run asked for and was refused — `not-a-lane` or `unready` — recorded so the
 // implementation-cut guard stops asking for it (joshuafolkken/kit#3881).
 //
-// **The reissue window alone re-asked every 90 seconds.** A run whose `run:cut --impl` can only answer
+// **A reissue window alone repeats a question whose answer cannot change.** A run whose `run:cut --impl` can only answer
 // `unready` was refused edit after edit, each refusal a round trip that cut nothing. Neither answer
 // changes while the same hold stands over the tree, so the record names the issue and the hold it
 // answered, and the guard stays silent while both still match; a fresh hold — a new run — asks again.

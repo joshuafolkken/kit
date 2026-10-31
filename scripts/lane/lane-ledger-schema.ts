@@ -176,8 +176,13 @@ const unit_files_schema = z.object({
 // how many vitest ran, absent where none reported. `trigger_files` are the changed files that sent a
 // full-suite run there, absent where none did and on rows written before it (joshuafolkken/kit#4510).
 const test_related_schema = z.object({
+	reused: z.number().optional(),
+	reuse_missed: z.number().optional(),
+	reuse_reason: z.string().optional(),
+	reuse_elapsed_ms: z.number().optional(),
 	kind: z.literal(KIND.TEST_RELATED),
 	at: z.string(),
+	issue: z.number().optional(),
 	scope: z.string(),
 	changed: z.number(),
 	synced: z.number(),
@@ -185,12 +190,15 @@ const test_related_schema = z.object({
 	readers: z.number(),
 	test_files: z.number().optional(),
 	trigger_files: z.array(z.string()).optional(),
+	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
+	over_cap: z.number().optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache
 // answered, and each probed hunk's `file`, the test files it ran (`tests`, absent where vitest wrote no
 // report) and its wall time. `issue` is the lane it ran in, absent outside a lane. `rewired` counts the
-// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), absent on older rows.
+// hunks not probed as an import moved under a new name (joshuafolkken/kit#5235), and `over_cap` the
+// ones whose file reaches more test files than the cap (joshuafolkken/kit#5503), absent on older rows.
 // `origin` is what started the run, and `discarded` marks a `run:review` background run stopped before
 // its answer, written by the stop with its wall time so far (joshuafolkken/kit#5262); both absent on
 // older rows. A probe's `pinned_by` names a red the type check reached before the whole reach ran
@@ -207,20 +215,23 @@ const test_pinned_schema = z.object({
 	issue: z.number().optional(),
 	held: z.number(),
 	rewired: z.number().optional(),
+	over_cap: z.number().optional(),
 	probes: z.array(test_pinned_probe_schema),
 	elapsed_ms: z.number(),
 	origin: pinned_origin_schema.optional(),
 	discarded: z.boolean().optional(),
 })
-// The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
-// Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
-// (joshuafolkken/kit#4695).
+// The split notice shown to the lane of `issue`, with the measured diff it fired on — the diff notice
+// written once per Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it
+// first (joshuafolkken/kit#4695). Each `split` from `josh lane:plan` writes one more, `reason` naming its
+// axis; a diff notice has none (joshuafolkken/kit#5568).
 const split_notice_schema = z.object({
 	kind: z.literal(KIND.SPLIT_NOTICE),
 	at: z.string(),
 	issue: z.number(),
 	files: z.number(),
 	lines: z.number(),
+	reason: z.enum(['files', 'hunks', 'lines']).optional(),
 })
 // One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
 const split_filed_schema = z.object({

@@ -8,8 +8,8 @@ import { split_assess, type SizeMeasurement } from './split-assess'
 import { split_measure } from './split-measure'
 
 // **The split notice, shown mid-implementation** (joshuafolkken/kit#4642). `josh main:merge` prints it
-// only before the gate, when the run can no longer carve anything out; a lane that grew to 17 files met
-// it 25 minutes in. The first `josh lint:related` or `josh test:related` after the branch's diff passes
+// only before the gate, when the run can no longer carve anything out. The first
+// `josh lint:related` or `josh test:related` after the branch's diff passes
 // the guide prints the same notice — `split_assess.notice`, so the bar and the question are one
 // definition — once per Issue: a marker in the work tree's git directory, created exclusively, records
 // that it was shown. A diff under the guide leaves no marker, so the first crossing still prints.

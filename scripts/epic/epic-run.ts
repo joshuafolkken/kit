@@ -127,6 +127,19 @@ interface PromoteEpicInput {
 	rationale: string
 	is_ordered: boolean
 	origin?: string | undefined
+	title?: string | undefined
+}
+
+// `--title` renames the promoted issue before its body is written, so the epic sections land on an
+// issue already carrying the split's title.
+async function write_promoted_issue(input: PromoteEpicInput, body: string): Promise<void> {
+	const issue_number = String(input.epic_number)
+
+	if (input.title !== undefined) {
+		console.info(`title: ${await git_gh_command.issue_edit_title(issue_number, input.title)}`)
+	}
+
+	await git_gh_command.issue_edit_body(issue_number, body)
 }
 
 // The issue being promoted, or the reason it cannot be. Refused when it already carries the epic
@@ -170,7 +183,7 @@ async function write_promotion(
 		return FAILURE_EXIT_CODE
 	}
 
-	await git_gh_command.issue_edit_body(String(input.epic_number), body)
+	await write_promoted_issue(input, body)
 
 	if (await git_gh_command.issue_add_label(String(input.epic_number), EPIC_LABEL)) {
 		return SUCCESS_EXIT_CODE

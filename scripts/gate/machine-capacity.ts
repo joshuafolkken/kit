@@ -5,11 +5,8 @@ import { execa } from 'execa'
 
 // What the machine has free right now, read for the core budget's admission.
 //
-// **The budget used to be the core count, and that count is not what is free.** The ledger in
-// `core-budget.ts` admits against `availableParallelism()`, so the load it never sees — Claude sessions,
-// node processes that do not pass through `josh`, the window server — ran on top of a budget already
-// spent. On 2026-10-07, three lanes on the 11-core / 18 GB machine reached a load average of 16.8 with
-// 31% of the CPU in the kernel, compressing and swapping 4.4 GB of memory the ledger never counted.
+// Core count alone cannot account for sessions, node processes and system work outside the ledger,
+// so admission needs a reading of the capacity actually free.
 //
 // **This is a closed loop, not an open-loop formula.** An open loop would derive a share from the
 // core count up front; this reads what is busy and free at the moment of
@@ -19,9 +16,8 @@ import { execa } from 'execa'
 // average trails by a minute, so a gate started just after another one finished would see the finished
 // one's load as external and wait out the decay. `os.cpus()` is one read with no process spawned.
 //
-// **A reading that fails answers undefined, and undefined is the old behavior.** A CI runner or a
-// container — where the host's CPU times are not this process's quota — budgets by the core count and
-// admits without looking at memory, exactly as before.
+// A failed reading answers undefined so CI runners and containers, whose host CPU times may not
+// describe their quota, can budget by core count without a misleading memory constraint.
 //
 // **`run:board` draws its machine gauges from the same reading**, so what the
 // board shows a person is what the gate admits against — the gate reading the free memory as none
@@ -66,12 +62,11 @@ const PRESSURE_NAME = 'kern.memorystatus_vm_pressure_level'
 // warning for hours after the pressure passed, so a hold on warning never lifts. What is pressured right
 // now shows in the free figure and the swap and compressor traffic; the verdict adds only critical.
 const PRESSURE_HOLD = 4
-// The swap traffic across one window that reads as pressure — 64 MB a second paged to disk. A machine
+// Swap pressure needs sustained traffic across a window. A machine
 // that swapped once still pages a few megabytes back in as old pages are touched.
 const SWAP_PRESSURE_MB = 16
-// The compressor traffic across one window that reads as pressure. An idle machine compresses nothing
-// across a window; the 2026-10-16 thrash compressed about 240,000 16 KB pages every three seconds, about
-// 310 MB a window, with no swap figure to show for it.
+// Compressor traffic also signals pressure: compression can thrash without any swap traffic
+// to show for it (joshuafolkken/kit#3943).
 const COMPRESSION_PRESSURE_MB = 64
 const SYSCTL_ARGUMENTS = [
 	LEVEL_NAME,
@@ -304,12 +299,9 @@ function is_pressured(before: MemoryReading, after: MemoryReading): boolean {
 	)
 }
 
-// **Only a reading the kernel calls critical has nothing free to admit against.** Swap and compressor
-// traffic across the window used to answer no free memory too (joshuafolkken/kit#3943), but this machine
-// swaps out 0.4–1.3 TB a day as a matter of course, so that traffic held about a third of every wait
-// with memory to spare (joshuafolkken/kit#4313). A claim now waits on memory only when the free figure
-// falls short of what it declares; the traffic still names the wait as pressure (`memory_pressured`),
-// and holds a claim past the shortfall that running alone or the wait cap would otherwise start
+// Only critical kernel pressure implies no free memory; swap and compressor traffic alone do not
+// prove a shortfall (joshuafolkken/kit#3943, #4313). Free memory is compared with the claim's declared
+// need. Traffic marks pressure and holds a shortfall past solo/wait-cap exceptions
 // (`core_admission.is_swap_held`, joshuafolkken/kit#4451).
 function pressured_available(after: MemoryReading): number | undefined {
 	if (after.available_mb === undefined) return undefined
@@ -342,9 +334,8 @@ async function read_sample(): Promise<MachineSample> {
 // The busy cores the ledger does not account for, in whole cores — the budget is in whole cores, and a
 // fraction of a core is not a core to give up.
 //
-// **Every busy core counts, the background included** (joshuafolkken/kit#4238). A baseline of two cores
-// used to be exempt, so with 10 cores reserved and all 11 busy the reading saw no excess and admitted
-// another claim onto a saturated CPU.
+// Every busy core, including background work, counts so a saturated CPU cannot admit another claim
+// through an exempt baseline (joshuafolkken/kit#4238).
 function external_cores(busy_cores: number | undefined, ledger_cores: number): number {
 	if (busy_cores === undefined) return 0
 

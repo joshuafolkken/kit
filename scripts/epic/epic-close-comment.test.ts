@@ -180,9 +180,8 @@ describe('read_close_comment_state — an announcement posted before the marker 
 	})
 })
 
-// joshuafolkken/kit#1068, problem 2: an epic that was reopened, gained a child and completed again
-// used to close in silence, because the announcement it already carried matched. The marker names
-// the set it was posted for, so the enlarged batch is announced on its own terms.
+// The completion marker identifies the announced child set, so an epic completing again with an
+// additional child receives its own announcement (joshuafolkken/kit#1068).
 describe('read_close_comment_state — an epic that gained a child after announcing', () => {
 	it('answers absent when the announcement named a smaller set', async () => {
 		mocked_comments.mockResolvedValue(comment_listing([build_close_comment(EPIC)]))

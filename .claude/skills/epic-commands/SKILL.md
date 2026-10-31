@@ -15,8 +15,8 @@ epic:audit → find contradictions across the children, and fix what it finds (T
 backlogrun → which calls epic:next each round
 ```
 
-Front-loading every `needs-decision` is `backlogrun`'s job: `backlogrun-steps.md` → "Resolve what
-the plan can resolve, before starting". A `backlogrun #E --only`'s pre-check is `epic:audit`.
+Settling every `needs-decision` is `backlogrun`'s job: `backlogrun-steps.md` → "Resolve what
+the plan can resolve". A `backlogrun #E --only`'s pre-check is `epic:audit`.
 
 Read `execution-waves.md` only when children need an order between groups (a wave boundary, or a child
 that must run alone), and `epic-bundle.md` only when a filing's `epic:bundle` answer places the issue.

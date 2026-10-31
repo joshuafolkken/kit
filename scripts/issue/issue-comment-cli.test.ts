@@ -98,7 +98,7 @@ describe('issue_comment_cli.run — refuses a call it cannot post', () => {
 		expect(errors).toContain(issue_comment_cli.USAGE)
 	})
 
-	// joshuafolkken/kit#3261: a misspelled flag used to be skipped, posting with whatever else was given.
+	// Reject misspelled flags before posting a comment with unintended arguments (joshuafolkken/kit#3261).
 	it('refuses an unknown flag', async () => {
 		const code = await issue_comment_cli.run(['5', '--body', 'note', '--bdy-file', BODY_FILE])
 

@@ -151,6 +151,7 @@ function emit(decision: BudgetRead, offer: OfferAnswer, is_json: boolean): numbe
 			answer: offer.answer,
 			cause: offer.cause,
 			waiting: offer.waiting,
+			is_judgment_owed: offer.is_judgment_owed,
 			retries: offer.retries,
 			reason,
 			is_finish,

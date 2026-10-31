@@ -96,17 +96,17 @@ Runs after every successful `run:hold` claim, and in a `backlogrun`'s once-per-r
 Carry one invocation’s budget across its own session cuts.
 
 ```bash
-pnpm josh run:carry --begin "backlogrun --max 5" --owner "$PPID"
-pnpm josh run:carry --json                                                                              # read the record back in a resumed session
-pnpm josh run:carry --cut --owner "$PPID"                                                               # hand the record off before a cut
-pnpm josh run:carry --retrospective --summary "0 filed; dropped #2240 already merged" --owner "$PPID"   # close the end-of-run retrospective
-pnpm josh run:carry --resume "backlogrun --max 5" --owner "$PPID"                                       # adopt a record no cut handed off
-pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind parked #2118"             # end + push
+pnpm josh run:carry --begin "backlogrun --max 5"
+pnpm josh run:carry --json                                                                    # read the record back in a resumed session
+pnpm josh run:carry --cut                                                                     # hand the record off before a cut
+pnpm josh run:carry --retrospective --summary "0 filed; dropped #2240 already merged"         # close the end-of-run retrospective
+pnpm josh run:carry --resume "backlogrun --max 5"                                             # adopt a record no cut handed off
+pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind parked #2118"   # end + push
 ```
 
 **Options:**
 
-- `--owner <pid>` — the long-lived process spending the budget (`$PPID` under a loop); required by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
+- `--owner <pid>` — the long-lived process spending the budget; omitted, the `CLAUDE_PID` of the calling Claude session (none elsewhere, e.g. Codex). Read by counts and `--begin` / `--resume`. A live PID stays `busy` if probes fail.
 - `--done <issue>` — shrinks a named-issue run's `remaining` list.
 - `--merged <issue>` — names the merged issue and counts it once against `merged_issues`, so a merge `run:merge` already recorded is not counted twice.
 - `--filed` / `--cut` — increments, never totals.
@@ -116,7 +116,7 @@ pnpm josh run:carry --end --stopped "epic #2126: everything is blocked behind pa
 
 <!-- /usage -->
 
-**Output / exit codes:** stdout is one token (`--json` prints the record on one line). `began`, `resumed`, `carried`, `counted`, `ended` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
+**Output / exit codes:** stdout: one token (`--json`: the record, one line). `began`, `resumed`, `driving`, `carried`, `counted`, `ended` exit 0; `busy`, `standing`, `mismatch`, `unreadable`, `unknown`, `over` exit 1; `none` exits 0 for a read/end, 1 for a count/resume.
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:carry` in detail".
 
@@ -281,6 +281,26 @@ The local park record is what the `lane-park` guard reads, so a child that parke
 
 **Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
 
+### `josh upstream:interrupt`
+
+<!-- usage: upstream:interrupt -->
+
+Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation.
+
+```bash
+pnpm josh upstream:interrupt 2304 "<root-cause title>" --repo joshuafolkken/kit --body-file body.md
+```
+
+**Options:**
+
+- `--repo <owner/repo>` — the upstream repository. Required.
+- `--body-file <path>` — the upstream issue body. Required.
+- `--blocks-finder` — passed to `issue:file`: the finder is recorded as blocked by the filing.
+
+<!-- /usage -->
+
+A third-party `--repo` files nothing: the body goes to the finder under `## Upstream candidate` for a person to post. An `unknown` party writes nothing. Each step prints one line; a failing step stops the rest and prints the command to re-run. Resume with the `stash:pop` line the backlink carries.
+
 ### `josh run:liveness`
 
 <!-- usage: run:liveness -->
@@ -336,9 +356,12 @@ Bundle a run’s pre-edit reads: body, comments, state, dependency scope.
 
 ```bash
 pnpm josh run:prep <N>
+pnpm josh run:prep <N> --summary   # the work summary skeleton
 ```
 
 <!-- /usage -->
+
+`--summary` prints only the work summary's skeleton from the body: `## 現象` as Now, `## 期待結果` as Change, each `## 受け入れ条件` item as Check with an empty `- test:` under it. A missing section prints its heading alone; a body whose author is not trusted carries `issue:read`'s untrusted-body heading.
 
 Its `=== ship preconditions ===` section asks, ahead of the ship, the refusals `josh ship` would otherwise meet late: a missing release classification, a runtime change whose PR body lacks `## 実機証跡`, and an unmapped acceptance criterion — printed with the `未記入` rows to copy. `met` when none applies; `unmet` lists each to fix before the gate. The ship and `followup` refuse on all.
 
@@ -572,7 +595,7 @@ pnpm josh ship --log <N>                                  # a detached ship's lo
 
 - `--body-file <path>` — the PR body carrying the live-execution evidence `followup` gates on; forwarded to `git -y` alone.
 - `--notify-message <text>` — forwarded to `followup` alone.
-- `--review` — runs review round 1 beside the gate, and round 2 after the commit when `review:round2` requires it; a High or an unfixed Medium stops the ship. A pre-detach `test:pinned` stop at the first unpinned hunk probes the rest in the background, for the next pre-detach.
+- `--review` — runs round 1 beside the gate; after sync and round 1, an owed round 2 runs beside the gate and joins before the PR opens. A High or unfixed Medium stops the ship. A pre-detach `test:pinned` stop probes remaining hunks in the background for the next pre-detach.
 - `--unpinned-ok <reason>` — forwarded to round 1's `run:review`, past `unpinned` places no test can pin.
 - `--detach` — hands the ship to a supervisor (implied in a lane child); a stop emits `ship-stop` (`--log <N>`). The preflight, type check, unused exports, cspell, guard tests and (`--review`, under `--unpinned-ok`, given or recorded, only if round 1 is reused) `test:pinned` precede hand-off, the checks even after a preflight refusal, so one stop reports every failure.
 
@@ -604,7 +627,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 
 <!-- usage: review:submit -->
 
-Write a ship reviewer's findings, read from stdin, where the ship reads them.
+Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them.
 
 ```bash
 pnpm josh review:submit < findings.txt                 # the /code-review slot
@@ -618,7 +641,8 @@ pnpm josh review:submit --none                         # a review with no findin
 
 <!-- /usage -->
 
-The reviewer `josh ship --review` launches pipes its findings here, one `review:record` line each. The command writes them to the slot's findings file, where the ship reads them, so the reviewer never copies a path. A line outside the grammar is refused, and nothing is written.
+A ship's reviewer, or the `reviewer` agent `run:review` briefs, pipes its findings here, one `review:record` line each.
+The command writes them to the slot's findings file, where the ship or [`josh review:record --from-slot`](josh-commands-automation.md#josh-reviewrecord) reads them, so no path or finding is copied by hand. A line outside the grammar is refused, and nothing is written.
 
 ### `josh ship:wait`
 
@@ -744,7 +768,7 @@ The header is three lines — the first two in three columns, the third a spinne
               ⠦        4″  🔧 #<N> · Bash pnpm josh test:related
 ```
 
-The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board; a colon is a time of day), a progress bar and per-state counts.
+The first line is how far the run is: its state mark and name, `⏰` elapsed in degree-minute-second style (`1°15′57″`, `3′27″`, `26″` — every length on the board; a colon is a time of day), a progress bar and per-state counts. `🛫`: start to first lane.
 
 The second line is what the run is on: the repository's name, `💓` age of the newest event (yellow after 15 quiet minutes, red after 30), and machine gauges (`💪` CPU, `🧠` memory, `💾` swap rate). `⏰` and `💓` share a column, digits right-aligned; both lines' first bars start in one.
 
@@ -757,7 +781,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: the `⛽ usage` section, Claude's and Codex's last-reported 5h and 7d usage gauges (percent, a `┊` mark where an even pace would stand, the `↻` reset; read off a lane's stream-json log and Codex's newest rollout, no API asked; folded with `u`), then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (percent, `┊` at even pace, `↻` reset, `≈N` tasks left at the median done-task spend of the last three; read off lane logs and Codex rollout files, no API asked; folded with `u`), then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 
@@ -766,13 +790,13 @@ A child whose open lane has had no child process for `lane:await`'s 15-second re
 A queued or waiting row draws `<icon> <condition> <number> <kind> <title>  <tail>`: the icon says what it waits on, in place of `⏳`, and the condition column — 11 columns in both sections, the width of `MM-DD HH:MM` — holds its figure, so every row's number starts in one column. The legend names each wait icon the frame draws. A row leads with one icon only, the first of these that holds:
 
 - `🚪` / `📥` / `📤` `<time>` — its lane is being opened, installed or dispatched, for that long.
-- `❓` — the issue carries neither `run:lane` nor `run:solo`; with a standing blocker, the column names the first one. It leads a blocked row too, since judging it is what a person can do meanwhile.
+- `❓` — neither `run:lane` nor `run:solo`, and a blocker stands (the column names the first) or its start time is ahead; a person can judge it meanwhile.
 - `🔗 <N>` — a standing blocker; with more, `<N>+<rest>`, the rest after the title. A first blocker that overruns the column — another repository's `owner/repo#N` — leaves it blank, and every blocker follows the title.
 - `📅 <MM-DD HH:MM>` — the body's `- 実施可能日:` names a UTC time not yet reached, so `backlog:next` withholds the issue. The board shows the local time; `backlog:next` keeps the UTC spelling.
 - `📅 <n>/<K>` / `📅 <PR>` — the body's `- 実施可能条件: #<PR> のマージ後 <K> マージ` is not yet met: the lane ledger has recorded `n` of the `K` merges it waits on after `<PR>` merged, or `<PR>` has not merged (or its merge is unread).
   The issue form, `#<issue> を閉じる PR のマージ後 <K> マージ`, shows `<issue>` and counts after the merged pull request that closed it.
 - `📋 <N>` — a named run's declared issue `<N>` is ahead of it, in flight or not yet started. Never on a `run:add` issue.
-- `✋ <N>` — judged and unblocked, but the unblocked untriaged issue `<N>` withholds the whole pool.
+- `✋` — neither `run:lane` nor `run:solo`, due, and nothing blocks it; `backlog:next` holds it alone for its judgment and offers the triaged rows.
 - `🔒 <N>` — the running issue `<N>` carries `run:solo`, so nothing starts until it merges or is parked; a waiting `run:solo` row leads with it too. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and is running …" from.
 - `🧍 <N>` — a `run:solo` issue, the first among the judged, due and unblocked rows, waits for the running lane `<N>` to finish; with more, `<N>+<rest>`, the rest after the title. It is `epic_solo`'s reading, the one `backlog:next` answers "carries `run:solo` and waits …" from.
 - `🙅 <N>` — ranked behind the waiting `run:solo` issue `<N>`, which nothing is offered past.
@@ -1058,6 +1082,14 @@ The stages — start to plan, implement, each ship stage, between ship stages �
 
 A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
 
+Under `implement` and `start to plan`, each line is one call group, at most three per row, longest first: `<row> › <label> ×<count> <minutes>` (`test › test:related ×3 8.7 min`), the row left out under `start to plan`.
+
+The label is the josh commands a Bash call chains, else its first 60 characters past a leading `cd`; a reviewer's pass (`round 1`, `interaction`, `round 2`), and its level when the prompt opens with one; any other subagent's type; any other tool's name.
+
+`editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
+
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs`, and none when no run capped a file (`lane-breakdown-related.ts`).
+
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
@@ -1089,6 +1121,10 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 
 A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body, so a candidate whose plan names a running lane's file is held back before dispatch and a path its body only cites holds nothing.
+
+A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
+
+So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. Each `split` writes a `split-notice` with its reason to the lane ledger.
 
 **Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 

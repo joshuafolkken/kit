@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { related_heavy_tests } from './related-heavy-tests'
 import { test_read_map, type ReadMap } from './test-read-map'
 import { test_related } from './test-related'
+import { test_related_reuse } from './test-related-reuse'
 import { test_unit_guard } from './test-unit-guard'
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { repository_root: vi.fn() } }))
@@ -35,11 +36,15 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
-// The claim walks no import graph here; what it claims is `test-related.claim.test.ts`.
-vi.mock('./test-pinned-reach', () => ({
-	test_pinned_reach: { reached_test_count: vi.fn() },
-}))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green } = await import_original()
+	const no_record = { fallback: since_green.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
+})
+// The claim and the reach cap walk no import graph here; what they claim and cap is
+// `test-related.claim.test.ts` and `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 
 const mocked_root = vi.mocked(git_command.repository_root)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
@@ -56,6 +61,7 @@ const REPOSITORY_ROOT = process.cwd()
 const CHANGED_SOURCE = path.join('scripts', 'test', 'test-related.ts')
 const ABSOLUTE_SOURCE = path.join(REPOSITORY_ROOT, CHANGED_SOURCE)
 const ADDED_TEST = path.join('scripts', 'test', 'test-related.test.ts')
+const REUSED_TEST = path.join(REPOSITORY_ROOT, ADDED_TEST)
 const MISSING_FILE = 'no-such-file.ts'
 const PACKAGE_FILE = 'package.json'
 const GIT_FAILURE = 'not a git repository'
@@ -149,6 +155,37 @@ describe('test_related.run_related_tests — the green record', () => {
 			before: undefined,
 			exit_code: 0,
 		})
+	})
+})
+
+describe('test_related.run_related_tests — individual reuse', () => {
+	it('passes the pre-run scope to reuse and excludes its proven tests from the runner', async () => {
+		const read = vi.spyOn(test_related_reuse, 'read').mockResolvedValueOnce({
+			excluded: [REUSED_TEST],
+			reused: 1,
+			missed: 0,
+			reason: 'closed',
+			elapsed_ms: 0,
+		})
+
+		vi.spyOn(test_related_reuse, 'retained').mockResolvedValueOnce([])
+		vi.spyOn(test_related_reuse, 'blobs').mockResolvedValueOnce({})
+
+		await test_related.run_related_tests([])
+
+		expect(read).toHaveBeenCalledWith(
+			REPOSITORY_ROOT,
+			expect.objectContaining({ mode: 'related' }),
+			BEFORE_TREE,
+		)
+		expect(vitest_arguments()).toEqual([
+			'related',
+			ABSOLUTE_SOURCE,
+			'--run',
+			'--passWithNoTests',
+			'--exclude',
+			REUSED_TEST,
+		])
 	})
 })
 

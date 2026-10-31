@@ -1,3 +1,4 @@
+import { git_gh_issue_read } from '#scripts/gh/git-gh-issue-read'
 import { git_stash } from '#scripts/git/stash/git-stash'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_read_cli, type BlockRead } from '#scripts/issue/issue-read-cli'
@@ -9,6 +10,7 @@ import { run_ship_preflight } from '#scripts/run/ship/run-ship-preflight'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
+import { run_prep_summary } from './run-prep-summary'
 
 // `josh run:prep <N>` — one call for the reads a `fullrun` makes before its first edit:
 // the issue body and comments (`issue:read`), the state, labels and
@@ -24,7 +26,8 @@ import { run_prep_locate } from './run-prep-locate'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:prep <issue-number>'
+const USAGE = 'Usage: josh run:prep <issue-number> [--summary]'
+const SUMMARY_FLAG = '--summary'
 const LANE_SKIP_SCOPE = 'not asked'
 const LANE_SKIP_REASON =
 	'a dispatched lane child does not run josh latest — the parent does, once per session'
@@ -135,14 +138,38 @@ function exit_code(reads: PrepReads): number {
 	return is_complete ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
 }
 
+// `--summary` prints the work summary's skeleton alone: it is read at the plan step, after the
+// bundle, so it reads the body and the author trust `issue:read` would mark it with. A trust read
+// that failed leaves the body unmarked as trusted, never trusted.
+async function print_summary(issue_number: string): Promise<number> {
+	const [body, block] = await Promise.all([
+		git_gh_issue_read.issue_get_body(issue_number),
+		issue_read_cli.read_block(issue_number),
+	])
+
+	if (body === undefined) {
+		console.error(failure_note(issue_number, 'unreadable'))
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const is_trusted = block.kind === 'ok' ? block.trust.is_body_trusted : undefined
+
+	console.info(session_cite.text(run_prep_summary.format_summary(body, is_trusted)))
+
+	return SUCCESS_EXIT_CODE
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
-	const issue_number = parse_number(argv)
+	const issue_number = parse_number(argv.filter((argument) => argument !== SUMMARY_FLAG))
 
 	if (issue_number === undefined) {
 		console.error(USAGE)
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (argv.includes(SUMMARY_FLAG)) return await print_summary(issue_number)
 
 	const reads = await gather(issue_number)
 	const report = run_prep.format_report(to_parts(issue_number, reads))

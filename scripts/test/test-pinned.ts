@@ -24,7 +24,7 @@ import type { RedProbe } from './test-red-logic'
 
 // `josh test:pinned` (joshuafolkken/kit#4516) — put each changed hunk of a non-test code file back to
 // the merge-base's lines, one at a time, run that file's related tests, and list the hunks no test went
-// red on: the "reverting it stays green" finding a review used to stop a lane on.
+// red on, so reviews can identify changes whose behavior the tests do not pin.
 //
 // **The reverts happen in a detached worktree at HEAD, never the caller's checkout** (`base-tree.ts`).
 // The changed files are copied in from the working tree first, so what is reverted is the change as it
@@ -47,13 +47,16 @@ interface RunOptions {
 	is_cached_only: boolean
 	is_first_unpinned?: boolean
 	rewired?: number
+	over_cap?: number
 	origin?: PinnedOrigin | undefined
 }
 
-// One run's probing: the checked hunks, what the cache knows of each, and the cache they are written to.
+// One run's probing: the checked hunks, what the cache knows of each, each file's test count, and the
+// cache they are written to.
 interface ProbeRun {
 	hunks: ReadonlyArray<Hunk>
 	known: ReadonlyArray<Known>
+	counts: ReadonlyMap<string, number>
 	cache: LoadedCache
 	keys: ReadonlyArray<string>
 	options: RunOptions
@@ -107,13 +110,21 @@ function probes_of(hunks: ReadonlyArray<Hunk>, known: ReadonlyArray<Known>): Arr
 		.filter((probe) => held_of(known[probe.index]) === undefined)
 }
 
-// The probes in the order they run: the fewest tests reached first (`test_pinned_logic.by_reach`),
-// each file's count read once and carried on its probes, which a wide one runs in stages by
-// (`test-pinned-stage.ts`); a file with no graph to read counts as 0.
-async function by_reach(probes: ReadonlyArray<Probe>, reach: Reach): Promise<Array<Probe>> {
-	const files = test_pinned_cache_logic.distinct(probes.map((probe) => probe.hunk.file))
+// Each hunk file's count of the test files it reaches, read once; a file with no graph to read counts
+// as 0.
+async function counts_of(
+	hunks: ReadonlyArray<Hunk>,
+	reach: Reach,
+): Promise<ReadonlyMap<string, number>> {
+	const files = test_pinned_cache_logic.distinct(hunks.map((hunk) => hunk.file))
 	const related = await Promise.all(files.map(async (file) => await reach.related(file)))
-	const counts = new Map(files.map((file, index) => [file, related[index]?.length ?? 0]))
+
+	return new Map(files.map((file, index) => [file, related[index]?.length ?? 0]))
+}
+
+// The probes in the order they run: the fewest tests reached first (`test_pinned_logic.by_reach`),
+// each file's count carried on its probes, which a wide one runs in stages by (`test-pinned-stage.ts`).
+function by_reach(probes: ReadonlyArray<Probe>, counts: ReadonlyMap<string, number>): Array<Probe> {
 	const counted = probes.map((probe) => ({ ...probe, reach: counts.get(probe.hunk.file) }))
 
 	return test_pinned_logic.by_reach(counted, counts)
@@ -128,6 +139,7 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 	return {
 		held,
 		rewired: options.rewired ?? 0,
+		over_cap: options.over_cap ?? 0,
 		is_first_unpinned: options.is_first_unpinned === true,
 		origin: options.origin,
 	}
@@ -139,7 +151,7 @@ function check_options(held: number, options: RunOptions): CheckOptions {
 async function verdicts_on(paths: ReadonlyArray<string>, probing: ProbeRun): Promise<Verdicts> {
 	const verdicts = probing.known.map((entry) => held_of(entry))
 	const reached = reached_of(verdicts)
-	const probes = await by_reach(probes_of(probing.hunks, probing.known), probing.cache.reach)
+	const probes = by_reach(probes_of(probing.hunks, probing.known), probing.counts)
 	const writer = test_pinned_cache.writer(probing.cache, probing.keys)
 	const options = check_options(reached.length, probing.options)
 
@@ -176,17 +188,20 @@ function cut_of(
 	return cut.length === 0 ? {} : { cut }
 }
 
+// The hunks over the test-file cap (joshuafolkken/kit#5503); none, no `over_cap` key.
+function over_cap_of(over_cap: ReadonlyArray<Hunk>): Pick<HunkOutcome, 'over_cap'> {
+	return over_cap.length === 0 ? {} : { over_cap }
+}
+
 // A fresh cached verdict is reused without a run (`test-pinned-cache.ts`); every hunk's verdict is
 // stored again, so a rerun on the same tree starts no vitest. `is_cached_only` runs no probe: only the
 // verdicts the cache holds are read, and nothing is written.
-async function outcome_on(
-	base: string,
+async function checked_outcome(
 	paths: ReadonlyArray<string>,
-	hunks: ReadonlyArray<Hunk>,
+	read: Pick<ProbeRun, 'hunks' | 'counts' | 'cache'>,
 	options: RunOptions,
 ): Promise<HunkOutcome> {
-	if (hunks.length === 0) return NO_OUTCOME
-	const cache = await test_pinned_cache.load(base, hunks)
+	const { hunks, cache } = read
 	const keys = await keys_of(hunks)
 	const known = await test_pinned_cache.known(
 		cache,
@@ -201,9 +216,27 @@ async function outcome_on(
 		)
 	}
 
-	const { verdicts, staged } = await verdicts_on(paths, { hunks, known, cache, keys, options })
+	const { verdicts, staged } = await verdicts_on(paths, { ...read, known, keys, options })
 
 	return { ...outcome_of(hunks, verdicts), ...cut_of(hunks, verdicts), staged }
+}
+
+// A hunk over the test-file cap is neither read from the cache nor probed, in either mode, so both
+// report it alike; the fresh run's ledger row counts it.
+async function outcome_on(
+	base: string,
+	paths: ReadonlyArray<string>,
+	changed: ReadonlyArray<Hunk>,
+	options: RunOptions,
+): Promise<HunkOutcome> {
+	if (changed.length === 0) return NO_OUTCOME
+	const cache = await test_pinned_cache.load(base, changed)
+	const counts = await counts_of(changed, cache.reach)
+	const { checked, unchecked } = test_pinned_logic.capped(changed, counts)
+	const capped_options = { ...options, over_cap: unchecked.length }
+	const outcome = await checked_outcome(paths, { hunks: checked, counts, cache }, capped_options)
+
+	return { ...outcome, ...over_cap_of(unchecked) }
 }
 
 // A target the base's tree does not hold is added — committed on the branch or still untracked.

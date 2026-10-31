@@ -10,7 +10,7 @@ import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// joshuafolkken/kit#1334: the pre-push hook ran the whole unit suite 40 seconds after `josh gate`
+// joshuafolkken/kit#1334: the pre-push hook ran the whole unit suite right after `josh gate`
 // had printed it green on the same tree, with nothing edited in between.
 //
 // Two things are asserted here, and the second is the one a push needs. The first is that the

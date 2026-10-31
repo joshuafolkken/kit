@@ -21,7 +21,7 @@ function mark(at: string, is_offerable: boolean): LedgerEntry {
 	return { kind: lane_ledger.KIND.OFFERABLE, at, is_offerable }
 }
 
-// Work and a free lane first observed together 15 minutes ago, after the 12:00 launch.
+// Work and a free lane become observable together after the launch, so their age starts there.
 const OPEN_EPISODE: ReadonlyArray<LedgerEntry> = [mark(OPENED_ISO, true)]
 
 function ports(overrides: Partial<DetectPorts>): DetectPorts {

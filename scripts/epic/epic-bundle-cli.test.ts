@@ -40,9 +40,7 @@ function render(decision: BundleDecision, subject: BacklogIssue): string {
 	return epic_bundle_cli.format_decision(decision, subject, [], true)
 }
 
-// Looked up through a variable key, as the command itself does. A literal key used to be rewritten
-// to dot notation by `dot-notation` and then rejected by `noPropertyAccessFromIndexSignature`;
-// joshuafolkken/kit#1783 switched that fix off, so matching the command is the whole reason now.
+// A variable key mirrors the command's own lookup (joshuafolkken/kit#1783).
 function action_line(action: BundleDecision['action']): string {
 	return epic_bundle_cli.ACTION_LINES[action] ?? ''
 }
@@ -85,11 +83,8 @@ describe('epic_bundle_cli.format_decision — the headline', () => {
 	})
 })
 
-// joshuafolkken/kit#1339: `ask` used to print "not a call to make without confirmation (Tier B)",
-// which told a run to stop over a placement one `epic --add` reverses. **Both lines are asserted,
-// because the reason prints directly under the headline**: the first version of this change left the
-// reason saying "merging epics is not a call to make without asking" beneath a headline that now says
-// Tier A, so the command contradicted itself in its own two lines of output.
+// Placement is reversible with `epic --add`, so both the headline and its adjacent reason must
+// describe Tier A consistently (joshuafolkken/kit#1339).
 // joshuafolkken/kit#2329: the command runs its human report through `issue_citation.linkify` before
 // printing, so the `Related: #N` / `Epics involved: #N` listings a run copies into its reply carry
 // clickable references — never a bare `#N` the stop guard would fire on.
@@ -327,8 +322,8 @@ describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => 
 
 	// Both reads are mocked here, and the relation spy is handed back rather than made per case
 	// (joshuafolkken/kit#1353). The relation read is on by default, so the case that mocked only the
-	// listing called through to a live `gh api` against real issues — 768ms where its siblings took
-	// 0–1ms, and a 10-second timeout in CI that had nothing to do with the change under test. Handing
+	// listing called through to a live `gh api` against real issues — far slower than its siblings,
+	// and a CI timeout that had nothing to do with the change under test. Handing
 	// the spy back rather than leaving each case to make its own is what keeps that from coming back:
 	// a case cannot forget a mock it is given, and no case ends up spying a second time on a property
 	// this helper has already spied.

@@ -33,7 +33,7 @@ describe('run_board_render.render queued rows', () => {
 	const lines = lines_of(header({ layout }))
 
 	it('draws a plan of three waves under one queued heading and no numbered one', () => {
-		expect(lines.filter((line) => line === rule('⏳ queued'))).toHaveLength(1)
+		expect(lines.filter((line) => line.startsWith('── ⏳ queued '))).toHaveLength(1)
 		expect(lines).not.toContain(rule('1'))
 		expect(lines).not.toContain(rule('2'))
 	})

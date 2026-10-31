@@ -36,9 +36,8 @@ function make_repository(name?: string): string {
 	return repository_path
 }
 
-// A consumer declaring two toolkits with only one of them runnable. This is the partial install that
-// used to leave the run syncing kit alone, writing app-kit's overlay paths back to kit's originals
-// (joshuafolkken/kit#1540).
+// A partial install must not sync kit alone: doing so overwrites app-kit's overlay paths with kit's
+// originals when the second declared toolkit has no runnable CLI (joshuafolkken/kit#1540).
 function make_partial_install(): string {
 	const repository_path = mkdtempSync(path.join(state.workspace, 'repo-'))
 	const modules = path.join(repository_path, NODE_MODULES)
@@ -127,7 +126,7 @@ describe('adopt_logic.refuse_incomplete_plan', () => {
 		expect(refusal).toContain('docs/maintainers/sync-rationale.md')
 	})
 
-	// The path that used to say nothing at all: a declared toolkit with no runnable CLI here.
+	// A declared toolkit without a runnable CLI needs an explicit diagnostic.
 	it('refuses and names a toolkit whose CLI could not be resolved', () => {
 		const refusal = adopt_logic.refuse_incomplete_plan([], [APP_KIT])
 

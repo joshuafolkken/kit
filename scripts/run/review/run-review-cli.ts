@@ -88,7 +88,7 @@ const JOIN_HINT =
 	'Gate is running in the background. Launch the /code-review subagent as the `reviewer` agent type (`kit:reviewer` in a consumer), with the prompt printed under its brief file, verbatim; when it returns, run `pnpm josh run:review --join` to join the gate and test:pinned and check their verdicts before committing.'
 
 const INTERACTION_HINT =
-	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass with `pnpm josh review:record --interaction --issue <N> [<finding> ...]` beside round 1.'
+	'Two brief files above: launch one `reviewer` per brief side by side, each with its own printed prompt, and once both are attested record the interaction pass the reviewer wrote with `pnpm josh review:submit --interaction` by `pnpm josh review:record --from-slot --interaction --issue <N>` beside round 1.'
 
 // The briefs an open writes: the slots this branch's issue owes round 1, and whether this is the ship's
 // own `--code-only` open, which prints code's brief instead.
@@ -129,10 +129,13 @@ async function handover_refusal(is_code_only: boolean): Promise<string | undefin
 // to `review:brief`, whose new code nonce dropped the interaction slot (joshuafolkken/kit#4863). Its
 // launch prompt follows, the one `josh ship` opens a reviewer with: the brief no longer travels in the
 // prompt, and `/code-review` beside `review:attest` is how the time and cost readers tell a review.
+// The slot's findings go with the old brief, read for a resume by then: a reviewer that ends without
+// `review:submit` leaves `review:record --from-slot` nothing to record, not the last round's findings.
 function save_brief(slot: ReviewSlot, text: string): void {
-	const { brief } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
+	const { brief, findings } = lane_session_broker.review_paths(PROJECT_ROOT, slot)
 
 	stamp_file.write_text_stamp(brief, `${text}\n`)
+	stamp_file.remove_stamp(findings)
 	process.stdout.write(
 		`${slot} brief: ${brief}\n${slot} prompt: ${run_ship_review.round_one_opening(brief)}\n`,
 	)

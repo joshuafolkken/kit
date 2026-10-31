@@ -106,10 +106,8 @@ describe('close_completed_epics — incomplete batch', () => {
 	})
 })
 
-// The auto-close used to bail the moment it saw a cross-repository child, because their state could
-// not be read. Reading them against their own repository is the only thing that changed: an epic
-// whose children are *all* readable and closed now closes, and one with a child it cannot read
-// still does not (joshuafolkken/kit#864).
+// Cross-repository children must be read against their own repository. Auto-close is safe only
+// when every child is readable and closed (joshuafolkken/kit#864).
 describe('close_completed_epics — cross-repository children', () => {
 	const REMOTE_REPO = 'joshuafolkken/app-kit'
 	const CROSS_REPO_BODY = `## Progress\n\n- [ ] #103 merged\n- [ ] ${REMOTE_REPO}#7 remote\n`

@@ -2,6 +2,7 @@ import { styleText } from 'node:util'
 import type { BudgetWait } from '#scripts/gate/core-wait'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_board_estimate } from './run-board-estimate'
+import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_fit } from './run-board-fit'
 import type { FoundOf } from './run-board-found'
 import { run_board_fresh } from './run-board-fresh'
@@ -377,6 +378,7 @@ function progress_parts(counts: BoardCounts, header: BoardHeader): Array<string 
 function progress_part(counts: BoardCounts, header: BoardHeader): string {
 	const parts = [
 		...progress_parts(counts, header),
+		run_board_first_lane.part(header.activity),
 		loading_part(header),
 		warning_of(WORDS.plan, header.plan_failed_ms),
 		warning_of(WORDS.read, header.read_failed_ms, header.read_error),

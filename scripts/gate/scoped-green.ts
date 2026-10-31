@@ -101,7 +101,7 @@ function checks_of(sources: ScopedSources): ReadonlyArray<ScopedCheck> {
 
 // **An unreadable record reads as an absent one, and that is the safe direction.** `read` swallows a
 // malformed or foreign file and answers `undefined`, so the two cases are indistinguishable here —
-// and the consequence of treating one as the other is a single 14-second scoped run, against the
+// and the consequence of treating one as the other is a single scoped run, against the
 // alternative of briefing a review on a tree nothing has checked.
 function describes_tree(
 	check: ScopedCheck,
@@ -262,11 +262,16 @@ function is_unmoved(before: GateTree, after: GateTree): boolean {
 	return JSON.stringify(before.files) === JSON.stringify(after.files)
 }
 
-function record_green(stamp: FileMapStampAccess, tree: GateTree, target?: string): void {
+function record_green(
+	stamp: FileMapStampAccess,
+	tree: GateTree,
+	target?: string,
+	blobs?: Record<string, string>,
+): void {
 	if (!is_describable(tree.files, tree.base)) return
 
 	try {
-		stamp.write(tree.files, target, tree.base)
+		stamp.write(tree.files, target, tree.base, blobs)
 	} catch {
 		/* a record that could not be written re-runs the checks rather than skipping them */
 	}
@@ -276,6 +281,7 @@ function record_green(stamp: FileMapStampAccess, tree: GateTree, target?: string
 // run was inconclusive — a vitest the guard skipped rather than ran, say. Either way there is nothing
 // to vouch for, and the two do not need telling apart here.
 interface GreenRecord {
+	blobs?: Record<string, string>
 	before: GateTree | undefined
 	exit_code: number
 	// Where the record lands, defaulted by the stamp itself. It exists for the same reason
@@ -296,7 +302,7 @@ async function record_if_green(stamp: FileMapStampAccess, record: GreenRecord): 
 		return
 	}
 
-	record_green(stamp, before, target)
+	record_green(stamp, before, target, record.blobs)
 }
 
 const scoped_green = {

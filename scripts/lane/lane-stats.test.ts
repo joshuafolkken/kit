@@ -134,7 +134,7 @@ describe('lane_stats.row — the lane median', () => {
 	})
 })
 
-// joshuafolkken/kit#4910: the median hides the lanes past the 40-minute overrun threshold.
+// joshuafolkken/kit#4910: the median hides the lanes past the overrun threshold.
 describe('lane_stats.row — the lane tail', () => {
 	const OVER = 'lanes over 40 min'
 	const P90 = 'lane p90 (min)'

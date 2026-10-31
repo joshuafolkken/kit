@@ -71,7 +71,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
 | `josh review:findings` · `josh rvf` | — | developer | files | Count review findings by category from the observation ledger |
-| `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file>[ — <reason>] ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
+| `josh review:record` | `--issue <N> [--comment \| --interaction] [<category>:<severity>:<file>[ — <reason>] ...] \| --from-slot --issue <N> [--comment \| --interaction] [<n>=<disposition> ...] \| --check [--interaction] --issue <N>` | automation | files, network | Record a review round’s findings, or check a round was recorded |
 | `josh review:stops` · `josh rvs` | `[--period <days>]` | developer | none | List the review findings that stopped a josh ship over a period, by kind, file:line and first sentence |
 
 ## Versioning
@@ -135,6 +135,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh defect:origin` | `<N>` | automation | network | List the merged pull requests that last changed what a defect issue names, as candidates for its origin line |
 | `josh defect:report` | — | automation | network | Count defects by the origin pull request their issue declares, by change kind and by area |
 | `josh delegate` | `<step> \| --list` | automation | none | Say whether a run step may go to a cheaper execution tier |
+| `josh diff:summary` | `[<base>]` | automation | files | Print the diff from the change base as one table — lines, hunks, ranges and declarations per file — and save it whole |
 | `josh disposition` | `<path...>` | automation | none | Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime) |
 | `josh doc:read` | `<file>` | automation | none | Read a whole document safely: print it, or point at the Read tool when over the Bash cap |
 | `josh doc:section` | `<file> <heading>` | automation | none | Print one section of a markdown document, for a `file.md` → "Heading" reference |
@@ -156,7 +157,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:fold-existing` | `<assessment.json> [--json]` | automation | none | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
-| `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
+| `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
 | `josh issue:priority` | `<issue>` | automation | network | Apply priority:high to an issue whose body reached the high floor after filing |
 | `josh issue:read` | `<issue...>` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
@@ -196,7 +197,8 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
 | `josh review:lint` | `[--round <1\|2>] (reads stdin)` | automation | none | Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
-| `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a ship reviewer's findings, read from stdin, where the ship reads them |
+| `josh review:selfcheck` | — | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
+| `josh review:submit` | `[--interaction] < findings \| [--interaction] --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them |
 | `josh rule:list` | — | automation | none | Print the trigger-delivered rules — each one's source, firing call and silent turn — from the guard rows |
 | `josh rule:value` · `josh ruv` | `[--fresh \| --refresh]` | developer | files | Print each delivered rule's unaided compliance — runs reached, kept rate, refusals |
 | `josh run:add` | `<issue...> [--no-priority] [--retry]` | automation | network, files | Add issues to a live backlogrun, ahead of the queue unless --no-priority |
@@ -212,7 +214,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:next` | `<issue>` | automation | network | Print the next step a fullrun takes, computed from the run’s state |
 | `josh run:park` | `<issue> --body-file <path> \| <issue> --clear` | automation | files, network | Park a lane child for a decision, or clear the park |
 | `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
-| `josh run:prep` | `<issue>` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
+| `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff]` | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
@@ -230,3 +232,4 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh stash:push` | `<message>` | automation | git | Stash the working tree, untracked files included, leaving the observation ledger |
 | `josh time` · `josh tm` · **kit only** | `[options]` | maintainer | none | Report where a run's wall clock went: model wait, tool execution, human wait |
 | `josh time:density` · `josh tmd` · **kit only** | `[--lanes <n>] [--path <dir>]` | maintainer | none | Report tool calls per round trip across the recent lane sessions |
+| `josh upstream:interrupt` | `<finder> <title> --repo <owner/repo> --body-file <path> [--blocks-finder]` | automation | git, network, notifications | Stop for a defect in another package in one call: stash, file the upstream issue, backlink it on the finder, send the confirmation |

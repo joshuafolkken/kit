@@ -78,6 +78,7 @@ Keeps caches of its own, apart from the gate's.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
+- A bare run whose green record cannot narrow, here and in `josh test:related`, first prints `whole branch — since-green fell back: <reason>`.
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
 - In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
@@ -294,6 +295,8 @@ pnpm josh test:related --silent           # flags are forwarded to vitest
 
 - Changed set handed to `vitest related`; value-taking flags must be `--flag=value`. Falls back to the whole suite (naming which case) when a changed non-code file has no map or no recorded reader and is new since the map's tree, or a changed file is one every test depends on (counting only files this change moved); a narrowed run matching nothing prints `No test files found` and exits 0.
 - A changed module the vitest config or a setup file imports (`IMPORTED_BY_EVERY_TEST` in `scripts/test/whole-suite-files.ts`) runs only the test files importing it directly, and none when no test does; `josh gate`'s `test:unit` passes `--keep-whole-suite` to run the whole suite for it, as CI does. `josh test:pinned`'s probe narrows by the same rule and leaves out the same heavy files.
+- A changed file whose imports reach more test files than `test_pinned_logic.MAX_TEST_FILES` (150) narrows the same way, to the test files importing it directly, and prints `<N> over cap` with the files (`scripts/test/test-related-cap.ts`).
+- The lane ledger row records that count as `over_cap`, which `josh lane:breakdown` sums. `--keep-whole-suite` lifts the cap; `josh gate` and CI run the rest.
 - An entries-only edit of `tools/test/pure-files.ts` runs the moved entries and the list's own tests; a `.josh/` run record reaches only a test that read it by name.
 - A changed non-code file narrows to the tests that read it, per the test-read map a whole-suite `josh test:unit` records (`<git-common-dir>/josh/test-read-map.v<version>.json`, one file per map version so lanes on different kits keep their own; a write removes another version's file unwritten for a week); with no map the changed set is the branch diff.
 - A change of only non-code files the map's tree held and no test read runs no test: it says why and exits 0.
@@ -925,6 +928,8 @@ pnpm josh backlogrun --restart       # replace the run's processes, keeping its 
 <!-- /usage -->
 
 The board is [`josh run:board`](./josh-commands-run.md#josh-runboard). The agent runs in the main checkout, its output going to a log file.
+
+The launch begins the run's carry record and hands it to the supervisor before the agent plans, so the first lane opens without waiting for the plan; the agent's own `run:carry --begin` answers `driving`, and it reports the plan and settles `needs-decision` beside the lanes.
 
 To default to Codex, add `JOSH_AGENT_PROVIDER=openai` to the project's `.env`. Provider selection is `--agent claude|codex` first, then the exported `JOSH_AGENT_PROVIDER`, then `.env`, then Claude Code (`anthropic`).
 

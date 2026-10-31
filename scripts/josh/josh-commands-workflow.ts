@@ -146,8 +146,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
-	// One observation-ledger sighting: the key's count, the append and the second-sighting verdict,
-	// which a run used to type as a `cat | grep -c` and judge by hand.
+	// Counting, appending and deciding a second sighting together keeps ledger judgments consistent.
 	'observation:record': {
 		script: 'scripts/observations/observation-record-cli.ts',
 		description: 'Record an observation sighting and answer whether it is now filed',
@@ -188,7 +187,7 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Record a review round’s findings, or check a round was recorded',
 		category: 'Workflow',
 		reference: [
-			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --check [--interaction] --issue <N>',
+			'--issue <N> [--comment | --interaction] [<category>:<severity>:<file>[ — <reason>] ...] | --from-slot --issue <N> [--comment | --interaction] [<n>=<disposition> ...] | --check [--interaction] --issue <N>',
 			'automation',
 			['files', 'network'],
 		],
@@ -204,6 +203,10 @@ const WORKFLOW_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: `${REVIEW_ISSUE} --interaction`,
 					note: 'the interaction review’s pass — a `- ri:` line',
+				},
+				{
+					arguments: `--from-slot ${REVIEW_ISSUE} 2=filed:#7`,
+					note: 'the findings the reviewer wrote with review:submit — each `fixed` unless its line is given another',
 				},
 			],
 		},

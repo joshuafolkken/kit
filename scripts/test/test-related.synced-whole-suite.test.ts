@@ -25,6 +25,8 @@ vi.mock('#scripts/git/changed-paths', () => ({
 	},
 }))
 vi.mock('./related-heavy-tests', () => ({ related_heavy_tests: { exclude_flags: () => [] } }))
+// The reach cap walks no import graph here; what it caps is `test-related-cap.test.ts`.
+vi.mock('./test-pinned-reach')
 vi.mock('./test-unit-guard', () => ({
 	test_unit_guard: { is_running: vi.fn(), run_guarded_vitest: vi.fn() },
 }))
@@ -32,11 +34,19 @@ vi.mock('./test-unit-guard', () => ({
 vi.mock('#scripts/gate/scoped-green', () => ({
 	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
 }))
-vi.mock('#scripts/gate/since-green', () => ({
-	since_green: { describe: vi.fn(() => 'since its last green run'), read_moved_parts: vi.fn() },
-}))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const original = await import_original()
 
-const mocked_moved = vi.mocked(since_green.read_moved_parts)
+	return {
+		since_green: {
+			...original.since_green,
+			describe: vi.fn(() => 'since its last green run'),
+			read_verdict: vi.fn(),
+		},
+	}
+})
+
+const mocked_moved = vi.mocked(since_green.read_verdict)
 const mocked_changed = vi.mocked(changed_paths.read_changed_paths)
 const mocked_run = vi.mocked(test_unit_guard.run_guarded_vitest)
 
@@ -70,7 +80,7 @@ beforeEach(() => {
 		readers: {},
 	})
 	mocked_changed.mockResolvedValue([FIXED_SOURCE])
-	mocked_moved.mockResolvedValue({ changed: [FIXED_SOURCE], synced: [STATE_GUARD] })
+	mocked_moved.mockResolvedValue({ parts: { changed: [FIXED_SOURCE], synced: [STATE_GUARD] } })
 	mocked_run.mockResolvedValue(0)
 })
 
@@ -87,7 +97,7 @@ describe('test_related.run_related_tests — a whole-suite file a main sync brou
 
 	it('never hands it to vitest for naming a file the branch moved', async () => {
 		mocked_changed.mockResolvedValue([UNIT_GUARD])
-		mocked_moved.mockResolvedValue({ changed: [UNIT_GUARD], synced: [NAMING_WORKERS] })
+		mocked_moved.mockResolvedValue({ parts: { changed: [UNIT_GUARD], synced: [NAMING_WORKERS] } })
 
 		await test_related.run_related_tests([])
 
@@ -122,7 +132,7 @@ describe('test_related.run_related_tests — an entries-only edit of the pure-fi
 		const list_text = readFileSync(path.join(REPOSITORY_ROOT, PURE_FILES), 'utf8')
 
 		mocked_changed.mockResolvedValue([PURE_FILES])
-		mocked_moved.mockResolvedValue({ changed: [PURE_FILES], synced: [] })
+		mocked_moved.mockResolvedValue({ parts: { changed: [PURE_FILES], synced: [] } })
 		vi.mocked(git_command.change_base).mockResolvedValue('b45e')
 		vi.mocked(git_command.show_file).mockResolvedValue(
 			list_text.replace(LIST_OPEN, () => `${LIST_OPEN}\t'${ENTRY}',\n`),
@@ -164,7 +174,9 @@ describe('test_related.run_related_tests — the gate’s whole-suite flag', () 
 	})
 
 	it('runs the whole suite for a file every test imports', async () => {
-		mocked_moved.mockResolvedValue({ changed: [pure_files_entries.PURE_FILES_PATH], synced: [] })
+		mocked_moved.mockResolvedValue({
+			parts: { changed: [pure_files_entries.PURE_FILES_PATH], synced: [] },
+		})
 
 		await test_related.run_related_tests([gate_labels.KEEP_WHOLE_SUITE_FLAG])
 

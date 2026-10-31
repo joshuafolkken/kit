@@ -4,10 +4,8 @@ import { TS_CACHE_FLAGS } from '#scripts/josh/josh-command-types'
 import { execa } from 'execa'
 import { project_checks } from './project-checks'
 
-// `josh check` — the project-wide TypeScript check. It used to be a bare `tsc --noEmit` shell entry,
-// so on a basic project with nothing to type-check it failed with `Command "tsc" not found` while
-// the gate, which asks `type_check_skip_reason` first, skipped the same step.
-// Both now read that one decision.
+// `josh check` and the gate share `type_check_skip_reason` so a basic project with no TypeScript
+// skips the check rather than trying to launch a missing compiler.
 
 const ARGV_OFFSET = 2
 const FAIL_EXIT_CODE = 1

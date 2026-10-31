@@ -31,15 +31,17 @@ reference is read as a section").
 1. **Claim nothing at the entry — this parent orchestrates and never implements.** The working-tree
    hold, the split assessment and `fullrun.md` are read by a dispatched child inside its own delegated
    `fullrun` unit, never at the parent's entry.
-2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>" --owner
-   "$PPID"` and `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`. Its answers:
+2. **Begin the carry record before the plan** — `pnpm josh run:carry --begin "<invocation>"` and
+   `pnpm josh run:wake --start`, in the same turn as the first `pnpm josh ms`. Its answers:
    `backlogrun-steps.md` → "The session cut is inside the invocation"; a resumed session:
    `backlogrun-progress.md` → "Resuming after a cut".
+   - `driving` → step 4 beside the lanes, then end the turn: `backlogrun-steps.md` → "The plan,
+     beside the first child".
 3. **What this invocation approves** — the opted-in pool, a run's own filings once bundled, and the
    brake that bounds the amount: `backlogrun-steps.md` → "What one invocation approves".
-4. **Report the plan before the first child** — `pnpm josh backlog:plan`, then resolve every
+4. **Report the plan beside the first child** — `pnpm josh backlog:plan`, then resolve every
    `needs-decision` issue decidable from its body in one pass, recording `blocked-by`, `run:solo` and
-   `run:lane` in the same pass: `backlogrun-steps.md` → "The plan, before the first child starts";
+   `run:lane` in the same pass: `backlogrun-steps.md` → "The plan, beside the first child";
    `run:solo`: `backlogrun-lanes.md` → "A solo run".
 5. **Named issues run first, in order** — each as a delegated `fullrun`, one at a time, then the pool;
    `--only` stops after the list.

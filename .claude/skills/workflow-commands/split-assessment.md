@@ -11,10 +11,11 @@ several. Every command applies it identically.
 2. **Does the whole of it exceed what one verification gate can confirm in one pass?** The guide is
    **more than 8 changed files or more than 200 changed lines** (test files excluded) — either one is
    over. Docs, snapshots and command listings the change has to follow count as files.
-   Under both, it is one Issue however many separable pieces a reader can name inside it.
 
-A change that must land in one commit to be correct is one deliverable however big it is; **separability
-alone no longer splits anything**. The numbers are read against the whole request's estimate.
+A change that must land in one commit is one deliverable, **separability alone splits nothing**, up to
+**the cap, three times the guide**: past it a lane runs over an hour, so no reason keeps it one Issue.
+The numbers are read against the whole request's estimate. `lane:plan` answers `split` past
+twice the declared files (files or hunks) or the line guide.
 
 ## The same two questions decide the filing-time fold
 

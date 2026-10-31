@@ -1,4 +1,5 @@
 import { json_value } from '#scripts/lib/json-value'
+import { review_prompt_level } from '#scripts/review/review-prompt-level'
 import { z } from 'zod'
 
 // One lane session's transcript reduced to its tool calls: each `tool_use` an `assistant` line carries,
@@ -16,11 +17,16 @@ import { z } from 'zod'
 //
 // **A subagent call keeps its agent type and model** — `subagent_type`, the harness's
 // `general-purpose` when absent, and `model` when named — so the implement's subagent time splits by
-// the agent dispatched (joshuafolkken/kit#5297).
+// the agent dispatched (joshuafolkken/kit#5297). **A review's pass and level are kept too** — the
+// interaction review by its brief's path or block, the round-2 verification pass by its prompt's words
+// (`run-ship-review.ts`), and the level when the prompt opens with it — so `josh lane:breakdown` tells
+// the reviews apart (joshuafolkken/kit#5539); the prompt itself is not kept.
 
 interface Subagent {
 	type: string
 	model: string | undefined
+	level?: string | undefined
+	pass?: string | undefined
 }
 
 interface ToolCall {
@@ -61,6 +67,7 @@ interface RawInput {
 	run_in_background?: unknown
 	subagent_type?: unknown
 	model?: unknown
+	prompt?: unknown
 }
 
 interface CallInput {
@@ -71,6 +78,11 @@ interface CallInput {
 
 const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Agent', 'Task'])
 const GENERAL_PURPOSE = 'general-purpose'
+// The words each pass's prompt carries: the interaction brief's path or block, the round-2 prompt's lead.
+const PASS_MARKERS: ReadonlyArray<readonly [ReadonlyArray<string>, string]> = [
+	[['review-brief-interaction-', '## Interaction review'], 'interaction'],
+	[['round-2 verification pass'], 'round 2'],
+]
 
 function string_or_undefined(value: unknown): string | undefined {
 	return typeof value === 'string' ? value : undefined
@@ -81,8 +93,31 @@ function named(value: unknown): string | undefined {
 	return value === '' ? undefined : string_or_undefined(value)
 }
 
+// The level a review brief or a reviewer launch prompt opens with, `undefined` for a prompt that opens
+// otherwise.
+function level_of(prompt: string): string | undefined {
+	const [first = ''] = prompt.split('\n', 1)
+
+	return review_prompt_level.level_of(first.trim())
+}
+
+function pass_of(prompt: string): string | undefined {
+	return PASS_MARKERS.find(([markers]) => markers.some((marker) => prompt.includes(marker)))?.[1]
+}
+
+// A review's level and pass, read off the prompt a subagent call carries.
+function brief_of(value: unknown): Pick<Subagent, 'level' | 'pass'> {
+	const prompt = string_or_undefined(value) ?? ''
+
+	return { level: level_of(prompt), pass: pass_of(prompt) }
+}
+
 function subagent_of(input: RawInput | null | undefined): Subagent {
-	return { type: named(input?.subagent_type) ?? GENERAL_PURPOSE, model: named(input?.model) }
+	return {
+		type: named(input?.subagent_type) ?? GENERAL_PURPOSE,
+		model: named(input?.model),
+		...brief_of(input?.prompt),
+	}
 }
 
 function to_input(input: RawInput | null | undefined): CallInput {
@@ -104,6 +139,7 @@ const INPUT_SCHEMA = z
 		run_in_background: z.unknown(),
 		subagent_type: z.unknown(),
 		model: z.unknown(),
+		prompt: z.unknown(),
 	})
 	.partial()
 

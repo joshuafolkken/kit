@@ -18,8 +18,8 @@ import { followup_job_needs, type NeedsGraph } from './followup-job-needs'
 import { followup_main_move } from './followup-main-move'
 
 // A GitHub Actions job whose every step succeeded can still end `cancelled` or `timed_out`: the runner
-// stops reporting after the last step and the job's `timeout-minutes` cuts it off (joshuafolkken/kit#4813,
-// two 3-second jobs cut at 2m0s). Nothing in the change caused it, so `followup` reruns such a job once
+// stops reporting after the last step and the job's `timeout-minutes` cuts it off (joshuafolkken/kit#4813).
+// Nothing in the change caused it, so `followup` reruns such a job once
 // — as `git-gh-retry.ts` retries a GitHub 5xx — rather than failing a pull request that is green.
 //
 // **A job red only on tests outside the change is rerun the same way** (joshuafolkken/kit#5171): a test

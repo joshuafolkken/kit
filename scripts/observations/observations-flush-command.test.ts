@@ -268,11 +268,9 @@ describe('observations_flush — a merged flush', () => {
 	})
 })
 
-// joshuafolkken/kit#1785: a commit rejected by the pre-commit hook used to leave the flush branch
-// behind with no commit on it, and the refusal the next run printed named two exits — finish that
-// branch, or delete it — that the distributed `.claude/settings.json` denies outright. What is pinned
-// here is the rollback, which is the half the messages cannot pin: the side that created the branch
-// removes it, the checkout goes back, and the appended lines stay in the working tree.
+// A rejected flush commit must roll back its own branch and restore the checkout while preserving
+// appended ledger lines; a caller cannot repair it through the denied branch operations
+// (joshuafolkken/kit#1785).
 
 describe('observations_flush — a commit the pre-commit hook rejects', () => {
 	beforeEach(() => {
@@ -310,8 +308,7 @@ describe('observations_flush — a commit the pre-commit hook rejects', () => {
 		expect(message).not.toContain(ONLY_COPY)
 	})
 
-	// The acceptance criterion the refusal used to break: with the branch gone and the checkout back
-	// on the default branch, the very next flush is a fresh branch rather than a refusal.
+	// Restoring the default branch must let the next flush start fresh without a refusal.
 	it('leaves the same command runnable immediately afterwards', async () => {
 		await rejected_flush()
 		vi.mocked(git_command.commit).mockResolvedValue(undefined)

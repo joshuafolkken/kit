@@ -75,11 +75,8 @@ describe('git_notify.build_notify_config — message and mentions', () => {
 	})
 })
 
-// **Trimming moved up with the expansion, and for the same reason.** This function used to read
-// `raw.trim().replaceAll(…)` — trim first, expand second. Keeping the trim here once the expansion
-// had moved reversed that order, so `--notify-message "…\n"` lost the newline its own escape had just
-// produced. The quoting slack is now removed by `cli_body` before the escape is expanded
-// (`scripts/josh/cli-body.test.ts`), and what arrives here is passed on as it stands.
+// `cli_body` trims quoting slack before expanding escapes. Passing its result through unchanged
+// preserves explicitly requested newlines (`scripts/josh/cli-body.test.ts`).
 describe('git_notify.build_notify_config — the message is passed on as it stands', () => {
 	it('keeps the newlines at either end of the message it was handed', () => {
 		const result = git_notify.build_notify_config({
@@ -155,6 +152,16 @@ describe('git_notify.build_completion_comment_body — the run’s own notes', (
 		})
 
 		expect(body).toContain(HIT_LINE)
+	})
+
+	// joshuafolkken/kit#5545: the check report `followup` drafts follows the `--notify-message` text,
+	// which stays the body's first line.
+	it('keeps the message first and the check report after it', () => {
+		const report = ['Checks:', '- E2E — re-run once, judged flaky; green on the re-run']
+		const lines = git_notify.build_completion_comment_body({ ...BASE, notes: report }).split('\n')
+
+		expect(lines[0]).toBe(`✅ ${COMPLETION_MESSAGE}`)
+		expect(lines.slice(-report.length)).toStrictEqual(report)
 	})
 
 	// The equality is the assertion: a run with nothing to note produces the byte-for-byte body it

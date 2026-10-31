@@ -250,7 +250,7 @@ describe('uncut_lane_issue', () => {
 	})
 
 	// **A person working in the lane carries no dispatch mark, so the rule stays silent for them**
-	// (joshuafolkken/kit#1904). This is the half that used to be the model's to judge.
+	// (joshuafolkken/kit#1904).
 	it('says nothing when the lane carries no dispatch mark', () => {
 		const state = state_marked(LANE_DIRECTORY, undefined)
 
@@ -398,10 +398,9 @@ describe('delivered_rules.delivery — inside a lane checkout', () => {
 	})
 })
 
-// **The two sessions of one cut run, which the row used to read as two runs** (joshuafolkken/kit#1867).
-// A cut relaunches a fresh process, so a perfectly obedient lane child reaches the measurement as two
-// transcripts issuing the identical entry check — and only the first of them can ever take a cut, so
-// scored on the asking alone the row had a ceiling of about 50%.
+// A cut relaunches a fresh process, so two transcripts can belong to one run. Only the first can
+// take a cut; measuring the pair together avoids penalizing the resumed session
+// (joshuafolkken/kit#1867).
 describe('rule_value.measure — the pre-gate cut row', () => {
 	it('counts the session that claimed the working tree and took the cut as a run that kept the rule', () => {
 		const reading = pre_gate_row([run_of(RESUME_CHECK, CLAIM_THE_HOLD, TAKE_THE_CUT)])

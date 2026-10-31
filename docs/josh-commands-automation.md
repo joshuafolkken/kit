@@ -504,6 +504,10 @@ Rows match by an identifier built from the criterion's text, so a reworded crite
 
 **Behavior:** waits for CI (every 10 s, a 32-minute budget, `JOSH_CI_TIMEOUT_SECONDS`), merges, then closes completed epics and the Issue, removes `in-progress` and flushes the ledger. A person's unacknowledged update stops it unmerged ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)). Give the call its longest timeout.
 
+**Check report:** a green run's completion notification (comment and Telegram) carries a `Checks:` list after the `--notify-message` text, one line per check: a failed check left in the green snapshot, marked `required` or `not required`; a job re-run as flaky; a retriggered rate-limited CodeRabbit review.
+
+A run with none adds no list. A red run, or a re-run on a merged PR, writes no list; `--notify-message` then names the failures by hand.
+
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
 Related: [`josh git`](josh-commands.md#josh-git), [`josh observations:flush`](#josh-observationsflush), [`josh time`](josh-commands-run.md#josh-time).
@@ -610,11 +614,14 @@ pnpm josh review:record --issue 2325                                            
 pnpm josh review:record --issue 2325 --comment                                            # a round that passed after the PR opened — an Issue comment, no append
 pnpm josh review:record --check --issue 2325                                              # the merge gate: was it recorded?
 pnpm josh review:record --issue 2325 --interaction                                        # the interaction review’s pass — a `- ri:` line
+pnpm josh review:record --from-slot --issue 2325 2=filed:#7                               # the findings the reviewer wrote with review:submit — each `fixed` unless its line is given another
 ```
 
 <!-- /usage -->
 
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
+
+`--from-slot` records what the reviewer wrote with [`josh review:submit`](josh-commands-run.md#josh-reviewsubmit) (`--interaction`: that slot), each finding `fixed` unless a positional `<n>=<disposition>` gives its 1-based line another. A slot nobody wrote, or an `<n>` past its last line, is refused.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 

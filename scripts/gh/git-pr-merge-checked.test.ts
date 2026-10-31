@@ -84,6 +84,7 @@ describe('git_pr_merge_checked.merge_checked — a merge that cannot land', () =
 
 		await expect(merge_checked(wait_for_green)).rejects.toThrow(HEAD_KEPT_MOVING_MESSAGE)
 		expect(mocked_merge).toHaveBeenCalledTimes(MAX_HEAD_MOVES)
+		expect(wait_for_green).toHaveBeenCalledTimes(MAX_HEAD_MOVES)
 	})
 
 	it('rethrows any other merge failure unchanged, without waiting again', async () => {

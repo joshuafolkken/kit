@@ -50,6 +50,9 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// The causing-lane line a refused filing prints to be pasted into the Issue body, whose shape
 	// `issue-priority.ts` reads with the bare `#N`.
 	['issue/issue-file-lane-hint.ts', 1],
+	// The stash name `stash:pop` matches, and the finder backlink comment and its Telegram copy; the
+	// stash line it prints goes through `session_cite.text`.
+	['issue/upstream-interrupt-cli.ts', 3],
 	// A person reads it on Telegram.
 	['notify/git-notify.ts', 1],
 	['backlog/backlog-drive-idle.ts', 1],
@@ -100,7 +103,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	['run/event/run-event-overrun.ts', 7],
 	['run/event/run-event-plan.ts', 1],
 	['run/event/run-event-scope.ts', 1],
-	['run/event/run-event-setup.ts', 3],
+	['run/event/run-event-setup.ts', 4],
 	// The halfrun / prrun stop confirmation: copy-out commands.
 	['run/hold/run-stop-notify.ts', 1],
 	['run/merge/run-merge-cli.ts', 6],

@@ -5,7 +5,7 @@ import { init_logic } from '#scripts/init/init-logic'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sync } from './sync'
 
-// The clause `josh init` used to write: a bare install whose failure is swallowed.
+// A bare install with a swallowed failure exercises the compatibility rewrite.
 const LEGACY_LEFTHOOK_CMD = 'command -v lefthook >/dev/null 2>&1 && lefthook install'
 const SVELTE_KIT_SYNC = 'svelte-kit sync'
 const WARNING_MARKER = 'git hooks are NOT installed'

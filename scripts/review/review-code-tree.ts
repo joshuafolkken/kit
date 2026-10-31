@@ -12,7 +12,7 @@ import { review_stamps } from './review-stamps'
 // text with the comments taken out (joshuafolkken/kit#3826).
 //
 // **Why a second record rather than a second reading of the first.** The round-1 snapshot holds
-// digests, not text, so after the fixes nothing can say what a changed `.ts` file used to contain. A
+// digests, not text, so it cannot reconstruct a changed `.ts` file's original contents. A
 // comment-free digest taken at the same moment is what lets round 2 tell "only the comments changed"
 // from "the code changed" — equal digests mean equal code.
 //

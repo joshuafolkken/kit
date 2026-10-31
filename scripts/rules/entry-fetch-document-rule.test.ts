@@ -7,12 +7,9 @@ import { entry_read_set } from '#scripts/document/entry-read-set'
 import { read_set_cli } from '#scripts/document/read-set-cli'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 
-// joshuafolkken/kit#1797 gave the entry read two properties this suite guards: the point-of-use files
-// stay out of every entry's read set, and the Bash output cap the fetch cannot exceed is read from
-// the settings rather than restated. joshuafolkken/kit#1959 removed what used to sit beside them —
-// the §1 "how to fetch" and "read at the point of use" prose that joshuafolkken/kit#1925 trims out of
-// the always-read skill. Both properties are held here structurally, off `entry_read_set` and the
-// settings file, so trimming that prose leaves them untouched.
+// Point-of-use files stay outside the entry read set, and fetches use the settings' Bash output cap
+// rather than restating it. Structural assertions on `entry_read_set` and the settings keep both
+// properties independent of prose edits (joshuafolkken/kit#1797, #1959, #1925).
 
 const SKILL = '.claude/skills/workflow-commands/SKILL.md'
 const CAP_KEY = 'BASH_MAX_OUTPUT_LENGTH'

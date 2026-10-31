@@ -5,8 +5,8 @@ import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 import { lane_yield } from './lane-yield'
 
-// joshuafolkken/kit#4995: #4970 ran 79.5 minutes of net time, 51 of them its implementation, and the
-// overrun investigation saw only the total. Its stages add up to the net time, waits taken out.
+// joshuafolkken/kit#4995: the overrun investigation needs stages, not only a total, to locate the cost.
+// Its stages add up to the net time, waits taken out.
 
 const ISSUE = 4970
 const OTHER = 4971
@@ -113,6 +113,13 @@ describe('lane_breakdown.of — #4970', () => {
 		)
 
 		expect(names).toStrictEqual(new Set(expected))
+	})
+
+	// joshuafolkken/kit#5539: the window the start to plan's longest calls are read in.
+	it('keeps the start to plan span', () => {
+		const spans = breakdown?.plan?.map(({ from_ms, to_ms }) => [from_ms, to_ms])
+
+		expect(spans).toStrictEqual([[START, START + 10 * MINUTE_MS]])
 	})
 })
 

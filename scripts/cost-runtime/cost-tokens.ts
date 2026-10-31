@@ -8,24 +8,25 @@
 //
 // **Why two terms rather than one bytes-per-token ratio.** A single ratio is wrong by a factor of
 // three across this project's own content: English markdown runs about 3 characters per token,
-// while Japanese runs about one token per character at 3 bytes each. Splitting on the ASCII
+// while Japanese runs about one token per character at several bytes each. Splitting on the ASCII
 // boundary removes that error without pretending to be a tokenizer.
 //
 // Both constants were calibrated against this repository's transcripts, using the one place where a
 // real count sits beside real text: an assistant response whose content is only `text` blocks and
 // whose `thinking_tokens` is 0, where `output_tokens` is the token count of exactly that text.
 //
-// - **Wide characters — 1 token each.** A least-squares fit over 238 such responses (197,259 ASCII
-//   and 164,073 wide characters against 257,036 output tokens) put the wide coefficient at 0.991.
+// - **Wide characters — one token each.** A least-squares fit over 238 such responses (197,259
+//   ASCII and 164,073 wide characters against 257,036 output tokens) put the wide coefficient at
+//   0.991.
 // - **ASCII — 3 characters per token**, taken from the one clean reading in that set: the responses
 //   that are almost entirely ASCII, which give 2.97. The other readings are all *denser* and each is
 //   denser for a reason that does not apply to a document like `CLAUDE.md`. Subtracting the wide
 //   term across the whole set leaves 2.12, but that ASCII is markdown scaffolding embedded in
 //   Japanese — punctuation, bullets, table pipes, identifiers in backticks — which tokenizes far
 //   denser than prose; the same figure rises monotonically as the wide fraction falls (2.08 → 2.27 →
-//   2.97). And the resident baseline moved 309–1,116 tokens across `CLAUDE.md` growth of
-//   807–2,045 bytes, i.e. 1.8–2.6, but other resident surfaces grew in those same commits, so that
-//   reading attributes their tokens to `CLAUDE.md`'s bytes and is biased dense by construction.
+//   2.97). And `CLAUDE.md` bytes per token of resident-baseline growth read 1.8–2.6, but other
+//   resident surfaces grew in those same commits, so that reading attributes their tokens to
+//   `CLAUDE.md`'s bytes and is biased dense by construction.
 //
 // **The residual error runs in one direction, and the report says where it lands.** If 3 is too
 // generous for some content, the rows sized from repository files are *under*-counted and the

@@ -15,6 +15,7 @@ const SLOW_MS = 370_000
 const STALLED = 'stalled.test.ts'
 const REPOSITORY = '/repository/.git'
 const COUNT_TARGET = '/repository/count'
+const PASSED = 'passed.test.ts'
 
 function timed(file: string, duration: number, root: string = ROOT): TimedModule {
 	return {
@@ -102,6 +103,16 @@ describe('unit_file_reporter.record_to_ledger — the ledger it writes', () => {
 describe('unit_file_reporter.create — the count file', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs()
+	})
+
+	it('reports successful modules only, never failed or skipped files', () => {
+		const files = unit_file_reporter.passed_files([
+			{ moduleId: PASSED, state: () => 'passed' },
+			{ moduleId: 'failed.test.ts', state: () => 'failed' },
+			{ moduleId: 'skipped.test.ts', state: () => 'skipped' },
+		])
+
+		expect(files).toEqual([PASSED])
 	})
 
 	it('writes the run’s test-file count to the file named when the reporter was created', async () => {

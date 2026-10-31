@@ -55,7 +55,8 @@ authorization a person gave, exactly as a delegated child runs `fullrun` in a un
 the keyword. Because the boundary is the budget, the budget has to survive the cut — and the
 conversation is the one place it cannot live, hence the carry record.
 
-**Why `--owner "$PPID"` matters.** It names the parent loop's own long-lived process, which is what
+**Why the owner matters.** It names the parent loop's own long-lived process — the session pid the
+agent exports, so the spelling carries no `$PPID` a shell guard refuses (joshuafolkken/kit#5498) — which is what
 lets `run:carry` answer `busy` instead of letting a second parent count into a budget still being
 spent. Without it every standing record reads as not provably live — refused rather than resumed, so
 nothing is lost silently, but the useful half of the answer is gone. When the sandbox cannot read a

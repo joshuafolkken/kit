@@ -96,9 +96,8 @@ describe('release_publish.is_release_branch_taken', () => {
 		expect(await release_publish.is_release_branch_taken(BRANCH)).toBe(true)
 	})
 
-	// The regression (joshuafolkken/kit#1641): the remote arm used to match `git branch --remotes`
-	// short names, which carry the remote, so an unprefixed pattern matched nothing and this answered
-	// false for a branch a previous attempt had pushed.
+	// Remote branch names carry the remote prefix, so matching must recognize an already pushed
+	// release branch through that prefix (joshuafolkken/kit#1641).
 	it('reports the name taken when only origin still has the branch', async () => {
 		given(false, 'present')
 

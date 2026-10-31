@@ -1,0 +1,8 @@
+{
+	"reason": "#5548 adds issue:plan planning notification (with a plan-summary fallback) and epic --promote --title; kickoff.md quotes the Next line",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 85,
+		"ai_cost.on_demand_bytes": 73
+	}
+}

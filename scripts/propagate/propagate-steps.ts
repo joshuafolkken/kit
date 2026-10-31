@@ -288,8 +288,7 @@ interface IssueOutcome {
 
 const ISSUE_NUMBER_PATTERN = /\/(?<number>\d+)\s*$/u
 
-// The creation answers the new issue's browser URL — `.html_url`, which is the value `gh issue
-// create` used to print — and its last path segment is the number `josh git` needs.
+// The creation returns the issue's browser URL; its last path segment supplies the number `josh git` needs.
 function parse_issue_number(issue_url: string): string | undefined {
 	const { groups } = ISSUE_NUMBER_PATTERN.exec(issue_url.trim()) ?? {}
 	const { number: issue_number } = groups ?? {}

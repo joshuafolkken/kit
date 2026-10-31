@@ -4,7 +4,7 @@ import { lane_breakdown_implement } from './lane-breakdown-implement'
 import type { ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
-// joshuafolkken/kit#4995: #4970's 51-minute implementation was one span, so which command took its
+// joshuafolkken/kit#4995: #4970's implementation was one span, so which command took its
 // time was unknown. Its tool calls split it by kind; what no call spent is the edits and the thinking.
 
 const MINUTE_MS = 60_000
@@ -67,7 +67,7 @@ function kinds_of(calls: ReadonlyArray<ToolCall>): Array<readonly [string, numbe
 	return detail.kinds.map((kind) => [kind.name, kind.ms / MINUTE_MS] as const)
 }
 
-// joshuafolkken/kit#5293: #5197's 13.5 minutes of other bash were run:review waits no kind named.
+// joshuafolkken/kit#5293: run:review waits need their own kind so they do not hide in other bash.
 describe('lane_breakdown_implement.of — run:review and ship', () => {
 	it('counts run:review and ship / ship:wait apart from other bash', () => {
 		const calls = [

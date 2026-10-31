@@ -10,13 +10,8 @@ import {
 import { describe, expect, it } from 'vitest'
 import { package_file } from './skill-fixture'
 
-// The canonical workflow document used to be one 169 KB file, and every pointer into it named a
-// section — so consulting one topic meant reading all of them, and paying for all of them on every
-// remaining turn of the session. joshuafolkken/kit#965 split it into one file per topic and left
-// the old path as an index.
-//
-// What can silently rot after a split is the pointers: a renamed topic file leaves a citation
-// resolving to nothing, and nothing else in the suite would notice. This is the guard.
+// Topic files keep workflow reads focused (joshuafolkken/kit#965). Renaming a topic can leave a
+// citation unresolved, so this suite checks the index and pointers together.
 
 const INDEX = 'prompts/collaboration-workflow.md'
 const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
@@ -26,37 +21,15 @@ const CITATION_PATTERN = /`prompts\/collaboration-workflow\/([a-z0-9-]+\.md)`/gu
 // opposite directions. The index grows only by table rows — the suite below requires every topic
 // file to be listed, so a conversion that splits a section into its own topic file
 // (joshuafolkken/kit#1186 is the first) owes it one — while the joshuafolkken/kit#1176 rollout
-// shrinks the corpus, each conversion replacing a body with a pointer of a few KB. Converting
-// `backlogrun.md` alone takes the corpus from 220 KB to about 174 KB; with `operating-rules.md` after
-// it, a 5% share falls under the index's current size and the assertion fails on a change that
-// never touched the index.
+// shrinks the corpus, each conversion replacing a body with a pointer. A share would fail on a
+// conversion that never touched the index.
 //
-// So the ceiling stays a byte count, raised from 8000 by the one row joshuafolkken/kit#1186 adds
-// plus room for the rollout's remaining section extractions at roughly 180 bytes a row. Measured
-// there, the index is 8090 bytes.
-//
-// Raised again by one row for `rule-delivery.md` (joshuafolkken/kit#1524), which is the growth this
-// ceiling is written to allow: **what it guards against is the index absorbing content**, not a new
-// topic being indexed at all. A row is about 180 bytes and a topic file nothing links to is a file
-// nobody opens, so refusing the row would keep the number green by leaving the corpus unreachable.
-//
-// And once more by one row for `shell-body.md` (joshuafolkken/kit#1198), on the same reading. The
-// row itself measured 131 bytes; the ceiling moves by a full row so the next topic is not decided by
-// how long its title happens to be.
-//
-// And once more by one row for `gh-rest.md` (joshuafolkken/kit#1565), on the same reading again. The
-// rule it carries — `gh` is written as `gh api`, in instructing prose as well as in runnable
-// blocks — is a topic of its own, and a topic file the index does not list is a file nobody opens.
-// The row itself measured 189 bytes, and the ceiling moves by that full row.
-// And once more by one row for `execution-waves.md` (joshuafolkken/kit#1584), on the same reading
-// again. How an epic's children are grouped into execution waves — and the condition under which a
-// wave may not be declared at all — is a topic of its own, and a topic file the index does not list
-// is a file nobody opens. The row itself measured 199 bytes, and the ceiling moves by that full row.
-// And once more by one row for `issue-citation.md` (joshuafolkken/kit#1758), on the same reading
-// again. How session-facing output cites an Issue — a number-link plus a short session-language
-// summary — is a rule whose body the resident budget kept out of CLAUDE.md, so it lives in a topic
-// file of its own, and a topic file the index does not list is a file nobody opens. The row itself
-// measured 200 bytes, and the ceiling moves by that full row.
+// So the ceiling stays a byte count, and it moves by one full row for each new topic file
+// (joshuafolkken/kit#1186, #1524, #1198, #1565, #1584 and #1758 each added one): **what it guards
+// against is the index absorbing content**, not a new topic being indexed at all. A topic file
+// nothing links to is a file nobody opens, so refusing the row would keep the number green by
+// leaving the corpus unreachable. A full row, not the row's own length, so the next topic is not
+// decided by how long its title happens to be.
 const INDEX_CEILING_BYTES = 9968
 
 // The fixture already enumerates them for the concatenating reader; re-implementing it here would

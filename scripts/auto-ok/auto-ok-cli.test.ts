@@ -104,6 +104,23 @@ describe('josh auto-ok:next — what it refuses to run', () => {
 	})
 })
 
+// joshuafolkken/kit#5502: one declared over the size cap waits on a person, as `backlog:next` holds it.
+describe('josh auto-ok:next — an estimate over the size cap', () => {
+	it('passes over an issue declared over the size cap', async () => {
+		const body = '## 背景\n\n- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）\n'
+
+		issue_list.mockResolvedValueOnce(
+			listing_of([
+				{ ...issue(NEW_ISSUE_NUMBER, CREATED_LATER), body },
+				issue(OLD_ISSUE_NUMBER, CREATED_EARLIER),
+			]),
+		)
+
+		expect(await auto_ok_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+	})
+})
+
 describe('josh auto-ok:next — the issue just merged', () => {
 	// GitHub applies the `closes #N` side effect asynchronously, so for a few seconds after a merge
 	// the picked-up issue is still listed as open. Without this the loop can hand the same number

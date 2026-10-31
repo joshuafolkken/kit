@@ -98,8 +98,7 @@ describe('git_command.add_tracked — the pathspec git actually receives', () =>
 
 	// `:/` is anchored to the repository root rather than to the process's working directory, which is
 	// what makes it a drop-in for a bare `git add -u`. A plain `.` here would stage only what sits
-	// under `docs/`, and every hook and script that runs git from a subdirectory would commit less
-	// than it used to without saying so.
+	// under `docs/`, silently omitting tracked changes elsewhere when a hook runs from a subdirectory.
 	it('stages from the repository root even when run inside a subdirectory', async () => {
 		modify_both_files()
 		process.chdir(path.join(state.fixture.workspace, path.dirname(OBSERVATION_LEDGER_PATH)))

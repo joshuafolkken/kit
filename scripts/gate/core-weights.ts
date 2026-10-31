@@ -53,21 +53,11 @@ const CORE_WEIGHTS = {
 	e2e: 2,
 } as const
 
-// **The memory each heavy tool holds, declared beside its cores**: peak
-// resident size in MB, rounded up. Measured with `/usr/bin/time -l` on the 11-core / 18 GB machine on
-// 2026-10-07: the type check 1,244 MB, the spell check 330 MB, and one unit worker 319 MB over 54 test
-// files. Typed eslint was 1,207 MB over one directory and was observed at 1.6–2.4 GB per whole-tree
-// `eslint .` with three lanes running the same day, so lint and the whole-tree scan take that peak.
-// On 2026-10-17: prettier 260 MB, the retrospective 862 MB and a lane install 65 MB. On 2026-10-22
-// (joshuafolkken/kit#4528) the whole suite, 1,830 files at `--maxWorkers=3` beside four lanes, sampled
-// each worker's resident size once a second: the largest peaked at 381 MB, so the 54-file
-// measurement had read a worker short of the files it lives through. On 2026-10-23
-// (joshuafolkken/kit#4595) `josh metrics`, its process tree sampled four times a second, peaked at
-// 1,176 MB on a merge-base cache hit and 1,851 MB on a miss, where its own untyped `max-lines`-only
-// eslint pass still holds its heap beside the `--json` child measuring the merge-base. It takes the miss.
-// On 2026-10-31 (joshuafolkken/kit#5413), a passing two-worker Chromium + SvelteKit dev-server
-// fixture, its full Playwright process tree sampled with `ps` once a second (10 samples), peaked at
-// 1,769.6875 MiB (1,812,160 KiB). E2E takes 1,800 MB for the whole run, not per worker.
+// **Memory reservations cover peak resident size, rounded up.** Lint and the whole-tree scan share
+// the whole-tree peak. Unit workers use a whole-suite reading because a small subset misses their
+// later growth (joshuafolkken/kit#4528). Metrics uses the cache-miss peak because its parent retains
+// its heap beside the merge-base child (joshuafolkken/kit#4595). E2E reserves the full Playwright
+// process tree, including the dev server, once per run rather than per worker (joshuafolkken/kit#5413).
 const MEMORY_MB = {
 	lint: 2400,
 	metrics: 1900,

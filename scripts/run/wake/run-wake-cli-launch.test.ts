@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { process_identity } from '#scripts/josh/process-identity'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_carry } from '#scripts/run/carry/run-carry'
@@ -84,6 +85,7 @@ function ports(
 		read_carry: () => run_carry.read_carry(CONTEXT.carry_target),
 		pending_invocation: () => (is_pending() ? INVOCATION : undefined),
 		is_owner_live: () => is_owner_live,
+		is_launched_record: () => false,
 		sleep: on_sleep,
 	}
 }
@@ -209,6 +211,32 @@ describe('run_wake_await.claim_run beside a launched parent', () => {
 			run_wake_await.claim_run(CONTEXT, PROFILE, INTERVAL_MS, ended),
 		).resolves.toStrictEqual(REFUSED)
 		expect(run_wake.read_wake(CONTEXT.wake_target)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5516: a launcher without a terminal exits after handing the record off, before
+// the supervisor's first read.
+describe('run_wake_await.claim_run beside the record the launcher handed off', () => {
+	it('claims it at once though the launcher that began it is gone', async () => {
+		const started_at = new Date().toISOString()
+
+		stamp_file.write_stamp(CONTEXT.carry_target, {
+			invocation: INVOCATION,
+			started_at,
+			merged: 0,
+			filed: 0,
+			cuts: 0,
+			is_handed_off: true,
+		})
+		vi.spyOn(backlogrun_launch, 'pending_launch').mockReturnValue({
+			invocation: INVOCATION,
+			started_at,
+		})
+
+		await expect(run_wake_await.claim_run(CONTEXT, PROFILE, INTERVAL_MS)).resolves.toMatchObject({
+			kind: 'claimed',
+			carry: { invocation: INVOCATION },
+		})
 	})
 })
 

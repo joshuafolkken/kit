@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { poll } from '#scripts/lib/poll'
 import { review_tree } from '#scripts/review/review-tree'
 import { test_pinned } from './test-pinned'
 import { test_pinned_ledger, type PinnedOrigin } from './test-pinned-ledger'
@@ -18,7 +19,8 @@ const USAGE = [
 	'Usage: josh test:pinned [--max <n>] [--record <token>] [--origin <run-review|pre-detach|manual>] [--first-unpinned] [--help]',
 	'  revert each changed code hunk outside tests and fixtures only they reach, and run its related tests;',
 	'  prints `unpinned <file>:<line>` for a hunk no test went red on, and',
-	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)})`,
+	`  \`unchecked <n> — <reason>\` for the hunks past the --max cap (default ${String(test_pinned_logic.DEFAULT_MAX_HUNKS)}),`,
+	`  over the ${String(test_pinned_logic.MAX_TEST_FILES)}-test-file cap,`,
 	'  or whose revert stopped vitest before any test ran, each place listed in the `full output:` log;',
 	'  --record also leaves the answer, under <token>, for `josh run:review --join`;',
 	'  --origin names what started the run on its lane ledger row (default manual);',
@@ -87,18 +89,26 @@ async function tree_digest(): Promise<string> {
 // The recorded check runs beside a review that may fix in place, and it reads the tree at more than
 // one moment; a check the tree moved under is run again, so its answer is about one tree.
 async function settled_run(options: PinnedOptions): Promise<PinnedReport> {
-	for (let attempt = 0; attempt < MAX_CHECKS; attempt += 1) {
-		// eslint-disable-next-line no-await-in-loop -- each check runs only once the last one saw the tree move
-		const before = await tree_digest()
-		// eslint-disable-next-line no-await-in-loop -- as above
-		const report = await test_pinned.run(
-			options.max_hunks,
-			options.is_first_unpinned,
-			options.origin,
-		)
-		// eslint-disable-next-line no-await-in-loop -- as above
-		if ((await tree_digest()) === before) return report
-	}
+	const settled = await poll.poll_for(
+		async () => {
+			const before = await tree_digest()
+			const report = await test_pinned.run(
+				options.max_hunks,
+				options.is_first_unpinned,
+				options.origin,
+			)
+
+			return (await tree_digest()) === before ? report : undefined
+		},
+		{
+			attempts: MAX_CHECKS,
+			interval_ms: 0,
+			sleeper: async () => {
+				await Promise.resolve()
+			},
+		},
+	)
+	if (settled !== undefined) return settled
 
 	throw new Error(MOVING_NOTE)
 }

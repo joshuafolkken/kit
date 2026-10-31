@@ -332,8 +332,8 @@ describe('get_configured_max_attempts', () => {
 		expect(get_configured_max_attempts()).toBe(DEFAULT_MAX_ATTEMPTS)
 	})
 
-	// Seven attempts, not six: the loop sleeps between polls and not after the last one, so covering
-	// 60 seconds at a 10-second interval takes six sleeps and the poll that follows them.
+	// The loop sleeps between polls and not after the last one, so the attempt count must include
+	// the poll following the final sleep.
 	it('returns computed value when env var is a valid positive number', () => {
 		vi.stubEnv('JOSH_CI_TIMEOUT_SECONDS', '60')
 		expect(get_configured_max_attempts()).toBe(7)

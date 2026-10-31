@@ -18,9 +18,8 @@ import { run_ship_waiter } from './run-ship-waiter'
 // - `pending` — the chunk ran out with the ship still before its commit: issue the wait again.
 //
 // **A chunk ends below the five-minute prompt-cache TTL a lane child runs on** (`lane-child-marker.ts`),
-// so re-issuing it is the keep-alive: the next request reads the cached context back (66k tokens on
-// Opus 5.5, about $0.013) instead of writing it whole again after the wait (about $0.33) —
-// joshuafolkken/kit#5344. The heartbeat outlives the chunk by the session gap.
+// so re-issuing it keeps the next request on cached context instead of rewriting the whole context
+// (joshuafolkken/kit#5344). The heartbeat outlives the chunk by the session gap.
 
 const VERDICT = {
 	RETURNED: 'returned',
@@ -44,8 +43,8 @@ const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh ship:wait <N>'
 const NO_REPOSITORY_NOTE = 'not inside a git repository'
 
-const { COMMIT, ROUND_TWO, FOLLOWUP, REPORT } = run_ship_stage.STAGE
-const PAST_COMMIT: ReadonlySet<string> = new Set([ROUND_TWO, FOLLOWUP, REPORT])
+const { COMMIT, FOLLOWUP, REPORT } = run_ship_stage.STAGE
+const PAST_COMMIT: ReadonlySet<string> = new Set([FOLLOWUP, REPORT])
 
 // Past the commit in the current attempt: the record's `done` outlives a stop after the commit, so a
 // re-ship after a followup stop would read as committed before its own gate and review ran. `started`

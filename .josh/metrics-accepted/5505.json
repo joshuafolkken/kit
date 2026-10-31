@@ -1,0 +1,7 @@
+{
+	"reason": "#5505: is_red splits a check that reports whether tsc ran, so a tsc that could not start is told from a clean pass",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}

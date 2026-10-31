@@ -34,6 +34,35 @@ describe('visible shell write scope', () => {
 	})
 })
 
+// joshuafolkken/kit#5534: only a single-quoted span is literal; an expansion beside it still refuses.
+describe('expansion outside a single-quoted span', () => {
+	it.each([
+		'echo \'text\' "`custom-editor app.ts`"',
+		"echo 'it'$(custom-editor app.ts)",
+		"echo 'it'`custom-editor app.ts`",
+		"echo 'a' FOO=1",
+		"echo 'a' $PPID",
+	])('refuses an expansion beside quoted text: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5498: the documented `run:carry` spelling carries no `$`, so it passes, while any
+// command expanding a variable stays refused — the session pid comes from the command, not the shell.
+describe('variable expansion beside the run:carry spelling', () => {
+	it.each(['echo $PPID', 'pnpm josh run:carry --cut --owner "$PPID"'])('refuses %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+
+	it.each([
+		'pnpm josh run:carry --begin "backlogrun --max 5"',
+		'pnpm josh run:carry --resume "backlogrun --max 5"',
+		'pnpm josh run:carry --cut',
+	])('lets %s through', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+})
+
 describe('unverified shell argument expansion', () => {
 	it.each([
 		'git diff --out{put,put}=app.ts',
@@ -46,6 +75,29 @@ describe('unverified shell argument expansion', () => {
 		'rg --p{re,re} custom-editor pattern app.ts',
 		'rg --p[r]e custom-editor pattern app.ts',
 	])('refuses expansion before classifying arguments: %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5497: the bare `epic` subcommand records decisions, adds children and files an
+// epic — operations like every `epic:*` — and `rule:list` is the read `delegation.md` asks for.
+describe('josh epic operations and rule:list', () => {
+	it.each([
+		'pnpm josh epic --decide 5392 5389 --decision-file .git/josh/decision-5389.md',
+		'pnpm josh epic --add 5392 5389',
+		'pnpm josh epic "Bring every lane under 30 minutes" 5502 5503',
+		'pnpm josh epic:check 5392',
+		'pnpm josh rule:list',
+	])('passes the operation %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+
+	it.each([
+		'pnpm josh epics 5392',
+		'pnpm josh gate',
+		'pnpm josh rule:other',
+		'pnpm josh rule:list-all',
+	])('still refuses %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(true)
 	})
 })
@@ -68,6 +120,8 @@ describe('operational shell reads and records', () => {
 		'git diff -- "*.ts"',
 		"git diff -- 'app[12].ts'",
 		'printf "{plan,record} * ? [literal]"',
+		"printf '%s' 'run `josh gate` with $(cmd) and FOO=1'",
+		"echo 'cost \\$5' \\`literal",
 	])('allows a visible read or record write: %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)
 	})

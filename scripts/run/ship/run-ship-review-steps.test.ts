@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const josh_run_mock = vi.hoisted(() => vi.fn())
 const launch = vi.hoisted(() => vi.fn())
 const review_in_mock = vi.hoisted(() => vi.fn())
-const missing_mock = vi.hoisted(() => vi.fn())
+const scoped = vi.hoisted(() => ({ missing_scripts: vi.fn(), is_unmoved: () => true }))
 const is_child_mock = vi.hoisted(() => vi.fn())
 // Unrecorded by default; a test that needs another answer sets it once.
 const record_check_mock = vi.hoisted(() => vi.fn(async () => ({ status: 'missing' })))
@@ -14,16 +14,19 @@ const stamps = vi.hoisted(() => ({
 	remove_stamp: vi.fn(),
 	stamp_path: vi.fn((prefix: string) => `stamps/${prefix}x`),
 	write_text_stamp: vi.fn(),
+	write_stamp: vi.fn(),
 }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/josh/stamp-file', () => ({ stamp_file: stamps }))
 vi.mock('#scripts/agent/agent-argv', () => ({ agent_argv: { review_in: review_in_mock } }))
 vi.mock('#scripts/run/detached-launch', () => ({ detached_launch: { launch_attached: launch } }))
+// No base, so a fix on this fixed tree runs the pair bare — narrowing's own cases are in
+// `run-ship-scoped.test.ts` (joshuafolkken/kit#5531).
 vi.mock('#scripts/gate/gate-tree', () => ({
-	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {}, base: 'base' })) },
+	gate_tree: { read_gate_tree: vi.fn(async () => ({ files: {} })) },
 }))
-vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: { missing_scripts: missing_mock } }))
+vi.mock('#scripts/gate/scoped-green', () => ({ scoped_green: scoped }))
 vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: is_child_mock },
 }))
@@ -67,7 +70,6 @@ const LINT = 'lint:related'
 const TEST = 'test:related'
 const BRIEF_TWO = 'review:brief --round 2'
 const SPAWN_NOTE = 'spawn failed'
-const PROFILE_NOTE = 'bad model'
 const FINDINGS_PREFIX = 'josh-ship-review-findings-'
 
 function commands(): ReadonlyArray<string> {
@@ -95,7 +97,7 @@ beforeEach(() => {
 		argv: ARGV,
 		profile: { provider: 'anthropic', role: 'reviewer', model: 'claude-opus-5-5', effort: 'high' },
 	})
-	missing_mock.mockReset().mockReturnValue([])
+	scoped.missing_scripts.mockReset().mockReturnValue([])
 	is_child_mock.mockReset().mockReturnValue(false)
 	stamps.read_stamp_text.mockReset().mockReturnValue('')
 	stamps.write_text_stamp.mockClear()
@@ -194,9 +196,9 @@ describe('run_ship_review_steps.review_stage — a reviewer error stops it', () 
 	})
 
 	it('stops when the reviewer profile is rejected', async () => {
-		review_in_mock.mockReturnValue({ kind: 'rejected', note: PROFILE_NOTE })
+		review_in_mock.mockReturnValue({ kind: 'rejected', note: 'bad model' })
 
-		expect(await stage()).toHaveProperty('out', expect.stringContaining(PROFILE_NOTE))
+		expect(await stage()).toHaveProperty('out', expect.stringContaining('bad model'))
 		expect(launch).not.toHaveBeenCalled()
 	})
 })
@@ -254,21 +256,21 @@ describe('run_ship_review_steps.review_stage — findings fixed in place', () =>
 // when the tree has no green record, stopped on only when a check genuinely fails.
 describe('run_ship_review_steps.review_stage — the scoped pair before the review', () => {
 	it('runs the checks the tree has no green record for, then reviews without stopping', async () => {
-		missing_mock.mockReturnValue([LINT, TEST])
+		scoped.missing_scripts.mockReturnValue([LINT, TEST])
 
 		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([LINT, TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
 	it('runs only the check whose record is stale', async () => {
-		missing_mock.mockReturnValueOnce([TEST])
+		scoped.missing_scripts.mockReturnValueOnce([TEST])
 
 		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([TEST, OPEN, JOIN, ATTEST, RECORD])
 	})
 
 	it('stops before the review on a genuinely failing check, launching no reviewer', async () => {
-		missing_mock.mockReturnValue([LINT, TEST])
+		scoped.missing_scripts.mockReturnValue([LINT, TEST])
 		answer_with(LINT)
 
 		expect(await stage()).toHaveProperty('cause', 'check')
@@ -282,7 +284,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 
 	it('verifies the fixed tree and ships on when the pair is green', async () => {
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
-		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
+		scoped.missing_scripts.mockReturnValueOnce([]).mockReturnValueOnce([LINT, TEST])
 
 		expect(await stage()).toHaveProperty('code', OK)
 		expect(commands()).toStrictEqual([OPEN, JOIN, ATTEST, LINT, TEST, `${RECORD} ${FIXED_MEDIUM}`])
@@ -290,7 +292,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 
 	it('records a fix the pair turned down as unfixed, then stops', async () => {
 		stamps.read_stamp_text.mockReturnValue(FIXED_MEDIUM)
-		missing_mock.mockReturnValueOnce([]).mockReturnValueOnce([TEST])
+		scoped.missing_scripts.mockReturnValueOnce([]).mockReturnValueOnce([TEST])
 		answer_with(TEST)
 
 		const result = await run_ship_review_steps.review_stage(ISSUE)
@@ -305,7 +307,7 @@ describe('run_ship_review_steps.review_stage — fixes in place are verified by 
 
 		await run_ship_review_steps.review_stage(ISSUE)
 
-		expect(missing_mock).toHaveBeenCalledOnce()
+		expect(scoped.missing_scripts).toHaveBeenCalledOnce()
 	})
 })
 
@@ -370,7 +372,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 	})
 
 	it('stops at a red scoped check without launching a reviewer', async () => {
-		missing_mock.mockReturnValue([LINT, TEST])
+		scoped.missing_scripts.mockReturnValue([LINT, TEST])
 		answer_round_two('required', TEST)
 
 		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', FAILED)
@@ -380,7 +382,7 @@ describe('run_ship_review_steps.round_two_stage — due or not', () => {
 
 describe('run_ship_review_steps.round_two_stage — the verification pass after the commit', () => {
 	it('runs the scoped pair, the round-2 brief, a fresh reviewer, attest and record', async () => {
-		missing_mock.mockReturnValue([LINT, TEST])
+		scoped.missing_scripts.mockReturnValue([LINT, TEST])
 		answer_round_two('required')
 
 		expect(await run_ship_review_steps.round_two_stage(ISSUE)).toHaveProperty('code', OK)

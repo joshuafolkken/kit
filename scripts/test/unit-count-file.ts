@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
+import { json_value } from '#scripts/lib/json-value'
 
 // How many test files a unit run ran, handed from the unit reporter to the caller that named a file to
 // receive it — `josh test:related`, which records it beside the scope it handed vitest
@@ -32,6 +33,29 @@ function read_count(file: string): number | undefined {
 	}
 }
 
-const unit_count_file = { COUNT_FILE_ENVIRONMENT, read_count, write_count }
+async function write_files(
+	files: ReadonlyArray<string>,
+	target: string | undefined,
+): Promise<void> {
+	if (target === undefined || target === '') return
+
+	try {
+		await writeFile(`${target}.files`, JSON.stringify(files))
+	} catch {
+		// Missing evidence cannot authorize reuse.
+	}
+}
+
+function read_files(target: string): ReadonlyArray<string> {
+	try {
+		const value = json_value.parse_or_undefined(readFileSync(`${target}.files`, 'utf8'))
+
+		return Array.isArray(value) && value.every((file) => typeof file === 'string') ? value : []
+	} catch {
+		return []
+	}
+}
+
+const unit_count_file = { COUNT_FILE_ENVIRONMENT, read_count, read_files, write_count, write_files }
 
 export { unit_count_file }

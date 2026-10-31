@@ -170,9 +170,8 @@ describe.each([
 	})
 })
 
-// **`pr_exists` is the one reader that does not fold**, because `git-pr.ts` acts on `false` by
-// *opening* a pull request: during a rate limit that used to mean creating a second one on a branch
-// that already had it, caught only by `pr_create`'s 422 recovery (joshuafolkken/kit#1043).
+// `pr_exists` must propagate read failures: `git-pr.ts` acts on false by opening a pull request,
+// so treating a rate limit as absence can create a duplicate (joshuafolkken/kit#1043).
 describe('pr_exists tells an absent pull request from an unreadable lookup', () => {
 	it('answers false only when the listing came back empty', async () => {
 		stub(NO_PULL_REQUEST)

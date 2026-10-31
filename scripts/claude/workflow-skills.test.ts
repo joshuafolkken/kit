@@ -219,8 +219,8 @@ describe('the residency list says what it covers', () => {
 		// own suites, and a maintainer who looks only in this one concludes they are unguarded.
 		'the UI verification gate in `scripts/claude/verify-ui-skill.test.ts`',
 		'Absence from the list is not an omission',
-		// The worked examples §3 used to carry (joshuafolkken/kit#1797); joshuafolkken/kit#3395 moved the
-		// `epic:*` rules off residency, and the list records where they went.
+		// The list pins the point-of-use homes for worked examples and `epic:*` rules
+		// (joshuafolkken/kit#1797, joshuafolkken/kit#3395).
 		'**Explicit invocation required**',
 		'**The `confirmation` notification on a stop**',
 		'**`overrides` protection**',
@@ -291,12 +291,9 @@ describe('the ceiling can be raised, but only against written conditions', () =>
 describe.each(AI_DOCS)('%s — stays inside the resident budget', (document_path) => {
 	const content = read_repo_file(document_path)
 
-	// joshuafolkken/kit#1275: this used to assert only `< EFFECTIVE_CEILING_BYTES`, and it passed at
-	// 30 bytes of headroom — the state the reserve exists to prevent rather than the state it
-	// permits, since the next resident rule then pays for itself out of whichever neighboring
-	// sentence no marker pinned. The guard floor is asserted in its place rather than beside it:
-	// being over the ceiling is being under the floor as well, so a second assertion could never
-	// fail on its own, and two tests for one condition report the same defect twice.
+	// The guard floor preserves enough room for the next resident rule. A ceiling-only assertion
+	// cannot guarantee that reserve; asserting both would duplicate the same failure condition
+	// (joshuafolkken/kit#1275).
 	it('stays under the resident ceiling, with room left to write the next rule', () => {
 		const headroom = EFFECTIVE_CEILING_BYTES - Buffer.byteLength(content, 'utf8')
 
@@ -436,8 +433,8 @@ describe.each([
 // joshuafolkken/kit#964: the residency criterion decides *whether* a rule stays; this is the guard
 // on *how much* of it stays. A rule that cites a canonical section has its procedure there, so the
 // resident text is a trigger and a pointer — and a trigger that grew past this cap has had its
-// procedure pasted back beside the pointer, which is how `CLAUDE.md` reached 585 bytes of headroom
-// with the procedures already moved out.
+// procedure pasted back beside the pointer, which is how `CLAUDE.md` ran out of headroom with the
+// procedures already moved out.
 //
 // The cap is not a style preference. It is set just above the largest rule that legitimately needs
 // most of its text resident — the cross-package interrupt, whose every sentence changes what an
@@ -459,9 +456,7 @@ interface ResidentRule {
 // the rules in `## Git Rules` and `## Collaboration Workflow` free to grow a second copy of their
 // procedure beside the pointer — which is the regression the cap exists to stop, so the cap has to
 // see them. Each rule is a single line: prettier runs with `proseWrap: preserve` here, so the line
-// is the rule. Matching line by line also avoided materializing a match iterator, which
-// `prefer-spread` and `prefer-iterator-to-array` used to disagree about how to spell —
-// joshuafolkken/kit#1783 settled that, so only the first reason is load-bearing now.
+// is the rule. Line-by-line matching also avoids materializing an iterator (joshuafolkken/kit#1783).
 function resident_rules(content: string): ReadonlyArray<ResidentRule> {
 	return content
 		.split('\n')
@@ -527,8 +522,7 @@ describe('the residency criterion defines how much of a resident rule is residen
 	it.each([
 		'**常駐規則は、トリガと導線の 2 つで書く。**',
 		'**判定は、導線を一度も開かないターンでも常駐の記述だけで正しく振る舞えるかである。**',
-		// Re-pointed by joshuafolkken/kit#1525: trimming is still moving, but a narrow retirement
-		// route now exists beside it, so the sentence that used to close the door names the exception.
+		// The residency pointer must name the narrow retirement exception (joshuafolkken/kit#1525).
 		'**削ることは移すことであり、削除は理由を示して初めて許される例外である。**',
 	])('states %j', (marker) => {
 		expect(criterion).toContain(marker)

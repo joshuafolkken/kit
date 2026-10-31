@@ -26,7 +26,7 @@ describe('run_ship_lap.timed — an inner step of a ship stage', () => {
 		const result = await run_ship_lap.within(
 			ISSUE,
 			STAGE,
-			async () => await run_ship_lap.timed(STEP, async () => 'done', sink),
+			async () => await run_ship_lap.timed(STEP, async () => 'done', { sink }),
 		)
 
 		expect(result).toBe('done')
@@ -39,7 +39,7 @@ describe('run_ship_lap.timed — an inner step of a ship stage', () => {
 	it('records nothing outside a ship stage', async () => {
 		const { laps, sink } = sink_of()
 
-		await run_ship_lap.timed(STEP, async () => 'done', sink)
+		await run_ship_lap.timed(STEP, async () => 'done', { sink })
 
 		expect(laps).toEqual([])
 	})
@@ -51,8 +51,62 @@ describe('run_ship_lap.timed — an inner step of a ship stage', () => {
 		})
 
 		await expect(
-			run_ship_lap.within(ISSUE, STAGE, async () => await run_ship_lap.timed(STEP, failing, sink)),
+			run_ship_lap.within(
+				ISSUE,
+				STAGE,
+				async () => await run_ship_lap.timed(STEP, failing, { sink }),
+			),
 		).rejects.toThrow(FAILURE)
 		expect(laps.map((lap) => lap.step)).toEqual([STEP])
+	})
+})
+
+// joshuafolkken/kit#5531: why a scoped check read the whole branch, carried on its lap.
+describe('run_ship_lap.timed — the fallback note', () => {
+	it('records the note the step result carries', async () => {
+		const { laps, sink } = sink_of()
+
+		await run_ship_lap.within(
+			ISSUE,
+			STAGE,
+			async () =>
+				await run_ship_lap.timed(STEP, async () => 'out', {
+					sink,
+					note_of: () => ({ fallback: 'hub' }),
+				}),
+		)
+
+		expect(laps[0]?.fallback).toBe('hub')
+	})
+
+	it('records no fallback when the note is absent', async () => {
+		const { laps, sink } = sink_of()
+
+		await run_ship_lap.within(
+			ISSUE,
+			STAGE,
+			async () => await run_ship_lap.timed(STEP, async () => 'out', { sink, note_of: () => ({}) }),
+		)
+
+		expect(laps[0]).not.toHaveProperty('fallback')
+	})
+})
+
+// joshuafolkken/kit#5538: which run of the scoped pair a lap was, and why it ran again.
+describe('run_ship_lap.timed — the rerun note', () => {
+	it('records the run count and the rerun reason the note carries', async () => {
+		const { laps, sink } = sink_of()
+
+		await run_ship_lap.within(
+			ISSUE,
+			STAGE,
+			async () =>
+				await run_ship_lap.timed(STEP, async () => 'out', {
+					sink,
+					note_of: () => ({ runs: 2, rerun: 'moved' }),
+				}),
+		)
+
+		expect(laps[0]).toMatchObject({ runs: 2, rerun: 'moved' })
 	})
 })

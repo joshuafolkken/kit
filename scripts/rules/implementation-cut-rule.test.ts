@@ -4,12 +4,12 @@ import { implementation_cut } from './implementation-cut'
 import { rule_list } from './rule-list'
 
 // joshuafolkken/kit#2310: the implementation-phase cut existed, was documented, and its verdict was
-// read only at session entry — so it fired **0 times** across five lanes while 33.9% of their requests
-// ran past 200,000 tokens. What this suite pins is the correction turned into a delivered refusal: that
+// read only at session entry — so it never fired across the lanes measured while a large share of
+// their requests ran past the threshold. What this suite pins is the correction turned into a delivered refusal: that
 // the rule is delivered at the `Edit` / `Write` it binds on, that its procedure stays in one place, and
 // that the enumeration names both the topic section and the suites that fix it.
 //
-// **The measurement is the load-bearing half.** Without the 0-of-5 / 33.9% figures the row reads as a
+// **The measurement is the load-bearing half.** Without the figures `pre-gate-cut-rationale.md` states the row reads as a
 // precaution, and a precaution is the first thing dropped when the enumeration is next trimmed.
 const TOPIC_FILE = '.claude/skills/workflow-commands/pre-gate-cut.md'
 const RATIONALE_FILE = 'docs/maintainers/pre-gate-cut-rationale.md'

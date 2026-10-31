@@ -1,6 +1,6 @@
 import { lane_breakdown, type Breakdown, type Segment, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
-import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger, type LedgerEntry, type ShipLapEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // What each ship stage of a lane's breakdown spent its time on (joshuafolkken/kit#5294): the laps the
@@ -21,10 +21,32 @@ interface Placed {
 	part: Stage
 }
 
+// A gate the ship reused rather than started (joshuafolkken/kit#5567), counted per stage (`counted`).
+const REUSED_NOTE = '(reused)'
+
+// A scoped pair's rerun names its run count; a gate's reason stands alone (joshuafolkken/kit#5567).
+function rerun_note(entry: ShipLapEntry): ReadonlyArray<string> {
+	if (entry.rerun === undefined) return []
+
+	return [entry.runs === undefined ? entry.rerun : `run ${String(entry.runs)}: ${entry.rerun}`]
+}
+
+// Which run of the ship's scoped pair a lap was and why it ran again (joshuafolkken/kit#5538), and why
+// a check read the whole branch (joshuafolkken/kit#5531), after the step's name.
+function lap_name(entry: ShipLapEntry): string {
+	if (entry.reused_tree !== undefined) return `${entry.step} ${REUSED_NOTE}`
+
+	const run = rerun_note(entry)
+	const whole = entry.fallback === undefined ? [] : [`whole branch: ${entry.fallback}`]
+	const notes = [...run, ...whole]
+
+	return notes.length === 0 ? entry.step : `${entry.step} (${notes.join('; ')})`
+}
+
 function lap_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	if (entry.kind !== KIND.SHIP_LAP || entry.issue !== issue) return []
 
-	return [{ at_ms: Date.parse(entry.at), part: { name: entry.step, ms: entry.elapsed_ms } }]
+	return [{ at_ms: Date.parse(entry.at), part: { name: lap_name(entry), ms: entry.elapsed_ms } }]
 }
 
 function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
@@ -67,6 +89,24 @@ function grouped(
 	return groups
 }
 
+// A stage's reused laps under one row carrying their count, `josh gate (reused ×2)`, before
+// `lane_breakdown.ranked` sums each name's time into one row.
+function counted(parts: ReadonlyArray<Stage>): Array<Stage> {
+	const reuses = new Map<string, number>()
+
+	for (const { name } of parts) {
+		if (name.endsWith(REUSED_NOTE)) reuses.set(name, (reuses.get(name) ?? 0) + 1)
+	}
+
+	return parts.map((part) => {
+		const count = reuses.get(part.name)
+
+		return count === undefined
+			? part
+			: { ...part, name: `${part.name.slice(0, -REUSED_NOTE.length)}(reused ×${String(count)})` }
+	})
+}
+
 function between_of(
 	calls: ReadonlyArray<ToolCall>,
 	segments: ReadonlyArray<Segment>,
@@ -91,7 +131,7 @@ function of(
 	const laps = new Map(
 		[...grouped(placed, breakdown.ship)].map(([stage, parts]) => [
 			stage,
-			lane_breakdown.ranked(parts),
+			lane_breakdown.ranked(counted(parts)),
 		]),
 	)
 	const between = between_of(calls, breakdown.ship)

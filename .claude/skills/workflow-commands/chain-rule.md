@@ -6,10 +6,10 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 0. **A lane child** (no `main:merge`: ship's sync merges main, stopping `conflict`): the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"), `pnpm josh check:related` (a metrics notice → its verdict line), `pnpm josh run:review` — its `--join`'s `test:pinned` lines
-   answer the self-check's question 1 — the ship body draft filled in beside the gate (`report-format.md` → "PR
-   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --interaction --issue <N>` — not backgrounded — a turn end kills it — then `run:review --join`, `review:attest --check`, the
-   round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), `pnpm josh review:record --issue <N> [<finding> ...]` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
+   the implementer's self-check"; 1: `--join`'s `test:pinned`, 2/4/10: `pnpm josh review:selfcheck`), `pnpm josh check:related` (a metrics notice → its verdict line), `pnpm josh run:review` —
+   the ship body draft filled in beside the gate (`report-format.md` → "PR
+   本文の受け入れ条件の対応表"), then its `/code-review` subagent (as `run:review` prints) — on two briefs, two `reviewer`s side by side, the second recorded with `review:record --from-slot --interaction --issue <N>` — not backgrounded — a turn end kills it — then `run:review --join`, `review:attest --check`, the
+   round's fixes, no `check:related` after them unless a brief follows (one before `--join` is refused, `round-one-check-related`), `pnpm josh review:record --from-slot --issue <N>` (round 2 stays ship's; it stamps the fixed tree, so ship reuses this round 1 and round 2 reads what moved since, unless round 2 would skip a move — never reopen `run:review`, which refuses it; on `Interaction review now due`, record that pass before the ship, running it first if none ran beside round 1; on `test:pinned restarted`, go on to the ship without waiting — its pre-detach reads that check), `pnpm josh ship --detach --review "<title> #<N>"`
    (`--cite <N>`; `--unpinned-ok "<reason>"` when `run:review` needed it). On `launched` with
    `pnpm josh cost --cut` `under`, run `pnpm josh ship:wait <N>` (`timeout` 600000) and follow
    it (`docs/josh-commands-run.md` → "`josh ship:wait`"); else, or on `busy`, **end the turn**. No `pnpm josh gate`,
@@ -25,11 +25,11 @@ Review results and successful pushes are never turn boundaries.
    `failed` → step 1.
 1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
    the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
-   (`prompts/review.md` → "Before round 1 — the implementer's self-check"), its question 1 left to
-   `run:review --join`, run the final scoped lint/test pair with `pnpm josh check:related` and
+   (`prompts/review.md` → "Before round 1 — the implementer's self-check"; 1: `run:review --join`, 2/4/10:
+   `pnpm josh review:selfcheck`), run the final scoped lint/test pair with `pnpm josh check:related` and
    `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
    and writes the `/code-review` brief to a file, printing its path and prompt, in one call, so they overlap; two briefs take two `reviewer`s side by side, the second recorded with
-   `review:record --interaction`. Launch the `/code-review` subagent as the `reviewer`
+   `review:record --from-slot --interaction`. Launch the `/code-review` subagent as the `reviewer`
    agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` — the alias of the `model=` id the brief prints (`claude-opus-5-5` → `opus`)
    (`.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
@@ -47,18 +47,16 @@ Review results and successful pushes are never turn boundaries.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.
-   Once a round's verdict is attested, record its findings with `pnpm josh review:record --issue <N>
-   ['[<disposition> ]<category>:<severity>:<file> — <reason>' ...]` (each one quoted argument; none if
-   clean; dispositions: its usage). **A round 2 that
+   Once a round's verdict is attested, record its findings with `pnpm josh review:record --from-slot
+   --issue <N>` (dispositions: its usage). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**
    (`pnpm josh review:record --check --issue <N>`).
 5. **The clean path ships in one call** — with no second round due, background
    `pnpm josh ship "<title> #<N>" --body-file <evidence.md>` — the file carries `## 実機証跡` and
    `## 受け入れ条件の対応` (`report-format.md`), both asked at the preflight: PR preflight → gate → `git -y` →
-   `followup` → `run:tail`, stopping at the first failure. `--review` runs both rounds. **Else a due
-   round 2 does not fit `ship`**: the PR opens between the rounds — background
-   `pnpm josh git -y "<title> #<N>"`, round 2 beside CI, then `pnpm josh followup`.
+   `followup` → `run:tail`, stopping at the first failure. With a due round 2, use `ship --review`:
+   after sync and round 1, round 2 runs beside the gate and joins before the commit opens the PR.
 
 A lane child may end once, at step 0 or the pre-gate cut (`pre-gate-cut.md`); never at the push. The chain otherwise stops only when the PR is merged, the completion Telegram was sent, and
 `run:tail` returned to the default branch, or when user judgment is required by an unverifiable

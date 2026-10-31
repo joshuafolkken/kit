@@ -22,8 +22,7 @@ import { timed_rerun } from './timed-rerun'
 // `pnpm josh reserved-run <weight> -- <command>` wraps is read as reserved.
 //
 // **A multi-worker eslint is refused even when reserved** (joshuafolkken/kit#4582): typed eslint holds a
-// TypeScript program per worker, so `--concurrency 4` or `auto` held 12 GB in one lane and swapped the
-// machine. `--concurrency off`, `1` and no flag pass.
+// TypeScript program per worker, so `--concurrency 4` or `auto` in one lane swapped the machine. `--concurrency off`, `1` and no flag pass.
 //
 // **Lane children only.** An interactive session outside a lane keeps its direct runs; the overlap this
 // prevents is between concurrently dispatched lanes.

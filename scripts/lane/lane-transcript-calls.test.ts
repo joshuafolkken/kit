@@ -78,6 +78,9 @@ function agent_call(name: string, input: Record<string, unknown>): string {
 	return JSON.stringify({ timestamp: START, message: { content: [block] } })
 }
 
+// A prompt that is not a review brief: no level, not the interaction review (joshuafolkken/kit#5539).
+const NO_BRIEF = { level: undefined, pass: undefined }
+
 // joshuafolkken/kit#5297: the implement's subagent time splits by the agent each call dispatched.
 describe('lane_transcript_calls.parse — subagent', () => {
 	it('keeps the agent type and model an Agent or Task call names', () => {
@@ -85,14 +88,16 @@ describe('lane_transcript_calls.parse — subagent', () => {
 		const [agent] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', input))
 		const [task] = lane_transcript_calls.parse(SOURCE, agent_call('Task', input))
 
-		expect(agent?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
-		expect(task?.subagent).toStrictEqual({ type: 'investigator', model: 'sonnet' })
+		const expected = { type: 'investigator', model: 'sonnet', ...NO_BRIEF }
+
+		expect(agent?.subagent).toStrictEqual(expected)
+		expect(task?.subagent).toStrictEqual(expected)
 	})
 
 	it('reads an Agent call naming no type as general-purpose, its model unnamed', () => {
 		const [call] = lane_transcript_calls.parse(SOURCE, agent_call('Agent', { model: '' }))
 
-		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined })
+		expect(call?.subagent).toStrictEqual({ type: 'general-purpose', model: undefined, ...NO_BRIEF })
 	})
 
 	it('gives a call of any other tool no subagent', () => {

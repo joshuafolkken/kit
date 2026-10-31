@@ -4,7 +4,7 @@ import { followup_coderabbit_retrigger } from './followup-coderabbit-retrigger'
 import { git_followup_stages } from './git-followup-stages'
 import { git_pr_followup, type FollowupInput } from './git-pr-followup'
 
-// joshuafolkken/kit#1349: nobody knew what `followup` spent its 44 seconds on, because the
+// joshuafolkken/kit#1349: nobody knew where `followup` spent its time, because the
 // command timed none of its own stages. What is pinned here is that every stage reaches the console,
 // in the order it ran — including on the **failed** run, which is the invocation whose wait is
 // longest and the one a block withheld would hide.
@@ -68,8 +68,8 @@ vi.mock('#scripts/epic/epic-close', () => ({
 
 // The same rule as the auto-close above, applied to the path that suite missed. `completion_sender`
 // asks this collaborator for the unreleased-merge line, and the real one resolves the tip by running
-// `git fetch origin main` — a live round trip, about 4 seconds per test on the machine it was found
-// on, once for every case here that calls `run`. This suite is a *timing* suite, so it was reporting
+// `git fetch origin main` — a live round trip for every case here that calls `run`.
+// This suite is a *timing* suite, so it was reporting
 // the network as the `telegram-and-merge` stage's cost. `git-pr-followup.test.ts` mocks the same collaborator
 // the same way (joshuafolkken/kit#1077), and since joshuafolkken/kit#1515 the network guard in
 // `tools/test/test-network-guard.ts` covers `git` as well as `gh`, so either mock going missing fails the
@@ -242,9 +242,8 @@ describe('git_pr_followup.run — the CodeRabbit wait in the lane ledger', () =>
 	})
 })
 
-// joshuafolkken/kit#1539: a step after the merge is cleanup, and the merge cannot be taken back. Its
-// failure used to end the process, which discarded the steps after it — the working-tree hold release
-// among them — and returned a non-zero exit that `epicrun` and `queue` read as a failed child.
+// Post-merge cleanup must continue through hold release even when one step fails: the merge cannot
+// be taken back, and callers must not classify a merged child as failed (joshuafolkken/kit#1539).
 describe('git_pr_followup.run — a merged run whose cleanup failed', () => {
 	const FAILURE = new Error('502 Bad Gateway')
 
@@ -364,7 +363,7 @@ describe('git_pr_followup.run — the notification beside the merge', () => {
 })
 
 // joshuafolkken/kit#1446: the four reads in front of the check wait need nothing from one another,
-// and were sent one at a time for 5.5 of `followup`'s measured 45.8 seconds. **What is pinned is the
+// so serial requests waste time. **What is pinned is the
 // property, not the wall clock** — a duration measured on a mocked call is not a fact about
 // anything, so the batch is observed by answering the body read last and asking what had already
 // gone out.

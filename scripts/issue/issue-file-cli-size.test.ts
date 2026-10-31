@@ -15,12 +15,14 @@ import { issue_scout_cli } from './issue-scout-cli'
 
 const HERE = 'joshuafolkken/kit'
 const FAILURE_EXIT_CODE = 1
-const OVER_GUIDE = '- 規模見積もり: 約 30 ファイル / 900 行（テスト除く）'
+const OVER_GUIDE = '- 規模見積もり: 約 12 ファイル / 300 行（テスト除く）'
+const OVER_CAP = '- 規模見積もり: 約 25 ファイル / 300 行（テスト除く）'
 const REASON = '- 分割しない理由: 1 コミットで入れないと壊れる'
 
 const work = mkdtempSync(path.join(tmpdir(), 'issue-file-cli-size-'))
 const over_path = path.join(work, 'over.md')
 const reasoned_path = path.join(work, 'reasoned.md')
+const capped_path = path.join(work, 'capped.md')
 
 function body_of(...declarations: ReadonlyArray<string>): string {
 	const sections = '## 現象\n\nx\n\n## 期待結果\n\ny\n\n## 受け入れ条件\n\n- [ ] z\n'
@@ -38,6 +40,7 @@ function body_of(...declarations: ReadonlyArray<string>): string {
 
 writeFileSync(over_path, body_of(OVER_GUIDE))
 writeFileSync(reasoned_path, body_of(OVER_GUIDE, REASON))
+writeFileSync(capped_path, body_of(OVER_CAP, REASON))
 
 function argv_of(body_file: string, ...extra: ReadonlyArray<string>): Array<string> {
 	return ['A title', '--body-file', body_file, ...extra]
@@ -83,6 +86,22 @@ describe('issue_file_cli.run — a size estimate over the split guide', () => {
 		await issue_file_cli.run(argv)
 
 		expect(refusals()).not.toContain('exceeds the guide')
+		expect(scout).toHaveBeenCalledTimes(1)
+	})
+})
+
+// joshuafolkken/kit#5502: over the cap the declared reason no longer lets it through; a split does.
+describe('issue_file_cli.run — a size estimate over the cap', () => {
+	it('refuses the filing despite a reason declared', async () => {
+		expect(await issue_file_cli.run(argv_of(capped_path))).toBe(FAILURE_EXIT_CODE)
+		expect(refusals()).toContain('exceeds the cap (more than 24 files or 600 lines)')
+		expect(scout).not.toHaveBeenCalled()
+	})
+
+	it('lets it through filed as a split', async () => {
+		await issue_file_cli.run(argv_of(capped_path, '--route', 'split'))
+
+		expect(refusals()).not.toContain('exceeds the cap')
 		expect(scout).toHaveBeenCalledTimes(1)
 	})
 })

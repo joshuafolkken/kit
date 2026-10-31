@@ -16,13 +16,12 @@ import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './gi
 const SECONDS_TO_MS = 1000
 const CHECK_WAIT_INTERVAL_MS = 10_000
 // The wait has to outlast what the CI it is watching is allowed to take, or it gives up on a run
-// that is still legitimately progressing — which is what 180 seconds did to every consumer whose
+// that is still legitimately progressing — which happened to consumers whose
 // suite includes E2E: `followup` became a command that needed `JOSH_CI_TIMEOUT_SECONDS` set by hand
 // on every invocation and, when that was forgotten, exited red beside a CI that was still running.
 // The budget is therefore read off the distributed `templates/workflows/ci.yml` rather than picked
-// as a round number: its longest chain is `e2e` (25 minutes) behind the `playwright-image` job it
-// needs (2), so 27 minutes is the longest run that workflow permits, and five minutes of
-// runner-queue headroom goes on top. A unit test walks the `needs` graph of the distributed
+// as a round number: its longest chain includes `e2e` and the `playwright-image` job it needs,
+// with runner-queue headroom on top. A unit test walks the `needs` graph of the distributed
 // workflows and fails if any declared budget outgrows this value; a job that declares no cap is a
 // gap the number cannot promise to cover rather than a reason to inflate it. Waiting longer costs
 // nothing on a fast project: polling returns as soon as the checks settle, and a failed check throws
@@ -30,7 +29,7 @@ const CHECK_WAIT_INTERVAL_MS = 10_000
 const DEFAULT_TIMEOUT_SECONDS = 1920
 
 // The poll loop sleeps between attempts and not after the last one, so spanning a budget takes one
-// more attempt than the budget holds intervals: without the `+ 1` a 60-second setting waited 50.
+// more attempt than the budget holds intervals; otherwise the wait ends one interval early.
 function compute_max_attempts(timeout_seconds: number, interval_ms: number): number {
 	return Math.ceil(timeout_seconds / (interval_ms / SECONDS_TO_MS)) + 1
 }
@@ -56,7 +55,7 @@ const WATCH_CONFIRMED_STABLE_READS = 1
 
 // **A read that failed is not a verdict.** The loop reads every ten seconds, so a dropped connection,
 // a rate limit or one request over its budget is the kind of failure the *next* poll answers — and
-// ending a 32-minute wait on one of them costs the whole run again, so the fetch catches them rather
+// ending a merge wait on one of them costs the whole run again, so the fetch catches them rather
 // than rejecting straight out of the loop.
 //
 // **The cap is what keeps "ask again" from becoming "wait out the budget in silence".** Three
@@ -177,7 +176,6 @@ interface PollAttempt {
 	options: WaitForPrSuccessOptions
 	stable_count: number
 	failure_count: number
-	attempt: number
 }
 
 interface PollAttemptResult {
@@ -211,21 +209,10 @@ async function read_pr_state(
 	}
 }
 
-// The loop sleeps between attempts and not after the last one, so a poll that is about to be the
-// final one returns immediately and lets the caller run out of attempts.
-async function sleep_before_next_attempt(input: PollAttempt): Promise<void> {
-	if (input.attempt < input.options.max_attempts - 1) {
-		await poll.sleep(input.options.interval_ms)
-	}
-}
-
 // The unreadable branch: count it, give up at the cap with the failure that caused it, and otherwise
 // wait out the interval exactly as a pending poll does — without the sleep a broken endpoint would be
 // spun on rather than re-read.
-async function retry_after_unreadable(
-	input: PollAttempt,
-	cause: unknown,
-): Promise<PollAttemptResult> {
+function retry_after_unreadable(input: PollAttempt, cause: unknown): PollAttemptResult {
 	const next_failure_count = input.failure_count + 1
 	if (next_failure_count >= MAX_CONSECUTIVE_READ_FAILURES) throw cause
 
@@ -234,7 +221,6 @@ async function retry_after_unreadable(
 	console.warn(
 		`Could not read the PR state (${String(next_failure_count)}/${String(MAX_CONSECUTIVE_READ_FAILURES)}); asking again on the next poll: ${String(cause)}`,
 	)
-	await sleep_before_next_attempt(input)
 
 	return { next_stable_count: 0, next_failure_count, read_failure: cause }
 }
@@ -250,7 +236,7 @@ function to_exhaustion_error(last_read_failure: unknown): unknown {
 async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptResult> {
 	const evaluator = input.options.evaluator ?? MERGE_GATE_EVALUATOR
 	const read = await read_pr_state(input, evaluator)
-	if (read.kind === 'unreadable') return await retry_after_unreadable(input, read.cause)
+	if (read.kind === 'unreadable') return retry_after_unreadable(input, read.cause)
 
 	const classification = classify_poll_result({
 		snapshot: read.snapshot,
@@ -263,32 +249,36 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 		return { snapshot: read.snapshot, next_stable_count: 0, next_failure_count: 0 }
 	}
 
-	await sleep_before_next_attempt(input)
-
 	return { next_stable_count: classification.next_stable_count, next_failure_count: 0 }
 }
 
 async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<PrStateSnapshot> {
 	// The whole carry-over of one poll into the next, in one value: the stable-read window, the
 	// consecutive-failure count, and what the last poll could not be read with.
-	let carried: PollAttemptResult = { next_stable_count: 0, next_failure_count: 0 }
-
-	for (let attempt = 0; attempt < options.max_attempts; attempt += 1) {
-		console.info(`Checking PR status… (${String(attempt + 1)}/${String(options.max_attempts)})`)
-		// eslint-disable-next-line no-await-in-loop -- polling: the check belongs to this poll, not to all of them at once
-		await options.before_poll?.()
-		// eslint-disable-next-line no-await-in-loop -- polling: each read waits on the state the previous one saw
-		carried = await attempt_pr_success_poll({
-			options,
-			stable_count: carried.next_stable_count,
-			failure_count: carried.next_failure_count,
-			attempt,
-		})
-
-		if (carried.snapshot !== undefined) return carried.snapshot
+	const progress: { carried: PollAttemptResult } = {
+		carried: { next_stable_count: 0, next_failure_count: 0 },
 	}
+	let attempt = 0
+	const snapshot = await poll.poll_for(
+		async () => {
+			attempt += 1
+			console.info(`Checking PR status… (${String(attempt)}/${String(options.max_attempts)})`)
+			await options.before_poll?.()
+			const carried = await attempt_pr_success_poll({
+				options,
+				stable_count: progress.carried.next_stable_count,
+				failure_count: progress.carried.next_failure_count,
+			})
 
-	throw to_exhaustion_error(carried.read_failure)
+			Object.assign(progress, { carried })
+
+			return carried.snapshot
+		},
+		{ attempts: options.max_attempts, interval_ms: options.interval_ms },
+	)
+	if (snapshot !== undefined) return snapshot
+
+	throw to_exhaustion_error(progress.carried.read_failure)
 }
 
 // The snapshot module rather than `git-gh-command`, which is deliberate: `git-gh-command` also
@@ -298,7 +288,8 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 // **Three requests, and a fourth only where it can change the answer.** The pull request detail and
 // the two commit listings are read every poll because `mergeable_state` and the rollup both move
 // while CI runs; the review listing is read when the predicate says this poll's verdict turns on it.
-// A `followup` that waits out its whole 32-minute budget went from about 800 requests to about 600.
+// Reading the review only when it can change the verdict keeps a long wait's request count down
+// (joshuafolkken/kit#1043).
 async function default_fetch_pr_state(
 	branch_name: string,
 	should_read_review_decision: ReviewDecisionPredicate = should_always_read_review_decision,

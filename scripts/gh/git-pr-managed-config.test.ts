@@ -52,10 +52,8 @@ describe('handle_managed_config_changes — a diff that distributes nothing', ()
 	})
 })
 
-// joshuafolkken/kit#1592. Every assertion here is `resolves`, and that is the point of the change:
-// this used to throw, which ended the run before the CI wait and needed a reason typed by hand to get
-// past. In kit the condition is nearly always true — kit is the distribution source — so the stop was
-// firing on changes the Issues themselves had ordered.
+// Every assertion resolves because managed-file reporting must allow CI to continue. Editing those
+// files is expected in kit, the distribution source (joshuafolkken/kit#1592).
 describe('handle_managed_config_changes — a distributed file', () => {
 	it('does not stop the run', async () => {
 		given_changed([DISTRIBUTED_ROOT_FILE])

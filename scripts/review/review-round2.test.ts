@@ -2,10 +2,8 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { describe, expect, it } from 'vitest'
 import { review_round2 } from './review-round2'
 
-// joshuafolkken/kit#1433: the second round used to run whenever round 1 found anything, including
-// where round 1's findings produced no code at all. The branches below are the whole decision, and
-// most of them answer `required` — the default is what keeps a forgotten flag or a missing record
-// from buying a skip.
+// Round 2 depends on unreviewed code, not merely on findings. Defaulting to required prevents a
+// forgotten flag or missing record from authorizing a skip (joshuafolkken/kit#1433).
 
 const TAKEN_AT = '2026-09-05T00:00:00.000Z'
 const SOURCE = 'src/thing.ts'

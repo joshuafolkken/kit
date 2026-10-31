@@ -193,11 +193,8 @@ describe('the widened unit is one row, not a second', () => {
 	})
 })
 
-// The delegated-unit procedure a batch child runs is `backlogrun.md`'s single source, and
-// `backlogrun-steps.md` → "Named issues run first, in order" points at it rather than restating it
-// (joshuafolkken/kit#1984 removed queue.md, which used to carry a second copy). So the markers that
-// were pinned against queue.md are not re-pinned against backlogrun.md — restating them there would be
-// the clone this rule exists to prevent.
+// The delegated-unit procedure has one source; named-item steps must point there rather than
+// duplicate its markers and create another procedure to maintain (joshuafolkken/kit#1984).
 
 // The pre-implementation reading is delegated too, and its threshold is a number both rule documents
 // have to carry. A document that stated the line without the number leaves the count to judgement,

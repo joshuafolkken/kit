@@ -1,0 +1,7 @@
+{
+	"reason": "review:record --from-slot reads the review:submit slot (#5549): a new expansion module, its entry wiring, and run:review clearing the slot a new brief replaces",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 114
+	}
+}

@@ -93,6 +93,17 @@ describe('verdict needs either guide exceeded', () => {
 	})
 })
 
+describe('is_over_cap is three times the guide', () => {
+	it('is under the cap at exactly 24 files / 600 lines', () => {
+		expect(split_assess.is_over_cap(24, 600)).toBe(false)
+	})
+
+	it('is over the cap past either axis', () => {
+		expect(split_assess.is_over_cap(25, 600)).toBe(true)
+		expect(split_assess.is_over_cap(24, 601)).toBe(true)
+	})
+})
+
 describe('reason', () => {
 	it('reports the excluded-test counting and the guide on a single verdict', () => {
 		const reason = split_assess.reason({ files: 2, lines: 30, verdict: 'single' })

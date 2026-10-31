@@ -1,5 +1,6 @@
 import { agent_provider } from '#scripts/agent/agent-provider'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_headless } from '#scripts/run/run-headless'
 import { run_invocation } from '#scripts/run/run-invocation'
@@ -192,15 +193,22 @@ function marked(owner: CarryOwner): CarryOwner {
 		: marked_owner
 }
 
+function session_owner(): CarryOwner {
+	const pid = agent_session_environment.own_session_pid()
+
+	return pid === undefined ? run_carry.NO_OWNER : marked(run_carry.owner_of(pid))
+}
+
 // **`--owner` is what makes liveness answerable at all.** The process that runs this command is a
 // short-lived `tsx`, so its own pid says nothing about whether the run is still going; the caller
-// names the process that is — its own session — and a `backlogrun` passes `--owner "$PPID"`. Absent,
-// the record simply declares no owner and every standing record reads as not provably live, which
-// refuses rather than resumes.
+// names the process that is — its own session. Omitted, it is the pid the session exports
+// (`agent_session_environment.own_session_pid`), so the documented spelling carries no `$` expansion a
+// shell guard refuses; with neither, the record declares no owner and every standing record reads as
+// not provably live, which refuses rather than resumes.
 function to_owner(value: OptionValue): CarryOwner | undefined {
 	const text = cli_flags.string_of(value)
 
-	if (text === undefined) return run_carry.NO_OWNER
+	if (text === undefined) return session_owner()
 
 	const pid = cli_flags.to_count(text)
 

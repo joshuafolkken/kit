@@ -26,9 +26,9 @@ const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --idle 0'
 const DRIVER_OUTPUT = 'watch\nresume: --owner 1'
-const CLAIM_PATTERN = /--resume "(?<invocation>[^"]+)" --owner "\$PPID"/u
+const CLAIM_PATTERN = /--resume "(?<invocation>[^"]+)"/u
 const SUCCESS = 0
-// The woken session's `$PPID`: a live process that is not the supervisor running this suite.
+// The woken session's own process: a live process that is not the supervisor running this suite.
 const SESSION_OWNER = String(process.ppid)
 const OWNER = ['--owner', SESSION_OWNER]
 

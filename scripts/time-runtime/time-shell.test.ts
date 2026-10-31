@@ -250,3 +250,13 @@ describe('unquoted', () => {
 		expect(time_shell.unquoted("x <<-'END'\n\tdon't\n\tEND")).toBe('x  ')
 	})
 })
+
+describe('literal_blanked', () => {
+	it('blanks single-quoted spans and escapes but keeps double-quoted spans', () => {
+		expect(time_shell.literal_blanked('echo \'`a` $b\' "`c`" \\$d')).toBe('echo          "`c`"   d')
+	})
+
+	it('reads a single quote inside double quotes as a character', () => {
+		expect(time_shell.literal_blanked(`echo "it's $(x)"`)).toBe(`echo "it's $(x)"`)
+	})
+})

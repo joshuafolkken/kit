@@ -1,0 +1,8 @@
+{
+	"reason": "lane:plan refuses a plan past twice its declared files and names the split (#5533): the refusal module, its documentation and the question's one-sentence rule",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 79,
+		"ai_cost.on_demand_bytes": 93
+	}
+}

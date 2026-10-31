@@ -16,8 +16,9 @@ const HAND_OFF_STEPS = 2
 const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
-const CUT_COMMAND = 'pnpm josh run:carry --cut --owner "$PPID"'
-const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}" --owner "$PPID"`
+const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
+const CUT_COMMAND = 'pnpm josh run:carry --cut'
+const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}"`
 const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", then hand the loop back with ${CUT_COMMAND}`
 const scratch = { directory: '', target: '' }
 
@@ -193,13 +194,16 @@ test('tells an epic judgment session how to advance the named carry', () => {
 
 	expect(result).toMatchObject({ kind: 'judgment' })
 	if (result.kind !== 'judgment') return
-	expect(result.material).toContain('run:carry --done <epic-number> --owner "$PPID"')
+	expect(result.material).toContain('run:carry --done <epic-number> before')
 	expect(result.material).toContain('Follow backlogrun-steps.md named epic procedure')
 })
 
 test.each([
 	['launch #2500\nresume: --owner 1', CUT_COMMAND],
-	['retrospective\nresume: --owner 1', 'pnpm josh run:carry --retrospective --summary'],
+	[
+		'retrospective\nresume: --owner 1',
+		'pnpm josh run:carry --retrospective --summary "<result>", ',
+	],
 	['merge human-review #2500\nresume: --owner 1', 'needs-human-review.md'],
 	[EPIC_OUTPUT, 'Named issues run first, in order'],
 ])('claims the carry record, then names the next move for a judgment branch: %j', (out, next) => {
@@ -231,6 +235,30 @@ test('releases a spent window to the supervisor instead of re-driving it', async
 	expect(await run_wake_driver.drive(scratch.target, no_pause)).toStrictEqual({ kind: 'released' })
 	expect(subprocess).toHaveBeenCalledOnce()
 	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
+})
+
+// joshuafolkken/kit#5516: the launched parent labels the pool while it plans, so a session woken for the
+// same `triage` would label the same issues beside it.
+test('leaves triage to the launched parent while it plans', async () => {
+	const subprocess = vi
+		.spyOn(josh_command, 'josh_run')
+		.mockResolvedValue({ code: 0, out: TRIAGE_OUTPUT })
+	const wait = vi.fn(no_pause)
+
+	const result = await run_wake_driver.drive(scratch.target, wait, () => true)
+
+	expect(result).toStrictEqual({ kind: 'released' })
+	expect(subprocess).toHaveBeenCalledOnce()
+	expect(wait).toHaveBeenCalledOnce()
+	expect(run_event_setup.emit).not.toHaveBeenCalledWith(run_event_setup.STAGE.JUDGING)
+})
+
+test('wakes a session for triage once no launched parent is planning', async () => {
+	vi.spyOn(josh_command, 'josh_run').mockResolvedValue({ code: 0, out: TRIAGE_OUTPUT })
+
+	const result = await run_wake_driver.drive(scratch.target, no_pause, () => false)
+
+	expect(result).toMatchObject({ kind: 'judgment' })
 })
 
 test.each(['merge busy #2509', 'merge retry #2509'])(

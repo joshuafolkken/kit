@@ -78,10 +78,12 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// The carried `--unpinned-ok` record (joshuafolkken/kit#4775) crossed the 73728 block.
 	// `run:merge`'s withdrawn child (joshuafolkken/kit#4916) crossed the 77824 block.
 	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 86_016 },
+	// `lane:plan`'s `split` refusal (joshuafolkken/kit#5533) crossed the 86016 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 90_112 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
-	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block.
-	{ path: 'docs/josh-commands-backlog.md', bytes: 65_536 },
+	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
+	// (joshuafolkken/kit#5547) crossed the 65536 block.
+	{ path: 'docs/josh-commands-backlog.md', bytes: 69_632 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
 	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
 	{ path: 'docs/josh-commands.md', bytes: 61_440 },

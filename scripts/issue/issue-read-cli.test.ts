@@ -171,8 +171,8 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 	})
 })
 
-// A long thread used to overflow the Bash output cap into a saved file read a second time
-// (joshuafolkken/kit#3143); past the cap the output is now part files, each one read.
+// Long threads need individually readable parts so the shell output cap cannot hide comments
+// (joshuafolkken/kit#3143).
 describe('issue_read_cli.run — a thread past the Bash output cap', () => {
 	const cap = bash_output_cap_reader.bash_output_cap(process.cwd())
 	const long_body = 'a line of a long issue thread\n'.repeat(cap / LINE_FRACTION)

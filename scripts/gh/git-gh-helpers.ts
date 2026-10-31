@@ -1,11 +1,7 @@
 import { has_stderr_field } from './git-gh-exec'
 
-// One optional string answer from `gh`. Every caller asks with `--jq`, which unwraps the JSON
-// string itself, so the value arrives raw and there is nothing to unquote — this used to strip a
-// leading and trailing `"` anyway, which ate real characters from any answer that legitimately
-// carried them. A title of `"queue" should stop at the first failure` reached Telegram as
-// `queue" should stop at the first failure`. Trimming and the empty answer
-// are the whole contract.
+// `--jq` already unwraps JSON strings, so only surrounding whitespace and empty answers need
+// normalization. Quotes in the raw answer belong to the user's text and must survive.
 function parse_pr_state_string(result: string): string | undefined {
 	const trimmed = result.trim()
 
