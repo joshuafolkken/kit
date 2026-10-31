@@ -992,12 +992,17 @@ The diff is saved in the worktree's git directory, so `git status` never lists i
 Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime).
 
 ```bash
-pnpm josh disposition <path...>   # → runtime | non-runtime
+pnpm josh disposition <path...>                 # → runtime | non-runtime
+pnpm josh disposition --batch <findings-file>   # → branch table + drop notes
 ```
 
 <!-- /usage -->
 
 `runtime` means any non-inert path, per `review-level.ts`'s inert set; only "is the defect confirmed" is left to a person. Reason on stderr. Full reasoning: `prompts/review.md` → "Three-way disposition after the cap".
+
+`--batch` reads one `review:record` positional per line — the findings not fixed in place — prefixed `confirmed ` when the failure scenario is stated. It prints a row per finding with its branch (`file` for a confirmed runtime finding, else `drop`).
+
+Each dropped finding's PR-body note follows, itself a `review:record` positional. A line outside the grammar exits 1, named.
 
 ### `josh review:attest`
 

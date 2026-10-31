@@ -239,8 +239,13 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Say whether a review finding reaches a runtime path (runtime) or is inert (non-runtime)',
 		category: 'AI tools',
-		reference: [PATH_ARGUMENTS, 'automation', ['none']],
-		usage: { examples: [{ arguments: '<path...>', note: '→ runtime | non-runtime' }] },
+		reference: [`${PATH_ARGUMENTS} | --batch <findings-file>`, 'automation', ['none']],
+		usage: {
+			examples: [
+				{ arguments: '<path...>', note: '→ runtime | non-runtime' },
+				{ arguments: '--batch <findings-file>', note: '→ branch table + drop notes' },
+			],
+		},
 	},
 	'e2e:retry-check': {
 		script: 'scripts/test/e2e-retry-check.ts',

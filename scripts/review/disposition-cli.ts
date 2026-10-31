@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { disposition_batch } from './disposition-batch'
 import { disposition } from './disposition-logic'
 
 // `josh disposition <path...>` — the machine half of the three-way review disposition.
@@ -7,9 +9,11 @@ import { disposition } from './disposition-logic'
 // runtime code path, a distributed artifact a consumer reads, or the verification guarding either —
 // and `non-runtime` when every path is inert. `prompts/review.md` → "Three-way disposition after the
 // cap" leaves the run one judgement after this: whether the finding is a confirmed defect.
+// `--batch <findings-file>` routes every remaining finding at once (`disposition-batch.ts`).
 
 const ARGV_OFFSET = 2
-const USAGE = 'Usage: josh disposition <path...>'
+const BATCH_FLAG = '--batch'
+const USAGE = 'Usage: josh disposition <path...> | --batch <findings-file>'
 const FAILURE_EXIT_CODE = 1
 
 function reason_line(paths: ReadonlyArray<string>): string {
@@ -20,7 +24,29 @@ function reason_line(paths: ReadonlyArray<string>): string {
 		: `reaches through: ${reaching.join(', ')}`
 }
 
+function run_batch(path: string | undefined): number {
+	if (path === undefined) {
+		console.error(USAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	const result = disposition_batch.parse(readFileSync(path, 'utf8'))
+
+	if ('invalid' in result) {
+		console.error(`not in the review:record grammar:\n${result.invalid.join('\n')}`)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	process.stdout.write(`${disposition_batch.render(result.findings)}\n`)
+
+	return 0
+}
+
 function run(argv: ReadonlyArray<string>): number {
+	if (argv[0] === BATCH_FLAG) return run_batch(argv[1])
+
 	if (argv.length === 0) {
 		console.error(USAGE)
 
