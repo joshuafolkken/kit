@@ -221,15 +221,17 @@ const test_pinned_schema = z.object({
 	origin: pinned_origin_schema.optional(),
 	discarded: z.boolean().optional(),
 })
-// The split notice shown to the lane of `issue`, with the measured diff it fired on — written once per
-// Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it first
-// (joshuafolkken/kit#4695).
+// The split notice shown to the lane of `issue`, with the measured diff it fired on — the diff notice
+// written once per Issue, by whichever of `josh lint:related`, `test:related` or `main:merge` showed it
+// first (joshuafolkken/kit#4695). Each `split` from `josh lane:plan` writes one more, `reason` naming its
+// axis; a diff notice has none (joshuafolkken/kit#5568).
 const split_notice_schema = z.object({
 	kind: z.literal(KIND.SPLIT_NOTICE),
 	at: z.string(),
 	issue: z.number(),
 	files: z.number(),
 	lines: z.number(),
+	reason: z.enum(['files', 'hunks', 'lines']).optional(),
 })
 // One `josh issue:file --route split` filed from the lane of `issue`; `child` is its reference.
 const split_filed_schema = z.object({

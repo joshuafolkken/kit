@@ -15,7 +15,7 @@ several. Every command applies it identically.
 A change that must land in one commit is one deliverable, **separability alone splits nothing**, up to
 **the cap, three times the guide**: past it a lane runs over an hour, so no reason keeps it one Issue.
 The numbers are read against the whole request's estimate. `lane:plan` answers `split` past
-twice the declared files: such lanes took twice the median.
+twice the declared files (files or hunks) or the line guide.
 
 ## The same two questions decide the filing-time fold
 
