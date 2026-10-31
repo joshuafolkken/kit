@@ -109,3 +109,18 @@ describe('issue_file_cli.run — every refusal in one pass', () => {
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })
+
+// `upstream:interrupt` reads the URL `file_issue` answers, so a failed create answers none.
+describe('issue_file_cli.file_issue — a create call that fails', () => {
+	it('answers no URL, and run exits 1', async () => {
+		vi.mocked(issue_scout_cli.scout).mockResolvedValue({
+			report: 'Duplicates: none',
+			candidates: [],
+		})
+		exec_gh_api.mockRejectedValue(new Error('HTTP 502'))
+
+		expect(await issue_file_cli.file_issue(CLEAR_ARGV)).toBeUndefined()
+		expect(await issue_file_cli.run(CLEAR_ARGV)).toBe(FAILURE_EXIT_CODE)
+		expect(vi.mocked(console.error).mock.calls.join('\n')).toContain('the create call failed')
+	})
+})
