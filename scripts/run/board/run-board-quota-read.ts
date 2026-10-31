@@ -36,6 +36,9 @@ const CODEX_MARK = '"rate_limits":{'
 const CODEX_PREFIX = 'rollout-'
 const CODEX_SUFFIX = '.jsonl'
 const LOG_SUFFIX = '.log'
+const TIMESTAMP_MARK = '"timestamp"'
+// `detached_launch.log_header`'s shape — `=== <time> · started by process <pid> · <command> ===`.
+const LAUNCH_HEADER = /^=== (?<stamp>\S+) · started by process /u
 const { two_digits } = figure_format
 
 type QuotaProvider = 'claude' | 'codex'
@@ -46,8 +49,9 @@ interface QuotaWindow {
 	resets_ms: number
 }
 
-// A provider's windows and their event's timestamp, unknown in older logs; `per_task` is each
-// window's recent spend per task by its length in minutes, where one could be told.
+// A provider's windows and when they were observed; `per_task` is each window's recent spend per task
+// by its length in minutes, where one could be told. Codex's event carries its own `timestamp`; Claude
+// Code's `rate_limit_event` carries none, so its time is the nearest timed line before it.
 interface QuotaReading {
 	windows: ReadonlyArray<QuotaWindow>
 	taken_ms: number | undefined
@@ -88,6 +92,7 @@ const CODEX_EVENT = z.looseObject({
 	payload: z.looseObject({ rate_limits: CODEX_LIMITS }),
 	timestamp: z.string().nullish().catch(undefined),
 })
+const TIMED_LINE = z.looseObject({ timestamp: z.string() })
 
 type ClaudeWindow = z.infer<typeof CLAUDE_WINDOW>
 type CodexWindow = z.infer<typeof CODEX_WINDOW>
@@ -152,9 +157,35 @@ function readings_in(
 		.filter((reading) => reading !== undefined)
 }
 
+function json_ms(line: string): number | undefined {
+	if (!line.includes(TIMESTAMP_MARK)) return undefined
+
+	return time_instant.parse_instant(json_value.parse_with(line, TIMED_LINE)?.timestamp)
+}
+
+// The time a line carries: the launcher's header's, or a JSON line's own `timestamp`.
+function line_ms(line: string): number | undefined {
+	const stamp = LAUNCH_HEADER.exec(line)?.groups?.['stamp']
+
+	return stamp === undefined ? json_ms(line) : time_instant.parse_instant(stamp)
+}
+
+// The nearest time among `lines` before `index`; the header heads the log, so it is reached last.
+function time_before(lines: ReadonlyArray<string>, index: number): number | undefined {
+	const timed = lines.slice(0, index).findLast((line) => line_ms(line) !== undefined)
+
+	return timed === undefined ? undefined : line_ms(timed)
+}
+
 // Windows and time from the same last event; unrelated later lines never refresh its age.
 function claude_reading(text: string): QuotaReading | undefined {
-	return readings_in(text, claude_line).at(-1)
+	const lines = text.split('\n')
+	const index = lines.findLastIndex((line) => claude_line(line) !== undefined)
+	const reading = claude_line(lines[index] ?? '')
+
+	if (reading === undefined || reading.taken_ms !== undefined) return reading
+
+	return { ...reading, taken_ms: time_before(lines, index) }
 }
 
 function codex_reading(text: string): QuotaReading | undefined {

@@ -1,0 +1,7 @@
+{
+	"reason": "#5509 claude usage reading time falls back to the nearest timed line before the event: +19 code lines",
+	"date": "2026-10-31",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}
