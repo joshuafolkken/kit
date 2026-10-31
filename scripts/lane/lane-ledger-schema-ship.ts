@@ -34,7 +34,8 @@ const unplanned_notice_schema = z.object({
 })
 // One inner step of a `josh ship` stage on `issue` — the overlap wait inside `sync`, the scoped pair
 // inside `gate` — so `lane:breakdown` names what a stage spent its time on (joshuafolkken/kit#5294).
-// `at` is its end and `elapsed_ms` its length, as on a stage row.
+// `at` is its end and `elapsed_ms` its length, as on a stage row. `fallback` names why a scoped pair's
+// check read the whole branch change (`since-green.ts`, joshuafolkken/kit#5531).
 const ship_lap_schema = z.object({
 	kind: z.literal(KIND.SHIP_LAP),
 	at: z.string(),
@@ -42,6 +43,7 @@ const ship_lap_schema = z.object({
 	stage: z.string(),
 	step: z.string(),
 	elapsed_ms: z.number(),
+	fallback: z.string().optional(),
 })
 
 // A merging `josh followup`'s size of `issue`: the Issue's declared size estimate and the branch's

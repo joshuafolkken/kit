@@ -36,7 +36,12 @@ vi.mock('#scripts/gate/scoped-green', () => ({
 }))
 // No green record, so every case reads the whole branch change; the since-green narrowing is
 // `test-related.since-green.test.ts`.
-vi.mock('#scripts/gate/since-green', () => ({ since_green: { read_moved_parts: vi.fn() } }))
+vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
+	const { since_green } = await import_original()
+	const no_record = { fallback: since_green.FALLBACK.NO_RECORD }
+
+	return { since_green: { ...since_green, read_verdict: vi.fn(async () => no_record) } }
+})
 // The claim walks no import graph here; what it claims is `test-related.claim.test.ts`.
 vi.mock('./test-pinned-reach', () => ({
 	test_pinned_reach: { reached_test_count: vi.fn() },

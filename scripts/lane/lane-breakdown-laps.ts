@@ -24,7 +24,10 @@ interface Placed {
 function lap_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	if (entry.kind !== KIND.SHIP_LAP || entry.issue !== issue) return []
 
-	return [{ at_ms: Date.parse(entry.at), part: { name: entry.step, ms: entry.elapsed_ms } }]
+	const name =
+		entry.fallback === undefined ? entry.step : `${entry.step} (whole branch: ${entry.fallback})`
+
+	return [{ at_ms: Date.parse(entry.at), part: { name, ms: entry.elapsed_ms } }]
 }
 
 function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {

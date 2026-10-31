@@ -7,6 +7,7 @@ import { unused_members_check } from '#scripts/exports/unused-members-check'
 import { gate_labels } from '#scripts/gate/gate-labels'
 import type { GateTree } from '#scripts/gate/gate-tree'
 import { metrics_totals } from '#scripts/gate/metrics-totals'
+import { moved_paths } from '#scripts/gate/moved-paths'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { since_green } from '#scripts/gate/since-green'
 import { structural_checks } from '#scripts/gate/structural-checks'
@@ -110,18 +111,27 @@ async function scoped_outcome(scope: ChangedFileScope, root: string): Promise<Li
 
 // **A bare run reads only what moved since its last green run** (`since-green.ts`), against the tree
 // its green record is read from, so one run reads the gate tree once (joshuafolkken/kit#4655).
-// Explicit file arguments read no tree, so they never consult the record.
+// Explicit file arguments read no tree, so they never consult the record. A record that cannot narrow
+// says why on the summary line (`since-green.ts`).
 async function read_since_green(
 	before: GateTree | undefined,
 ): Promise<ReadonlyArray<string> | undefined> {
 	if (before === undefined) return undefined
 
-	return await since_green.read_moved(
+	const verdict = await since_green.read_verdict(
 		review_stamps.lint_related_stamp,
 		gate_labels.LINT_LABEL,
 		undefined,
 		before,
 	)
+
+	if ('parts' in verdict) return moved_paths.union_of(verdict.parts)
+
+	process.stdout.write(
+		`${since_green.fallback_line(lint_related_scope.COMMAND_LABEL, verdict.fallback)}\n`,
+	)
+
+	return undefined
 }
 
 // Narrowed to what moved while a lintable file is among it; otherwise the whole branch change, as before.
