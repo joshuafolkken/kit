@@ -322,8 +322,8 @@ describe('epic_bundle_cli.fetch_backlog — the title and the relations', () => 
 
 	// Both reads are mocked here, and the relation spy is handed back rather than made per case
 	// (joshuafolkken/kit#1353). The relation read is on by default, so the case that mocked only the
-	// listing called through to a live `gh api` against real issues — 768ms where its siblings took
-	// 0–1ms, and a 10-second timeout in CI that had nothing to do with the change under test. Handing
+	// listing called through to a live `gh api` against real issues — far slower than its siblings,
+	// and a CI timeout that had nothing to do with the change under test. Handing
 	// the spy back rather than leaving each case to make its own is what keeps that from coming back:
 	// a case cannot forget a mock it is given, and no case ends up spying a second time on a property
 	// this helper has already spied.

@@ -52,6 +52,20 @@ describe('lane_launch_pending.launch', () => {
 		expect(run).toHaveBeenCalledOnce()
 	})
 
+	// joshuafolkken/kit#5519: a pass launches its lanes side by side, each waiting on its own claim.
+	it('keeps one waiting claim per issue when two lanes wait at once', async () => {
+		const other: LaunchContext = { issue: '18', stash: undefined }
+		const run = vi.fn(async (): Promise<LaunchOutcome> => LAUNCHED)
+
+		await Promise.all([
+			lane_launch_pending.launch(CONTEXT, run),
+			lane_launch_pending.launch(other, run),
+		])
+		lane_launch_pending.keep([CONTEXT.issue])
+
+		expect(core_budget.budget_waits(probe.directory).map((wait) => wait.lane)).toStrictEqual(['17'])
+	})
+
 	it('releases a waiting claim when the offer withdraws it or the driver exits', async () => {
 		await lane_launch_pending.launch(CONTEXT, async () => LAUNCHED)
 		lane_launch_pending.keep([])

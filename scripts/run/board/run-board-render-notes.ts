@@ -174,12 +174,14 @@ function note_lines(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesBody
 }
 
 // The findings under a rule, led by 📌 where a legend names it and by its word where none does, and how
-// many more there are, so the section never pushes the plan off the screen.
+// many more there are, so the section never pushes the plan off the screen; its rule counts them all.
 function notes_part(notes: ReadonlyArray<BoardNote>, view: NotesView): NotesPart {
 	const body = note_lines(notes, view)
 	const label = view.layout === undefined ? WORDS.notes : `${NOTES_ICON} ${WORDS.notes}`
+	const { counted, heading_lines } = run_board_render_section
+	const head = heading_lines(counted(label, body.lines.length + body.hidden))
 
-	return { head: run_board_render_section.heading_lines(label), label, ...body }
+	return { head, label, ...body }
 }
 
 // Each kind a drawn line leads with — one the rows' legend already names (`named`) is not named twice.

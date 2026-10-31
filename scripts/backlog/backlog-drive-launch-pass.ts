@@ -53,17 +53,44 @@ function launched(state: DriveState, settled: Settled, ports: DrivePorts): Drive
 }
 
 // Whether the launch settled the issue — into flight, or closed by its measurement.
-function is_settled(settled: Settled, issue: string, outcome: DriveLaunch): boolean {
+function is_settled(outcome: DriveLaunch): boolean {
+	return outcome === MEASURED_LAUNCH || outcome === LAUNCHED
+}
+
+function settle(settled: Settled, issue: string, outcome: DriveLaunch): void {
 	if (outcome === MEASURED_LAUNCH) settled.measured.push(issue)
 	if (outcome === LAUNCHED) settled.in_flight.push(issue)
+}
 
-	return outcome === MEASURED_LAUNCH || outcome === LAUNCHED
+interface Launched {
+	issue: string
+	outcome: DriveLaunch
+}
+
+// Every launch runs to its end before a failure is thrown, so none is still opening a lane once the
+// pass has given up.
+async function launch_each(
+	issues: ReadonlyArray<string>,
+	ports: DrivePorts,
+): Promise<Array<Launched>> {
+	const results = await Promise.allSettled(
+		issues.map(async (issue) => ({ issue, outcome: await ports.launch(issue) })),
+	)
+	const failure = results.find((result) => result.status === 'rejected')
+
+	if (failure !== undefined) throw failure.reason
+
+	return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
 }
 
 // **No more new lanes than free lanes**. `backlog:offer` lists every ready issue without reading the
 // lanes, so launching all of them overran `JOSH_LANE_LIMIT` until `lane:open` ran out of seats. An issue
 // that already holds a kept lane reuses its port seat but takes a place under the limit, ahead of a
 // fresh launch; the rest launch up to the free count (`backlog-drive-seats.ts`), read before the first.
+//
+// **The pass's launches run side by side** (joshuafolkken/kit#5519): one after another, four lanes took
+// 49 s. Their outcomes are then settled in offer order, so every lane that launched is in flight
+// whichever refused, and the first refusal in that order is the one the pass answers.
 async function launch_all(
 	issues: ReadonlyArray<string>,
 	state: DriveState,
@@ -71,18 +98,15 @@ async function launch_all(
 ): Promise<PassResult> {
 	const settled: Settled = { in_flight: [...state.in_flight], measured: [] }
 	const launching = await backlog_drive_seats.seated(issues, ports)
+	const outcomes = await launch_each(launching, ports)
+	for (const { issue, outcome } of outcomes) settle(settled, issue, outcome)
 
-	for (const issue of launching) {
-		// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
-		const outcome = await ports.launch(issue)
+	const refusal = outcomes.find(({ outcome }) => !is_settled(outcome))
+	const next = launched(state, settled, ports)
 
-		if (!is_settled(settled, issue, outcome)) {
-			// eslint-disable-next-line no-await-in-loop -- lanes launch in order and the first refusal ends the pass
-			return await refused(issue, outcome, launched(state, settled, ports), ports)
-		}
-	}
+	if (refusal === undefined) return { kind: 'continue', state: next }
 
-	return { kind: 'continue', state: launched(state, settled, ports) }
+	return await refused(refusal.issue, refusal.outcome, next, ports)
 }
 
 const backlog_drive_launch_pass = { MEASURED_LAUNCH, launch_all }

@@ -14,7 +14,7 @@ import { run_board_render_section } from './run-board-render-section'
 // A folded section is its heading alone, led by ▸ and saying what it holds, and the rows it gave up go
 // to the other sections before `run-board-fit.ts` cuts anything; an unfolded one's heading is led by ▾.
 
-const { folded_head, open_head } = run_board_render_section
+const { folded_head, open_head, row_count, widened } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
 	['u', 'usage'],
 	['l', 'lanes'],
@@ -71,7 +71,7 @@ function fold_section(section: PlanSection, folded: ReadonlySet<SectionKey>): Pl
 	if (key === undefined || label === undefined) return section
 	if (!folded.has(key)) return headed(section, label, undefined)
 
-	const count = section.lines.filter((line) => line.row !== undefined).length
+	const count = row_count(section.lines)
 
 	return { ...headed(section, label, String(count)), lines: [] }
 }
@@ -113,10 +113,30 @@ function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FramePa
 	}
 }
 
+function widened_part<Part extends Headed>(part: Part, width: number): Part {
+	return { ...part, head: widened(part.head, width) }
+}
+
+// Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).
+function widened_parts(parts: FrameParts): FrameParts {
+	const { rule_width: width } = parts
+
+	if (width === undefined) return parts
+
+	return {
+		...parts,
+		usage: parts.usage === undefined ? undefined : widened_part(parts.usage, width),
+		plan: parts.plan.map((section) => widened_part(section, width)),
+		below: parts.below?.map((section) => widened_part(section, width)),
+		processes: parts.processes === undefined ? undefined : widened_part(parts.processes, width),
+		notes: widened_part(parts.notes, width),
+	}
+}
+
 // A live frame is kept within its terminal, folded as a person folded it; any other is drawn whole.
 function bounded(parts: FrameParts, bounds: FrameBounds): Array<string> {
 	const { size, folded } = bounds
-	const shown = folded === undefined ? parts : fold_parts(parts, folded)
+	const shown = widened_parts(folded === undefined ? parts : fold_parts(parts, folded))
 
 	return size === undefined ? run_board_fit.whole(shown) : run_board_fit.fit(shown, size)
 }

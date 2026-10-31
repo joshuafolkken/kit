@@ -9,18 +9,16 @@ import {
 } from './git-execa-error'
 import { git_ssh_keepalive } from './git-ssh-keepalive'
 
-// The budget for one `git push`, and the reason a push can no longer wait without end.
-// Measured on PR #1244: the commit itself took 0.6 seconds and the push
-// then sat silent for 8 minutes 13 seconds before it was found by hand and killed — about 9 minutes
-// 50 seconds of a 72-minute run, with no way while waiting to tell a stalled push from a slow one.
-// `execa` has always accepted a `timeout`; the push path never passed one, which left it the single
+// The budget for one `git push`, and the reason a push can no longer wait without end. On PR #1244
+// the push sat silent long after a quick commit until it was found by hand and killed
+// (joshuafolkken/kit#1251), with no way while waiting to tell a stalled push
+// from a slow one. `execa` has always accepted a `timeout`; the push path never passed one, which left it the single
 // unbounded network call in this directory beside `GH_REQUEST_TIMEOUT_MS`.
 //
 // **It sits at that same layer, and is deliberately larger.** That budget covers one REST request;
-// a push transfers objects, so this number is read off what a healthy push actually costs here — 22
-// seconds on the manual re-run that finally succeeded, 33 seconds on PR #1247. 120 is roughly four
-// times the slower of the two, which leaves room for a first push of a large branch while staying
-// far under the 6 minutes 45 seconds the hang had already reached when it was noticed.
+// a push transfers objects, so this number is a few times what a healthy push actually costs here
+// (joshuafolkken/kit#1251), which leaves room for a first push of a large branch while staying far
+// under how long the hang had already run when it was noticed.
 //
 // **It bounds one push, not one command.** A push killed on the budget is retried exactly once, and
 // `git_command.push` may then fall back to a `--set-upstream` push that is itself bounded and
@@ -96,7 +94,7 @@ function create_timeout_error(arguments_list: Array<string>): Error {
 // One push, bounded and retried once — and **only** on a timeout. A push the remote rejected (a
 // stale branch, a blocked hook, no upstream) answers the same way every time, so retrying it would
 // buy a second wait to reach an identical failure; a hang is the one outcome a second attempt has
-// been observed to clear, which is what the manual re-run on PR #1244 did in 22 seconds.
+// been observed to clear, which is what the manual re-run on PR #1244 did.
 async function push(arguments_list: Array<string>): Promise<void> {
 	if (!(await did_push_time_out(arguments_list))) return
 

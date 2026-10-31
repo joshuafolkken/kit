@@ -1,9 +1,8 @@
 // What a dispatched lane child reads, and what that costs.
 //
-// **A lane child is the largest fixed cost a `backlogrun` has.** Measured on the batch of
-// 2026-09-13, the lane child sessions were 72% of the run's whole input,
-// and each `claude -p fullrun #N` child read the `fullrun` entry set in full — around 227KB. Most of
-// that is spent on procedure a leaf child never carries out: it dispatches no child of its own, opens
+// **A lane child is the largest fixed cost a `backlogrun` has**: the lane child sessions carry most
+// of the run's whole input, and each `claude -p fullrun #N` child read the `fullrun` entry set in
+// full. Most of that is spent on procedure a leaf child never carries out: it dispatches no child of its own, opens
 // no lane, runs no progress watcher and performs no hand-off, so the point-of-use documents that
 // carry those steps are read by the parent and never by the child.
 //
@@ -43,7 +42,7 @@ const UNUSED_SKILL_SECTIONS: ReadonlyArray<string> = [
 // once-per-session tail — none of which a leaf child performs. Every reference to it lives in a
 // document the child never reads (`backlogrun.md`, `backlogrun-progress.md`, `retrospective.md`) or in a
 // `SKILL.md` section the child trims (§0's session-cut note), so the child has no path
-// that opens it. It was the child's single largest read — ~16,000 tokens read whole — charged for a
+// that opens it. It was the child's single largest read, read whole and charged for a
 // document it never reaches, so dropping it is a correction of an over-count, not a loss of any rule the
 // child needs. The parent still reads it in full.
 // **`progress-watcher.md` is the parent's too**: a dispatched child is refused

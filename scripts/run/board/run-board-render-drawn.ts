@@ -1,3 +1,4 @@
+import { run_board_first_lane } from './run-board-first-lane'
 import { run_board_header, type BoardHeader } from './run-board-header'
 import { run_board_labels } from './run-board-labels'
 import { run_board_layout, type BoardRow } from './run-board-layout'
@@ -35,7 +36,7 @@ function has_solo_lane(header: BoardHeader): boolean {
 }
 
 // The third line's kinds, ⏰ where the lanes rule stands it over the lanes' times, then the estimated
-// finish.
+// finish and the time to the first lane.
 function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string> {
 	const is_operation = icons.has(NOW_ICONS.operation)
 	const operation = is_operation ? `${NOW_ICONS.operation} ${WORDS.operation}` : undefined
@@ -45,6 +46,7 @@ function named_of(header: BoardHeader, icons: ReadonlySet<string>): Array<string
 		operation,
 		elapsed,
 		run_board_header.estimate_legend(header),
+		run_board_first_lane.legend(header.activity),
 	]
 
 	return legends.filter((legend) => legend !== undefined)

@@ -4,7 +4,7 @@ import { latest_stamp } from '#scripts/version/latest-stamp'
 import { describe, expect, it } from 'vitest'
 
 // joshuafolkken/kit#1215: `josh latest` sat at the head of every run as "mandatory, never skip",
-// costing 60–120 seconds of network time to answer the same thing several times a day. Three things
+// costing network time to answer the same thing several times a day. Three things
 // can rot independently — a procedure can go back to running the update unconditionally, the gate
 // document can stop naming the command, and the chain can stop recording the run that the command
 // reads. Each is pinned here.

@@ -1,5 +1,5 @@
 import { git_stash } from '#scripts/git/stash/git-stash'
-import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
+import { lane_launch_cli, type LaunchOutcome } from '#scripts/lane/lane-launch-cli'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { backlog_drive_launch_pass, type DriveLaunch } from './backlog-drive-launch-pass'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -31,17 +31,37 @@ async function latest_stash(): Promise<string | undefined> {
 	return selection.kind === 'match' ? LATEST_STASH_MESSAGE : undefined
 }
 
+// **One launch at a time holds the stash** (joshuafolkken/kit#5519): a pass's launches run side by
+// side, and each asking the stack alone would find the stash every one of them, before any pop. The
+// claim is taken before the stack is read and given back when the launch ends, so a pop that refused
+// leaves the stash for the next pass's first launch.
+const stash_holders = new Set<string>()
+
+async function launch_ready(issue: string): Promise<LaunchOutcome> {
+	const { launch_ready_lane } = lane_launch_cli
+
+	if (stash_holders.size > 0) return await launch_ready_lane({ issue, stash: undefined })
+
+	stash_holders.add(issue)
+
+	try {
+		return await launch_ready_lane({ issue, stash: await latest_stash() })
+	} finally {
+		stash_holders.delete(issue)
+	}
+}
+
 // An issue its measurement declaration closed takes no lane (`backlog-measure-close.ts`).
 async function launch(issue: string, owner: string): Promise<DriveLaunch> {
 	await backlog_drive_owner.assert_current(owner)
 	if (await backlog_measure_close.closed(issue)) return MEASURED_LAUNCH
 	await run_event_setup.emit(run_event_setup.opening_lane(issue))
 
-	const outcome = await lane_launch_cli.launch_ready_lane({ issue, stash: await latest_stash() })
+	const outcome = await launch_ready(issue)
 
 	// A refusal the driver waits out writes nothing else, so the lane's stage is ended here.
 	if (outcome.kind !== 'launched' && outcome.kind !== 'waiting') {
-		await run_event_setup.emit(run_event_setup.STAGE.NO_CHILD)
+		await run_event_setup.emit(run_event_setup.no_child(issue))
 	}
 
 	return outcome.kind
