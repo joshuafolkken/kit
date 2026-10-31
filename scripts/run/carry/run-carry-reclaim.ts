@@ -7,7 +7,8 @@ import { run_carry_conversation } from './run-carry-conversation'
 // counts nothing — `lane:await` blocks in the background and the transcript stays unwritten — so a
 // restart followed by a long wait outlasts the quiet window with the record still naming the dead
 // process, and `run:wake` recovers it as a crash. The wait itself is therefore where the parent
-// declares its owner: `lane:await --owner "$PPID"` reclaims the record before it starts waiting.
+// declares its owner: `lane:await` (its owner the session's `CLAUDE_PID` unless `--owner` names one)
+// reclaims the record before it starts waiting.
 
 // Writes the record back under the caller's process when the caller is the record's own conversation
 // in a new one; answers whether it did.

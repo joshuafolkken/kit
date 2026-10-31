@@ -1,4 +1,5 @@
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import type { DriveState } from './backlog-drive'
@@ -10,7 +11,7 @@ import type { DriveState } from './backlog-drive'
 
 const LIST_SEPARATOR = ','
 const USAGE =
-	'Usage: josh backlog:drive --owner <pid> [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
+	'Usage: josh backlog:drive [--owner <pid>] [--active <ISO-8601>] [--max <n>] [--idle <minutes>] [--only] [--exclude <n>[,<n>...]] [--await <n>[,<n>...]] [--window <minutes>] [--stopped <n>]'
 
 const OPTIONS = {
 	active: { type: 'string' },
@@ -77,8 +78,9 @@ function is_valid_single(values: Values): boolean {
 	return is_valid_stopped && is_valid_window(values.window)
 }
 
+// Omitted, the pid the session exports (`agent_session_environment.own_session_pid`).
 function owner_of(values: Values | undefined): string | undefined {
-	const owner = values?.owner
+	const owner = values?.owner ?? agent_session_environment.own_session_pid()?.toString()
 
 	return cli_flags.to_count(owner) === undefined ? undefined : owner
 }

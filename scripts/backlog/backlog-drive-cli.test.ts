@@ -1,3 +1,4 @@
+import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { josh_command } from '#scripts/josh/josh-run'
 import { lane_launch_cli } from '#scripts/lane/lane-launch-cli'
 import { lane_registry } from '#scripts/lane/lane-registry'
@@ -6,8 +7,9 @@ import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_carry, type RunCarry } from '#scripts/run/carry/run-carry'
 import type { MergeResult } from '#scripts/run/merge/run-merge-cli'
 import { run_merge_driver } from '#scripts/run/merge/run-merge-driver'
-import { describe, expect, it, vi, type MockInstance } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { backlog_drive } from './backlog-drive'
+import { backlog_drive_args } from './backlog-drive-args'
 import { backlog_drive_cli } from './backlog-drive-cli'
 import { backlog_drive_named } from './backlog-drive-named'
 import { backlog_drive_owner } from './backlog-drive-owner'
@@ -70,8 +72,30 @@ describe('backlog_drive_cli.parse', () => {
 	})
 })
 
+// joshuafolkken/kit#5504: an omitted `--owner` is the pid the calling session exports.
+describe('backlog_drive_cli.parse omitted owner', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('reads the owner from the session environment', () => {
+		vi.spyOn(agent_session_environment, 'own_session_pid').mockReturnValue(4242)
+
+		expect(backlog_drive_cli.parse([])?.owner).toBe('4242')
+	})
+
+	it('refuses where the session exports none', () => {
+		vi.spyOn(agent_session_environment, 'own_session_pid').mockReturnValue(undefined)
+
+		expect(backlog_drive_cli.parse([])).toBeUndefined()
+	})
+
+	it('marks the owner optional in its usage', () => {
+		expect(backlog_drive_args.USAGE).toContain('backlog:drive [--owner <pid>]')
+	})
+})
+
 it.each([
-	[[]],
 	[['--owner', 'abc']],
 	[['--owner', '1', '--exclude', '2400,--evil']],
 	[['--owner', '1', '--exclude', '0']],

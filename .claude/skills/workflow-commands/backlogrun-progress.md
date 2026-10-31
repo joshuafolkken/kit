@@ -7,7 +7,7 @@ Point-of-use, read one section at a time from `backlogrun.md` → "The manifest 
 **`backlog:drive` walks this loop on its own; a session runs it when the driver hands back `epic #N`.**
 Each child runs as `fullrun #<N>` in a lane —
 `pnpm josh lane:launch <N>` (`backlogrun-lanes.md` → "Opening one lane and dispatching its child"),
-then `pnpm josh lane:await <N...> --owner "$PPID"` in the background — and every ending is read by one
+then `pnpm josh lane:await <N...>` in the background — and every ending is read by one
 command:
 
 ```bash
