@@ -1,6 +1,6 @@
 import { lane_breakdown, type Breakdown, type Segment, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
-import { lane_ledger, type LedgerEntry } from './lane-ledger'
+import { lane_ledger, type LedgerEntry, type ShipLapEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // What each ship stage of a lane's breakdown spent its time on (joshuafolkken/kit#5294): the laps the
@@ -21,10 +21,20 @@ interface Placed {
 	part: Stage
 }
 
+// Which run of the ship's scoped pair a lap was and why it ran again (joshuafolkken/kit#5538), and why
+// a check read the whole branch (joshuafolkken/kit#5531), after the step's name.
+function lap_name(entry: ShipLapEntry): string {
+	const run = entry.rerun === undefined ? [] : [`run ${String(entry.runs)}: ${entry.rerun}`]
+	const whole = entry.fallback === undefined ? [] : [`whole branch: ${entry.fallback}`]
+	const notes = [...run, ...whole]
+
+	return notes.length === 0 ? entry.step : `${entry.step} (${notes.join('; ')})`
+}
+
 function lap_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
 	if (entry.kind !== KIND.SHIP_LAP || entry.issue !== issue) return []
 
-	return [{ at_ms: Date.parse(entry.at), part: { name: entry.step, ms: entry.elapsed_ms } }]
+	return [{ at_ms: Date.parse(entry.at), part: { name: lap_name(entry), ms: entry.elapsed_ms } }]
 }
 
 function wait_of(entry: LedgerEntry, issue: number): ReadonlyArray<Placed> {
