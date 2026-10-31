@@ -204,6 +204,27 @@ describe('acceptance_map.skeleton', () => {
 	})
 })
 
+// joshuafolkken/kit#5541: a test the change added that names a criterion's identifier meets its row.
+describe('acceptance_map.with_test_rows', () => {
+	const skeleton = acceptance_map.skeleton(issue_with([FIRST, SECOND])) ?? ''
+	const naming = `acceptance_map > refuses an unmapped criterion (${id(FIRST)})`
+
+	it('meets a pending row a test title names, leaving the unnamed row pending (ac-6863b4b8)', () => {
+		const filled = acceptance_map.with_test_rows(skeleton, [naming, 'an unrelated test'])
+
+		expect(filled).toContain(`- \`${id(FIRST)}\` ${FIRST} — 満たした: \`${naming}\``)
+		expect(filled).toContain(`- \`${id(SECOND)}\` ${SECOND} — 未記入`)
+		expect([...acceptance_map.rows_of(filled).met]).toStrictEqual([id(FIRST)])
+	})
+
+	it('never rewrites a row the run already filled in (ac-05552640)', () => {
+		const written = `- \`${id(FIRST)}\` ${FIRST} — 見送り: ${SPLIT_OFF} later`
+		const body = [acceptance_map.MAP_HEADING, '', written].join('\n')
+
+		expect(acceptance_map.with_test_rows(body, [naming])).toBe(body)
+	})
+})
+
 describe('acceptance_map.refusal_message', () => {
 	it('names the missing criterion, the absent deferral and the stale row', () => {
 		const message = acceptance_map.refusal_message(
