@@ -40,6 +40,9 @@ interface Breakdown {
 	yield_ms: number
 	// The waits taken out, each — the implementation's split leaves them out of its remainder too.
 	waits: ReadonlyArray<LaneSpan>
+	// The start-to-plan spans, waits left in — the window its longest calls are read in
+	// (joshuafolkken/kit#5539).
+	plan?: ReadonlyArray<LaneSpan>
 	// The implementation's spans, waits left in — the window its tool calls are read in.
 	implement: ReadonlyArray<LaneSpan>
 	// The ship pre-detach stage's spans — the window its `test:pinned` rows are read in
@@ -177,6 +180,18 @@ function spans_ms(spans: ReadonlyArray<LaneSpan>): number {
 	return spans.reduce((sum, span) => sum + span.to_ms - span.from_ms, 0)
 }
 
+type Windows = Pick<Breakdown, 'plan' | 'implement' | 'pre_detach' | 'ship'>
+
+// The stages' spans each later read is windowed by.
+function windows_of(segments: ReadonlyArray<Segment>): Windows {
+	return {
+		plan: segments.filter((segment) => segment.stage === PLAN_STAGE),
+		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
+		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),
+		ship: segments.filter((segment) => is_ship(segment)),
+	}
+}
+
 /**
  * `issue`'s lane by stage, or `undefined` when the ledger holds no dispatch and merge of it — the same
  * span and waits `lane_net_time.net_ms` reads, so the stages add up to it.
@@ -203,9 +218,7 @@ function of(
 		slept_ms: spans_ms(lane_net_time.slept(events, span)),
 		yield_ms: spans_ms(lane_net_time.yielded(entries, events, issue, span)),
 		waits,
-		implement: segments.filter((segment) => segment.stage === IMPLEMENT_STAGE),
-		pre_detach: segments.filter((segment) => segment.stage === PRE_DETACH_STAGE),
-		ship: segments.filter((segment) => is_ship(segment)),
+		...windows_of(segments),
 		reasons: reasons_of(events, issue, span),
 	}
 }
@@ -227,6 +240,7 @@ const lane_breakdown = {
 	BETWEEN_STAGE,
 	FOLLOWUP_STAGE,
 	IMPLEMENT_STAGE,
+	PLAN_STAGE,
 	PRE_DETACH_STAGE,
 	covered_ms,
 	longest_of,

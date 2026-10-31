@@ -1,4 +1,5 @@
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
+import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
 import { lane_breakdown_implement, type ImplementDetail } from './lane-breakdown-implement'
 import { lane_breakdown_laps, type Laps } from './lane-breakdown-laps'
 import { lane_breakdown_pinned } from './lane-breakdown-pinned'
@@ -25,12 +26,16 @@ interface Report {
 	critical?: string
 	// Each ship stage's laps, and the Bash between ship stages, longest first (joshuafolkken/kit#5294).
 	laps?: Laps
+	// The start to plan's longest call groups (joshuafolkken/kit#5539).
+	plan_calls?: ReadonlyArray<CallGroup>
 }
 
-// A stage's line and the laps printed under it.
+// A stage's line, the laps printed under it, and the call groups printed under it in the bullets
+// alone — the one-line form leaves them out.
 interface Entry {
 	text: string
 	laps: ReadonlyArray<string>
+	calls: ReadonlyArray<string>
 }
 
 function part_text(part: Stage): string {
@@ -69,12 +74,30 @@ function suffix_of(name: string, report: Report): string {
 	return suffixes[name] ?? reason_text(report.breakdown.reasons?.get(name))
 }
 
+// Each implementation kind's longest call groups, the kind leading each line.
+function implement_calls(detail: ImplementDetail): Array<string> {
+	return detail.kinds.flatMap((kind) =>
+		(detail.calls?.get(kind.name) ?? []).map(
+			(group) => `${kind.name} › ${lane_breakdown_calls.group_text(group)}`,
+		),
+	)
+}
+
+// The call groups printed under a stage, none for a stage other than the start to plan and the implement.
+function calls_of(name: string, report: Report): Array<string> {
+	if (name === lane_breakdown.IMPLEMENT_STAGE) return implement_calls(report.detail)
+	if (name !== lane_breakdown.PLAN_STAGE) return []
+
+	return (report.plan_calls ?? []).map((group) => lane_breakdown_calls.group_text(group))
+}
+
 function stage_entry(stage: Stage, report: Report): Entry {
 	const laps = report.laps?.get(stage.name) ?? []
 
 	return {
 		text: `${part_text(stage)}${suffix_of(stage.name, report)}`,
 		laps: laps.map((lap) => part_text(lap)),
+		calls: calls_of(stage.name, report),
 	}
 }
 
@@ -87,13 +110,13 @@ function entries_of(report: Report): Array<Entry> {
 	const discarded =
 		report.discarded === undefined || report.discarded === '' ? [] : [report.discarded]
 
-	const tail = [...discarded, excluded].map((text) => ({ text, laps: [] }))
+	const tail = [...discarded, excluded].map((text) => ({ text, laps: [], calls: [] }))
 
 	return [...breakdown.stages.map((stage) => stage_entry(stage, report)), ...tail]
 }
 
 function bullets_of(entry: Entry): Array<string> {
-	return [`- ${entry.text}`, ...entry.laps.map((lap) => `  - ${lap}`)]
+	return [`- ${entry.text}`, ...[...entry.laps, ...entry.calls].map((lap) => `  - ${lap}`)]
 }
 
 function inline_of(entry: Entry): string {
@@ -117,6 +140,7 @@ function report_of(
 		pinned: lane_breakdown_pinned.detail_text(rows),
 		discarded: lane_breakdown_pinned.discarded_text(entries, issue),
 		critical: lane_ci_path_stats.last_check_text(entries, issue),
+		plan_calls: lane_breakdown_implement.plan_calls(calls, breakdown),
 	}
 }
 

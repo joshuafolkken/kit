@@ -1,5 +1,6 @@
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
+import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
 import type { LaneSpan } from './lane-net-time'
 import type { Subagent, ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
@@ -42,6 +43,8 @@ interface ImplementDetail {
 	background: number
 	// Each subagent kind's backgrounded calls, counted at no time.
 	untimed: ReadonlyMap<string, number>
+	// Each kind's longest call groups (joshuafolkken/kit#5539).
+	calls?: ReadonlyMap<string, ReadonlyArray<CallGroup>>
 }
 
 function command_kind(command: string): string {
@@ -62,6 +65,7 @@ function kind_of(call: ToolCall): string | undefined {
 
 interface TimedPart extends Stage {
 	from_ms: number
+	call: ToolCall
 }
 
 function is_untimed_subagent(call: ToolCall): boolean {
@@ -77,7 +81,7 @@ function timed_part(call: ToolCall, span: LaneSpan): ReadonlyArray<TimedPart> {
 	const ms = Math.min(call.duration_ms ?? 0, span.to_ms - call.started_ms)
 	const is_counted = call.duration_ms !== undefined || is_untimed_subagent(call)
 
-	return is_counted ? [{ name, ms, from_ms: call.started_ms }] : []
+	return is_counted ? [{ name, ms, from_ms: call.started_ms, call }] : []
 }
 
 function untimed_of(placed: ReadonlyArray<readonly [ToolCall, LaneSpan]>): Map<string, number> {
@@ -126,7 +130,15 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 		kinds: lane_breakdown.ranked([...parts, remainder]),
 		background: placed.filter(([call]) => call.background).length,
 		untimed: untimed_of(placed),
+		calls: lane_breakdown_calls.by_kind(parts),
 	}
+}
+
+// The longest call groups of the start to plan (joshuafolkken/kit#5539).
+function plan_calls(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<CallGroup> {
+	const placed = placed_of(calls, breakdown.plan ?? [])
+
+	return lane_breakdown_calls.top_of(placed.flatMap(([call, span]) => timed_part(call, span)))
 }
 
 // The Bash calls started inside `spans`, by the implementation's kinds — the fixes, re-ships and checks
@@ -151,10 +163,10 @@ function transcript_directories(issue: number): ReadonlyArray<string> {
 		.filter((directory) => directory.endsWith(suffix))
 }
 
-// The tool calls of `issue`'s lane sessions still written to once its implementation began, up to the
+// The tool calls of `issue`'s lane sessions still written to once its start to plan began, up to the
 // end of its last ship stage.
 function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
-	const [first] = breakdown.implement
+	const [first] = [...(breakdown.plan ?? []), ...breakdown.implement]
 	const last = breakdown.ship.at(-1) ?? breakdown.implement.at(-1)
 
 	if (first === undefined || last === undefined) return []
@@ -164,7 +176,7 @@ function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
 	return lane_transcript_stats.read_calls(transcript_directories(issue), window)
 }
 
-const lane_breakdown_implement = { bash_kinds, of, read, transcript_directories }
+const lane_breakdown_implement = { bash_kinds, of, plan_calls, read, transcript_directories }
 
 export { lane_breakdown_implement }
 export type { ImplementDetail }
