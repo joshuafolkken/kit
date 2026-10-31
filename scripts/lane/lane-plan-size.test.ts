@@ -145,6 +145,15 @@ describe('lane_plan_size.oversize on a re-plan of a recorded plan', () => {
 		})
 	})
 
+	// joshuafolkken/kit#5605: a plan recorded `sized` before an unread listing or a yield met the bar too.
+	it('skips the lines axis for a sized plan that never cleared', () => {
+		const recorded = { ...plan_of(files(1)), sized: true }
+		const signals = { ...QUIET, lines_ratio: 1.8 }
+		const plan = plan_of(files(2))
+
+		expect(lane_plan_size.oversize(plan, declared(4, 200), recorded, signals)).toBeUndefined()
+	})
+
 	it('still answers hunks for a cleared plan', () => {
 		expect(replanned(declared(8, 100), { hunks: 17 })).toMatchObject({ reason: 'hunks' })
 	})

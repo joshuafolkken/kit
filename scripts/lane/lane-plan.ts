@@ -23,6 +23,8 @@ const lane_plan_schema = z.object({
 	paths: z.array(z.string()),
 	planned_at: z.string(),
 	cleared: z.boolean().optional(),
+	// The plan met the size bar (`lane-plan-size.ts`), whatever the overlap check answered after it.
+	sized: z.boolean().optional(),
 	// The lane gave its lane back on this plan (`lane-yield.ts`), so the plan outlives the lane.
 	yielded: z.boolean().optional(),
 })
@@ -65,6 +67,12 @@ function is_uncleared(issue: number, directory: string): boolean {
 		git_common_directory.repository(directory) !== undefined &&
 		read(issue, directory)?.cleared !== true
 	)
+}
+
+// Whether `plan` met the size bar — recorded `sized`, or cleared before `sized` was recorded
+// (joshuafolkken/kit#5605).
+function is_sized(plan: LanePlan | undefined): boolean {
+	return plan?.sized === true || plan?.cleared === true
 }
 
 // What an ended lane does with its plan. A plan the lane yielded on (`lane-yield.ts`,
@@ -130,6 +138,7 @@ function is_yield_held(issue: number, declared: Declared, directory: string): bo
 const lane_plan = {
 	clash_of,
 	earlier_holders,
+	is_sized,
 	is_uncleared,
 	is_yield_held,
 	is_yielded,
