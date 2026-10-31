@@ -114,7 +114,7 @@ Every kit hook command, Claude Code and Codex alike, has this shape (`scripts/in
 
 #### The batching guard
 
-- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`; `AskUserQuestion`, `Agent` and `Task` in the matcher are the rule guard's. All but `Write` are refusable; `Write` earns only a non-blocking notice. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
+- The batch guard reaches `Bash`, `Edit`, `Read`, `Write`, `Glob`, `Grep`, `WebFetch`; `AskUserQuestion`, `Agent` and `Task` in the matcher are the rule guard's. All but `Write` (a notice only) are refusable. Refused only when two single-call turns are closed behind it, the call is bundleable, and it touches nothing the sequence already touched.
 - **In a dispatched lane child** (`JOSH_LANE_CHILD`): off, except a chain of single-call `grep` / `rg` / `find` / `fd` / read-only `sed` searches, which the `search-batching` row refuses unless the investigation guard refuses the same call (`scripts/lane/lane-guard-policy.ts`). Why: `docs/maintainers/josh-commands-automation-rationale.md` → "The batching guard is off in a lane child".
 - **Fires more than once per run**: again every `REFIRE_EVERY` further single-call turns (the notice every `NOTICE_REFIRE_EVERY`); a batched turn starts a fresh sequence.
 - Set `JOSH_BATCH_GUARD` to `off` / `0` / `false` / `no` to disable.
@@ -504,9 +504,7 @@ Rows match by an identifier built from the criterion's text, so a reworded crite
 
 **Behavior:** waits for CI (every 10 s, a 32-minute budget, `JOSH_CI_TIMEOUT_SECONDS`), merges, then closes completed epics and the Issue, removes `in-progress` and flushes the ledger. A person's unacknowledged update stops it unmerged ([`josh issue:ack`](josh-commands-backlog.md#josh-issueack)). Give the call its longest timeout.
 
-**Check report:** a green run's completion notification (comment and Telegram) carries a `Checks:` list after the `--notify-message` text, one line per check: a failed check left in the green snapshot, marked `required` or `not required`; a job re-run as flaky; a retriggered rate-limited CodeRabbit review.
-
-A run with none adds no list. A red run, or a re-run on a merged PR, writes no list; `--notify-message` then names the failures by hand.
+**Check report:** a green run's completion notification lists under `Checks:` each failed check left in the green snapshot (`required` / `not required`), each job re-run as flaky and each retriggered rate-limited CodeRabbit review. A red run or a merged-PR re-run writes no list; `--notify-message` names its failures.
 
 **Output / exit codes:** exits non-zero naming the failing check on a red run; prints a per-stage timing block (`followup stage: <name> <n> s`) on both success and failure.
 
@@ -621,7 +619,7 @@ pnpm josh review:record --from-slot --issue 2325 2=filed:#7                     
 
 The findings are a `/code-review` round's, written as `- rf:` lines in the issue's ledger file (`.josh/observations/<N>.md`) — the one write path for findings. Each code round opens with a `- rb:<date> | #<N>` boundary line, so [`josh review:round2`](josh-commands-backlog.md#josh-reviewround2) reads only the latest round's lines.
 
-`--from-slot` records what the reviewer wrote with [`josh review:submit`](josh-commands-run.md#josh-reviewsubmit) (`--interaction`: that slot), each finding `fixed` unless a positional `<n>=<disposition>` gives its 1-based line another. A slot nobody wrote, or an `<n>` past its last line, is refused.
+`--from-slot` records the findings written with [`josh review:submit`](josh-commands-run.md#josh-reviewsubmit) (`--interaction`: that slot's), each `fixed` unless a positional `<n>=<disposition>` names another for its 1-based line. An unwritten slot or an `<n>` past the last line is refused.
 
 **Behavior:** each positional is `'<category>:<severity>:<file>[ — <reason>]'` (quoted).
 
@@ -688,7 +686,7 @@ A `private: true` package skips the npm stage.
 
 Watch budgets (default 30 minutes each): `JOSH_RELEASE_TAG_TIMEOUT_SECONDS` (tag), `JOSH_RELEASE_NPM_TIMEOUT_SECONDS` (npm publish), `JOSH_RELEASE_GITHUB_RELEASE_TIMEOUT_SECONDS` (GitHub Release).
 
-**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base can be found, the `release/v<version>` branch is already taken (locally or on origin), or a watched stage (tag, npm version, GitHub Release) never appears, which prints that stage with ❌.
+**Output / exit codes:** exits 0 and writes nothing when the pending count is zero; exits non-zero if `origin/<default>` cannot be read, no version base is found, `release/v<version>` already exists (locally or on origin), or a watched stage never appears (printed with ❌).
 
 The npm watch stops early when the tag's `Publish` run fails; its ❌ line names the run ID.
 
