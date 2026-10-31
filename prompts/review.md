@@ -87,7 +87,7 @@ pnpm josh review:brief --level-only --staged   # the staged diff
 `pnpm josh run:review` writes its brief to a file beside round 1's where it is due, printing both paths; one still owed after round 1
 takes `pnpm josh review:brief --interaction`. Hand it to a reviewer subagent, dispose of the findings
 by the three-way disposition below, and record the pass with
-`pnpm josh review:record --interaction --issue <N> [<category>:<severity>:<file> ...]`.
+`pnpm josh review:record --from-slot --interaction --issue <N> [<n>=<disposition> ...]`.
 
 `pnpm josh followup` refuses a due change with none recorded; `pnpm josh ship --review` runs it itself, beside round 1, and stops once on the findings of both.
 

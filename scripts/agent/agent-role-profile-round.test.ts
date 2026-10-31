@@ -98,7 +98,7 @@ describe('the review round override refusals', () => {
 describe('describe_review', () => {
 	it('names the round beside the profile', () => {
 		expect(agent_role_profile.describe_review(ROUND_TWO, DEFAULT_PROFILES.reviewer)).toBe(
-			'review round 2 · provider=anthropic role=reviewer model=claude-opus-5-5 effort=medium',
+			'review round 2 · provider=anthropic role=reviewer model=claude-opus-5-5 (opus) effort=medium',
 		)
 	})
 })
