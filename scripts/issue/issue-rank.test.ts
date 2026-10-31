@@ -155,8 +155,9 @@ describe('issue_rank.rank accumulated cause loss', () => {
 	})
 })
 
-// joshuafolkken/kit#5302: a declared weekly speed-up is the key after the cause loss and before the
-// dependents, so a measured time-saver runs ahead of an unmeasured feature of its priority.
+// joshuafolkken/kit#5302: a declared weekly speed-up is a key below the cause loss and, since
+// joshuafolkken/kit#5506, below the dependents, so a measured time-saver runs ahead of an unmeasured
+// feature of its priority.
 describe('issue_rank.rank weekly gain', () => {
 	const SAVER = 'saver'
 	const BIG_SAVER = 'big-saver'
@@ -175,10 +176,10 @@ describe('issue_rank.rank weekly gain', () => {
 		expect(names_of(rows)).toStrictEqual([BIG_SAVER, SAVER, PLAIN, PLAIN_SECOND])
 	})
 
-	it('keeps a declared cause loss ahead of the gain, and the gain ahead of the dependents', () => {
-		const rows = [row(WAITED_ON, [], MANY), gained(SAVER, GAIN_MINUTES), lost(DEFECT, LOST_MINUTES)]
+	it('keeps a declared cause loss ahead of the dependents, and the dependents ahead of the gain', () => {
+		const rows = [gained(SAVER, GAIN_MINUTES), row(WAITED_ON, [], MANY), lost(DEFECT, LOST_MINUTES)]
 
-		expect(names_of(rows)).toStrictEqual([DEFECT, SAVER, WAITED_ON])
+		expect(names_of(rows)).toStrictEqual([DEFECT, WAITED_ON, SAVER])
 	})
 
 	it('never lets the gain lift an issue over a higher priority', () => {
@@ -230,5 +231,52 @@ describe('issue_rank.count_dependents', () => {
 		expect(counts.get('a')).toBe(2)
 		expect(counts.get('b')).toBe(1)
 		expect(counts.get('c')).toBeUndefined()
+	})
+
+	// joshuafolkken/kit#5506: a chain's head counts every row behind it.
+	it('counts the rows down a chain transitively', () => {
+		const counts = issue_rank.count_dependents([
+			{ key: 'a', blockers: [] },
+			{ key: 'b', blockers: ['a'] },
+			{ key: 'c', blockers: ['b'] },
+		])
+
+		expect(counts.get('a')).toBe(2)
+		expect(counts.get('b')).toBe(1)
+		expect(counts.get('c')).toBeUndefined()
+	})
+
+	it('stops on a cycle, counting each side once', () => {
+		const counts = issue_rank.count_dependents([
+			{ key: 'a', blockers: ['b'] },
+			{ key: 'b', blockers: ['a'] },
+		])
+
+		expect(counts.get('a')).toBe(1)
+		expect(counts.get('b')).toBe(1)
+	})
+})
+
+// joshuafolkken/kit#5506: the head of a chain of three runs ahead of an independent issue of its
+// priority that declares a weekly gain.
+describe('issue_rank.rank chain head', () => {
+	const HEAD = 'head'
+	const INDEPENDENT = 'independent'
+	const GAIN_MINUTES = 10
+
+	it('puts the chain head ahead of an independent priority:high issue with a weekly gain', () => {
+		const dependents = issue_rank.count_dependents([
+			{ key: HEAD, blockers: [] },
+			{ key: 'second', blockers: [HEAD] },
+			{ key: 'third', blockers: ['second'] },
+			{ key: 'fourth', blockers: ['third'] },
+		])
+		const rows = [
+			{ ...gained(INDEPENDENT, GAIN_MINUTES), labels: [PRIORITY_HIGH_LABEL] },
+			row(HEAD, [PRIORITY_HIGH_LABEL], dependents.get(HEAD)),
+		]
+
+		expect(dependents.get(HEAD)).toBe(MANY)
+		expect(names_of(rows)).toStrictEqual([HEAD, INDEPENDENT])
 	})
 })
