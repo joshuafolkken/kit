@@ -5,6 +5,7 @@ import { environment_file_fixture } from '#ports/environment-file-fixture'
 import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import type { LaunchResult } from '#scripts/run/detached-launch'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PreflightResult } from './backlog-preflight'
 import { backlogrun_cli, type BacklogrunPorts } from './backlogrun-cli'
 import type { StartResult } from './backlogrun-launch'
 import type { StopReport } from './backlogrun-stop'
@@ -26,6 +27,7 @@ function ports_for(is_running = false): BacklogrunPorts {
 			kind: 'launched',
 			launched: { pid: 1, log_path: '/log', session: undefined },
 		})),
+		preflight: vi.fn((): PreflightResult => ({ kind: 'standing' })),
 		start_supervisor: vi.fn((): LaunchResult => ({ kind: 'launched', pid: 1 })),
 		stop: vi.fn(async (): Promise<StopReport> => ({
 			supervisor: undefined,

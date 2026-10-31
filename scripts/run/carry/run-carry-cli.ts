@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
+import { backlog_preflight } from '#scripts/backlog/backlog-preflight'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { cost_verdict } from '#scripts/cost-runtime/cost-verdict'
@@ -44,6 +45,10 @@ const MISMATCH_VERDICT = 'mismatch'
 const BUSY_VERDICT = 'busy'
 const STANDING_VERDICT = 'standing'
 const UNKNOWN_VERDICT = 'unknown'
+// The launched parent, over the record its launch already handed to the supervisor.
+const DRIVING_VERDICT = 'driving'
+const DRIVING_MESSAGE =
+	'The supervisor `josh backlogrun` started is already driving this run, so this session took no record. Report the plan and settle every `needs-decision` issue, then end the turn — no `run:step` hand-off.'
 const COMMAND = 'run:carry'
 // The invocation has taken its maximum cuts. A benign, non-failing refusal:
 // the run carries on uncut rather than paying a cold preamble the accumulation it would shed no longer
@@ -176,6 +181,28 @@ async function start_fresh(
 	return report_carry(BEGAN_VERDICT, carry, is_json)
 }
 
+// The parent `josh backlogrun` launched, meeting the record its preflight handed to the supervisor:
+// the loop is already driven, so this parent reports the plan and settles `needs-decision` beside the
+// lanes, and takes nothing (`backlog-preflight.ts`).
+async function report_carried(
+	target: string,
+	carry: RunCarry,
+	request: CarryClaimRequest,
+	is_json: boolean,
+): Promise<number> {
+	const directory = await run_carry.repository_directory()
+	const is_driven =
+		directory !== undefined && backlog_preflight.is_driven_for(directory, carry, request.owner)
+
+	if (!is_driven || carry.invocation !== request.invocation) {
+		return report_claim(target, carry, request, is_json)
+	}
+
+	console.error(DRIVING_MESSAGE)
+
+	return report(DRIVING_VERDICT, carry, is_json, SUCCESS_EXIT_CODE)
+}
+
 // **A standing record is never replaced, and never resumed into by something else.** Replacing one
 // would restart the budget the cut exists to carry, and resuming into one would put two parents on a
 // single budget. Its age changes none of that: a record is replaced by nothing but a person's `--end`.
@@ -188,7 +215,7 @@ async function begin(
 
 	if (read.kind === 'unreadable') return report_unreadable(is_json)
 
-	if (read.kind === 'carried') return report_claim(target, read.carry, request, is_json)
+	if (read.kind === 'carried') return await report_carried(target, read.carry, request, is_json)
 
 	return await start_fresh(target, request, is_json)
 }

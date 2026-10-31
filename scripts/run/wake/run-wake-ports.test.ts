@@ -3,12 +3,14 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_diagnostics } from '#scripts/agent/agent-diagnostics'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WakeContext } from './run-wake-describe'
+import { run_wake_driver } from './run-wake-driver'
 import { run_wake_ports } from './run-wake-ports'
 import { run_wake_session, type LaunchResult } from './run-wake-session'
 
@@ -96,6 +98,20 @@ describe('run_wake_ports.ports_for — code staleness', () => {
 		const ports = run_wake_ports.ports_for(context(), PROFILE, async () => true)
 
 		expect(await ports.is_code_stale()).toBe(true)
+	})
+})
+
+// joshuafolkken/kit#5516: triage waits for the launched parent this repository's launch names.
+describe('run_wake_ports.ports_for — the launched parent planning', () => {
+	it('drives with the launched parent of this repository as the planning check', async () => {
+		const drive = vi.spyOn(run_wake_driver, 'drive').mockResolvedValue({ kind: 'released' })
+		const parent = vi.spyOn(backlogrun_launch, 'running_parent').mockReturnValue(SESSION_PID)
+
+		await run_wake_ports.ports_for(context(), PROFILE).drive()
+		const is_parent_planning = drive.mock.calls[0]?.[2]
+
+		expect(is_parent_planning?.()).toBe(true)
+		expect(parent).toHaveBeenCalledWith(context().git_directory)
 	})
 })
 
