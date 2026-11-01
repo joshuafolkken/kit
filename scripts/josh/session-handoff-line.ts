@@ -1,9 +1,9 @@
-import { text } from 'node:stream/consumers'
 import { json_value } from '#scripts/lib/json-value'
 import { consultation_handoff } from '#scripts/rules/consultation-handoff'
 import { run_handoff_args } from '#scripts/run/handoff/run-handoff-args'
 import { time_density_hook } from '#scripts/time-runtime/time-density-hook'
 import { z } from 'zod'
+import { session_model_record } from './session-model-record'
 
 // The `session-lang` prompt hook's handoff line (joshuafolkken/kit#5622): a workflow keyword typed to
 // a consultation-model main line (Fable, Codex Astra) is pointed at `run:handoff` at the prompt, one
@@ -37,7 +37,8 @@ function keyword_of(prompt: string): string | undefined {
 }
 
 // A transcript that cannot be read leaves the payload's `model` to decide. Claude Code's payload has
-// none, so its first prompt — no assistant turn yet — gets no line (joshuafolkken/kit#5761).
+// none, so its first prompt — no assistant turn yet — reads the model recorded at session start
+// (`session-model-record.ts`, joshuafolkken/kit#5761).
 function tail_of(transcript_path: string | null | undefined): string {
 	if (transcript_path === undefined || transcript_path === null) return ''
 
@@ -64,8 +65,9 @@ function line_of(payload: PromptPayload): string {
 	const tail = tail_of(payload.transcript_path)
 
 	const model = payload.model ?? undefined
+	const recorded = session_model_record.recorded(payload.transcript_path)
 
-	return consultation_handoff.is_consultation_main(tail, model) ? line_for(keyword) : ''
+	return consultation_handoff.is_consultation_main(tail, model, recorded) ? line_for(keyword) : ''
 }
 
 function handoff_line(raw_payload: string): string {
@@ -74,11 +76,10 @@ function handoff_line(raw_payload: string): string {
 	return payload === undefined ? '' : line_of(payload)
 }
 
-// A terminal run of `josh session:lang` has no payload to wait for.
-async function read_stdin(): Promise<string> {
-	return process.stdin.isTTY ? '' : await text(process.stdin)
+const session_handoff_line = {
+	LINE_PREFIX,
+	handoff_line,
+	read_stdin: session_model_record.read_stdin,
 }
-
-const session_handoff_line = { LINE_PREFIX, handoff_line, read_stdin }
 
 export { session_handoff_line }
