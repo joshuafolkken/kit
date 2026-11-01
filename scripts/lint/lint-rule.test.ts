@@ -184,7 +184,7 @@ describe('lint_rule.run_lint_rule — no answer', () => {
 	it("never reads an earlier run's report as this one's", async () => {
 		eslint_writes(two_file_report())
 		await lint_rule.run_lint_rule([RULE], fixture.root)
-		eslint_writes(undefined, ESLINT_FATAL_EXIT_CODE)
+		eslint_writes(undefined, ESLINT_FOUND_EXIT_CODE)
 
 		await expect(lint_rule.run_lint_rule([RULE], fixture.root)).resolves.toBe(FAIL_EXIT_CODE)
 	})

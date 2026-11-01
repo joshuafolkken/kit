@@ -221,4 +221,3 @@ const lint_parallel = {
 }
 
 export { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS }
-export type { EslintRun }
