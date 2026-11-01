@@ -21,7 +21,7 @@ const { ANTHROPIC_PROVIDER, OPENAI_PROVIDER } = agent_provider
 const { READ_LINE_CAP, is_broad_investigation, is_delegated_investigation } = broad_investigation
 const DELEGATION = '.claude/skills/workflow-commands/delegation.md'
 const TOPIC = `\`${DELEGATION}\` → "A consultation main line hands its investigation to a unit"`
-const NARROW_EXAMPLE = `\`Read\` with \`offset\` / \`limit\` <= ${String(READ_LINE_CAP)}, \`grep -n <pattern> <one file>\``
+const NARROW_EXAMPLE = `\`Read\` of a file or an \`offset\` / \`limit\` range <= ${String(READ_LINE_CAP)} lines, \`grep -n <pattern> <one file>\``
 
 const QUIET = `a main line on any other model, or a narrow check (${NARROW_EXAMPLE})`
 

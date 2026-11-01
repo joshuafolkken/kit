@@ -19,6 +19,8 @@ function lines(count: number): string {
 beforeAll(() => {
 	writeFileSync(path.join(WORK_DIRECTORY, 'short.ts'), lines(SHORT_LINES))
 	writeFileSync(path.join(WORK_DIRECTORY, 'long.ts'), lines(READ_LINE_CAP * 2))
+	// The cap's own count of lines, the last one ended by a final newline.
+	writeFileSync(path.join(WORK_DIRECTORY, 'at-cap.ts'), `${lines(READ_LINE_CAP)}\n`)
 	mkdirSync(path.join(WORK_DIRECTORY, 'tree'))
 	vi.stubEnv('JOSH_HOOK_CWD', WORK_DIRECTORY)
 })
@@ -61,6 +63,7 @@ describe('broad_investigation_shell.is_broad_command — the narrow', () => {
 		'head long.ts',
 		'tail -20 long.ts',
 		'cat short.ts',
+		'cat at-cap.ts',
 		'cat <<EOF\nbody\nEOF',
 		'git status',
 		'git diff | rg TODO',
