@@ -10,23 +10,29 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_clear_label: vi.fn() },
 }))
+vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { record: vi.fn() } }))
 vi.mock('#scripts/run/park/run-park', () => ({ run_park: { clear: vi.fn() } }))
 
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
+const { epic_blocked_by } = await import('#scripts/epic/epic-blocked-by')
 const { run_park } = await import('#scripts/run/park/run-park')
 const apply_label = vi.mocked(git_gh_command.issue_apply_label)
 const post_comment = vi.mocked(git_gh_command.issue_comment)
 const clear_label = vi.mocked(git_gh_issue_write.issue_clear_label)
 const clear_record = vi.mocked(run_park.clear)
+const record_blocked_by = vi.mocked(epic_blocked_by.record)
 
 const ISSUE = '5636'
+const BLOCKER = '5647'
 const DIRECTORY = '/lane/5636'
 const REASON = 'no gate path is named'
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 const LANE_ARGV = ['--apply', ISSUE, '--lane', '--reason', REASON]
 const CLEAR_ARGV = [...LANE_ARGV, '--clear']
+const BLOCKED_BY_FLAG = '--blocked-by'
+const BLOCKED_ARGV = ['--apply', ISSUE, BLOCKED_BY_FLAG, BLOCKER, '--reason', REASON]
 
 vi.spyOn(console, 'info').mockImplementation(() => undefined)
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -52,16 +58,27 @@ beforeEach(() => {
 
 		return { is_applied: true }
 	})
+	record_blocked_by.mockImplementation(async (request) => {
+		order.push(`blocked-by ${request.prerequisite}`)
+
+		return 'recorded'
+	})
 })
 
 describe('josh backlog:triage — the arguments', () => {
 	it.each([
 		['no issue', ['--lane', '--reason', REASON]],
-		['no run label', ['--apply', ISSUE, '--reason', REASON]],
+		['no run label and no blocker', ['--apply', ISSUE, '--reason', REASON]],
 		['both run labels', ['--apply', ISSUE, '--lane', '--solo', '--reason', REASON]],
+		['both run labels beside a blocker', [...BLOCKED_ARGV, '--lane', '--solo']],
 		['a blank reason', ['--apply', ISSUE, '--lane', '--reason', ' ']],
 		['a non-number issue', ['--apply', 'abc', '--lane', '--reason', REASON]],
-		['an unknown flag', [...LANE_ARGV, '--blocked-by', '1']],
+		['a non-number blocker', ['--apply', ISSUE, BLOCKED_BY_FLAG, 'abc', '--reason', REASON]],
+		[
+			'the issue as its own blocker',
+			['--apply', ISSUE, BLOCKED_BY_FLAG, ISSUE, '--reason', REASON],
+		],
+		['an unknown flag', [...LANE_ARGV, '--force']],
 	])('refuses %s with the usage and writes nothing', async (_case, argv) => {
 		expect(await backlog_triage_cli.run(argv, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(backlog_triage_cli.USAGE)
@@ -111,5 +128,38 @@ describe('josh backlog:triage --apply', () => {
 		apply_label.mockResolvedValueOnce({ is_applied: false, reason: 'denied' })
 
 		expect(await backlog_triage_cli.run(LANE_ARGV, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+	})
+})
+
+describe('josh backlog:triage --blocked-by', () => {
+	it('names the flag in the usage', () => {
+		expect(backlog_triage_cli.USAGE).toContain(`[${BLOCKED_BY_FLAG} <M>]`)
+	})
+
+	it('records the relation in place of a run label', async () => {
+		expect(await backlog_triage_cli.run(BLOCKED_ARGV, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
+		expect(order).toStrictEqual([`blocked-by ${BLOCKER}`, 'comment'])
+		expect(record_blocked_by).toHaveBeenCalledWith({ issue: ISSUE, prerequisite: BLOCKER })
+		expect(post_comment.mock.calls[0]?.[1]).toContain(`blocked by #${BLOCKER}`)
+	})
+
+	it('records the relation before the comment and the run label when both are given', async () => {
+		expect(await backlog_triage_cli.run([...BLOCKED_ARGV, '--solo'], DIRECTORY)).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(order).toStrictEqual([`blocked-by ${BLOCKER}`, 'comment', `label ${RUN_SOLO_LABEL}`])
+	})
+
+	it('comments nothing and applies no run label when the relation cannot be recorded', async () => {
+		const refusal = 'declaration refused'
+
+		record_blocked_by.mockRejectedValueOnce(new Error(refusal))
+
+		expect(await backlog_triage_cli.run([...BLOCKED_ARGV, '--lane'], DIRECTORY)).toBe(
+			FAILURE_EXIT_CODE,
+		)
+		expect(post_comment).not.toHaveBeenCalled()
+		expect(apply_label).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(refusal))
 	})
 })

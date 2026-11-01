@@ -1,0 +1,7 @@
+{
+	"reason": "backlog:triage gains --blocked-by (#5647): the flag, its validation (a non-number or self blocker), the epic-aware relation write shared with run:pause via scripts/epic/epic-blocked-by.ts, and its usage docs",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 62
+	}
+}
