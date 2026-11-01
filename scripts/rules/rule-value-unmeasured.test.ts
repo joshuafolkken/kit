@@ -17,6 +17,7 @@ const UNMEASURABLE_ROWS: ReadonlyArray<string> = [
 	'credential-body',
 	'raw-field-body',
 	'round-one-check-related',
+	'repeat-check-related',
 	'test-declared',
 	'lane-background',
 	'lane-split-park',
