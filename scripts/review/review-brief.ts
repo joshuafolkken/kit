@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
 import { file_map_stamp, type FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { removed_tests } from './removed-tests'
 import { review_brief_paths } from './review-brief-paths'
@@ -478,13 +478,13 @@ function interaction_block(targets: ReadonlyArray<string> | undefined): Readonly
 }
 
 function compose(input: BriefInput): string {
-	const profile = input.profile ?? agent_role_profile.DEFAULT_PROFILES.reviewer
+	const profile = input.profile ?? agent_profile_schema.DEFAULT_PROFILES.reviewer
 	const target = target_block(input)
 
 	return [
 		input.level,
 		'',
-		`Agent profile: ${agent_role_profile.describe(profile)}`,
+		`Agent profile: ${agent_profile_schema.describe(profile)}`,
 		'',
 		rubric_line(input.rubric_path),
 		'',

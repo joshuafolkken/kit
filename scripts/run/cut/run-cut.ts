@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { git_command } from '#scripts/git/git-command'
 import { git_common_directory } from '#scripts/git/git-common-directory'
@@ -34,13 +34,13 @@ import { run_cut_handoff, type Handoff } from './run-cut-handoff'
 // pre-gate cut with an implementation cut after returning to review fixes.
 
 const CUT_PREFIX = 'josh-run-cut-'
-// **The two phase names are `agent-role-profile.ts`'s**: a lane child resumes into a phase, and that
-// module resolves the effort the resumed child runs at from the same name. Reading them from there
-// rather than restating the literals here is what keeps the phase a cut records and the phase the
-// effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
+// **The two phase names are `agent-profile-schema.ts`'s**: a lane child resumes into a phase, and
+// `agent-role-profile.ts` resolves the effort the resumed child runs at from the same name. Reading
+// them from `agent-profile-schema.ts` rather than restating the literals here is what keeps the phase
+// a cut records and the phase the effort table is keyed on from drifting. `PRE_GATE_PHASE` is the boundary before the gate;
 // `IMPLEMENTATION_PHASE` drops the thinking accumulated *during* implementation and resumes back into
 // implementation (`resumes_into_implementation`); only the pre-gate cut resumes into the gate.
-const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_role_profile
+const { PRE_GATE_PHASE, IMPLEMENTATION_PHASE } = agent_profile_schema
 // **The bound is `backlog-budget.ts`'s idle wait, imported rather than restated**, so the eight hours
 // stay written once. A resume is expected within seconds of the cut, so this age is only a backstop
 // against a fresh process that never started; an expired record is cleared and replaced by the next

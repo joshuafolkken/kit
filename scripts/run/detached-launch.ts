@@ -1,7 +1,8 @@
 import { spawn, type SpawnOptions } from 'node:child_process'
 import { closeSync, constants, openSync, writeSync } from 'node:fs'
 import { agent_launch_environment } from '#scripts/agent/agent-launch-environment'
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { agent_session_environment } from '#scripts/josh/agent-session-environment'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { launch_priority } from '#scripts/run/launch-priority'
@@ -72,7 +73,7 @@ interface LaunchRequest {
 	profile?: AgentProfile | undefined
 }
 
-const { is_safe_prompt, is_safe_value } = agent_role_profile
+const { is_safe_prompt, is_safe_value } = agent_safe_text
 const LAST = -1
 
 // An agent vector's prompt, the last element, may break lines; every other element is a value.
@@ -114,7 +115,7 @@ const LOG_FLAGS = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | 
 const LOG_MODE = 0o600
 
 function profile_suffix(profile: AgentProfile | undefined): string {
-	return profile === undefined ? '' : ` · ${agent_role_profile.describe(profile)}`
+	return profile === undefined ? '' : ` · ${agent_profile_schema.describe(profile)}`
 }
 
 // One line in front of each launch, so the sessions started into one file can be told apart. The

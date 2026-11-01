@@ -1,5 +1,5 @@
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { agent_provider } from '#scripts/agent/agent-provider'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { own_session } from '#scripts/cost-runtime/own-session'
 import type { RunCut } from './run-cut'
 
@@ -34,8 +34,8 @@ function matches_run(previous: RunCut, next: RunCut): boolean {
 
 function can_replace(previous: RunCut, next: RunCut): boolean {
 	return (
-		previous.phase === agent_role_profile.PRE_GATE_PHASE &&
-		next.phase === agent_role_profile.IMPLEMENTATION_PHASE &&
+		previous.phase === agent_profile_schema.PRE_GATE_PHASE &&
+		next.phase === agent_profile_schema.IMPLEMENTATION_PHASE &&
 		is_own_adoption(previous) &&
 		matches_run(previous, next)
 	)

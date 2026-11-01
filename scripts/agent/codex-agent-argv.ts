@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { agent_role_profile, type AgentProfile } from './agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from './agent-profile-schema'
 import { agent_session_role } from './agent-session-role'
 
 const AGENT_COMMAND = 'codex'
@@ -37,7 +37,7 @@ function sqlite_config(cwd: string): string {
 }
 
 function persistence_arguments(profile: AgentProfile): ReadonlyArray<string> {
-	return profile.role === agent_role_profile.WORKER ? [] : [EPHEMERAL_FLAG]
+	return profile.role === agent_profile_schema.WORKER ? [] : [EPHEMERAL_FLAG]
 }
 
 function lane_arguments(cwd: string | undefined, profile: AgentProfile): ReadonlyArray<string> {

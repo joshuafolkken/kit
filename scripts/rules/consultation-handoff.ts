@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_consultation_model } from '#scripts/agent/agent-consultation-model'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { bash_triggers } from './bash-triggers'
 import type { DeliveredRule } from './delivered-rules'
@@ -40,7 +40,7 @@ function is_not_consultation_main(tail: string, _call: unknown, run: GuardRun): 
 	if (run.is_unit === true) return true
 	const model = main_model_reader.main_model(tail, run.model)
 
-	return model === undefined || agent_role_profile.consultation_provider(model) === undefined
+	return model === undefined || agent_consultation_model.consultation_provider(model) === undefined
 }
 
 const ROW: DeliveredRule = {

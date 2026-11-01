@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentProfile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from '#scripts/agent/agent-profile-schema'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { durable_state } from '#scripts/josh/durable-state'
 import { process_identity } from '#scripts/josh/process-identity'
@@ -105,7 +105,7 @@ const run_wake_schema = process_owner_schema.extend({
 	woke_pid: z.number().optional(),
 	spawned: z.array(z.string()).optional(),
 	idle_since: z.string().optional(),
-	profile: agent_role_profile.PROFILE_SCHEMA.optional(),
+	profile: agent_profile_schema.PROFILE_SCHEMA.optional(),
 })
 
 // An unparsable stamp is overdue: a mark that cannot be confirmed is reported as a failure.
