@@ -100,6 +100,13 @@ describe('run_step_section — a lane child reads its own step of the chain', ()
 		expect(printed()).not.toContain(MAIN_MERGE_STEP)
 	})
 
+	// joshuafolkken/kit#5626: `run:review` prints its own row, so a lane child's open reads step 0 too.
+	it('prints step 0, not the main:merge step, for a lane child run:review', () => {
+		expect(run_step_section.print_section('run:review', process.cwd(), true)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^0\. \*\*A lane child\*\*/u)
+		expect(printed()).not.toContain(MAIN_MERGE_STEP)
+	})
+
 	it('prints the whole chain under implement outside a lane', () => {
 		expect(run_step_section.print_for(implement, false)).toBe(SUCCESS)
 		expect(printed()).toMatch(/^## Run the review-to-merge chain/u)

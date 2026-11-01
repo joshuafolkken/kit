@@ -1,5 +1,7 @@
 import { document_section_cli } from '#scripts/document/document-section-cli'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_step, type StepAction } from './run-step'
+import { run_step_section_once } from './run-step-section-once'
 
 // The section that governs each action `run:step` and `run:entry` print — the one table the action →
 // rule mapping lives in, so the manifests no longer carry a route table the reader walks to find it.
@@ -30,6 +32,10 @@ function reference(document: string, heading: string): SectionReference {
 const CHAIN_RULE = 'chain-rule.md'
 const CHAIN = reference(CHAIN_RULE, 'Run the review-to-merge chain')
 const PROGRESS = 'backlogrun-progress.md'
+// The chain's own commands, which print their row themselves (`print_once`); `run:step` prints the
+// `ship` row too, for the `ship --review` it hands.
+const SHIP = 'ship'
+const REVIEW = 'run:review'
 
 // Keyed on a verdict token, or on the josh subcommand a command action runs. An action with no row —
 // `wait`, `stop`, a `decide:` line — has no rule to read beyond its own line.
@@ -42,7 +48,8 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	['run:merge', reference(PROGRESS, "Running a named epic's children")],
 	['backlog:next', reference('backlogrun-steps.md', 'The loop')],
 	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
-	['ship', CHAIN],
+	[SHIP, CHAIN],
+	[REVIEW, CHAIN],
 	['retrospective', reference('retrospective.md', 'The end-of-run retrospective')],
 	['run:carry', reference(PROGRESS, 'The hand-off')],
 ])
@@ -55,7 +62,8 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 const LANE_CHILD_STEP = reference(CHAIN_RULE, 'A lane child')
 const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[run_step.IMPLEMENT, LANE_CHILD_STEP],
-	['ship', LANE_CHILD_STEP],
+	[SHIP, LANE_CHILD_STEP],
+	[REVIEW, LANE_CHILD_STEP],
 ])
 
 function key_of(action: StepAction): string {
@@ -73,13 +81,33 @@ function section_for(key: string, is_lane_child: boolean): SectionReference | un
 }
 
 // Printed through `doc:section` itself, so the extent, the Bash-cap split and the refusal of an
-// unresolved heading are that command's, never a second copy of them.
+// unresolved heading are that command's, never a second copy of them. Each print is recorded for the
+// session, so a command printing its own row after it prints one line (`print_once`).
 function print_section(key: string, root: string = process.cwd(), is_lane_child = false): number {
 	const found = section_for(key, is_lane_child)
 
 	if (found === undefined) return SUCCESS_EXIT_CODE
+	const exit_code = document_section_cli.run([found.document, found.heading], root)
 
-	return document_section_cli.run([found.document, found.heading], root)
+	if (exit_code === SUCCESS_EXIT_CODE) run_step_section_once.record(found)
+
+	return exit_code
+}
+
+// **A command's own row prints once per session** (joshuafolkken/kit#5626): `run:review` and `ship`
+// print the section that governs them, so the reader spends no `doc:section` turn on it, and a
+// section this session already printed — by `run:step`, or by the other command — is one line.
+function print_once(key: string, root: string = process.cwd()): number {
+	const is_lane_child = lane_child_marker.is_child_of(root)
+	const found = section_for(key, is_lane_child)
+
+	if (found === undefined || !run_step_section_once.is_recorded(found)) {
+		return print_section(key, root, is_lane_child)
+	}
+
+	console.info(run_step_section_once.repeat_line(found))
+
+	return SUCCESS_EXIT_CODE
 }
 
 function print_for(
@@ -96,6 +124,7 @@ const run_step_section = {
 	LANE_CHILD_SECTIONS,
 	key_of,
 	print_for,
+	print_once,
 	print_section,
 }
 

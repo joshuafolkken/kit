@@ -1,0 +1,8 @@
+{
+	"reason": "#5626 adds the once-per-session governing-section print shared by run:review and ship, and the SKILL.md row that says the commands print it",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 79,
+		"ai_cost.on_demand_bytes": 129
+	}
+}
