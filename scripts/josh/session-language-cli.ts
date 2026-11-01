@@ -1,6 +1,7 @@
 import { agent_session_role } from '#scripts/agent/agent-session-role'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { run_carry } from '#scripts/run/carry/run-carry'
+import { session_handoff_line } from './session-handoff-line'
 import { session_language, type Resolution } from './session-language'
 
 // `josh session:lang` — say, on stdout, which language this session writes in, so a
@@ -24,6 +25,9 @@ import { session_language, type Resolution } from './session-language'
 // run, so a session asked from the side never met it. The prompt is the one moment every session
 // shares, and the line is gated on the run being live, so a repository with no run pays nothing for
 // it. Live is `backlogrun_launch.is_running`'s answer, not a second reading of the records.
+//
+// **And the `run:handoff` line on a consultation model** — `session-handoff-line.ts`, read off the
+// hook's stdin payload.
 
 const { DEFAULT_SESSION_LANG, ENV_KEY, resolve_session_lang } = session_language
 
@@ -63,16 +67,21 @@ async function is_run_live(ports: LivePorts = LIVE_PORTS): Promise<boolean> {
 	}
 }
 
-function prompt_lines(resolution: Resolution, is_live: boolean): Array<string> {
+// `handoff` is `session_handoff_line`'s answer for this prompt's payload, `''` when it has none.
+function prompt_lines(resolution: Resolution, is_live: boolean, handoff = ''): Array<string> {
 	return [
 		agent_session_role.scope_line(),
 		format_line(resolution),
 		is_live ? BOARD_LINE : '',
+		handoff,
 	].filter((line) => line !== '')
 }
 
-async function print_prompt_lines(): Promise<void> {
-	const lines = prompt_lines(resolve_session_lang(), await is_run_live())
+async function print_prompt_lines(
+	read_payload: () => Promise<string> = session_handoff_line.read_stdin,
+): Promise<void> {
+	const handoff = session_handoff_line.handoff_line(await read_payload())
+	const lines = prompt_lines(resolve_session_lang(), await is_run_live(), handoff)
 
 	for (const line of lines) console.info(line)
 }
