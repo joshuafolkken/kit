@@ -144,6 +144,26 @@ describe('review_round_reuse.answer_here — the cause', () => {
 	})
 })
 
+// joshuafolkken/kit#5662: the moves no round reads ride on the reuse to the ship's reason line.
+describe('review_round_reuse.answer_here — the note', () => {
+	const NOTE = 'passed over documentation, a prompt or an inert path no round executes: docs/a.md'
+
+	beforeEach(() => {
+		check_mock.mockReset().mockResolvedValue({ status: 'ok' })
+		stopped_on_mock.mockReset().mockReturnValue(false)
+		refusal_mock.mockReset().mockResolvedValue(undefined)
+	})
+
+	it.each([
+		['held', REUSE.HELD],
+		['delta', REUSE.DELTA],
+	])('carries the standing note on a %s reuse', async (movement, reuse) => {
+		movement_mock.mockResolvedValue({ movement, note: NOTE })
+
+		expect(await review_round_reuse.answer_here(ISSUE)).toStrictEqual({ reuse, note: NOTE })
+	})
+})
+
 describe('review_round_reuse.is_stale_here', () => {
 	it('is stale when josh followup would refuse the review', async () => {
 		refusal_mock.mockResolvedValue(REFUSAL)

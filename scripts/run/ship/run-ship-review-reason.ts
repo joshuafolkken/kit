@@ -12,7 +12,9 @@ const RAN_PREFIX = 'ran: --review with no reusable round 1 — '
 const UNNAMED_CAUSE = 'the recorded round does not cover this tree'
 
 function reused(answer: ReuseAnswer): string {
-	return answer.reuse === review_round_reuse.REUSE.HELD ? HELD_REASON : DELTA_REASON
+	const reason = answer.reuse === review_round_reuse.REUSE.HELD ? HELD_REASON : DELTA_REASON
+
+	return answer.note === undefined ? reason : `${reason} — ${answer.note}`
 }
 
 function ran(answer: ReuseAnswer): string {
