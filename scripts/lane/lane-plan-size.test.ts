@@ -12,6 +12,7 @@ const DECLARED_BODY = '## 背景\n\n- 規模見積もり: 約 4 ファイル / 7
 const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
 const UNPLANNED = 'scripts/lane/unplanned.ts'
+const LANE_DIRECTORY = 'scripts/lane/'
 const QUIET: PlanSignals = { hunk_files: [], lines_ratio: undefined, split_filed: false }
 
 // `count` probed hunks, all in `file`.
@@ -180,10 +181,9 @@ describe('lane_plan_size.oversize on the hunks of a re-plan', () => {
 	})
 
 	it('passes 3 hunks under a directory the recorded plan claims', () => {
-		const directory = 'scripts/lane/'
-		const recorded = plan_of([directory])
+		const recorded = plan_of([LANE_DIRECTORY])
 		const signals = { ...QUIET, ...hunks(3) }
-		const plan = plan_of([directory, 'docs/x.md'])
+		const plan = plan_of([LANE_DIRECTORY, 'docs/x.md'])
 
 		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
 	})
@@ -213,9 +213,44 @@ describe('lane_plan_size.oversize on the hunks of a re-plan that restores a clea
 	})
 })
 
+// joshuafolkken/kit#5679: a plan recorded too narrow; the re-plan the ship's `unplanned` stop asks for adds
+// files no plan ever held, and passes while it stays within the files axis.
+describe('lane_plan_size.oversize on a re-plan that adds files to a narrow recorded plan', () => {
+	const [held = '', added = '', other = ''] = files(3)
+	const recorded = { ...plan_of([held, TEST_FILE]), cleared: true }
+	const signals = {
+		...QUIET,
+		hunk_files: [...hunks(5, added).hunk_files, ...hunks(4, other).hunk_files],
+	}
+
+	it('passes 9 hunks in the files the re-plan adds against a declaration of 3 files', () => {
+		const plan = plan_of([held, TEST_FILE, added, other])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers files for a re-plan past twice the declared files', () => {
+		const plan = plan_of([...files(7), TEST_FILE])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'files',
+			limit: 6,
+		})
+	})
+
+	it('still answers hunks for a re-plan that claims their directory', () => {
+		const plan = plan_of([held, TEST_FILE, LANE_DIRECTORY])
+
+		expect(lane_plan_size.oversize(plan, declared(3, 40), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			measured: 9,
+		})
+	})
+})
+
 describe('lane_plan_size.refusal_text', () => {
 	it.each([
-		['hunks', hunks(17), "17 hunks outside the recorded plan's files (tests excluded), over 16"],
+		['hunks', hunks(17), "17 hunks outside the plan's files (tests excluded), over 16"],
 		['lines', { lines_ratio: 1.8 }, 'about 360'],
 	])('names the %s axis and its measure', (reason, signals, measure) => {
 		const text = text_of(signalled(declared(8, 200), signals))
