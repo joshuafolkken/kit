@@ -14,6 +14,7 @@ const FIRST_HEADER_CELLS = [
 	'implement sub-stage',
 	'stop',
 	'gap',
+	'cuts',
 	'round 1',
 	'round 2',
 	'reason',

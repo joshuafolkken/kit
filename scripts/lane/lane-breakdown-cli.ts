@@ -5,6 +5,7 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { lane_breakdown } from './lane-breakdown'
 import { lane_breakdown_text } from './lane-breakdown-text'
+import { lane_cut_stats } from './lane-cut-stats'
 import { lane_ledger } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
 
@@ -37,8 +38,12 @@ async function print(issue: string): Promise<number> {
 	if (minutes === undefined || breakdown === undefined) return missing(issue)
 
 	const report = lane_breakdown_text.report_of(Number(issue), breakdown, entries)
+	const cuts = lane_cut_stats.line(events, Number(issue))
+	const cut_lines = cuts === undefined ? [] : [`- ${cuts}`]
 
-	console.info(lane_breakdown_text.comment(Number(issue), minutes, report))
+	console.info(
+		[lane_breakdown_text.comment(Number(issue), minutes, report), ...cut_lines].join('\n'),
+	)
 
 	return 0
 }
