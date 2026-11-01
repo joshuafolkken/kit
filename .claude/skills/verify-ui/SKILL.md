@@ -18,22 +18,16 @@ passing tests are not that look.
 
 State the list before capturing.
 
-## 2. Find this project's screenshot command
+## 2. Capture
 
-Stop at the first hit:
-
-1. `pnpm josh-app shot` — the SvelteKit application toolkit (`@joshuafolkken/app-kit`).
-2. `pnpm josh-game shot` — the game toolkit (`@joshuafolkken/game-kit`).
-3. A project-local script named `shot`, `screenshot` or `verify:ui` in `package.json`.
-
-Option 1 exists since app-kit 0.86.0; game-kit carries no `shot` yet —
-the version a project has installed is the only thing that decides.
-
-**Decide by the printed command list, not by whether the toolkit is installed.** Run the toolkit with
-no subcommand (`pnpm josh-app`) and read its usage line; an absent toolkit and one without `shot` both
-exit non-zero.
+Run `pnpm josh ui:shot <route>...` once, with every route (`pnpm josh ui:shot / /blog`). It finds this
+project's screenshot command and runs it; do not probe the candidates by hand. The command prints the
+image paths, and its exit status is the result. A failed capture is not a passed gate.
 
 ### When there is no screenshot command
+
+`ui:shot` says so — `no screenshot command in this project — tried:` and the candidates — and exits
+non-zero. Only then:
 
 **Capture through the project's own E2E suite**: add `await page.screenshot({ path: … })` to the
 Playwright spec covering the screen (or a new spec) and run it.
@@ -45,19 +39,15 @@ Never report the gate as satisfied on tests alone. Never stand up a preview serv
 it from a throwaway script. A project that should have the command and does not is an issue against
 the application toolkit.
 
-## 3. Capture
-
-Run the command once for every route (`pnpm josh-app shot / /blog`) and note the output directory (on
-the E2E fallback, the `path` option). A non-zero exit is the result. A failed capture is not a passed gate.
-
-## 4. Look at the images
+## 3. Look at the images
 
 Read every produced image with the Read tool — capturing without opening does not close the gate.
 Check the change's intent: element present, placed, sized, spaced, colored and worded as intended;
 nothing else disappeared or moved; the layout holds at the captured viewport.
 
-## 5. Report
+## 4. Report
 
-- **Matches the intent**: route by route, what you checked, with the image paths.
+- **Matches the intent**: route by route, what you checked, with the image paths (on the E2E
+  fallback, the `path` option).
 - **Does not match**: route, intended result, what the image shows, image path. Fix and capture again.
-- **Could not capture**: the report from step 2 or step 3, unchanged. This is not a pass.
+- **Could not capture**: the report from step 2, unchanged. This is not a pass.

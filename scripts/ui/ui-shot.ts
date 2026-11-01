@@ -1,5 +1,5 @@
-// `josh ui:shot <route>...` — resolve this project's screenshot command, in the `verify-ui` skill's
-// order, so a capture is one call rather than a hand-run probe of every candidate.
+// `josh ui:shot <route>...` — resolve this project's screenshot command, so the `verify-ui` skill's
+// capture is one call rather than a hand-run probe of every candidate. The order lives here alone:
 //
 // 1. A toolkit (`josh-app`, then `josh-game`) whose usage line lists `shot` — the printed command
 //    list decides, never the toolkit's presence (`type-check-step.ts`).
