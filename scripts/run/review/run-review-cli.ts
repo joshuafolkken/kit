@@ -115,14 +115,14 @@ async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewS
 	return review_interaction.round_one_slots(answer.status)
 }
 
-// A lane child's reopen after a round 1 the ship reuses is refused before anything is launched
-// (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
+// A lane child's reopen after an attested round 1 is refused before anything is launched, a widened
+// plan included (`review-lane-handover.ts`); the ship's own `--code-only` open is never refused.
 async function handover_refusal(is_code_only: boolean): Promise<string | undefined> {
 	if (is_code_only) return undefined
 	const issue = git_branch.issue_from_branch(await git_command.branch())
 	if (issue === undefined) return undefined
 
-	return (await review_lane_handover.is_handed_over(issue))
+	return (await review_lane_handover.is_reopen_refused(issue))
 		? review_lane_handover.refusal(issue)
 		: undefined
 }
