@@ -12,6 +12,7 @@ const SESSION = 'session-1'
 const WINDOW = { since_ms: 0, until_ms: 1000 * MINUTE_MS }
 const CHECK_RELATED = 'pnpm josh check:related'
 const SHIP = 'pnpm josh ship'
+const LINT_RELATED = 'pnpm josh lint:related scripts/lane'
 const LANE_ISSUE = 4887
 const NO_PAUSE: PausedSpans = new Map()
 
@@ -149,5 +150,36 @@ describe('lane_implement_stats.table', () => {
 
 		expect(lines).toHaveLength(lane_implement_stats.SUB_STAGES.length + 3)
 		expect(lines.at(-1)).toMatch(/^\| subagent: reviewer \| 1 \| 4(?:\.0)? \| 4(?:\.0)? \| 1 \|$/u)
+	})
+})
+
+// A lane whose first timed `lint:related` runs `first_minutes`, after an untimed backgrounded one and a
+// foreground one its session ended before.
+function lint_lane(lane: string, first_minutes: number): Array<ToolCall> {
+	return [
+		call(0, { command: LINT_RELATED, background: true, duration_ms: undefined, lane }),
+		call(0, { command: LINT_RELATED, duration_ms: undefined, lane }),
+		call(1, { command: LINT_RELATED, duration_ms: first_minutes * MINUTE_MS, lane }),
+		call(20, { command: LINT_RELATED, lane }),
+		call(30, { command: SHIP, lane }),
+	]
+}
+
+// joshuafolkken/kit#5714: a lane's first `lint:related` ran far longer than its later ones (#5657).
+describe('lane_implement_stats.table — the lane first lint:related row', () => {
+	it("prints each lane's first timed lint:related, not its later runs, over the lanes that ran one", () => {
+		const calls = [
+			...lint_lane(LANE, 2),
+			...lint_lane(`${LANE}-cold`, 8),
+			call(0, { tool: 'Edit', lane: `${LANE}-none` }),
+			call(2, { command: SHIP, lane: `${LANE}-none` }),
+		]
+		const table = lane_implement_stats.table(calls, WINDOW, NO_PAUSE)
+
+		expect(table).toMatch(/^\| lane first lint:related \| 2 \| 5(?:\.0)? \| 8(?:\.0)? \| {2}\|$/mu)
+	})
+
+	it('prints no row when no lane ran lint:related', () => {
+		expect(lane_implement_stats.table(LANE_CALLS, WINDOW, NO_PAUSE)).not.toContain('lint:related')
 	})
 })
