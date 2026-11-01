@@ -1127,7 +1127,7 @@ The label is the josh commands a Bash call chains, a `reserved-run` as what it w
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
 
-The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs`, and none when no run capped a file (`lane-breakdown-related.ts`).
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
 
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
