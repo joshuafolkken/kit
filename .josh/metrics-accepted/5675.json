@@ -1,0 +1,7 @@
+{
+	"reason": "issue:file --batch reads one %%%-separated file and prints every scout report once before filing (#5675)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 56
+	}
+}
