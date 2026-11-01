@@ -15,6 +15,9 @@ const mark_result_mock = vi.hoisted(() => vi.fn())
 const preflight_mock = vi.hoisted(() => vi.fn())
 const pre_detach_mock = vi.hoisted(() => vi.fn())
 const merge_mock = vi.hoisted(() => vi.fn())
+const wait_mock = vi.hoisted(() => vi.fn().mockResolvedValue(0))
+
+vi.mock('./run-ship-detach-wait', () => ({ run_ship_detach_wait: { after_launch: wait_mock } }))
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('./run-ship-probe', () => ({
@@ -162,14 +165,17 @@ describe('run_ship_cli.run — --detach hands the region to a supervisor', () =>
 		)
 		expect(josh_run_mock).not.toHaveBeenCalled()
 		expect(info_lines).toEqual(['launched'])
+		expect(wait_mock).toHaveBeenCalledWith(NUMBER)
 		// joshuafolkken/kit#4785: a `--review` ship hands the pre-detach checks its `test:pinned` check.
 		expect(pre_detach_mock.mock.calls[0]?.[2]).toBeTypeOf('function')
 	})
 
 	it('exits non-zero on a refused launch', async () => {
 		detach_mock.mockResolvedValue({ verdict: 'busy', note: 'already running' })
+		wait_mock.mockClear()
 
 		expect(await run_ship_cli.run([TITLE, '--detach'])).toBe(FAILED)
+		expect(wait_mock).not.toHaveBeenCalled()
 	})
 })
 

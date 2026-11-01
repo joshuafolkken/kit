@@ -10,6 +10,7 @@ import { run_ship_args } from './run-ship-args'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_conflict_probe } from './run-ship-conflict-probe'
 import { run_ship_detach } from './run-ship-detach'
+import { run_ship_detach_wait } from './run-ship-detach-wait'
 import { run_ship_group } from './run-ship-group'
 import { run_ship_handover, type CodeCheck } from './run-ship-handover'
 import { run_ship_infra_retry } from './run-ship-infra-retry'
@@ -310,7 +311,7 @@ async function print_log(number: string): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
-// The one-token contract `run:cut` keeps: the verdict on stdout, the explanation on stderr.
+// The verdict as its own stdout line, the explanation on stderr; a launch goes on to the wait.
 async function detach(args: ShipArguments): Promise<number> {
 	const repository = await run_ship_probe.repository_directory()
 
@@ -324,8 +325,9 @@ async function detach(args: ShipArguments): Promise<number> {
 
 	console.error(result.note)
 	console.info(result.verdict)
+	if (result.verdict !== run_ship_detach.LAUNCHED) return FAILURE_EXIT_CODE
 
-	return result.verdict === run_ship_detach.LAUNCHED ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return await run_ship_detach_wait.after_launch(args.number)
 }
 
 // A headless lane child's turn ending kills a ship it left in its own process,

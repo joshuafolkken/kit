@@ -23,8 +23,9 @@ import { run_tail_rule } from './run-tail-rule'
 //
 // **`ship` is in the set too, `--detach` or not**. It detaches in a child, but only after its
 // preflight — the scoped checks — has passed in the calling process, so a backgrounded `ship` is
-// killed at the turn's end before any supervisor exists. Issued in the foreground it returns at
-// `launched` within the tool timeout, and the supervisor carries the rest. A backgrounded `ship` alone
+// killed at the turn's end before any supervisor exists. Issued in the foreground it returns after
+// `launched` and, on `cost --cut` `under`, one `ship:wait` chunk timed from its own start, within the
+// tool timeout; the supervisor carries the rest. A backgrounded `ship` alone
 // is not refused but rewritten into that foreground call (`foreground_input`); one chained after
 // another long command is refused. A foreground `ship` without the cap is given it the same way.
 //
@@ -143,7 +144,7 @@ const FOREGROUND_NOTE =
 	"lane background: a lane child's `josh ship`, `josh ship:wait` or `josh lane:plan` backgrounded, by its flag or by " +
 	'outrunning the Bash timeout, dies with the headless turn — so it was run in the foreground at the ' +
 	'600000 ms cap, where `ship` detaches itself after the preflight. Then follow ' +
-	'`chain-rule.md` step 0 (`josh ship:wait` on `launched`).'
+	'`chain-rule.md` step 0 (`josh ship:wait` on its `pending`).'
 
 type LaunchedIds = (block: TranscriptBlock) => ReadonlyArray<string>
 
@@ -196,8 +197,8 @@ function pending_command_ids(tail: string): ReadonlyArray<string> {
 const LANE_BACKGROUND_REASON =
 	'⛔ lane background: this session is a dispatched lane child (`JOSH_LANE_CHILD`), a headless ' +
 	'process whose background tasks die when the turn ends. Hand over to ' +
-	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground, then `josh ship:wait <N>` on ' +
-	'`launched` or end the turn. It fires on every occurrence ' +
+	'`pnpm josh ship --detach --review "<title> #<N>"`, issued in the foreground; on `launched` it ' +
+	'runs `josh ship:wait` itself on `cost --cut` `under`. It fires on every occurrence ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` step 0).'
 
 const LANE_BACKGROUND_STOP_REASON =

@@ -168,6 +168,15 @@ describe('run_ship_wait_cli.run', () => {
 		)
 	})
 
+	it('counts the chunk from the process start, so a long preflight leaves it no wait', async () => {
+		vi.spyOn(performance, 'now').mockReturnValue(run_ship_wait_cli.CHUNK_MS)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		await expect(run_ship_wait_cli.run([ISSUE])).resolves.toBe(0)
+		expect(beat_mock).not.toHaveBeenCalled()
+		expect(String(info.mock.calls[0]?.[0])).toMatch(/^pending — /u)
+	})
+
 	it('refuses anything but one issue number', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_chain, type ChainStage } from './run-chain'
 import { run_chain_join } from './run-chain-join'
 
-// `josh run:chain <N>` — `main:merge`, `review:selfcheck`, `check:related` and `run:review` in one call
+// `josh run:chain <N>` — `main:merge` (none in a lane child), `review:selfcheck`, `check:related` and `run:review` in one call
 // (`run-chain.ts`); `--join [--fixing]` runs the half after the review instead (`run-chain-join.ts`).
 // `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok "<reason>"` goes to
 // `run:review` as given, so it opens a review and never rides on `--join`.
@@ -34,11 +35,19 @@ interface ChainArguments {
 	stages: ReadonlyArray<ChainStage>
 }
 
+// A lane child merges main in ship's sync, so its opening half is the review stages alone
+// (`chain-rule.md` → "A lane child").
+function opening_stages(unpinned_ok: ReadonlyArray<string>): ReadonlyArray<ChainStage> {
+	if (lane_child_marker.is_child_of(process.cwd())) return run_chain.review_stages(unpinned_ok)
+
+	return run_chain.main_line_stages(unpinned_ok)
+}
+
 function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
 	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing)
 	const reason = values.unpinned_ok
 
-	return run_chain.main_line_stages(reason === undefined ? [] : ['--unpinned-ok', reason])
+	return opening_stages(reason === undefined ? [] : ['--unpinned-ok', reason])
 }
 
 // `--fixing` belongs to the join and `--unpinned-ok` to the opening half, so each refuses the other list.
