@@ -46,6 +46,11 @@ describe('review_record_interaction.report_due', () => {
 		expect(line).toContain('if no interaction reviewer ran beside this round, first open its brief')
 	})
 
+	// joshuafolkken/kit#5656: a run-tooling change that only edits comments is not due either.
+	it('names the comment-only change among the reasons no pass is due', () => {
+		expect(review_record_interaction.NOT_REQUIRED_LINE).toContain('changes only comments in it')
+	})
+
 	it.each<InteractionStatus>(['ok', 'not-required'])('prints nothing on %s', async (status) => {
 		expect(await printed_for(status)).toBe('')
 	})
