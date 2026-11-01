@@ -26,6 +26,11 @@ const LOCATIONS_HEADER = '=== code locations ==='
 const INVESTIGATION_HEADER = '=== investigation ==='
 // The step the investigation guard would otherwise name only once it refuses, mid-reading (#4345).
 const INVESTIGATION_BODY = `Delegate before the first read — the guard refuses at ${delegation_policy.INVESTIGATION_LIMIT}. ${delegation_policy.INVESTIGATION_STEP} Brief it with the code locations above; read in the main line only the files this run will edit.`
+// An issue the entry reads as planned already carries its investigation in the recorded plan, so the
+// run — a lane dispatched again after a yield among them — reads that instead of re-running the
+// investigator (joshuafolkken/kit#5700).
+const INVESTIGATION_PLANNED_BODY =
+	'Skip the investigator — the plan is recorded (`run:planned` or a plan comment): the recorded plan in the issue (body or plan comment) is the investigation; read in the main line only the files this run will edit.'
 const SHIP_HEADER = '=== ship preconditions ==='
 const SHIP_MET = 'met — nothing `josh ship` refuses on as the tree stands'
 const SHIP_UNMET =
@@ -49,6 +54,9 @@ interface PrepParts {
 	has_changes: boolean
 	// What `josh ship` would refuse on as the tree stands — `run_ship_preflight.ahead`.
 	ship_problems: ReadonlyArray<string>
+	// Whether the entry's stage read the issue as planned (`run_stage.PLANNED`) — set by `run:entry`,
+	// which owns the stage; a bare `run:prep` leaves it unset.
+	is_planned?: boolean
 }
 
 function human_review_value(state: IssueState | undefined): string {
@@ -93,7 +101,10 @@ function format_report(parts: PrepParts): string {
 		section(STATE_HEADER, state_body(parts)),
 		section(LATEST_HEADER, `${parts.latest_scope}${LATEST_JOINER}${parts.latest_reason}`),
 		section(LOCATIONS_HEADER, parts.locations),
-		section(INVESTIGATION_HEADER, INVESTIGATION_BODY),
+		section(
+			INVESTIGATION_HEADER,
+			parts.is_planned === true ? INVESTIGATION_PLANNED_BODY : INVESTIGATION_BODY,
+		),
 		section(SHIP_HEADER, ship_body(parts.ship_problems)),
 	].join(SECTION_SEPARATOR)
 }
@@ -101,6 +112,7 @@ function format_report(parts: PrepParts): string {
 const run_prep = {
 	CONTENT_HEADER,
 	INVESTIGATION_HEADER,
+	INVESTIGATION_PLANNED_BODY,
 	LATEST_HEADER,
 	LOCATIONS_HEADER,
 	SHIP_HEADER,
