@@ -95,6 +95,24 @@ describe('round_one_check_related.fixes_an_open_round', () => {
 	})
 })
 
+describe('round_one_check_related.fixes_an_open_round — run:chain', () => {
+	it('reads run:chain as a brief', () => {
+		const chain = time_transcript_fixture.josh_call_line(1, BRANCH, 'pnpm josh run:chain 5205')
+
+		expect(round_one_check_related.fixes_an_open_round(`${chain}\n${FIX_LINE}`)).toBe(true)
+	})
+
+	it('answers false once run:chain --join closes the round', () => {
+		const chain_join = time_transcript_fixture.josh_call_line(
+			3,
+			BRANCH,
+			'pnpm josh run:chain 5205 --join',
+		)
+
+		expect(round_one_check_related.fixes_an_open_round(`${OPEN_ROUND}\n${chain_join}`)).toBe(false)
+	})
+})
+
 function enter_lane_child(): void {
 	mkdirSync(LANE_DIRECTORY, { recursive: true })
 	process.chdir(LANE_DIRECTORY)

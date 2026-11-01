@@ -22,7 +22,8 @@ import { tail_commands } from './tail-commands'
 
 // Named canonically — `shell_segments.is_josh_command` expands an alias (`josh cr`) before the match.
 const CHECK_COMMANDS: ReadonlySet<string> = new Set(['check:related'])
-const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['run:review'])
+// `run:chain` opens the brief at its `run:review` stage, and `run:chain --join` closes the round (#5752).
+const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['run:review', 'run:chain'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
 const JOIN_FLAG = /(?:^|\s)--join(?:[=\s]|$)/u
 // The `run:review` modes that read a running check rather than write a brief.
@@ -106,7 +107,7 @@ const ROW = {
 		title: "No check:related on round 1's fixes",
 		topic: '`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"',
 		fires:
-			"`pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s brief, before `run:review --join` or `ship --detach`. Every occurrence",
+			"`pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s (or `run:chain`'s) brief, before `run:review --join`, `run:chain --join` or `ship --detach`. Every occurrence",
 		quiet: 'no fix since the brief, already joined or detached, or not a lane child',
 	},
 }
