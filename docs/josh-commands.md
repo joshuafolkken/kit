@@ -78,6 +78,7 @@ Keeps caches of its own, apart from the gate's.
 
 - Changed set = branch diff plus untracked files (cache `.eslintcache.related`); flags are named rather than forwarded (`--fix` is reported ignored).
 - A bare run after a green one lints only what moved since, main syncs included (`scripts/gate/since-green.ts`); nothing moved lints nothing and exits green; the branch diff when there is no comparable record (none, or one written under other tool versions or `NODE_ENV`), nothing lintable moved, or a toolchain or lint config moved (`scripts/gate/verification-inputs.ts`).
+- A bare run on a tree it already answered (same file contents and base) runs nothing and prints `reused: tree <hash> <green|red> at <time>` with the kept verdict; a red one names its record to remove (`tree-verdict.ts`).
 - A bare run whose green record cannot narrow, here and in `josh test:related`, first prints `whole branch — since-green fell back: <reason>`.
 - Falls back to the whole tree (naming the case) when no changed file is lintable.
 - In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
@@ -87,15 +88,18 @@ Keeps caches of its own, apart from the gate's.
 
 <!-- usage: lint:rule -->
 
-Run one eslint rule over the whole repository on a cache of its own and write the rule's violations to a file.
+Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file.
 
 ```bash
 pnpm josh lint:rule kit/no-measurement-comment
 pnpm josh lint:rule kit/no-measurement-comment --config eslint.tmp.config.js       # a temporary config
 pnpm josh lint:rule kit/no-measurement-comment --output .josh/tmp/violations.txt
+pnpm josh lint:rule kit/no-measurement-comment --paths scripts/lint/*.ts           # only these paths, on a subset cache and report
 ```
 
 <!-- /usage -->
+
+- Check a rule while changing it with `--paths <path>...` on a few files, then run the whole repository once. A whole run takes minutes, and each change to the rule or its config misses the cache for every file. A `--paths` run uses its own cache, JSON report and default output (`<rule>.paths.txt`), so the whole run's files stay as they were.
 
 ### `josh lines`
 
@@ -206,21 +210,21 @@ pnpm josh check:related --full   # whole outputs
 
 <!-- /usage -->
 
-Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming every check that failed, and exits non-zero if any fails.
+Each check runs through its own `pnpm josh` command, preserving its core-budget reservation, green record or cache. The command waits for every check it started, ends with one verdict line naming each failed check, and exits non-zero if any fails.
 
-`test:related` starts once `lint:related` passes; on a failed `lint:related` it is not run: its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`. A reused `lint:related` lets it start at once.
+`test:related` starts once `lint:related` passes (at once on a reused one); after a failed one its section reads `=== test:related: not run ===` and the verdict line adds `(not run: test:related)`.
 
 A section prints its check's last 5 lines, 40 on a failure; the log keeps the whole output.
 
-A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict line lists it as `(reused: …)`. A check that failed last time left no record and runs again.
+A tree it already answered runs no check, as in `josh lint:related`. A check whose green record still describes the tree is not run: its section reads `=== <check>: reused ===` and the verdict lists it `(reused: …)`.
 
-`lint:related` and `test:related` read their own scoped records; the type check and `cspell:dot` read the gate's per-check records, which `check:related` also writes when they pass.
+`lint:related` and `test:related` read their own scoped records, the type check and `cspell:dot` the gate's per-check records (written here on a pass). A record holds only for the same changed files (`.josh/` records included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`.
 
-A record holds only for the same changed files (a `.josh/` record included), merge base, and tool and environment fingerprint; any moved file reruns `cspell:dot`. In kit, a metrics growth notice from `lint:related` is printed again above that verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
+In kit, `lint:related`'s metrics growth notice prints again above the verdict line, which then says the ship's pre-detach stops on it and names `josh metrics --accept`.
 
-When a `josh test:pinned` launched on the current tree has already answered with unpinned places the ship's pre-detach would stop on, they are printed there too, with the `josh ship --review … --unpinned-ok "<reason>"` form, so the first ship can carry the reason; a check this run did not start, if still running, prints nothing and is not waited on.
+Unpinned places a `josh test:pinned` already answered on the current tree, which the ship's pre-detach would stop on, print there too, with the `josh ship --review … --unpinned-ok "<reason>"` form for the first ship; one still running prints nothing and is not waited on.
 
-In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`. That check is waited for after the four, until it answers, ends, the tree moves again, or 240 seconds pass; only an answer on the current tree is printed.
+In a lane child, a tree a round-1 fix moved first restarts the background `josh test:pinned`. It is waited for after the four until it answers, ends, the tree moves again, or 240 s pass; only an answer on the current tree is printed.
 
 ### `josh behavior`
 

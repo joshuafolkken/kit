@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import {
 	LINT_RULE_CACHE_FILE,
 	LINT_RULE_CACHE_FLAGS,
 	LINT_RULE_DIRECTORY,
+	LINT_RULE_PATHS_CACHE_FILE,
+	LINT_RULE_PATHS_CACHE_FLAGS,
 	LINT_RULE_WORKERS,
 } from '#scripts/josh/josh-command-types'
 import { FAIL_EXIT_CODE } from '#scripts/lib/buffered-process'
@@ -23,6 +25,10 @@ const OUTPUT_FILE_FLAG = '--output-file'
 const JSON_FILE = '/out.json'
 const ESLINT_OUTPUT = 'eslint said this'
 const DEFAULT_REPORT = `${LINT_RULE_DIRECTORY}/kit-no-measurement-comment.txt`
+const PATHS_REPORT = `${LINT_RULE_DIRECTORY}/kit-no-measurement-comment.paths.txt`
+const PATHS_FLAG = '--paths'
+const FIRST_VIOLATION = 'scripts/a.ts:3:5'
+const SUBSET = ['scripts/lint/lint-rule.ts', 'scripts/lint/lint-parallel.ts']
 const ESLINT_FOUND_EXIT_CODE = 1
 const ESLINT_FATAL_EXIT_CODE = 2
 const FIRST_LINE = 3
@@ -91,11 +97,29 @@ describe('lint_rule.parse_arguments', () => {
 		).toStrictEqual({ rule: RULE, config: TEMPORARY_CONFIG, output: 'out.txt' })
 	})
 
+	it('reads every path after --paths, across repeats, beside the other options', () => {
+		expect(
+			lint_rule.parse_arguments([
+				RULE,
+				PATHS_FLAG,
+				'a.ts',
+				'b.ts',
+				'--output',
+				'o',
+				PATHS_FLAG,
+				'c',
+			]),
+		).toStrictEqual({ rule: RULE, output: 'o', paths: ['a.ts', 'b.ts', 'c'] })
+	})
+
 	it.each([
 		['no rule', []],
 		['a flag where the rule goes', ['--config', TEMPORARY_CONFIG]],
 		['an option with no value', [RULE, '--output']],
 		['an unknown option', [RULE, '--fix', 'yes']],
+		['--paths with no value', [RULE, PATHS_FLAG]],
+		['--paths followed by another flag', [RULE, PATHS_FLAG, '--output', 'o']],
+		['two values for a single-value option', [RULE, '--output', 'a', 'b']],
 	])('refuses %s', (_case, command_arguments) => {
 		expect(lint_rule.parse_arguments(command_arguments)).toBeUndefined()
 	})
@@ -118,6 +142,16 @@ describe('lint_rule.eslint_arguments', () => {
 		const args = lint_rule.eslint_arguments({ rule: RULE, config: TEMPORARY_CONFIG }, JSON_FILE)
 
 		expect(value_after(args, '--config')).toBe(TEMPORARY_CONFIG)
+	})
+
+	it('lints the --paths in place of the whole tree, on the subset cache', () => {
+		const args = lint_rule.eslint_arguments({ rule: RULE, paths: SUBSET }, JSON_FILE)
+
+		expect(args.slice(0, 4)).toStrictEqual(['exec', 'eslint', ...SUBSET])
+		expect(args).not.toContain('.')
+		expect(args.slice(-LINT_RULE_PATHS_CACHE_FLAGS.length)).toStrictEqual(
+			LINT_RULE_PATHS_CACHE_FLAGS,
+		)
 	})
 })
 
@@ -158,7 +192,22 @@ describe('lint_rule.run_lint_rule — a report', () => {
 
 		await lint_rule.run_lint_rule([RULE, '--output', output], fixture.root)
 
-		expect(readFileSync(path.join(fixture.root, output), 'utf8')).toContain('scripts/a.ts:3:5')
+		expect(readFileSync(path.join(fixture.root, output), 'utf8')).toContain(FIRST_VIOLATION)
+	})
+})
+
+describe('lint_rule.run_lint_rule — a --paths report', () => {
+	it("keeps a --paths run's cache and report apart from the whole run's", async () => {
+		eslint_writes(two_file_report())
+
+		await lint_rule.run_lint_rule([RULE, PATHS_FLAG, ...SUBSET], fixture.root)
+
+		expect(mocked_run_eslint).toHaveBeenCalledWith(
+			expect.objectContaining({ cache_file: LINT_RULE_PATHS_CACHE_FILE }),
+		)
+		expect(readFileSync(path.join(fixture.root, PATHS_REPORT), 'utf8')).toContain(FIRST_VIOLATION)
+		expect(existsSync(path.join(fixture.root, DEFAULT_REPORT))).toBe(false)
+		expect(process.stdout.write).toHaveBeenCalledWith(expect.stringContaining(PATHS_REPORT))
 	})
 })
 

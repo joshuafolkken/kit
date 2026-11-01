@@ -11,9 +11,13 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 	'lint:rule': {
 		script: 'scripts/lint/lint-rule.ts',
 		description:
-			"Run one eslint rule over the whole repository on a cache of its own and write the rule's violations to a file",
+			"Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file",
 		category: 'Development',
-		reference: ['<rule> [--config <path>] [--output <path>]', 'developer', ['files', 'processes']],
+		reference: [
+			'<rule> [--config <path>] [--output <path>] [--paths <path>...]',
+			'developer',
+			['files', 'processes'],
+		],
 		core_weight: LINT_RULE_WORKERS * core_weights.CORE_WEIGHTS.eslint_scan,
 		memory_mb: LINT_RULE_WORKERS * core_weights.MEMORY_MB.eslint_scan,
 		usage: {
@@ -24,6 +28,10 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 					note: 'a temporary config',
 				},
 				{ arguments: 'kit/no-measurement-comment --output .josh/tmp/violations.txt' },
+				{
+					arguments: 'kit/no-measurement-comment --paths scripts/lint/*.ts',
+					note: 'only these paths, on a subset cache and report',
+				},
 			],
 		},
 	},
