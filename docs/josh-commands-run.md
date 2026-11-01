@@ -903,12 +903,14 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 <!-- usage: run:chain -->
 
-Run main:merge, review:selfcheck, check:related and run:review in one call, stopping at the first refusal with its next action.
+Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
 
 ```bash
 pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review
 pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
 pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
+pnpm josh run:chain <N> --join                      # once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition
+pnpm josh run:chain <N> --join --fixing             # the same, when round 1 has fixes to make
 ```
 
 <!-- /usage -->
