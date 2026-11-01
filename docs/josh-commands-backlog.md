@@ -543,6 +543,7 @@ pnpm josh epic --decide 893 894 --decision-file why.md
 - `--ordered` — argument order is the dependency order; writes the arrow chain, records the matching `blocked-by` relations, and adds a `### Declared order` entry under `## Decisions`.
 - `--rationale-file <path|->` — split rationale prose (`-` reads stdin).
 - `--origin <owner/repo#N>` — backlink when the split originated in another repository.
+- `--notify` — on create or `--promote`: send the split path's `planning` Telegram (the epic's URL, every child's URL and `Next: backlogrun #<E> --only`), the same send as `issue:plan --planned`; a failed send only warns.
 - `--title <title>` — with `--promote`: rename the issue first.
 - `--before <M>` — with `--add`: insert before `#M`, re-pointing what `#M` was waiting on so the chain is never broken.
 - `--after <M>` — with `--add`: start after `#M`; branches when `#M` already has a successor, extends when it is a tail.

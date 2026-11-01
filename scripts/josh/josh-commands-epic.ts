@@ -47,6 +47,11 @@ const EPIC_COMMANDS: Record<string, CommandEntry> = {
 					description: 'backlink when the split originated in another repository.',
 				},
 				{
+					names: ['--notify'],
+					description:
+						"on create or `--promote`: send the split path's `planning` Telegram (the epic's URL, every child's URL and `Next: backlogrun #<E> --only`), the same send as `issue:plan --planned`; a failed send only warns.",
+				},
+				{
 					names: ['--title <title>'],
 					description: 'with `--promote`: rename the issue first.',
 				},
