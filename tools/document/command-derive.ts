@@ -12,7 +12,6 @@ import { usage_span_placement } from './usage-span-placement'
 
 const { page_path, USAGE_PAGES } = generate_command_usage
 const CATALOG_PAGE = 'docs/josh-command-catalog.md'
-const WHY_PAGE = 'docs/why.md'
 
 function read_usage_pages(): ReadonlyMap<string, string> {
 	return new Map(USAGE_PAGES.map((page) => [page, readFileSync(page_path(page), 'utf8')]))
@@ -26,15 +25,9 @@ function write_usage_pages(pages: ReadonlyMap<string, string>): void {
 	}
 }
 
-function write_why_counts(): void {
-	const file = page_path(WHY_PAGE)
-
-	writeFileSync(file, derived_artifacts.rewrite_why_counts(readFileSync(file, 'utf8')))
-}
-
 // Non-zero when a written page is over its ceiling, so the run names the page to shrink.
 function report_bytes(): number {
-	const sizes = [...USAGE_PAGES, CATALOG_PAGE, WHY_PAGE].map((path) => ({
+	const sizes = [...USAGE_PAGES, CATALOG_PAGE].map((path) => ({
 		path,
 		bytes: statSync(page_path(path)).size,
 	}))
@@ -59,7 +52,6 @@ function main(): number {
 
 	write_usage_pages(pages)
 	writeFileSync(CATALOG_FILE, generate_catalog())
-	write_why_counts()
 
 	return report_bytes()
 }

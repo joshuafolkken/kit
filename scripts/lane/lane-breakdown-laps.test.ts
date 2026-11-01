@@ -245,4 +245,12 @@ describe('lane_breakdown_laps.of — between ship stages', () => {
 
 		expect(minutes_of([], calls)).toStrictEqual([[BETWEEN, [['gate', 2]]]])
 	})
+
+	// joshuafolkken/kit#5646: a lane that never paused reads as before.
+	it('splits it by the Bash alone when the lane recorded no park', () => {
+		const breakdown = { ...BREAKDOWN, pauses: [] }
+		const laps = lane_breakdown_laps.of([], ISSUE, breakdown, [bash(17, 2, GATE_COMMAND)])
+
+		expect([...laps]).toStrictEqual([[BETWEEN, [{ name: 'gate', ms: 2 * MINUTE_MS }]]])
+	})
 })

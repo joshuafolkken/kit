@@ -12,6 +12,7 @@ import { review_brief_cli } from '#scripts/review/review-brief-cli'
 import { review_interaction } from '#scripts/review/review-interaction'
 import { review_lane_handover } from '#scripts/review/review-lane-handover'
 import { review_stamps } from '#scripts/review/review-stamps'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_ship_review } from '#scripts/run/ship/run-ship-review'
 import { test_pinned_record, type PinnedSummary } from '#scripts/test/test-pinned-record'
 import { run_review, type GateState, type ReviewTiming } from './run-review'
@@ -357,11 +358,7 @@ function refuse(text: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`.
-async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
-	const reason = run_review_pinned.ok_reason_of(argv)
-
-	if (reason === undefined && argv.length > 0) return refuse(USAGE)
+async function open_accepted(is_code_only: boolean, reason: string | undefined): Promise<number> {
 	const accepted = await accept_finished(is_code_only, reason)
 
 	if (accepted !== undefined) return accepted
@@ -370,6 +367,18 @@ async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Pro
 	if (handover !== undefined) return refuse(handover)
 
 	return await run_start({ is_code_only, slots: await brief_slots(is_code_only) }, reason)
+}
+
+// The open's arguments after `--code-only`: none, or `--unpinned-ok "<reason>"`. The governing section
+// prints once they are accepted, so a refused argv prints its usage line alone; the ship's own
+// `--code-only` open prints nothing, since the ship printed the section it runs under.
+async function run_open(is_code_only: boolean, argv: ReadonlyArray<string>): Promise<number> {
+	const reason = run_review_pinned.ok_reason_of(argv)
+
+	if (reason === undefined && argv.length > 0) return refuse(USAGE)
+	const printed = is_code_only ? SUCCESS_EXIT_CODE : run_step_section.print_once('run:review')
+
+	return printed === SUCCESS_EXIT_CODE ? await open_accepted(is_code_only, reason) : printed
 }
 
 async function run_pinned(): Promise<number> {
