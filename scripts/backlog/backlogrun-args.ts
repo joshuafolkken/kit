@@ -26,7 +26,6 @@ const LONE_FLAGS: ReadonlyMap<string, LoneKind> = new Map([
 	['--restart', 'restart'],
 ])
 const BACKLOG_COMMAND = 'backlogrun'
-const ISSUE_PREFIX = '#'
 const FLAG_PREFIX = '-'
 const NOT_FOUND = -1
 const FLAG_AND_VALUE = 2
@@ -86,16 +85,15 @@ function selected_provider(
 		: { kind: 'provider', provider }
 }
 
-function issue_token(token: string): string {
-	return issue_number_shape.ISSUE_NUMBER_PATTERN.test(token) ? `${ISSUE_PREFIX}${token}` : token
-}
-
 // The named list is the leading block before the first flag, as the grammar reads it.
 function normalized(rest: ReadonlyArray<string>): Array<string> {
 	const stop = rest.findIndex((token) => token.startsWith(FLAG_PREFIX))
 	const split_at = stop === NOT_FOUND ? rest.length : stop
 
-	return [...rest.slice(0, split_at).map((token) => issue_token(token)), ...rest.slice(split_at)]
+	return [
+		...rest.slice(0, split_at).map((token) => issue_number_shape.issue_token(token)),
+		...rest.slice(split_at),
+	]
 }
 
 function parse_start(argv: ReadonlyArray<string>, environment: AgentEnvironment): ArgumentsResult {

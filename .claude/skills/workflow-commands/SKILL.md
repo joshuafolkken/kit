@@ -77,6 +77,7 @@ from — read at that trigger, never restated here.
 
 | Trigger | Action | Single source |
 | --- | --- | --- |
+| Typed on a consultation model (Fable / Astra), not in a `run:handoff` child | `pnpm josh run:handoff <keyword> … --brief-file <brief>` | `docs/josh-commands-run.md` → "josh run:handoff" |
 | First call of any entry | `#N`: `pnpm josh run:entry <N> --to <command>` (claims the tree, except `kickoff`); `new` (not `kickoff`): `pnpm josh run:hold`; `busy` / `unknown` stop | `working-tree-hold.md` |
 | `run:entry` prints its stage line | The command sets how far a run goes, the Issue where it starts; **`start: reached` redoes nothing** — stop (at `merged`, the next line answers) | `docs/how-to/run-issues.md` |
 | Same turn as the hold (not a dispatched child, not `kickoff`) | `pnpm josh cost --cut`; `under` continues, `over` stops — `run:entry` notifies and runs `run:release` (by hand for `new`) | `backlogrun-progress.md` → "The hand-off" (model-priced threshold) |

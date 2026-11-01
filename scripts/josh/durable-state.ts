@@ -54,6 +54,7 @@ const PREFIX = {
 	WAKE_LOG: 'josh-run-wake-log-',
 	BACKLOGRUN_LAUNCH: 'josh-backlogrun-launch-',
 	BACKLOGRUN_LOG: 'josh-backlogrun-log-',
+	HANDOFF_LOG: 'josh-run-handoff-log-',
 	SHIP_LOG: 'josh-ship-log-',
 	SHIP_RESULT: 'josh-ship-result-',
 	LANE_DISPATCH: 'josh-lane-dispatch-',

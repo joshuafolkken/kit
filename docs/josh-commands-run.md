@@ -831,6 +831,26 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
+### `josh run:handoff`
+
+<!-- usage: run:handoff -->
+
+Hand a workflow keyword typed in a consultation session to a child on the role profile model.
+
+```bash
+pnpm josh run:handoff kickoff new --brief-file <path>   # waits; prints its final message and URLs
+pnpm josh run:handoff fullrun <N> --brief-file <path>   # detached; a bare N is #N; check it with run:progress --once
+pnpm josh run:handoff backlogrun <E> --only             # josh backlogrun with this session’s --agent
+```
+
+<!-- /usage -->
+
+For a session on a consultation model (Fable / Astra): the child runs on its provider at the role profile's model (`kickoff` scheduler, else worker). Background a `kickoff`; it can outlast the Bash timeout.
+
+**Output / exit codes:** exits 0 once the child starts (`kickoff`: once it exits 0); `backlogrun` exits with `josh backlogrun`'s code. A bad argument, an unreadable brief, an unresolvable profile, no git repository, a failed start, or a tree hold that blocks the child's `run:entry` claim exits 1.
+
+A hand-off still starting has not claimed yet, so `run:entry` stays the guard.
+
 ### `josh run:watcher:guard`
 
 <!-- usage: run:watcher:guard -->

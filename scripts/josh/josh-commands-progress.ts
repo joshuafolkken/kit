@@ -1,8 +1,8 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// The run's progress and board commands, split out of `josh-commands-run.ts` when each command's
-// usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so the map
-// keeps its order.
+// The run's progress, board and hand-off commands, split out of `josh-commands-run.ts` when each
+// command's usage moved onto its entry (#4185). `RUN_COMMANDS` spreads this in at the same place, so
+// the map keeps its order.
 
 /* eslint-disable @typescript-eslint/naming-convention */
 const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
@@ -77,6 +77,29 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--every <minutes>'],
 					description:
 						'sends the `--chat` frame as a `📊 Progress` Telegram now and every `<minutes>` until the run ends — only when a person asks for it.',
+				},
+			],
+		},
+	},
+	'run:handoff': {
+		script: 'scripts/run/handoff/run-handoff-cli.ts',
+		description:
+			'Hand a workflow keyword typed in a consultation session to a child on the role profile model',
+		category: 'AI tools',
+		reference: ['<keyword> [N|new ...] --brief-file <path>', 'automation', ['processes', 'files']],
+		usage: {
+			examples: [
+				{
+					arguments: 'kickoff new --brief-file <path>',
+					note: 'waits; prints its final message and URLs',
+				},
+				{
+					arguments: 'fullrun <N> --brief-file <path>',
+					note: 'detached; a bare N is #N; check it with run:progress --once',
+				},
+				{
+					arguments: 'backlogrun <E> --only',
+					note: 'josh backlogrun with this session’s --agent',
 				},
 			],
 		},
