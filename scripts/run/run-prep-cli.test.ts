@@ -1,7 +1,7 @@
 import type { IssueState } from '#scripts/issue/issue-state'
 import { session_cite } from '#scripts/issue/session-cite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { run_prep } from './run-prep'
+import { run_prep, type PrepParts } from './run-prep'
 
 const read_block_mock = vi.hoisted(() => vi.fn())
 const read_state_mock = vi.hoisted(() => vi.fn())
@@ -236,22 +236,42 @@ describe('run_prep_cli.gather — uncommitted work', () => {
 	})
 })
 
+const PARTS: PrepParts = {
+	issue_number: ISSUE,
+	content_body: BLOCK,
+	state: REVIEW_STATE,
+	state_failure: '',
+	latest_scope: 'required',
+	latest_reason: 'last update 20h ago',
+	has_changes: false,
+	locations: '',
+	ship_problems: [],
+}
+
 describe('run_prep.format_report', () => {
 	it('surfaces a human-review issue on the summary line', () => {
-		const report = run_prep.format_report({
-			issue_number: ISSUE,
-			content_body: BLOCK,
-			state: REVIEW_STATE,
-			state_failure: '',
-			latest_scope: 'required',
-			latest_reason: 'last update 20h ago',
-			has_changes: false,
-			locations: '',
-			ship_problems: [],
-		})
+		const report = run_prep.format_report(PARTS)
 
 		expect(report.split('\n', 1)[0]).toContain('human_review: yes')
 		expect(report).toContain('latest: required')
+	})
+
+	// joshuafolkken/kit#5700: a recorded plan is the investigation, so the investigator is skipped.
+	it('names the investigator skip and its reason when the entry read the issue as planned', () => {
+		const report = run_prep.format_report({ ...PARTS, is_planned: true })
+
+		expect(report).toContain(
+			`${run_prep.INVESTIGATION_HEADER}\n${run_prep.INVESTIGATION_PLANNED_BODY}`,
+		)
+		expect(run_prep.INVESTIGATION_PLANNED_BODY).toContain('`run:planned`')
+		expect(report).not.toContain('Delegate before the first read')
+	})
+
+	it('keeps the delegation step when the issue is not planned', () => {
+		const report = run_prep.format_report({ ...PARTS, is_planned: false })
+
+		expect(report).toContain(`${run_prep.INVESTIGATION_HEADER}\nDelegate before the first read`)
+		expect(report).not.toContain(run_prep.INVESTIGATION_PLANNED_BODY)
 	})
 })
 

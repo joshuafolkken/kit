@@ -76,6 +76,6 @@ async function declared_of(issues: ReadonlyArray<PoolIssue>, directory: string):
 	return lane_plan.with_plans(backlog_overlap.declared_of(planned), directory)
 }
 
-const backlog_plan_comment = { declared_of, plan_of, plan_paths }
+const backlog_plan_comment = { declared_of, plan_of, plan_paths, read_plan }
 
 export { backlog_plan_comment }

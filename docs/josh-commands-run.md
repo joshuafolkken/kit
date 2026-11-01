@@ -384,6 +384,8 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
+An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:entry` in detail".
 
 ### `josh run:status`
