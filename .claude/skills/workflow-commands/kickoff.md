@@ -18,15 +18,14 @@
 
   **Two or more separately-mergeable deliverables** take the split path instead of a plan: create the
   children as in `kickoff new`, then either **promote `#N`** with `pnpm josh epic --promote <N> <N1> <N2>
-  ... --title "<title>" [--ordered] [--rationale-file <path|->]` (when `#N` is a request, a discussion
+  ... --title "<title>" [--ordered] [--rationale-file <path|->] --notify` (when `#N` is a request, a discussion
   or a container) — `--title` renames it to the step-2 title — or keep `#N` as a child of a new epic
-  made with `pnpm josh epic`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
+  made with `pnpm josh epic … --notify`, renamed when its own plan is recorded (`issue:plan --title`). That branch is Tier A: choose and
   record the reasoning on the Issue. Present `backlogrun #<E> --only` and stop.
 
-  Telegram for the multi-issue split path: `pnpm josh notify --task-type planning --issue-url "<issue-url>"
-  --body-file <path>`. `--task-type` sets the icon (`planning` 📋 / `completion` ✅ /
-  `failure` ❌ / `kickoff_retry` 🔄 / `confirmation` ⏸️); `--repo-name` and `--issue-title` are
-  auto-fetched. The Issue URL must be included.
+  The split path's Telegram is `epic --notify`'s — the `planning` message with the epic's URL, every
+  child's URL and `Next: backlogrun #<E> --only`, sent through `issue:plan --planned`'s own send; never
+  composed by hand.
 
 **`kickoff` does not claim the working-tree hold, and does not release one** — it touches GitHub, never
 the tree (`working-tree-hold.md`).
@@ -55,10 +54,10 @@ checked out here. A third-party owner is Tier C: stop rather than file.
     backlink, the epic the same link as prose (never a checkbox row, which disables its auto-close), and
     the originating Issue lists children and epic under `## Upstream issues`. (2) **Epic — always, for
     every split into two or more Issues**: `pnpm josh epic "<epic-title>" <N1> <N2> ... [--ordered]
-    [--rationale-file <path|->] [--origin <owner/repo#N>]`, capturing `<E>`. It builds the `epic` label,
-    the task-list rows (`- [ ] #N`), the machine-readable `Dependencies` and the `backlogrun` line; check
-    a hand-edited epic with `pnpm josh epic:check <E>`. (3) Telegram listing every created Issue. (4)
-    Present `backlogrun #<E> --only`. (5) **Stop**.
+    [--rationale-file <path|->] [--origin <owner/repo#N>] --notify`, capturing `<E>`. It builds the `epic` label,
+    the task-list rows (`- [ ] #N`), the machine-readable `Dependencies` and the `backlogrun` line, and
+    `--notify` sends the Telegram listing every created Issue; check
+    a hand-edited epic with `pnpm josh epic:check <E>`. (3) Present `backlogrun #<E> --only`. (4) **Stop**.
 
   **The epic itself is never implemented** — `backlogrun` runs its *children*, and it closes itself
   once every child is closed, whichever josh path closes the last one. Children with no required order take `None — the children are

@@ -3,7 +3,7 @@
  * Create an epic Issue that satisfies every requirement the auto-close and the order warning read.
  *
  * Usage: tsx scripts/epic/epic.ts "<title>" <N1> <N2> ... [--ordered] [--rationale-file <path|->]
- *                                                       [--origin <owner/repo#N>]
+ *                                                       [--origin <owner/repo#N>] [--notify]
  *        tsx scripts/epic/epic.ts --promote <N> <N1> <N2> ... [same flags] [--title <title>]
  *        tsx scripts/epic/epic.ts --add <E> <N1> <N2> ... [--before <M> | --after <M>]
  *                                                      [--decision-file <path|->]
@@ -15,12 +15,13 @@ import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_decide } from './epic-decide'
+import { epic_notify, type EpicNotice } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
 
 const ARGV_OFFSET = 2
-const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>]'
+const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
 const USAGE = [
 	`Usage: josh epic "<title>" <N1> <N2> ... ${FLAGS}`,
 	`       josh epic --promote <N> <N1> <N2> ... ${FLAGS} [--title <title>]`,
@@ -31,6 +32,13 @@ const USAGE = [
 	'       josh epic --decide <E> <N1> <N2> ... --decision-file <path|->',
 ].join('\n')
 const FAILURE_EXIT_CODE = 1
+const SUCCESS_EXIT_CODE = 0
+
+// `--notify`'s `planning` Telegram, sent only once the epic exists — an epic whose number could not be
+// read, or a promotion that failed, has nothing to announce.
+async function announce(is_notified: boolean, notice: EpicNotice | undefined): Promise<void> {
+	if (is_notified && notice !== undefined) await epic_notify.send(notice)
+}
 
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
@@ -41,7 +49,7 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await epic_run.promote_epic({
+	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
@@ -49,6 +57,11 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		origin: parsed.origin,
 		title: parsed.title,
 	})
+	const is_promoted = exit_code === SUCCESS_EXIT_CODE
+
+	await announce(parsed.is_notified, is_promoted ? parsed : undefined)
+
+	return exit_code
 }
 
 // The parsed insertion as the writer's input: the decision file becomes the decision itself, read here
@@ -181,13 +194,18 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await epic_run.create_epic({
+	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
 		children: parsed.children,
 		rationale: epic_cli.read_rationale(parsed.rationale_path),
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
 	})
+	const notice = epic_number === undefined ? undefined : { ...parsed, epic_number }
+
+	await announce(parsed.is_notified, notice)
+
+	return SUCCESS_EXIT_CODE
 }
 
 type EpicForm = readonly [
