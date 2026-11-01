@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { session_cite } from '#scripts/issue/session-cite'
 import { durable_state } from '#scripts/josh/durable-state'
@@ -130,7 +130,7 @@ function record_launch(request: DetachRequest, pid: number, launch_id: string): 
 
 function supervisor_environment(launch_id: string): Record<string, string | undefined> {
 	return {
-		...agent_role_profile.handoff_environment(),
+		...agent_provider.handoff_environment(),
 		[SUPERVISED_KEY]: SUPERVISED_VALUE,
 		[LAUNCH_ID_KEY]: launch_id,
 	}
@@ -312,7 +312,7 @@ function launch(request: DetachRequest): DetachResult {
 		},
 	)
 
-	agent_role_profile.warn_of_default()
+	agent_provider.warn_of_default()
 	if (result.kind === 'failed') return failed_launch(request, result.note)
 
 	record_launch(request, result.pid, launch_id)

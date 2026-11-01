@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentRole } from './agent-role-profile'
+import { agent_profile_schema, type AgentRole } from './agent-profile-schema'
 
 // The role an agent session kit launched was launched in — the fact that tells a ship reviewer apart
 // from the implementing child whose checkout it reads.
@@ -24,11 +24,11 @@ function environment_for(role: AgentRole): Record<string, string> {
 }
 
 function is_reviewer(source: EnvironmentSource = process.env): boolean {
-	return source[KEY] === agent_role_profile.REVIEWER
+	return source[KEY] === agent_profile_schema.REVIEWER
 }
 
 function can_implement(source: EnvironmentSource = process.env): boolean {
-	return source[KEY] === agent_role_profile.WORKER
+	return source[KEY] === agent_profile_schema.WORKER
 }
 
 function scope_line(source: EnvironmentSource = process.env): string {

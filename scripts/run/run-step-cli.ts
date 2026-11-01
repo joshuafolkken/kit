@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_provider } from '#scripts/agent/agent-provider'
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { hook_decision } from '#scripts/josh/hook-decision'
 import { find_package_directory } from '#scripts/josh/josh-logic'
@@ -120,7 +120,7 @@ function step_input(parts: PrepParts, run_reads: RunReads, is_lane_child: boolea
 		// Read here rather than in `run-step.ts` so the position logic stays a pure function of its input.
 		is_retrospective_enabled: run_retrospective.is_enabled(),
 		has_changes: parts.has_changes,
-		has_completion_callback: agent_role_profile.has_completion_callback(),
+		has_completion_callback: agent_provider.has_completion_callback(),
 	}
 }
 

@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
+import type { AgentProvider } from '#scripts/agent/agent-provider'
 import { api_auth } from '#scripts/agent/api-auth'
 import { distributed_paths } from '#scripts/init/distributed-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
@@ -163,7 +164,7 @@ async function launch_review(
 		return failure(`the reviewer resolved to ${built.profile.provider}, not the lane's provider`)
 	}
 
-	console.error(agent_role_profile.describe_review(Number(action.round), built.profile))
+	console.error(agent_profile_schema.describe_review(Number(action.round), built.profile))
 	const result = await detached_launch.launch_attached(
 		{
 			argv: built.argv,
@@ -195,7 +196,7 @@ async function relaunch(lane: LaneInfo, stop: ShipStop): Promise<BrokerAnswer> {
 	}
 
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
-	const phase = agent_role_profile.IMPLEMENTATION_PHASE
+	const phase = agent_profile_schema.IMPLEMENTATION_PHASE
 	const result = await lane_relaunch.relaunch(lane, invocation, phase, console.error)
 
 	return result.kind === 'launched'

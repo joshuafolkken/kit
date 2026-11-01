@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
+import { review_interaction } from './review-interaction'
 import { selfcheck_report, type Sections } from './selfcheck-report'
 
 const CLEAN: Sections = {
 	stale: { text: 'ok', exit_code: 0 },
 	readers: { readers: [], omitted: 0, has_failed: false },
+	interaction: [],
 	commands: { lines: [], failed: 0 },
 }
+const INTERACTION_HEADING = '## q4 interaction review questions'
 const READER = {
 	target: 'run',
 	origin: 'scripts/a.ts:3',
@@ -56,6 +59,23 @@ describe('selfcheck_report.report', () => {
 		expect(verdict(sections)).toBe(
 			'selfcheck: fail — q2 2 stale · q10 1 failed (q4: 0 readers to read)',
 		)
+	})
+})
+
+describe('selfcheck_report.report on the interaction review', () => {
+	it("asks the interaction review's questions over the due paths without failing the verdict", () => {
+		const sections = { ...CLEAN, interaction: ['scripts/run/a.ts'] }
+		const { text, exit_code } = selfcheck_report.report(sections)
+
+		expect(exit_code).toBe(0)
+		expect(text).toContain(
+			[INTERACTION_HEADING, ...review_interaction.QUESTIONS, '- scripts/run/a.ts'].join('\n'),
+		)
+		expect(review_interaction.brief_block([])).toContain(review_interaction.QUESTIONS.join('\n'))
+	})
+
+	it('answers none where the interaction review is not due', () => {
+		expect(selfcheck_report.report(CLEAN).text).toContain(`${INTERACTION_HEADING}\nnone`)
 	})
 })
 

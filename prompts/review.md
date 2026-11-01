@@ -41,7 +41,8 @@ tests and the round cap are unchanged.
    path returns something a caller can tell apart from `false`, `undefined` or "nothing found".
 4. **Every caller moved with it** — grep every reference to a changed function, list or command, and
    update each sibling path (the other CLI, the registry, the consumer side) in the same change.
-   The readers outside the diff: `pnpm josh review:selfcheck` → `q4`.
+   The readers outside the diff: `pnpm josh review:selfcheck` → `q4`; where the interaction review is
+   due, answer the questions it prints under `q4 interaction review questions` too.
 5. **The Issue is met on HEAD** — the premises you relied on hold on the current tree, and each
    acceptance criterion is checked against the diff.
 6. **State is read fresh** — for every record, stamp, snapshot, memo or ledger a decision reads, name
