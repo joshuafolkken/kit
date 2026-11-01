@@ -75,6 +75,10 @@ interface CommandEntry {
 	// Composite (`sh -c`) commands reject extra CLI arguments instead of swallowing them; this
 	// names the sub-commands that do accept them, so the refusal points somewhere useful.
 	argument_targets?: ReadonlyArray<string>
+	// Flags that turn the invocation into a read whatever its declared side effects — `ship --log` —
+	// so a scope that may not implement passes it (`josh-read-only.ts`). Declared here, not read off
+	// `side_effects`: `none` there is documentation, not a write audit (`edit:files` writes).
+	read_only_flags?: ReadonlyArray<string>
 	// A command that only makes sense inside the kit repository itself — the rule-compliance eval and
 	// the run measurements that analyze kit's own development. It is dropped from a consumer's
 	// `josh --help` and refused with guidance when run in a consumer project, so a distributed help
