@@ -33,11 +33,11 @@ Review results and successful pushes are never turn boundaries.
    agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` — the alias the brief prints beside its `model=` id (`(opus)` → `opus`)
    (`.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
-2. Once the review returns, run `pnpm josh run:review --join` to join and read the gate before
-   committing (`--join --fixing` if round 1 has fixes to make); it exits non-zero on a red gate, `3` on an `unpinned` line (its note names the `--unpinned-ok` call). Fix any red check, then rerun the affected scoped check
+2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes) joins,
+   attests and, on a clean slot, records (below); a stop prints its next. The join exits non-zero on a red gate, `3` on an `unpinned` line (its note names the `--unpinned-ok` call). Fix any red check, then rerun the affected scoped check
    and gate. Never version-bump a child (`pnpm josh release` decides).
-3. Before acting on any review round, run `pnpm josh review:attest --check`. `missing` or `mismatch`
-   discards it without counting; rerun against the brief's checkout. A review error receives a
+3. A bare `run:review --join` (lane child) takes `review:attest --check` first; `missing` or
+   `mismatch` discards the round uncounted; rerun against the brief's checkout. A review error receives a
    `confirmation` Telegram and stops.
 4. Route the attested verdict mechanically:
    - Clean or Low-only round 1: no second round. Fix, file, or drop each Low with a one-line reason.
@@ -46,7 +46,7 @@ Review results and successful pushes are never turn boundaries.
    - Round 2 is final. Fix a branch-1 finding, run its scoped check, push it, then run the gate. Dispose
      of remaining non-High findings; a confirmed High blocks and receives a `confirmation` Telegram.
    Outside step 0, round-1 fixes run one scoped check and the gate before `git -y`.
-   Once a round's verdict is attested, record its findings with `pnpm josh review:record --from-slot
+   Record an attested round's findings with `pnpm josh review:record --from-slot
    --issue <N>` (dispositions: its usage). **A round 2 that
    passes takes `--comment`** (`observation-ledger.md` → "The commit path").
    **`pnpm josh followup` refuses the merge until the round is recorded**

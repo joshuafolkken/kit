@@ -20,12 +20,14 @@ const RUN_REVIEW = 'run:review'
 
 type NextAction = (issue: string) => string
 
-// A notice a stage that exited 0 still stops on, read after it ends for the issue the run is on;
-// `undefined` lets the run go on.
-interface StageHold {
-	notice: (issue: string) => Promise<string | undefined>
+// A notice a stage that exited 0 still stops on, with the action after it, read after the stage ends
+// for the issue the run is on; `undefined` lets the run go on.
+interface HoldStop {
+	notice: string
 	next: NextAction
 }
+
+type StageHold = (issue: string) => Promise<HoldStop | undefined>
 
 interface ChainStage {
 	name: string
@@ -45,17 +47,26 @@ interface ChainStop {
 type StageRunner = (argv: ReadonlyArray<string>) => Promise<JoshResult>
 type Print = (text: string) => void
 
-function rerun(issue: string, from?: string): string {
-	const argv = from === undefined ? [issue] : [issue, '--from', from]
+// `mode` is the flags that chose the list (`--join` for the half after the review).
+function rerun(issue: string, from?: string, mode: ReadonlyArray<string> = []): string {
+	const resume = from === undefined ? [] : ['--from', from]
 
-	return `then rerun \`${COMMAND} ${argv.join(' ')}\``
+	return `then rerun \`${[COMMAND, issue, ...mode, ...resume].join(' ')}\``
 }
 
 // `main:merge` exits 0 on its split notice, which is answered before the cut (`split-assessment.md` →
 // "Over the guide before the gate"), so the chain holds on the check the cut refuses with
 // (`split-unresolved`): a notice on record with neither a recorded reason nor a split child.
-async function split_notice(issue: string): Promise<string | undefined> {
-	return await split_resolution.ledger_refusal(Number(issue))
+async function split_hold(issue: string): Promise<HoldStop | undefined> {
+	const notice = await split_resolution.ledger_refusal(Number(issue))
+
+	if (notice === undefined) return undefined
+
+	return {
+		notice,
+		next: (target) =>
+			`answer the split notice, issue \`pnpm josh run:cut ${target}\` alone again, ${rerun(target, SELFCHECK)}`,
+	}
 }
 
 const MERGE_STAGE: ChainStage = {
@@ -63,11 +74,7 @@ const MERGE_STAGE: ChainStage = {
 	argv: [MAIN_MERGE],
 	next: (issue) =>
 		`settle what \`${MAIN_MERGE}\` refused (\`chain-rule.md\` → "Orchestration facts single-sourced here"), ${rerun(issue)}`,
-	hold: {
-		notice: split_notice,
-		next: (issue) =>
-			`answer the split notice, issue \`pnpm josh run:cut ${issue}\` alone again, ${rerun(issue, SELFCHECK)}`,
-	},
+	hold: split_hold,
 }
 
 // `--unpinned-ok "<reason>"` as given, forwarded to `run:review` alone; empty when absent.
@@ -113,11 +120,9 @@ async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
 
 async function held(stage: ChainStage, issue: string): Promise<ChainStop | undefined> {
 	if (stage.hold === undefined) return undefined
-	const notice = await stage.hold.notice(issue)
+	const stop = await stage.hold(issue)
 
-	return notice === undefined
-		? undefined
-		: { stage, code: SUCCESS_EXIT_CODE, next: stage.hold.next, notice }
+	return stop === undefined ? undefined : { stage, code: SUCCESS_EXIT_CODE, ...stop }
 }
 
 // The stage's stdout is printed as it ends; stderr is forwarded as it is written.
@@ -166,6 +171,7 @@ const run_chain = {
 	SUCCESS_EXIT_CODE,
 	done_report,
 	main_line_stages,
+	rerun,
 	review_stages,
 	run_stages,
 	stages_from,
@@ -173,4 +179,4 @@ const run_chain = {
 }
 
 export { run_chain }
-export type { ChainStage, ChainStop, StageHold, StageRunner }
+export type { ChainStage, ChainStop, HoldStop, StageHold, StageRunner }
