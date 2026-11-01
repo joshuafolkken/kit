@@ -89,6 +89,13 @@ describe('repeat_check_related.repeats_before_brief', () => {
 		expect(repeat_check_related.repeats_before_brief(tail)).toBe(false)
 	})
 
+	it('restarts the count at run:review --join', () => {
+		const join = time_transcript_fixture.josh_call_line(3, BRANCH, 'pnpm josh run:review --join')
+		const tail = `${CHECKED_AND_FIXED}\n${join}\n${FIX_LINE}`
+
+		expect(repeat_check_related.repeats_before_brief(tail)).toBe(false)
+	})
+
 	it('restarts the count at ship --detach', () => {
 		const tail = `${CHECKED_AND_FIXED}\n${DETACH_LINE}\n${FIX_LINE}`
 

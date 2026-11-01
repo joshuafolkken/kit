@@ -14,10 +14,10 @@ import { round_one_check_related } from './round-one-check-related'
 // **The material is the run's own calls, read off the transcript tail** — the same events
 // `round-one-check-related` reads, where a `check` is a call that came back with no refusal: the call being
 // decided is already in the transcript, and a reissue after another guard's refusal is still the first.
-// A count restarts at `ship --detach`, whose stop a session resumes on a moved tree; a brief hands the
-// question to `round-one-check-related`.
+// A count restarts at a join or `ship --detach`, after which the tree has moved under the review or a
+// stopped ship; a brief hands the question to `round-one-check-related`.
 
-// Whether a `check:related` already ran since the last detach, with no brief after it.
+// Whether a `check:related` already ran since the last join or detach, with no brief after it.
 function repeats_before_brief(tail: string): boolean {
 	const events = round_one_check_related.round_events(tail)
 	const since_close = events.slice(events.lastIndexOf('close') + 1)
@@ -34,9 +34,9 @@ function decide(_call: unknown, run: GuardRun): boolean {
 
 const REPEAT_CHECK_RELATED_REASON =
 	'⛔ repeat check:related: the full-reach `check:related` runs once before the brief; refused on every ' +
-	'later occurrence. Re-run the one check you need by name — `pnpm josh lint:related`, ' +
-	'`pnpm josh test:related` (`--touched` while implementing), `pnpm josh cspell:dot` — then ' +
-	'`pnpm josh run:review` (`.claude/skills/workflow-commands/chain-rule.md` → "A lane child").'
+	'later occurrence. Re-run the failing check by name — `pnpm josh lint:related`, `check`, ' +
+	'`test:related` (`--touched` mid-run), `cspell:dot` — then `pnpm josh run:review` ' +
+	'(`.claude/skills/workflow-commands/chain-rule.md` → "A lane child").'
 
 // It declares no `keeps`: skipping the check is the absence of a call, so the row is reported
 // unmeasured rather than scored on an act that does not exist (`lane-split-park.ts`).
@@ -49,8 +49,8 @@ const ROW = {
 		title: 'One check:related before the brief',
 		topic: '`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"',
 		fires:
-			'`pnpm josh check:related` (`josh cr`) in a lane child after an earlier one, with no `run:review` (or `run:chain`) brief and no `ship --detach` since. Every occurrence',
-		quiet: 'the first since the last detach, a brief since, or not a lane child',
+			'`pnpm josh check:related` (`josh cr`) in a lane child after an earlier one that ran, with no `run:review` (or `run:chain`) brief, join or `ship --detach` since. Every occurrence',
+		quiet: 'the first since the last join or detach, a brief since, or not a lane child',
 	},
 }
 
