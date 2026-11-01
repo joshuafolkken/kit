@@ -28,6 +28,12 @@ const JOIN_FLAG = /(?:^|\s)--join(?:[=\s]|$)/u
 // The `run:review` modes that read a running check rather than write a brief.
 const READING_MODE_FLAG = /(?:^|\s)--(?:pinned|push)(?:[=\s]|$)/u
 const DETACH_FLAG = /(?:^|\s)--detach(?:[=\s]|$)/u
+// The mid-run `check:related --touched` keeps no record a brief reuses, so neither guard counts it.
+const TOUCHED_FLAG = /(?:^|\s)--touched(?:[=\s]|$)/u
+
+function is_full_reach_check(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, CHECK_COMMANDS) && !TOUCHED_FLAG.test(segment)
+}
 
 type RoundEvent = 'brief' | 'check' | 'close' | 'edit' | 'none'
 
@@ -39,7 +45,7 @@ function review_event(segment: string): RoundEvent {
 
 function segment_event(segment: string): RoundEvent {
 	if (shell_segments.is_josh_command(segment, REVIEW_COMMANDS)) return review_event(segment)
-	if (shell_segments.is_josh_command(segment, CHECK_COMMANDS)) return 'check'
+	if (is_full_reach_check(segment)) return 'check'
 
 	const is_detach =
 		shell_segments.is_josh_command(segment, SHIP_COMMANDS) && DETACH_FLAG.test(segment)
@@ -90,9 +96,7 @@ function fixes_an_open_round(tail: string): boolean {
 }
 
 function runs_check_related(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, CHECK_COMMANDS))
+	return shell_segments.segments_of(command).some((segment) => is_full_reach_check(segment))
 }
 
 // **The command test comes first and the world is consulted second**: a person working in a lane
@@ -125,7 +129,8 @@ const ROW = {
 		topic: '`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"',
 		fires:
 			"`pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s (or `run:chain`'s) brief, before `run:review --join`, `run:chain --join` or `ship --detach`. Every occurrence",
-		quiet: 'no fix since the brief, already joined or detached, or not a lane child',
+		quiet:
+			'no fix since the brief, already joined or detached, a `--touched` run, or not a lane child',
 	},
 }
 

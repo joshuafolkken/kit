@@ -7,7 +7,8 @@ import { round_one_check_related } from './round-one-check-related'
 //
 // **Mid-run checks are one check by name.** The #5630 lane ran `check:related` four times while
 // implementing, 7.0 of its 29.4 implement minutes; each run re-reads the whole related reach, while a
-// mid-run question is answered by `lint:related`, `test:related --touched` or `cspell:dot` alone. The
+// mid-run question is answered by `check:related --touched`, or by `lint:related`,
+// `test:related --touched` or `cspell:dot` alone; a `--touched` run is never counted. The
 // brief then needs `lint:related` and `test:related` green on its tree (`scoped-green.ts`), which a
 // re-run of the failing one gives.
 //
@@ -34,8 +35,9 @@ function decide(_call: unknown, run: GuardRun): boolean {
 
 const REPEAT_CHECK_RELATED_REASON =
 	'⛔ repeat check:related: the full-reach `check:related` runs once before the brief; refused on every ' +
-	'later occurrence. Re-run the failing check by name — `pnpm josh lint:related`, `check`, ' +
-	'`test:related` (`--touched` mid-run), `cspell:dot` — then `pnpm josh run:review` ' +
+	'later occurrence. Mid-run, run `pnpm josh check:related --touched` (never refused), or the ' +
+	'failing check by name — `pnpm josh lint:related`, `check`, `test:related` (`--touched` mid-run), ' +
+	'`cspell:dot` — then `pnpm josh run:review` ' +
 	'(`.claude/skills/workflow-commands/chain-rule.md` → "A lane child").'
 
 // It declares no `keeps`: skipping the check is the absence of a call, so the row is reported
@@ -50,7 +52,8 @@ const ROW = {
 		topic: '`.claude/skills/workflow-commands/chain-rule.md` → "A lane child"',
 		fires:
 			'`pnpm josh check:related` (`josh cr`) in a lane child after an earlier one that ran, with no `run:review` (or `run:chain`) brief, join or `ship --detach` since. Every occurrence',
-		quiet: 'the first since the last join or detach, a brief since, or not a lane child',
+		quiet:
+			'the first since the last join or detach, a brief since, a `--touched` run, or not a lane child',
 	},
 }
 
