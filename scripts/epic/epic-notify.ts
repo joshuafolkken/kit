@@ -45,15 +45,28 @@ interface NotifyRequest {
 	title?: string | undefined
 }
 
+const SUCCESS_EXIT_CODE = 0
+
+// The promoted epic's number, or `undefined` when the promotion failed and there is no epic to announce.
+function promoted_number(exit_code: number, epic_number: number): number | undefined {
+	return exit_code === SUCCESS_EXIT_CODE ? epic_number : undefined
+}
+
 // `--notify`'s send, made only once the epic exists — an epic whose number could not be read, or a
-// promotion that failed (`undefined`), has nothing to announce.
+// promotion that failed (`undefined`), has nothing to announce, and says so.
 async function announce(request: NotifyRequest, epic_number: number | undefined): Promise<void> {
-	if (epic_number === undefined || !request.is_notified) return
+	if (!request.is_notified) return
+
+	if (epic_number === undefined) {
+		console.error('⚠️  epic has no epic number to announce; no planning notification was sent.')
+
+		return
+	}
 
 	await send({ epic_number, children: request.children, title: request.title })
 }
 
-const epic_notify = { announce, body_of, send }
+const epic_notify = { announce, body_of, promoted_number, send }
 
 export type { EpicNotice, NotifyRequest }
 export { epic_notify }

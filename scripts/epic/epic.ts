@@ -51,9 +51,8 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		origin: parsed.origin,
 		title: parsed.title,
 	})
-	const promoted = exit_code === SUCCESS_EXIT_CODE ? parsed.epic_number : undefined
 
-	await epic_notify.announce(parsed, promoted)
+	await epic_notify.announce(parsed, epic_notify.promoted_number(exit_code, parsed.epic_number))
 
 	return exit_code
 }

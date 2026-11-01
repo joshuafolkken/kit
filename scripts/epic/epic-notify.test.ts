@@ -49,10 +49,21 @@ describe('epic_notify.announce — whether the epic is announced', () => {
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
 	})
 
-	it('sends nothing when there is no epic to announce', async () => {
+	it('sends nothing, with a warning, when there is no epic to announce', async () => {
 		await epic_notify.announce(REQUEST, undefined)
 
 		expect(telegram_test.send_values).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no epic number'))
+	})
+})
+
+describe('epic_notify.promoted_number — a promotion as the epic to announce', () => {
+	it('is the epic number once the promotion succeeded', () => {
+		expect(epic_notify.promoted_number(0, NOTICE.epic_number)).toBe(NOTICE.epic_number)
+	})
+
+	it('is undefined when the promotion failed', () => {
+		expect(epic_notify.promoted_number(1, NOTICE.epic_number)).toBeUndefined()
 	})
 })
 
