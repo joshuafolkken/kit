@@ -89,6 +89,25 @@ Runs after every successful `run:hold` claim, and in a `backlogrun`'s once-per-r
 
 **Output / exit codes:** always exits 0. What was cleaned and what was kept (with the reason) goes to stderr; nothing is printed when nothing merged was found.
 
+### `josh run:stale`
+
+<!-- usage: run:stale -->
+
+Remove a stale `in-progress` label no checkout still holds.
+
+```bash
+pnpm josh run:stale
+```
+
+<!-- /usage -->
+
+Removes `in-progress` from an open issue only when nothing holds it. Kept:
+
+- a label inside `epic:next`'s stale window, or of unread age;
+- a checkout (the lane, else the primary one whose run record names the issue) with uncommitted changes, a live, stop-marked or unreadable run record, or a process still in it (`lane-residents.ts`).
+
+**Output / exit codes:** `#N kept — <reason>` or `#N removed — <age>` per issue on stdout; exit 1 on an unreadable listing, else 0.
+
 ### `josh run:carry`
 
 <!-- usage: run:carry -->

@@ -1,0 +1,7 @@
+{
+	"reason": "#5635 adds the run:stale command (judge, live ports, entry) replacing a manual procedure; round-1 review fixes keep stop-marked and unreadable records",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 156
+	}
+}
