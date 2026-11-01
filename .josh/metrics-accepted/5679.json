@@ -1,0 +1,7 @@
+{
+	"reason": "lane:plan counts the plan's own files, not its directory claims, as planned on the hunks axis (#5679)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
