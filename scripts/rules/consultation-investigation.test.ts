@@ -90,7 +90,7 @@ function dispatch(input: Record<string, unknown>): Record<string, unknown> {
 
 describe('consultation-investigation — a Fable main line', () => {
 	it.each([
-		['a `Read` with no limit', 'Read', { file_path: ONE_FILE }],
+		['a `Read` with no limit of a file past the cap', 'Read', { file_path: ONE_FILE }],
 		['a `Read` past the cap', 'Read', { file_path: ONE_FILE, limit: BROAD_LIMIT }],
 		['a recursive grep of a directory', 'Bash', { command: TREE_GREP }],
 		['a `Glob`', 'Glob', { pattern: '**/*.ts' }],
