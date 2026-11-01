@@ -33,7 +33,8 @@ interface RunInput {
 	branch?: ReadonlyArray<string> | undefined
 	// The name the run is recorded under when it is not the scope's own — `touched` for a `--touched` run.
 	kind?: string
-	// The changed files past the reach cap, narrowed to their direct importers (`test-related-cap.ts`).
+	// The changed files past the reach cap, narrowed to their direct importers, widest reach first
+	// (`test-related-cap.ts`).
 	over_cap?: ReadonlyArray<string>
 }
 
@@ -136,6 +137,16 @@ function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> 
 	}
 }
 
+// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699).
+function over_cap_record(
+	over_cap: ReadonlyArray<string> | undefined,
+): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
+	if (over_cap === undefined) return {}
+	const [hub] = over_cap
+
+	return hub === undefined ? { over_cap: 0 } : { over_cap: over_cap.length, over_cap_hub: hub }
+}
+
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 	const { own, synced, since_map } = parts_of(input)
 	const record = {
@@ -146,7 +157,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
-		...(input.over_cap !== undefined && { over_cap: input.over_cap.length }),
+		...over_cap_record(input.over_cap),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 

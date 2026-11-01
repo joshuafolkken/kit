@@ -87,7 +87,7 @@ describe('test_related.run_related_tests — a file past the reach cap', () => {
 
 		await test_related.run_related_tests([])
 
-		expect(written_output()).toContain(`1 over cap (150 test files)`)
+		expect(written_output()).toContain(`1 over cap (150 test files), hub ${CHANGED_SOURCE}`)
 		expect(record.mock.calls[0]?.[0].over_cap).toEqual([CHANGED_SOURCE])
 	})
 

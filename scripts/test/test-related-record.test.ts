@@ -123,6 +123,16 @@ describe('test_related_record.record_of — the reach cap', () => {
 		expect(test_related_record.record_of(capped, result).over_cap).toBe(2)
 		expect(test_related_record.record_of(related_input(), result)).not.toHaveProperty('over_cap')
 	})
+
+	// joshuafolkken/kit#5699: the first over-cap file, the widest reach, is recorded as the hub.
+	it('records the first over-cap file as the hub, and none where nothing was capped', () => {
+		const capped = { ...related_input(), over_cap: ['src/a.ts', 'src/b.ts'] }
+		const uncapped = { ...related_input(), over_cap: [] }
+		const result = { elapsed_ms: 0, test_files: undefined }
+
+		expect(test_related_record.record_of(capped, result).over_cap_hub).toBe('src/a.ts')
+		expect(test_related_record.record_of(uncapped, result)).not.toHaveProperty('over_cap_hub')
+	})
 })
 
 // joshuafolkken/kit#5041: a shared test and a synced file the split cannot vouch for are in the change
