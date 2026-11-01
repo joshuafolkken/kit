@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats gains the lane first lint:related row (#5714)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 19
+	}
+}
