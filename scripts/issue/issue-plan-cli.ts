@@ -7,6 +7,8 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_plan_notify } from '#scripts/issue/issue-plan-notify'
 import { plan_consumers_section } from '#scripts/issue/plan-consumers-section'
 import { cli_body } from '#scripts/josh/cli-body'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
+import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 
@@ -141,12 +143,29 @@ async function try_record_plan(request: PlanRequest): Promise<boolean> {
 	}
 }
 
+// True when the plan is the running lane's own: a lane child planning its own issue in this repository.
+// Any other plan has no lane to plan — one recorded at `kickoff`, or on another issue, would hold its
+// files (or yield them) long before its own lane runs.
+function is_own_lane(request: PlanRequest): boolean {
+	const is_lane_issue = lane_child_marker.marked_issue() === request.issue_number
+
+	return is_lane_issue && request.repo === undefined && lane_child_marker.is_child_of(process.cwd())
+}
+
+// **A lane child's plan runs `lane:plan` on its own paths** (joshuafolkken/kit#5738), its exit code the
+// command's, so the child spends no second call copying the paths.
+async function lane_plan_code(request: PlanRequest): Promise<number> {
+	if (!is_own_lane(request)) return SUCCESS_EXIT_CODE
+
+	return await lane_plan_auto.run_from_plan(request.issue_number, request.plan)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const request = resolve_request(argv)
 
-	if (request === undefined) return FAILURE_EXIT_CODE
+	if (request === undefined || !(await try_record_plan(request))) return FAILURE_EXIT_CODE
 
-	return (await try_record_plan(request)) ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return await lane_plan_code(request)
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {
