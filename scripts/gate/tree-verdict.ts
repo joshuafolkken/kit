@@ -69,11 +69,16 @@ function reused_line(verdict: TreeVerdict, target: string): string {
 	return is_green ? line : `${line} — remove ${target} to run it again`
 }
 
-// `live` is a notice the caller asks again rather than keeps, as an answer that can change on this tree.
-function replay(verdict: TreeVerdict, target: string, live?: string): number {
-	const notice = live === undefined ? '' : `\n${live}\n`
+// `live` holds the notices the caller asks again rather than keeps: answers that read state outside the
+// tree key (a running `test:pinned`, the lane's `lane:plan` record), so they can change on this tree.
+function replay(
+	verdict: TreeVerdict,
+	target: string,
+	live: ReadonlyArray<string | undefined> = [],
+): number {
+	const notices = live.map((notice) => (notice === undefined ? '' : `\n${notice}\n`)).join('')
 
-	process.stdout.write(`${reused_line(verdict, target)}\n${notice}${verdict.tail}`)
+	process.stdout.write(`${reused_line(verdict, target)}\n${notices}${verdict.tail}`)
 
 	return verdict.exit_code
 }

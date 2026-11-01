@@ -87,15 +87,15 @@ describe('tree_verdict.replay', () => {
 		)
 	})
 
-	it('prints a notice asked again between the reuse line and the kept tail', async () => {
+	it('prints the notices asked again between the reuse line and the kept tail', async () => {
 		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		await tree_verdict.record(GREEN, same_tree, target)
 		const kept = tree_verdict.read(TREE, target)
 
-		expect(kept && tree_verdict.replay(kept, target, 'live notice')).toBe(0)
+		expect(kept && tree_verdict.replay(kept, target, ['live a', undefined, 'live b'])).toBe(0)
 		expect(String(write.mock.calls[0]?.[0])).toMatch(
-			/^reused: tree [\da-f]{12} green at \S+\n\nlive notice\n\n✔ josh lint:related passed\n$/u,
+			/^reused: tree [\da-f]{12} green at \S+\n\nlive a\n\nlive b\n\n✔ josh lint:related passed\n$/u,
 		)
 	})
 

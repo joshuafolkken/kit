@@ -207,11 +207,11 @@ function verdict_tail(
 	return `\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`
 }
 
-// Returns what `tree-verdict.ts` keeps for a re-run on the same tree: the notices and the tail, less
-// the `test:pinned` notice, printed first, which a replay asks again above the kept text as that check
-// may have answered since.
+// Returns what `tree-verdict.ts` keeps for a re-run on the same tree: the metrics notice and the tail.
+// The `test:pinned` and unplanned notices, printed first, read state outside the tree key, so a replay
+// asks them again above the kept text.
 function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): string {
-	const { is_full, log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
+	const { is_full, log_target = LOG_PATH, reused = new Set<string>() } = options
 
 	report_reused(reused)
 
@@ -223,9 +223,11 @@ function report_results(results: ReadonlyArray<CheckResult>, options: ReportOpti
 	const log = { path: write_log(results, log_target) }
 	const tail = verdict_tail(results, log, verdict_line(results, metrics !== undefined, reused))
 
-	const kept = `${format_notices([metrics, options.unplanned_notice])}${tail}`
+	const kept = `${format_notices([metrics])}${tail}`
 
-	process.stdout.write(`${format_notices([pinned_notice])}${kept}`)
+	process.stdout.write(
+		`${format_notices([options.pinned_notice, options.unplanned_notice])}${kept}`,
+	)
 
 	return kept
 }
@@ -281,18 +283,21 @@ async function run_fresh(
 }
 
 // A tree this run already answered for, green or red, is answered again with no check run
-// (`tree-verdict.ts`).
+// (`tree-verdict.ts`) — unless `--full` asks for the whole output the kept tail does not hold.
 async function run_all(
 	root?: string,
 	execute: CheckExecutor = execute_check,
 	is_full = false,
 ): Promise<number> {
 	const tree = await check_related_reuse.read_tree()
-	const kept = tree_verdict.read(tree, VERDICT_RECORD)
+	const kept = is_full ? undefined : tree_verdict.read(tree, VERDICT_RECORD)
 
 	if (kept === undefined) return await run_fresh(tree, root, execute, is_full)
 
-	return tree_verdict.replay(kept, VERDICT_RECORD, await check_related_pinned.notice(root, false))
+	return tree_verdict.replay(kept, VERDICT_RECORD, [
+		await check_related_pinned.notice(root, false),
+		await check_related_unplanned.notice(),
+	])
 }
 
 const check_related = {
