@@ -4,6 +4,7 @@ import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { lint_related_scope } from '#scripts/lint/lint-related-scope'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
+import { test_related_touched } from '#scripts/test/test-related-touched'
 import { execa } from 'execa'
 import run_parallel from 'run-parallel'
 import { check_related_order } from './check-related-order'
@@ -26,14 +27,18 @@ const LOG_PATH = stamp_file.stamp_path(
 	gate_log.GATE_LOG_SUFFIX,
 )
 const LINT_RELATED = 'lint:related'
+const TEST_RELATED = 'test:related'
 // The verdict `lint:related` itself prints last, under its own label.
 const LINT_PASSED = verification_tail.format_verdict(lint_related_scope.COMMAND_LABEL, [])
 const CHECKS: ReadonlyArray<string> = [
 	LINT_RELATED,
-	'test:related',
+	TEST_RELATED,
 	gate_labels.TYPE_CHECK_TARGET,
 	'cspell:dot',
 ]
+const TOUCHED_CHECKS: ReadonlyArray<string> = CHECKS.map((command) =>
+	command === TEST_RELATED ? `${TEST_RELATED} ${test_related_touched.TOUCHED_FLAG}` : command,
+)
 const REUSED = 'reused'
 const VERDICT_RECORD = tree_verdict.record_path('check-related')
 const METRICS_STOP =
@@ -67,7 +72,7 @@ async function execute_check(
 	run: ProcessRunner = run_execa,
 ): Promise<CheckResult> {
 	try {
-		const result = await run('pnpm', ['josh', command], { all: true, reject: false })
+		const result = await run('pnpm', ['josh', ...command.split(' ')], { all: true, reject: false })
 
 		return { command, exit_code: result.exitCode ?? 1, output: result.all ?? '' }
 	} catch (error) {
@@ -300,23 +305,45 @@ async function run_all(
 	])
 }
 
+// **`--touched` is the mid-run check** (joshuafolkken/kit#5784): its unit stage is `test:related
+// --touched`, so like that run it keeps nothing a brief or the ship reuses — no per-check green, no kept
+// verdict, no `test:pinned` restart. The full-reach run before the brief stays the one that vouches.
+async function run_touched(
+	execute: CheckExecutor = execute_check,
+	is_full = false,
+): Promise<number> {
+	const results = await run_checks(execute, TOUCHED_CHECKS)
+
+	report_results(results, { is_full })
+
+	return exit_code(results)
+}
+
+async function run_cli(argv: ReadonlyArray<string>): Promise<number> {
+	const is_full = check_related_section.is_full_requested(argv)
+
+	if (argv.includes(test_related_touched.TOUCHED_FLAG)) {
+		return await run_touched(execute_check, is_full)
+	}
+
+	return await run_all(undefined, execute_check, is_full)
+}
+
 const check_related = {
 	CHECKS,
 	METRICS_STOP,
 	REUSED,
+	TOUCHED_CHECKS,
 	execute_check,
 	exit_code,
 	report_results,
 	run_all,
 	run_checks,
+	run_touched,
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await check_related.run_all(
-		undefined,
-		execute_check,
-		check_related_section.is_full_requested(process.argv),
-	)
+	process.exitCode = await run_cli(process.argv)
 }
 
 export type { CheckExecutor }

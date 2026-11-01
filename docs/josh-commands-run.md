@@ -404,6 +404,8 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 `--adopt` claims by `run:hold --adopt <N>` instead — a `new` run's bare hold re-keyed to the Issue it filed; `none` or `busy` stops as a held tree does.
 
+After the budget and before the reads, `--adopt` synchronizes the tree (skipped in a lane child): `stash:push "<command> new #<N>: pre-existing changes"`, `main:sync` (primary checkout) or `main:merge` (linked), then `stash:pop` after `stashed`. A failed step exits non-zero, keeps and names the stash, releases the hold and sends the `confirmation` Telegram.
+
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.

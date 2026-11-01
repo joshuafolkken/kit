@@ -191,7 +191,11 @@ const DEV_COMMANDS: Record<string, CommandEntry> = {
 		category: 'Development',
 		reference: ['', 'developer', ['processes']],
 		usage: {
-			examples: [{ arguments: '' }, { arguments: '--full', note: 'whole outputs' }],
+			examples: [
+				{ arguments: '' },
+				{ arguments: '--full', note: 'whole outputs' },
+				{ arguments: '--touched', note: 'mid-run: test:related --touched, no green record' },
+			],
 		},
 	},
 	behavior: {

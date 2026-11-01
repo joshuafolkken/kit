@@ -141,6 +141,25 @@ describe('the repeat-check-related delivery in a lane child', () => {
 		expect(delivered_rules.delivery(payload_of('first', CHECK, FIX_LINE))).toBeUndefined()
 	})
 
+	// joshuafolkken/kit#5784: the touched run is the mid-run check the refusal points to.
+	it('lets a mid-run check:related --touched through, and names it in the refusal', () => {
+		const command = 'pnpm josh check:related --touched'
+
+		expect(
+			delivered_rules.delivery(payload_of('touched-check', command, CHECKED_AND_FIXED)),
+		).toBeUndefined()
+		expect(REASON).toContain('`pnpm josh check:related --touched`')
+	})
+
+	it('does not count an earlier check:related --touched as the run before the brief', () => {
+		const touched = [
+			time_transcript_fixture.josh_call_line(1, BRANCH, `${CHECK} --touched`, CHECK_ID),
+			time_transcript_fixture.result_line(2, BRANCH, CHECK_ID),
+		].join('\n')
+
+		expect(delivered_rules.delivery(payload_of('after-touched', CHECK, touched))).toBeUndefined()
+	})
+
 	it('lets a by-name test:related --touched through', () => {
 		const command = 'pnpm josh test:related --touched'
 

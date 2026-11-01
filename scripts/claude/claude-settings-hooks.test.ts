@@ -88,6 +88,8 @@ const PRETOOL_GUARD_TOOLS = [
 // rather than a push that dies after the unit suite has already run. It goes through the shared
 // launcher like every other hook (joshuafolkken/kit#3256), so a bundle runs it instead of `pnpm josh`.
 const PROVISION_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision --session-start')
+// The `clear` start's model record (joshuafolkken/kit#5761): no download, so one script start.
+const MODEL_RECORD_HOOK_COMMAND = hook_launch.hook_launch_command('audit-provision --session-model')
 // Derived from the download's own bound for the reason the formatter's is: a harness kill lands
 // mid-write, and the staging file this script renames from is the only thing that makes that
 // survivable. Raising the download budget has to raise the declared timeout with it.
@@ -251,6 +253,22 @@ describe_session_hook('.claude/settings.json — session-start audit provisionin
 	event: 'SessionStart',
 	command: PROVISION_HOOK_COMMAND,
 	minimum_timeout_seconds: MINIMUM_PROVISION_TIMEOUT_SECONDS,
+})
+
+// `/clear` opens a new transcript with no assistant entry, so its start records the model too —
+// `resume` and `compact` keep a transcript that already names one.
+describe('.claude/settings.json — clear-start model record', () => {
+	const wiring: HookWiring = {
+		event: 'SessionStart',
+		command: MODEL_RECORD_HOOK_COMMAND,
+		minimum_timeout_seconds: STARTUP_ALLOWANCE_SECONDS,
+	}
+
+	describe_shared_hook_properties(wiring)
+
+	it('matches only a clear start', () => {
+		expect(matchers_of(wiring).map((entry) => entry.matcher)).toEqual(['clear'])
+	})
 })
 
 // `UserPromptSubmit` carries no tool matcher, so it shares the session hook's three checks and the

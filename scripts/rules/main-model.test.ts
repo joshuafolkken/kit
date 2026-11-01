@@ -40,6 +40,16 @@ describe('main_model_reader.main_model — the main line model', () => {
 		expect(model_of([assistant(FABLE)], ASTRA)).toBe(ASTRA)
 	})
 
+	it('lets the transcript win over the model recorded at session start', () => {
+		const tail = tail_of(assistant(OPUS))
+
+		expect(main_model_reader.main_model(tail, undefined, FABLE)).toBe(OPUS)
+	})
+
+	it('falls back to the model recorded at session start when no entry names one', () => {
+		expect(main_model_reader.main_model('', undefined, FABLE)).toBe(FABLE)
+	})
+
 	it('names nothing when no entry does', () => {
 		const user = JSON.stringify({ type: 'user', message: { content: 'hi' } })
 

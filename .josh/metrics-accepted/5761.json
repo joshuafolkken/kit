@@ -1,0 +1,7 @@
+{
+	"reason": "SessionStart model record for the session-lang handoff line (#5761): one new module, its fallback and the clear-start record",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
