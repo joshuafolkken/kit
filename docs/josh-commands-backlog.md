@@ -131,11 +131,13 @@ File an Issue with every filing step: filing cap, fold, local checks (lint, Orig
 pnpm josh issue:file "<title>" --body-file body.md
 pnpm josh issue:file "<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit
 pnpm josh issue:file "<title>" --body-file body.md --distinct 2801,2795
+pnpm josh issue:file --batch .josh/tmp/deferred --route tier-a
 ```
 
 **Options:**
 
-- `--body-file <path>` — the body. Required.
+- `--body-file <path>` — the body. Required unless `--batch`.
+- `--batch <dir>` — file every `*.md` body file in `<dir>`, in name order, in one call, with the other flags applied to each. A title is the front matter `title:`, else the first line; a front matter `distinct: <N,…>` is that filing’s `--distinct`. A refused filing stays unfiled, the rest are filed, and the summary names each; any refusal exits 1.
 - `--route <tier-a|split|interrupt|review-cap>` — the `route:` label naming the filing route. Omit it for a filing with no route.
 - `--label <name>` — an extra label (for example `epic`). Repeatable.
 - `--repo <owner/repo>` — the target repository. Defaults to this repository.
