@@ -10,9 +10,10 @@ import { run_wake } from './run-wake'
 import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 
-// joshuafolkken/kit#3238: a session woken on a judgment branch is handed a record the supervisor has
-// already handed off. Followed as the hand-off material words it — claim, act, then the turn-end's cut — the session's
-// counts land and the supervisor reads the wake as claimed; skipping the claim is refused outright.
+// joshuafolkken/kit#3238, joshuafolkken/kit#5743: a session woken on a judgment branch is handed a
+// record the supervisor has already adopted for it. Followed as the hand-off material words it — act,
+// then the turn-end's cut, no claim — the session's counts land and the supervisor reads the wake as
+// claimed; a count from any other live process is refused.
 
 vi.mock('#scripts/git/git-command', () => ({
 	git_command: { git_directories: vi.fn(), status: vi.fn() },
@@ -26,24 +27,29 @@ const WORKTREE = path.join(scratch, 'worktree.git')
 const REPOSITORY = path.join(scratch, 'repository.git')
 const INVOCATION = 'backlogrun --idle 0'
 const DRIVER_OUTPUT = 'watch\nresume: --owner 1'
-const CLAIM_PATTERN = /--resume "(?<invocation>[^"]+)"/u
 const SUCCESS = 0
 // The woken session's own process: a live process that is not the supervisor running this suite.
-const SESSION_OWNER = String(process.ppid)
-const OWNER = ['--owner', SESSION_OWNER]
+const SESSION_PID = process.ppid
+const OWNER = ['--owner', String(SESSION_PID)]
+// The supervisor's own process, which is not the session.
+const FOREIGN_OWNER = ['--owner', String(process.pid)]
+const SESSION = { worktree: WORKTREE, session_id: 'woken', provider: 'anthropic' } as const
 
 function target(): string {
 	return run_carry.carry_path(REPOSITORY)
 }
 
-// The supervisor's half of a judgment wake: drive to the branch, hand the record off, and return the
-// material the woken session is launched with.
+// The supervisor's half of a judgment wake: drive to the branch, adopt the record for the session
+// before its launch, move the owner to the launched process, and return the material it is woken with.
 async function wake_on_judgment(): Promise<string> {
 	vi.spyOn(josh_command, 'josh_run').mockResolvedValueOnce({ code: SUCCESS, out: DRIVER_OUTPUT })
 	const driven = await run_wake_driver.drive(target())
 
 	if (driven.kind !== 'judgment') throw new Error(`expected a judgment, got ${driven.kind}`)
-	run_wake_handoff.hand_off(target())
+	const owner = run_wake_handoff.session_owner(SESSION)
+
+	run_wake_handoff.hand_to(target(), owner)
+	run_wake_handoff.hand_on(target(), owner, SESSION_PID)
 
 	return driven.material
 }
@@ -83,12 +89,10 @@ afterAll(() => {
 })
 
 describe('a session woken on a judgment branch', () => {
-	it('is counted as a claimed wake once it follows the material: claim, merge, cut', async () => {
+	it('is counted as a claimed wake once it follows the material with no claim: merge, cut', async () => {
 		const material = await wake_on_judgment()
-		const invocation = CLAIM_PATTERN.exec(material)?.groups?.['invocation']
 
-		expect(invocation).toBe(INVOCATION)
-		expect(await run_carry_cli.run(['--resume', invocation ?? '', ...OWNER])).toBe(SUCCESS)
+		expect(material).not.toContain('--resume')
 		expect(supervisor_decision()).toBe('wait')
 		expect(await run_carry_cli.run(['--merged', '1', ...OWNER])).toBe(SUCCESS)
 		expect(merged_count()).toBe(1)
@@ -96,11 +100,19 @@ describe('a session woken on a judgment branch', () => {
 		expect(run_carry.read_carry(target())).toMatchObject({ carry: { is_handed_off: true } })
 	})
 
-	it('has its merge refused when it skips the claim', async () => {
+	it('still answers a session that claims with --resume as before', async () => {
 		await wake_on_judgment()
 
-		expect(await run_carry_cli.run(['--merged', '1', ...OWNER])).not.toBe(SUCCESS)
+		expect(await run_carry_cli.run(['--resume', INVOCATION, ...OWNER])).toBe(SUCCESS)
+		expect(supervisor_decision()).toBe('wait')
+		expect(await run_carry_cli.run(['--merged', '1', ...OWNER])).toBe(SUCCESS)
+		expect(merged_count()).toBe(1)
+	})
+
+	it('refuses a count from a live process that is not the woken session', async () => {
+		await wake_on_judgment()
+
+		expect(await run_carry_cli.run(['--merged', '1', ...FOREIGN_OWNER])).not.toBe(SUCCESS)
 		expect(merged_count()).toBe(0)
-		expect(supervisor_decision()).not.toBe('wait')
 	})
 })

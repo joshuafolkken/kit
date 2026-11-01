@@ -193,8 +193,8 @@ itself. A judgment handoff carries the driver's verdict, affected issue, diagnos
 output and resume flags. The carry record keeps a restarted supervisor from counting a merge into
 another live owner's run.
 
-**A failure is visible rather than silent.** A judgment wake that never claims the carry record is
-retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
+**A failure is visible rather than silent.** A judgment wake whose session never begins work on the carry
+record is retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
 record that cannot be read ends it the same way. A `failed` stop while the carry record is
 still resumable restarts the supervisor in place after one interval, up to three times; only the
 failure past that bound sends the warning, its note counting the restarts. `none` and a
@@ -906,12 +906,14 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 <!-- usage: run:chain -->
 
-Run main:merge, review:selfcheck, check:related and run:review in one call, stopping at the first refusal with its next action.
+Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
 
 ```bash
 pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review
 pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
 pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
+pnpm josh run:chain <N> --join                      # once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition
+pnpm josh run:chain <N> --join --fixing             # the same, when round 1 has fixes to make
 ```
 
 <!-- /usage -->

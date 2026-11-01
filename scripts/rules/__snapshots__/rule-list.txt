@@ -33,7 +33,7 @@
   - silent: `-F` / `--field body=@`, a body without `@`, or `pnpm josh issue:comment`
   - not automated: the body moves to a file the call does not name
 - **No check:related on round 1's fixes** (`round-one-check-related`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
-  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s brief, before `run:review --join` or `ship --detach`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s (or `run:chain`'s) brief, before `run:review --join`, `run:chain --join` or `ship --detach`. Every occurrence
   - silent: no fix since the brief, already joined or detached, or not a lane child
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Piped verification** (`piped-verification`, `output-bounds.md`)

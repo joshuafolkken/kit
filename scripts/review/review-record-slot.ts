@@ -148,6 +148,8 @@ async function run(argv: ReadonlyArray<string>, record: Recorder): Promise<numbe
 const review_record_slot = {
 	expand,
 	run,
+	slot_text,
+	unmarked,
 }
 
 export { review_record_slot }

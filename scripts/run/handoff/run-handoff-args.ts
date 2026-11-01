@@ -14,6 +14,9 @@ const FLAG_AND_VALUE = 2
 
 const WORKFLOW_KEYWORDS = ['kickoff', 'fullrun', 'halfrun', 'prrun'] as const
 
+// Every keyword `run:handoff` takes — the one list the `session-lang` prompt hook matches too.
+const KEYWORDS: ReadonlyArray<string> = [...WORKFLOW_KEYWORDS, BACKLOG_KEYWORD]
+
 type WorkflowKeyword = (typeof WORKFLOW_KEYWORDS)[number]
 
 // Widened so `.includes()` takes any token; the guard below narrows it back.
@@ -62,14 +65,12 @@ function parse(argv: ReadonlyArray<string>): HandoffArguments {
 
 	if (keyword === BACKLOG_KEYWORD) return { kind: 'backlogrun', rest }
 
-	if (!is_workflow_keyword(keyword)) {
-		return refused(`expected one of ${[...WORKFLOW_KEYWORDS, BACKLOG_KEYWORD].join(', ')}`)
-	}
+	if (!is_workflow_keyword(keyword)) return refused(`expected one of ${KEYWORDS.join(', ')}`)
 
 	return workflow_of(keyword, rest)
 }
 
-const run_handoff_args = { parse }
+const run_handoff_args = { BACKLOG_KEYWORD, KEYWORDS, parse }
 
 export type { HandoffArguments, WorkflowHandoff, WorkflowKeyword }
 export { run_handoff_args }

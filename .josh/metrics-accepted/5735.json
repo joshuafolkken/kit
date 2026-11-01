@@ -1,0 +1,8 @@
+{
+	"reason": "run:chain --join adds the post-review stage list and its CLI mode (#5735)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 93,
+		"prose.long_paragraphs": 1
+	}
+}

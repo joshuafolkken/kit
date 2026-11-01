@@ -2,37 +2,60 @@
 import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { cli_flags } from '#scripts/lib/cli-flags'
-import { run_chain } from './run-chain'
+import { run_chain, type ChainStage } from './run-chain'
+import { run_chain_join } from './run-chain-join'
 
 // `josh run:chain <N>` — `main:merge`, `review:selfcheck`, `check:related` and `run:review` in one call
-// (`run-chain.ts`). `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok
-// "<reason>"` goes to `run:review` as given.
+// (`run-chain.ts`); `--join [--fixing]` runs the half after the review instead (`run-chain-join.ts`).
+// `--from <stage>` resumes at a stage after a stop the run settled; `--unpinned-ok "<reason>"` goes to
+// `run:review` as given, so it opens a review and never rides on `--join`.
 
 const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"]'
+const USAGE =
+	'Usage: josh run:chain <N> [--from <stage>] [--unpinned-ok "<reason>"] | <N> --join [--fixing] [--from <stage>]'
 const OPTIONS = {
 	from: { type: 'string' },
 	'unpinned-ok': { type: 'string' },
+	join: { type: 'boolean' },
+	fixing: { type: 'boolean' },
 } as const
+
+interface ChainValues {
+	from: string | undefined
+	unpinned_ok: string | undefined
+	is_join: boolean
+	is_fixing: boolean
+}
 
 interface ChainArguments {
 	issue: string
 	from?: string
-	unpinned_ok: ReadonlyArray<string>
+	stages: ReadonlyArray<ChainStage>
+}
+
+function stages_of(issue: string, values: ChainValues): ReadonlyArray<ChainStage> {
+	if (values.is_join) return run_chain_join.join_stages(issue, values.is_fixing)
+	const reason = values.unpinned_ok
+
+	return run_chain.main_line_stages(reason === undefined ? [] : ['--unpinned-ok', reason])
+}
+
+// `--fixing` belongs to the join and `--unpinned-ok` to the opening half, so each refuses the other list.
+function is_mixed(values: ChainValues): boolean {
+	return values.is_join ? values.unpinned_ok !== undefined : values.is_fixing
 }
 
 function arguments_from(
 	issue: string | undefined,
-	from: string | undefined,
-	reason: string | undefined,
+	values: ChainValues,
 ): ChainArguments | undefined {
-	if (issue === undefined) return undefined
+	if (issue === undefined || is_mixed(values)) return undefined
 
 	return {
 		issue,
-		...(from !== undefined && { from }),
-		unpinned_ok: reason === undefined ? [] : ['--unpinned-ok', reason],
+		...(values.from !== undefined && { from: values.from }),
+		stages: stages_of(issue, values),
 	}
 }
 
@@ -40,14 +63,14 @@ function parse(argv: ReadonlyArray<string>): ChainArguments | undefined {
 	const parsed = cli_flags.arguments_of(argv, OPTIONS)
 
 	if (parsed === undefined) return undefined
-
 	const { values, positionals } = parsed
 
-	return arguments_from(
-		issue_number_shape.single_of(positionals),
-		values.from,
-		values['unpinned-ok'],
-	)
+	return arguments_from(issue_number_shape.single_of(positionals), {
+		from: values.from,
+		unpinned_ok: values['unpinned-ok'],
+		is_join: values.join === true,
+		is_fixing: values.fixing === true,
+	})
 }
 
 function refuse(message: string): number {
@@ -60,8 +83,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = parse(argv)
 
 	if (parsed === undefined) return refuse(USAGE)
-	const all = run_chain.main_line_stages(parsed.unpinned_ok)
-	const stages = run_chain.stages_from(all, parsed.from)
+	const stages = run_chain.stages_from(parsed.stages, parsed.from)
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
 	const stop = await run_chain.run_stages(stages, parsed.issue, (text) => {
