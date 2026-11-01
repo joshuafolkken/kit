@@ -82,7 +82,7 @@ describe('run_step_section — the one table of governing sections', () => {
 
 describe('run_step_section — a lane child reads its own step of the chain', () => {
 	const implement = { kind: 'verdict' as const, line: run_step.IMPLEMENT }
-	const MAIN_MERGE_STEP = '1. Run `pnpm josh main:merge`.'
+	const MAIN_MERGE_STEP = '`pnpm josh run:chain <N>` runs `main:merge`'
 
 	it.each([...run_step_section.LANE_CHILD_SECTIONS])(
 		'resolves the lane child %s row against the shipped documents',

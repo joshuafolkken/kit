@@ -1,0 +1,9 @@
+{
+	"reason": "run:chain step 1 names its Bash timeout (review round 2 low finding)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 214,
+		"ai_cost.on_demand_bytes": 52,
+		"prose.excess_bold": 1
+	}
+}

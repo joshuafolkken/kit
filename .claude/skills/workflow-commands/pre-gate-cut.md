@@ -26,7 +26,7 @@ answers `not-a-lane` outside a lane, so it is safe to issue unconditionally.
 
 ## Taking the cut
 
-`chain-rule.md` step 1 issues it after `pnpm josh main:merge`, before the scoped pair and the gate —
+`chain-rule.md` step 1 issues it before `pnpm josh run:chain <N>`, the scoped pair and the gate —
 **unconditionally**:
 
 ```bash
