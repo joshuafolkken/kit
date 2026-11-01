@@ -1,6 +1,7 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_ship_stage } from '#scripts/run/ship/run-ship-stage'
+import { lane_breakdown_pause, type PauseMark } from './lane-breakdown-pause'
 import { lane_ledger, type LedgerEntry } from './lane-ledger'
 import { lane_net_time, type LaneSpan } from './lane-net-time'
 import { lane_stop_stats } from './lane-stop-stats'
@@ -51,6 +52,8 @@ interface Breakdown {
 	// Each ship stage's spans and the spans between them, waits left in — the windows its laps and the
 	// fixes between stages are read in (joshuafolkken/kit#5294).
 	ship: ReadonlyArray<Segment>
+	// The lane's parks, each naming the stretch between ship stages it fell in (joshuafolkken/kit#5646).
+	pauses?: ReadonlyArray<PauseMark>
 	// Why each ship stage last ran or was skipped, where its event line said (joshuafolkken/kit#5296).
 	reasons?: ReadonlyMap<string, string>
 }
@@ -225,6 +228,7 @@ function of(
 		waits,
 		...windows_of(segments),
 		reasons: reasons_of(events, issue, span),
+		pauses: lane_breakdown_pause.of(events, issue, span),
 	}
 }
 

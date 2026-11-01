@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown attributes between-ship-stage time to park events (#5646): new lane-breakdown-pause module",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 46
+	}
+}
