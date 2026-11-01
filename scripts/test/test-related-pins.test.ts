@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -51,6 +51,12 @@ describe('test_related_pins.is_registry_source', () => {
 			expect(test_related_pins.is_registry_source(file)).toBe(false)
 		},
 	)
+})
+
+describe('test_related_pins.REGISTRY_TESTS', () => {
+	it.each(REGISTRY_TESTS)('names %s, a test file on disk', (file) => {
+		expect(existsSync(path.resolve(file))).toBe(true)
+	})
 })
 
 describe('test_related_pins.pinned_tests', () => {

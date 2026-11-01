@@ -69,12 +69,9 @@ async function direct_of(
 	over_cap: ReadonlyArray<string>,
 ): Promise<Array<[string, Array<string>]>> {
 	const importers = await direct_importers.importers_of(root, over_cap)
-	const pinned = [...importers].map(([file, tests]): [string, Array<string>] => [
-		file,
-		test_related_pins.with_pins(file, tests),
-	])
+	const narrowed = [...importers].filter(([, tests]) => tests.length > 0)
 
-	return pinned.filter(([, tests]) => tests.length > 0)
+	return narrowed.map(([file, tests]) => [file, test_related_pins.with_pins(file, tests)])
 }
 
 // `files` are repository-root-relative, as the change was read. `is_whole` keeps the whole suite:
