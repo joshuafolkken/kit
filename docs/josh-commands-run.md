@@ -465,7 +465,7 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit.
+A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
@@ -1203,6 +1203,8 @@ pnpm josh lane:plan 4864 scripts/lane/lane-plan.ts scripts/backlog/backlog-next.
 A lane child runs it once its work summary settles, before the first edit, naming every file the summary changes. It checks once; until it prints `clear`, `scripts/hooks/lane-plan-guard.ts` refuses its runtime-file edits.
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
+
+A lane child's `issue:plan` runs it on the recorded plan's backticked paths, so a plan naming them needs no separate call (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
 
 On a clash the child gives its lane back instead of polling with its seat taken:
 

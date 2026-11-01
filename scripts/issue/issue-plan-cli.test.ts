@@ -36,6 +36,17 @@ const { send_notice } = vi.hoisted(() => ({ send_notice: vi.fn<() => Promise<voi
 
 vi.mock('#scripts/issue/issue-plan-notify', () => ({ issue_plan_notify: { send: send_notice } }))
 
+const { is_child_of, marked_issue, run_from_plan } = vi.hoisted(() => ({
+	is_child_of: vi.fn<() => boolean>(),
+	marked_issue: vi.fn<() => string | undefined>(() => '7'),
+	run_from_plan: vi.fn<(issue_number: string, plan: string) => Promise<number>>(),
+}))
+
+vi.mock('#scripts/lane/lane-child-marker', () => ({
+	lane_child_marker: { is_child_of, marked_issue },
+}))
+vi.mock('#scripts/lane/lane-plan-auto', () => ({ lane_plan_auto: { run_from_plan } }))
+
 const ISSUE_URL = 'https://github.com/o/r/issues/7'
 const COMMENT_URL = 'https://github.com/o/r/issues/7#issuecomment-1'
 const CONSUMERS_SECTION = `${plan_consumers_section.HEADING}\n- なし（the plan adds no concept）\n`
@@ -48,6 +59,8 @@ const TITLE_FLAG = '--title'
 const PLANNED_FLAG = '--planned'
 const NO_NOTIFY_FLAG = '--no-notify'
 const FILLED_BODY = '## Background'
+// `lane:plan`'s exit code for `split` (`lane-plan-check.ts`).
+const SPLIT_EXIT_CODE = 3
 
 // The issue read `issue_body_or_comment` makes: the body, filed by the owner.
 function body_json(body: string): string {
@@ -63,6 +76,18 @@ writeFileSync(PLAN_FILE, PLAN)
 writeFileSync(EMPTY_FILE, '  \n')
 writeFileSync(NO_CONSUMERS_FILE, PLAN_WITHOUT_CONSUMERS)
 
+// Every write succeeds on a blank body, and the session is no lane child, so no `lane:plan` runs unless
+// a test says so.
+function default_session(): void {
+	issue_view_json.mockResolvedValue(body_json(''))
+	issue_edit_body.mockResolvedValue(ISSUE_URL)
+	issue_edit_title.mockResolvedValue(ISSUE_URL)
+	issue_comment.mockResolvedValue(COMMENT_URL)
+	issue_add_label.mockResolvedValue(true)
+	is_child_of.mockReturnValue(false)
+	run_from_plan.mockResolvedValue(0)
+}
+
 const printed: Array<string> = []
 const errors: Array<string> = []
 
@@ -70,11 +95,7 @@ beforeEach(() => {
 	printed.length = 0
 	errors.length = 0
 	vi.clearAllMocks()
-	issue_view_json.mockResolvedValue(body_json(''))
-	issue_edit_body.mockResolvedValue(ISSUE_URL)
-	issue_edit_title.mockResolvedValue(ISSUE_URL)
-	issue_comment.mockResolvedValue(COMMENT_URL)
-	issue_add_label.mockResolvedValue(true)
+	default_session()
 	vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
 		printed.push(String(line))
 	})
@@ -110,6 +131,38 @@ describe('issue_plan_cli.run — the plan goes to a blank body, else a comment',
 		expect(issue_comment).toHaveBeenCalledWith('7', PLAN, undefined)
 		expect(issue_edit_body).not.toHaveBeenCalled()
 		expect(printed).toContain(`comment: ${COMMENT_URL}`)
+	})
+})
+
+describe('issue_plan_cli.run — a lane child’s plan runs lane:plan on its paths', () => {
+	it('runs lane:plan on the recorded plan in a lane child and returns its code', async () => {
+		is_child_of.mockReturnValue(true)
+		run_from_plan.mockResolvedValue(SPLIT_EXIT_CODE)
+
+		const code = await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE])
+
+		expect(code).toBe(SPLIT_EXIT_CODE)
+		expect(run_from_plan).toHaveBeenCalledWith('7', PLAN)
+		expect(issue_edit_body).toHaveBeenCalledWith('7', PLAN, undefined)
+	})
+
+	it.each([
+		{ name: 'outside a lane child', is_child: false, issue: '7', argv: [] },
+		{ name: 'for another repository', is_child: true, issue: '7', argv: ['--repo', OTHER_REPO] },
+		{ name: 'for another issue than the lane’s', is_child: true, issue: '8', argv: [] },
+	])('runs no lane:plan $name', async ({ is_child, issue, argv }) => {
+		is_child_of.mockReturnValue(is_child)
+
+		expect(await issue_plan_cli.run([issue, BODY_FILE_FLAG, PLAN_FILE, ...argv])).toBe(0)
+		expect(run_from_plan).not.toHaveBeenCalled()
+	})
+
+	it('runs no lane:plan when the plan failed to post', async () => {
+		is_child_of.mockReturnValue(true)
+		issue_add_label.mockResolvedValue(false)
+
+		expect(await issue_plan_cli.run(['7', BODY_FILE_FLAG, PLAN_FILE, PLANNED_FLAG])).toBe(1)
+		expect(run_from_plan).not.toHaveBeenCalled()
 	})
 })
 

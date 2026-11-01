@@ -286,6 +286,10 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
 
+When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split). On `wait` (`1`), re-run the printed command, not `issue:plan`.
+
+A plan naming no path prints `pnpm josh lane:plan <N> <path>...` for the child to finish (`scripts/lane/lane-plan-auto.ts`). Outside a lane child, `kickoff`'s plan records no lane plan.
+
 ### `josh plan:consumers`
 
 <!-- usage: plan:consumers -->
