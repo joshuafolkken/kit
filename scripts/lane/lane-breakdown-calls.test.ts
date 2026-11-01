@@ -6,7 +6,7 @@ import { lane_breakdown_text } from './lane-breakdown-text'
 import { lane_transcript_calls, type Subagent, type ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
 
-// joshuafolkken/kit#5539: #5519's breakdown printed `test 8.7 min` and `subagent: reviewer 10.0 min`
+// joshuafolkken/kit#5539: #5519's breakdown printed the `test` and `subagent: reviewer` rows' totals
 // with no word on which calls made them up, so its overrun investigation stopped at the row. Each row
 // now prints its longest three call groups, a reviewer's split by pass and level.
 

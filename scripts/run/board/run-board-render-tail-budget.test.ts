@@ -4,8 +4,9 @@ import type { Phase } from './run-board-phase'
 import { run_board_render_fixture } from './run-board-render-fixture'
 import { run_board_render_tail } from './run-board-render-tail'
 
-// joshuafolkken/kit#5563: a running lane whose phase ran past its share of a 30-minute lane ends on
-// `over budget +N′`; one within it, or in a phase with no budget, ends without it.
+// joshuafolkken/kit#5563: a running lane whose phase ran past its share of a lane's
+// 30-minute budget ends on `over budget +N′`; one within it, or in a phase with no budget, ends
+// without it.
 
 const { MINUTE, NOW, header } = run_board_render_fixture
 const OVER = 'over budget +8′'
