@@ -5,7 +5,7 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { hook_bundle_stamp, type HookSources } from './hook-bundle-stamp'
 
-const { is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME } = hook_bundle_stamp
+const { has_outputs, is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME } = hook_bundle_stamp
 
 const FIRST_INPUT = 'scripts/a.ts'
 const SECOND_INPUT = 'scripts/b.ts'
@@ -90,6 +90,32 @@ describe('is_fresh', () => {
 		rmSync(path.join(fixture.out_directory, OUTPUT_NAME))
 
 		expect(is_fixture_fresh(fixture)).toBe(false)
+	})
+})
+
+describe('has_outputs', () => {
+	it('reads a finished build as runnable even once its source has been edited', () => {
+		const fixture = create_fixture()
+
+		writeFileSync(path.join(fixture.package_directory, FIRST_INPUT), EDITED_CONTENT)
+
+		expect(has_outputs(fixture.out_directory)).toBe(true)
+	})
+
+	it('reads a build with a missing output as not runnable', () => {
+		const { out_directory } = create_fixture()
+
+		rmSync(path.join(out_directory, OUTPUT_NAME))
+
+		expect(has_outputs(out_directory)).toBe(false)
+	})
+
+	it('reads a directory with no record as not runnable', () => {
+		const { out_directory } = create_fixture()
+
+		rmSync(path.join(out_directory, STAMP_NAME))
+
+		expect(has_outputs(out_directory)).toBe(false)
 	})
 })
 

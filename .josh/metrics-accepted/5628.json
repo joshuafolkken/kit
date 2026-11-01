@@ -1,0 +1,7 @@
+{
+	"reason": "Background hook-bundle rebuild with a lock (#5628): detached rebuild path, failure record, pruned-chunk retry and their tests",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 123
+	}
+}
