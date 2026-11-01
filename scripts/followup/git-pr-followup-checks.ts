@@ -141,14 +141,26 @@ function is_checks_failure(error: unknown): boolean {
 }
 
 // A required job a partial rerun dropped is recovered by rerunning its whole run, or waited for again
-// when it only trailed (`followup-run-rerun.ts`).
+// when it only trailed (`followup-run-rerun.ts`). `undefined` leaves it to the failed-job rerun: a
+// job failed beside the gap, and rerunning it brings back the jobs that wait on it.
 async function rejudge_missing(
 	input: RunChecksInput,
 	error: MissingContextError,
-): Promise<PrStateSnapshot> {
+): Promise<PrStateSnapshot | undefined> {
 	const outcome = await followup_run_rerun.recover_missing(error.missing)
-	if (outcome === 'none') throw error
+	if (outcome === 'none') return undefined
 	if (outcome === 'rerun') input.reran?.push(...error.missing.contexts)
+
+	return await wait_for_checks(input)
+}
+
+async function rejudge_failed_jobs(
+	input: RunChecksInput,
+	error: unknown,
+): Promise<PrStateSnapshot> {
+	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
+	if (rerun.length === 0) throw error
+	input.reran?.push(...rerun)
 
 	return await wait_for_checks(input)
 }
@@ -161,12 +173,10 @@ async function rejudge_after_rerun(
 	error: unknown,
 ): Promise<PrStateSnapshot> {
 	if (!is_checks_failure(error)) throw error
-	if (error instanceof MissingContextError) return await rejudge_missing(input, error)
-	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
-	if (rerun.length === 0) throw error
-	input.reran?.push(...rerun)
+	const recovered =
+		error instanceof MissingContextError ? await rejudge_missing(input, error) : undefined
 
-	return await wait_for_checks(input)
+	return recovered ?? (await rejudge_failed_jobs(input, error))
 }
 
 async function run_checks(input: RunChecksInput): Promise<PrStateSnapshot> {

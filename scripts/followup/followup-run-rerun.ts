@@ -34,7 +34,7 @@ interface RunJobs {
 }
 
 // `present`: every lost job is back in a latest attempt — its creation only trailed — so the wait is
-// judged again with no rerun; `none`: nothing here recovers it, and the failure stands.
+// judged again with no rerun; `none`: nothing here recovers it.
 type MissingOutcome = 'present' | 'rerun' | 'none'
 
 async function read_jobs(run_id: number, filter: 'all' | 'latest'): Promise<Array<Job>> {
@@ -115,13 +115,15 @@ async function recover(missing: MissingContexts): Promise<MissingOutcome> {
 	if (holds_every(latest, lost)) return 'present'
 	const targets = runs.filter((run) => is_rerun_target(run, lost))
 	if (targets.length === 0) return 'none'
-	await rerun_whole(targets, lost)
+	const rerun = lost.filter((context) => targets.some((run) => holds(run.all, context)))
+
+	await rerun_whole(targets, rerun)
 
 	return 'rerun'
 }
 
 // A read or a rerun that fails is reported and answers `none`: the rerun is a recovery, so the
-// original failure stands.
+// failure is left to the failed-job rerun, and stands where that finds nothing.
 async function recover_missing(missing: MissingContexts): Promise<MissingOutcome> {
 	try {
 		return await recover(missing)
@@ -136,4 +138,4 @@ const followup_run_rerun = {
 	recover_missing,
 }
 
-export { followup_run_rerun, LATEST_ATTEMPTS, type MissingOutcome }
+export { followup_run_rerun }

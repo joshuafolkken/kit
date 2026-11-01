@@ -81,15 +81,27 @@ describe('run_checks — a required context with no check-run', () => {
 		await expect(run(reran)).resolves.toStrictEqual(SNAPSHOT)
 		expect(reran).toStrictEqual([])
 	})
+})
 
+describe('run_checks — a required context the whole-run rerun cannot recover', () => {
 	it('fails with the original failure when nothing recovers it', async () => {
 		const error = missing_error()
 
 		wait.mockRejectedValue(error)
 		recover.mockResolvedValue('none')
+		rerun.mockResolvedValue([])
 
 		await expect(run()).rejects.toBe(error)
 		expect(wait).toHaveBeenCalledOnce()
+	})
+
+	it('leaves a gap beside a failed job to the failed-job rerun', async () => {
+		wait.mockRejectedValueOnce(missing_error()).mockResolvedValueOnce(SNAPSHOT)
+		recover.mockResolvedValue('none')
+		rerun.mockResolvedValue(RERUN_NAMES)
+
+		await expect(run()).resolves.toStrictEqual(SNAPSHOT)
+		expect(rerun).toHaveBeenCalledExactlyOnceWith(BRANCH_NAME)
 	})
 
 	it('does not recover a second time when the context is missing again', async () => {
