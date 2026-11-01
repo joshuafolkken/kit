@@ -96,6 +96,24 @@ describe('lane_plan.earlier_holders', () => {
 	})
 })
 
+// joshuafolkken/kit#5672: a narrowing re-plan keeps the files an earlier clear held, for the hunks axis.
+describe('lane_plan.record on a re-plan', () => {
+	it('keeps every path an earlier cleared plan held when a re-plan narrows it', () => {
+		lane_plan.record({ ...LATER_PLAN, paths: [OVERRUN, RANK], cleared: true }, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.record({ ...LATER_PLAN, cleared: true }, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.cleared_paths).toEqual([OVERRUN, RANK])
+	})
+
+	it('records no history before any plan of the issue cleared', () => {
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+		lane_plan.record(LATER_PLAN, DIRECTORY)
+
+		expect(lane_plan.read(LATER, DIRECTORY)?.cleared_paths).toBeUndefined()
+	})
+})
+
 describe('lane_plan.release', () => {
 	// joshuafolkken/kit#4926: a lane that yielded closes on a plan marked yielded, which keeps the issue
 	// held back and its place in line; any other plan — cleared or never answered — leaves nothing.
