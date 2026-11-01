@@ -1123,7 +1123,7 @@ A subagent call counts under the agent it dispatched (`subagent: reviewer`), a b
 
 Under `implement` and `start to plan`, each line is one call group, at most three per row, longest first: `<row> › <label> ×<count> <minutes>` (`test › test:related ×3 8.7 min`), the row left out under `start to plan`.
 
-The label is the josh commands a Bash call chains, else its first 60 characters past a leading `cd`; a reviewer's pass (`round 1`, `interaction`, `round 2`), and its level when the prompt opens with one; any other subagent's type; any other tool's name.
+The label is the josh commands a Bash call chains, a `reserved-run` as what it wrapped (`reserved-run (eslint)`, `reserved-run (test:related)`), else its first 60 characters past a leading `cd`; a reviewer's pass (`round 1`, `interaction`, `round 2`), and its level when the prompt opens with one; any other subagent's type; any other tool's name.
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
 

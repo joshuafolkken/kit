@@ -155,6 +155,42 @@ describe('lane_breakdown_calls.label_of', () => {
 	})
 })
 
+describe('lane_breakdown_calls.label_of — a reserved-run', () => {
+	it('names a reserved-run by the program it wrapped, past its runner', () => {
+		const lint = 'pnpm josh reserved-run 4 --memory 512 -- pnpm exec eslint --concurrency off .'
+
+		expect(lane_breakdown_calls.label_of(bash(1, 1, lint))).toBe('reserved-run (eslint)')
+	})
+
+	it('names a reserved-run by the josh command it wrapped', () => {
+		const related = 'cd /a && pnpm josh reserved-run 2 -- pnpm josh test:related'
+
+		expect(lane_breakdown_calls.label_of(bash(1, 1, related))).toBe('reserved-run (test:related)')
+	})
+
+	it('keeps a josh command chained after a reserved-run out of what it wrapped', () => {
+		const chained = 'pnpm josh reserved-run 1 -- pnpm exec eslint . && pnpm josh test:related'
+
+		expect(lane_breakdown_calls.label_of(bash(1, 1, chained))).toBe(
+			'reserved-run (eslint) + test:related',
+		)
+	})
+
+	it('keeps a josh command chained before a reserved-run in the label', () => {
+		const chained = 'pnpm josh lint:related && pnpm josh reserved-run 1 -- npx eslint .'
+
+		expect(lane_breakdown_calls.label_of(bash(1, 1, chained))).toBe(
+			'lint:related + reserved-run (eslint)',
+		)
+	})
+
+	it('keeps a reserved-run that wrapped no command as the bare wrapper', () => {
+		expect(lane_breakdown_calls.label_of(bash(1, 1, 'pnpm josh reserved-run --help'))).toBe(
+			'reserved-run',
+		)
+	})
+})
+
 describe('lane_breakdown_text.comment — the call lines', () => {
 	it('prints each row’s groups under the implement and the start to plan', () => {
 		const calls = [
