@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { agent_consultation_model } from './agent-consultation-model'
 import { agent_model_alias } from './agent-model-alias'
 import {
 	agent_provider,
@@ -22,6 +23,7 @@ const {
 	trimmed,
 	warn_of_default,
 } = agent_provider
+const { CONSULTATION_MODELS, consultation_provider } = agent_consultation_model
 
 const ROLE_SCHEMA = z.enum(['scheduler', 'worker', 'reviewer'])
 const EFFORT_SCHEMA = z.enum(['low', 'medium', 'high', 'xhigh', 'max'])
@@ -117,16 +119,8 @@ const VERIFICATION_KEYS = {
 	effort: 'JOSH_REVIEWER_VERIFICATION_EFFORT',
 }
 
-// **The consultation models, and the model the main line hands its investigation to**
-// (joshuafolkken/kit#5351). A main line consulted on one of these pays its rate for every byte it reads,
-// so broad investigation goes to a subagent on that provider's investigation model. The Astra id is
-// confirmed on a live Codex CLI by joshuafolkken/kit#5394.
-const CONSULTATION_MODELS: Readonly<Record<AgentProvider, string>> = {
-	anthropic: 'claude-fable-5-1',
-	openai: 'gpt-6.1-astra',
-}
-// The `Agent` tool's alias for the Claude consultation model.
-const CONSULTATION_ALIAS = 'fable'
+// The model a consultation main line hands its investigation to (joshuafolkken/kit#5351); the
+// consultation models themselves are `agent-consultation-model.ts`'s.
 const INVESTIGATION_MODELS: Readonly<Record<AgentProvider, string>> = {
 	anthropic: ANTHROPIC_MODEL,
 	openai: OPENAI_MODEL,
@@ -241,9 +235,16 @@ function resolved_effort(override: Override, fallback: AgentEffort): EffortResul
 		: rejection(override.key, override.value ?? '', 'is not an allowed effort')
 }
 
+// **A launched main line never runs on a consultation model** (joshuafolkken/kit#5616): a scheduler or
+// worker on one is itself a consultation main line, which `consultation-handoff` refuses its
+// `run:entry` / `run:hold`, so every launcher refuses the profile here instead. A reviewer runs neither.
 function validate(profile: AgentProfile, model_key: string): ProfileResult {
 	if (!is_safe_value(profile.model)) {
 		return rejection(model_key, profile.model, 'is not a safe model')
+	}
+
+	if (profile.role !== REVIEWER && consultation_provider(profile.model) !== undefined) {
+		return rejection(model_key, profile.model, 'is a consultation model')
 	}
 
 	return { kind: 'profile', profile }
@@ -342,14 +343,6 @@ function describe(profile: AgentProfile): string {
 // The run-log line a review launch writes, so each round's model is on record beside its round.
 function describe_review(round: number, profile: AgentProfile): string {
 	return `review round ${String(round)} · ${describe(profile)}`
-}
-
-// The provider whose consultation model this is, by id or by the `Agent` alias; `undefined` for any
-// other model.
-function consultation_provider(model: string): AgentProvider | undefined {
-	if (model === CONSULTATION_ALIAS) return ANTHROPIC_PROVIDER
-
-	return PROVIDER_SCHEMA.options.find((provider) => CONSULTATION_MODELS[provider] === model)
 }
 
 // The model a consultation main line hands its investigation to. Its key moves the Claude model alone,

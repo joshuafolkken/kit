@@ -17,6 +17,9 @@ import type { WorkflowHandoff, WorkflowKeyword } from './run-handoff-args'
 // so a consultation on Claude Code hands to a Claude child and one on Codex to a Codex child; the model
 // and effort come from the role profile, resolved from an environment cleared of the session's keys
 // exactly as `josh backlogrun` resolves its parent's (`backlogrun-launch.ts`).
+//
+// A profile on a consultation model is refused by `agent_role_profile.resolve` itself, as for every
+// launcher: the child would be refused its `run:entry` and pointed back here (joshuafolkken/kit#5616).
 
 type BuiltArgv = Extract<AgentArgvResult, { kind: 'argv' }>
 
