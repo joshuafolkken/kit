@@ -78,11 +78,20 @@ describe('lane_net_time.net_ms', () => {
 	})
 })
 
-function yielded(minute: number, by: string = lane_yield.YIELD_TEXT.name): RunEvent {
+function withdrawn(minute: number, by: string): RunEvent {
 	return event(
 		minute,
 		'withdraw',
 		`#${String(ISSUE)} withdrawn by ${by}: overlaps #${String(OTHER)}`,
+	)
+}
+
+// The note a yielding child writes (`lane-yield.ts`); `run:merge` may close the lane later, or never.
+function yielded(minute: number): RunEvent {
+	return event(
+		minute,
+		'note',
+		`#${String(ISSUE)} yielded its lane: overlaps #${String(OTHER)} · at: summary`,
 	)
 }
 
@@ -94,10 +103,18 @@ describe('lane_net_time.net_ms -- a yield', () => {
 		expect(net_minutes(entries, [yielded(7)])).toBe(61)
 	})
 
+	// joshuafolkken/kit#5755: #5635's yield had no closing withdrawal; one that has it waits from the note.
+	it('takes the wait out from the note, the closing withdrawal counted with it', () => {
+		const entries = [dispatch(0), dispatch(50), merge(104)]
+		const events = [yielded(7), withdrawn(9, lane_yield.YIELD_TEXT.name)]
+
+		expect(net_minutes(entries, events)).toBe(61)
+	})
+
 	it('keeps the time after a withdrawal that is not a yield', () => {
 		const entries = [dispatch(0), dispatch(50), merge(104)]
 
-		expect(net_minutes(entries, [yielded(7, 'a person')])).toBe(104)
+		expect(net_minutes(entries, [withdrawn(7, 'a person')])).toBe(104)
 	})
 
 	it('cuts a yield no redispatch ended at the merge', () => {

@@ -1,0 +1,8 @@
+{
+	"reason": "lane:breakdown attributes the rest between ship stages and starts a yield at its note (#5755)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 14,
+		"prose.long_paragraphs": 1
+	}
+}

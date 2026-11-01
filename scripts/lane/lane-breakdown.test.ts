@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { lane_breakdown, type Breakdown } from './lane-breakdown'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
-import { lane_yield } from './lane-yield'
 
 // joshuafolkken/kit#4995: the overrun investigation needs stages, not only a total, to locate the cost.
 // Its stages add up to the net time, waits taken out.
@@ -153,8 +152,8 @@ describe('lane_breakdown.of — a yield', () => {
 			{ kind: 'dispatch', at: at(0), issue: ISSUE },
 			{ kind: 'merge', at: at(MERGE_MINUTE), issue: ISSUE },
 		]
-		const text = `${LANE} withdrawn by ${lane_yield.YIELD_TEXT.name}: overlaps`
-		const events = [event(-43, 'withdraw', text), ...events_4970()]
+		const text = `${LANE} yielded its lane: overlaps · at: summary`
+		const events = [event(-43, 'note', text), ...events_4970()]
 		const breakdown = lane_breakdown.of(entries, events, ISSUE)
 
 		expect(stage_minutes(breakdown, START_TO_PLAN)).toBe(17)

@@ -15,6 +15,7 @@ const BETWEEN = 'between ship stages'
 const JOSH_GATE = 'josh gate'
 const SCOPED_PAIR = 'scoped pair'
 const GATE_COMMAND = 'pnpm josh gate'
+const EDITING = 'editing & thinking'
 
 const BREAKDOWN: Breakdown = {
 	stages: [],
@@ -141,7 +142,9 @@ describe('lane_breakdown_laps.of — ship stages', () => {
 	})
 
 	it("leaves out another lane's laps and a lap ended between ship stages", () => {
-		expect(minutes_of([lap(JOSH_GATE, 3, 15, OTHER_ISSUE), lap('push', 1, 18)])).toStrictEqual([])
+		const entries = [lap(JOSH_GATE, 3, 15, OTHER_ISSUE), lap('push', 1, 18)]
+
+		expect(minutes_of(entries)).toStrictEqual([])
 	})
 })
 
@@ -243,7 +246,15 @@ describe('lane_breakdown_laps.of — between ship stages', () => {
 	it('splits the time between ship stages by the Bash the child ran there', () => {
 		const calls = [bash(17, 2, GATE_COMMAND), bash(12, 1, GATE_COMMAND)]
 
-		expect(minutes_of([], calls)).toStrictEqual([[BETWEEN, [['gate', 2]]]])
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['gate', 2],
+					[EDITING, 2],
+				],
+			],
+		])
 	})
 
 	// joshuafolkken/kit#5646: a lane that never paused reads as before.
@@ -251,6 +262,36 @@ describe('lane_breakdown_laps.of — between ship stages', () => {
 		const breakdown = { ...BREAKDOWN, pauses: [] }
 		const laps = lane_breakdown_laps.of([], ISSUE, breakdown, [bash(17, 2, GATE_COMMAND)])
 
-		expect([...laps]).toStrictEqual([[BETWEEN, [{ name: 'gate', ms: 2 * MINUTE_MS }]]])
+		expect([...laps]).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					{ name: 'gate', ms: 2 * MINUTE_MS },
+					{ name: EDITING, ms: 2 * MINUTE_MS },
+				],
+			],
+		])
+	})
+})
+
+// joshuafolkken/kit#5755: what no Bash call covered between two ship stages is the child's own time.
+describe('lane_breakdown_laps.of — the rest between ship stages', () => {
+	it('names the time no Bash call covered editing and thinking, a wait taken out', () => {
+		const breakdown = { ...BREAKDOWN, waits: [{ from_ms: 19 * MINUTE_MS, to_ms: 20 * MINUTE_MS }] }
+		const laps = lane_breakdown_laps.of([], ISSUE, breakdown, [bash(16, 1, GATE_COMMAND)])
+
+		expect(laps.get(BETWEEN)).toStrictEqual([
+			{ name: EDITING, ms: 2 * MINUTE_MS },
+			{ name: 'gate', ms: MINUTE_MS },
+		])
+	})
+
+	it('adds no row when the Bash covered all of it', () => {
+		expect(minutes_of([], [bash(16, 4, GATE_COMMAND)])).toStrictEqual([[BETWEEN, [['gate', 4]]]])
+	})
+
+	// A reader with no transcript calls (`lane-sinks.ts`) does not know the time was editing.
+	it('leaves the time unsplit when no calls were read', () => {
+		expect(minutes_of([], [])).toStrictEqual([])
 	})
 })

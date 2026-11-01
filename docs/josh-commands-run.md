@@ -1191,7 +1191,7 @@ The changed files the lane's `josh test:related` runs narrowed past the reach ca
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
-`between ship stages` lists the child's Bash there by kind. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
+`between ship stages` lists the child's Bash there by kind, and what no Bash call covered as editing & thinking. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
 
 A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait, and what the lane redid up to its next park — `(re-plan, ship ×2 re-run)`, a ship counted again where a stage starts twice (`lane-breakdown-pause.ts`).
 

@@ -94,11 +94,15 @@ function untimed_of(placed: ReadonlyArray<readonly [ToolCall, LaneSpan]>): Map<s
 	return counts
 }
 
-// What neither a timed call nor a wait covers of the implementation's spans, each millisecond once.
-function remainder_ms(parts: ReadonlyArray<TimedPart>, breakdown: Breakdown): number {
+// What neither a timed call nor a wait covers of `spans`, each millisecond once.
+function remainder_ms(
+	parts: ReadonlyArray<TimedPart>,
+	spans: ReadonlyArray<LaneSpan>,
+	waits: ReadonlyArray<LaneSpan>,
+): number {
 	const busy = parts.map((part) => ({ from_ms: part.from_ms, to_ms: part.from_ms + part.ms }))
-	const covering = [...busy, ...breakdown.waits]
-	const idle = breakdown.implement.map(
+	const covering = [...busy, ...waits]
+	const idle = spans.map(
 		(span) => span.to_ms - span.from_ms - lane_breakdown.covered_ms(span, covering),
 	)
 
@@ -125,7 +129,10 @@ function placed_of(
 function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDetail {
 	const placed = placed_of(calls, breakdown.implement)
 	const parts = placed.flatMap(([call, span]) => timed_part(call, span))
-	const remainder = { name: REMAINDER, ms: remainder_ms(parts, breakdown) }
+	const remainder = {
+		name: REMAINDER,
+		ms: remainder_ms(parts, breakdown.implement, breakdown.waits),
+	}
 
 	return {
 		kinds: lane_breakdown.ranked([...parts, remainder]),
@@ -145,14 +152,23 @@ function plan_calls(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array
 }
 
 // The Bash calls started inside `spans`, by the implementation's kinds — the fixes, re-ships and checks
-// a lane child ran between two ship stages (joshuafolkken/kit#5294).
-function bash_kinds(calls: ReadonlyArray<ToolCall>, spans: ReadonlyArray<LaneSpan>): Array<Stage> {
+// a lane child ran between two ship stages (joshuafolkken/kit#5294) — and what neither those calls nor
+// `waits` covered as the remainder (joshuafolkken/kit#5755), left out when nothing is left. A reader
+// that read no calls (`lane-sinks.ts`) gets no rows: its time is not known to be editing.
+function bash_kinds(
+	calls: ReadonlyArray<ToolCall>,
+	spans: ReadonlyArray<LaneSpan>,
+	waits: ReadonlyArray<LaneSpan>,
+): Array<Stage> {
+	if (calls.length === 0) return []
 	const placed = placed_of(
 		calls.filter((call) => call.tool === BASH_TOOL),
 		spans,
 	)
+	const parts = placed.flatMap(([call, span]) => timed_part(call, span))
+	const remainder = { name: REMAINDER, ms: remainder_ms(parts, spans, waits) }
 
-	return lane_breakdown.ranked(placed.flatMap(([call, span]) => timed_part(call, span)))
+	return lane_breakdown.ranked(remainder.ms > 0 ? [...parts, remainder] : parts)
 }
 
 // The lane's own transcript directories — `<lane root slug>-<issue>` under `~/.claude/projects`.
