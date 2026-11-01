@@ -22,7 +22,7 @@ function quiet_world(tail = ''): void {
 	vi.spyOn(run_hold, 'worktree_directory').mockResolvedValue(undefined)
 	vi.spyOn(run_hold, 'is_tree_dirty').mockResolvedValue(true)
 	vi.spyOn(run_cut, 'carried_cut_sync').mockReturnValue(undefined)
-	vi.spyOn(run_headless, 'must_keep_waiting').mockResolvedValue(false)
+	vi.spyOn(run_headless, 'hand_back_at_turn_end').mockResolvedValue(false)
 	vi.spyOn(run_headless, 'is_backlog_parent').mockResolvedValue(false)
 	vi.spyOn(run_headless, 'is_headless').mockReturnValue(true)
 	vi.spyOn(time_density_hook, 'read_tail').mockReturnValue(tail)

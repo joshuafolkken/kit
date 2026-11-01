@@ -1,0 +1,9 @@
+{
+	"reason": "#5739: the headless hand-back cut moves into the Stop hook (hand_back_at_turn_end, hand_back_outcome) with its tests",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 28,
+		"ai_cost.on_demand_bytes": 93,
+		"prose.long_paragraphs": 2
+	}
+}

@@ -899,6 +899,20 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 **Output / exit codes:** exits 0 when no lane children are in-flight or the watcher is fresh. Exits 1 and writes a note to stderr telling the user to restart `run:progress --wait` before proceeding.
 
+### `josh run:chain`
+
+<!-- usage: run:chain -->
+
+Run main:merge, review:selfcheck, check:related and run:review in one call, stopping at the first refusal with its next action.
+
+```bash
+pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review
+pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
+pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
+```
+
+<!-- /usage -->
+
 ## Lanes
 
 ### `josh lane:open` / `josh lane:close` / `josh lane:list` / `josh lane:prune`

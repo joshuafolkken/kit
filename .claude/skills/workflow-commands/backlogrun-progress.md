@@ -72,8 +72,8 @@ park** — nothing is labelled, stashed or filed.
 
 ## Resuming after a cut
 
-**A session woken by the driver** — `Driver result:` in its prompt — acts on its branch and cuts as its
-`Next:` line says. A session resumed by hand reads the subsections below.
+**A session woken by the driver** — `Driver result:` in its prompt — acts on its branch and ends its turn
+as its `Next:` line says. A session resumed by hand reads the subsections below.
 
 ### Picking the lanes up in the fresh session
 

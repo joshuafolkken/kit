@@ -14,6 +14,7 @@ vi.mock('#scripts/run/carry/run-carry', () => ({
 		repository_directory: vi.fn(),
 		carry_path: vi.fn(() => '/carry.json'),
 		read_carry: vi.fn(),
+		apply_change: vi.fn(),
 		is_at_cut_cap: vi.fn(() => true),
 	},
 }))
@@ -25,6 +26,7 @@ const { run_headless } = await import('./run-headless')
 const lanes_in_flight = vi.mocked(lane_registry.has_lanes_in_flight)
 const repository_directory = vi.mocked(run_carry.repository_directory)
 const read_carry = vi.mocked(run_carry.read_carry)
+const apply_change = vi.mocked(run_carry.apply_change)
 
 const HEADLESS = { [run_headless.HEADLESS_ENV_KEY]: '1' }
 const HEADLESS_CHILD = { ...HEADLESS, JOSH_LANE_CHILD: '2437' }
@@ -194,6 +196,43 @@ describe('run_headless.is_backlog_parent — ownership', () => {
 		read_carry.mockReturnValue(DRIVING)
 
 		expect(await run_headless.is_backlog_parent(ATTACHED, own_ancestry)).toBe(false)
+	})
+})
+
+// joshuafolkken/kit#5739: a headless judgment session's turn-end writes the hand-back cut itself.
+describe('run_headless.hand_back_at_turn_end', () => {
+	beforeEach(() => {
+		read_carry.mockReturnValue(OWNED)
+		apply_change.mockImplementation((_target, written) => {
+			read_carry.mockReturnValue(HANDED_OFF)
+
+			return written
+		})
+	})
+
+	it('cuts the record a headless parent drives and lets it stop, lanes in flight or not', async () => {
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).toHaveBeenCalledWith(expect.any(String), OWNED.carry, { cuts: 1 })
+
+		read_carry.mockReturnValue(OWNED)
+		lanes_in_flight.mockResolvedValue(false)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).toHaveBeenCalledTimes(2)
+	})
+
+	it('writes no cut for an attached session, a lane child or a handed-off record', async () => {
+		expect(await run_headless.hand_back_at_turn_end(ATTACHED, own_ancestry)).toBe(false)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS_CHILD, own_ancestry)).toBe(false)
+
+		read_carry.mockReturnValue(HANDED_OFF)
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(false)
+		expect(apply_change).not.toHaveBeenCalled()
+	})
+
+	it('keeps a parent with lanes in flight waiting when the write left the record un-handed-off', async () => {
+		apply_change.mockImplementation((_target, written) => written)
+
+		expect(await run_headless.hand_back_at_turn_end(HEADLESS, own_ancestry)).toBe(true)
 	})
 })
 

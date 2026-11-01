@@ -23,12 +23,12 @@ Review results and successful pushes are never turn boundaries.
    A preflight stop `unplanned: <files>` → take one of the two ways out it prints, then re-detach
    — unless its `lane:plan` answers `yield` (`docs/josh-commands-run.md` → "`josh ship`").
    `failed` → step 1.
-1. Run `pnpm josh main:merge`. **Then issue `pnpm josh run:cut <N>` alone, before `check:related` and
-   the gate** — the pre-gate cut (a no-op outside a lane). Then answer the self-check
-   (`prompts/review.md` → "Before round 1 — the implementer's self-check"; 1: `run:review --join`, 2/4/10:
-   `pnpm josh review:selfcheck`), run the final scoped lint/test pair with `pnpm josh check:related` and
-   `pnpm josh run:review`: it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background
-   and writes the `/code-review` brief to a file, printing its path and prompt, in one call, so they overlap; two briefs take two `reviewer`s side by side, the second recorded with
+1. **Issue `pnpm josh run:cut <N>` alone first** — the pre-gate cut (a no-op outside a lane). Then
+   `pnpm josh run:chain <N>` runs `main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
+   the implementer's self-check"; 1: `run:review --join`, 2/4/10: `review:selfcheck`), the scoped
+   lint/test pair `check:related` and `run:review` in one Bash call (`timeout` 600000); a stop prints its next step
+   (`--from <stage>` resumes). `run:review` starts `pnpm josh test:pinned` and
+   `pnpm josh gate` in the background and writes the `/code-review` brief to a file, printing its path and prompt; two briefs take two `reviewer`s side by side, the second recorded with
    `review:record --from-slot --interaction`. Launch the `/code-review` subagent as the `reviewer`
    agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` — the alias the brief prints beside its `model=` id (`(opus)` → `opus`)
    (`.claude/agents/reviewer.md`; never a guessed type name).

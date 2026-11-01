@@ -42,7 +42,8 @@ a judgement, so its `split` is the size condition met, not a decision to divide.
 **Trigger: `pnpm josh main:merge` prints a `split notice`** — the branch's diff, untracked files
 included, answers `split` on `split:assess`; the first `pnpm josh lint:related` or `pnpm josh
 test:related` past the guide prints it earlier, once per Issue. Take one action on it, before `pnpm josh run:cut <N>`
-(`chain-rule.md` step 1) — the cut ends the turn, and the resumed run does not see the notice:
+(`chain-rule.md` step 1; `run:chain` holds on it and names the cut to reissue) — the cut ends the
+turn, and the resumed run does not see the notice:
 
 - Keep it one Issue — it must land together: one Issue comment with the line
   `- 分割しない理由: <理由>`, citing the counts.
