@@ -151,14 +151,14 @@ describe(`${WORKFLOW_SKILL} — carries the procedures that left the documents`,
 	})
 
 	// A command that stashes the working tree and never pops it leaves the user's changes buried in
-	// the stash list with the run reporting success. The pop is `pnpm josh stash:pop`, targeted by
-	// message, because the stash is a repository-wide stack every lane shares — a positional
-	// `git stash pop` takes whichever lane last pushed (joshuafolkken/kit#2050).
-	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s restores everything it stashes', (filename) => {
+	// the stash list with the run reporting success (joshuafolkken/kit#2050). joshuafolkken/kit#5747
+	// moved a `new` entry's stash, sync and pop into `run:entry <N> --adopt`, whose pop by message is
+	// pinned in `run-entry-sync.test.ts`, so the step lists hand it over rather than stash by hand.
+	it.each([FULLRUN_STEPS_FILE, HALFRUN_FILE])('%s hands its stash to run:entry', (filename) => {
 		const content = read_skill_file(WORKFLOW_SKILL, filename)
 
-		expect(content).toContain('pnpm josh stash:push')
-		expect(content).toContain('pnpm josh stash:pop')
+		expect(content).toContain('--adopt`')
+		expect(content).not.toContain('pnpm josh stash:')
 	})
 
 	// The comment-reading step every `#N` entry point owes is pinned by its own suite, beside the two

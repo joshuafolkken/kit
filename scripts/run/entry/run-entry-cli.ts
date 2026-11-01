@@ -27,7 +27,8 @@ import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
 import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
-import { run_entry_stop } from './run-entry-stop'
+import { run_entry_stop, type StopNotice } from './run-entry-stop'
+import { run_entry_sync, type EntryStop } from './run-entry-sync'
 import { run_entry_trust, type TrustStop } from './run-entry-trust'
 
 // `josh run:entry <N>` — one call for the fixed entry sequence a lane opens on. Rather than a round
@@ -58,6 +59,7 @@ const COST_STOP_NOTE = '(session budget spent — see the figure above; resume i
 const YIELD_NOTE =
 	'(lane given back at the entry — see the overlap above; end the session now, with no edit)'
 const { BUDGET_REASON, HOLD_REASON } = run_entry_stop
+const COST_STOP: EntryStop = { report: COST_STOP_NOTE, notice: { reason: BUDGET_REASON } }
 const HALFRUN_RESUME_TOKEN = 'halfrun'
 
 // Exactly one issue number, or the call is refused — `run:entry` opens one run, and a second number
@@ -196,12 +198,9 @@ function stop_report(issue_number: string, hold: string, cost: string, report: s
 
 // A stop this command decided carries its own chores: the `confirmation`
 // Telegram always, and the release where this call claimed the hold — `run_entry_stop` says why.
-interface StopCall {
+interface StopCall extends Omit<StopNotice, 'issue_number' | 'command'> {
 	parts: Pick<EntryParts, 'issue_number' | 'hold' | 'cost' | 'report'>
 	command: StageCommand
-	reason: string
-	should_release: boolean
-	recommended?: string
 }
 
 async function stop_run({ parts, command, ...notice }: StopCall): Promise<number> {
@@ -392,6 +391,20 @@ async function proceed(
 	return print_entry_sections()
 }
 
+// A stop after this call claimed the hold, which it releases. It exits non-zero though a failed sync
+// leaves the hold and the budget tokens both allowing the run.
+async function stop_claimed(
+	{ issue_number, command }: EntryRequest,
+	{ hold, cost }: Pick<EntryParts, 'hold' | 'cost'>,
+	{ report, notice }: EntryStop,
+): Promise<number> {
+	const parts = { issue_number, hold, cost, report }
+
+	await stop_run({ parts, command, should_release: true, ...notice })
+
+	return FAILURE_EXIT_CODE
+}
+
 async function claim_run(request: EntryRequest, state: StageState): Promise<number> {
 	const { issue_number, command } = request
 	const hold = await claim_hold(request)
@@ -403,12 +416,10 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 	}
 
 	const cost = await check_cost()
+	// A `new` run's entry synchronizes the tree it adopted before reading the issue.
+	const stop = cost === run_entry.COST_OVER ? COST_STOP : await run_entry_sync.sync(request)
 
-	if (cost === run_entry.COST_OVER) {
-		const parts = { issue_number, hold, cost, report: COST_STOP_NOTE }
-
-		return await stop_run({ parts, command, reason: BUDGET_REASON, should_release: true })
-	}
+	if (stop !== undefined) return await stop_claimed(request, { hold, cost }, stop)
 
 	return await proceed(request, { hold, cost }, state)
 }
