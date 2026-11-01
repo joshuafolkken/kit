@@ -1,9 +1,12 @@
 import { project_checks } from '#scripts/gate/project-checks'
+import { change_base } from '#scripts/git/change-base'
 import { changed_paths } from '#scripts/git/changed-paths'
 import { session_cite } from '#scripts/issue/session-cite'
 import { observation_ledger_home } from '#scripts/observations/observation-ledger-home'
 import { review_attest, type ReviewSlot } from './review-attest'
+import { review_code_tree } from './review-code-tree'
 import { review_finding_ledger } from './review-finding-ledger'
+import { review_round2 } from './review-round2'
 
 // The interaction review — one adversarial pass after `/code-review`, over a change to the run
 // tooling (joshuafolkken/kit#4276).
@@ -16,7 +19,8 @@ import { review_finding_ledger } from './review-finding-ledger'
 //
 // **Its round is its own ledger line, `- ri:`**, so the merge gate tells it apart from `/code-review`'s
 // and `josh followup` refuses a due change that has none. The verdicts mirror `review_record.check`'s:
-// `not-required` covers both a change outside the directories and a checkout that keeps no ledger.
+// `not-required` covers a change outside the directories, a change that leaves what executes in them
+// unchanged, and a checkout that keeps no ledger.
 
 const TARGET_DIRECTORIES = ['scripts/run/', 'scripts/lane/', 'scripts/backlog/', 'scripts/hooks/']
 
@@ -32,7 +36,18 @@ const ROLE_LINES = [
 	"Report each break with the reader's `file:line` and the change's, rated by the rubric's severities; it is disposed of by `prompts/review.md` → \"Interaction review\".",
 ]
 
+const INERT_LINE_PREFIX =
+	'Interaction review not due: every run-tooling path this change touches leaves what executes unchanged (round 2’s inert reading — in these directories, a comment-only edit)'
+
 type InteractionStatus = 'ok' | 'missing' | 'not-required'
+
+const NOT_REQUIRED: InteractionStatus = 'not-required'
+
+// The status, and why a due change is not due after all — its paths all inert.
+interface InteractionReading {
+	status: InteractionStatus
+	inert_line?: string
+}
 
 function due_paths(
 	paths: ReadonlyArray<string>,
@@ -49,21 +64,56 @@ function brief_block(targets: ReadonlyArray<string>): string {
 	return [...ROLE_LINES, 'Changed in the run tooling:', ...listed].join('\n')
 }
 
-async function status_of(
+// **A due change whose every due path leaves what executes unchanged is not due** — round 2's own
+// inert predicate (joshuafolkken/kit#5567), over the change since the base (joshuafolkken/kit#5656).
+async function inert_line(due: ReadonlyArray<string>): Promise<string | undefined> {
+	const base = await change_base.resolved_through_merge()
+	if (base === undefined) return undefined
+	const comment_only = await review_code_tree.comment_only_since(base, due)
+	const is_inert = due.every((relative) => review_round2.is_unexecuted(relative, comment_only))
+
+	return is_inert ? `${INERT_LINE_PREFIX}: ${due.join(', ')}` : undefined
+}
+
+async function unrecorded_reading(due: ReadonlyArray<string>): Promise<InteractionReading> {
+	const line = await inert_line(due)
+
+	return line === undefined ? { status: 'missing' } : { status: NOT_REQUIRED, inert_line: line }
+}
+
+async function reading_of(
 	issue: number,
 	paths: ReadonlyArray<string>,
 	root: string = observation_ledger_home.ledger_root(),
+): Promise<InteractionReading> {
+	const due = due_paths(paths)
+	const content = due.length > 0 ? await observation_ledger_home.read(root) : undefined
+	if (content === undefined) return { status: NOT_REQUIRED }
+	if (review_finding_ledger.has_issue_record(content, issue, 'interaction')) return { status: 'ok' }
+
+	return await unrecorded_reading(due)
+}
+
+async function status_of(
+	issue: number,
+	paths: ReadonlyArray<string>,
+	root?: string,
 ): Promise<InteractionStatus> {
-	const content = due_paths(paths).length > 0 ? await observation_ledger_home.read(root) : undefined
+	const answer = await reading_of(issue, paths, root)
 
-	if (content === undefined) return 'not-required'
+	return answer.status
+}
 
-	return review_finding_ledger.has_issue_record(content, issue, 'interaction') ? 'ok' : 'missing'
+// The reading over this checkout's change — the one `run:review` opens round 1 from.
+async function reading(issue: number, root?: string): Promise<InteractionReading> {
+	return await reading_of(issue, await changed_paths.read_changed_paths(false), root)
 }
 
 // The status over this checkout's change — the reading `review:brief` takes.
 async function status(issue: number, root?: string): Promise<InteractionStatus> {
-	return await status_of(issue, await changed_paths.read_changed_paths(false), root)
+	const answer = await reading(issue, root)
+
+	return answer.status
 }
 
 // **Round 1's slots — the interaction review beside `/code-review`'s where it is due and not yet
@@ -94,6 +144,7 @@ const review_interaction = {
 	brief_block,
 	due_paths,
 	NOT_DUE_LINE,
+	reading,
 	refusal,
 	refusal_message,
 	round_one_slots,
@@ -101,5 +152,5 @@ const review_interaction = {
 	status_of,
 }
 
-export type { InteractionStatus }
+export type { InteractionReading, InteractionStatus }
 export { review_interaction }
