@@ -45,14 +45,16 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision
+pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision, then releases
 ```
 
-`in-progress` stays; the parked child does **not** hold the repository (`needs-decision` takes
-precedence in `epic:next`). Return to step 1.
+The one call also runs `run:release <N>`, so the parked child holds neither the tree nor
+`in-progress`; a failed release prints `pnpm josh run:release <N>` to re-run. A tree whose hold names
+another run (a split lane parking a leftover child) is left to that run's own release. Return to
+step 1.
 
-**A parked child's lane is kept, whether or not it had committed**, and every parked ending owes
-`pnpm josh run:release <N>` — `backlogrun-lanes.md` → "What happens to a lane". A lost merge race
+**A parked child's lane is kept, whether or not it had committed** — `backlogrun-lanes.md` → "What
+happens to a lane". A lost merge race
 resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
 
 **Parking keeps the stop's rule** — file upstream defects; never work around them.

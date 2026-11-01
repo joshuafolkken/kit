@@ -4,25 +4,29 @@ import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_park_cli } from './run-park-cli'
 
-const { apply_mock, clear_label_mock, record_mock, clear_record_mock } = vi.hoisted(() => ({
-	apply_mock:
-		vi.fn<
-			(
-				issue: string,
-				label: string,
-				body: string,
-			) => Promise<{ is_labelled: boolean; is_commented: boolean }>
-		>(),
-	clear_label_mock: vi.fn<(issue: string, label: string) => Promise<boolean>>(),
-	record_mock: vi.fn<(issue: string, directory: string) => boolean>(),
-	clear_record_mock: vi.fn<(issue: string, directory: string) => void>(),
-}))
+const { apply_mock, clear_label_mock, record_mock, clear_record_mock, release_mock } = vi.hoisted(
+	() => ({
+		apply_mock:
+			vi.fn<
+				(
+					issue: string,
+					label: string,
+					body: string,
+				) => Promise<{ is_labelled: boolean; is_commented: boolean }>
+			>(),
+		clear_label_mock: vi.fn<(issue: string, label: string) => Promise<boolean>>(),
+		record_mock: vi.fn<(issue: string, directory: string) => boolean>(),
+		clear_record_mock: vi.fn<(issue: string, directory: string) => void>(),
+		release_mock: vi.fn<(issue: string) => Promise<number>>(),
+	}),
+)
 
 vi.mock('#scripts/issue/issue-park', () => ({ issue_park: { apply: apply_mock } }))
 vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 	git_gh_issue_write: { issue_clear_label: clear_label_mock },
 }))
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
+vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
 
 const ISSUE = '4132'
 const LABEL = 'needs-decision'
@@ -42,6 +46,7 @@ beforeEach(() => {
 	clear_label_mock.mockReset().mockResolvedValue(true)
 	record_mock.mockReset().mockReturnValue(true)
 	clear_record_mock.mockReset()
+	release_mock.mockReset().mockResolvedValue(0)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -93,11 +98,38 @@ describe('run:park', () => {
 	)
 })
 
+// joshuafolkken/kit#5737: every parked ending owes the release, so the park runs it.
+describe('run:park release', () => {
+	it('releases the hold after the park is recorded', async () => {
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(release_mock).toHaveBeenCalledWith(ISSUE)
+		expect(record_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			release_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('leaves the hold alone when the park did not land', async () => {
+		apply_mock.mockResolvedValue({ is_labelled: true, is_commented: false })
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(release_mock).not.toHaveBeenCalled()
+	})
+
+	it('keeps the park and exits non-zero when the release fails', async () => {
+		release_mock.mockResolvedValue(1)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(record_mock).toHaveBeenCalledWith(ISSUE, DIRECTORY)
+		expect(clear_record_mock).not.toHaveBeenCalled()
+	})
+})
+
 describe('run:park --clear', () => {
 	it('removes needs-decision and the record', async () => {
 		await expect(run_park_cli.run([ISSUE, '--clear'], DIRECTORY)).resolves.toBe(0)
 		expect(clear_label_mock).toHaveBeenCalledWith(ISSUE, LABEL)
 		expect(clear_record_mock).toHaveBeenCalledWith(ISSUE, DIRECTORY)
+		expect(release_mock).not.toHaveBeenCalled()
 	})
 
 	// `issue_clear_label` answers `true` for a label that is already off, so the clear succeeds.
