@@ -1,0 +1,8 @@
+{
+	"reason": "Refuse a second round 1 once it is attested in a lane (#5655), and name the ship in review:record's not-reused line",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 23,
+		"ai_cost.on_demand_bytes": 120
+	}
+}
