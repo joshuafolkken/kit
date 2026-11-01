@@ -1,0 +1,7 @@
+{
+	"reason": "#5778 adds the whole-run rerun that recovers a required job a partial rerun dropped (new followup-run-rerun module, the failed-job fall-through and their tests)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 145
+	}
+}
