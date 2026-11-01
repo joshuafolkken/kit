@@ -1,0 +1,7 @@
+{
+	"reason": "run-entry-sync.ts gains per-verdict stop texts (conflicted vs ambiguous/no-match) and Telegram alternatives naming the kept stash, from round-1 review findings",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 109
+	}
+}

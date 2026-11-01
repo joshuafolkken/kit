@@ -25,6 +25,8 @@ interface StopNotice {
 	should_release: boolean
 	// The choice the Telegram recommends where a rerun alone would stop the same way again.
 	recommended?: string
+	// The other choices, where a stop left something behind that "nothing was changed" would deny.
+	alternatives?: Array<string>
 }
 
 interface StopPorts {
@@ -84,7 +86,7 @@ async function notify_stop(notice: StopNotice, ports: StopPorts): Promise<void> 
 		recommended:
 			notice.recommended ??
 			`Run \`${notice.command} ${issue_cite.plain(notice.issue_number)}\` again in a fresh session`,
-		alternatives: [LATER_ALTERNATIVE],
+		alternatives: notice.alternatives ?? [LATER_ALTERNATIVE],
 	})
 
 	console.info(is_sent ? lane_park.COMMAND_NOTIFY_MARKER : NOTIFY_FAILED_NOTE)
