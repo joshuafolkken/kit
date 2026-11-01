@@ -22,7 +22,7 @@ function failure_lines(review: string, argv: ReadonlyArray<string>): ReadonlyArr
 	if (round === undefined) return [USAGE]
 	if (review.trim().length === 0) return [NO_INPUT_MESSAGE]
 
-	return review_lint.with_reference(review_lint.lint_review(review, round), round)
+	return review_lint.failures(review, round)
 }
 
 function run(review: string, argv: ReadonlyArray<string>): number {

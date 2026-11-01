@@ -1,0 +1,9 @@
+{
+	"reason": "review:submit absorbs review:lint: an argv module with --review/--round validation (now refusing a relative path) plus the shared failures helper; the standalone review:lint is retired in #5640",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 91,
+		"ai_cost.on_demand_bytes": 7,
+		"prose.long_paragraphs": 1
+	}
+}
