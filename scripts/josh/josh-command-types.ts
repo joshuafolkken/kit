@@ -253,7 +253,7 @@ const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 // name it: its `--rule` override changes every entry's config hash, so on the gate's file each run
 // would leave the gate a cold lint. The workers are its `--concurrency`, and its registration claims
 // the whole-tree scan's cores and memory once per worker. A `--paths` run lints on a cache of its
-// own, since eslint keeps only the entries a run visited and a subset would leave the whole run cold.
+// own, so a subset run never rewrites the whole run's cache, whose unvisited entries eslint may drop.
 const LINT_RULE_DIRECTORY = 'node_modules/.cache/josh/lint-rule'
 const LINT_RULE_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache`
 const LINT_RULE_CACHE_FLAGS = content_cache_flags(LINT_RULE_CACHE_FILE)
