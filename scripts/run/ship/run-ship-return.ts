@@ -208,17 +208,41 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 	return server === undefined ? await relaunched(lane, stop) : await brokered(lane, stop, server)
 }
 
-// A child that stopped more often than the cap allows is parked instead of relaunched
+// A child past the cap, or on a timed-out merge wait, is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
 // A timed-out merge wait's block, named in the stage output, becomes the park's cause.
-async function parked(issue: string, reason: string, output: StageOutput): Promise<ReturnOutcome> {
+async function parked(
+	issue: string,
+	reason: string,
+	output: StageOutput,
+	is_timed_out: boolean,
+): Promise<ReturnOutcome> {
 	const blocked = run_ship_stop_cause.blocked_cause_of(output.body)
+	const { park, park_timed_out } = run_ship_relaunch_cap
+	const is_parked = await (is_timed_out ? park_timed_out : park)(issue, reason, blocked)
 
-	if (await run_ship_relaunch_cap.park(issue, reason, blocked)) return 'parked'
+	if (is_parked) return 'parked'
 
-	note('the lane child was not relaunched past the ship-stop cap, and the park label was refused')
+	note('the lane child was not relaunched, and the park label was refused')
 
 	return 'recorded'
+}
+
+// A stop no relaunch clears parks at once (joshuafolkken/kit#5775); any other parks past the cap.
+async function park_outcome(
+	issue: string,
+	stage: Stage,
+	resume: ShipResume,
+	output: StageOutput,
+): Promise<ReturnOutcome | undefined> {
+	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+	const is_timed_out = run_ship_stop_cause.parks_at_once(stage, { ...resume, ...output })
+
+	if (is_timed_out || (await run_ship_relaunch_cap.is_over(issue, reason))) {
+		return await parked(issue, reason, output, is_timed_out)
+	}
+
+	return undefined
 }
 
 // `output` is the failed stage's own output: the relaunched child's prompt carries the body's tail, and
@@ -250,9 +274,9 @@ async function stopped(
 
 	if (lane === undefined) return 'recorded'
 
-	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
+	const parked_outcome = await park_outcome(issue, stage, resume, output)
 
-	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason, output)
+	if (parked_outcome !== undefined) return parked_outcome
 
 	const findings = run_ship_stop_cause.details_of(stage, { ...resume, ...output })
 	const context = await run_ship_stop_context.build(issue, output.body, findings)

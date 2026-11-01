@@ -1,0 +1,7 @@
+{
+	"reason": "#5775 adds the merge-wait timeout stop cause, its immediate park and the park test file split out of a capped test file",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 67
+	}
+}

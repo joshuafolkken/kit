@@ -2,6 +2,7 @@ import { api_auth } from '#scripts/agent/api-auth'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { MERGE_UNCONFIRMED_MESSAGE } from '#scripts/gh/git-gh-pr'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
+import { PR_CHECKS_TIMEOUT_MESSAGE } from '#scripts/gh/git-pr-checks'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
 import { describe, expect, it } from 'vitest'
@@ -265,5 +266,28 @@ describe('run_ship_stop_cause.blocked_cause_of — the block a timed-out wait na
 	it('reads none from a failure with no blocked cause', () => {
 		expect(run_ship_stop_cause.blocked_cause_of(`${TIMEOUT}\n`)).toBeUndefined()
 		expect(run_ship_stop_cause.blocked_cause_of(RED_CHECK)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5775: a timed-out merge wait read as `check`, so a relaunch waited the same timeout
+// on the same blocked merge until the stop cap parked it.
+describe('run_ship_stop_cause.cause_of — a merge wait that timed out', () => {
+	const TIMED_OUT = `${git_error.FAILURE_PREFIX} ${PR_CHECKS_TIMEOUT_MESSAGE}\n${git_error.DETAILS_PREFIX} BLOCKED: Checks missing\n`
+
+	it.each(['followup', 'report'] as const)('reads a %s stop on it as a timeout', (stage) => {
+		expect(cause_of(stage, { body: TIMED_OUT })).toBe(CAUSE.TIMEOUT)
+		expect(run_ship_stop_cause.parks_at_once(stage, { body: TIMED_OUT })).toBe(true)
+	})
+
+	it('reads the text in a gate or a review, or above a later failure, as no timeout', () => {
+		const later = `${TIMED_OUT}${git_error.FAILURE_PREFIX} ${RED_CHECK}\n`
+
+		expect(cause_of('gate', { body: TIMED_OUT })).toBe(CAUSE.CHECK)
+		expect(cause_of('followup', { body: later })).toBe(CAUSE.CHECK)
+		expect(run_ship_stop_cause.parks_at_once('review', { body: TIMED_OUT })).toBe(false)
+	})
+
+	it('keeps the timeout out of the infrastructure an in-place retry reruns', () => {
+		expect(cause_of('followup', { body: `${RATE_LIMITED}\n${TIMED_OUT}` })).toBe(CAUSE.TIMEOUT)
 	})
 })
