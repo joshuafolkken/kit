@@ -1,9 +1,10 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 
-// The filings `josh issue:file --batch <dir>` reads: every `*.md` body file in the directory, in name
-// order. A body's title is its front matter's `title:` line, else its first line (a leading `#`
-// heading marker dropped); a front matter `distinct: <N,…>` line is that filing's `--distinct`.
+// The filings `josh issue:file --batch <dir|file>` reads: every `*.md` body file in a directory, in
+// name order, or each part of one file split at its `%%%` lines. A body's title is its front matter's
+// `title:` line, else its first line (a leading `#` heading marker dropped); a front matter
+// `distinct: <N,…>` line is that filing's `--distinct`.
 
 interface BatchEntry {
 	source: string
@@ -22,6 +23,7 @@ const HEADING_MARKER = /^#+\s*/u
 const BODY_EXTENSION = '.md'
 const FIELD_SEPARATOR = ':'
 const CRLF = /\r\n/gu
+const SEPARATOR_LINE = /^%%%[ \t]*$/mu
 // One pair of matching quotes around a whole value: `title: "Quoted"` is the title `Quoted`.
 const QUOTED = /^(?<quote>["'])(?<value>.*)\k<quote>$/u
 
@@ -67,7 +69,17 @@ function entry_of(text: string, source: string): BatchEntry {
 	}
 }
 
-async function entries_of(directory: string): Promise<ReadonlyArray<BatchEntry>> {
+// `---` opens a front matter and `===` underlines a heading, so neither can separate filings.
+function split_entries(text: string, file: string): ReadonlyArray<BatchEntry> {
+	const parts = text
+		.replaceAll(CRLF, '\n')
+		.split(SEPARATOR_LINE)
+		.filter((part) => part.trim() !== '')
+
+	return parts.map((part, index) => entry_of(part, `${file}[${String(index + 1)}]`))
+}
+
+async function directory_entries(directory: string): Promise<ReadonlyArray<BatchEntry>> {
 	const listing = await readdir(directory)
 	const names = listing
 		.filter((name) => name.endsWith(BODY_EXTENSION))
@@ -80,6 +92,14 @@ async function entries_of(directory: string): Promise<ReadonlyArray<BatchEntry>>
 			return entry_of(await readFile(source, 'utf8'), source)
 		}),
 	)
+}
+
+async function entries_of(source: string): Promise<ReadonlyArray<BatchEntry>> {
+	const status = await stat(source)
+
+	if (status.isFile()) return split_entries(await readFile(source, 'utf8'), source)
+
+	return await directory_entries(source)
 }
 
 const issue_file_batch_entries = { entries_of, entry_of }
