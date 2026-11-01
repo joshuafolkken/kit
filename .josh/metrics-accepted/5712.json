@@ -1,0 +1,7 @@
+{
+	"reason": "lint:related timing line (new lint-timing module and its tests), the daemon state it reports, and its lane:breakdown start-to-plan detail #5712",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 109
+	}
+}

@@ -1,5 +1,6 @@
 // The shape checks the fixed-shape linters share — `report:lint`, its `--child-summary` mode and
-// `review:lint` — kept in one place so the fence rule and the line count read the same in all three.
+// `review:submit --review` — kept in one place so the fence rule and the line count read the same
+// in all three.
 
 const FENCE_MARKER = '```'
 

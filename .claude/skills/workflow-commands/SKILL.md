@@ -50,14 +50,14 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | Document                | Read it when                                                                   |
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `run:prep` answers `latest: required` — before `josh latest:if-required` runs  |
-| `followup.md` → "Run `pnpm josh followup`" | Never fetched: `pnpm josh followup` prints it as it starts, once per session — none under a detached ship or in a lane child, a repeat names the section in one line |
+| `followup.md` → "Run `pnpm josh followup`" | Never fetched: `pnpm josh followup` prints it as it starts, once per session — none in a followup any `josh ship` runs, a repeat names the section in one line |
 | `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`), never fetched: `run:step` prints it at `implement`, `run:review` (which launches the gate) and `ship` once per session — a lane child gets "A lane child" alone, a repeat names the section in one line |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
 `backlogrun-park.md` → "park and continue" at that point of use**, and **every implementing run starts
 `pnpm josh run:progress --wait` once its hold is claimed** — `progress-watcher.md` → "Progress while
-the run is quiet" is never fetched: `run:progress --wait` prints it as it starts, once per session.
+the run is quiet" is never fetched: `run:entry` (no lane child) and `run:progress --wait` print it, once per session.
 
 ### A section reference is read as a section
 

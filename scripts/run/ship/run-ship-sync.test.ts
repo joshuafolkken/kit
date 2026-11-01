@@ -1,3 +1,4 @@
+import { followup_section } from '#scripts/followup/followup-section'
 import { pre_commit_lint_switch } from '#scripts/hooks/pre-commit-lint-switch'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship_overlap } from './run-ship-overlap'
@@ -258,6 +259,16 @@ describe('run_ship_sync.followup_stage — a default branch that moved since the
 		expect(result.conflicts).toStrictEqual(CONFLICTED)
 		expect(result.out).toContain(FOLLOWUP_FAILED.out)
 		expect(commands()).toStrictEqual([FOLLOWUP])
+	})
+})
+
+// joshuafolkken/kit#5696: the ship's followup carries the marker, so it prints no section.
+describe('run_ship_sync.followup_stage — the ship marker', () => {
+	it('runs the followup with the ship marker in its environment', async () => {
+		await run_ship_sync.followup_stage(TITLE, NOTIFY)
+
+		expect(josh_run_mock.mock.calls[0]?.[0]).toStrictEqual(FOLLOWUP)
+		expect(josh_run_mock.mock.calls[0]?.[3]).toStrictEqual(followup_section.SHIPPED_ENVIRONMENT)
 	})
 })
 
