@@ -207,7 +207,7 @@ describe('lint_related.run_related_lint', () => {
 	it('asks for the warm eslint daemon on the narrowed run', async () => {
 		await lint_related.run_related_lint([])
 
-		expect(mocked_scoped.mock.calls[0]?.[3]).toEqual({ warm_daemon: true })
+		expect(mocked_scoped.mock.calls[0]?.[3]).toMatchObject({ warm_daemon: true })
 	})
 
 	it('reports the narrowing it applied before either linter starts', async () => {

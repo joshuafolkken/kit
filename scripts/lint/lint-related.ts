@@ -16,7 +16,7 @@ import { verification_tail } from '#scripts/gate/verification-tail'
 import { changed_file_scope, type ChangedFileScope } from '#scripts/git/changed-file-scope'
 import { review_stamps } from '#scripts/review/review-stamps'
 import { split_early_notice } from '#scripts/split/split-early-notice'
-import { lint_parallel } from './lint-parallel'
+import { lint_parallel, type LintRunTiming } from './lint-parallel'
 import { lint_related_scope } from './lint-related-scope'
 
 // `josh lint:related` — the lint check an implementation loop runs between edits.
@@ -39,16 +39,27 @@ function report_ignored_flags(command_arguments: ReadonlyArray<string>): void {
 	)
 }
 
+// The timing line names what the run read, so a slow first run is told apart from a wide one
+// (joshuafolkken/kit#5712).
+function timing_of(targets: string): LintRunTiming {
+	return { label: lint_related_scope.COMMAND_LABEL, targets }
+}
+
 // A fallback to the whole project is a superset of the changed files, so it vouches for them too —
 // which is why the record below is written from either arm rather than only from the narrow one.
 async function lint_exit_code(scope: ChangedFileScope): Promise<number> {
-	if (scope.mode === 'all') return await lint_parallel.run_lint_parallel_checks()
+	if (scope.mode === 'all') {
+		return await lint_parallel.run_lint_parallel_checks({
+			warm_daemon: false,
+			timing: timing_of('whole tree'),
+		})
+	}
 
 	return await lint_parallel.run_lint_checks(
 		lint_related_scope.prettier_arguments(scope.files),
 		lint_related_scope.eslint_arguments(scope.files),
 		lint_related_scope.RELATED_CACHES.eslint_file,
-		{ warm_daemon: true },
+		{ warm_daemon: true, timing: timing_of(`${String(scope.files.length)} file(s)`) },
 	)
 }
 

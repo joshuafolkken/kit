@@ -49,6 +49,25 @@ interface DaemonOutcome {
 	output: string
 }
 
+// What a warm run did with the daemon, as `josh lint:related`'s timing line names it
+// (joshuafolkken/kit#5712): a stale one is stopped before the run, a failed start falls back cold.
+const DAEMON_STATE = {
+	REUSED: 'daemon reused',
+	RESTARTED: 'daemon restarted',
+	STARTED: 'daemon started',
+	COLD_FALLBACK: 'daemon unreachable, cold process',
+} as const
+
+type DaemonState = (typeof DAEMON_STATE)[keyof typeof DAEMON_STATE]
+
+interface WarmOutcome extends DaemonOutcome {
+	daemon: DaemonState
+}
+
+interface WarmRunResult extends BufferedProcessResult {
+	daemon: DaemonState
+}
+
 interface DaemonRecord {
 	// The running daemon's own record, or nothing when none runs.
 	daemon: string | undefined
@@ -165,6 +184,13 @@ function is_stale(record: DaemonRecord, current: string): boolean {
 	return record.recorded !== record_text(record.daemon, current)
 }
 
+// What a run found, by the same reading that decides whether it stops the daemon first.
+function state_of(record: DaemonRecord, current: string): DaemonState {
+	if (record.daemon === undefined) return DAEMON_STATE.STARTED
+
+	return is_stale(record, current) ? DAEMON_STATE.RESTARTED : DAEMON_STATE.REUSED
+}
+
 // Best-effort, like the daemon's own record: one that could not be written restarts the daemon once
 // more on the next run.
 function remember(project_root: string, current: string): void {
@@ -245,16 +271,17 @@ async function run_current(
 	cli: string,
 	eslint_arguments: ReadonlyArray<string>,
 	options: DaemonRunOptions,
-): Promise<DaemonOutcome | undefined> {
+): Promise<WarmOutcome | undefined> {
 	const { project_root } = options
 	const current = fingerprint(project_root)
-	if (is_stale(read_record(project_root), current)) await spawn_daemon(cli, [DAEMON_STOP], options)
+	const daemon = state_of(read_record(project_root), current)
+	if (daemon === DAEMON_STATE.RESTARTED) await spawn_daemon(cli, [DAEMON_STOP], options)
 
 	const outcome = await spawn_daemon(cli, eslint_arguments, options)
 	if (is_start_failure(outcome)) return undefined
 	remember(project_root, current)
 
-	return outcome
+	return { ...outcome, daemon }
 }
 
 // The run through the warm daemon, or nothing when there is no daemon to reach or it failed to
@@ -262,7 +289,7 @@ async function run_current(
 async function run(
 	pnpm_arguments: ReadonlyArray<string>,
 	options: DaemonRunOptions,
-): Promise<DaemonOutcome | undefined> {
+): Promise<WarmOutcome | undefined> {
 	const eslint_arguments = eslint_arguments_of(pnpm_arguments)
 	if (eslint_arguments === undefined) return undefined
 	const cli = resolve_daemon_cli(options.project_root)
@@ -274,15 +301,21 @@ async function run(
 // The warm run from the current directory, read as a buffered child's result, or the cold
 // `pnpm exec eslint` when the daemon cannot answer — the one fallback `josh lint:related` and the
 // pre-commit hook both take.
-async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<BufferedProcessResult> {
+async function run_or_cold(pnpm_arguments: ReadonlyArray<string>): Promise<WarmRunResult> {
 	const started_at = performance.now()
 	const outcome = await run(pnpm_arguments, { project_root: process.cwd() })
-	if (outcome === undefined) return await buffered_process.run_buffered_process(pnpm_arguments)
+
+	if (outcome === undefined) {
+		const cold = await buffered_process.run_buffered_process(pnpm_arguments)
+
+		return { ...cold, daemon: DAEMON_STATE.COLD_FALLBACK }
+	}
 
 	return {
 		output: outcome.output,
 		exit_code: outcome.exit_code,
 		elapsed_ms: performance.now() - started_at,
+		daemon: outcome.daemon,
 	}
 }
 
@@ -300,5 +333,5 @@ const eslint_daemon = {
 	ESLINT_DAEMON,
 }
 
-export type { DaemonOutcome, DaemonRecord }
+export type { DaemonOutcome, DaemonRecord, DaemonState }
 export { eslint_daemon }
