@@ -6,6 +6,8 @@ import {
 	LINT_RULE_CACHE_FILE,
 	LINT_RULE_CACHE_FLAGS,
 	LINT_RULE_DIRECTORY,
+	LINT_RULE_PATHS_CACHE_FILE,
+	LINT_RULE_PATHS_CACHE_FLAGS,
 	LINT_RULE_WORKERS,
 } from '#scripts/josh/josh-command-types'
 import { FAIL_EXIT_CODE, type BufferedProcessResult } from '#scripts/lib/buffered-process'
@@ -19,12 +21,17 @@ import { lint_parallel } from './lint-parallel'
 //
 // **It reports and never fails on a violation.** Counting violations is the question, so a non-zero
 // exit means eslint could not answer — an unknown rule, an unreadable config — never that it found some.
+//
+// **`--paths` lints only the paths it names**, so checking a rule while fixing it costs seconds, not a
+// whole-tree run each time (joshuafolkken/kit#5692). It keeps a cache, report and JSON of its own, so
+// the whole run's stay as they were.
 
 const ARGV_START = 2
-const OPTION_PAIR = 2
 // eslint's exit for a configuration or internal error; 1 only means problems were found.
 const ESLINT_FATAL_EXIT_CODE = 2
-const USAGE = 'lint:rule: usage: lint:rule <rule> [--config <path>] [--output <path>]'
+const PATHS_FLAG = '--paths'
+const USAGE =
+	'lint:rule: usage: lint:rule <rule> [--config <path>] [--output <path>] [--paths <path>...]'
 
 type OptionKey = 'config' | 'output'
 
@@ -33,10 +40,28 @@ const OPTION_KEYS: Readonly<Partial<Record<string, OptionKey>>> = {
 	'--output': 'output',
 }
 
-interface LintRuleOptions {
-	rule: string
+interface ParsedOptions {
 	config?: string | undefined
 	output?: string | undefined
+	paths?: ReadonlyArray<string> | undefined
+}
+
+interface LintRuleOptions extends ParsedOptions {
+	rule: string
+}
+
+interface LintScope {
+	targets: ReadonlyArray<string>
+	cache_file: string
+	cache_flags: ReadonlyArray<string>
+	suffix: string
+}
+
+const WHOLE_TREE: LintScope = {
+	targets: ['.'],
+	cache_file: LINT_RULE_CACHE_FILE,
+	cache_flags: LINT_RULE_CACHE_FLAGS,
+	suffix: '',
 }
 
 interface Violation {
@@ -52,19 +77,47 @@ interface RuleMessage {
 	message: string
 }
 
-function parse_options(
-	rest: ReadonlyArray<string>,
-): Partial<Record<OptionKey, string>> | undefined {
-	const options: Partial<Record<OptionKey, string>> = {}
+// Each flag with the values that follow it, so `--paths` takes every path a shell glob expands to.
+function option_groups(rest: ReadonlyArray<string>): ReadonlyArray<ReadonlyArray<string>> {
+	const groups: Array<Array<string>> = []
 
-	for (let index = 0; index < rest.length; index += OPTION_PAIR) {
-		const key = OPTION_KEYS[rest[index] ?? '']
-		const value = rest[index + 1]
-		if (key === undefined || value === undefined) return undefined
-		options[key] = value
+	for (const token of rest) {
+		const current = groups.at(-1)
+		if (current === undefined || token.startsWith('-')) groups.push([token])
+		else current.push(token)
 	}
 
-	return options
+	return groups
+}
+
+function add_paths(options: ParsedOptions, values: ReadonlyArray<string>): boolean {
+	if (values.length === 0) return false
+	options.paths = [...(options.paths ?? []), ...values]
+
+	return true
+}
+
+// `--config` and `--output` take exactly one value.
+function set_option(options: ParsedOptions, flag: string, values: ReadonlyArray<string>): boolean {
+	const key = OPTION_KEYS[flag]
+	const [value, ...extra] = values
+	if (key === undefined || value === undefined || extra.length > 0) return false
+	options[key] = value
+
+	return true
+}
+
+function apply_group(options: ParsedOptions, group: ReadonlyArray<string>): boolean {
+	const [flag = '', ...values] = group
+
+	return flag === PATHS_FLAG ? add_paths(options, values) : set_option(options, flag, values)
+}
+
+function parse_options(rest: ReadonlyArray<string>): ParsedOptions | undefined {
+	const options: ParsedOptions = {}
+	const is_applied = option_groups(rest).every((group) => apply_group(options, group))
+
+	return is_applied ? options : undefined
 }
 
 function parse_arguments(command_arguments: ReadonlyArray<string>): LintRuleOptions | undefined {
@@ -75,27 +128,40 @@ function parse_arguments(command_arguments: ReadonlyArray<string>): LintRuleOpti
 	return options === undefined ? undefined : { rule, ...options }
 }
 
-function rule_slug(rule: string): string {
-	return rule.replaceAll('/', '-')
+function lint_scope(options: LintRuleOptions): LintScope {
+	const { paths } = options
+	if (paths === undefined) return WHOLE_TREE
+
+	return {
+		targets: paths,
+		cache_file: LINT_RULE_PATHS_CACHE_FILE,
+		cache_flags: LINT_RULE_PATHS_CACHE_FLAGS,
+		suffix: '.paths',
+	}
 }
 
-function default_output(rule: string): string {
-	return `${LINT_RULE_DIRECTORY}/${rule_slug(rule)}.txt`
+function report_name(options: LintRuleOptions): string {
+	return `${options.rule.replaceAll('/', '-')}${lint_scope(options).suffix}`
 }
 
-function json_file_for(rule: string, root: string): string {
-	return path.resolve(root, LINT_RULE_DIRECTORY, `${rule_slug(rule)}.json`)
+function default_output(options: LintRuleOptions): string {
+	return `${LINT_RULE_DIRECTORY}/${report_name(options)}.txt`
+}
+
+function json_file_for(options: LintRuleOptions, root: string): string {
+	return path.resolve(root, LINT_RULE_DIRECTORY, `${report_name(options)}.json`)
 }
 
 // The configured rule set plus the rule at `error`: a severity-only override keeps the options the
 // config gives it, and a rule the config turns off is turned on.
 function eslint_arguments(options: LintRuleOptions, json_file: string): ReadonlyArray<string> {
 	const config = options.config === undefined ? [] : ['--config', options.config]
+	const { targets, cache_flags } = lint_scope(options)
 
 	return [
 		'exec',
 		'eslint',
-		'.',
+		...targets,
 		'--concurrency',
 		String(LINT_RULE_WORKERS),
 		'--rule',
@@ -105,7 +171,7 @@ function eslint_arguments(options: LintRuleOptions, json_file: string): Readonly
 		'--output-file',
 		json_file,
 		...config,
-		...LINT_RULE_CACHE_FLAGS,
+		...cache_flags,
 	]
 }
 
@@ -183,7 +249,7 @@ async function run_eslint_report(
 
 	return await lint_parallel.run_eslint({
 		args: eslint_arguments(options, json_file),
-		cache_file: LINT_RULE_CACHE_FILE,
+		cache_file: lint_scope(options).cache_file,
 		warm_daemon: false,
 	})
 }
@@ -194,11 +260,11 @@ function write_report(output_file: string, violations: ReadonlyArray<Violation>)
 }
 
 async function run_parsed(options: LintRuleOptions, root: string): Promise<number> {
-	const json_file = json_file_for(options.rule, root)
+	const json_file = json_file_for(options, root)
 	const result = await run_eslint_report(options, json_file)
 	const violations = read_violations(json_file, options.rule, root)
 	if (violations === undefined || result.exit_code === ESLINT_FATAL_EXIT_CODE) return failed(result)
-	const output = options.output ?? default_output(options.rule)
+	const output = options.output ?? default_output(options)
 
 	write_report(path.resolve(root, output), violations)
 	process.stdout.write(summary_line(options.rule, violations, output))
