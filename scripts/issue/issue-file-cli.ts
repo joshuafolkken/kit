@@ -340,7 +340,8 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 // Every step the caller answers from the body and the arguments, cheapest first, each tier's refusals
 // printed at once and fixed in one reissue: the local checks (the body's own refusals and the run
 // label) before anything asks GitHub, then the start condition's citation and the WIP count, then the
-// duplicate scout's search, run only once nothing else refuses. The labels, or `undefined` when any refused.
+// duplicate scout's search, run only once nothing else refuses (`--batch` scouts every filing up
+// front). The labels, or `undefined` when any refused.
 async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const is_body_clear = await is_admitted(filing)
 	const labels = labels_of(filing)

@@ -81,6 +81,22 @@ async function scout_all(
 	return outcomes
 }
 
+// The combined report predates this batch's own filings, so a filing after one of them is scouted
+// again to hold a near-duplicate of it; that report prints only when it names a new candidate.
+async function scout_again(
+	argv: ReadonlyArray<string>,
+	earlier: ScoutOutcome | undefined,
+): Promise<ScoutOutcome | undefined> {
+	const outcome = await issue_file_cli.scout(argv)
+	const known = earlier?.candidates ?? []
+
+	if (outcome?.candidates.some((number) => !known.includes(number)) === true) {
+		console.info(outcome.report)
+	}
+
+	return outcome
+}
+
 // In order, one at a time: the filing cap and the fold question count the filings before each one.
 async function file_in_order(
 	planned: ReadonlyArray<Planned>,
@@ -90,8 +106,12 @@ async function file_in_order(
 
 	for (const [index, { entry, argv }] of planned.entries()) {
 		console.info(heading_of(entry))
+		const has_filed = outcomes.some((outcome) => outcome.url !== undefined)
 		// eslint-disable-next-line no-await-in-loop -- each filing reads the ones before it
-		outcomes.push({ entry, url: await issue_file_cli.file_issue(argv, scouted[index]) })
+		const scout = has_filed ? await scout_again(argv, scouted[index]) : scouted[index]
+
+		// eslint-disable-next-line no-await-in-loop -- each filing reads the ones before it
+		outcomes.push({ entry, url: await issue_file_cli.file_issue(argv, scout) })
 	}
 
 	return outcomes
