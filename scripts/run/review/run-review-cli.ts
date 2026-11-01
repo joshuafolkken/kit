@@ -109,8 +109,10 @@ async function brief_slots(is_code_only: boolean): Promise<ReadonlyArray<ReviewS
 	if (is_code_only) return [CODE]
 	const issue = git_branch.issue_from_branch(await git_command.branch())
 	if (issue === undefined) return [CODE]
+	const answer = await review_interaction.reading(issue)
+	if (answer.inert_line !== undefined) process.stderr.write(`${answer.inert_line}\n`)
 
-	return review_interaction.round_one_slots(await review_interaction.status(issue))
+	return review_interaction.round_one_slots(answer.status)
 }
 
 // A lane child's reopen after a round 1 the ship reuses is refused before anything is launched
