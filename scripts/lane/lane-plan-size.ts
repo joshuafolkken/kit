@@ -25,11 +25,14 @@ import { lane_plan, type LanePlan } from './lane-plan'
 // unread listing or a yield (joshuafolkken/kit#5605). A yielded plan the entry probe recorded never met
 // the bar, so it still does.
 //
-// **The hunks axis counts only the hunks outside the recorded plan's files** (joshuafolkken/kit#5601):
+// **The hunks axis counts only the hunks outside the plan's files** (joshuafolkken/kit#5601):
 // those files already passed the files axis, so more edits inside them grow no new deliverable, and a
 // re-plan that adds one document would otherwise be refused on the hunks it already planned. The files
 // an earlier clear of this lane held count as the recorded plan's too (joshuafolkken/kit#5672), so a
-// re-plan that restores a file a narrowing re-plan dropped is not refused on its edits.
+// re-plan that restores a file a narrowing re-plan dropped is not refused on its edits. The files this
+// plan lists count too (joshuafolkken/kit#5679): the files axis is read first, so a plan that reaches
+// the hunks axis passed it, and the re-plan the ship's `unplanned` stop asks for is not refused on the
+// hunks of the files it adds.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -101,13 +104,16 @@ function files_over(
 }
 
 // Matched by the ship's `unplanned` rule — a claim ending in `/` holds every file under it — against a
-// wider set: a path an earlier clear of this lane held counts as planned too, while the ship's stop reads
-// `paths` alone (joshuafolkken/kit#5672).
+// wider set: this plan's files and a path an earlier clear of this lane held count as planned too, while
+// the ship's stop reads the recorded `paths` alone (joshuafolkken/kit#5672, joshuafolkken/kit#5679).
+// A directory this plan claims is left out: the files axis counts it as one file, so it passed nothing.
 function unplanned_hunks(
 	hunk_files: ReadonlyArray<string>,
+	plan: LanePlan,
 	recorded: LanePlan | undefined,
 ): number {
-	const planned = [...(recorded?.paths ?? []), ...(recorded?.cleared_paths ?? [])]
+	const listed = plan.paths.filter((path) => !path.endsWith('/'))
+	const planned = [...listed, ...(recorded?.paths ?? []), ...(recorded?.cleared_paths ?? [])]
 
 	return run_ship_planned.unplanned_of(planned, hunk_files).length
 }
@@ -128,6 +134,7 @@ function lines_over(declared: number, lines_ratio: number | undefined): MeasureO
 function measure_over(
 	declared: Declared,
 	signals: PlanSignals,
+	plan: LanePlan,
 	recorded: LanePlan | undefined,
 ): MeasureOver | undefined {
 	if (signals.split_filed) return undefined
@@ -135,7 +142,7 @@ function measure_over(
 		? undefined
 		: lines_over(declared.lines, signals.lines_ratio)
 
-	return hunks_over(declared.files, unplanned_hunks(signals.hunk_files, recorded)) ?? lines
+	return hunks_over(declared.files, unplanned_hunks(signals.hunk_files, plan, recorded)) ?? lines
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.
@@ -150,7 +157,7 @@ function oversize(
 
 	return (
 		files_over(plan, declared.files, recorded?.paths ?? []) ??
-		measure_over(declared, signals, recorded)
+		measure_over(declared, signals, plan, recorded)
 	)
 }
 
@@ -168,7 +175,7 @@ function files_text(issue: number, over: FilesOver): string {
 
 function measure_bar(over: MeasureOver): string {
 	if (over.reason === 'hunks') {
-		return `change holds ${String(over.measured)} hunks outside the recorded plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
+		return `change holds ${String(over.measured)} hunks outside the plan's files (tests excluded), over ${String(over.limit)} — ${String(split_assess.PLAN_GROWTH_FACTOR)} times the ${String(over.declared)} files its \`- 規模見積もり:\` declares`
 	}
 
 	return `\`- 規模見積もり:\` declares ${String(over.declared)} lines, about ${String(over.measured)} at the lines lanes ran over their declaration — over the ${String(over.limit)}-line guide`
