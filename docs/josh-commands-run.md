@@ -395,11 +395,14 @@ Open a run in one call: claim the tree, read the budget, bundle the reads, decid
 ```bash
 pnpm josh run:entry <N>                # a `fullrun`
 pnpm josh run:entry <N> --to halfrun   # a run that goes as far as `halfrun`
+pnpm josh run:entry <N> --adopt        # a `new` run's entry once <N> is filed
 ```
 
 <!-- /usage -->
 
 It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:step`. The `entry #<N> — hold: … · cost: … · verdict: …` line carries the facts the run branches on; a `busy`/`unknown` hold or an `over` budget short-circuits with a non-zero exit, and a stopped `halfrun` or `prrun` is adopted as `resume: …`.
+
+`--adopt` claims by `run:hold --adopt <N>` instead — a `new` run's bare hold re-keyed to the Issue it filed; `none` or `busy` stops as a held tree does.
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
@@ -1188,7 +1191,7 @@ The changed files the lane's `josh test:related` runs narrowed past the reach ca
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
-`between ship stages` lists the child's Bash there by kind. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
+`between ship stages` lists the child's Bash there by kind, and what no Bash call covered as editing & thinking. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
 
 A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait, and what the lane redid up to its next park — `(re-plan, ship ×2 re-run)`, a ship counted again where a stage starts twice (`lane-breakdown-pause.ts`).
 

@@ -126,12 +126,36 @@ describe('test_related_record.record_of — the reach cap', () => {
 
 	// joshuafolkken/kit#5699: the first over-cap file, the widest reach, is recorded as the hub.
 	it('records the first over-cap file as the hub, and none where nothing was capped', () => {
-		const capped = { ...related_input(), over_cap: ['src/a.ts', 'src/b.ts'] }
+		const capped = { ...related_input(), over_cap: [OWN_CHANGE, 'src/b.ts'] }
 		const uncapped = { ...related_input(), over_cap: [] }
 		const result = { elapsed_ms: 0, test_files: undefined }
 
-		expect(test_related_record.record_of(capped, result).over_cap_hub).toBe('src/a.ts')
+		expect(test_related_record.record_of(capped, result).over_cap_hub).toBe(OWN_CHANGE)
 		expect(test_related_record.record_of(uncapped, result)).not.toHaveProperty('over_cap_hub')
+	})
+
+	// joshuafolkken/kit#5756: a file a main merge or the map's tree brought in is no hub of the lane's run.
+	it('picks the hub from the branch own change over a wider file main brought in', () => {
+		const input: RunInput = {
+			...related_input(),
+			branch: [OWN_CHANGE],
+			over_cap: [SYNCED_CHANGE, SINCE_MAP_CHANGE, OWN_CHANGE],
+		}
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record).toMatchObject({ over_cap: 3, over_cap_hub: OWN_CHANGE })
+	})
+
+	it('counts the over-cap files yet names no hub when none of them is the branch own change', () => {
+		const input: RunInput = {
+			...related_input(),
+			branch: [OWN_CHANGE],
+			over_cap: [SYNCED_CHANGE, SINCE_MAP_CHANGE],
+		}
+		const record = test_related_record.record_of(input, { elapsed_ms: 0, test_files: undefined })
+
+		expect(record.over_cap).toBe(2)
+		expect(record).not.toHaveProperty('over_cap_hub')
 	})
 })
 

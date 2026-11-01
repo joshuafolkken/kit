@@ -18,17 +18,17 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    source; a cross-repository target resolves its checkout from `pnpm josh doctor` first
    (`target-repository.md`).
 2. **`in-progress` rides on the hold** — for a `#N`, `run:entry` applies it once the tree is held and
-   the budget allows the run; a `new` entry runs `pnpm josh run:hold --adopt <N>` right after filing,
-   which re-keys the hold and applies it (`fullrun-steps.md`). Every stop that leaves the tree clean
+   the budget allows the run; a `new` entry runs `pnpm josh run:entry <N> --adopt` once filed — the
+   `#N` entry, re-keying the hold (`fullrun-steps.md`). Every stop that leaves the tree clean
    ends with `pnpm josh run:release <N>`, which removes the label with the record.
 3. **Ask the session boundary in the same turn as the hold** — `pnpm josh cost --cut`. `under`
-   continues; `over` (or unanswerable) stops before the title — `run:entry` sends the `confirmation`
-   Telegram and runs `run:release` (`stop notified: …`); by hand only for `new`. **Skip it when
+   continues; `over` (or unanswerable) stops before the plan — `run:entry` sends the `confirmation`
+   Telegram and runs `run:release` (`stop notified: …`); `new` asks it through `--adopt`. **Skip it when
    dispatched by a batch** (that batch owns the question). The verdict and the model-priced threshold
    are the command's own.
 4. **Gather the mechanical reads — `pnpm josh run:prep <N>`**: `issue:read`'s body and comments
    (`issue-comments.md`), `issue:state`'s state, labels and `human_review`, and `latest:scope`'s
-   dependency scope in one report; a `new` entry runs it once filed. The comment stops, the
+   dependency scope in one report; `new` runs it through `--adopt`. The comment stops, the
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
 5. Honor prep's stop and update verdicts first. **`start: gate` skips `run:step`, planning and implementation**;
    enter the verification chain. Otherwise run `pnpm josh run:step <N>` and follow its step list.

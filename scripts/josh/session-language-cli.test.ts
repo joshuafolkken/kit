@@ -10,6 +10,7 @@ const {
 	format_line,
 	is_run_live,
 	prompt_lines,
+	print_prompt_lines,
 } = session_language_cli
 
 const DEFAULT_RESULT = { lang: DEFAULT_SESSION_LANG, is_default: true }
@@ -87,6 +88,20 @@ describe('prompt_lines', () => {
 
 	it('still prints the session scope for the ja default', () => {
 		expect(prompt_lines(DEFAULT_RESULT, false)).toStrictEqual([SCOPE_LINE])
+	})
+
+	it('appends the run:handoff line when the payload asked for one', () => {
+		expect(prompt_lines(DEFAULT_RESULT, false, 'handoff')).toStrictEqual([SCOPE_LINE, 'handoff'])
+	})
+
+	it('prints the run:handoff line the hook payload asks for', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const payload = '{"prompt":"fullrun #1","model":"claude-fable-5-1"}'
+
+		await print_prompt_lines(async () => payload)
+
+		expect(info.mock.calls.flat().join('\n')).toContain('pnpm josh run:handoff fullrun')
+		info.mockRestore()
 	})
 
 	it('keeps the board line within its bound', () => {

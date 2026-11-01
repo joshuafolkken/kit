@@ -28,7 +28,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh pretool:guard` | — | automation | none | Claude Code hook: the batch, investigation and rule guards in one process (reads the tool call on stdin) |
 | `josh refactor:scan` | — | automation | processes | List refactoring candidates in the changed scope by category and answer clear/candidates |
 | `josh rename` | `<old-identifier> <new-identifier> [--import <old-specifier> <new-specifier>] <file...>` | automation | files, processes | Rename an identifier, and the import specifier it moved with, across files through the TypeScript parse tree |
-| `josh session:lang` | — | automation | none | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing) |
+| `josh session:lang` | — | automation | none | Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing) |
 | `josh stop:guard` | — | automation | none | Claude Code Stop hook: send the hold notify and release the hold itself; block on the rules that need the model (reads the Stop payload on stdin) |
 | `josh test` · `josh t` | — | developer | processes | Run unit and E2E tests |
 | `josh test:declared` · `josh td` | `[--match]` | developer | processes | Report whether the working-tree change needs a test (required/exempt/satisfied); --match checks Step 0 declarations on stdin |
@@ -210,7 +210,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:chain` | `<issue> [--from <stage>] [--unpinned-ok "<reason>"] \| <issue> --join [--fixing] [--from <stage>]` | automation | processes, files, git, network | Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action |
 | `josh run:cut` | `[--resume] <issue> [--impl] [--handoff <path>]` | automation | files | Cut a lane child before the gate and resume a fresh process |
 | `josh run:ending` | `<issue> --output <path> [--repo <owner/repo>]` | automation | network | Classify how a dispatched lane child ended (merged, cut, abandoned, unreadable) |
-| `josh run:entry` | `<issue> [--to <command>]` | automation | git, network, files | Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step |
+| `josh run:entry` | `<issue> [--to <command>] [--adopt]` | automation | git, network, files | Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step |
 | `josh run:event` | `--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last` | automation | files | Append to, read or watch the run’s append-only event stream (--append <kind> <text> \| --from\|--follow <n> \| --watch [<n>] \| --last) |
 | `josh run:handoff` | `<keyword> [N\|new ...] --brief-file <path>` | automation | processes, files | Hand a workflow keyword typed in a consultation session to a child on the role profile model |
 | `josh run:hold` | `[<issue> [--fullrun \| --halfrun-stop \| --human-review-stop \| --prrun-stop]] \| --adopt <issue>` | automation | files | Claim this working tree for a run, or say which run already holds it |
