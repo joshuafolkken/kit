@@ -42,6 +42,6 @@ async function run_from_plan(
 	return await lane_plan_check.check_plan(lane_plan_check.placed(lane, directory), directory)
 }
 
-const lane_plan_auto = { command_of, run_from_plan }
+const lane_plan_auto = { command_of, paths_of, run_from_plan }
 
 export { lane_plan_auto }

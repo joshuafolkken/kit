@@ -405,6 +405,8 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
 
+A lane child entering a `planned` issue whose plan `lane:plan` has not cleared runs `lane:plan` on its plan comment's backticked paths before the report, printing the command and its verdict; `yield` gives the lane back at the entry with exit 2, as the entry probe does. A plan comment naming no path runs nothing, and `run:step`'s `lane:plan` line stays.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:entry` in detail".
 
 ### `josh run:status`
@@ -465,7 +467,7 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan.
+A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
