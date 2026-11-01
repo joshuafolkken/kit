@@ -30,6 +30,7 @@ import { run_ship_stop_text } from './run-ship-stop-text'
 // relaunches leave a ship that converges alone and stop the one that does not.
 const MAX_SHIP_STOP_RELAUNCHES = 4
 const PARK_CAUSE = 'ship-stop cap'
+const TIMEOUT_PARK_CAUSE = 'merge-wait timeout'
 const { CHILD_LAUNCH, PARK, SHIP_STOP } = run_event_stream.EVENT_KIND
 const STOP_KIND = { REVIEW: 'review', MECHANICAL: 'mechanical' } as const
 const REVIEW_REASONS: ReadonlySet<string> = new Set([
@@ -67,11 +68,19 @@ async function is_over(issue: string, reason: string): Promise<boolean> {
 	return stops_since_dispatch(events, issue, kind_of(reason)) > MAX_SHIP_STOP_RELAUNCHES
 }
 
+// Why the issue is parked: the comment's lead line, the park event's cause, and the warning's title and body.
+interface ParkNotice {
+	lead: string
+	cause: string
+	title: string
+	body: string
+}
+
 // `blocked` is what a timed-out merge wait was still blocked on (`run-ship-stop-cause.ts` →
 // `blocked_cause_of`); it leads the comment and replaces the generic cause, so `run:board` names it.
-function park_comment(issue: string, reason: string, blocked: string | undefined): string {
+function park_comment(issue: string, lead: string, blocked: string | undefined): string {
 	return [
-		`Parked by the \`josh ship\` supervisor: the ship stopped at \`${reason}\` after ${String(MAX_SHIP_STOP_RELAUNCHES)} relaunches of the lane child for ${kind_of(reason)} stops since its dispatch — the ${kind_of(reason)} stop cap was exceeded.`,
+		lead,
 		...(blocked === undefined ? [] : ['', `Cause: \`${blocked}\``]),
 		'',
 		`Read the stop with \`pnpm josh ship --log ${issue}\`, then ${run_stalled.next_step(issue)}.`,
@@ -80,22 +89,55 @@ function park_comment(issue: string, reason: string, blocked: string | undefined
 
 // The label is what keeps the issue from being re-dispatched; without it the stop stays a plain stop,
 // which `run:merge` books as an unanswered ship stop under its own outage cap.
-async function park(issue: string, reason: string, blocked?: string): Promise<boolean> {
-	const comment = park_comment(issue, reason, blocked)
+async function park_with(
+	issue: string,
+	notice: ParkNotice,
+	blocked: string | undefined,
+): Promise<boolean> {
+	const comment = park_comment(issue, notice.lead, blocked)
 	const park_write = await issue_park.apply(issue, RUN_STALLED_LABEL, comment)
 
 	if (!park_write.is_labelled) return false
 
-	const cite = issue_cite.plain(issue)
-
-	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, blocked ?? PARK_CAUSE))
+	await run_event_stream_emit.emit(PARK, run_stalled.park_event(issue, blocked ?? notice.cause))
 	await telegram_notify.warn({
-		issue_title: `Ship stop cap reached ${cite}`,
-		body: `The lane child's ${kind_of(reason)} stops passed their cap of ${String(MAX_SHIP_STOP_RELAUNCHES)} relaunches since its dispatch, the last at ${reason}, so it was not relaunched and the issue is parked.`,
+		issue_title: `${notice.title} ${issue_cite.plain(issue)}`,
+		body: notice.body,
 		recovery: `Read pnpm josh ship --log ${issue}, then fix the cause and remove ${RUN_STALLED_LABEL} to offer it again.`,
 	})
 
 	return true
+}
+
+async function park(issue: string, reason: string, blocked?: string): Promise<boolean> {
+	const kind = kind_of(reason)
+	const relaunches = String(MAX_SHIP_STOP_RELAUNCHES)
+
+	return await park_with(
+		issue,
+		{
+			lead: `Parked by the \`josh ship\` supervisor: the ship stopped at \`${reason}\` after ${relaunches} relaunches of the lane child for ${kind} stops since its dispatch — the ${kind} stop cap was exceeded.`,
+			cause: PARK_CAUSE,
+			title: 'Ship stop cap reached',
+			body: `The lane child's ${kind} stops passed their cap of ${relaunches} relaunches since its dispatch, the last at ${reason}, so it was not relaunched and the issue is parked.`,
+		},
+		blocked,
+	)
+}
+
+// A timed-out merge wait parks at once: a relaunch waits the same timeout on the same blocked merge
+// (joshuafolkken/kit#5775).
+async function park_timed_out(issue: string, reason: string, blocked?: string): Promise<boolean> {
+	return await park_with(
+		issue,
+		{
+			lead: `Parked by the \`josh ship\` supervisor: the merge wait at \`${reason}\` timed out, which a relaunch of the lane child does not clear, so none was started.`,
+			cause: TIMEOUT_PARK_CAUSE,
+			title: 'Merge wait timed out',
+			body: `The merge wait at ${reason} timed out, so the lane child was not relaunched and the issue is parked.`,
+		},
+		blocked,
+	)
 }
 
 const run_ship_relaunch_cap = {
@@ -104,6 +146,7 @@ const run_ship_relaunch_cap = {
 	is_over,
 	kind_of,
 	park,
+	park_timed_out,
 	stops_since_dispatch,
 }
 

@@ -6,13 +6,16 @@ import {
 	collect_missing_contexts,
 	forget_missing_contexts,
 	is_blocked_cause,
+	missing_context_error,
 	MISSING_GRACE_MS,
+	MissingContextError,
 } from './git-pr-checks-missing'
 
 // joshuafolkken/kit#5774: a partial rerun dropped the required `Checks` job from its run's latest
 // attempt, and the wait read the BLOCKED pull request as `pending` for its whole 32-minute budget.
 
 const CHECKS = 'Checks'
+const HEAD_SHA = 'abc123'
 const BLOCKED = 'BLOCKED'
 const NAMED_FAILURE = 'PR checks failed (required context Checks has no check-run).'
 const PENDING_ROLLUP = [...PASSING_ROLLUP, { name: 'Unit Tests', status: 'pending' }]
@@ -122,6 +125,31 @@ describe('evaluate_pr_state — a required context with no check-run', () => {
 
 	it('keeps waiting while the context may still register', () => {
 		expect(evaluate_pr_state(missing_checks_snapshot({ rollup: PENDING_ROLLUP }))).toBe('pending')
+	})
+})
+
+// joshuafolkken/kit#5778: `followup` reruns the run that lost the job off what the error carries.
+describe('missing_context_error — the typed failure of a missing context', () => {
+	it('carries the missing contexts and the head they are missing on', () => {
+		const snapshot = missing_checks_snapshot({ head_sha: HEAD_SHA })
+
+		read_after_grace(snapshot)
+		const error = missing_context_error(NAMED_FAILURE, snapshot)
+
+		expect(error).toBeInstanceOf(MissingContextError)
+		expect(error?.message).toBe(NAMED_FAILURE)
+		expect(error?.missing).toStrictEqual({ contexts: [CHECKS], head_sha: HEAD_SHA })
+	})
+
+	it.each([
+		['no context is missing', { head_sha: HEAD_SHA, rollup: PENDING_ROLLUP }],
+		['the head is unknown', {}],
+	])('answers nothing when %s', (_label, overrides) => {
+		const snapshot = missing_checks_snapshot(overrides)
+
+		read_after_grace(snapshot)
+
+		expect(missing_context_error(NAMED_FAILURE, snapshot)).toBeUndefined()
 	})
 })
 

@@ -12,7 +12,7 @@ import {
 	REQUIRED_CHECKS,
 	type PrEvaluation,
 } from './git-pr-checks-eval'
-import { blocked_cause } from './git-pr-checks-missing'
+import { blocked_cause, missing_context_error } from './git-pr-checks-missing'
 import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './git-pr-checks-parse'
 
 const SECONDS_TO_MS = 1000
@@ -149,9 +149,9 @@ function advance_stable_count(previous: number, state: PrEvaluation): number {
 }
 
 function failure_error(message: string, snapshot: PrStateSnapshot): Error {
-	return is_merge_conflict(snapshot.merge_state_status)
-		? new PrConflictError(message)
-		: new Error(message)
+	if (is_merge_conflict(snapshot.merge_state_status)) return new PrConflictError(message)
+
+	return missing_context_error(message, snapshot) ?? new Error(message)
 }
 
 function classify_poll_result(input: {

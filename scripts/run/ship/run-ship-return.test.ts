@@ -7,7 +7,6 @@ const relaunch_mock = vi.hoisted(() => vi.fn())
 const serving_mock = vi.hoisted(() => vi.fn())
 const request_mock = vi.hoisted(() => vi.fn())
 const is_over_mock = vi.hoisted(() => vi.fn())
-const park_mock = vi.hoisted(() => vi.fn())
 const stale_mock = vi.hoisted(() => vi.fn())
 const CHANGED_FILE = vi.hoisted(() => 'scripts/changed.ts')
 
@@ -43,7 +42,7 @@ vi.mock('./run-ship-probe', () => ({
 	run_ship_probe: { read_review_stale: stale_mock, repository_directory: vi.fn() },
 }))
 vi.mock('./run-ship-relaunch-cap', () => ({
-	run_ship_relaunch_cap: { is_over: is_over_mock, park: park_mock },
+	run_ship_relaunch_cap: { is_over: is_over_mock },
 }))
 
 const { run_ship_return } = await import('./run-ship-return')
@@ -57,7 +56,6 @@ const BODY_PATH = 'scratchpad/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
-const TIMED_OUT = '❌ Error: Timed out\n💡 Details: BLOCKED: Checks missing'
 const CONTEXT = { excerpt: [OUTPUT], changed: [CHANGED_FILE], more_changed: 0 }
 const ARGS = {
 	number: ISSUE,
@@ -82,7 +80,6 @@ beforeEach(() => {
 	serving_mock.mockReset().mockReturnValue(undefined)
 	request_mock.mockReset().mockResolvedValue({ is_success: true })
 	is_over_mock.mockReset().mockResolvedValue(false)
-	park_mock.mockReset().mockResolvedValue(true)
 	stale_mock.mockReset().mockResolvedValue(false)
 	vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 })
@@ -264,36 +261,7 @@ describe('run_ship_return.return_control after the broker stopped serving', () =
 	})
 })
 
-// joshuafolkken/kit#3999: a child that keeps stopping is parked past the cap rather than relaunched forever.
-describe('run_ship_return.return_control past the ship-stop cap', () => {
-	// joshuafolkken/kit#5780: with the block a timed-out merge wait logged as the park's cause.
-	it('parks the issue for the stopped stage and relaunches nothing', async () => {
-		is_over_mock.mockResolvedValue(true)
-
-		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, TIMED_OUT)).toBe(
-			'parked',
-		)
-		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'followup')
-		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'followup', 'BLOCKED: Checks missing')
-		expect(relaunch_mock).not.toHaveBeenCalled()
-		expect(request_mock).not.toHaveBeenCalled()
-	})
-
-	it('records the stop when the park label was refused', async () => {
-		is_over_mock.mockResolvedValue(true)
-		park_mock.mockResolvedValue(false)
-
-		expect(await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)).toBe('recorded')
-		expect(relaunch_mock).not.toHaveBeenCalled()
-	})
-
-	it('asks the cap only inside a dispatched lane child', async () => {
-		is_child_mock.mockReturnValue(false)
-		await run_ship_return.return_control(ISSUE, 'gate', RESUME, OUTPUT)
-
-		expect(is_over_mock).not.toHaveBeenCalled()
-	})
-})
+// The ship-stop cap and the merge-wait timeout's park are covered in `run-ship-return-park.test.ts`.
 
 // joshuafolkken/kit#3221: a stop on a merge git could not finish reads as `conflict`, not as the stage.
 describe('run_ship_return.return_control on a merge conflict', () => {
