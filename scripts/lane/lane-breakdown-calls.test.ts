@@ -137,6 +137,18 @@ describe('lane_breakdown_implement.plan_calls', () => {
 	})
 })
 
+// joshuafolkken/kit#5717: a lane's first `lint:related` falls in the implementation, so its row carries
+// the timing line too.
+describe('lane_breakdown_implement.of — lint:related detail', () => {
+	it('carries the lint:related timing line onto its implementation group', () => {
+		const calls = [call(11, 7, { command: LINT_RELATED, output: timing_output(LINT_DETAIL) })]
+
+		expect(groups_of(calls, 'lint / cspell')).toStrictEqual([
+			{ label: LINT_LABEL, count: 1, ms: 7 * MINUTE_MS, detail: LINT_DETAIL },
+		])
+	})
+})
+
 // joshuafolkken/kit#5712: the row a lane's slow first `lint:related` is read on.
 describe('lane_breakdown_implement.plan_calls lint:related detail', () => {
 	it('carries the lint:related timing line onto its group and the printed row', () => {

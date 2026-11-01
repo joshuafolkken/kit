@@ -30,7 +30,7 @@ interface CallGroup {
 	label: string
 	count: number
 	ms: number
-	// What the group's longest call said its seconds went on — the start to plan's `lint:related` alone.
+	// What the group's longest call said its seconds went on — a `lint:related` group alone.
 	detail?: string | undefined
 }
 
@@ -113,15 +113,6 @@ function top_of(timed: ReadonlyArray<TimedCall>): Array<CallGroup> {
 	return [...groups.values()].toSorted((left, right) => right.ms - left.ms).slice(0, TOP)
 }
 
-// Each row's longest groups, by the row's name.
-function by_kind(parts: ReadonlyArray<KindCall>): Map<string, Array<CallGroup>> {
-	const names = new Set(parts.map((part) => part.name))
-
-	return new Map(
-		[...names].map((name) => [name, top_of(parts.filter((part) => part.name === name))]),
-	)
-}
-
 function names_lint_related(label: string): boolean {
 	return label.split(CHAIN).includes(LINT_RELATED)
 }
@@ -145,6 +136,20 @@ function with_lint_detail(
 ): Array<CallGroup> {
 	return groups.map((group) =>
 		names_lint_related(group.label) ? { ...group, detail: lint_detail(group.label, timed) } : group,
+	)
+}
+
+// Each row's longest groups, by the row's name — a `lint:related` group with its timing line, since a
+// lane's first run falls in the implementation (joshuafolkken/kit#5717).
+function by_kind(parts: ReadonlyArray<KindCall>): Map<string, Array<CallGroup>> {
+	const names = new Set(parts.map((part) => part.name))
+
+	return new Map(
+		[...names].map((name) => {
+			const timed = parts.filter((part) => part.name === name)
+
+			return [name, with_lint_detail(top_of(timed), timed)]
+		}),
 	)
 }
 
