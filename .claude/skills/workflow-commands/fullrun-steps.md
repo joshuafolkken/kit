@@ -39,12 +39,13 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
 with the labels `kickoff.md` → "Words typed after `new`" maps (per
 `prompts/collaboration-workflow/issue-template.md`) — its duplicate scan runs first, and a candidate
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
-`<N>`. (3) `pnpm josh run:hold --adopt <N>` — re-keys the bare hold to `<N>` and applies `in-progress`;
-every later stop releases with `run:release <N>`. (4) Record the agreed plan
-in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers section as in
-`kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`. (6) Synchronize per `entry-sequence.md`. (7)
-`pnpm josh run:prep <N>`; on `latest: required` run `pnpm josh latest:if-required` and load the `dependency-update`
-skill; on `skip` neither runs (`latest-gate.md` is the single source). If (5) answered `stashed`,
+`<N>`. (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`
+(`run:hold --adopt`) for its claim; every later stop releases with `run:release <N>`. (4) Record the
+agreed plan in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers
+section as in `kickoff.md` step 4). (5) `pnpm josh stash:push "fullrun new: pre-existing changes"`.
+(6) Synchronize per `entry-sequence.md`. (7) On (3)'s `latest: required` run
+`pnpm josh latest:if-required` and load the `dependency-update` skill; on `skip` neither runs
+(`latest-gate.md` is the single source). If (5) answered `stashed`,
 `pnpm josh stash:pop "fullrun new: pre-existing changes"`. (8) Implement. (9) Run round 1 of the verification chain (`chain-rule.md` → "Run the review-to-merge
 chain"). (10) File whatever the review round cap routed to branch 2 with `pnpm josh issue:file` (it
 runs `epic:bundle` on each). (11) Ship in one call — `pnpm josh ship "<title> #<N>" --notify-message
