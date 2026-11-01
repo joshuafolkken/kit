@@ -25,6 +25,7 @@ import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop } from './run-entry-stop'
 import { run_entry_trust, type TrustStop } from './run-entry-trust'
@@ -303,11 +304,15 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 // lane that planned one of them since dispatch takes the lane back here, at the cost of the entry
 // alone, rather than after the investigation `lane:plan` would otherwise yield on. `lane:plan` has
 // already released the hold and noted the yield, so this only reports it — no stop notice, as for
-// any yield.
-async function yields_at_entry(issue_number: string): Promise<boolean> {
+// any yield. A planned issue's `lane:plan`, run next on its plan comment's paths
+// (`run-entry-lane-plan.ts`), gives the lane back the same way; any other verdict runs on to the report.
+async function yields_at_entry(issue_number: string, state: StageState): Promise<boolean> {
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
+	if (await lane_plan_check.yield_at_entry(Number(issue_number))) return true
 
-	return await lane_plan_check.yield_at_entry(Number(issue_number))
+	const code = await run_entry_lane_plan.run_at_entry(issue_number, state)
+
+	return code === lane_plan_check.YIELD_EXIT_CODE
 }
 
 // The report of a lane given back at the entry, exiting as `lane:plan` does on a yield.
@@ -344,7 +349,8 @@ async function proceed(
 	const reads = await gather_reads(issue_number)
 
 	if (reads.trust_stop) return await stop_untrusted(request, { hold, cost }, reads.trust_stop)
-	if (await yields_at_entry(issue_number)) return yield_report(issue_number, { hold, cost })
+
+	if (await yields_at_entry(issue_number, state)) return yield_report(issue_number, { hold, cost })
 
 	await mark_planned(issue_number, state)
 

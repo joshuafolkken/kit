@@ -133,6 +133,15 @@ describe('run_wake_loop.run_loop — one wake per cut', () => {
 		expect(run_wake.read_wake(scratch.target)?.spawned).toStrictEqual(scripted.session_ids)
 		expect(scripted.session_ids).toStrictEqual(['sid-1', 'sid-2'])
 	})
+
+	// joshuafolkken/kit#5743. The record is adopted for the very session the supervisor then wakes.
+	it('hands the record to the session it wakes', async () => {
+		const scripted = recorder([HANDED_OFF, IN_FLIGHT, HANDED_OFF, IN_FLIGHT])
+
+		await run_wake_loop.run_loop(scratch.target, scripted.ports, 0)
+
+		expect(scripted.handed).toStrictEqual(scripted.session_ids)
+	})
 })
 
 describe('run_wake_loop.run_loop — recovering a session that claimed and died', () => {

@@ -193,8 +193,8 @@ itself. A judgment handoff carries the driver's verdict, affected issue, diagnos
 output and resume flags. The carry record keeps a restarted supervisor from counting a merge into
 another live owner's run.
 
-**A failure is visible rather than silent.** A judgment wake that never claims the carry record is
-retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
+**A failure is visible rather than silent.** A judgment wake whose session never begins work on the carry
+record is retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
 record that cannot be read ends it the same way. A `failed` stop while the carry record is
 still resumable restarts the supervisor in place after one interval, up to three times; only the
 failure past that bound sends the warning, its note counting the restarts. `none` and a
@@ -290,15 +290,15 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` in
 Park a lane child for a decision, or clear the park.
 
 ```bash
-pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision and the local record
+pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision, the local record, then run:release
 pnpm josh run:park 1839 --clear                              # remove needs-decision and the record
 ```
 
 <!-- /usage -->
 
-The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off. `in-progress` and the hold are left alone — a parked ending still owes `pnpm josh run:release <N>`.
+The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 
-**Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
+**Output / exit codes:** one `park #<N>` line naming what was written, then the release's line; exit `0` once the label and the comment are both on the issue and the release succeeded (or, with `--clear`, once the label is off), `1` otherwise. The record is written only once both are on; a failed release keeps it and prints `pnpm josh run:release <N>` to re-run.
 
 ### `josh upstream:interrupt`
 
@@ -405,6 +405,8 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
 
+A lane child entering a `planned` issue whose plan `lane:plan` has not cleared runs `lane:plan` on its plan comment's backticked paths before the report, printing the command and its verdict; `yield` gives the lane back at the entry with exit 2, as the entry probe does. A plan comment naming no path runs nothing, and `run:step`'s `lane:plan` line stays.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:entry` in detail".
 
 ### `josh run:status`
@@ -465,7 +467,7 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan.
+A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the

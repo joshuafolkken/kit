@@ -1,0 +1,8 @@
+{
+	"reason": "run:park runs the release itself (run-park-release.ts), with a guard for an unreadable git directory found in round 2",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 38,
+		"ai_cost.on_demand_bytes": 110
+	}
+}
