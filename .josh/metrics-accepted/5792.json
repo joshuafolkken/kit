@@ -2,6 +2,6 @@
 	"reason": "#5792 adds scripts/lint/import-move.ts, the named-import move behind josh rename <name> <name> --import",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 142
+		"scripts.code_lines": 151
 	}
 }

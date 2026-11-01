@@ -13,7 +13,8 @@ import {
 
 // `josh rename <old> <new> [--import <old-specifier> <new-specifier>] <file...>` — one identifier, and
 // the import specifier it moved with, renamed across files in one call (joshuafolkken/kit#5236), where
-// a lane would otherwise spend one Read and one Edit per file.
+// a lane would otherwise spend one Read and one Edit per file. The same name on both sides moves only
+// that named import to the new module (joshuafolkken/kit#5792, `import-move.ts`).
 //
 // **All or nothing**: a file the rename would not touch is named and nothing is written, since a path
 // passed by mistake means the file list is not the one the caller thinks it is. Each written file is

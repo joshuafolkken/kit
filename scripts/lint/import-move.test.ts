@@ -96,13 +96,29 @@ describe('import_move.rewrite — leaves what is not the named import', () => {
 		})
 	})
 
-	it('reports a file that already imports the name from the new module as taken', () => {
-		const text = "import { a, b } from './x'\nimport { b } from './y'\n"
+	it('changes nothing in a file that imports the name twice from the old module', () => {
+		const text = "import { b as c, b } from './x'\n"
 
-		expect(import_move.rewrite(ts, FILE, text, BARE_MOVE)).toStrictEqual({
-			text,
-			count: 0,
-			is_taken: true,
-		})
+		expect(import_move.rewrite(ts, FILE, text, BARE_MOVE).count).toBe(0)
+	})
+})
+
+describe('import_move.rewrite — cuts only the name and its comma', () => {
+	it('keeps a comment inside the braces', () => {
+		expect(moved("import {\n\ta, // keep\n\tb,\n} from './x'\n")).toBe(
+			"import {\n\ta, // keep\n\t\n} from './x'\nimport { b } from './y'\n",
+		)
+	})
+
+	it('cuts a name that is not the last one with the comma after it', () => {
+		expect(moved("import { b, c } from './x'\n")).toBe(
+			"import { c } from './x'\nimport { b } from './y'\n",
+		)
+	})
+
+	it('moves an inline type name in a mixed list as an import type', () => {
+		expect(moved("import { a, type b } from './x'\n")).toBe(
+			"import { a } from './x'\nimport type { b } from './y'\n",
+		)
 	})
 })

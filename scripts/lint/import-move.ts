@@ -11,8 +11,12 @@ import {
 //
 // **Only the named import moves, never the declaration's other names.** `import { a, b } from 'x'`
 // moving `b` keeps `import { a } from 'x'` and adds `import { b } from 'y'` below it; a declaration
-// the name was alone in takes the new specifier instead. A type-only name stays type-only. Nothing
-// but import declarations is read, so strings, keys and other uses of the name are never touched.
+// the name was alone in takes the new specifier instead. A type-only name stays type-only. Only the
+// name and its comma are cut, so a comment in the braces stays. Nothing but import declarations is
+// read, so strings, keys and other uses of the name are never touched. A name imported twice from the
+// old module is not guessed at: the file counts as untouched.
+
+const BLANK = /[\t ]/u
 
 interface MoveRequest {
 	name: string
@@ -71,7 +75,7 @@ function moving_of(
 		named(api, declaration, request.name).map((element) => ({ declaration, element })),
 	)
 
-	return found[0]
+	return found.length === 1 ? found[0] : undefined
 }
 
 function quoted(declaration: ts.ImportDeclaration, specifier: string): string {
@@ -110,17 +114,41 @@ function specifier_edit(declaration: ts.ImportDeclaration, to: string): Replacem
 	}
 }
 
-// The clause rebuilt without the moving name; `undefined` when no name would be left in it.
-function clause_edit(
-	clause: ts.ImportClause,
-	keyword: string,
-	remaining: ReadonlyArray<string>,
-): Replacement | undefined {
-	const named_text = remaining.length > 0 ? `{ ${remaining.join(', ')} }` : undefined
-	const parts = [clause.name?.text, named_text].filter((part) => part !== undefined)
-	if (parts.length === 0) return undefined
+function blank_end(text: string, at: number): number {
+	let end = at
 
-	return { start: clause.getStart(), end: clause.getEnd(), text: keyword + parts.join(', ') }
+	while (BLANK.test(text.charAt(end))) end += 1
+
+	return end
+}
+
+function blank_start(text: string, at: number): number {
+	let start = at
+
+	while (BLANK.test(text.charAt(start - 1))) start -= 1
+
+	return start
+}
+
+// The name and the comma that separates it — the one after it, else (the last name, with no trailing
+// comma) the one before it. What sits between, a comment included, stays for the formatter.
+function cut_edits(element: ts.ImportSpecifier): ReadonlyArray<Replacement> {
+	const { elements } = element.parent
+	const { text } = element.getSourceFile()
+
+	if (elements.at(-1) !== element || elements.hasTrailingComma) {
+		const after = text.indexOf(',', element.getEnd()) + 1
+
+		return [{ start: element.getStart(), end: blank_end(text, after), text: '' }]
+	}
+
+	const before = text.lastIndexOf(',', element.getStart())
+	const start = blank_start(text, element.getStart())
+
+	return [
+		{ start: before, end: before + 1, text: '' },
+		{ start, end: element.getEnd(), text: '' },
+	]
 }
 
 function edits_of(
@@ -129,19 +157,16 @@ function edits_of(
 	clause: ts.ImportClause,
 	to: string,
 ): ReadonlyArray<Replacement> {
-	const { declaration } = moving
-	const remaining = elements_of(api, declaration)
-		.filter((element) => element !== moving.element)
-		.map((element) => element.getText())
-	const keyword = type_keyword(api, clause)
-	const kept = clause_edit(clause, keyword, remaining)
+	const { declaration, element } = moving
+	const insert = insert_edit(moving, type_keyword(api, clause), to)
 
-	if (kept === undefined) return [specifier_edit(declaration, to)]
+	if (element.parent.elements.length > 1) return [...cut_edits(element), insert]
+	if (clause.name === undefined) return [specifier_edit(declaration, to)]
 
-	return [kept, insert_edit(moving, keyword, to)]
+	return [{ start: clause.name.getEnd(), end: element.parent.getEnd(), text: '' }, insert]
 }
 
-// `is_taken`: the destination already imports the name, so moving it would bind it twice.
+// Never `is_taken`: the name keeps its local binding, so the move binds nothing new.
 function rewrite(
 	api: TypeScriptApi,
 	file_name: string,
@@ -149,15 +174,12 @@ function rewrite(
 	request: MoveRequest,
 ): RenameResult {
 	const source = api.createSourceFile(file_name, text, api.ScriptTarget.Latest, true)
-	const is_taken = imports_from(api, source, request.to).some(
-		(declaration) => named(api, declaration, request.name).length > 0,
-	)
 	const moving = moving_of(api, source, request)
 	const clause = moving?.declaration.importClause
-	if (moving === undefined || clause === undefined || is_taken) return { text, count: 0, is_taken }
+	if (moving === undefined || clause === undefined) return { text, count: 0, is_taken: false }
 	const edits = edits_of(api, moving, clause, request.to)
 
-	return { text: rename_identifier.apply(text, edits), count: 1, is_taken }
+	return { text: rename_identifier.apply(text, edits), count: 1, is_taken: false }
 }
 
 const import_move = { rewrite }
