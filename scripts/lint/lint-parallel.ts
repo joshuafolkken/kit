@@ -214,6 +214,7 @@ async function run_lint_command(command_arguments: ReadonlyArray<string>): Promi
 }
 
 const lint_parallel = {
+	run_eslint,
 	run_lint_checks,
 	run_lint_command,
 	run_lint_parallel_checks,

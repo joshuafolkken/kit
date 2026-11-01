@@ -249,6 +249,15 @@ const PRETTIER_RELATED_CACHE_FLAGS = content_cache_flags(PRETTIER_RELATED_CACHE_
 const CSPELL_COMMIT_CACHE_FLAGS = content_cache_flags(CSPELL_COMMIT_CACHE_FILE)
 const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 
+// `josh lint:rule`'s own cache and report directory, under `node_modules` so no ignore rule has to
+// name it: its `--rule` override changes every entry's config hash, so on the gate's file each run
+// would leave the gate a cold lint. The workers are its `--concurrency`, and its registration claims
+// the whole-tree scan's cores and memory once per worker.
+const LINT_RULE_DIRECTORY = 'node_modules/.cache/josh/lint-rule'
+const LINT_RULE_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache`
+const LINT_RULE_CACHE_FLAGS = content_cache_flags(LINT_RULE_CACHE_FILE)
+const LINT_RULE_WORKERS = 2
+
 export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
 // The three cache files are exported one by one as well as as a list, because `josh bench` clears
 // them per target: the lint step writes only the eslint one, so a target
@@ -273,6 +282,10 @@ export {
 	GATE_CACHE_SPECS,
 	GATE_COMMAND,
 	IGNORED_CACHE_FILES,
+	LINT_RULE_CACHE_FILE,
+	LINT_RULE_CACHE_FLAGS,
+	LINT_RULE_DIRECTORY,
+	LINT_RULE_WORKERS,
 	OPTIONAL_ENV_FILE_FLAGS,
 	PRETTIER_CACHE_FILE,
 	PRETTIER_CACHE_FLAGS,

@@ -1,0 +1,7 @@
+{
+	"reason": "New josh lint:rule command (#5664): its script, argument parsing, violation report and alias",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 203
+	}
+}
