@@ -14,7 +14,8 @@
 #   runs through josh, whose command is the name with its first `-` turned into `:`
 #   (`pretool-guard` → `pretool:guard`).
 # - In kit's own checkout the gate is the kit-only `tools/hooks/hook-bundle-ready.ts`, which rebuilds stale bundles
-#   (joshuafolkken/kit#2984) and then runs the bundle — or the josh fallback — itself, so a hook call
+#   (joshuafolkken/kit#2984) — in the background while a stale but whole build runs (joshuafolkken/kit#5628)
+#   — and then runs the bundle — or the josh fallback — itself, so a hook call
 #   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
 #   published bundles cannot be stale against a source the consumer never edits, and Node strips no
 #   types under `node_modules`.
