@@ -1,0 +1,9 @@
+{
+	"reason": "josh run:chain adds a stage runner with a split-notice hold, its CLI and tests (#5630); chain-rule.md step 1 keeps its bolded pre-gate cut while it is rewritten around run:chain",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 217,
+		"ai_cost.on_demand_bytes": 47,
+		"prose.excess_bold": 1
+	}
+}

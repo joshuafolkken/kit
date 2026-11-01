@@ -57,7 +57,7 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 ])
 
 // **A lane child reads its own step of the chain, never the whole of it** (joshuafolkken/kit#5016):
-// the chain's step 1 opens with `josh main:merge`, which a lane child leaves to ship's sync, and a
+// the chain's step 1 runs `josh main:merge` (in `josh run:chain`), which a lane child leaves to ship's sync, and a
 // child handed the whole section ran it, moving the tree its scoped pair was green on. The step is
 // the chain's labelled step 0, cited where it stands, so it is written once; it ends at the sibling
 // item `1.`, so a blank line inside it would cut it short. A stopped ship's report reads it too.

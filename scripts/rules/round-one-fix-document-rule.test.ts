@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 const CHAIN_RULE = '.claude/skills/workflow-commands/chain-rule.md'
 const LANE_STEP = '0. **A lane child**'
-const MAIN_LINE_STEP = '1. Run `pnpm josh main:merge`'
+const MAIN_LINE_STEP = '1. **Issue `pnpm josh run:cut <N>` alone first**'
 
 function lane_step(): string {
 	const content = read_unwrapped(CHAIN_RULE)
