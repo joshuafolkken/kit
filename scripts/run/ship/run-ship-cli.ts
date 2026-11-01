@@ -22,6 +22,7 @@ import { run_ship_return } from './run-ship-return'
 import { run_ship_stage, type Phase, type ShipState, type Stage } from './run-ship-stage'
 import { run_ship_steps, type ShipArguments, type Step } from './run-ship-steps'
 import { run_ship_stop_cause } from './run-ship-stop-cause'
+import { run_ship_supervised } from './run-ship-supervised'
 
 // `josh ship "<title> #<N>"` — one call for the fixed commit-to-report region a run ships a change on.
 // It runs `gate`, `git -y`, `followup` and `run:tail` internally, so no round trip re-bills a lane's
@@ -414,24 +415,6 @@ async function detach_after_preflight(args: ShipArguments): Promise<number> {
 	return code
 }
 
-async function supervised_repository(): Promise<string | undefined> {
-	return run_ship_detach.is_supervised() ? await run_ship_probe.repository_directory() : undefined
-}
-
-async function claim_supervised_identity(args: ShipArguments): Promise<void> {
-	const repository = await supervised_repository()
-	if (repository !== undefined) await run_ship_detach.claim_identity(repository, args.number)
-}
-
-async function record_supervised_result(
-	args: ShipArguments,
-	sections: ReadonlyArray<ShipSection>,
-): Promise<void> {
-	const repository = await supervised_repository()
-	if (repository === undefined) return
-	await run_ship_detach.mark_result(repository, args.number, run_ship.exit_code(sections))
-}
-
 async function run_ship_command(given: ShipArguments): Promise<number> {
 	const args = await run_ship_pre_detach_pinned.with_recorded_reason(given)
 
@@ -441,14 +424,20 @@ async function run_ship_command(given: ShipArguments): Promise<number> {
 		return await detach_after_preflight(args)
 	}
 
-	await claim_supervised_identity(args)
+	await run_ship_supervised.claim_identity(args)
 	const { sections, is_handed_over } = await ship(args)
 
 	// The successor carries the same launch record, so its result is the one written there.
-	if (!is_handed_over) await record_supervised_result(args, sections)
+	if (!is_handed_over) await run_ship_supervised.record_result(args, sections)
 	console.info(run_ship.format_report(sections))
 
 	return run_ship.exit_code(sections)
+}
+
+async function run_governed(args: ShipArguments): Promise<number> {
+	const printed = run_ship_supervised.print_section()
+
+	return printed === SUCCESS_EXIT_CODE ? await run_ship_command(args) : printed
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -462,7 +451,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	return command.kind === 'log'
 		? await print_log(command.number)
-		: await run_ship_command(await run_ship_body_draft.with_draft(command.args))
+		: await run_governed(await run_ship_body_draft.with_draft(command.args))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

@@ -51,7 +51,7 @@ Each is fetched at its named scope, in the same turn, by the named command that 
 | ----------------------- | ------------------------------------------------------------------------------ |
 | `latest-gate.md`        | `run:prep` answers `latest: required` — before `josh latest:if-required` runs  |
 | `followup.md` → "Run `pnpm josh followup`" | Before issuing `pnpm josh followup`, in that same turn |
-| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`; a lane child reads "A lane child" alone) — the gate overlaps the review |
+| `chain-rule.md` → "Run the review-to-merge chain" | Before the first `pnpm josh gate` launch (`fullrun` / `prrun` / `backlogrun`), never fetched: `run:step` prints it at `implement`, `run:review` (which launches the gate) and `ship` once per session — a lane child gets "A lane child" alone, a repeat names the section in one line |
 | `background-commands.md` → "Background the gate and push" | Before backgrounding `pnpm josh gate` — the first long-running command a run detaches (`fullrun` / `halfrun` / `prrun` / `backlogrun`) |
 
 A `latest: skip` answer reads nothing. **A lane child that parks reads
