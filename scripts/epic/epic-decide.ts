@@ -35,10 +35,20 @@ function untracked_error(epic_number: number, untracked: ReadonlyArray<number>):
 	return `${format_list(untracked)} not tracked by ${session_cite.issue(epic_number)}; place it with \`pnpm josh epic --add ${String(epic_number)} <N> --decision-file <path>\`. Nothing was written.`
 }
 
+// A size estimate is one child's: stated in a record about several, it would overwrite each child's
+// own with one figure, so the record is refused before anything is written.
+function size_error(input: DecideInput): string | undefined {
+	if (input.children.length === 1 || size_estimate.stated_line(input.decision) === undefined) {
+		return undefined
+	}
+
+	return `The record states a size estimate but names ${format_list(input.children)}; an estimate is one child's, so record it with \`--decide\` for that child alone. Nothing was written.`
+}
+
 // The epic the decision goes to, or why nothing is written: a record `append_decision` would refuse
 // (checked before any read), an unreadable epic, or a child it does not track.
 async function read_decision_target(input: DecideInput): Promise<EpicSubject | { error: string }> {
-	const record_error = epic_decision.find_decision_error(input.decision)
+	const record_error = epic_decision.find_decision_error(input.decision) ?? size_error(input)
 	if (record_error !== undefined) return { error: record_error }
 	const subject = await epic_read.read_subject(input.epic_number)
 
@@ -76,9 +86,19 @@ async function has_comment(child: number, decision: string): Promise<boolean | u
 	return comments?.some((comment) => comment.body.trim() === decision.trim())
 }
 
+async function try_edit_body(child: number, body: string): Promise<boolean> {
+	try {
+		await git_gh_command.issue_edit_body(String(child), body)
+
+		return true
+	} catch {
+		return false
+	}
+}
+
 // joshuafolkken/kit#5758: a record that states a size estimate line restates the child's own, so
 // `lane:plan` reads the widened scope rather than the estimate filed before the decision. `false` when
-// the child cannot be read.
+// the child cannot be read or written, as a failed comment is, so a rerun finishes it.
 async function restate_size(child: number, decision: string): Promise<boolean> {
 	const line = size_estimate.stated_line(decision)
 	if (line === undefined) return true
@@ -87,9 +107,7 @@ async function restate_size(child: number, decision: string): Promise<boolean> {
 	const body = subject.body ?? ''
 	const restated = size_estimate.restated(body, line)
 
-	if (restated !== body) await git_gh_command.issue_edit_body(String(child), restated)
-
-	return true
+	return restated === body || (await try_edit_body(child, restated))
 }
 
 // The label goes only once the child carries the record, so a failed comment leaves it parked.

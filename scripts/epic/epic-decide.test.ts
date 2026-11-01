@@ -141,6 +141,38 @@ describe('epic_decide.decide — size estimate', () => {
 		expect(mocked_edit).not.toHaveBeenCalledWith(String(CHILD), expect.anything())
 	})
 
+	it('reads no child body when the record states no estimate', async () => {
+		expect(await decide()).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_read).not.toHaveBeenCalledWith(String(CHILD))
+	})
+})
+
+describe('epic_decide.decide — size estimate not written', () => {
+	it('refuses a record stating an estimate for several children before any write', async () => {
+		const result = await epic_decide.decide({
+			epic_number: EPIC_NUMBER,
+			children: [890, CHILD],
+			decision: `${RECORD}\n${NEW_SIZE}`,
+		})
+
+		expect(result).toBe(FAILURE_EXIT_CODE)
+		expect(mocked_read).not.toHaveBeenCalled()
+		expect(mocked_edit).not.toHaveBeenCalled()
+	})
+
+	it('keeps needs-decision when the child body edit fails', async () => {
+		read_child(OLD_SIZE)
+		mocked_edit.mockImplementation(async (issue_number) => {
+			await Promise.resolve()
+			if (issue_number === String(CHILD)) throw new Error('PATCH failed')
+
+			return ''
+		})
+
+		expect(await decide_widening()).toBe(FAILURE_EXIT_CODE)
+		expect(mocked_clear).not.toHaveBeenCalled()
+	})
+
 	it('keeps needs-decision when the child cannot be read', async () => {
 		mocked_read.mockImplementation(async (issue_number) => {
 			await Promise.resolve()
@@ -150,11 +182,6 @@ describe('epic_decide.decide — size estimate', () => {
 
 		expect(await decide_widening()).toBe(FAILURE_EXIT_CODE)
 		expect(mocked_clear).not.toHaveBeenCalled()
-	})
-
-	it('reads no child body when the record states no estimate', async () => {
-		expect(await decide()).toBe(SUCCESS_EXIT_CODE)
-		expect(mocked_read).not.toHaveBeenCalledWith(String(CHILD))
 	})
 })
 

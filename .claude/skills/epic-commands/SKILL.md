@@ -31,8 +31,8 @@ Recording a decision removes that child's `needs-decision` label (Tier A; `backl
   (`epic-bundle.md`).
 - **About a child the epic already tracks**: `pnpm josh epic --decide <E> <N...> --decision-file
   <path|->` writes the entry, the comments and the label removal; a rerun writes nothing twice.
-- A decision that changes a child's scope → state the new `- 規模見積もり:` line in the record;
-  `scripts/epic/epic-decide.ts`.
+- A decision that changes one child's scope → state the new `- 規模見積もり:` line in a record naming
+  that child alone; `scripts/epic/epic-decide.ts`.
 
 ```md
 ## Decisions
