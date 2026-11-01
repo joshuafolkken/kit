@@ -73,7 +73,7 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 			"Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call",
 		category: 'AI tools',
 		reference: [
-			'[--interaction] [--review <file> [--round <1|2>]] < findings | … --none',
+			'[--interaction] [--review <absolute-path> [--round <1|2>]] < findings | … --none',
 			'automation',
 			['files'],
 		],
@@ -83,7 +83,7 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '--interaction < findings.txt', note: 'the interaction review slot' },
 				{ arguments: '--none', note: 'a review with no findings' },
 				{
-					arguments: '--review review.md < findings.txt',
+					arguments: '--review "$PWD/review.md" < findings.txt',
 					note: 'lint the review and submit the findings in one call',
 				},
 			],
@@ -93,9 +93,9 @@ const REVIEW_COMMANDS: Record<string, CommandEntry> = {
 					description: 'a review with no findings; empty stdin without it is refused.',
 				},
 				{
-					names: ['--review <file>'],
+					names: ['--review <absolute-path>'],
 					description:
-						"the reviewer's markdown review, linted against the rubric's output format in the same call; a violation and a grammar refusal are reported together, and nothing is written while either stands.",
+						"the reviewer's markdown review, by absolute path (josh runs from the package root, so a relative path is refused), linted against the rubric's output format in the same call; a violation and a grammar refusal are reported together, and nothing is written while either stands.",
 				},
 				{
 					names: ['--round <1|2>'],

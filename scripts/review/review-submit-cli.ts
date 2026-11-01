@@ -25,7 +25,7 @@ import { review_submit_args, type Submission } from './review-submit-args'
 const ARGV_OFFSET = 2
 const NONE_FLAG = '--none'
 const USAGE =
-	'Usage: josh review:submit [--interaction] [--review <file> [--round <1|2>]] < findings | josh review:submit [--interaction] [--review <file> [--round <1|2>]] --none'
+	'Usage: josh review:submit [--interaction] [--review <absolute-path> [--round <1|2>]] < findings | josh review:submit [--interaction] [--review <absolute-path> [--round <1|2>]] --none'
 const EMPTY_NOTE = `nothing written — no findings on stdin; a review with none passes ${NONE_FLAG}`
 const NONE_WITH_FINDINGS_NOTE = `nothing written — ${NONE_FLAG} was passed with findings on stdin`
 const SUCCESS_EXIT_CODE = 0

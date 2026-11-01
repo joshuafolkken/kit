@@ -117,12 +117,17 @@ describe('review_submit_cli — a refusal writes nothing', () => {
 		[[NONE_FLAG, NONE_FLAG]],
 		[[ROUND_FLAG, '2']],
 		[[REVIEW_FLAG]],
-		[[REVIEW_FLAG, 'review.md', ROUND_FLAG, '3']],
+		[[REVIEW_FLAG, path.join(REVIEW_DIRECTORY, 'review.md'), ROUND_FLAG, '3']],
+		[[REVIEW_FLAG, 'review.md']],
 	])('refuses the arguments %j', (argv) => {
 		expect(review_submit_cli.run(argv, MEDIUM)).toBe(FAILED)
 
 		expect(stamps.size).toBe(0)
 		expect(console.error).toHaveBeenCalledWith(review_submit_cli.USAGE)
+	})
+
+	it('names the absolute review path in its usage', () => {
+		expect(review_submit_cli.USAGE).toContain('--review <absolute-path>')
 	})
 })
 

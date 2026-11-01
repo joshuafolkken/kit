@@ -14,7 +14,7 @@ Review policy: the level, the round count, and what happens to a finding after t
 When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, round 1 runs before the commit, round 2
 in `ship --review` (`.claude/skills/workflow-commands/chain-rule.md`). Launch a `reviewer` agent
 type (round 2: `reviewer-verification`), never nested, with the model `pnpm josh review:brief` prints.
-Reviewer's last step → `pnpm josh review:submit --review <file>` (`.claude/agents/reviewer.md`).
+Reviewer's last step → `pnpm josh review:submit --review <absolute-path>` (`.claude/agents/reviewer.md`).
 
 Re-run after fixes until **no high or medium findings remain or the round cap below is reached** (the
 first review counts), whichever comes first. Round 2 is a verification pass over the fixes

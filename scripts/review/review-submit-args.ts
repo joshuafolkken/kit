@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { review_attest, type ReviewSlot } from './review-attest'
 import { review_brief_cli } from './review-brief-cli'
@@ -50,10 +51,18 @@ function round_of(raw_round: string | undefined): number | undefined {
 }
 
 // A `--round` without `--review` has nothing to lint, so it is refused rather than ignored.
-function is_valid(values: SubmitValues): boolean {
+function is_valid_round(values: SubmitValues): boolean {
 	if (values.round === undefined) return true
 
 	return values.review !== undefined && round_of(values.round) !== undefined
+}
+
+// **A relative `--review` is refused**: `pnpm josh` runs from the package root, not the directory the
+// reviewer typed it in, so a relative path would read another file or none.
+function is_valid(values: SubmitValues): boolean {
+	const is_absolute_review = values.review === undefined || path.isAbsolute(values.review)
+
+	return is_absolute_review && is_valid_round(values)
 }
 
 function review_of(values: SubmitValues): ReviewToLint | undefined {

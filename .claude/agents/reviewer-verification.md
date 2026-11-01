@@ -15,8 +15,9 @@ its `review:attest` step.
 - Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says. Never run
   `pnpm josh review:brief` yourself: a new brief drops the attestation you left.
 - Apply a fix only where the brief's level and your dispatcher ask for one; never commit, stage or push.
-- Write the review in the rubric's output format to a file, then submit it with the findings in one
-  call: `pnpm josh review:submit --review <file>` (round 2: `--round 2`), the findings one per line
+- Write the review in the rubric's output format to a file outside the checkout (under `/tmp`), then
+  submit it with the findings in one call: `pnpm josh review:submit --review <absolute-path>` (round 2:
+  `--round 2`; a relative path is refused), the findings one per line
   on stdin as `[fixed ]<category>:<severity>:<file>[:<line>] — <one sentence>` (`--interaction` for
   the interaction brief, the one whose file name carries `interaction-`; `--none` and no stdin when
   there is none). It lints the review and checks the lines together; fix everything it reports and
