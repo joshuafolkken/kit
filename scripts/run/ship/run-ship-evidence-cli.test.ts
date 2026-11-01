@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { live_evidence } from '#scripts/review/live-evidence'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const existing_mock = vi.hoisted(() => vi.fn<() => Promise<string | undefined>>())
 
@@ -16,6 +16,7 @@ const TEMPORARY = mkdtempSync(path.join(tmpdir(), 'josh-ship-evidence-'))
 const DRAFT = path.join(TEMPORARY, 'josh-ship-body-5585.md')
 const RUNTIME_PATH = 'scripts/run/ship/run-ship-evidence-cli.ts'
 const FAILURE_EXIT_CODE = 1
+const PRINT_42 = ['5585', '--', 'node', '-e', 'console.log(42)']
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -23,6 +24,10 @@ beforeEach(() => {
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 	writeFileSync(DRAFT, `${live_evidence.EVIDENCE_HEADING}\n`)
 	existing_mock.mockResolvedValue(DRAFT)
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 afterAll(() => {
@@ -35,12 +40,20 @@ function draft_text(): string {
 
 describe('run_ship_evidence_cli.run', () => {
 	it('runs the command and appends it with its output to the draft', async () => {
-		await expect(
-			run_ship_evidence_cli.run(['5585', '--', 'node', '-e', 'console.log(42)']),
-		).resolves.toBe(0)
+		await expect(run_ship_evidence_cli.run(PRINT_42)).resolves.toBe(0)
 
 		expect(draft_text()).toContain("`node -e 'console.log(42)'`\n\n```\n42\n```\n")
 		expect(live_evidence.verdict_for([RUNTIME_PATH], draft_text())).toBe('satisfied')
+	})
+
+	// joshuafolkken/kit#5617: a parent FORCE_COLOR made Node warn that NO_COLOR is ignored.
+	it('keeps an inherited FORCE_COLOR out of the recorded command’s output', async () => {
+		vi.stubEnv('FORCE_COLOR', '1')
+
+		await expect(run_ship_evidence_cli.run(PRINT_42)).resolves.toBe(0)
+
+		expect(draft_text()).not.toContain('NO_COLOR')
+		expect(draft_text()).toContain('```\n42\n```\n')
 	})
 
 	it('accepts the command with no separator, and exits with the command’s own code', async () => {

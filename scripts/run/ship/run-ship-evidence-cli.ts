@@ -38,7 +38,8 @@ async function execute(command: ReadonlyArray<string>): Promise<{ output: string
 		reject: false,
 		// A command reading a piped stdin would wait for an end that never comes.
 		stdin: 'ignore',
-		env: { NO_COLOR: '1' },
+		// An inherited FORCE_COLOR overrides NO_COLOR, and Node warns about it into the output.
+		env: { NO_COLOR: '1', FORCE_COLOR: undefined },
 	})
 
 	// A command that never ran (not found, killed) has no exit code: its reason is the output.
