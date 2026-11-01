@@ -1,0 +1,7 @@
+{
+	"reason": "lane-cut-stats: new lane:stats cut table and lane:breakdown cut line (#5661)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 83
+	}
+}

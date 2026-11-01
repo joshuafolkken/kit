@@ -77,6 +77,26 @@ describe('lane_breakdown_cli.run', () => {
 	})
 })
 
+// joshuafolkken/kit#5661: a lane that cut ends with its cuts by phase; one that never cut prints as above.
+describe('lane_breakdown_cli.run on a lane that cut', () => {
+	it('ends with the cuts counted by the phase each cut at', async () => {
+		const lane = `#${String(ISSUE)}`
+
+		mocks.all_events.mockResolvedValue([
+			{ pos: 1, at: at(10), kind: 'plan', text: `${lane} plan` },
+			{ pos: 2, at: at(20), kind: 'cut', text: `${lane} cut (implementation)` },
+			{ pos: 3, at: at(50), kind: 'cut', text: `${lane} cut (pre-gate)` },
+			{ pos: 4, at: at(52), kind: 'cut', text: '#1 cut (pre-gate)' },
+		])
+
+		await lane_breakdown_cli.run([String(ISSUE)])
+
+		expect(console.info).toHaveBeenCalledWith(
+			expect.stringMatching(/\n- run:cut ×2 \(implementation ×1, pre-gate ×1\)$/u),
+		)
+	})
+})
+
 // joshuafolkken/kit#5078: the pre-detach line names what its test:pinned probe spent.
 describe('lane_breakdown_cli.run on a lane whose ship pre-detach probed', () => {
 	it("prints the test:pinned row written inside the stage on that stage's line", async () => {

@@ -285,6 +285,21 @@ ended at the hour.
 made of. `hand-back:*` rows are time spent waiting on a session, and `offer:*` rows are the backlog's
 own answer. Compare the rows from one period to the next to show the idle time shrinking.
 
+## How often a lane cut
+
+Under the gap table, `lane:stats` prints the period's `run:cut`s (`scripts/lane/lane-cut-stats.ts`). The
+`all` row shows the per-lane median and maximum cut count and the total, a lane dispatched in the
+period that never cut counting as zero. One row per phase follows.
+
+`lane:breakdown <N>` ends with one lane's count, `run:cut ×3 (implementation ×2, pre-gate ×1)`. A lane
+that never cut gets no line.
+
+The phase is the only attribution a `cut` event records (`#<N> cut (<phase>)`). A pause is a `park`,
+not a cut, so it counts in the stop table.
+
+**The decision the table is for**: which phase's cuts to reduce. Each resume reruns the self-check,
+lint and `run:review`, so the loss grows with the cut count.
+
 ## How long a lane waited for the core budget
 
 Under the hold table, `lane:stats` prints one row per lane whose commands waited for the core budget:

@@ -3,6 +3,7 @@ import { lane_check_stats } from './lane-check-stats'
 import { lane_ci_path_stats } from './lane-ci-path-stats'
 import { lane_claim_stats } from './lane-claim-stats'
 import { lane_core_wait_stats } from './lane-core-wait-stats'
+import { lane_cut_stats } from './lane-cut-stats'
 import { lane_gap_stats } from './lane-gap-stats'
 import { lane_held_stats } from './lane-held-stats'
 import { lane_implement_stats } from './lane-implement-stats'
@@ -39,6 +40,7 @@ function tables_of({ entries, events, calls }: PeriodRecords, window: StatsWindo
 		lane_implement_stats.table(calls, window, lane_paused_spans.by_lane(entries)),
 		lane_stop_stats.table(entries, window, events),
 		lane_gap_stats.table(entries, window, events),
+		lane_cut_stats.table(entries, window, events),
 		lane_round_one_stats.table(entries, window),
 		lane_round_two_stats.table(entries, window),
 		lane_split_stats.table(entries, window),
