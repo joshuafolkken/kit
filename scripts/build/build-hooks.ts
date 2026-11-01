@@ -4,7 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { hook_bundle_stamp } from '#scripts/build/hook-bundle-stamp'
 import { toolchain_inputs } from '#scripts/gate/toolchain-inputs'
 import { atomic_write } from '#scripts/lib/atomic-write'
-import { build, type OnLoadArgs, type OutputFile, type Plugin, type PluginBuild } from 'esbuild'
+import {
+	build,
+	type OnLoadArgs,
+	type OnResolveArgs,
+	type OutputFile,
+	type Plugin,
+	type PluginBuild,
+} from 'esbuild'
 
 const BUILD_SCRIPT = fileURLToPath(import.meta.url)
 const PACKAGE_DIR = path.join(path.dirname(BUILD_SCRIPT), '..', '..')
@@ -15,6 +22,15 @@ const STAGING_PREFIX = '.hooks-staging-'
 // esbuild compiles a plugin filter as a Go regexp, which rejects the `u` flag.
 // eslint-disable-next-line require-unicode-regexp
 const ANY_PATH = /.*/
+// A bare specifier: not relative, absolute, a `#scripts/*` subpath import or a `node:` built-in.
+// eslint-disable-next-line require-unicode-regexp
+const BARE_SPECIFIER = /^[^./#]/
+const NODE_BUILTIN_PREFIX = 'node:'
+const ENTRY_POINT_KIND = 'entry-point'
+const SCOPE_PREFIX = '@'
+const SCOPED_NAME_SEGMENTS = 2
+const NODE_MODULES_SEGMENT = `${path.sep}node_modules${path.sep}`
+const INLINED_PACKAGES: ReadonlySet<string> = new Set(['execa', 'js-yaml', 'semver', 'zod'])
 
 // Each Claude Code hook is bundled to its own `dist/hooks/<name>.js`, so a consumer (and kit itself)
 // invokes `node dist/hooks/<name>.js` directly — no `pnpm` launch and no `tsx` re-spawn from the
@@ -33,10 +49,13 @@ const ANY_PATH = /.*/
 // elsewhere becomes a re-export stub that runs nothing. Each launched hook is therefore a `*-cli.ts`
 // file holding only the self-invoke, which no other module imports.
 //
-// `packages: 'external'` keeps bare dependencies as runtime imports the consumer resolves from kit's
-// node_modules, exactly as the library bundles do, while kit's internal `#scripts/*` graph is inlined.
-// No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed directly), a hook
-// bundle is always launched as `node <path>`.
+// Kit's internal `#scripts/*` graph is inlined. **The light dependencies every hook launch loads are
+// inlined too** (`INLINED_PACKAGES`, with whatever they import): resolving and loading their module
+// graphs file by file from node_modules was most of a bundle's import time on every tool call
+// (joshuafolkken/kit#5641). Every other bare dependency stays a runtime import the consumer resolves
+// from kit's node_modules, exactly as the library bundles do — `typescript` alone would grow the
+// bundles tenfold. No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed
+// directly), a hook bundle is always launched as `node <path>`.
 interface HookBundle {
 	source: string
 	out: string
@@ -84,8 +103,47 @@ function loaded_contents(contents: Uint8Array, is_entry: boolean): string {
 	return is_entry ? source : source.replaceAll(SELF_INVOKE_GUARD, 'false')
 }
 
-// Every file the build loads is read here, so the stamp digests the exact bytes that were bundled —
-// a source edited mid-build is recorded as what it was, and the next launch rebuilds it.
+function is_dependency_file(file_path: string): boolean {
+	return file_path.includes(NODE_MODULES_SEGMENT)
+}
+
+function package_name(specifier: string): string {
+	const segments = specifier.split('/')
+	const length = specifier.startsWith(SCOPE_PREFIX) ? SCOPED_NAME_SEGMENTS : 1
+
+	return segments.slice(0, length).join('/')
+}
+
+// An import inside node_modules belongs to an inlined package's graph — an external package is never
+// loaded — so it is inlined with it. An entry point is never external: a Windows absolute path such as
+// `C:\…` also reads as bare.
+function is_external(args: OnResolveArgs): boolean {
+	if (args.kind === ENTRY_POINT_KIND) return false
+	if (args.path.startsWith(NODE_BUILTIN_PREFIX)) return true
+
+	return !INLINED_PACKAGES.has(package_name(args.path)) && !is_dependency_file(args.importer)
+}
+
+function dependency_boundary(): Plugin {
+	return {
+		name: 'hook-dependency-boundary',
+		setup(plugin_build: PluginBuild): void {
+			plugin_build.onResolve({ filter: BARE_SPECIFIER }, function resolve(args: OnResolveArgs) {
+				return is_external(args) ? { path: args.path, external: true } : undefined
+			})
+		},
+	}
+}
+
+function record(sources: Map<string, Uint8Array>, file_path: string, contents: Uint8Array): void {
+	if (!is_dependency_file(file_path)) sources.set(path.relative(PACKAGE_DIR, file_path), contents)
+}
+
+// Every first-party file the build loads is read here, so the stamp digests the exact bytes that were
+// bundled — a source edited mid-build is recorded as what it was, and the next launch rebuilds it. An
+// inlined dependency is loaded as esbuild reads it and left out of the record: the lockfile and pnpm's
+// install record among the toolchain inputs already change with it, and every recorded input is
+// stat-ed on every hook launch.
 function source_recorder(sources: Map<string, Uint8Array>, entries: ReadonlySet<string>): Plugin {
 	return {
 		name: 'hook-source-recorder',
@@ -93,7 +151,7 @@ function source_recorder(sources: Map<string, Uint8Array>, entries: ReadonlySet<
 			plugin_build.onLoad({ filter: ANY_PATH, namespace: 'file' }, function load(args: OnLoadArgs) {
 				const contents = readFileSync(args.path)
 
-				sources.set(path.relative(PACKAGE_DIR, args.path), contents)
+				record(sources, args.path, contents)
 
 				return { contents: loaded_contents(contents, entries.has(args.path)), loader: 'default' }
 			})
@@ -166,9 +224,8 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 		platform: 'node',
 		format: 'esm',
 		target: 'node22',
-		packages: 'external',
 		write: false,
-		plugins: [source_recorder(sources, entries)],
+		plugins: [dependency_boundary(), source_recorder(sources, entries)],
 	})
 	const stamp = hook_bundle_stamp.stamp_text(
 		sources,
@@ -179,4 +236,4 @@ async function build_hooks(out_directory: string = OUT_DIR): Promise<void> {
 }
 
 export type { HookBundle }
-export { build_hooks, HOOK_BUNDLES, OUT_DIR, outfile_for, STAGING_PREFIX }
+export { build_hooks, HOOK_BUNDLES, INLINED_PACKAGES, OUT_DIR, outfile_for, STAGING_PREFIX }
