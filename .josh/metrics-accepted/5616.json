@@ -1,7 +1,7 @@
 {
-	"reason": "consultation-handoff guard row #5616",
+	"reason": "consultation-handoff rule and its tests; agent_role_profile refusing a consultation model for a launched scheduler/worker, with the consultation models moved to their own module and tested (#5616)",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 47
+		"scripts.code_lines": 56
 	}
 }

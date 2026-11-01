@@ -60,7 +60,7 @@ A missing `.env` file is not itself an error: both commands also read the two va
 
 ### Unattended agents
 
-Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider.
+Each role's model and effort for a `backlogrun`. The invoking CLI picks the provider. Model overrides apply to Claude Code only — Codex always runs `gpt-6.1-sol`; effort accepts `low`, `medium`, `high`, `xhigh` or `max` for either provider. A scheduler or worker model set to a consultation model (Fable) is rejected before launch.
 
 Set `JOSH_AGENT_PROVIDER=openai` in the project's `.env` to start `pnpm josh backlogrun` with Codex and its existing role profiles. `anthropic`, an unset value, or a blank value selects Claude Code.
 
