@@ -220,13 +220,26 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
 		category: 'AI tools',
-		reference: ['[--handoff]', 'automation', ['files', 'network']],
+		// `--end` stops the `run:wake` supervisor process.
+		reference: [
+			'[--handoff | --end [--stopped "<reason>"]]',
+			'automation',
+			['files', 'network', 'processes'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'print the report; the same text josh notify sends' },
 				{
 					arguments: '--handoff',
 					note: 'print the backlogrun hand-off report and send it as the confirmation',
+				},
+				{
+					arguments: '--end',
+					note: 'end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage',
+				},
+				{
+					arguments: '--end --stopped "<reason>"',
+					note: 'end a run that stopped: run:carry --end --stopped sends the confirmation',
 				},
 			],
 		},

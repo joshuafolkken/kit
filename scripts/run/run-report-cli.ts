@@ -11,6 +11,7 @@ import { run_event_scope, type EventScope } from '#scripts/run/event/run-event-s
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { run_report } from './run-report'
+import { run_report_end } from './run-report-end'
 import { run_report_handoff, type Handoff } from './run-report-handoff'
 
 // `josh run:report` — the session-facing report, generated from the run's event stream rather than
@@ -28,12 +29,14 @@ import { run_report_handoff, type Handoff } from './run-report-handoff'
 // the run record and the scoped stream — and sends it itself as the `confirmation`, the resume command
 // as its `recommended` choice (joshuafolkken/kit#4161). The body is built with plain `#N` and linked
 // here, at the print boundary, through `session_cite.text`.
+//
+// `--end` prints the same report, then ends the record and stops the supervisor (`run-report-end.ts`).
 
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const HANDOFF_FLAG = '--handoff'
-const USAGE = `Usage: josh run:report [${HANDOFF_FLAG}]`
+const USAGE = `Usage: josh run:report [${HANDOFF_FLAG} | --end [--stopped "<reason>"]]`
 const NO_RECORD_NOTE =
 	'No readable run record, so there is no run to hand off. Begin one with `pnpm josh run:carry --begin` first.'
 const HANDOFF_TITLE = 'backlogrun hand-off'
@@ -133,9 +136,17 @@ async function run_handoff(): Promise<number> {
 	return SUCCESS_EXIT_CODE
 }
 
+function is_handoff(argv: ReadonlyArray<string>): boolean {
+	return argv.length === 1 && argv[0] === HANDOFF_FLAG
+}
+
 async function run(argv: ReadonlyArray<string> = []): Promise<number> {
 	if (argv.length === 0) return await run_summary()
-	if (argv.length === 1 && argv[0] === HANDOFF_FLAG) return await run_handoff()
+	if (is_handoff(argv)) return await run_handoff()
+
+	const end_request = run_report_end.read_request(argv)
+
+	if (end_request !== undefined) return await run_report_end.end(run_summary, end_request)
 
 	console.error(USAGE)
 
