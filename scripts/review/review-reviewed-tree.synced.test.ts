@@ -39,6 +39,7 @@ const STAMP: FileMapStamp = {
 	blobs: BLOBS,
 }
 const SYNCED_CAUSE = 'the default branch changed a file the round covers'
+const UNEXECUTED_NOTE = 'passed over documentation, a prompt or an inert path no round executes'
 
 const { HELD, UNSETTLED } = review_reviewed_tree.MOVEMENT
 
@@ -62,15 +63,37 @@ describe('review_reviewed_tree.standing_here on a base the sync moved under a co
 		})
 	})
 
-	it.each([
-		['the lane edited it since the record', [DOC]],
-		['git could not carry the recorded blob', undefined],
-	])('answers synced on the covered document when %s', async (_case, delta) => {
-		carried_delta_mock.mockReturnValue(delta)
+	it('answers synced on the covered document when the lane edited it since the record', async () => {
+		carried_delta_mock.mockReturnValue([DOC])
 
 		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
 			movement: UNSETTLED,
 			cause: `${SYNCED_CAUSE}: ${DOC}`,
+		})
+	})
+})
+
+// joshuafolkken/kit#5791: the #5757 ship — a document the branch added has no blob on one side, so git
+// cannot carry it, yet round 2 would not execute it either; round 1 stands, its note naming the path.
+describe('review_reviewed_tree.standing_here on a covered document git could not carry', () => {
+	beforeEach(arrange_synced_document)
+
+	it('answers held with the document passed over in the note', async () => {
+		carried_delta_mock.mockReturnValue(undefined)
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
+			movement: HELD,
+			note: `${UNEXECUTED_NOTE}: ${DOC}`,
+		})
+	})
+
+	it('answers synced on a covered runtime file beside it', async () => {
+		carried_delta_mock.mockReturnValue(undefined)
+		git_read_mock.mockResolvedValue(`${DOC}\0${FILE}\0`)
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
+			movement: UNSETTLED,
+			cause: `${SYNCED_CAUSE}: ${FILE}`,
 		})
 	})
 })

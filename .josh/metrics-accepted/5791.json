@@ -1,0 +1,7 @@
+{
+	"reason": "#5791: carry returns a two-list result so a synced document git could not carry is passed over and noted, not SYNCED",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 8
+	}
+}
