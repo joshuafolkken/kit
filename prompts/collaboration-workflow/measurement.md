@@ -35,4 +35,5 @@ PR の効果を測る後続 Issue を起票するとき:
 記録で答えられない問い（記録の無い変更前後の比較など）に限る。
 
 - 1 回だけ実行する。lane 子は `pnpm josh reserved-run <weight> -- <command>` で包み、コア予算に数えさせる。ESLint は `--concurrency off` で走らせ、並列度の計測はレーン外で行う（`lane-direct-tool`）。
+- 1 ルールをリポジトリ全体に当てる → `pnpm josh lint:rule <rule>`（コアを自ら予約するので `reserved-run` で包まない）、違反は出力ファイルを読み直す（`docs/josh-commands.md` → "`josh lint:rule`"）。
 - 結果を Issue のコメントに残し、以後はそれを使い回す。

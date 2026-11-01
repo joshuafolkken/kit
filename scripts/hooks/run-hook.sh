@@ -18,6 +18,12 @@
 #   starts node once (joshuafolkken/kit#3327). In an installed package it is a presence check: the
 #   published bundles cannot be stale against a source the consumer never edits, and Node strips no
 #   types under `node_modules`.
+# - In kit's checkout node keeps a compile cache under `node_modules/.cache` (`NODE_COMPILE_CACHE`):
+#   the type stripping of the gate's TypeScript is most of its load, and the cache keeps the stripped
+#   output and the bundle's compiled code across launches. Node checks each entry against the source,
+#   so an edited file is compiled afresh; the bundles' freshness stays the gate's (joshuafolkken/kit#5663).
+#   The node processes a hook starts inherit the variable and share the cache, which is safe for the
+#   same reason.
 # - Nothing is spawned that the shell can do itself: the directory is a parameter expansion rather than
 #   `dirname`, and `node` replaces this shell through `exec` rather than running beside it.
 # - An `if`/`else`, never `&&`/`||`: a guard's refusal is a non-zero exit, and a chain would read it as
@@ -59,6 +65,6 @@ case $0 in
 	if [ -d "$package_dir/dist/hooks" ]; then exec node "$bundle" "$@"; else exec node "$package_dir/dist/josh.js" "$josh_command" "$@"; fi
 	;;
 *)
-	exec node --disable-warning=ExperimentalWarning "$package_dir/tools/hooks/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
+	NODE_COMPILE_CACHE="$package_dir/node_modules/.cache/kit-hook-compile" exec node --disable-warning=ExperimentalWarning "$package_dir/tools/hooks/hook-bundle-ready.ts" "$hook_name" "$josh_command" "$@"
 	;;
 esac
