@@ -72,6 +72,12 @@ describe('run_step_section — the one table of governing sections', () => {
 		expect(run_step_section.print_section(run_step_section.ENTRY)).toBe(SUCCESS)
 		expect(String(vi.mocked(console.info).mock.calls[0]?.[0])).toMatch(/^## The question/u)
 	})
+
+	// joshuafolkken/kit#5645: `run:progress --wait` prints the watcher's rules from this row.
+	it('prints the progress watcher section for run:progress', () => {
+		expect(run_step_section.print_section(run_step_section.PROGRESS)).toBe(SUCCESS)
+		expect(printed()).toMatch(/^## Progress while the run is quiet/u)
+	})
 })
 
 describe('run_step_section — a lane child reads its own step of the chain', () => {

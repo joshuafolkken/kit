@@ -1,6 +1,7 @@
 # The progress watcher — every implementing run
 
-**Read this file in full when the run's hold is claimed, before the watcher starts.** It is a
+**"Progress while the run is quiet" is never fetched: `pnpm josh run:progress --wait` prints it as it
+starts, once per session.** It is a
 point-of-use document, never an entry read, and the single source of the heartbeat for `fullrun`,
 `halfrun`, `prrun` and the `backlogrun` parent alike. `kickoff` starts none.
 

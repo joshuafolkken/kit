@@ -11,6 +11,7 @@ import { live_evidence } from '#scripts/review/live-evidence'
 import { removed_tests_check } from '#scripts/review/removed-tests-check'
 import { parse_issue_number_from_text } from './followup-issue-number'
 import { followup_review_gates } from './followup-review-gates'
+import { followup_section } from './followup-section'
 import { git_followup_finish } from './git-followup-finish'
 import { git_followup_flush } from './git-followup-flush'
 import { git_followup_merged, type MergePlan } from './git-followup-merged'
@@ -194,15 +195,24 @@ async function prepare_merge(
 	await git_followup_flush.commit_ledger_step(plan.should_merge, issue_number)
 }
 
+// `--help` answers alone; every other invocation opens on the section that governs it. `true` when the
+// help was the whole answer.
+function answer_help_or_open(values: CliArguments['values']): boolean {
+	if (values.help !== true) {
+		followup_section.print_section()
+
+		return false
+	}
+
+	display_help()
+
+	return true
+}
+
 async function main(): Promise<void> {
 	const cli = parse_cli_arguments()
 
-	if (cli.values.help === true) {
-		display_help()
-
-		return
-	}
-
+	if (answer_help_or_open(cli.values)) return
 	const issue_number =
 		cli.values['issue-number'] ?? parse_issue_number_from_text(cli.positionals[0] ?? undefined)
 	const branch_name = await resolve_branch_name(cli.values.branch)
@@ -235,6 +245,7 @@ try {
 }
 
 const git_followup_workflow = {
+	answer_help_or_open,
 	assert_acceptance_mapped,
 	assert_live_evidence,
 	assert_removed_tests_disposed,

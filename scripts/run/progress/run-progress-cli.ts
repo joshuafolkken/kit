@@ -7,6 +7,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { poll } from '#scripts/lib/poll'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_progress, type ProgressState } from './run-progress'
 import { run_progress_args, type ParsedValues } from './run-progress-args'
 import { run_progress_clock } from './run-progress-clock'
@@ -24,7 +25,8 @@ import { run_progress_read, type ObservationRead } from './run-progress-read'
 // **Standard output carries the progress line and nothing else**, the way `run:liveness` keeps its
 // verdict there: a relaying parent should never have to tell a report apart from an explanation.
 // Notices go to standard error. The one other stdout line is a `--wait` exit's pick-up reading for a
-// `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on.
+// `backlogrun` parent — `ready #N · free lanes N` — which is itself something the parent acts on —
+// and the governing section a `--wait` prints as it starts, read with that exit.
 //
 // **It cannot send a Telegram.** That is structural rather than a promise — nothing here imports
 // `scripts/notify/telegram-notify`, which is the only egress there is. A heartbeat every twenty minutes on
@@ -457,12 +459,23 @@ function to_options(values: ParsedValues): WatchOptions | undefined {
 	}
 }
 
+// **`--wait` opens on the section that governs it, once per session** (joshuafolkken/kit#5645): it is
+// the form a run starts, so the reader spends no `doc:section` turn on `progress-watcher.md`. An
+// unresolved heading starts no watcher, so the watcher never runs on a rule nobody read.
+async function start_wait(options: WatchOptions): Promise<number> {
+	const printed = run_step_section.print_once(run_step_section.PROGRESS)
+
+	if (printed !== SUCCESS_EXIT_CODE) return printed
+
+	return await wait_once(options)
+}
+
 async function run_watch(values: ParsedValues): Promise<number> {
 	const options = to_options(values)
 
 	if (options === undefined) return report_repo_unresolved()
 	if (values.once === true) return await once(options)
-	if (values.wait === true) return await wait_once(options)
+	if (values.wait === true) return await start_wait(options)
 
 	return await watch(options)
 }
