@@ -200,8 +200,8 @@ const READ_JOSH_SUBCOMMANDS: ReadonlySet<string> = new Set([
 ])
 
 // The launchers that put a `josh` subcommand on the line, and the word that names it. `pnpm josh`,
-// `npx josh` and the bare `josh` name it as the word `josh`; `tsx scripts/josh/josh.ts` names it as a
-// path ending in `josh.ts`. The subcommand is the token after whichever the scan finds first.
+// `npx josh` and the bare `josh` name it as the word `josh`; `node --import tsx scripts/josh/josh.ts`
+// (or `tsx scripts/josh/josh.ts`) names it as a path ending in `josh.ts`. The subcommand is the token after whichever the scan finds first.
 const JOSH_WORD = 'josh'
 const JOSH_SCRIPT_SUFFIX = 'josh.ts'
 
