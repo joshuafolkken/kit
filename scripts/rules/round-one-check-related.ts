@@ -16,13 +16,12 @@ import { tail_commands } from './tail-commands'
 // `check:related` after each, a sizeable share of its run, because the sentence was prose with no delivery.
 //
 // **The material is the run's own calls, read in order off the transcript tail.** The brief is a
-// `run:review` in its writing mode, the fix an `Edit` / `Write` after it, and the round closes at
-// `run:review --join` or `ship --detach`. Neither the brief file nor the join leaves a record on disk
+// `run:review` in its writing mode (or `run:chain`), the fix an `Edit` / `Write` after it, and the round
+// closes at `run:review --join`, `run:chain --join` or `ship --detach`. Neither the brief file nor the join leaves a record on disk
 // that tells "briefed, not yet joined" apart, so the tail is the one source that can answer.
 
 // Named canonically — `shell_segments.is_josh_command` expands an alias (`josh cr`) before the match.
 const CHECK_COMMANDS: ReadonlySet<string> = new Set(['check:related'])
-// `run:chain` opens the brief at its `run:review` stage, and `run:chain --join` closes the round (#5752).
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['run:review', 'run:chain'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
 const JOIN_FLAG = /(?:^|\s)--join(?:[=\s]|$)/u
