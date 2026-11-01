@@ -13,6 +13,7 @@ import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-st
 import { run_board_checks } from './run-board-checks'
 import type { ClosedIssue } from './run-board-closed'
 import { run_board_ending_reason } from './run-board-ending-reason'
+import { run_board_ending_states } from './run-board-ending-states'
 import { run_board_lane_event, type LaneEvent } from './run-board-lane-event'
 import type { BoardLanes } from './run-board-lane-state'
 import { run_board_lane_time } from './run-board-lane-time'
@@ -90,16 +91,6 @@ interface RunActivity extends Partial<SetupRead> {
 }
 
 const KIND = run_event_stream.EVENT_KIND
-const ENDING_STATES: Readonly<Partial<Record<string, ItemState>>> = {
-	[KIND.MERGE]: 'merged',
-	// A drive-closed measurement completes its issue as a merge does (`issue-merged.ts` → `is_measured`).
-	[KIND.MEASURED]: 'merged',
-	[KIND.PARK]: 'parked',
-	[KIND.HUMAN_REVIEW]: 'human',
-	[KIND.SPLIT]: 'done',
-	[KIND.STOP]: 'done',
-	[KIND.WITHDRAW]: 'withdrawn',
-}
 // A cut or a resume says the child is still running, on whatever phase it had reached.
 const CONTINUING_KINDS: ReadonlySet<string> = new Set([KIND.CUT, KIND.RESUME])
 // A person's restart, and a re-dispatch after an outage, start the child over in a fresh session, so
@@ -218,7 +209,7 @@ function next_status(previous: ItemStatus | undefined, event: RunEvent): ItemSta
 	if (run_event_retry.is_retry(event)) return settled_as(previous, 'waiting')
 	if (LAUNCH_KINDS.has(event.kind)) return launched(previous, event)
 
-	const ending = ENDING_STATES[event.kind]
+	const ending = run_board_ending_states.STATES[event.kind]
 
 	if (ending !== undefined) return ended(previous, ending, event)
 

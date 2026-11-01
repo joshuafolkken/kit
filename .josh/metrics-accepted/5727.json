@@ -1,0 +1,7 @@
+{
+	"reason": "#5727: the epic usage gains its --notify flag entry and one test",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 5
+	}
+}

@@ -37,14 +37,25 @@ async function read_labeled_at(issue: number, repo: string): Promise<LabeledAt> 
 	}
 }
 
+function minutes_since(at: string, now: Date): number {
+	return Math.floor((now.getTime() - Date.parse(at)) / MS_PER_MINUTE)
+}
+
+// Whether the label is past the window. An unread timeline is never stale: nothing is known about it.
+function is_stale(labeled_at: LabeledAt, now: Date): boolean {
+	if (labeled_at.kind === 'unread') return false
+	if (labeled_at.kind === 'absent') return true
+
+	return minutes_since(labeled_at.at, now) > STALE_MINUTES
+}
+
 function age_text(labeled_at: LabeledAt, now: Date): string {
 	if (labeled_at.kind === 'unread') return 'label age unread'
 	if (labeled_at.kind === 'absent') return `${IN_PROGRESS_LABEL} older than the timeline — stale`
 
-	const minutes = Math.floor((now.getTime() - Date.parse(labeled_at.at)) / MS_PER_MINUTE)
-	const stale = minutes > STALE_MINUTES ? ' — stale' : ''
+	const stale = is_stale(labeled_at, now) ? ' — stale' : ''
 
-	return `${IN_PROGRESS_LABEL} for ${String(minutes)} min${stale}`
+	return `${IN_PROGRESS_LABEL} for ${String(minutes_since(labeled_at.at, now))} min${stale}`
 }
 
 async function read_ages(
@@ -66,6 +77,7 @@ async function read_ages(
 const epic_label_age = {
 	STALE_MINUTES,
 	read_labeled_at,
+	is_stale,
 	age_text,
 	read_ages,
 }

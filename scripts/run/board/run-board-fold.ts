@@ -16,6 +16,7 @@ import { run_board_render_section } from './run-board-render-section'
 
 const { folded_head, open_head, row_count, widened } = run_board_render_section
 const SECTION_KEYS: ReadonlyMap<string, SectionKey> = new Map([
+	['t', 'throughput'],
 	['u', 'usage'],
 	['l', 'lanes'],
 	['p', 'processes'],
@@ -90,7 +91,7 @@ function fold_notes(notes: NotesPart, folded: ReadonlySet<SectionKey>): NotesPar
 }
 
 // A folded detail part says its summary: the processes each group's totals, the usage gauges each
-// provider's percents.
+// provider's percents, the throughput each row's closes per hour.
 function fold_detail(
 	part: DetailPart | undefined,
 	folded: ReadonlySet<SectionKey>,
@@ -105,6 +106,7 @@ function fold_detail(
 function fold_parts(parts: FrameParts, folded: ReadonlySet<SectionKey>): FrameParts {
 	return {
 		...parts,
+		throughput: fold_detail(parts.throughput, folded, 'throughput'),
 		usage: fold_detail(parts.usage, folded, 'usage'),
 		plan: parts.plan.map((section) => fold_section(section, folded)),
 		below: parts.below?.map((section) => fold_section(section, folded)),
@@ -117,6 +119,10 @@ function widened_part<Part extends Headed>(part: Part, width: number): Part {
 	return { ...part, head: widened(part.head, width) }
 }
 
+function widened_detail(part: DetailPart | undefined, width: number): DetailPart | undefined {
+	return part === undefined ? undefined : widened_part(part, width)
+}
+
 // Every rule run on to the lane rows' title column, folded or open (joshuafolkken/kit#5520).
 function widened_parts(parts: FrameParts): FrameParts {
 	const { rule_width: width } = parts
@@ -125,10 +131,11 @@ function widened_parts(parts: FrameParts): FrameParts {
 
 	return {
 		...parts,
-		usage: parts.usage === undefined ? undefined : widened_part(parts.usage, width),
+		throughput: widened_detail(parts.throughput, width),
+		usage: widened_detail(parts.usage, width),
 		plan: parts.plan.map((section) => widened_part(section, width)),
 		below: parts.below?.map((section) => widened_part(section, width)),
-		processes: parts.processes === undefined ? undefined : widened_part(parts.processes, width),
+		processes: widened_detail(parts.processes, width),
 		notes: widened_part(parts.notes, width),
 	}
 }
