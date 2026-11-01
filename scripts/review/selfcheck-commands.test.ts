@@ -143,3 +143,14 @@ describe('selfcheck_commands.run', () => {
 		expect(failed).toBe(1)
 	})
 })
+
+describe('help requests in prose', () => {
+	it('runs a help request, which no registry entry names', async () => {
+		const { runner: fake, calls } = runner()
+		const { lines, failed } = await selfcheck_commands.run(['help ship'], fake)
+
+		expect(calls.length).toBeGreaterThan(0)
+		expect(lines).toEqual([])
+		expect(failed).toBe(0)
+	})
+})

@@ -103,6 +103,44 @@ describe('import_move.rewrite — leaves what is not the named import', () => {
 	})
 })
 
+describe('import_move.rewrite — joins an existing import of the new module', () => {
+	it('adds the name to the declaration that already imports from the new module', () => {
+		expect(moved("import { a, b } from './x'\nimport { c } from './y'\n")).toBe(
+			"import { a } from './x'\nimport { c, b } from './y'\n",
+		)
+	})
+
+	it('removes the old declaration once the name leaves it empty', () => {
+		expect(moved("import { b } from './x'\nimport { c } from './y'\n\nb()\n")).toBe(
+			"import { c, b } from './y'\n\nb()\n",
+		)
+	})
+
+	it('keeps the default import of the old declaration', () => {
+		expect(moved("import a, { b } from './x'\nimport { c } from './y'\n")).toBe(
+			"import a from './x'\nimport { c, b } from './y'\n",
+		)
+	})
+
+	it('joins a type-only name to a value declaration with an inline type', () => {
+		expect(moved("import type { a, b } from './x'\nimport { c } from './y'\n")).toBe(
+			"import type { a } from './x'\nimport { c, type b } from './y'\n",
+		)
+	})
+
+	it('joins a type-only name to an import type declaration', () => {
+		expect(moved("import { a, type b } from './x'\nimport type { c } from './y'\n")).toBe(
+			"import { a } from './x'\nimport type { c, b } from './y'\n",
+		)
+	})
+
+	it('never joins a value name to an import type declaration', () => {
+		expect(moved("import { a, b } from './x'\nimport type { c } from './y'\n")).toBe(
+			"import { a } from './x'\nimport { b } from './y'\nimport type { c } from './y'\n",
+		)
+	})
+})
+
 describe('import_move.rewrite — cuts only the name and its comma', () => {
 	it('keeps a comment inside the braces', () => {
 		expect(moved("import {\n\ta, // keep\n\tb,\n} from './x'\n")).toBe(

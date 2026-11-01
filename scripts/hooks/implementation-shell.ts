@@ -1,4 +1,6 @@
-import { git_argv } from '#scripts/rules/git-argv'
+import { canonical_command } from '#scripts/josh/josh-aliases'
+import { josh_read_only } from '#scripts/josh/josh-read-only'
+import { git_argv, type ProgramCall } from '#scripts/rules/git-argv'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { time_shell } from '#scripts/time-runtime/time-shell'
 import { step_zero_notice } from './step-zero-notice'
@@ -8,6 +10,7 @@ import { step_zero_notice } from './step-zero-notice'
 const FILE_PROGRAMS: ReadonlySet<string> = new Set(['tee', 'touch', 'rm', 'truncate'])
 const READ_PROGRAMS: ReadonlySet<string> = new Set([
 	'cat',
+	'grep',
 	'head',
 	'tail',
 	'ls',
@@ -51,6 +54,9 @@ const SUBSTITUTION = /\$\(|`|[<>]\(/u
 const ENV_ASSIGNMENT = /(?:^|\s)[A-Za-z_]\w*=/u
 const ARGUMENT_QUOTES = /['"\\]/gu
 const ARGUMENT_EXPANSION = /[*?{}[\]]/u
+
+// The rule an unverified shell matched, or `undefined` for a visible read or record write.
+type Refusal = string | undefined
 
 function unsafe_path(target: string, root: string): boolean {
 	const file_path = target.replaceAll(QUOTES, '')
@@ -99,7 +105,7 @@ function is_gh_operation(args: Array<string>): boolean {
 function is_operation(name: string, args: Array<string>): boolean {
 	if (name === 'gh') return is_gh_operation(args)
 
-	return name === 'josh' && OPERATIONS.test(args[0] ?? '')
+	return name === 'josh' && OPERATIONS.test(canonical_command(args[0] ?? ''))
 }
 
 function is_read_or_operation(segment: string, name: string, args: Array<string>): boolean {
@@ -110,45 +116,77 @@ function is_read_or_operation(segment: string, name: string, args: Array<string>
 	return is_operation(name, args)
 }
 
-function command_is_unsafe(segment: string, root: string): boolean {
-	const call = git_argv.program_of(segment)
-	if (call === undefined) return false
-	if (FILE_PROGRAMS.has(call.name)) return write_args_are_unsafe(call.args, root)
+// A `josh` command outside the operations passes as a help request or on a declared read-only flag.
+function program_refusal(segment: string, name: string, args: Array<string>): Refusal {
+	if (is_read_or_operation(segment, name, args)) return undefined
+	if (name === 'josh') return josh_read_only.refusal(args)
+
+	return `\`${name}\` is neither a read-only program nor a consultation operation`
+}
+
+// A glob or brace expands into a read-only program's operands only, where no word it yields writes.
+function expansion_refusal(segment: string, name: string): Refusal {
+	if (READ_PROGRAMS.has(name)) return undefined
+
+	return ARGUMENT_EXPANSION.test(time_shell.blanked(segment) ?? segment)
+		? `glob or brace expansion in \`${name}\`, which is not a read-only program`
+		: undefined
+}
+
+function file_write_refusal(call: ProgramCall, root: string): Refusal {
+	return write_args_are_unsafe(call.args, root) ? `\`${call.name}\` to a runtime path` : undefined
+}
+
+function call_refusal(segment: string, call: ProgramCall, root: string): Refusal {
+	if (FILE_PROGRAMS.has(call.name)) return file_write_refusal(call, root)
 
 	const args = call.args.map((argument) => argument.replaceAll(ARGUMENT_QUOTES, ''))
 
-	return !is_read_or_operation(segment, call.name, args)
+	return program_refusal(segment, call.name, args)
 }
 
-function segment_is_unsafe(segment: string, root: string): boolean {
-	return (
-		redirected_paths(segment).some((target) => unsafe_path(target, root)) ||
-		command_is_unsafe(segment, root)
-	)
+function command_refusal(segment: string, root: string): Refusal {
+	const call = git_argv.program_of(segment)
+	if (call === undefined) return undefined
+
+	return expansion_refusal(segment, call.name) ?? call_refusal(segment, call, root)
+}
+
+function segment_refusal(segment: string, root: string): Refusal {
+	const target = redirected_paths(segment).find((path) => unsafe_path(path, root))
+
+	return target === undefined ? command_refusal(segment, root) : `redirect to \`${target}\``
 }
 
 // A single-quoted span expands nothing, so a finding quoting `code` in it is text, not a substitution.
-function input_is_unverified(command: string): boolean {
+function input_refusal(command: string): Refusal {
 	const expanded = time_shell.literal_blanked(command)
+	const rules: ReadonlyArray<readonly [string, boolean]> = [
+		['an empty command', command.trim() === ''],
+		['a heredoc', time_shell.has_heredoc(command)],
+		['a command or process substitution', SUBSTITUTION.test(expanded)],
+		['an environment assignment', ENV_ASSIGNMENT.test(expanded)],
+		['a variable expansion', expanded.includes('$')],
+	]
 
-	return (
-		command.trim() === '' ||
-		time_shell.has_heredoc(command) ||
-		SUBSTITUTION.test(expanded) ||
-		ENV_ASSIGNMENT.test(expanded) ||
-		expanded.includes('$')
-	)
+	return rules.find(([, is_matched]) => is_matched)?.[0]
 }
 
-function is_unsafe(command: string, root: string = process.cwd()): boolean {
-	const plain = time_shell.blanked(command) ?? command
-	if (input_is_unverified(command) || ARGUMENT_EXPANSION.test(plain)) return true
+// The rule the first unverified part of the command matched, named so a refusal can be diagnosed.
+function refusal(command: string, root: string = process.cwd()): Refusal {
+	const input = input_refusal(command)
+	if (input !== undefined) return input
 
 	return shell_segments
 		.quote_aware_commands_of(command)
-		.some((segment) => segment_is_unsafe(segment, root))
+		.map((segment) => segment_refusal(segment, root))
+		.find((rule) => rule !== undefined)
 }
 
-const implementation_shell = { is_unsafe }
+function is_unsafe(command: string, root: string = process.cwd()): boolean {
+	return refusal(command, root) !== undefined
+}
+
+const implementation_shell = { is_unsafe, refusal }
 
 export { implementation_shell }
