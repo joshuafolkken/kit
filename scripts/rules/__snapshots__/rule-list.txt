@@ -38,7 +38,7 @@
   - not automated: the right act is another command, whose arguments the call does not carry
 - **One check:related before the brief** (`repeat-check-related`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
   - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an earlier one that ran, with no `run:review` (or `run:chain`) brief, join or `ship --detach` since. Every occurrence
-  - silent: the first since the last join or detach, a brief since, or not a lane child
+  - silent: the first since the last join or detach, a brief since, a `--touched` run, or not a lane child
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Piped verification** (`piped-verification`, `output-bounds.md`)
   - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early and carries no `<` / `>` / `&`), refused otherwise

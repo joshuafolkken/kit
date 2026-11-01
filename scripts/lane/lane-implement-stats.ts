@@ -37,7 +37,6 @@ const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
-const LINT_COMMANDS: ReadonlySet<string> = new Set([LINT_RELATED])
 const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
@@ -191,12 +190,13 @@ function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string
 	)
 }
 
-// One lane's first timed `lint:related` less its paused overlap, or `undefined` when it ran none; a
-// backgrounded call, or one whose session ended before its result, has no duration to count.
+// One lane's first timed solo `lint:related` less its paused overlap, or `undefined` when it ran none; a
+// backgrounded call, or one whose session ended before its result, has no duration to count, and a
+// chained call's duration holds its other commands too (joshuafolkken/kit#5785).
 function first_lint_ms(lane: ImplementLane): number | undefined {
-	const first = lane.calls.find(
-		(call) => call.duration_ms !== undefined && runs_any(call, LINT_COMMANDS),
-	)
+	const first = lane_transcript_stats
+		.solo_calls(lane.calls, LINT_RELATED)
+		.find((call) => call.duration_ms !== undefined)
 
 	return first === undefined ? undefined : active_ms(first, NO_REACH, lane.paused)
 }

@@ -113,14 +113,14 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 
 // joshuafolkken/kit#5656: before round 1 has recorded anything, the base's blobs stand in for the
 // snapshot.
-describe('review_code_tree.comment_only_since — the paths whose code the base already had', () => {
+describe('review_code_tree.inert_since — the paths whose code the base already had', () => {
 	it('names a file whose change is only a comment, and not one whose code changed', async () => {
 		base_holds({ [SOURCE]: CODE, [OTHER_SOURCE]: CODE })
 		write(SOURCE, `// Explained.\n${CODE}`)
 		write(OTHER_SOURCE, CHANGED_CODE)
 
 		expect(
-			await review_code_tree.comment_only_since(BASE, [SOURCE, OTHER_SOURCE], ROOT, ts),
+			await review_code_tree.inert_since(BASE, [SOURCE, OTHER_SOURCE], ROOT, ts),
 		).toStrictEqual([SOURCE])
 	})
 
@@ -129,16 +129,57 @@ describe('review_code_tree.comment_only_since — the paths whose code the base 
 		write(SOURCE, CODE)
 		write(DOCUMENT, '# Guide\n')
 
-		expect(
-			await review_code_tree.comment_only_since(BASE, [SOURCE, DOCUMENT], ROOT, ts),
-		).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE, DOCUMENT], ROOT, ts)).toStrictEqual([])
 	})
 
 	it('names nothing where TypeScript cannot be resolved from the project', async () => {
 		base_holds({ [SOURCE]: CODE })
 		write(SOURCE, CODE)
 
-		expect(await review_code_tree.comment_only_since(BASE, [SOURCE], ROOT)).toStrictEqual([])
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT)).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5789: an import whose bindings stay and whose module path alone moved.
+describe('review_code_tree.inert_since — a change to import specifiers only', () => {
+	const OLD_IMPORT = "import { profile } from '#scripts/agent/agent-role-profile'\n"
+	const NEW_IMPORT = "import { profile } from '#scripts/agent/agent-profile-schema'\n"
+
+	it('names a file whose only change is the module specifier of a binding import', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `${NEW_IMPORT}${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([SOURCE])
+	})
+
+	it('does not name a file whose body changed beside the import', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `${NEW_IMPORT}${CHANGED_CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('does not name a file whose import changed a binding name', async () => {
+		base_holds({ [SOURCE]: `${OLD_IMPORT}${CODE}` })
+		write(SOURCE, `import { schema } from '#scripts/agent/agent-profile-schema'\n${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('does not name a file whose side-effect import moved, since that path alone decides what runs', async () => {
+		base_holds({ [SOURCE]: `import './setup-old'\n${CODE}` })
+		write(SOURCE, `import './setup-new'\n${CODE}`)
+
+		expect(await review_code_tree.inert_since(BASE, [SOURCE], ROOT, ts)).toStrictEqual([])
+	})
+
+	it('keeps the round-1 digest sensitive to a moved import', () => {
+		write(SOURCE, `${OLD_IMPORT}${CODE}`)
+		const before = review_code_tree.tree_of(ROOT, [SOURCE], ts)
+
+		write(SOURCE, `${NEW_IMPORT}${CODE}`)
+
+		expect(review_code_tree.tree_of(ROOT, [SOURCE], ts)).not.toStrictEqual(before)
 	})
 })
 

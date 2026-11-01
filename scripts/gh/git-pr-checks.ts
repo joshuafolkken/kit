@@ -9,8 +9,10 @@ import {
 	is_merge_conflict,
 	is_review_decision_decisive,
 	PrConflictError,
+	REQUIRED_CHECKS,
 	type PrEvaluation,
 } from './git-pr-checks-eval'
+import { blocked_cause } from './git-pr-checks-missing'
 import { parse_pr_state_snapshot, read_string, type PrStateSnapshot } from './git-pr-checks-parse'
 
 const SECONDS_TO_MS = 1000
@@ -185,6 +187,9 @@ interface PollAttemptResult {
 	// What this poll could not be read with, carried so that a wait ending on an unreadable poll can
 	// report *that* rather than the timeout. Absent on every poll that was read.
 	read_failure?: unknown
+	// The last read of a poll that was not done, so a wait ending on the timeout can name what it was
+	// still blocked on (joshuafolkken/kit#5780).
+	last_snapshot?: PrStateSnapshot
 }
 
 // The two things one poll can come back with, kept apart so that only the *read* is retried. The
@@ -229,8 +234,17 @@ function retry_after_unreadable(input: PollAttempt, cause: unknown): PollAttempt
 // ends on that failure rather than on the timeout: reporting expired auth or a rate limit as "the
 // checks are still running" is exactly the misread this file refuses everywhere else, and
 // `is_pr_checks_timeout` would otherwise let `git-pr-checks-watch.ts` answer `timed_out` for it.
-function to_exhaustion_error(last_read_failure: unknown): unknown {
-	return last_read_failure ?? new Error(PR_CHECKS_TIMEOUT_MESSAGE)
+// The timeout keeps its exact message for that match and names the block in its `cause`.
+function timeout_error(last_snapshot: PrStateSnapshot | undefined): Error {
+	const cause = last_snapshot && blocked_cause(last_snapshot, REQUIRED_CHECKS)
+
+	return cause === undefined
+		? new Error(PR_CHECKS_TIMEOUT_MESSAGE)
+		: new Error(PR_CHECKS_TIMEOUT_MESSAGE, { cause })
+}
+
+function to_exhaustion_error(carried: PollAttemptResult): unknown {
+	return carried.read_failure ?? timeout_error(carried.last_snapshot)
 }
 
 async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptResult> {
@@ -249,7 +263,11 @@ async function attempt_pr_success_poll(input: PollAttempt): Promise<PollAttemptR
 		return { snapshot: read.snapshot, next_stable_count: 0, next_failure_count: 0 }
 	}
 
-	return { next_stable_count: classification.next_stable_count, next_failure_count: 0 }
+	return {
+		next_stable_count: classification.next_stable_count,
+		next_failure_count: 0,
+		last_snapshot: read.snapshot,
+	}
 }
 
 async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<PrStateSnapshot> {
@@ -278,7 +296,7 @@ async function wait_for_pr_success(options: WaitForPrSuccessOptions): Promise<Pr
 	)
 	if (snapshot !== undefined) return snapshot
 
-	throw to_exhaustion_error(progress.carried.read_failure)
+	throw to_exhaustion_error(progress.carried)
 }
 
 // The snapshot module rather than `git-gh-command`, which is deliberate: `git-gh-command` also
