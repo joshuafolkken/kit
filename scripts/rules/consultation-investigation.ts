@@ -21,7 +21,7 @@ const { ANTHROPIC_PROVIDER, OPENAI_PROVIDER } = agent_provider
 const { READ_LINE_CAP, is_broad_investigation, is_delegated_investigation } = broad_investigation
 const DELEGATION = '.claude/skills/workflow-commands/delegation.md'
 const TOPIC = `\`${DELEGATION}\` → "A consultation main line hands its investigation to a unit"`
-const NARROW_EXAMPLE = `\`Read\` with \`offset\` / \`limit\` <= ${String(READ_LINE_CAP)}, \`grep -n <pattern> <one file>\``
+const NARROW_EXAMPLE = `\`Read\` of a file or an \`offset\` / \`limit\` range <= ${String(READ_LINE_CAP)} lines, \`grep -n <pattern> <one file>\``
 
 const QUIET = `a main line on any other model, or a narrow check (${NARROW_EXAMPLE})`
 
@@ -75,7 +75,7 @@ const ROW = row('consultation-investigation', ANTHROPIC_PROVIDER, 'an `investiga
 	title: 'Consultation main line delegates investigation (Claude)',
 	topic: TOPIC,
 	fires:
-		'a broad investigation call — `Glob`, `WebFetch`, an unbounded `Read`, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on Fable. Every occurrence',
+		'a broad investigation call — `Glob`, `WebFetch`, a `Read` past the line cap, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on Fable. Every occurrence',
 	quiet: QUIET,
 })
 

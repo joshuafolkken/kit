@@ -13,7 +13,7 @@ import { broad_investigation_shell } from './broad-investigation-shell'
 // line hands to a subagent instead of paying its own rate for. The shell half is
 // `broad-investigation-shell.ts`.
 
-const { READ_LINE_CAP, is_broad_command, is_file } = broad_investigation_shell
+const { READ_LINE_CAP, is_broad_command, is_file, is_past_cap } = broad_investigation_shell
 
 const ALWAYS_BROAD: ReadonlySet<string> = new Set(['Glob', 'WebFetch'])
 const GENERAL_PURPOSE = 'general-purpose'
@@ -30,10 +30,13 @@ function field(call: GuardedCall, key: string): unknown {
 	return json_value.is_record(call.input) ? call.input[key] : undefined
 }
 
+// A `Read` with no `limit` reads the whole file, so it is broad only when the file runs past the cap.
 function is_broad_read(call: GuardedCall): boolean {
 	const limit = field(call, 'limit')
+	if (typeof limit === 'number') return limit > READ_LINE_CAP
+	const file = field(call, 'file_path')
 
-	return typeof limit !== 'number' || limit > READ_LINE_CAP
+	return typeof file !== 'string' || is_past_cap(file)
 }
 
 // A `Grep` is narrow only when its `path` is one file.

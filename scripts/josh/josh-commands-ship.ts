@@ -161,6 +161,8 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			'automation',
 			['git', 'network'],
 		],
+		// `--log <N>` stands alone and prints a detached ship's log (`run-ship-args.ts`).
+		read_only_flags: ['--log'],
 		usage: {
 			examples: [
 				{ arguments: '"<title> #<N>" --body-file <evidence.md>' },

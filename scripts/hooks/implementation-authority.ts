@@ -9,18 +9,21 @@ const HANDOFF =
 const UNKNOWN =
 	' Cannot verify the write targets of this shell or patch input. Use explicit Edit/Write paths for operational records, or hand implementation to a worker lane.'
 
-function is_unverified_write(raw_payload: string): boolean {
+const MATCHED = ' Matched rule: '
+
+function edit_refusal(tool_input: unknown): string | undefined {
+	return step_zero_notice.edited_paths(tool_input).length === 0 ? 'no edited path' : undefined
+}
+
+// The rule an unverified write matched (joshuafolkken/kit#5793), so a false refusal can be diagnosed.
+function unverified_write(raw_payload: string): string | undefined {
 	const payload = hook_decision.parse_hook_payload(raw_payload)
-	if (payload === undefined || ['apply_patch', 'exec'].includes(payload.tool_name)) return true
+	if (payload === undefined) return 'an unparsed hook payload'
+	if (['apply_patch', 'exec'].includes(payload.tool_name)) return `\`${payload.tool_name}\` input`
+	if (['Edit', 'Write'].includes(payload.tool_name)) return edit_refusal(payload.tool_input)
+	if (payload.tool_name !== 'Bash') return undefined
 
-	if (['Edit', 'Write'].includes(payload.tool_name)) {
-		return step_zero_notice.edited_paths(payload.tool_input).length === 0
-	}
-
-	return (
-		payload.tool_name === 'Bash' &&
-		implementation_shell.is_unsafe(time_shell.bash_command(payload.tool_input))
-	)
+	return implementation_shell.refusal(time_shell.bash_command(payload.tool_input))
 }
 
 function reason(raw_payload: string): string | undefined {
@@ -30,9 +33,10 @@ function reason(raw_payload: string): string | undefined {
 		return agent_session_role.scope_line() + HANDOFF
 	}
 
-	if (is_unverified_write(raw_payload)) return agent_session_role.scope_line() + HANDOFF + UNKNOWN
+	const rule = unverified_write(raw_payload)
+	if (rule === undefined) return undefined
 
-	return undefined
+	return `${agent_session_role.scope_line()}${HANDOFF}${UNKNOWN}${MATCHED}${rule}.`
 }
 
 const implementation_authority = { reason }

@@ -1,0 +1,7 @@
+{
+	"reason": "josh rename --import merges a moved name into an existing import of the destination module (#5800)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 52
+	}
+}
