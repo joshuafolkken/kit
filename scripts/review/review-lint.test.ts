@@ -249,7 +249,7 @@ describe('review_lint.with_reference', () => {
 	})
 })
 
-// joshuafolkken/kit#5627: `review:lint` and `review:submit --review` print the same lines.
+// joshuafolkken/kit#5627: what `review:submit --review` prints against a review.
 describe('review_lint.failures', () => {
 	it('stays empty on a conforming review', () => {
 		expect(review_lint.failures('REVIEW TARGET MISMATCH', ROUND_ONE)).toEqual([])

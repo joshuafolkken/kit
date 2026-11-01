@@ -174,6 +174,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_RUN_HEADLESS`         | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
 | `JOSH_SHIP_SUPERVISED`      | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
 | `JOSH_SHIP_LAUNCH_ID`       | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
+| `JOSH_SHIP_FOLLOWUP`        | `josh ship`                    | This `josh followup` is the one a `josh ship` runs, so it prints no section of its own.                                                 |
 | `JOSH_SHIP_RETRY_PENDING`   | `josh ship`                    | `josh ship` will run this stage again on an infrastructure stop, so the AI review gate sends no confirmation for an unreadable listing. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |

@@ -52,16 +52,6 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '< summary.md' }, { arguments: '--child-summary < summary.md' }],
 		},
 	},
-	'review:lint': {
-		script: 'scripts/review/review-lint-cli.ts',
-		description:
-			"Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass",
-		category: 'AI tools',
-		reference: ['[--round <1|2>] (reads stdin)', 'automation', ['none']],
-		usage: {
-			examples: [{ arguments: '< review.md' }, { arguments: '--round 2 < review.md' }],
-		},
-	},
 	'report:template': {
 		script: 'scripts/report/report-template-cli.ts',
 		description:

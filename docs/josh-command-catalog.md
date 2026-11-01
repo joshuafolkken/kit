@@ -198,7 +198,6 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
-| `josh review:lint` | `[--round <1\|2>] (reads stdin)` | automation | none | Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh review:selfcheck` | — | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
