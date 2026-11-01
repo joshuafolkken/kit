@@ -33,6 +33,8 @@ const OTHER_KIND = 'other'
 // helper runs out of its `.app` bundle, so the bundle name catches them all — and only them: Playwright's
 // `Google Chrome for Testing.app` is not the person's browser.
 const RESIDENT_APPS: ReadonlyArray<string> = ['Google Chrome.app', 'Visual Studio Code.app']
+const RESIDENT_APPS_VARIABLE = 'JOSH_LANE_RESIDENT_APPS'
+const NAME_SEPARATOR = ','
 
 const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['vscode', /Visual Studio Code|Code Helper|\.vscode\/extensions\//u],
@@ -93,6 +95,19 @@ function process_of(line: string): Omit<ProcessKind, 'count'> | undefined {
 	}
 }
 
+// The resident apps' names: `JOSH_LANE_RESIDENT_APPS`, comma-separated, overrides the default; an empty
+// value names none, so no sample records a size (joshuafolkken/kit#5690).
+function resident_apps(
+	value: string | undefined = process.env[RESIDENT_APPS_VARIABLE],
+): ReadonlyArray<string> {
+	if (value === undefined) return RESIDENT_APPS
+
+	return value
+		.split(NAME_SEPARATOR)
+		.map((name) => name.trim())
+		.filter((name) => name.length > 0)
+}
+
 function is_resident(
 	reading: LineReading | undefined,
 	names: ReadonlyArray<string>,
@@ -147,7 +162,7 @@ function summarize(listing: string): Array<ProcessKind> {
 
 // `undefined` where `ps` did not answer, so the sample records no breakdown rather than an empty one.
 async function read(
-	names: ReadonlyArray<string> = RESIDENT_APPS,
+	names: ReadonlyArray<string> = resident_apps(),
 ): Promise<ProcessSnapshot | undefined> {
 	try {
 		const { stdout } = await execa('ps', PS_ARGUMENTS, {
@@ -166,6 +181,7 @@ const lane_process_load = {
 	TOP_KINDS,
 	kind_of,
 	read,
+	resident_apps,
 	resident_mb,
 	summarize,
 }
