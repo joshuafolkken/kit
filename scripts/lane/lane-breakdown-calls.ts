@@ -1,3 +1,6 @@
+import { command_memory } from '#scripts/gate/command-memory'
+import { git_argv } from '#scripts/rules/git-argv'
+import { shell_segments } from '#scripts/rules/shell-segments'
 import { lane_breakdown } from './lane-breakdown'
 import type { Subagent, ToolCall } from './lane-transcript-calls'
 
@@ -5,8 +8,9 @@ import type { Subagent, ToolCall } from './lane-transcript-calls'
 // the longest three groups with their count and minutes — so an overrun investigation reads which
 // `test:related`, which command or which review pass a row's minutes went to without the transcript.
 //
-// **A call's label is what it ran**: the josh command a Bash call names (`test:related`), else the
-// command's first 60 characters past a leading `cd`; a review subagent's pass and level (`round 1 ·
+// **A call's label is what it ran**: the josh command a Bash call names (`test:related`), what a
+// `reserved-run` wrapped (`reserved-run (eslint)`), else the command's first 60 characters past a
+// leading `cd`; a review subagent's pass and level (`round 1 ·
 // medium`, `interaction · medium`, `round 2 · low`); any other subagent's type; any other tool's name.
 
 const TOP = 3
@@ -36,11 +40,35 @@ interface KindCall extends TimedCall {
 	name: string
 }
 
+function josh_commands(command: string): Array<string | undefined> {
+	return [...command.matchAll(JOSH_COMMAND)].map((match) => match[1])
+}
+
+// What a `josh reserved-run <weight> -- <command>` wrapped (joshuafolkken/kit#5653): the josh commands
+// it names, else its program past a runner (`pnpm exec eslint …` is `eslint`) — so a lane's
+// whole-repository eslint reads `reserved-run (eslint)`, not the bare wrapper.
+function reserved_label(wrapped: string): string {
+	const commands = josh_commands(wrapped)
+	const program = git_argv.program_of(wrapped)?.name ?? ''
+
+	return `reserved-run (${commands.length > 0 ? commands.join(CHAIN) : program})`
+}
+
+// The josh commands one command of a line names, a `reserved-run` as the one it wrapped.
+function segment_labels(segment: string): Array<string | undefined> {
+	const call = git_argv.program_of(segment)
+	const wrapped = call === undefined ? undefined : command_memory.wrapped_command_of(call)
+
+	return wrapped === undefined ? josh_commands(segment) : [reserved_label(wrapped)]
+}
+
 // Every josh command a Bash call chains, joined (`lint:related + test:related`), else its own words
 // on one line, so a heredoc keeps the printout at one call group per line.
 function command_label(command: string): string {
-	const commands = [...command.matchAll(JOSH_COMMAND)].map((match) => match[1])
 	const words = command.replace(LEADING_CD, '').replaceAll(WHITESPACE, ' ').trim()
+	const commands = shell_segments
+		.quote_aware_commands_of(words)
+		.flatMap((segment) => segment_labels(segment))
 
 	return commands.length > 0 ? commands.join(CHAIN) : words.slice(0, LABEL_WIDTH)
 }

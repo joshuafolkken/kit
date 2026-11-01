@@ -186,7 +186,13 @@ function runs_multi_worker_eslint(
 	)
 }
 
-const command_memory = { estimated_memory_mb, runs_multi_worker_eslint, tool_calls_of, workers_of }
+const command_memory = {
+	estimated_memory_mb,
+	runs_multi_worker_eslint,
+	tool_calls_of,
+	workers_of,
+	wrapped_command_of,
+}
 
 export { command_memory }
 export type { ToolCall }

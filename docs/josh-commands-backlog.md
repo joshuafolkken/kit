@@ -805,19 +805,21 @@ Apply backlogrun's triage verdict to one issue: clear the park, comment the reas
 
 ```bash
 pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
-pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear   # its question answered
+pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear     # its question answered
+pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"   # the blocker lands first
 ```
 
 **Options:**
 
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.
 - `--clear` — first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.
+- `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
 
 <!-- /usage -->
 
 The triage step of `backlogrun-steps.md` → "Resolve what the plan can resolve", in one call.
 Without `--clear` a `needs-decision` issue keeps its park, so a question left for a person is never offered once labelled.
-The comment lands before the label, as `auto-ok:judge`'s does. Prints `triage #N — <label>`; a failed write exits 1 naming it.
+The comment lands before the label, as `auto-ok:judge`'s does. Prints `triage #N — <label> · blocked by #M` (whichever were given); a failed write exits 1 naming it.
 
 ### `josh backlog:budget`
 
