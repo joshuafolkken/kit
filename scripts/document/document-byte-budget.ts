@@ -86,8 +86,9 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// (joshuafolkken/kit#5547) crossed the 65536 block.
 	{ path: 'docs/josh-commands-backlog.md', bytes: 69_632 },
 	// `run:merge` withdrawing a lane closed without a merge (joshuafolkken/kit#4916) crossed the 53248 block;
-	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block.
-	{ path: 'docs/josh-commands.md', bytes: 61_440 },
+	// `gate --static-group` (joshuafolkken/kit#5215) crossed the 57344 block; `lint:rule`'s usage span
+	// (joshuafolkken/kit#5664) crossed the 61440 block.
+	{ path: 'docs/josh-commands.md', bytes: 65_536 },
 	{ path: 'docs/labels-and-run-states.md', bytes: 8192 },
 	{ path: 'prompts/coding-standards.md', bytes: 4096 },
 	{ path: 'prompts/collaboration-workflow.md', bytes: 4096 },

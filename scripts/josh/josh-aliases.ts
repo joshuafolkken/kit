@@ -9,6 +9,7 @@ const ALIASES: Record<string, string> = {
 	ga: 'gate',
 	l: 'lint',
 	lr: 'lint:related',
+	lrr: 'lint:rule',
 	cr: 'check:related',
 	ln: 'lines',
 	by: 'bytes',
