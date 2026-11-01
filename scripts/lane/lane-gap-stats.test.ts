@@ -58,6 +58,10 @@ function withdraw(issue: number, by: string, seconds_before: number): RunEvent {
 	return event('withdraw', `#${String(issue)} withdrawn by ${by}: overlaps`, seconds_before)
 }
 
+function yield_note(issue: number, seconds_before: number): RunEvent {
+	return event('note', `#${String(issue)} yielded its lane: overlaps · at: summary`, seconds_before)
+}
+
 function dispatch(issue: number, seconds_before: number): LedgerEntry {
 	return { kind: 'dispatch', at: seconds_before_now(seconds_before), issue }
 }
@@ -165,10 +169,17 @@ describe('lane_gap_stats.table -- park → offer', () => {
 describe('lane_gap_stats.table -- yield → redispatch', () => {
 	// joshuafolkken/kit#5216: the #5171 yield waited for its holder's lane, no seat held.
 	it('times each yield until its own issue next dispatch', () => {
-		const events = [withdraw(ISSUE, lane_yield.YIELD_TEXT.name, 100)]
+		const events = [yield_note(ISSUE, 100)]
 		const entries = [dispatch(OTHER, 90), dispatch(ISSUE, 40)]
 
 		expect(row_of(entries, events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
+	})
+
+	// joshuafolkken/kit#5755: the wait starts at the yield note; the withdrawal closing it is no second yield.
+	it('times a yield closed by its withdrawal once, from its note', () => {
+		const events = [yield_note(ISSUE, 100), withdraw(ISSUE, lane_yield.YIELD_TEXT.name, 70)]
+
+		expect(row_of([dispatch(ISSUE, 40)], events, YIELD)).toBe(`| ${YIELD} | 1 | 60 | 60 | 0 |`)
 	})
 
 	it('leaves out a withdrawal that is not a yield', () => {

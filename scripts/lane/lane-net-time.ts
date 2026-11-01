@@ -105,14 +105,16 @@ function slept(events: ReadonlyArray<RunEvent>, span: LaneSpan): Array<LaneSpan>
 }
 
 // Each yield (`lane:plan` gave the seat back) until its issue's next dispatch, every issue's — the
-// `yield → redispatch` gap `josh lane:stats` prints (`lane-gap-stats.ts`).
+// `yield → redispatch` gap `josh lane:stats` prints (`lane-gap-stats.ts`). The wait starts at the
+// child's yield note, not at the withdrawal `run:merge` may close the lane with later, or never
+// (joshuafolkken/kit#5755).
 function yield_spans(
 	entries: ReadonlyArray<LedgerEntry>,
 	events: ReadonlyArray<RunEvent>,
 ): Array<Span> {
 	const yields = lane_stop_stats.events_of(
-		events.filter((event) => lane_yield.is_yield(event)),
-		EVENT_KIND.WITHDRAW,
+		events.filter((event) => lane_yield.is_yield_note(event)),
+		EVENT_KIND.NOTE,
 	)
 
 	return lane_spans.issue_spans({
