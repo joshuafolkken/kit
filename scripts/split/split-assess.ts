@@ -33,7 +33,8 @@ interface SizeMeasurement {
 const FILE_GUIDE = 8
 const LINE_GUIDE = 200
 // The cap, three times the guide: past it a declared reason no longer keeps an Issue as one. A lane
-// declared at 57 files with a reason ran 76 minutes and about 190 files (joshuafolkken/kit#5502).
+// declared past it with a reason overran both its time budget and its declared files by far
+// (joshuafolkken/kit#5502).
 const CAP_FACTOR = 3
 const FILE_CAP = FILE_GUIDE * CAP_FACTOR
 const LINE_CAP = LINE_GUIDE * CAP_FACTOR

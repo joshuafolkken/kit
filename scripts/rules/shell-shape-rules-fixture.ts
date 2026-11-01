@@ -70,6 +70,7 @@ const LANE_RULES: Record<string, ReadonlyArray<ShellShapeId>> = {
 	'reviewer-foreground': [],
 	'consultation-investigation': [],
 	'consultation-investigation-codex': [],
+	'consultation-handoff': [],
 	'lane-carry-conflict': [HEREDOC],
 	'lane-switch-main': [SUBSHELL, HEREDOC],
 	'round-one-check-related': [],

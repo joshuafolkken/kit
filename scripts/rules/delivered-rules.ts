@@ -5,6 +5,7 @@ import { time_batch_guard, type GuardedCall } from '#scripts/time-runtime/time-b
 import { agent_model } from './agent-model'
 import { bash_triggers } from './bash-triggers'
 import { concise_reply } from './concise-reply'
+import { consultation_handoff } from './consultation-handoff'
 import { consultation_investigation } from './consultation-investigation'
 import { credential_body } from './credential-body'
 import { direct_filing } from './direct-filing'
@@ -220,6 +221,7 @@ const DELIVERED_RULES: ReadonlyArray<DeliveredRule> = [
 	// After `agent-model`, its one overlap (an unnamed `general-purpose` on Fable): `model` fixes both.
 	consultation_investigation.ROW,
 	consultation_investigation.CODEX_ROW,
+	consultation_handoff.ROW,
 	lane_carry_conflict.ROW,
 	lane_switch_main.ROW,
 	// Before `lane-direct-tool`, its one overlap (a timed tool in a lane): the record is the right first

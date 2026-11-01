@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lane_stage_budget } from './lane-stage-budget'
 
-// joshuafolkken/kit#5563: a 30-minute lane's budget split by stage, and the whole minutes past it.
+// joshuafolkken/kit#5563: a lane's 30-minute budget split by stage, and the whole minutes past it.
 
 const MINUTE_MS = 60_000
 

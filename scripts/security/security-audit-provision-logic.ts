@@ -15,10 +15,10 @@ const RELEASE_BASE_URL = 'https://github.com/google/osv-scanner/releases/downloa
 const WINDOWS_PLATFORM = 'win32'
 const WINDOWS_ASSET_SUFFIX = '.exe'
 
-// The asset is ~55 MB, and a link delivering it at 300 KB/s — measured, not hypothetical — takes
-// over three minutes. A `SessionStart` hook is waited on, so a single bound generous enough to
-// finish that download would be a three-minute stall at session start, and one short enough not to
-// stall would abort every slow link for ever.
+// The asset is large enough that a slow link — a real one, not hypothetical — takes minutes to
+// deliver it. A `SessionStart` hook is waited on, so a single bound generous enough to finish that
+// download would be a stall of minutes at session start, and one short enough not to stall would
+// abort every slow link for ever.
 //
 // So the bound depends on how the command was reached. The automatic attempt gives up quickly and
 // says what to run; `--force` is a person typing a command in the foreground, where waiting for a

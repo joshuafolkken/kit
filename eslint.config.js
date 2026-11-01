@@ -84,7 +84,11 @@ export default [
 		plugins: {
 			kit: { rules: { ...english_only_prose_plugin.rules, ...comment_why_only_plugin.rules } },
 		},
-		rules: { 'kit/english-only-prose': 'error', 'kit/no-history-comment': 'error' },
+		rules: {
+			'kit/english-only-prose': 'error',
+			'kit/no-history-comment': 'error',
+			'kit/no-measurement-comment': 'error',
+		},
 	},
 	{
 		files: ['eslint/rules/**'],

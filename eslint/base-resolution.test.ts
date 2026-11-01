@@ -45,7 +45,8 @@ const TEST_FILE = 'eslint/base.test.ts'
 const INIT_DECLARATIONS_RULE = 'init-declarations'
 const FLOATING_POINT_EQUALITY_RULE = 'sonarjs/no-floating-point-equality'
 const HISTORY_RULE = 'kit/no-history-comment'
-const HISTORY_FILES = [SOURCE_FILE, TEST_FILE, 'eslint/rules/comment-why-only.js']
+const MEASUREMENT_RULE = 'kit/no-measurement-comment'
+const COMMENT_RULE_FILES = [SOURCE_FILE, TEST_FILE, 'eslint/rules/comment-why-only.js']
 
 async function resolve_rule_entry(file_path: string, rule_name: string): Promise<unknown> {
 	type RuleMap = Record<string, unknown>
@@ -114,19 +115,20 @@ function expect_no_fatal(messages: ReadonlyArray<Linter.LintMessage>): void {
 	expect(messages.filter((message) => message.fatal).map((message) => message.message)).toEqual([])
 }
 
-describe('kit comment history enforcement', () => {
-	it.each(HISTORY_FILES)('enables history enforcement for %s', async (file_path) => {
-		await expect(resolve_severity(file_path, HISTORY_RULE)).resolves.toBe(ERROR)
+describe.each([
+	{ rule: HISTORY_RULE, comment: '// Previously, the gate waited.\n' },
+	{ rule: MEASUREMENT_RULE, comment: '// The gate took 1.9 seconds.\n' },
+])('kit comment enforcement — $rule', ({ rule, comment }) => {
+	it.each(COMMENT_RULE_FILES)('enables the rule for %s', async (file_path) => {
+		await expect(resolve_severity(file_path, rule)).resolves.toBe(ERROR)
 	})
 
-	it('reports a history comment through the repository config', async () => {
-		const [result] = await untyped_linter.lintText('// Previously, the gate waited.\n', {
-			filePath: TEST_FILE,
-		})
+	it('reports its comment through the repository config', async () => {
+		const [result] = await untyped_linter.lintText(comment, { filePath: TEST_FILE })
 		const messages = result?.messages ?? []
 
 		expect_no_fatal(messages)
-		expect(messages.filter((message) => message.ruleId === HISTORY_RULE)).toHaveLength(1)
+		expect(messages.filter((message) => message.ruleId === rule)).toHaveLength(1)
 	})
 })
 
