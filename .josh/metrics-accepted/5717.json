@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown carries the lint:related timing line onto implementation rows (#5717)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}

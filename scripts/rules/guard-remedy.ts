@@ -67,6 +67,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'pre-gate-cut': judgment(ANOTHER_COMMAND),
 	'implementation-cut': judgment(ANOTHER_COMMAND),
 	'round-one-check-related': judgment(ANOTHER_COMMAND),
+	'repeat-check-related': judgment(ANOTHER_COMMAND),
 	'early-heartbeat': judgment(ANOTHER_COMMAND),
 	'poll-loop': judgment(ANOTHER_COMMAND),
 	'lane-park': judgment(ANOTHER_COMMAND),
