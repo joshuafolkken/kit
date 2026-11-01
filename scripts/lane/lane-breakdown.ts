@@ -20,7 +20,6 @@ const PLAN_STAGE = 'start to plan'
 const IMPLEMENT_STAGE = 'implement'
 const BETWEEN_STAGE = 'between ship stages'
 const SHIP_LEAD = 'ship '
-const IMPLEMENT_SUFFIX = ' implement'
 const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
 const FOLLOWUP_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.FOLLOWUP}`
 
@@ -85,11 +84,8 @@ function ship_stage_of(text: string): string {
 // The stage an event opens, `undefined` for one that opens none.
 function stage_of(event: RunEvent): string | undefined {
 	if (event.kind === EVENT_KIND.SHIP_STAGE) return ship_stage_of(event.text)
-	const is_implement =
-		event.kind === EVENT_KIND.PLAN ||
-		(event.kind === EVENT_KIND.LANE_PHASE && event.text.endsWith(IMPLEMENT_SUFFIX))
 
-	return is_implement ? IMPLEMENT_STAGE : undefined
+	return lane_breakdown_pause.is_planning(event) ? IMPLEMENT_STAGE : undefined
 }
 
 function is_inside(at_ms: number, span: LaneSpan): boolean {
