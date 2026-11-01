@@ -1,5 +1,5 @@
 import { setTimeout as sleep } from 'node:timers/promises'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { backlog_budget } from '#scripts/backlog/backlog-budget'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { lane_child_invocation, type ShipStop } from '#scripts/lane/lane-child-invocation'
@@ -107,7 +107,7 @@ async function record_failed_relaunch(issue: string, reason: string): Promise<vo
 
 async function relaunched(lane: LaneInfo, stop: ShipStop): Promise<ReturnOutcome> {
 	const invocation = lane_child_invocation.ship_stop_invocation(lane.issue, stop)
-	const phase = agent_role_profile.IMPLEMENTATION_PHASE
+	const phase = agent_profile_schema.IMPLEMENTATION_PHASE
 	const result = await lane_relaunch.relaunch(lane, invocation, phase, note)
 
 	if (result.kind === 'launched') return 'relaunched'

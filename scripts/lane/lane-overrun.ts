@@ -1,5 +1,5 @@
 import { agent_argv } from '#scripts/agent/agent-argv'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { git_gh_issue_write } from '#scripts/gh/git-gh-issue-write'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import { issue_cite } from '#scripts/issue/issue-cite'
@@ -170,7 +170,7 @@ interface Investigation {
 // investigation's (`lane-baseline.ts`) alike.
 function launch(investigation: Investigation): string {
 	const cwd = process.cwd()
-	const built = agent_argv.resolve_in(investigation.prompt, agent_role_profile.WORKER, cwd)
+	const built = agent_argv.resolve_in(investigation.prompt, agent_profile_schema.WORKER, cwd)
 
 	if (built.kind === 'rejected') return `not investigated: ${built.note}`
 

@@ -1,4 +1,4 @@
-import { agent_role_profile, type AgentProvider } from '#scripts/agent/agent-role-profile'
+import { agent_provider, type AgentProvider } from '#scripts/agent/agent-provider'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { codex_usage } from './codex-usage'
 import { context_cut_payback } from './context-cut-payback'
@@ -138,7 +138,7 @@ function report_empty(cwd: string, session_id: string | undefined): number {
 // The provider of this process's own session. A defaulted provider is no session at all: a launch may
 // default to Claude Code, but pricing here would measure the newest transcript of some other session.
 function provider_of(environment: Environment): AgentProvider | undefined {
-	const resolved = agent_role_profile.resolve_provider(environment)
+	const resolved = agent_provider.resolve_provider(environment)
 	if (resolved.kind !== 'provider' || resolved.is_default === true) return undefined
 
 	return resolved.provider
