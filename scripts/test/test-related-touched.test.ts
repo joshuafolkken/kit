@@ -53,6 +53,16 @@ describe('test_related_touched.touched_tests', () => {
 		).toEqual([])
 	})
 
+	// joshuafolkken/kit#5642: a command-table change also runs the registry tests it never names.
+	it('adds the pinned registry tests to a command-table change', () => {
+		const command_table = path.join('scripts', 'josh', 'josh-commands-development.ts')
+
+		expect(test_related_touched.touched_tests(ROOT, [command_table], LIST)).toEqual([
+			'scripts/josh/josh-logic.test.ts',
+			'scripts/josh/josh-command-map.test.ts',
+		])
+	})
+
 	it('names each test once when the module and its test are both in the diff', () => {
 		expect(test_related_touched.touched_tests(ROOT, [at(MODULE), at(MODULE_TEST)], LIST)).toEqual([
 			at(MODULE_TEST),
