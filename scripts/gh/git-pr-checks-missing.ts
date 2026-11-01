@@ -57,12 +57,19 @@ function has_outlasted_grace(key: string, now: number): boolean {
 	return false
 }
 
+function absent_from(
+	rollup: ReadonlyArray<RollupCheck>,
+	required: ReadonlyArray<string>,
+): Array<string> {
+	return required.filter((context) =>
+		rollup.every((check) => !is_required_match(check.name, context)),
+	)
+}
+
 function collect_absent_contexts(snapshot: PrStateSnapshot): Array<string> {
 	if (snapshot.merge_state_status === MERGE_STATE_CLEAN || !is_settled(snapshot.rollup)) return []
 
-	return (snapshot.required_contexts ?? []).filter((context) =>
-		snapshot.rollup.every((check) => !is_required_match(check.name, context)),
-	)
+	return absent_from(snapshot.rollup, snapshot.required_contexts ?? [])
 }
 
 function forget_present_contexts(snapshot: PrStateSnapshot, absent: ReadonlyArray<string>): void {
@@ -83,10 +90,35 @@ function describe_missing_context(context: string): string {
 	return `required context ${context} has no check-run`
 }
 
+// **Why a wait that ran out of budget was still waiting** (joshuafolkken/kit#5780): the required checks
+// and the base branch's required contexts the last read showed no check-run for — or, with none
+// absent, the merge state GitHub held the pull request in. Read without the grace window, since the
+// wait is already over. A `josh ship` park carries the line as its cause, so `run:board` shows it.
+const BLOCKED_LEAD = 'BLOCKED: '
+const MERGE_STATE_LEAD = 'mergeStateStatus: '
+
+function blocked_cause(
+	snapshot: PrStateSnapshot,
+	required_checks: ReadonlyArray<string>,
+): string | undefined {
+	const required = [...new Set([...required_checks, ...(snapshot.required_contexts ?? [])])]
+	const absent = absent_from(snapshot.rollup, required)
+	if (absent.length > 0) return `${BLOCKED_LEAD}${absent.join(', ')} missing`
+	if (snapshot.merge_state_status === undefined) return undefined
+
+	return `${MERGE_STATE_LEAD}${snapshot.merge_state_status}`
+}
+
+function is_blocked_cause(message: string): boolean {
+	return message.startsWith(BLOCKED_LEAD) || message.startsWith(MERGE_STATE_LEAD)
+}
+
 export {
+	blocked_cause,
 	collect_missing_contexts,
 	describe_missing_context,
 	forget_missing_contexts,
+	is_blocked_cause,
 	is_required_match,
 	MISSING_GRACE_MS,
 }
