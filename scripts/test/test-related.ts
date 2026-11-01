@@ -301,6 +301,8 @@ async function read_run_input(
 	const red = await test_related_red.read_red(before)
 	const change = await read_change(root, command_arguments, is_whole, red)
 	const capped = await capped_of(root, change, is_whole)
+
+	test_related_cap.report_over_cap(capped)
 	const scope = await resolve_change(root, change, capped)
 	const reuse = await test_related_reuse.read(root, scope, red === undefined ? before : undefined)
 
@@ -377,7 +379,6 @@ async function run_related_tests(given: ReadonlyArray<string>): Promise<number> 
 	const input = await read_run_input(root, command_arguments, is_whole, before)
 
 	report_unhanded(root, command_arguments, input)
-	test_related_cap.report_over_cap(input.over_cap ?? [])
 
 	return await test_related_run.run_and_vouch(input, command_arguments, before)
 }

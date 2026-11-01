@@ -99,7 +99,7 @@ async function record(
 	stamp_file.replace_stamp(target, { tree: tree_hash(before), exit_code, tail, at })
 }
 
-const tree_verdict = { read, record, record_path, replay }
+const tree_verdict = { read, record, record_path, replay, reused_line }
 
 export type { TreeVerdict, VerdictEntry }
 export { tree_verdict }
