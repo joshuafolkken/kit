@@ -187,6 +187,7 @@ describe('lane_breakdown_laps.of — between ship stages a lane paused in', () =
 		).toStrictEqual([
 			[PAUSE_FOR_5582, 10],
 			['pause for #5600', 7],
+			['editing & thinking', 2],
 			['gate', 1],
 		])
 	})
