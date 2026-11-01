@@ -45,14 +45,16 @@ When a child hits something only a person can decide (→ "Only a person's judge
 `needs-decision`"), **park the child and keep going**:
 
 ```bash
-pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision
+pnpm josh run:park <N> --body-file <path>   # what needs deciding, and the options; applies needs-decision, then releases
 ```
 
-`in-progress` stays; the parked child does **not** hold the repository (`needs-decision` takes
-precedence in `epic:next`). Return to step 1.
+The one call also runs `run:release <N>`, so the parked child holds neither the tree nor
+`in-progress`; a failed release prints `pnpm josh run:release <N>` to re-run. A tree whose hold names
+another run (a split lane parking a leftover child) is left to that run's own release. Return to
+step 1.
 
-**A parked child's lane is kept, whether or not it had committed**, and every parked ending owes
-`pnpm josh run:release <N>` — `backlogrun-lanes.md` → "What happens to a lane". A lost merge race
+**A parked child's lane is kept, whether or not it had committed** — `backlogrun-lanes.md` → "What
+happens to a lane". A lost merge race
 resolves in its lane instead (`backlogrun-recovery.md` → "Conflicts are not predicted").
 
 **Parking keeps the stop's rule** — file upstream defects; never work around them.
@@ -102,17 +104,13 @@ and occupies a lane. **A session that detects a stale child removes the label it
 reports it, before continuing. **The rule therefore applies to any open issue in the repository, not
 only to this epic's children** (`epic:next` names the holders on standard error).
 
-**Age alone is not the test.** Past the 90-minute window, check what holds it: a `halfrun` stopped for
-manual verification, a run paused mid-child, and a `needs-human-review` child hold it legitimately.
-**All three leave uncommitted work in the checkout**, so `git status` there decides: a dirty tree means
-the hold is real — leave the label and report.
-
-**A closed issue's labels are neither a finding nor something to clean up** (no lane, never offered).
-**Do not report it, and do not strip it.**
-
 ```bash
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
+pnpm josh run:stale
 ```
+
+It removes the label only where nothing holds it, keeps a real hold (a dirty checkout, a live run),
+and leaves a closed issue alone; report each `kept` / `removed` line. The test is
+`docs/josh-commands-run.md` → "`josh run:stale`".
 
 ## A prerequisite discovered mid-run
 
