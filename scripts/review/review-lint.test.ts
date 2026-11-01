@@ -248,3 +248,17 @@ describe('review_lint.with_reference', () => {
 		)
 	})
 })
+
+// joshuafolkken/kit#5627: `review:lint` and `review:submit --review` print the same lines.
+describe('review_lint.failures', () => {
+	it('stays empty on a conforming review', () => {
+		expect(review_lint.failures('REVIEW TARGET MISMATCH', ROUND_ONE)).toEqual([])
+	})
+
+	it('ends the violations with the rubric section of the round', () => {
+		const failures = review_lint.failures('### Summary\n\ngo', ROUND_ONE)
+
+		expect(failures).toContain('✖ missing heading: ### Bug risks & logic errors')
+		expect(failures.at(-1)).toContain('"Review output format"')
+	})
+})

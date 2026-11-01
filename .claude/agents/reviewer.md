@@ -15,10 +15,12 @@ its `review:attest` step.
 - Run `pnpm josh review:attest <nonce>` from the checkout the brief pins, as the brief says. Never run
   `pnpm josh review:brief` yourself: a new brief drops the attestation you left.
 - Apply a fix only where the brief's level and your dispatcher ask for one; never commit, stage or push.
-- Write the findings with `pnpm josh review:submit`, one per line on stdin as
-  `[fixed ]<category>:<severity>:<file>[:<line>] — <one sentence>` (`--interaction` for the
-  interaction brief, the one whose file name carries `interaction-`; `--none` and no stdin when there
-  is none); if it refuses a line, fix that line and run it again. The dispatcher records that slot
-  with `pnpm josh review:record --from-slot` and never copies findings from your reply.
-- Return the review in the rubric's output format; check it first with `pnpm josh review:lint`
-  (round 2: `--round 2`; findings on stdin) and fix what it reports.
+- Write the review in the rubric's output format to a file outside the checkout (under `/tmp`), then
+  submit it with the findings in one call: `pnpm josh review:submit --review <absolute-path>` (round 2:
+  `--round 2`; a relative path is refused), the findings one per line
+  on stdin as `[fixed ]<category>:<severity>:<file>[:<line>] — <one sentence>` (`--interaction` for
+  the interaction brief, the one whose file name carries `interaction-`; `--none` and no stdin when
+  there is none). It lints the review and checks the lines together; fix everything it reports and
+  run it again. The dispatcher records that slot with `pnpm josh review:record --from-slot` and
+  never copies findings from your reply.
+- Return that review as your reply.

@@ -76,6 +76,7 @@ const GUARD_REMEDIES: Readonly<Record<string, GuardRemedy>> = {
 	'investigator-foreground': judgment('which reads go beside the dispatch is the author’s call'),
 	'consultation-investigation': judgment(NARROW_ENOUGH),
 	'consultation-investigation-codex': judgment(NARROW_ENOUGH),
+	'consultation-handoff': judgment(ANOTHER_COMMAND),
 	'lane-carry-conflict': judgment(ANOTHER_COMMAND),
 	'lane-switch-main': judgment(ANOTHER_COMMAND),
 	'lane-direct-tool': rewrite(), // a one-command line behind `pnpm josh reserved-run <weight> --`

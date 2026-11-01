@@ -255,8 +255,8 @@ describe('lane_breakdown_text.report_of — ship laps', () => {
 	})
 })
 
-// joshuafolkken/kit#5563: a stage past its share of a 30-minute lane says by how much; one within it
-// carries nothing.
+// joshuafolkken/kit#5563: a stage past its share of a lane's 30-minute budget says by how much; one
+// within it carries nothing.
 function report_with(stages: Report['breakdown']['stages']): Report {
 	return { ...REPORT, breakdown: { ...REPORT.breakdown, stages } }
 }

@@ -75,8 +75,8 @@ function replace_safe_chain_block(existing: string, safe_chain: Record<string, u
 	return `${prefix}${prefix ? '\n' : ''}${replacement}${suffix}`
 }
 
-// Safe Chain enforces its own minimum package age (48 hours by default), so CI refused lockfiles pnpm
-// had resolved under pnpm's shorter window (kit #2743). The workspace's `minimumReleaseAge` is the
+// Safe Chain enforces its own minimum package age (a 48-hour limit by default), so CI refused
+// lockfiles pnpm had resolved under pnpm's shorter window (kit #2743). The workspace's `minimumReleaseAge` is the
 // source: its minutes are floored to whole hours so Safe Chain is never stricter than pnpm, and an
 // undeclared window writes nothing; an explicit `0` opt-out is written as 0 so an earlier
 // synchronized age cannot outlive it.

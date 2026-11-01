@@ -1,8 +1,8 @@
 import { MS_PER_MINUTE } from '#scripts/lib/timeouts'
 
-// Each stage's share of a 30-minute lane (joshuafolkken/kit#5563), split by `lane:stats`'s medians, so
-// `lane:breakdown` and `run:board` say which stage ate the budget while it still runs. Change a budget
-// here only. The ship budget covers preflight to round-2; one ship stage is checked against the whole
+// Each stage's share of a lane's 30-minute budget (joshuafolkken/kit#5563), split by `lane:stats`'s
+// medians, so `lane:breakdown` and `run:board` say which stage ate the budget while it still runs.
+// Change a budget here only. The ship budget covers preflight to round-2; one ship stage is checked against the whole
 // of it, a lower bound of the group's time.
 
 const BUDGET_MINUTES = {

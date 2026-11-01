@@ -10,8 +10,8 @@ import { run_record_path } from '#scripts/josh/run-record-path'
 import type { SyncedCheck } from './run-ship-synced-scope'
 
 // **A scoped pair the ship can name the moved files of runs over them alone** (joshuafolkken/kit#5531).
-// A pair whose records could not narrow re-ran over the whole branch's related set — 6 to 18 minutes
-// a stage — after a review fix of one file, or a main merge meeting the branch in one.
+// A pair whose records could not narrow re-ran over the whole branch's related set after a review
+// fix of one file, or a main merge meeting the branch in one.
 //
 // **The check is no weaker.** Each named run starts from a tree the pair was green on over the whole
 // branch: the tree this ship last met the pair green on, on the same base (a review round's fix), or the

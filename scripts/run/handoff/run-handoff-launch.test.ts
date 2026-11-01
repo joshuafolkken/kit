@@ -80,6 +80,15 @@ describe('run_handoff_launch.argv_of', () => {
 
 		expect(built).toMatchObject({ kind: 'argv', profile: { role: WORKER } })
 	})
+
+	it('refuses a role profile that resolves to a consultation model', () => {
+		const consultation_model = 'claude-fable-5-1'
+		const environment = { ...ENVIRONMENT, JOSH_WORKER_MODEL: consultation_model }
+		const built = run_handoff_launch.argv_of(child({ role: WORKER }), environment)
+
+		expect(built.kind).toBe('rejected')
+		expect(built.kind === 'rejected' && built.note).toContain(consultation_model)
+	})
 })
 
 describe('run_handoff_launch.request_of', () => {
