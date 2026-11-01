@@ -1,15 +1,10 @@
 import { doctor_consumer } from '#scripts/doctor/doctor-consumer'
 import { command_usage } from './command-usage'
 import { find_package_directory, josh_logic, UNKNOWN_COMMAND_EXIT_CODE } from './josh-logic'
+import { josh_read_only } from './josh-read-only'
 
 const ARGV_OFFSET = 2
-
-// `--help` and `-h` request the listing just as `help` does, so they must reach stdout independently
-// of the unknown-command diagnostic on stderr (#825).
-const HELP_COMMANDS: ReadonlySet<string> = new Set(['help', '--help', '-h'])
-// `josh --all` (and `josh --help --all`) lists every command available in this checkout.
-// A bare `--all` in the command slot is a help request, not a command.
-const ALL_FLAG = '--all'
+const { ALL_FLAG } = josh_read_only
 
 // Both halves go to stderr. The help listing is a diagnosis here, not the answer, and a shell
 // wiring `--port $(josh port dev)` reads stdout alone, so a command name this kit cannot resolve
@@ -50,7 +45,7 @@ async function main(): Promise<void> {
 	const is_all = process.argv.includes(ALL_FLAG)
 	const is_consumer = doctor_consumer.is_kit_consumer(find_package_directory(process.cwd()))
 
-	if (!cmd || cmd === ALL_FLAG || HELP_COMMANDS.has(cmd)) {
+	if (!cmd || josh_read_only.is_help_request(cmd)) {
 		print_help(is_all, is_consumer, process.argv[ARGV_OFFSET + 1])
 
 		return

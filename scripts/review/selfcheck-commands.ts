@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { josh_read_only } from '#scripts/josh/josh-read-only'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
 import type { Hunk } from '#scripts/test/test-pinned-logic'
 
@@ -65,7 +66,10 @@ function tokenize(command: string): Array<string> {
 }
 
 // The side effects that keep a command out of the scratch tree; `undefined` for an unknown command.
+// A help request is no registry entry, yet only prints usage.
 function blocking_effects(name: string): Array<string> | undefined {
+	if (josh_read_only.is_help_request(name)) return []
+
 	const command = Object.hasOwn(COMMAND_MAP, name) ? COMMAND_MAP[name] : undefined
 
 	if (command === undefined) return undefined

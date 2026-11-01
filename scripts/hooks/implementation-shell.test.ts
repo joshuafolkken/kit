@@ -134,6 +134,68 @@ describe('josh auto-ok operations', () => {
 	})
 })
 
+// joshuafolkken/kit#5793: the reads a consultation investigation needs pass on one read-only rule —
+// `grep`, a glob into a read-only program, and a josh command the registry declares read-only.
+describe('read-only investigation shell', () => {
+	it.each([
+		'grep -rn is_carry_candidate scripts/review',
+		'grep -n "is_carry_candidate" scripts/review/review-reviewed-tree.ts',
+		'grep -n is_carry_candidate /tmp/other-repo/notes.md',
+		'ls .git/josh/run-state/ | grep 5757',
+		'ls .git/josh/josh-lane-dispatch-5757-*',
+		'ls .claude/agents/ && grep -n "^tools\\|^model" .claude/agents/investigator.md',
+		'grep -rl 5757 .josh',
+		'cat scripts/hooks/*.ts',
+		'pnpm josh',
+		'pnpm josh --help',
+		'pnpm josh -h --all',
+		'pnpm josh help ship',
+		'pnpm josh ship --log 5757',
+		'pnpm josh lbd 5757',
+	])('passes %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(false)
+	})
+})
+
+describe('read-only investigation shell refusals', () => {
+	it.each([
+		'grep -n pattern app.ts > app.ts',
+		'sed -i s/a/b/ app.ts',
+		'echo changed | tee app.ts',
+		'ls * > app.ts',
+		'rg pattern scripts/*.ts',
+		'git diff scripts/*.ts',
+		'cat app.ts | tee scripts/*.ts',
+		'pnpm josh check',
+		'pnpm josh rename',
+		'pnpm josh ship "Title #5757"',
+		'pnpm josh constructor',
+		'pnpm josh edit:files plan.json',
+		'pnpm josh edit:files - < plan.json',
+		'pnpm josh stop:guard',
+	])('refuses the write or unregistered read %s', (command) => {
+		expect(implementation_shell.is_unsafe(command)).toBe(true)
+	})
+})
+
+describe('the named refusal rule', () => {
+	it.each([
+		['cat <<EOT > notes.ts\nchanged\nEOT', 'a heredoc'],
+		['echo $(custom-editor notes.ts)', 'a command or process substitution'],
+		['echo changed > notes.ts', 'redirect to `notes.ts`'],
+		['sed -i s/x/y/ notes.ts', '`sed` is neither a read-only program nor a consultation operation'],
+		['echo changed | tee notes.ts', '`tee` to a runtime path'],
+		['git log scripts/*.ts', 'glob or brace expansion in `git`'],
+		['pnpm josh rename old new notes.ts', 'pnpm josh help rename'],
+	])('names the rule %s matched', (command, rule) => {
+		expect(implementation_shell.refusal(command)).toContain(rule)
+	})
+
+	it('names no rule for a read', () => {
+		expect(implementation_shell.refusal('grep -n pattern app.ts')).toBeUndefined()
+	})
+})
+
 describe('operational shell reads and records', () => {
 	it.each([
 		'printf "example > app.ts"',
