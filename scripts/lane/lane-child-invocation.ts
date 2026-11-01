@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { run_ship_next, type ShipResume } from '#scripts/run/ship/run-ship-next'
@@ -109,7 +109,7 @@ function known_stop_lines(
 	if (context === undefined) return [next]
 
 	const fixed = [...frame, next].join(LINE_BREAK).length + LINE_BREAK.length
-	const budget = agent_role_profile.MAX_VALUE_LENGTH - fixed
+	const budget = agent_safe_text.MAX_VALUE_LENGTH - fixed
 
 	return [next, run_ship_stop_context.describe(issue, context, budget)]
 }

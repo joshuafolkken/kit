@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_profile_schema } from '#scripts/agent/agent-profile-schema'
 import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream, type RunEvent } from '#scripts/run/event/run-event-stream'
@@ -37,7 +37,7 @@ const YIELD = 'yield → redispatch'
 const MERGE = 'followup → merge'
 const FIRST_LANE = 'start → first lane'
 const FOLLOWUP_STAGE = 'followup'
-const IMPLEMENTATION_CUT = `cut (${agent_role_profile.IMPLEMENTATION_PHASE})`
+const IMPLEMENTATION_CUT = `cut (${agent_profile_schema.IMPLEMENTATION_PHASE})`
 const { NOT_MEASURED, is_dispatch, is_merge, is_number, is_stage } = lane_stage_stats
 const { EVENT_KIND } = run_event_stream
 // The offer answers that are not a dispatch: a free lane held, or the pool found full.

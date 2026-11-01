@@ -3,7 +3,7 @@ import path from 'node:path'
 import { gh_cli_token } from '#scripts/gh/gh-cli-token'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
 import { agent_headless } from './agent-headless'
-import { agent_role_profile, type AgentProfile } from './agent-role-profile'
+import { agent_profile_schema, type AgentProfile } from './agent-profile-schema'
 import { agent_session_role } from './agent-session-role'
 import { codex_home_source } from './codex-home-source'
 
@@ -70,7 +70,7 @@ function build(
 
 	const base = { ...openai_environment(), ...marked }
 
-	return profile.role === agent_role_profile.REVIEWER
+	return profile.role === agent_profile_schema.REVIEWER
 		? { ...base, CODEX_HOME: reviewer_home(cwd, environment) }
 		: base
 }

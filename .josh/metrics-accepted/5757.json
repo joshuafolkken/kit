@@ -1,0 +1,7 @@
+{
+	"reason": "agent-profile-schema.ts split out of agent-role-profile.ts to cut its test reach (728 -> 284); the new module's imports, namespace object and header comment add lines (joshuafolkken/kit#5757)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 46
+	}
+}

@@ -1,4 +1,4 @@
-import { rm, writeFile } from 'node:fs/promises'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -15,6 +15,8 @@ const NEW_LINE = 'run `pnpm josh a:b`'
 const IGNORED_FILE = 'skip.md'
 const MOVED_FROM = 'a.ts'
 const MOVED_DECLARATION = 'function moved_name(): void {}\n'
+const RUN_DIRECTORY = 'scripts/run'
+const RUN_FILE = `${RUN_DIRECTORY}/new.ts`
 
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -40,6 +42,11 @@ afterEach(async () => {
 	await git_fixture_workspace.close_workspace(fixture)
 })
 
+async function commit_base(): Promise<void> {
+	await git(fixture.root, ['add', '--all'])
+	await git(fixture.root, ['commit', '--no-verify', '-m', 'base'])
+}
+
 describe('selfcheck_cli.untracked_hunks against real git', () => {
 	it(
 		'reads an untracked file as wholly added and leaves an ignored one out',
@@ -63,14 +70,30 @@ describe('selfcheck_cli.untracked_hunks against real git', () => {
 	)
 })
 
+describe('selfcheck_cli.sections against real git', () => {
+	it(
+		'names a run-tooling file the change adds as due for the interaction questions',
+		async () => {
+			await writeFile(path.join(fixture.root, NEW_FILE), 'base\n')
+			await commit_base()
+			await mkdir(path.join(fixture.root, RUN_DIRECTORY), { recursive: true })
+			await writeFile(path.join(fixture.root, RUN_FILE), 'const value = 1\n')
+
+			const { interaction } = await selfcheck_cli.sections(fixture.root, 'HEAD')
+
+			expect(interaction).toEqual([RUN_FILE])
+		},
+		TIMEOUT_MS,
+	)
+})
+
 describe('selfcheck_cli.change_hunks against real git', () => {
 	it(
 		'keeps a declaration moved from a tracked file into an untracked one, so q2 reports none',
 		async () => {
 			await writeFile(path.join(fixture.root, MOVED_FROM), MOVED_DECLARATION)
 			await writeFile(path.join(fixture.root, 'docs.md'), 'Call moved_name.\n')
-			await git(fixture.root, ['add', '--all'])
-			await git(fixture.root, ['commit', '--no-verify', '-m', 'base'])
+			await commit_base()
 			await rm(path.join(fixture.root, MOVED_FROM))
 			await writeFile(path.join(fixture.root, 'b.ts'), MOVED_DECLARATION)
 

@@ -1,4 +1,4 @@
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_consultation_model } from '#scripts/agent/agent-consultation-model'
 import type { GuardRun } from '#scripts/josh/hook-decision'
 import { bash_triggers } from './bash-triggers'
 import type { DeliveredRule } from './delivered-rules'
@@ -39,7 +39,7 @@ const is_handoff_call = josh_call_of(['run:handoff'])
 function is_consultation_main(tail: string, payload_model: string | undefined): boolean {
 	const model = main_model_reader.main_model(tail, payload_model)
 
-	return model !== undefined && agent_role_profile.consultation_provider(model) !== undefined
+	return model !== undefined && agent_consultation_model.consultation_provider(model) !== undefined
 }
 
 // A delegated unit enters no run.

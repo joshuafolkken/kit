@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_consultation_model } from '#scripts/agent/agent-consultation-model'
 import { find_package_directory } from '#scripts/josh/package-directory'
 import { json_value } from '#scripts/lib/json-value'
 import type { GuardedCall } from '#scripts/time-runtime/time-batch-guard'
@@ -77,7 +77,7 @@ function is_investigation_dispatch(call: GuardedCall): boolean {
 }
 
 function is_consultation(model: string | undefined): boolean {
-	return model === undefined || agent_role_profile.consultation_provider(model) !== undefined
+	return model === undefined || agent_consultation_model.consultation_provider(model) !== undefined
 }
 
 // An investigation dispatch whose effective model would be the consultation model.

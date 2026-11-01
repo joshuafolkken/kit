@@ -27,12 +27,18 @@ const TARGET_DIRECTORIES = ['scripts/run/', 'scripts/lane/', 'scripts/backlog/',
 const NOT_DUE_LINE =
 	'Interaction review not due: this is not the kit repository, or the change touches none of scripts/run/, scripts/lane/, scripts/backlog/ or scripts/hooks/.'
 
-const ROLE_LINES = [
-	'## Interaction review',
-	'This pass is not a second `/code-review`: do not hunt for bugs inside the diff — the round before it did. Your role is to find three existing features this change breaks. Check only these three:',
+// The pass's three questions — also the implementer's own before round 1, through `josh review:selfcheck`
+// (joshuafolkken/kit#5766).
+const QUESTIONS = [
 	'1. Every state, command, label, file or process this change adds or gives a new meaning to — who else reads or writes it? Search the repository outside the diff for each. Where the plan has a `### 影響を受ける既存の利用者` section, check it names them all.',
 	'2. Does each of those readers and writers still behave correctly when the new state or value reaches it (for example, a paused lane counted as running)?',
 	'3. Does the change add heavy or synchronous work to a path called repeatedly — every second, every Bash call, every edit?',
+]
+
+const ROLE_LINES = [
+	'## Interaction review',
+	'This pass is not a second `/code-review`: do not hunt for bugs inside the diff — the round before it did. Your role is to find three existing features this change breaks. Check only these three:',
+	...QUESTIONS,
 	"Report each break with the reader's `file:line` and the change's, rated by the rubric's severities; it is disposed of by `prompts/review.md` → \"Interaction review\".",
 ]
 
@@ -144,6 +150,7 @@ const review_interaction = {
 	brief_block,
 	due_paths,
 	NOT_DUE_LINE,
+	QUESTIONS,
 	reading,
 	refusal,
 	refusal_message,

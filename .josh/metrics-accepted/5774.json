@@ -1,0 +1,7 @@
+{
+	"reason": "Grace window for a missing required context (round-1 medium): absence memory per head and its tests",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 53
+	}
+}
