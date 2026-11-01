@@ -19,8 +19,7 @@ const MINUTE_MS = 60_000
 // joshuafolkken/kit#3439: the board reads the running run, else the one that last ended, and keeps the
 // next run's events off an ended run's board.
 
-const { AFTER, CARRY, ENDED_AT, INSIDE, LANE_LIMIT, REPOSITORY, arrange, lane } =
-	run_board_read_fixture
+const { AFTER, CARRY, ENDED_AT, INSIDE, REPOSITORY, arrange, lane } = run_board_read_fixture
 const STARTED_AT = '2026-10-08T09:00:00.000Z'
 const NONE: CarryRead = { kind: 'none' }
 const EPIC_RUN = 'backlogrun #3431 --only'
@@ -44,7 +43,7 @@ afterEach(() => {
 // The one lane against the limit, as `lane:limit` counts it — this run's, no earlier run's among them.
 const LANE_ROOM = {
 	free_lanes: FREE_LANES,
-	lane_limit: LANE_LIMIT,
+	lane_limit: run_board_read_fixture.LANE_LIMIT,
 	occupied_count: 1,
 	earlier_occupied: [],
 }
@@ -127,6 +126,7 @@ describe('run_board_read.read_local', () => {
 			ended_ms: Date.parse(ENDED_AT),
 			scope: { issues: [3431], only: true },
 			events: [INSIDE],
+			throughput: expect.any(Array) as Array<unknown>,
 			found: new Map(),
 			lanes: ['3432'],
 			...UNRECORDED,
