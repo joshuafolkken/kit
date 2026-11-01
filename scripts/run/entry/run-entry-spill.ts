@@ -5,8 +5,10 @@ import { capped_print_part } from '#scripts/document/capped-print-part'
 import { document_section } from '#scripts/document/document-section'
 import { document_section_cli } from '#scripts/document/document-section-cli'
 import { PLATFORM_TEMP_ROOT } from '#scripts/josh/platform-temporary'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_prep, type PrepParts } from '#scripts/run/run-prep'
 import { run_step_section } from '#scripts/run/run-step-section'
+import { run_step_section_once } from '#scripts/run/run-step-section-once'
 
 // The `run:prep` bundle `run:entry` prints, kept under the Bash result cap (joshuafolkken/kit#5213).
 // Past the cap the harness hands back a preview, and a lane child re-ran `run:entry` into a file to see
@@ -21,8 +23,8 @@ import { run_step_section } from '#scripts/run/run-step-section'
 // investigation guard already reads it as a session artifact, not as the Issue's subject.
 //
 // **The budget is `capped_output`'s, less what shares the same Bash result**: the split assessment's
-// section `run:entry` prints after the bundle, and a second headroom for the stage line and the
-// stderr the hold forwards before it.
+// section `run:entry` prints after the bundle (and the progress watcher's, outside a lane child), and a
+// second headroom for the stage line and the stderr the hold forwards before it.
 
 const FILE_MODE = 0o600
 const SECTION_SEPARATOR = '\n\n'
@@ -31,8 +33,8 @@ function byte_length(text: string): number {
 	return Buffer.byteLength(text, 'utf8')
 }
 
-function entry_section_length(root: string): number {
-	const found = run_step_section.GOVERNING_SECTIONS.get(run_step_section.ENTRY)
+function section_length(key: string, root: string): number {
+	const found = run_step_section.GOVERNING_SECTIONS.get(key)
 
 	if (found === undefined) return 0
 
@@ -42,8 +44,28 @@ function entry_section_length(root: string): number {
 	return byte_length(document_section.section(markdown, found.heading)?.text ?? '')
 }
 
+// The watcher's section counts only where `run:entry` prints it whole: outside a lane child, before
+// this session printed it — after that it is one line the headroom covers.
+function is_watcher_printed_whole(root: string): boolean {
+	const watcher = run_step_section.GOVERNING_SECTIONS.get(run_step_section.PROGRESS)
+	const is_printed = watcher === undefined || run_step_section_once.is_recorded(watcher)
+
+	return !is_printed && !lane_child_marker.is_child_of(root)
+}
+
+function watcher_length(root: string): number {
+	if (!is_watcher_printed_whole(root)) return 0
+
+	return section_length(run_step_section.PROGRESS, root)
+}
+
+// The sections `run:entry` prints after the bundle.
+function sections_length(root: string): number {
+	return section_length(run_step_section.ENTRY, root) + watcher_length(root)
+}
+
 function report_budget(root: string): number {
-	const shared = entry_section_length(root) + capped_output.HEADROOM_CHARS
+	const shared = sections_length(root) + capped_output.HEADROOM_CHARS
 
 	return capped_output.output_budget(root) - shared
 }
