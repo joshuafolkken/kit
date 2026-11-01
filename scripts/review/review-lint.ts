@@ -216,7 +216,7 @@ function with_reference(violations: ReadonlyArray<string>, round: number): Reado
 	return [...violations, `→ the format: ${RUBRIC} → "${section}"`]
 }
 
-// What `review:lint` and `review:submit --review` print against a review: its violations with the
+// What `review:submit --review` prints against a review: its violations with the
 // rubric section they are read against, empty on a pass.
 function failures(review: string, round: number): ReadonlyArray<string> {
 	return with_reference(lint_review(review, round), round)
