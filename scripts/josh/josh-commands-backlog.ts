@@ -75,7 +75,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			"Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label",
 		category: 'AI tools',
 		reference: [
-			'--apply <n> (--lane | --solo) --reason <text> [--clear]',
+			'--apply <n> [--lane | --solo] [--blocked-by <m>] --reason <text> [--clear]',
 			'automation',
 			['files', 'network'],
 		],
@@ -83,6 +83,10 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '--apply 912 --lane --reason "<why>"' },
 				{ arguments: '--apply 913 --solo --reason "<why>" --clear', note: 'its question answered' },
+				{
+					arguments: '--apply 914 --blocked-by 912 --reason "<why>"',
+					note: 'the blocker lands first',
+				},
 			],
 			flags: [
 				{
@@ -94,6 +98,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--clear'],
 					description:
 						'first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.',
+				},
+				{
+					names: ['--blocked-by <M>'],
+					description:
+						'records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.',
 				},
 			],
 		},
