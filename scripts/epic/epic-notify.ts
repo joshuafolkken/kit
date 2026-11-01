@@ -38,7 +38,22 @@ async function send(notice: EpicNotice): Promise<void> {
 	})
 }
 
-const epic_notify = { body_of, send }
+// What the parsed invocation carries into the announcement.
+interface NotifyRequest {
+	is_notified: boolean
+	children: ReadonlyArray<number>
+	title?: string | undefined
+}
 
-export type { EpicNotice }
+// `--notify`'s send, made only once the epic exists — an epic whose number could not be read, or a
+// promotion that failed (`undefined`), has nothing to announce.
+async function announce(request: NotifyRequest, epic_number: number | undefined): Promise<void> {
+	if (epic_number === undefined || !request.is_notified) return
+
+	await send({ epic_number, children: request.children, title: request.title })
+}
+
+const epic_notify = { announce, body_of, send }
+
+export type { EpicNotice, NotifyRequest }
 export { epic_notify }

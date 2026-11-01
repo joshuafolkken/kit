@@ -34,6 +34,28 @@ describe('epic_notify.body_of — the split announcement', () => {
 	})
 })
 
+describe('epic_notify.announce — whether the epic is announced', () => {
+	const REQUEST = { is_notified: true, children: NOTICE.children, title: NOTICE.title }
+
+	it('sends once the epic exists and --notify was given', async () => {
+		await epic_notify.announce(REQUEST, NOTICE.epic_number)
+
+		expect(telegram_test.send_values).toHaveBeenCalledOnce()
+	})
+
+	it('sends nothing without --notify', async () => {
+		await epic_notify.announce({ ...REQUEST, is_notified: false }, NOTICE.epic_number)
+
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+	})
+
+	it('sends nothing when there is no epic to announce', async () => {
+		await epic_notify.announce(REQUEST, undefined)
+
+		expect(telegram_test.send_values).not.toHaveBeenCalled()
+	})
+})
+
 describe('epic_notify.send — the planning Telegram', () => {
 	it('sends a planning message on the epic, titled and listing its children', async () => {
 		await epic_notify.send(NOTICE)

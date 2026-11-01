@@ -15,7 +15,7 @@ import { error_text } from '#scripts/lib/error-message'
 import { epic_add, type AddChildrenInput } from './epic-add'
 import { epic_cli, type AddArguments, type CrossRepoAddTarget } from './epic-cli'
 import { epic_decide } from './epic-decide'
-import { epic_notify, type EpicNotice } from './epic-notify'
+import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
@@ -34,12 +34,6 @@ const USAGE = [
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 
-// `--notify`'s `planning` Telegram, sent only once the epic exists — an epic whose number could not be
-// read, or a promotion that failed, has nothing to announce.
-async function announce(is_notified: boolean, notice: EpicNotice | undefined): Promise<void> {
-	if (is_notified && notice !== undefined) await epic_notify.send(notice)
-}
-
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
 
@@ -57,9 +51,9 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 		origin: parsed.origin,
 		title: parsed.title,
 	})
-	const is_promoted = exit_code === SUCCESS_EXIT_CODE
+	const promoted = exit_code === SUCCESS_EXIT_CODE ? parsed.epic_number : undefined
 
-	await announce(parsed.is_notified, is_promoted ? parsed : undefined)
+	await epic_notify.announce(parsed, promoted)
 
 	return exit_code
 }
@@ -201,9 +195,8 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 		is_ordered: parsed.is_ordered,
 		origin: parsed.origin,
 	})
-	const notice = epic_number === undefined ? undefined : { ...parsed, epic_number }
 
-	await announce(parsed.is_notified, notice)
+	await epic_notify.announce(parsed, epic_number)
 
 	return SUCCESS_EXIT_CODE
 }

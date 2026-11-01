@@ -1,7 +1,7 @@
 {
-	"reason": "epic --notify sends the split path's planning Telegram (#5637): a new epic-notify module, the --notify switch, the .env load and the shared send_planning",
+	"reason": "epic --notify sends the split path's planning Telegram (#5637): a new epic-notify module with announce, the --notify switch, the .env load and the shared send_planning",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 61
+		"scripts.code_lines": 66
 	}
 }
