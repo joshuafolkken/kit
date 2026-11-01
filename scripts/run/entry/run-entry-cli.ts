@@ -44,8 +44,9 @@ import { run_entry_trust, type TrustStop } from './run-entry-trust'
 const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
-const USAGE = 'Usage: josh run:entry <issue-number> [--to kickoff|halfrun|prrun|fullrun]'
+const USAGE = 'Usage: josh run:entry <issue-number> [--to kickoff|halfrun|prrun|fullrun] [--adopt]'
 const TO_FLAG = '--to'
+const ADOPT_FLAG = '--adopt'
 // The flag and its command.
 const TO_ARGUMENT_COUNT = 2
 const should_forward_stderr = true
@@ -78,6 +79,8 @@ function parse_number(argv: ReadonlyArray<string>): string | undefined {
 interface EntryRequest {
 	issue_number: string
 	command: StageCommand
+	// A `new` run's entry once its Issue is filed: the bare hold is re-keyed, not claimed afresh.
+	is_adopt: boolean
 }
 
 // `--to <command>` names how far the run goes; absent, it is `fullrun`.
@@ -92,11 +95,26 @@ function parse_command(rest: ReadonlyArray<string>): StageCommand | undefined {
 	return run_stage.to_command(value)
 }
 
+// `--adopt` may stand before or after `--to <command>`, once — never with `kickoff`, which claims
+// nothing, so the adopt would be dropped silently.
+function adopt_flag(rest: ReadonlyArray<string>, command: StageCommand): boolean | undefined {
+	const count = rest.filter((argument) => argument === ADOPT_FLAG).length
+
+	if (count > 1 || (count === 1 && command === run_stage.KICKOFF)) return undefined
+
+	return count === 1
+}
+
 function parse_request(argv: ReadonlyArray<string>): EntryRequest | undefined {
 	const issue_number = parse_number(argv.slice(0, 1))
-	const command = parse_command(argv.slice(1))
+	const rest = argv.slice(1)
+	const command = parse_command(rest.filter((argument) => argument !== ADOPT_FLAG))
 
-	return issue_number === undefined || command === undefined ? undefined : { issue_number, command }
+	if (issue_number === undefined || command === undefined) return undefined
+
+	const is_adopt = adopt_flag(rest, command)
+
+	return is_adopt === undefined ? undefined : { issue_number, command, is_adopt }
 }
 
 function first_line(out: string): string {
@@ -107,12 +125,18 @@ function first_line(out: string): string {
 // stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
 // hold as a run whose implementation cut resumes as `fullrun #N` — a
 // `fullrun`'s, and a `prrun`'s, which runs `fullrun`'s steps; a `halfrun`'s hold is never marked.
-async function claim_hold(issue_number: string, command: StageCommand): Promise<string> {
+// `--adopt` re-keys a `new` run's bare hold instead (`run:hold --adopt`), answering `none` or `busy`
+// when there is none to hand over — either stops the entry as a held tree does.
+function hold_argv({ issue_number, command, is_adopt }: EntryRequest): Array<string> {
+	if (is_adopt) return ['run:hold', ADOPT_FLAG, issue_number]
+
 	const mark = command === run_stage.HALFRUN ? [] : ['--fullrun']
-	const held = await josh_command.josh_run(
-		['run:hold', issue_number, ...mark],
-		should_forward_stderr,
-	)
+
+	return ['run:hold', issue_number, ...mark]
+}
+
+async function claim_hold(request: EntryRequest): Promise<string> {
+	const held = await josh_command.josh_run(hold_argv(request), should_forward_stderr)
 
 	return first_line(held.out)
 }
@@ -370,7 +394,7 @@ async function proceed(
 
 async function claim_run(request: EntryRequest, state: StageState): Promise<number> {
 	const { issue_number, command } = request
-	const hold = await claim_hold(issue_number, command)
+	const hold = await claim_hold(request)
 
 	if (hold !== run_hold_cli.HOLD_VERDICT) {
 		const parts = { issue_number, hold, cost: run_entry.COST_SKIPPED, report: HOLD_STOP_NOTE }

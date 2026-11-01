@@ -1,0 +1,8 @@
+{
+	"reason": "run:entry --adopt: a new run's entry folds into the #N entry (#5629)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 12,
+		"ai_cost.on_demand_bytes": 31
+	}
+}
