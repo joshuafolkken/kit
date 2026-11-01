@@ -7,15 +7,16 @@ import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
 import { test_related_pins } from './test-related-pins'
 import { related_scope } from './test-related-scope'
 
-// **A changed file whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs
-// only the tests importing it directly** (joshuafolkken/kit#5532), as a file every test imports does
+// **A change whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs only the
+// tests importing its widest files directly** (joshuafolkken/kit#5532, #5702), as a file every test imports does
 // (`direct-importers.ts`): the tests past them stay unchecked here, for `josh gate`'s whole suite and
 // CI to run. `--keep-whole-suite` (the gate's unit leg) lifts the cap, and so does a missing graph.
 
 type CountReader = (files: ReadonlyArray<string>) => Promise<Array<ReachedCount> | undefined>
 
 // The changed files that narrow to their direct importers, each with those importers, and the ones of
-// them the cap narrowed.
+// them the cap narrowed — widest reach first, so the first is the hub that put the run past the cap
+// (joshuafolkken/kit#5699).
 interface CappedImporters {
 	importers: ReadonlyMap<string, ReadonlyArray<string>>
 	over_cap: ReadonlyArray<string>
@@ -23,11 +24,21 @@ interface CappedImporters {
 
 const NO_CAP: CappedImporters = { importers: new Map(), over_cap: [] }
 
+function reach_sum(counts: ReadonlyArray<ReachedCount>): number {
+	return counts.reduce((sum, reached) => sum + reached.count, 0)
+}
+
+// Widest reach first, until the reach of the files left whole sums within the cap: past the cap is the
+// change, not one file — a spread of files each under it runs as wide as one hub (joshuafolkken/kit#5702).
 function over_cap_of(
 	counts: ReadonlyArray<ReachedCount>,
 	max_tests = test_pinned_logic.MAX_TEST_FILES,
 ): Array<string> {
-	return counts.filter((reached) => reached.count > max_tests).map((reached) => reached.file)
+	const widest = counts.toSorted((first, second) => second.count - first.count)
+	const fits = widest.findIndex((_, index) => reach_sum(widest.slice(index)) <= max_tests)
+	const narrowed = fits === -1 ? widest : widest.slice(0, fits)
+
+	return narrowed.map((reached) => reached.file)
 }
 
 // The code files the cap is read for: in the tree, not a test, and not narrowed already — a change of
@@ -90,18 +101,29 @@ async function capped_importers(
 	return { importers: new Map([...every_test, ...capped]), over_cap: capped.map(([file]) => file) }
 }
 
-// The summary line of a capped run, none where the cap narrowed nothing.
-function over_cap_line(over_cap: ReadonlyArray<string>): string | undefined {
-	if (over_cap.length === 0) return undefined
-	const { COMMAND_LABEL } = related_scope
-	const cap = String(test_pinned_logic.MAX_TEST_FILES)
-	const count = String(over_cap.length)
+// The test files the capped files run instead of their reach — their direct importers and a registry's
+// pinned tests, counted once.
+function capped_test_count(capped: CappedImporters): number {
+	const tests = capped.over_cap.flatMap((file) => capped.importers.get(file) ?? [])
 
-	return `${COMMAND_LABEL}: ${count} over cap (${cap} test files) — direct importers only, the rest unchecked: ${over_cap.join(', ')}`
+	return new Set(tests).size
 }
 
-function report_over_cap(over_cap: ReadonlyArray<string>): void {
-	const line = over_cap_line(over_cap)
+// The summary line of a capped run, none where the cap narrowed nothing: the hub, and how many test
+// files ran in place of the reach (joshuafolkken/kit#5699).
+function over_cap_line(capped: CappedImporters): string | undefined {
+	const { over_cap } = capped
+	const [hub] = over_cap
+	if (hub === undefined) return undefined
+	const { COMMAND_LABEL } = related_scope
+	const cap = String(test_pinned_logic.MAX_TEST_FILES)
+	const ran = String(capped_test_count(capped))
+
+	return `${COMMAND_LABEL}: ${String(over_cap.length)} over cap (${cap} test files), hub ${hub} — ${ran} test files run, the rest unchecked: ${over_cap.join(', ')}`
+}
+
+function report_over_cap(capped: CappedImporters): void {
+	const line = over_cap_line(capped)
 
 	if (line !== undefined) process.stdout.write(`${line}\n`)
 }

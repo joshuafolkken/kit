@@ -4,6 +4,7 @@ const read_issue_mock = vi.hoisted(() => vi.fn())
 const is_pending_mock = vi.hoisted(() => vi.fn())
 const prrun_token_mock = vi.hoisted(() => vi.fn())
 const open_pr_mock = vi.hoisted(() => vi.fn())
+const read_plan_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
@@ -11,6 +12,9 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 vi.mock('./run-halfrun-resume', () => ({ run_halfrun_resume: { is_pending: is_pending_mock } }))
 vi.mock('./run-prrun-resume', () => ({ run_prrun_resume: { resume_token: prrun_token_mock } }))
 vi.mock('./run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: read_plan_mock },
+}))
 
 const { run_stage_read } = await import('./run-stage-read')
 const { run_stage } = await import('./run-stage')
@@ -27,6 +31,31 @@ beforeEach(() => {
 	is_pending_mock.mockReset().mockResolvedValue(false)
 	prrun_token_mock.mockReset().mockResolvedValue(undefined)
 	open_pr_mock.mockReset().mockResolvedValue(false)
+	read_plan_mock.mockReset().mockResolvedValue(undefined)
+})
+
+// joshuafolkken/kit#5700: a fullrun lane's `issue:plan` posts the plan comment without `run:planned`, so
+// the lane dispatched again after a yield reads the comment as its recorded plan.
+describe('run_stage_read.read_stage — a plan recorded before a yield', () => {
+	it('reads a plan comment without the label as planned, so the run starts at implement', async () => {
+		read_issue_mock.mockResolvedValue(open_with(['run:lane']))
+		read_plan_mock.mockResolvedValue('## 計画')
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read_plan_mock).toHaveBeenCalledWith(Number(ISSUE))
+		expect(read.state).toBe(run_stage.PLANNED)
+		expect(run_stage.decide(read.state, 'fullrun').start).toBe('implement')
+	})
+
+	it('starts from the plan as before when neither the label nor a plan comment is recorded', async () => {
+		read_issue_mock.mockResolvedValue(open_with(['run:lane']))
+
+		const read = await run_stage_read.read_stage(ISSUE)
+
+		expect(read.state).toBe(run_stage.FRESH)
+		expect(run_stage.decide(read.state, 'fullrun').start).toBe('plan')
+	})
 })
 
 describe('run_stage_read.read_stage — an existing fullrun pull request', () => {

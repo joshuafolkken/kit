@@ -56,6 +56,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh sync` · `josh sy` | — | developer | files | Sync config files |
 | `josh sync:scope` | `[--staged] [--json]` | automation | none | Say whether this change touches a file josh sync distributes |
 | `josh ui:routes` | `[--staged]` | automation | none | List the screenshot-target routes the current change touches |
+| `josh ui:shot` | `<route> [route...]` | automation | processes | Capture routes with this project's own screenshot command |
 | `josh uninstall` · `josh un` | `[--profile basic\|full] [--yes]` | developer | files, processes | Remove what kit added to a project and list what is left to review by hand |
 
 ## Workflow
@@ -183,7 +184,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
-| `josh lane:stats` · `josh lst` | `--period <days> [--limit <lane-limit>]` | maintainer | none | Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used |
+| `josh lane:stats` · `josh lst` | `--period <days> [--limit <lane-limit> \| --sinks [<minutes>]]` | maintainer | none | Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold |
 | `josh lane:value` · `josh lva` | `<metric> --since <instant>` | maintainer | none | Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit) |
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure |
 | `josh oracle:list` | — | automation | none | Print the decision oracles — commands that answer a rule question mechanically |
@@ -198,7 +199,6 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh retrospective` · `josh rtr` · **kit only** | — | maintainer | none | Aggregate a finished run's cost, review findings, observation ledger and events into one digest |
 | `josh review:attest` | `<nonce> \| --check` | automation | files | Record, or verify, which checkout a /code-review actually read |
 | `josh review:brief` | `[--round <1\|2>] \| --interaction \| --level-only [--staged] [--json]` | automation | files | Print the whole /code-review invocation: level, what the gate already proved, target (--level-only for the level alone) |
-| `josh review:lint` | `[--round <1\|2>] (reads stdin)` | automation | none | Check a review's markdown on stdin against the review rubric's output format, round 1 or with --round 2 the verification pass |
 | `josh review:round2` | `[--record <N>] [--json]` | automation | network | Say whether the second /code-review round is due, or may be skipped entirely |
 | `josh review:selfcheck` | — | automation | files, processes | Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command |
 | `josh review:submit` | `[--interaction] [--review <absolute-path> [--round <1\|2>]] < findings \| … --none` | automation | files | Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call |
@@ -221,7 +221,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
-| `josh run:report` | `[--handoff]` | automation | files, network | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
+| `josh run:report` | `[--handoff \| --end [--stopped "<reason>"]]` | automation | files, network, processes | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
 | `josh run:review` | `[--code-only] [--unpinned-ok "<reason>"] \| --join [--fixing] \| --pinned \| --push` | automation | processes, files, git, network | Start test:pinned and the gate in the background and write the /code-review brief to a file, printing its path, in one call so they overlap (--join to join them; it stops on an unpinned change) |
 | `josh run:status` | `<issue> [--repo <owner/repo>]` | automation | network | Bundle a run’s read-only status: issue state, cost verdict, carry counters |
 | `josh run:step` | `[<issue>]` | automation | network, files | Print the run’s next single action, computed from the event stream, carry record and issue state |
@@ -230,7 +230,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:wake` | `[options]` | automation | processes, notifications | Wake the next session of a cut backlogrun from outside the conversation |
 | `josh run:watcher:guard` | — | automation | none | Guard: exits non-zero when lane children are in-flight but the watcher has not pinged recently |
 | `josh ship` | `"<title> #<N>" [<follow-up-N> ...] [--cite <N>] [--review [--unpinned-ok "<reason>"]] [--detach] [--body-file <path>] [--notify-message <text> \| --notify-message-file <path>] \| --log <N>` | automation | git, network | Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the report bookkeeping, stopping at the first failed step |
-| `josh ship:evidence` | `<N> -- <command...>` | automation | files, processes | Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code) |
+| `josh ship:evidence` | `<N> [--fresh] -- <command...>` | automation | files, processes | Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code) |
 | `josh ship:wait` | `<N>` | automation | files, processes | Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned \| passed \| ended \| pending) |
 | `josh split:assess` | `[--json]` | automation | none | Measure the branch change size (tests excluded) and answer the split assessment size question: split \| single |
 | `josh stash:pop` | `<message>` | automation | git | Pop the stash matching this message, not whichever a shared stack has on top |

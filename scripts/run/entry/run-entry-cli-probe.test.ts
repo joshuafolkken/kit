@@ -9,7 +9,13 @@ const is_child_mock = vi.hoisted(() => vi.fn())
 const yield_mock = vi.hoisted(() => vi.fn())
 const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
+const print_once_mock = vi.hoisted(() => vi.fn(() => 0))
+const SECTION = vi.hoisted(() => ({ ENTRY: 'entry', PROGRESS: 'run:progress' }))
 const open_pr_mock = vi.hoisted(() => vi.fn())
+const labels_mock = vi.hoisted(() => vi.fn((): Array<string> => []))
+const fit_mock = vi.hoisted(() => vi.fn((_prep: { is_planned?: boolean }) => 'report'))
+const halfrun_adopt_mock = vi.hoisted(() => vi.fn(async () => true))
+const halfrun_pending_mock = vi.hoisted(() => vi.fn(async () => false))
 
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
@@ -19,7 +25,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {
 		read_issue: async () => ({
 			kind: 'state',
-			state: { state: 'OPEN', labels: [], is_human_review: false },
+			state: { state: 'OPEN', labels: labels_mock(), is_human_review: false },
 		}),
 	},
 }))
@@ -38,14 +44,21 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 		to_parts: () => ({ state: { state: 'OPEN' } }),
 	},
 }))
-vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => 'report' } }))
+vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: async () => undefined },
+}))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
 vi.mock('#scripts/run/run-step-section', () => ({
-	run_step_section: { print_section: print_section_mock },
+	run_step_section: {
+		...SECTION,
+		print_section: print_section_mock,
+		print_once: print_once_mock,
+	},
 }))
 vi.mock('#scripts/run/run-halfrun-resume', () => ({
-	run_halfrun_resume: { adopt: vi.fn(), is_pending: async () => false },
+	run_halfrun_resume: { adopt: halfrun_adopt_mock, is_pending: halfrun_pending_mock },
 }))
 vi.mock('#scripts/run/run-prrun-resume', () => ({
 	run_prrun_resume: { adopt: vi.fn(), resume_token: async () => undefined },
@@ -126,5 +139,72 @@ describe('run_entry_cli.run — the entry probe of a lane child', () => {
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(yield_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5696: outside a lane child the entry prints the progress watcher's section once,
+// after its own, since `run:progress --wait` starts in the background.
+describe('run_entry_cli.run — the progress watcher section', () => {
+	it('prints the watcher section once after the entry section outside a lane child', async () => {
+		is_child_mock.mockReturnValue(false)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(print_section_mock).toHaveBeenCalledExactlyOnceWith(SECTION.ENTRY)
+		expect(print_once_mock).toHaveBeenCalledExactlyOnceWith(SECTION.PROGRESS)
+		expect(print_section_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			print_once_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('prints no watcher section in a lane child', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(print_once_mock).not.toHaveBeenCalled()
+	})
+
+	it('prints no watcher section when the entry section fails', async () => {
+		is_child_mock.mockReturnValue(false)
+		print_section_mock.mockReturnValueOnce(1)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(1)
+		expect(print_once_mock).not.toHaveBeenCalled()
+	})
+
+	// A resumed stop skips the entry section, and its watcher still starts in the background.
+	it('prints the watcher section after the resume line of a halfrun stop', async () => {
+		is_child_mock.mockReturnValue(false)
+		josh_run_mock.mockReset().mockResolvedValueOnce(FRESH).mockResolvedValue(UNDER)
+		halfrun_pending_mock.mockResolvedValueOnce(true)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.at(-1)).toContain('resume:')
+		expect(print_section_mock).not.toHaveBeenCalled()
+		expect(print_once_mock).toHaveBeenCalledExactlyOnceWith(SECTION.PROGRESS)
+	})
+})
+
+// joshuafolkken/kit#5700: a lane dispatched again after a yield starts at the recorded plan, and the
+// report it prints tells it to skip the investigator.
+describe('run_entry_cli.run — a lane dispatched again after a yield', () => {
+	it('starts past the plan and hands the report the planned stage when the plan is recorded', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(['run:lane', 'run:planned'])
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('at: planned · to: fullrun · start: implement')
+		expect(fit_mock.mock.calls[0]?.[0]).toMatchObject({ is_planned: true })
+	})
+
+	it('starts from the plan as before when no plan was recorded before the yield', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(['run:lane'])
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('at: fresh · to: fullrun · start: plan')
+		expect(fit_mock.mock.calls[0]?.[0]).toMatchObject({ is_planned: false })
 	})
 })

@@ -1,0 +1,7 @@
+{
+	"reason": "test:related records and prints the over-cap hub and its run count, and lane:breakdown names it (#5699)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 26
+	}
+}

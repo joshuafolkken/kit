@@ -240,12 +240,19 @@ const LANE_COMMANDS: Record<string, CommandEntry> = {
 	'lane:stats': {
 		...MEASURE_ARGUMENTS,
 		description:
-			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used",
+			"Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold",
 		category: 'AI tools',
-		reference: ['--period <days> [--limit <lane-limit>]', 'maintainer', ['none']],
+		reference: [
+			'--period <days> [--limit <lane-limit> | --sinks [<minutes>]]',
+			'maintainer',
+			['none'],
+		],
 		default_script_arguments: ['stats'],
 		usage: {
-			examples: [{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" }],
+			examples: [
+				{ arguments: '--period 7', note: "a 7-day period's stage medians and maxima" },
+				{ arguments: '--period 1 --sinks', note: 'stage totals of the lanes over 30 net min' },
+			],
 		},
 	},
 	// One lane measurement as one number on the last line, for an Issue's measurement declaration

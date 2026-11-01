@@ -384,6 +384,8 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
+An issue with `run:planned` or a trusted plan comment reads as `planned`, and its `=== investigation ===` section says to skip the investigator — a lane dispatched again after a yield starts at its recorded plan.
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:entry` in detail".
 
 ### `josh run:status`
@@ -670,13 +672,17 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` 
 Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code).
 
 ```bash
-pnpm josh ship:evidence <N> -- pnpm josh <command>   # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> -- pnpm josh <command>           # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> --fresh -- pnpm josh <command>   # runs it even when this tree already holds a recorded run of it
 ```
 
 <!-- /usage -->
 
 The command runs with `NO_COLOR`; its invocation is written as a code span and the last 40 lines of its combined output in a fence, at the end of the draft's `## 実機証跡` section, the shape `josh ship`'s preflight reads.
 A draft is required: `josh run:prep <N>` writes it.
+
+A command already run on this tree with the same arguments is not run again: its recorded output tail and exit code are written, under a `reused: tree <hash> … at <time>` line in the draft (`scripts/gate/tree-verdict.ts`).
+The key sees only the tree, so `--fresh` runs a command that reads state outside it (GitHub, a server) again.
 
 ### `josh run:report`
 
@@ -685,8 +691,10 @@ A draft is required: `josh run:prep <N>` writes it.
 Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends.
 
 ```bash
-pnpm josh run:report             # print the report; the same text josh notify sends
-pnpm josh run:report --handoff   # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report                              # print the report; the same text josh notify sends
+pnpm josh run:report --handoff                    # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report --end                        # end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage
+pnpm josh run:report --end --stopped "<reason>"   # end a run that stopped: run:carry --end --stopped sends the confirmation
 ```
 
 <!-- /usage -->
@@ -748,7 +756,7 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 - `--mark` — record that a real report happened without printing a line (keeps the last line for `run:wake --list`).
 - `--path` — print the ambient heartbeat log's path and exit. Every heartbeat line is mirrored there, so `tail -F "$(pnpm josh run:progress --path)"` follows the run across a `backlogrun` session cut. Reads no run state, so it answers in a lane child too.
 - `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
-- `--wait` — start once in the background: each report goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.
+- `--wait` — start once in the background: as it starts it prints `progress-watcher.md` → "Progress while the run is quiet" once per session (a repeat names it in one line — `run:entry` has printed it first outside a lane child); each report then goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.
 - `--hours <n>` — how long the watcher lives (default 8 with `--wait`, 1 otherwise).
 - `--repo <owner/name>` — scopes the read.
 
@@ -1048,13 +1056,24 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold.
 
 ```bash
-pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 7           # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 net min
 ```
 
 <!-- /usage -->
+
+`--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
+lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
+(`lane-sinks.ts`).
+
+The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
+listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+
+A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
+only, not by Bash kind, since a transcript call names no lane.
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
@@ -1119,7 +1138,7 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
-A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
+A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column. Between the two, its `lane first lint:related` row takes each lane's first timed `lint:related`, over the lanes that ran one.
 
 Under `implement` and `start to plan`, each line is one call group, at most three per row, longest first: `<row> › <label> ×<count> <minutes>` (`test › test:related ×3 8.7 min`), the row left out under `start to plan`.
 
@@ -1127,7 +1146,7 @@ The label is the josh commands a Bash call chains, a `reserved-run` as what it w
 
 `editing & thinking` has no calls, so no lines; the overrun prompt's one-line form leaves them out (`lane-breakdown-calls.ts`).
 
-The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs`, and none when no run capped a file (`lane-breakdown-related.ts`).
+The changed files the lane's `josh test:related` runs narrowed past the reach cap get a line before the waits taken out, `test:related <N> over cap, in <capped> of <runs> runs, hub <file>` — the hub the most capped runs recorded, left off where none did — and none when no run capped a file (`lane-breakdown-related.ts`).
 
 The `ship followup` line names the check its CI wait waited on last, and when it settled (`(last check: e2e 150.0s)`), read off the lane's latest `ci-wait` row; a row that names none adds nothing (`lane-ci-path-stats.ts`).
 

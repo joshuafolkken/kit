@@ -176,12 +176,16 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code)',
 		category: 'AI tools',
-		reference: ['<N> -- <command...>', 'automation', ['files', 'processes']],
+		reference: ['<N> [--fresh] -- <command...>', 'automation', ['files', 'processes']],
 		usage: {
 			examples: [
 				{
 					arguments: '<N> -- pnpm josh <command>',
 					note: 'the run picks which command is the evidence; the format is written for it',
+				},
+				{
+					arguments: '<N> --fresh -- pnpm josh <command>',
+					note: 'runs it even when this tree already holds a recorded run of it',
 				},
 			],
 		},
@@ -216,13 +220,26 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends',
 		category: 'AI tools',
-		reference: ['[--handoff]', 'automation', ['files', 'network']],
+		// `--end` stops the `run:wake` supervisor process.
+		reference: [
+			'[--handoff | --end [--stopped "<reason>"]]',
+			'automation',
+			['files', 'network', 'processes'],
+		],
 		usage: {
 			examples: [
 				{ arguments: '', note: 'print the report; the same text josh notify sends' },
 				{
 					arguments: '--handoff',
 					note: 'print the backlogrun hand-off report and send it as the confirmation',
+				},
+				{
+					arguments: '--end',
+					note: 'end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage',
+				},
+				{
+					arguments: '--end --stopped "<reason>"',
+					note: 'end a run that stopped: run:carry --end --stopped sends the confirmation',
 				},
 			],
 		},

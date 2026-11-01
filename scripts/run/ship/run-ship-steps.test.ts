@@ -1,3 +1,4 @@
+import { followup_section } from '#scripts/followup/followup-section'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
@@ -170,7 +171,12 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		await step_for(STAGE.REPORT).run(ARGS, FRESH)
 
 		expect(josh_spy.mock.calls).toStrictEqual([
-			[['followup', TITLE, '--notify', 'done'], true],
+			[
+				['followup', TITLE, '--notify', 'done'],
+				true,
+				undefined,
+				followup_section.SHIPPED_ENVIRONMENT,
+			],
 			[['run:tail', ISSUE, '--cite', '#1'], true],
 		])
 	})

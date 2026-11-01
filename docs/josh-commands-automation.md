@@ -426,6 +426,20 @@ pnpm josh ui:routes --staged   # the staged diff instead
 
 A changed `+page` / `+layout` gives its own route, a changed shared component the routes that import it (a one-level `src/routes` scan). Empty output prints "no route derived"; `verify-ui` §1 narrows the list.
 
+### `josh ui:shot`
+
+<!-- usage: ui:shot -->
+
+Capture routes with this project's own screenshot command.
+
+```bash
+pnpm josh ui:shot / /blog
+```
+
+<!-- /usage -->
+
+It runs the first of `josh-app shot`, `josh-game shot` (listed in the toolkit's usage line) and a `shot` / `screenshot` / `verify:ui` script with the routes; that command prints the image paths and its exit status is the result. Nothing resolved prints the candidates tried and exits `1`.
+
 ### `josh propagate`
 
 <!-- usage: propagate -->

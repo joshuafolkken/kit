@@ -237,6 +237,15 @@ function resume_report(issue_number: string, resume: Resume): number {
 // first, as for any run; then the hold is adopted and the run goes to the gate, skipping everything up
 // to and including implementation. **A `prrun` stopped before its merge is resumed the same way**,
 // under the token that says what is left of it.
+// Outside a lane child the progress watcher's section, once per session: `run:progress --wait`
+// starts in the background, so the section it prints as it starts would reach the session only when
+// it exits (joshuafolkken/kit#5696).
+function print_watcher_section(): number {
+	if (lane_child_marker.is_child_of(process.cwd())) return SUCCESS_EXIT_CODE
+
+	return run_step_section.print_once(run_step_section.PROGRESS)
+}
+
 async function resume_stopped(
 	{ issue_number, command }: EntryRequest,
 	token: string,
@@ -258,7 +267,7 @@ async function resume_stopped(
 
 	console.info(`entry ${session_cite.issue(issue_number)} — resume: ${token}`)
 
-	return SUCCESS_EXIT_CODE
+	return print_watcher_section()
 }
 
 // The stopped run a decision picks up: a `halfrun` stop resumes at the gate, a `prrun` stop at
@@ -311,6 +320,16 @@ function yield_report(
 	return lane_plan_check.YIELD_EXIT_CODE
 }
 
+// The entry's own read — the split assessment every run answers before its work — printed here so
+// the reader does not spend a turn fetching it.
+function print_entry_sections(): number {
+	const code = run_step_section.print_section(run_step_section.ENTRY)
+
+	if (code !== SUCCESS_EXIT_CODE) return code
+
+	return print_watcher_section()
+}
+
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // — the label then shows in the `labels:` line the report below carries.
 // The plan event is written only once the run passed the trust gate.
@@ -335,14 +354,12 @@ async function proceed(
 
 	const code = emit_fitted(
 		{ issue_number, hold, cost, verdict: run_entry.stage_verdict(state, reads.verdict) },
-		reads.prep,
+		{ ...reads.prep, is_planned: state === run_stage.PLANNED },
 	)
 
-	// The entry's own read — the split assessment every run answers before its work — printed here so
-	// the reader does not spend a turn fetching it.
 	if (code !== SUCCESS_EXIT_CODE) return code
 
-	return run_step_section.print_section(run_step_section.ENTRY)
+	return print_entry_sections()
 }
 
 async function claim_run(request: EntryRequest, state: StageState): Promise<number> {

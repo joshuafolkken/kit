@@ -1,7 +1,7 @@
 # The progress watcher — every implementing run
 
-**"Progress while the run is quiet" is never fetched: `pnpm josh run:progress --wait` prints it as it
-starts, once per session.** It is a
+**"Progress while the run is quiet" is never fetched: `run:entry` prints it after its own section
+outside a lane child, and `run:progress --wait` as it starts — once per session.** It is a
 point-of-use document, never an entry read, and the single source of the heartbeat for `fullrun`,
 `halfrun`, `prrun` and the `backlogrun` parent alike. `kickoff` starts none.
 

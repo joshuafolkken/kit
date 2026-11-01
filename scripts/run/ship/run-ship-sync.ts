@@ -1,3 +1,4 @@
+import { followup_section } from '#scripts/followup/followup-section'
 import { git_gh_code_scanning } from '#scripts/gh/git-gh-code-scanning'
 import { git_gh_pr_read } from '#scripts/gh/git-gh-pr-read'
 import {
@@ -291,7 +292,8 @@ function ignore_wait(): void {
 }
 
 // The wait is marked only while `josh followup` runs: the merge again and its gate run unmarked, so a
-// lane gating here still holds its place (joshuafolkken/kit#4466).
+// lane gating here still holds its place (joshuafolkken/kit#4466). The followup carries the ship
+// marker, so it prints no section of its own (joshuafolkken/kit#5696).
 async function marked_followup(
 	title: string,
 	notify: ReadonlyArray<string>,
@@ -300,7 +302,12 @@ async function marked_followup(
 	mark(true)
 
 	try {
-		return await josh(['followup', title, ...notify])
+		return await josh_command.josh_run(
+			['followup', title, ...notify],
+			should_forward_stderr,
+			undefined,
+			followup_section.SHIPPED_ENVIRONMENT,
+		)
 	} finally {
 		mark(false)
 	}

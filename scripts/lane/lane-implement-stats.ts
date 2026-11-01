@@ -23,19 +23,22 @@ const SUB_STAGES = ['plan', 'read', 'edit', 'check', 'review-fix'] as const
 type SubStage = (typeof SUB_STAGES)[number]
 const [PLAN, READ, EDIT, CHECK, REVIEW_FIX] = SUB_STAGES
 type Totals = ReadonlyMap<SubStage, number>
+const LINT_RELATED = 'lint:related'
 
 const EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'MultiEdit', 'NotebookEdit', 'Write'])
 const CHECK_COMMANDS: ReadonlySet<string> = new Set([
 	'check:related',
 	'cspell:dot',
 	'gate',
-	'lint:related',
+	LINT_RELATED,
 	'metrics',
 	'test:pinned',
 	'test:related',
 ])
 const REVIEW_COMMANDS: ReadonlySet<string> = new Set(['review:brief', 'run:review'])
 const SHIP_COMMANDS: ReadonlySet<string> = new Set(['ship'])
+const LINT_COMMANDS: ReadonlySet<string> = new Set([LINT_RELATED])
+const FIRST_LINT_ROW = `lane first ${LINT_RELATED}`
 // `backgrounded` counts a subagent row's untimed calls (`lane-implement-subagents.ts`); a sub-stage has none.
 const COLUMNS = [
 	'implement sub-stage',
@@ -171,11 +174,9 @@ function lane_totals_in(
 	return implement_lanes(calls, window, paused).map((lane) => lane_totals(lane.calls, lane.paused))
 }
 
-function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string> {
-	const values = totals.map((lane) => lane.get(stage) ?? 0)
-
+function minutes_row(label: string, values: ReadonlyArray<number>): Array<string> {
 	return [
-		stage,
+		label,
 		String(values.length),
 		lane_stage_stats.cell(lane_stats.median(values)),
 		lane_stage_stats.cell(lane_stats.peak(values)),
@@ -183,14 +184,39 @@ function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string
 	]
 }
 
+function stage_row(stage: SubStage, totals: ReadonlyArray<Totals>): Array<string> {
+	return minutes_row(
+		stage,
+		totals.map((lane) => lane.get(stage) ?? 0),
+	)
+}
+
+// One lane's first timed `lint:related` less its paused overlap, or `undefined` when it ran none; a
+// backgrounded call, or one whose session ended before its result, has no duration to count.
+function first_lint_ms(lane: ImplementLane): number | undefined {
+	const first = lane.calls.find(
+		(call) => call.duration_ms !== undefined && runs_any(call, LINT_COMMANDS),
+	)
+
+	return first === undefined ? undefined : active_ms(first, NO_REACH, lane.paused)
+}
+
+// How many lanes a cold first `lint:related` held up (joshuafolkken/kit#5714); no row when none ran one.
+function first_lint_rows(lanes: ReadonlyArray<ImplementLane>): Array<Array<string>> {
+	const values = lanes.flatMap((lane) => first_lint_ms(lane) ?? [])
+
+	return values.length === 0 ? [] : [minutes_row(FIRST_LINT_ROW, values)]
+}
+
 // The period's table: `calls` is every lane session's calls, filtered here to `window`; `paused` is
-// each lane's paused spans (`lane-paused-spans.ts`). The sub-stages, then the subagents by agent type
-// (`lane-implement-subagents.ts`).
+// each lane's paused spans (`lane-paused-spans.ts`). The sub-stages, the lane first `lint:related` row,
+// then the subagents by agent type (`lane-implement-subagents.ts`).
 function table(calls: ReadonlyArray<ToolCall>, window: StatsWindow, paused: PausedSpans): string {
 	const lanes = implement_lanes(calls, window, paused)
 	const totals = lanes.map((lane) => lane_totals(lane.calls, lane.paused))
 	const rows = [
 		...SUB_STAGES.map((stage) => stage_row(stage, totals)),
+		...first_lint_rows(lanes),
 		...lane_implement_subagents.rows(lanes),
 	]
 

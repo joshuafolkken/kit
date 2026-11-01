@@ -9,6 +9,8 @@ import { MS_PER_SECOND } from '#scripts/lib/timeouts'
 import { lane_capacity } from './lane-capacity'
 import { lane_net_read } from './lane-net-read'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
+import { lane_sinks } from './lane-sinks'
+import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
@@ -39,13 +41,18 @@ const VALUE_DIGITS = 2
 const USAGE = [
 	'Usage: josh lane:sample [--every <seconds>]',
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
+	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
 	`       josh lane:value ${CELL_METRIC} --table <title> --row <label> --column <header> --since <instant>`,
 	'       josh lane:net <issue>',
 ].join('\n')
 
 const SAMPLE_OPTIONS = { every: { type: 'string' } } as const
-const STATS_OPTIONS = { period: { type: 'string' }, limit: { type: 'string' } } as const
+const STATS_OPTIONS = {
+	period: { type: 'string' },
+	limit: { type: 'string' },
+	sinks: { type: 'boolean' },
+} as const
 const VALUE_OPTIONS = {
 	since: { type: 'string' },
 	table: { type: 'string' },
@@ -134,22 +141,90 @@ async function period_records(
 	}
 }
 
+interface StatsRequest {
+	period_days: number
+	limit: string | undefined
+	// The `--sinks` threshold in minutes, `undefined` for the period's row and tables.
+	sinks: number | undefined
+}
+
+// The sinks table labels no lane limit, so `--limit` beside `--sinks` is refused.
+function sink_threshold(
+	limit: string | undefined,
+	positionals: ReadonlyArray<string>,
+): number | undefined {
+	const [given, ...more] = positionals
+
+	if (limit !== undefined) return undefined
+
+	if (given === undefined) return lane_sinks.DEFAULT_MINUTES
+
+	return more.length === 0 ? positive(given) : undefined
+}
+
+// `--sinks` reads one optional threshold after it; without the flag a positional is refused.
+function sink_choice(
+	values: { sinks?: boolean | undefined; limit?: string | undefined },
+	positionals: ReadonlyArray<string>,
+): { minutes: number | undefined } | undefined {
+	if (values.sinks === true) {
+		const minutes = sink_threshold(values.limit, positionals)
+
+		return minutes === undefined ? undefined : { minutes }
+	}
+
+	return positionals.length === 0 ? { minutes: undefined } : undefined
+}
+
+function stats_request(rest: ReadonlyArray<string>): StatsRequest | undefined {
+	const parsed = cli_flags.arguments_of(rest, STATS_OPTIONS)
+
+	if (parsed === undefined) return undefined
+
+	const period_days = positive(parsed.values.period)
+	const choice = sink_choice(parsed.values, parsed.positionals)
+
+	if (period_days === undefined || choice === undefined) return undefined
+
+	return { period_days, limit: parsed.values.limit, sinks: choice.minutes }
+}
+
+// The sinks table reads the ledger and the event stream alone — no lane's transcript (`lane-sinks.ts`).
+async function stats_text(
+	request: StatsRequest,
+	context: MeasureContext,
+	window: StatsWindow,
+): Promise<string> {
+	if (request.sinks !== undefined) {
+		const sources = {
+			entries: await lane_net_read.read_ledger(context),
+			events: await lane_net_read.read_events(context),
+		}
+
+		const issues = await lane_sinks_issues.read()
+
+		return session_cite.text(lane_sinks.table(sources, window, request.sinks, issues))
+	}
+
+	const records = await period_records(context, window)
+	const label = { limit: await limit_label(request.limit), period_days: request.period_days }
+	const row = lane_stats.row(records.entries, window, label)
+	const tables = lane_stats_tables.tables_of(records, window)
+
+	return [`${lane_stats.header()}\n${row}`, ...tables].join('\n\n')
+}
+
 async function stats_command(
 	rest: ReadonlyArray<string>,
 	context: MeasureContext,
 ): Promise<number> {
-	const values = cli_flags.values_of(rest, STATS_OPTIONS)
-	const period_days = positive(values?.period)
+	const request = stats_request(rest)
 
-	if (values === undefined || period_days === undefined) return refuse()
+	if (request === undefined) return refuse()
 
-	const window = lane_stats.window_of(period_days, context.now_ms ?? Date.now())
-	const label = { limit: await limit_label(values.limit), period_days }
-	const records = await period_records(context, window)
-	const row = lane_stats.row(records.entries, window, label)
-	const tables = lane_stats_tables.tables_of(records, window)
+	const window = lane_stats.window_of(request.period_days, context.now_ms ?? Date.now())
 
-	console.info([`${lane_stats.header()}\n${row}`, ...tables].join('\n\n'))
+	console.info(await stats_text(request, context, window))
 
 	return 0
 }

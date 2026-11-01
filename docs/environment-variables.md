@@ -4,7 +4,7 @@ Every environment variable kit reads, in one place. Set the ones you need in a `
 
 Only these load `.env` themselves, and only when it exists:
 
-- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`, `josh upstream:interrupt`, and `josh issue:plan`, whose `--planned` sends the planning Telegram.
+- **Workflow** — `josh notify`, `josh followup`, `josh ship`, `josh backlogrun`, `josh backlog:drive`, `josh epic:next`, `josh upstream:interrupt`, `josh issue:plan`, whose `--planned` sends the planning Telegram, and `josh epic`, whose `--notify` sends the split path's.
 - **Run state** — `josh run:entry`, `josh run:hold`, `josh run:release`, `josh run:pause`, `josh run:step`, `josh run:event`, `josh run:carry`, `josh run:board`, `josh run:wake`, `josh run:merge`, and `josh issue:already-done` and `josh issue:measured`, which release the hold.
 - **Lanes** — every lane command except `lane:launch`: `josh lane:open`, `josh lane:close`, `josh lane:list`, `josh lane:prune`, `josh lane:output`, `josh lane:dispatch`, `josh lane:await`, `josh lane:limit`, `josh lane:restart`, `josh lane:withdraw`, `josh lane:pause`, `josh lane:resume`, `josh lane:plan`, `josh lane:adopt`, `josh lane:sample`, `josh lane:stats`, `josh lane:value`, `josh lane:net`, `josh lane:breakdown`.
 - **Setup** — `josh doctor`, `josh latest:scope`, `josh latest:if-required`, `josh latest:update`, `josh port`, `josh session:lang`.
@@ -174,6 +174,7 @@ kit sets these for the processes it starts, or writes them into a lane's own `.e
 | `JOSH_RUN_HEADLESS`         | the run supervisor             | This session was launched headless by the supervisor.                                                                                   |
 | `JOSH_SHIP_SUPERVISED`      | `josh ship --detach`           | This `josh ship` runs under the detached supervisor.                                                                                    |
 | `JOSH_SHIP_LAUNCH_ID`       | `josh ship --detach`           | The supervisor launch this `josh ship` belongs to.                                                                                      |
+| `JOSH_SHIP_FOLLOWUP`        | `josh ship`                    | This `josh followup` is the one a `josh ship` runs, so it prints no section of its own.                                                 |
 | `JOSH_SHIP_RETRY_PENDING`   | `josh ship`                    | `josh ship` will run this stage again on an infrastructure stop, so the AI review gate sends no confirmation for an unreadable listing. |
 | `JOSH_INIT_HANDED_OFF`      | `josh init`                    | `josh init` already handed off to the project's installed kit once.                                                                     |
 | `JOSH_WORKFLOW`             | `josh start`                   | `github`: the setup `josh start` runs records `josh.workflow`, so a `basic` project receives `.claude/settings.json`.                   |

@@ -21,7 +21,7 @@ const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const ENTRY_KEY = vi.hoisted(() => 'entry')
 
 vi.mock('#scripts/run/run-step-section', () => ({
-	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock },
+	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock, print_once: () => 0 },
 }))
 
 vi.mock('#scripts/issue/issue-watch', () => ({
@@ -30,6 +30,9 @@ vi.mock('#scripts/issue/issue-watch', () => ({
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: async () => undefined },
+}))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
@@ -67,7 +70,11 @@ const RELEASE_CALL = ['run:release', ISSUE]
 
 const info_lines: Array<string> = []
 
-function state_parts(state: string, is_human_review = false, latest_scope = 'skip'): unknown {
+function state_parts(
+	state: string,
+	is_human_review = false,
+	latest_scope = 'skip',
+): Record<string, unknown> {
 	return { issue_number: ISSUE, state: { state, is_human_review }, latest_scope }
 }
 
@@ -143,7 +150,7 @@ describe('run_entry_cli.run — a held tree in budget folds hold, cost, prep and
 		// joshuafolkken/kit#5213: the parts are fitted to the Bash cap on the composite they print in.
 		expect(
 			fit_mock.mock.calls.map(([parts, compose]) => [parts, compose(PREP_BODY)]),
-		).toStrictEqual([[state_parts('OPEN'), info_lines[1]]])
+		).toStrictEqual([[{ ...state_parts('OPEN'), is_planned: false }, info_lines[1]]])
 	})
 })
 

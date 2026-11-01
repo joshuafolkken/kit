@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats --sinks gains the open issues column (#5711)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 38
+	}
+}

@@ -7,6 +7,8 @@ import { lane_ledger, type LedgerEntry } from './lane-ledger'
 
 const ISSUE = 5532
 const OTHER_ISSUE = 5503
+const FIRST_HUB = 'scripts/a.ts'
+const SECOND_HUB = 'scripts/b.ts'
 
 function row(issue: number, over_cap?: number): LedgerEntry {
 	return {
@@ -30,6 +32,28 @@ describe('lane_breakdown_related.over_cap_text', () => {
 		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
 			'test:related 3 over cap, in 2 of 3 runs',
 		)
+	})
+
+	// joshuafolkken/kit#5699: the hub the most capped runs named is printed on the row.
+	it('names the hub the most capped runs recorded', () => {
+		const entries = [
+			{ ...row(ISSUE, 1), over_cap_hub: FIRST_HUB },
+			{ ...row(ISSUE, 2), over_cap_hub: SECOND_HUB },
+			{ ...row(ISSUE, 1), over_cap_hub: SECOND_HUB },
+		]
+
+		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toBe(
+			`test:related 4 over cap, in 3 of 3 runs, hub ${SECOND_HUB}`,
+		)
+	})
+
+	it('names the earliest recorded hub on a tie', () => {
+		const entries = [
+			{ ...row(ISSUE, 1), over_cap_hub: FIRST_HUB },
+			{ ...row(ISSUE, 1), over_cap_hub: SECOND_HUB },
+		]
+
+		expect(lane_breakdown_related.over_cap_text(entries, ISSUE)).toContain(`hub ${FIRST_HUB}`)
 	})
 
 	it('prints nothing where no run capped a file', () => {

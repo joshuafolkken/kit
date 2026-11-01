@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { project_checks } from '#scripts/gate/project-checks'
 import { changed_file_scope } from '#scripts/git/changed-file-scope'
 import {
@@ -12,10 +13,10 @@ import {
 	type BufferedProcessResult,
 } from '#scripts/lib/buffered-process'
 import { SKIP_MARKER } from '#scripts/test/skip-marker'
-import { time_format } from '#scripts/time-runtime/time-format'
 import { eslint_cache_dependencies } from './eslint-cache-dependencies'
-import { eslint_daemon } from './eslint-daemon'
+import { eslint_daemon, type DaemonState } from './eslint-daemon'
 import { lint_gate_scope } from './lint-gate-scope'
+import { lint_timing } from './lint-timing'
 
 // This — not the `lint:eslint` map entry — is the eslint invocation `josh gate` reaches, so the
 // cache flags come from the same constant the ignore rules are asserted against.
@@ -27,6 +28,7 @@ const ESLINT_ARGS = ['exec', 'eslint', WHOLE_TREE, ...ESLINT_CACHE_FLAGS] as con
 // Prettier's cache stays this checkout's own, never shared through `lane_cache_run` as eslint's is:
 // its entries do not survive a move (`josh-command-types.ts` → `GATE_CACHE_SPECS`).
 const PRETTIER_ARGS = ['exec', 'prettier', '--check', WHOLE_TREE, ...PRETTIER_CACHE_FLAGS] as const
+const GATE_TIMING_LABEL = 'lint'
 
 // What one eslint run is made of: the child's arguments and the cache file they name.
 interface EslintRun {
@@ -35,21 +37,36 @@ interface EslintRun {
 	warm_daemon: boolean
 }
 
+// The name a run's timing line carries and what it read (`lint-timing.ts`).
+interface LintRunTiming {
+	label: string
+	targets: string
+}
+
 // Whether eslint may go through the checkout's warm daemon (`eslint-daemon.ts`). `josh lint:related`
 // asks for it; the gate's own lint does not, so its whole-tree run stays one cold process of its own.
+// `josh lint:related` names a `timing` too, so its run prints where its seconds went (joshuafolkken/kit#5712).
 interface LintRunOptions {
 	warm_daemon: boolean
+	timing?: LintRunTiming | undefined
 }
 
 const COLD_RUN: LintRunOptions = { warm_daemon: false }
 
+// Whether the eslint cache was there once the lane's cache sharing had run, before eslint read it,
+// and what a warm run did with the daemon (`eslint_daemon.run_or_cold`).
+interface EslintResult extends BufferedProcessResult {
+	is_cached?: boolean | undefined
+	daemon?: DaemonState | undefined
+}
+
 interface LintPair {
 	prettier: BufferedProcessResult
-	eslint: BufferedProcessResult
+	eslint: EslintResult
 }
 
 // The warm daemon when asked for and reachable, else the cold `pnpm exec eslint` it falls back to.
-async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessResult> {
+async function run_eslint_process(eslint: EslintRun): Promise<EslintResult> {
 	if (eslint.warm_daemon) return await eslint_daemon.run_or_cold(eslint.args)
 
 	return await buffered_process.run_buffered_process(eslint.args)
@@ -57,14 +74,17 @@ async function run_eslint_process(eslint: EslintRun): Promise<BufferedProcessRes
 
 // The run sits inside the lane's cache sharing, between dropping the entries whose imports changed
 // and recording what the fresh ones read (`eslint-cache-dependencies.ts`).
-async function run_eslint(eslint: EslintRun): Promise<BufferedProcessResult> {
+async function run_eslint(eslint: EslintRun): Promise<EslintResult> {
 	const { cache_file } = eslint
 
 	return await lane_cache_run.run(cache_file, async () => {
-		return await eslint_cache_dependencies.guard(
+		const is_cached = existsSync(cache_file)
+		const result = await eslint_cache_dependencies.guard(
 			cache_file,
 			async () => await run_eslint_process(eslint),
 		)
+
+		return { ...result, is_cached }
 	})
 }
 
@@ -91,10 +111,7 @@ async function run_prettier(
 	return await buffered_process.run_buffered_process(prettier_args)
 }
 
-async function run_checked_eslint(
-	directory: string,
-	eslint: EslintRun,
-): Promise<BufferedProcessResult> {
+async function run_checked_eslint(directory: string, eslint: EslintRun): Promise<EslintResult> {
 	const reason = project_checks.eslint_skip_reason(directory)
 	if (reason !== undefined) return skipped('eslint', reason)
 
@@ -151,22 +168,47 @@ function write_lint_pair({ prettier, eslint }: LintPair): number {
 	return lint_exit_code(prettier, eslint)
 }
 
+function timing_line(pair: LintPair, label: string, facts: ReadonlyArray<string>): string {
+	const { prettier, eslint } = pair
+
+	return lint_timing.line({
+		label,
+		prettier_ms: prettier.elapsed_ms,
+		eslint_ms: eslint.elapsed_ms,
+		facts,
+	})
+}
+
+// A run that never asked for the daemon, or skipped eslint, names none.
+function daemon_fact(eslint: EslintResult): string {
+	return eslint.daemon ?? 'cold process'
+}
+
+function cache_fact(eslint: EslintResult): string {
+	return eslint.is_cached === true ? 'cache present' : 'cache absent'
+}
+
+// A run that names a `timing` prints its line after the linters' output: the tools' seconds, then
+// what it read, the daemon it found and the cache it started from (joshuafolkken/kit#5712).
 async function run_lint_checks(
 	prettier_args: ReadonlyArray<string>,
 	eslint_args: ReadonlyArray<string>,
 	cache_file: string,
 	options: LintRunOptions = COLD_RUN,
 ): Promise<number> {
-	return write_lint_pair(await run_lint_pair(prettier_args, eslint_args, cache_file, options))
-}
+	const { timing } = options
 
-// joshuafolkken/kit#5116: the gate times `lint` as one step, and the two tools run side by side, so
-// the step's seconds name neither tool as the long pole. This line, the gate's lint alone, does.
-function timing_line({ prettier, eslint }: LintPair): string {
-	const prettier_seconds = time_format.format_seconds(prettier.elapsed_ms)
-	const eslint_seconds = time_format.format_seconds(eslint.elapsed_ms)
+	if (timing === undefined) {
+		return write_lint_pair(await run_lint_pair(prettier_args, eslint_args, cache_file, options))
+	}
 
-	return `lint timing — prettier ${prettier_seconds} · eslint ${eslint_seconds}\n`
+	const pair = await run_lint_pair(prettier_args, eslint_args, cache_file, options)
+	const exit_code = write_lint_pair(pair)
+	const facts = [timing.targets, daemon_fact(pair.eslint), cache_fact(pair.eslint)]
+
+	process.stdout.write(timing_line(pair, timing.label, facts))
+
+	return exit_code
 }
 
 async function run_timed_lint_checks(
@@ -177,13 +219,14 @@ async function run_timed_lint_checks(
 	const pair = await run_lint_pair(prettier_args, eslint_args, cache_file, COLD_RUN)
 	const exit_code = write_lint_pair(pair)
 
-	process.stdout.write(timing_line(pair))
+	// joshuafolkken/kit#5116: the gate times `lint` as one step, so only this line names the long pole.
+	process.stdout.write(timing_line(pair, GATE_TIMING_LABEL, []))
 
 	return exit_code
 }
 
-async function run_lint_parallel_checks(): Promise<number> {
-	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE)
+async function run_lint_parallel_checks(options: LintRunOptions = COLD_RUN): Promise<number> {
+	return await run_lint_checks(PRETTIER_ARGS, ESLINT_ARGS, ESLINT_CACHE_FILE, options)
 }
 
 // `josh lint --changed`, the gate's lint: the branch's changed files on the gate's own caches, or the
@@ -220,4 +263,5 @@ const lint_parallel = {
 	run_lint_parallel_checks,
 }
 
+export type { LintRunTiming }
 export { ESLINT_ARGS, lint_parallel, PRETTIER_ARGS }

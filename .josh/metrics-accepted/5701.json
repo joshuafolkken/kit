@@ -1,0 +1,7 @@
+{
+	"reason": "lane:stats --sinks: new lane-sinks module with its tests, plus the review round's fractional-threshold fix and its regression test",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 131
+	}
+}

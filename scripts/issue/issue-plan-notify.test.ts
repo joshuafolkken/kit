@@ -93,3 +93,31 @@ describe('issue_plan_notify.send — the planning notification', () => {
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('offline'))
 	})
 })
+
+describe('issue_plan_notify.send_planning — the send every planning message shares', () => {
+	const MESSAGE = {
+		issue_number: '7',
+		body: 'a written body',
+		title: undefined,
+		repo: undefined,
+		command: 'epic',
+	}
+
+	it('sends the written body as a planning message on the checkout issue', async () => {
+		await issue_plan_notify.send_planning(MESSAGE)
+
+		expect(telegram_test.send_values).toHaveBeenCalledWith({
+			'task-type': 'planning',
+			body: MESSAGE.body,
+			'issue-url': 'https://github.com/joshuafolkken/kit/issues/7',
+		})
+	})
+
+	it('names the calling command when the send fails', async () => {
+		vi.mocked(telegram_test.send_values).mockRejectedValue(new Error('offline'))
+
+		await issue_plan_notify.send_planning(MESSAGE)
+
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('epic could not send'))
+	})
+})

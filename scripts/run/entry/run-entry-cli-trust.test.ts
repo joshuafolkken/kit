@@ -12,6 +12,9 @@ const read_issue_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
 vi.mock('#scripts/notify/telegram-notify', () => ({ telegram_notify: { confirm: confirm_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: async () => undefined },
+}))
 vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: { read_issue: read_issue_mock },
 }))
@@ -27,7 +30,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => '' } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
-vi.mock('#scripts/run/run-step-section', () => ({ run_step_section: { print_section: () => 0 } }))
+vi.mock('#scripts/run/run-step-section', () => ({
+	run_step_section: { print_section: () => 0, print_once: () => 0 },
+}))
 vi.mock('#scripts/run/run-halfrun-resume', () => ({
 	run_halfrun_resume: { is_pending: async () => false },
 }))

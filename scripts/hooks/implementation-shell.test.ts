@@ -102,6 +102,21 @@ describe('josh epic operations and rule:list', () => {
 	})
 })
 
+// joshuafolkken/kit#5706: `kickoff` drafts its consumers section with `plan:consumers`, a `git grep`
+// read, before `issue:plan` — so the consultation session passes it, and no other `plan:` command.
+describe('josh plan:consumers', () => {
+	it('passes pnpm josh plan:consumers run:board', () => {
+		expect(implementation_shell.is_unsafe('pnpm josh plan:consumers run:board')).toBe(false)
+	})
+
+	it.each(['pnpm josh plan:other', 'pnpm josh plan:consumers-all run:board'])(
+		'refuses the other plan command %s',
+		(command) => {
+			expect(implementation_shell.is_unsafe(command)).toBe(true)
+		},
+	)
+})
+
 // joshuafolkken/kit#5614: `auto-ok:judge` lists issues and records a judgement as an Issue comment
 // and label — the `judge` hand-back of `backlog:drive` a consultation session has to answer.
 describe('josh auto-ok operations', () => {
@@ -130,7 +145,7 @@ describe('operational shell reads and records', () => {
 		'git -C /tmp/repo diff --stat',
 		'git diff -- app.ts',
 		'pnpm josh review:attest nonce',
-		'pnpm josh review:lint',
+		'pnpm josh review:brief',
 		'pnpm josh backlog:plan --waves',
 		'gh pr view 123',
 		'cat app.ts 2>&1',
