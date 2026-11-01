@@ -84,6 +84,20 @@ Keeps caches of its own, apart from the gate's.
 - In kit, a green bare run also reports a metrics total grown past the merge-base (`josh metrics --totals-only`) as a notice; it changes no exit code and writes no approval file.
 - Also runs the fast byte-ceiling check on any changed agent-read document, sharing `document-byte-budget.ts`: a documentation update over its ceiling fails here in seconds, and the green record is withheld until both lint and the byte check pass.
 
+### `josh lint:rule`
+
+<!-- usage: lint:rule -->
+
+Run one eslint rule over the whole repository on a cache of its own and write the rule's violations to a file.
+
+```bash
+pnpm josh lint:rule kit/no-measurement-comment
+pnpm josh lint:rule kit/no-measurement-comment --config eslint.tmp.config.js       # a temporary config
+pnpm josh lint:rule kit/no-measurement-comment --output .josh/tmp/violations.txt
+```
+
+<!-- /usage -->
+
 ### `josh lines`
 
 <!-- usage: lines -->

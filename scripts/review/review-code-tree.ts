@@ -46,15 +46,31 @@ function load_typescript(root: string): TypeScriptApi | undefined {
 	}
 }
 
+function text_digest(api: TypeScriptApi, text: string, relative: string): string | undefined {
+	const code = comment_ranges.strip(api, text, is_svelte(relative))
+
+	return code === undefined ? undefined : stamp_file.digest(code)
+}
+
 function code_digest(api: TypeScriptApi, root: string, relative: string): string | undefined {
 	try {
-		const code = comment_ranges.strip(
-			api,
-			readFileSync(path.join(root, relative), 'utf8'),
-			is_svelte(relative),
-		)
+		return text_digest(api, readFileSync(path.join(root, relative), 'utf8'), relative)
+	} catch {
+		return undefined
+	}
+}
 
-		return code === undefined ? undefined : stamp_file.digest(code)
+// A path absent at `base` (a new file) or that does not parse there has no digest. `git show`'s
+// output arrives with its final newline stripped, which the working-tree file still ends in.
+async function base_digest(
+	api: TypeScriptApi,
+	base: string,
+	relative: string,
+): Promise<string | undefined> {
+	try {
+		const text = await git_command.show_file(`${base}:${relative}`)
+
+		return text_digest(api, `${text}\n`, relative)
 	} catch {
 		return undefined
 	}
@@ -118,6 +134,34 @@ function comment_only(
 	)
 }
 
-const review_code_tree = { comment_only, load_typescript, read, record, tree_of }
+// The paths whose code is what it was at `base` — whose difference from it, if any, is in comments.
+// Read before round 1 has recorded anything, so it compares against the base's blobs rather than a
+// round-1 snapshot (joshuafolkken/kit#5656).
+async function comment_only_since(
+	base: string,
+	paths: ReadonlyArray<string>,
+	root?: string,
+	api?: TypeScriptApi,
+): Promise<ReadonlyArray<string>> {
+	const checkout = root ?? (await git_command.repository_root())
+	const typescript = api ?? load_typescript(checkout)
+	if (typescript === undefined) return []
+	const tree = tree_of(checkout, paths, typescript)
+	const sources = Object.keys(tree)
+	const digests = await Promise.all(
+		sources.map(async (relative) => await base_digest(typescript, base, relative)),
+	)
+
+	return sources.filter((relative, index) => digests[index] === tree[relative])
+}
+
+const review_code_tree = {
+	comment_only,
+	comment_only_since,
+	load_typescript,
+	read,
+	record,
+	tree_of,
+}
 
 export { review_code_tree }

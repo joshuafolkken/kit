@@ -146,7 +146,7 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 			'File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',
+			'<title> --body-file <path> | --batch <dir> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',
 			'automation',
 			['network'],
 		],
@@ -155,9 +155,15 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 				{ arguments: '"<title>" --body-file body.md' },
 				{ arguments: '"<title>" --body-file body.md --route tier-a --repo joshuafolkken/kit' },
 				{ arguments: '"<title>" --body-file body.md --distinct 2801,2795' },
+				{ arguments: '--batch .josh/tmp/deferred --route tier-a' },
 			],
 			flags: [
-				{ names: [BODY_FILE], description: 'the body. Required.' },
+				{ names: [BODY_FILE], description: 'the body. Required unless `--batch`.' },
+				{
+					names: ['--batch <dir>'],
+					description:
+						'file every `*.md` body file in `<dir>`, in name order, in one call, with the other flags applied to each. A title is the front matter `title:`, else the first line; a front matter `distinct: <N,…>` is that filing’s `--distinct`. A refused filing stays unfiled, the rest are filed, and the summary names each; any refusal exits 1.',
+				},
 				{
 					names: ['--route <tier-a|split|interrupt|review-cap>'],
 					description:

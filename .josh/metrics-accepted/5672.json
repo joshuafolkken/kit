@@ -1,0 +1,7 @@
+{
+	"reason": "lane:plan records the cleared-path history so the hunks axis counts against it (#5672)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 11
+	}
+}

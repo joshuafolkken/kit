@@ -21,6 +21,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lines` · `josh ln` | `<files...>` | developer | none | Print a file's code lines against the max-lines limit and the headroom left |
 | `josh lint` · `josh l` | `[--changed]` | developer | processes | Check code with prettier and eslint (skips a tool a basic project lacks) |
 | `josh lint:related` · `josh lr` | `[files...]` | developer | processes | Check only the changed files with prettier and eslint, and in kit the source guard tests (whole tree on fallback) |
+| `josh lint:rule` · `josh lrr` | `<rule> [--config <path>] [--output <path>]` | developer | files, processes | Run one eslint rule over the whole repository on a cache of its own and write the rule's violations to a file |
 | `josh metrics` · `josh mt` · **kit only** | `[--no-startup \| --totals-only [--rerecord] \| --accept --reason "<why>"]` | developer | files | Print repository-wide quality totals and durations, and fail when a total grew past the merge-base or a duration past its baseline |
 | `josh port` · `josh pt` | `<dev\|preview>` | developer | none | Print the PORT_SEED-resolved dev or preview port |
 | `josh pr:classification` | — | automation | none | Require one release classification on a pull request |
@@ -154,7 +155,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:already-done` | `<issue> --evidence-file <path>` | automation | network, files | Exit an issue whose work is already merged: post the evidence, apply already-done, release the hold |
 | `josh issue:cite` | `<issue...> [--repo <owner/repo>]` | automation | network | Print the paste-ready number-link citation line for each issue, in one call |
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
-| `josh issue:file` | `<title> --body-file <path> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]` | automation | network | File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle |
+| `josh issue:file` | `<title> --body-file <path> \| --batch <dir> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]` | automation | network | File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle |
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
 | `josh issue:fold-existing` | `<assessment.json> [--json]` | automation | none | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
