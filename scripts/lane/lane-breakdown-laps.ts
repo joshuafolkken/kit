@@ -1,12 +1,14 @@
 import { lane_breakdown, type Breakdown, type Segment, type Stage } from './lane-breakdown'
 import { lane_breakdown_implement } from './lane-breakdown-implement'
+import { lane_breakdown_pause } from './lane-breakdown-pause'
 import { lane_ledger, type LedgerEntry, type ShipLapEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // What each ship stage of a lane's breakdown spent its time on (joshuafolkken/kit#5294): the laps the
 // ship wrote for its inner steps (`run-ship-lap.ts`), the lane's core-budget waits and the checks of
 // the lane's gates, each under the stage it ended in, and the time between two ship stages split by
-// the Bash the lane child ran there, by the implementation's kinds (`lane-breakdown-implement.ts`).
+// the park it went to (`lane-breakdown-pause.ts`), else by the Bash the lane child ran there, by the
+// implementation's kinds (`lane-breakdown-implement.ts`).
 // A lap and a wait or a check inside it overlap — the gate's wait for cores and its checks, run side
 // by side, are part of its `josh gate` lap — so a stage's laps can add up to more.
 
@@ -107,16 +109,32 @@ function counted(parts: ReadonlyArray<Stage>): Array<Stage> {
 	})
 }
 
-function between_of(
-	calls: ReadonlyArray<ToolCall>,
-	segments: ReadonlyArray<Segment>,
-): Array<Stage> {
-	const between = segments.filter((segment) => segment.stage === lane_breakdown.BETWEEN_STAGE)
+// A stretch between ship stages a park fell in, under the park's row and net of the waits taken out
+// (joshuafolkken/kit#5646); a stretch with no park is left to the Bash kinds.
+function paused_of(segment: Segment, breakdown: Breakdown): ReadonlyArray<Stage> {
+	const mark = lane_breakdown_pause.in_segment(breakdown.pauses ?? [], segment)
 
-	return lane_breakdown_implement.bash_kinds(calls, between)
+	if (mark === undefined) return []
+	const waited_ms = lane_breakdown.covered_ms(segment, breakdown.waits)
+
+	return [{ name: mark.name, ms: segment.to_ms - segment.from_ms - waited_ms }]
 }
 
-/** `issue`'s ship stages split by their laps, and the time between them by the lane child's Bash. */
+function between_of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<Stage> {
+	const between = breakdown.ship.filter((segment) => segment.stage === lane_breakdown.BETWEEN_STAGE)
+	const paused = between.map((segment) => paused_of(segment, breakdown))
+	const unpaused = between.filter((_segment, index) => paused[index]?.length === 0)
+
+	return lane_breakdown.ranked([
+		...paused.flat(),
+		...lane_breakdown_implement.bash_kinds(calls, unpaused),
+	])
+}
+
+/**
+ * `issue`'s ship stages split by their laps, and the time between them by the park it went to, else by
+ * the lane child's Bash.
+ */
 function of(
 	entries: ReadonlyArray<LedgerEntry>,
 	issue: number,
@@ -134,7 +152,7 @@ function of(
 			lane_breakdown.ranked(counted(parts)),
 		]),
 	)
-	const between = between_of(calls, breakdown.ship)
+	const between = between_of(calls, breakdown)
 
 	if (between.length > 0) laps.set(lane_breakdown.BETWEEN_STAGE, between)
 
