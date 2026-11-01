@@ -84,11 +84,42 @@ describe('lane_process_load.summarize', () => {
 	})
 })
 
+// joshuafolkken/kit#5658: the IDE and browser a person keeps open, summed by command-line name.
+describe('lane_process_load.resident_mb', () => {
+	const VSCODE = `${String(1024 * KB_PER_MB)} 3.0 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app`
+	const TESTING = `${String(512 * KB_PER_MB)} 9.0 /cache/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`
+
+	it('sums every process a resident app runs', () => {
+		expect(
+			lane_process_load.resident_mb(`${LISTING}\n${VSCODE}`, lane_process_load.RESIDENT_APPS),
+		).toBe(3072)
+	})
+
+	it("leaves Playwright's testing browser out of the person's own", () => {
+		expect(
+			lane_process_load.resident_mb(`${LISTING}\n${TESTING}`, lane_process_load.RESIDENT_APPS),
+		).toBe(2048)
+	})
+
+	it('sums only the names it is given', () => {
+		expect(lane_process_load.resident_mb(`${LISTING}\n${VSCODE}`, ['Visual Studio Code'])).toBe(
+			1024,
+		)
+	})
+
+	it('answers nothing with no names to match', () => {
+		expect(lane_process_load.resident_mb(LISTING, [])).toBeUndefined()
+	})
+})
+
 describe('lane_process_load.read', () => {
 	it('summarizes the live listing', async () => {
 		execa.mockResolvedValue({ stdout: LISTING })
 
-		await expect(lane_process_load.read()).resolves.toHaveLength(lane_process_load.TOP_KINDS)
+		const reading = await lane_process_load.read()
+
+		expect(reading?.processes).toHaveLength(lane_process_load.TOP_KINDS)
+		expect(reading?.resident_mb).toBe(2048)
 		expect(execa).toHaveBeenCalledWith(
 			'ps',
 			expect.any(Array),

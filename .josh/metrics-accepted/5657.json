@@ -1,0 +1,7 @@
+{
+	"reason": "Per-tree verdict reuse for lint:related and check:related (#5657), plus the review fixes: notices kept or asked again on a replay, the tool and env fingerprint in the tree key, and --full running fresh",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 112
+	}
+}

@@ -87,6 +87,85 @@ describe('lane_breakdown_pause.of', () => {
 	})
 })
 
+// joshuafolkken/kit#5649: what the lane redid after each pause, read up to the next one.
+const PREFLIGHT_START = 'preflight start'
+const GATE_START = 'gate start'
+const GATE_FAILED = 'gate failed'
+
+function stage(minute: number, words: string): RunEvent {
+	return event(minute, `#${String(ISSUE)} ${words}`, 'ship-stage')
+}
+
+function names_of(events: ReadonlyArray<RunEvent>): ReadonlyArray<string> {
+	return lane_breakdown_pause.of(events, ISSUE, SPAN).map((mark) => mark.name)
+}
+
+// A `--review` ship's stage starts in the order `josh ship` runs them, gate and round-2 side by side.
+const PRE_DETACH = 'pre-detach'
+const GATE_SIDE_BY_SIDE = ['gate', 'round-2']
+const REVIEW_SHIP = [
+	PRE_DETACH,
+	'preflight',
+	'sync',
+	'review',
+	...GATE_SIDE_BY_SIDE,
+	'commit',
+	'followup',
+	'report',
+]
+
+function starts(minute: number, stages: ReadonlyArray<string>): ReadonlyArray<RunEvent> {
+	return stages.map((name, index) => stage(minute + index / stages.length, `${name} start`))
+}
+
+describe('lane_breakdown_pause.of — what the lane redid after a pause', () => {
+	it('counts one --review ship after the pause as one run', () => {
+		const events = [event(12, WAITING_ON_5582), ...starts(20, REVIEW_SHIP)]
+
+		expect(names_of(events)).toStrictEqual(['pause for #5582 (ship ×1 re-run)'])
+	})
+
+	it('counts the ship runs after the pause, a resumed run that skips its first stages among them', () => {
+		const events = [
+			stage(5, PREFLIGHT_START),
+			stage(6, GATE_FAILED),
+			event(12, WAITING_ON_5582),
+			...starts(20, [PRE_DETACH, 'preflight', 'sync', ...GATE_SIDE_BY_SIDE]),
+			stage(25, GATE_FAILED),
+			stage(30, 'preflight skipped'),
+			...starts(31, [PRE_DETACH, 'sync', ...GATE_SIDE_BY_SIDE, 'commit']),
+		]
+
+		expect(names_of(events)).toStrictEqual(['pause for #5582 (ship ×2 re-run)'])
+	})
+
+	it('names a re-plan, and reads each pause only up to the next one', () => {
+		const events = [
+			event(12, WAITING_ON_5582),
+			event(13, '#5544 plan', 'plan'),
+			event(20, '#5544 waiting on #5600'),
+			stage(21, GATE_START),
+			stage(22, 'round-2 start'),
+			stage(23, GATE_START),
+			event(23, '#5545 implement', 'lane-phase'),
+		]
+
+		expect(names_of(events)).toStrictEqual([
+			'pause for #5582 (re-plan)',
+			'pause for #5600 (ship ×2 re-run)',
+		])
+	})
+})
+
+describe('lane_breakdown_pause.of — a pause the lane redid nothing after', () => {
+	it('leaves a pause the lane did nothing after as it was, and a lane with no pause without one', () => {
+		expect(names_of([event(12, WAITING_ON_5582), stage(13, 'gate done')])).toStrictEqual([
+			PAUSE_FOR_5582,
+		])
+		expect(names_of([stage(5, PREFLIGHT_START), stage(6, GATE_START)])).toStrictEqual([])
+	})
+})
+
 describe('lane_breakdown.of — the parks', () => {
 	it("carries the lane's parks between its dispatch and its merge", () => {
 		const entries: Array<LedgerEntry> = [
