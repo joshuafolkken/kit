@@ -1136,7 +1136,7 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
-A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
+A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column. Between the two, its `lane first lint:related` row takes each lane's first timed `lint:related`, over the lanes that ran one.
 
 Under `implement` and `start to plan`, each line is one call group, at most three per row, longest first: `<row> › <label> ×<count> <minutes>` (`test › test:related ×3 8.7 min`), the row left out under `start to plan`.
 

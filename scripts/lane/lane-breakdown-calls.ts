@@ -1,4 +1,6 @@
 import { command_memory } from '#scripts/gate/command-memory'
+import { lint_related_scope } from '#scripts/lint/lint-related-scope'
+import { lint_timing } from '#scripts/lint/lint-timing'
 import { git_argv } from '#scripts/rules/git-argv'
 import { shell_segments } from '#scripts/rules/shell-segments'
 import { lane_breakdown } from './lane-breakdown'
@@ -22,11 +24,14 @@ const WHITESPACE = /\s+/gu
 const ROUND_TWO_AGENT = 'reviewer-verification'
 const ROUND_ONE_AGENT = 'reviewer'
 const SEPARATOR = ' · '
+const LINT_RELATED = 'lint:related'
 
 interface CallGroup {
 	label: string
 	count: number
 	ms: number
+	// What the group's longest call said its seconds went on — the start to plan's `lint:related` alone.
+	detail?: string | undefined
 }
 
 // A call and the milliseconds it counted under its row.
@@ -117,11 +122,39 @@ function by_kind(parts: ReadonlyArray<KindCall>): Map<string, Array<CallGroup>> 
 	)
 }
 
-function group_text(group: CallGroup): string {
-	return `${group.label} ×${String(group.count)} ${lane_breakdown.minutes_text(group.ms)}`
+function names_lint_related(label: string): boolean {
+	return label.split(CHAIN).includes(LINT_RELATED)
 }
 
-const lane_breakdown_calls = { by_kind, group_text, label_of, top_of }
+// The timing line of the group's own longest call (`lint-timing.ts`).
+function lint_detail(label: string, timed: ReadonlyArray<TimedCall>): string | undefined {
+	const [longest] = timed
+		.filter(({ call }) => label_of(call) === label)
+		.toSorted((left, right) => right.ms - left.ms)
+
+	return longest === undefined
+		? undefined
+		: lint_timing.detail_of(lint_related_scope.COMMAND_LABEL, longest.call.output)
+}
+
+// Each `lint:related` group with what its longest call spent its seconds on (joshuafolkken/kit#5712):
+// a lane's first run is the outlier the start to plan is read for.
+function with_lint_detail(
+	groups: ReadonlyArray<CallGroup>,
+	timed: ReadonlyArray<TimedCall>,
+): Array<CallGroup> {
+	return groups.map((group) =>
+		names_lint_related(group.label) ? { ...group, detail: lint_detail(group.label, timed) } : group,
+	)
+}
+
+function group_text(group: CallGroup): string {
+	const text = `${group.label} ×${String(group.count)} ${lane_breakdown.minutes_text(group.ms)}`
+
+	return group.detail === undefined ? text : `${text} (${group.detail})`
+}
+
+const lane_breakdown_calls = { by_kind, group_text, label_of, top_of, with_lint_detail }
 
 export { lane_breakdown_calls }
 export type { CallGroup }
