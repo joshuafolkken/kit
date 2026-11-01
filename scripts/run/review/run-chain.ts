@@ -1,6 +1,5 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
-import { split_assess } from '#scripts/split/split-assess'
-import { split_measure } from '#scripts/split/split-measure'
+import { split_resolution } from '#scripts/split/split-resolution'
 
 // The stage runner behind `josh run:chain` (joshuafolkken/kit#5630): the main line's chain up to the
 // review in one call, not one model round trip per command. Each stage runs as its own `josh` command,
@@ -21,9 +20,10 @@ const RUN_REVIEW = 'run:review'
 
 type NextAction = (issue: string) => string
 
-// A notice a stage that exited 0 still stops on, read after it ends; `undefined` lets the run go on.
+// A notice a stage that exited 0 still stops on, read after it ends for the issue the run is on;
+// `undefined` lets the run go on.
 interface StageHold {
-	notice: () => Promise<string | undefined>
+	notice: (issue: string) => Promise<string | undefined>
 	next: NextAction
 }
 
@@ -52,14 +52,10 @@ function rerun(issue: string, from?: string): string {
 }
 
 // `main:merge` exits 0 on its split notice, which is answered before the cut (`split-assessment.md` →
-// "Over the guide before the gate"), so the chain re-reads the notice from the same measurement rather
-// than run the review on it. An unmeasurable diff holds nothing: `main:merge` already said so.
-async function split_notice(): Promise<string | undefined> {
-	try {
-		return split_assess.notice(await split_measure.read_branch())
-	} catch {
-		return undefined
-	}
+// "Over the guide before the gate"), so the chain holds on the check the cut refuses with
+// (`split-unresolved`): a notice on record with neither a recorded reason nor a split child.
+async function split_notice(issue: string): Promise<string | undefined> {
+	return await split_resolution.ledger_refusal(Number(issue))
 }
 
 const MERGE_STAGE: ChainStage = {
@@ -115,9 +111,9 @@ async function josh_stage(argv: ReadonlyArray<string>): Promise<JoshResult> {
 	return await josh_command.josh_run(argv, true)
 }
 
-async function held(stage: ChainStage): Promise<ChainStop | undefined> {
+async function held(stage: ChainStage, issue: string): Promise<ChainStop | undefined> {
 	if (stage.hold === undefined) return undefined
-	const notice = await stage.hold.notice()
+	const notice = await stage.hold.notice(issue)
 
 	return notice === undefined
 		? undefined
@@ -127,6 +123,7 @@ async function held(stage: ChainStage): Promise<ChainStop | undefined> {
 // The stage's stdout is printed as it ends; stderr is forwarded as it is written.
 async function run_stage(
 	stage: ChainStage,
+	issue: string,
 	print: Print,
 	run: StageRunner,
 ): Promise<ChainStop | undefined> {
@@ -135,17 +132,18 @@ async function run_stage(
 	if (result.out !== '') print(result.out)
 	if (result.code !== SUCCESS_EXIT_CODE) return { stage, code: result.code, next: stage.next }
 
-	return await held(stage)
+	return await held(stage, issue)
 }
 
 async function run_stages(
 	stages: ReadonlyArray<ChainStage>,
+	issue: string,
 	print: Print,
 	run: StageRunner = josh_stage,
 ): Promise<ChainStop | undefined> {
 	for (const stage of stages) {
 		// eslint-disable-next-line no-await-in-loop -- each stage runs on the tree the earlier ones left
-		const stop = await run_stage(stage, print, run)
+		const stop = await run_stage(stage, issue, print, run)
 
 		if (stop !== undefined) return stop
 	}

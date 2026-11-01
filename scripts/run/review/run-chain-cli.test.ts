@@ -1,4 +1,4 @@
-import { split_assess } from '#scripts/split/split-assess'
+import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
 
@@ -7,11 +7,9 @@ const josh_run_mock = vi.hoisted(() =>
 )
 
 vi.mock('#scripts/josh/josh-run', () => ({ josh_command: { josh_run: josh_run_mock } }))
-vi.mock('#scripts/split/split-measure', () => ({
-	split_measure: { read_branch: vi.fn(async () => ({})) },
-}))
 
-const SPLIT_NOTICE = 'split notice: 12 files over the guide'
+const SPLIT_REFUSAL = 'split notice unresolved: record a reason or file a split child'
+const ISSUE_NUMBER = 5630
 
 const MAIN_MERGE = 'main:merge'
 const SELFCHECK = 'review:selfcheck'
@@ -42,7 +40,7 @@ function stop_at(name: string): void {
 beforeEach(() => {
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
-	vi.spyOn(split_assess, 'notice').mockReturnValue(undefined)
+	vi.spyOn(split_resolution, 'ledger_refusal').mockResolvedValue(undefined)
 	info_lines.length = 0
 	error_lines.length = 0
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
@@ -100,13 +98,14 @@ describe('run_chain_cli.run — main:merge', () => {
 		)
 	})
 
-	it('holds after main:merge on its split notice, before the review stages', async () => {
-		vi.mocked(split_assess.notice).mockReturnValue(SPLIT_NOTICE)
+	it('holds after main:merge on an unanswered split notice, before the review stages', async () => {
+		vi.mocked(split_resolution.ledger_refusal).mockResolvedValue(SPLIT_REFUSAL)
 
 		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(1)
 
+		expect(split_resolution.ledger_refusal).toHaveBeenCalledWith(ISSUE_NUMBER)
 		expect(ran()).toStrictEqual([[MAIN_MERGE]])
-		expect(error_lines.join('\n')).toContain(`stopped at main:merge (${SPLIT_NOTICE})`)
+		expect(error_lines.join('\n')).toContain(`stopped at main:merge (${SPLIT_REFUSAL})`)
 		expect(error_lines.join('\n')).toContain(
 			'issue `pnpm josh run:cut 5630` alone again, then rerun `pnpm josh run:chain 5630 --from review:selfcheck`',
 		)

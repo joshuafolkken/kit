@@ -64,7 +64,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const stages = run_chain.stages_from(all, parsed.from)
 
 	if (stages === undefined) return refuse(`no stage ${String(parsed.from)}\n${USAGE}`)
-	const stop = await run_chain.run_stages(stages, (text) => {
+	const stop = await run_chain.run_stages(stages, parsed.issue, (text) => {
 		console.info(text)
 	})
 
