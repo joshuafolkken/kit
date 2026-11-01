@@ -80,6 +80,7 @@
 		"!**/*.golden.txt",
 		"!dist/hooks/.inputs-verified.json*",
 		"!dist/.hooks-staging-*",
+		"!dist/.hooks-rebuild.*",
 		"!dist/.commands-test-*",
 		"!dist/.dispatch-test-*"
 	],

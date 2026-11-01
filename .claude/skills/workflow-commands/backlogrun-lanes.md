@@ -137,8 +137,8 @@ it prints is `PR checks failed (merge conflict)`** — resolve in the lane. Neve
 and `pnpm josh lane:close <N>` to give it back.
 
 **Release the hold on either parked arm, and leave the lane before closing it**: `pnpm josh
-run:release <N>` in the lane (**a release names the run it belongs to**); `lane:close` does not
-release it. `cd` out of the lane **before** `pnpm josh lane:close <N>`. **A `needs-human-review` stop is
+run:park <N>` in the lane releases it (**a release names the run it belongs to**); `lane:close` does
+not. `cd` out of the lane **before** `pnpm josh lane:close <N>`. **A `needs-human-review` stop is
 not a park and keeps its hold.**
 
 **A `needs-human-review` stop ends only its child** — its lane stays in use; the parent keeps

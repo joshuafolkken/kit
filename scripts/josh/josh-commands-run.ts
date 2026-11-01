@@ -194,12 +194,13 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/run/park/run-park-cli.ts',
 		description: 'Park a lane child for a decision, or clear the park',
 		category: 'AI tools',
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		reference: ['<issue> --body-file <path> | <issue> --clear', 'automation', ['files', 'network']],
 		usage: {
 			examples: [
 				{
 					arguments: '1839 --body-file .josh/tmp/park-1839.md',
-					note: 'comment, needs-decision and the local record',
+					note: 'comment, needs-decision, the local record, then run:release',
 				},
 				{ arguments: '1839 --clear', note: 'remove needs-decision and the record' },
 			],

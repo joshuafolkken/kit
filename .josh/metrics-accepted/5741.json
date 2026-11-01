@@ -1,0 +1,8 @@
+{
+	"reason": "run:entry runs lane:plan on a kickoff-planned issue's plan comment (#5741): new module run-entry-lane-plan.ts and its run:entry doc paragraph",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 24,
+		"ai_cost.on_demand_bytes": 72
+	}
+}

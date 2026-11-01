@@ -201,14 +201,24 @@ function lists_toolchain(stamp: HookBundleStamp, package_directory: string): boo
 	return toolchain_inputs.paths(package_directory).every((input) => recorded.has(input))
 }
 
+function lists_present_outputs(stamp: HookBundleStamp, out_directory: string): boolean {
+	return stamp.outputs.every((output) => existsSync(path.join(out_directory, output)))
+}
+
 function is_complete(
 	stamp: HookBundleStamp,
 	out_directory: string,
 	package_directory: string,
 ): boolean {
-	if (stamp.outputs.some((output) => !existsSync(path.join(out_directory, output)))) return false
+	return lists_present_outputs(stamp, out_directory) && lists_toolchain(stamp, package_directory)
+}
 
-	return lists_toolchain(stamp, package_directory)
+// True when a build finished in `out_directory` and every file it emitted is still there — the
+// bundles can be launched, whether or not they still match the source. A stale launch reads this.
+function has_outputs(out_directory: string): boolean {
+	const stamp = read_stamp(out_directory)
+
+	return stamp !== undefined && lists_present_outputs(stamp, out_directory)
 }
 
 // Fresh only when the record exists, every output it lists is still there, it lists every toolchain
@@ -225,7 +235,7 @@ function is_fresh(out_directory: string, package_directory: string): boolean {
 	return is_digest_current(out_directory, package_directory, stamp, snapshot)
 }
 
-const hook_bundle_stamp = { is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME }
+const hook_bundle_stamp = { has_outputs, is_fresh, STAMP_NAME, stamp_text, VERIFIED_NAME }
 
 export type { HookSources }
 export { hook_bundle_stamp }
