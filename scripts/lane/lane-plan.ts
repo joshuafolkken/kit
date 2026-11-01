@@ -27,6 +27,9 @@ const lane_plan_schema = z.object({
 	sized: z.boolean().optional(),
 	// The lane gave its lane back on this plan (`lane-yield.ts`), so the plan outlives the lane.
 	yielded: z.boolean().optional(),
+	// Every path an earlier cleared plan of this lane held (joshuafolkken/kit#5672), so a re-plan that
+	// narrows `paths` keeps the files the lane already cleared and edited planned for the hunks axis.
+	cleared_paths: z.array(z.string()).optional(),
 })
 
 type LanePlan = z.infer<typeof lane_plan_schema>
@@ -35,12 +38,34 @@ function plan_path(repository: string, issue: number): string {
 	return durable_state.path(durable_state.PREFIX.LANE_PLAN, repository, `-${String(issue)}.json`)
 }
 
+function read(issue: number, directory: string): LanePlan | undefined {
+	const repository = git_common_directory.repository(directory)
+	const text =
+		repository === undefined ? undefined : stamp_file.read_stamp_text(plan_path(repository, issue))
+
+	return text === undefined ? undefined : json_value.parse_with(text, lane_plan_schema)
+}
+
+// The paths `prior`'s clears held — its history, and its `paths` when it was cleared itself.
+function cleared_history(prior: LanePlan | undefined): Array<string> {
+	const latest = prior?.cleared === true ? prior.paths : []
+
+	return [...new Set([...(prior?.cleared_paths ?? []), ...latest])]
+}
+
+function with_history(plan: LanePlan, prior: LanePlan | undefined): LanePlan {
+	const cleared_paths = cleared_history(prior)
+
+	return cleared_paths.length === 0 ? plan : { ...plan, cleared_paths }
+}
+
 function record(plan: LanePlan, directory: string): boolean {
 	const repository = git_common_directory.repository(directory)
 
 	if (repository === undefined) return false
+	const recorded = with_history(plan, read(plan.issue, directory))
 
-	stamp_file.replace_stamp(plan_path(repository, plan.issue), plan)
+	stamp_file.replace_stamp(plan_path(repository, plan.issue), recorded)
 
 	return true
 }
@@ -49,14 +74,6 @@ function remove(issue: number, directory: string): void {
 	const repository = git_common_directory.repository(directory)
 
 	if (repository !== undefined) stamp_file.remove_stamp(plan_path(repository, issue))
-}
-
-function read(issue: number, directory: string): LanePlan | undefined {
-	const repository = git_common_directory.repository(directory)
-	const text =
-		repository === undefined ? undefined : stamp_file.read_stamp_text(plan_path(repository, issue))
-
-	return text === undefined ? undefined : json_value.parse_with(text, lane_plan_schema)
 }
 
 // Whether `issue` has no plan that `lane:plan` cleared, in a repository that can hold one — a checkout

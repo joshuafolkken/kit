@@ -27,7 +27,9 @@ import { lane_plan, type LanePlan } from './lane-plan'
 //
 // **The hunks axis counts only the hunks outside the recorded plan's files** (joshuafolkken/kit#5601):
 // those files already passed the files axis, so more edits inside them grow no new deliverable, and a
-// re-plan that adds one document would otherwise be refused on the hunks it already planned.
+// re-plan that adds one document would otherwise be refused on the hunks it already planned. The files
+// an earlier clear of this lane held count as the recorded plan's too (joshuafolkken/kit#5672), so a
+// re-plan that restores a file a narrowing re-plan dropped is not refused on its edits.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
@@ -98,12 +100,16 @@ function files_over(
 	return { reason: 'files', declared, limit, kept, split_off: files.slice(limit), tests }
 }
 
-// Matched as the ship's `unplanned` stop matches them: a claim ending in `/` holds every file under it.
+// Matched by the ship's `unplanned` rule — a claim ending in `/` holds every file under it — against a
+// wider set: a path an earlier clear of this lane held counts as planned too, while the ship's stop reads
+// `paths` alone (joshuafolkken/kit#5672).
 function unplanned_hunks(
 	hunk_files: ReadonlyArray<string>,
 	recorded: LanePlan | undefined,
 ): number {
-	return run_ship_planned.unplanned_of(recorded?.paths ?? [], hunk_files).length
+	const planned = [...(recorded?.paths ?? []), ...(recorded?.cleared_paths ?? [])]
+
+	return run_ship_planned.unplanned_of(planned, hunk_files).length
 }
 
 function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
