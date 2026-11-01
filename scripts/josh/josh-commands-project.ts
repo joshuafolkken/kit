@@ -198,6 +198,13 @@ const PROJECT_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'ui:shot': {
+		script: 'scripts/ui/ui-shot-cli.ts',
+		description: "Capture routes with this project's own screenshot command",
+		category: 'Project',
+		reference: ['<route> [route...]', 'automation', ['processes']],
+		usage: { examples: [{ arguments: '/ /blog' }] },
+	},
 	propagate: {
 		script: 'scripts/propagate/propagate.ts',
 		description: 'Carry the published release into every consumer repository next to this one',
