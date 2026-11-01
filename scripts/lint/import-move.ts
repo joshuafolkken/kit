@@ -14,9 +14,9 @@ import {
 // the name was alone in takes the new specifier instead. A file already importing names from the new
 // module gets the name in that declaration instead, and a declaration it leaves empty goes
 // (joshuafolkken/kit#5800); `import type { … }` takes only a type-only name. A type-only name stays
-// type-only. Only the name and its comma are cut, so a comment in the braces stays. Nothing but import declarations is
-// read, so strings, keys and other uses of the name are never touched. A name imported twice from the
-// old module is not guessed at: the file counts as untouched.
+// type-only. Only the name and its comma are cut, so a comment in the braces stays. Nothing but
+// import declarations is read, so strings, keys and other uses of the name are never touched. A name
+// imported twice from the old module is not guessed at: the file counts as untouched.
 
 const BLANK = /[\t ]/u
 
