@@ -4,6 +4,7 @@ import { direct_importers } from './direct-importers'
 import { test_declared_logic } from './test-declared-logic'
 import { test_pinned_logic } from './test-pinned-logic'
 import { test_pinned_reach, type ReachedCount } from './test-pinned-reach'
+import { test_related_pins } from './test-related-pins'
 import { related_scope } from './test-related-scope'
 
 // **A changed file whose imports reach more than `test_pinned_logic.MAX_TEST_FILES` test files runs
@@ -61,14 +62,19 @@ async function read_over_cap(
 }
 
 // A file past the cap that no test imports directly keeps its whole reach: narrowed, it would run no
-// test at all.
+// test at all. A registry file narrows to its direct importers and the pinned registry tests
+// (`test-related-pins.ts`).
 async function direct_of(
 	root: string,
 	over_cap: ReadonlyArray<string>,
 ): Promise<Array<[string, Array<string>]>> {
 	const importers = await direct_importers.importers_of(root, over_cap)
+	const pinned = [...importers].map(([file, tests]): [string, Array<string>] => [
+		file,
+		test_related_pins.with_pins(file, tests),
+	])
 
-	return [...importers].filter(([, tests]) => tests.length > 0)
+	return pinned.filter(([, tests]) => tests.length > 0)
 }
 
 // `files` are repository-root-relative, as the change was read. `is_whole` keeps the whole suite:
