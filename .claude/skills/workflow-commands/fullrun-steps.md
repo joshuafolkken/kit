@@ -14,6 +14,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    `--title "<title>"` when the title is not in English or can be phrased more clearly (the plan goes
    into the body when it is blank and its author has write access, otherwise into a comment; its
    `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
+   In a lane child it runs `lane:plan` on the plan's paths: `docs/josh-commands-backlog.md` → "`josh issue:plan`".
 4. Synchronize as `entry-sequence.md` → "The ordered entry sequence" directs, then update dependencies only where the `run:prep` report answers
    `latest: required` — `latest-gate.md` is its single source. Load the `dependency-update` skill
    after an update. **A dispatched lane child skips entry synchronization**; ship syncs before its gate.

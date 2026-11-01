@@ -1,5 +1,6 @@
 import { AI_DOCS, read_repo_file } from '#scripts/document/ai-document-fixture'
 import { init_logic } from '#scripts/init/init-logic'
+import { ui_shot } from '#scripts/ui/ui-shot'
 import { skill_meta } from '#tools/claude/skill-meta'
 import { describe, expect, it } from 'vitest'
 import { read_skill_file } from './skill-fixture'
@@ -36,8 +37,9 @@ describe(`${SKILL_PATH} — distribution`, () => {
 // gate exactly as open as the missing skill did, while reading as closed.
 describe(`${SKILL_PATH} — refuses to pass without a capture`, () => {
 	it.each([
-		'pnpm josh-app shot',
-		'pnpm josh-game shot',
+		// #5729: `josh ui:shot` resolves the screenshot command (`ui-shot.ts`), so the skill captures in
+		// one call instead of probing the toolkits and scripts by hand.
+		'pnpm josh ui:shot <route>...',
 		'### When there is no screenshot command',
 		'not** closed by this run',
 		// The gate has to stay reachable while the toolkit command does not exist: a screenshot added
@@ -45,18 +47,26 @@ describe(`${SKILL_PATH} — refuses to pass without a capture`, () => {
 		// rather than something the skill forbids.
 		'await page.screenshot',
 		'A failed capture is not a passed gate.',
-		// Verified in a consumer: an installed toolkit without the subcommand and an absent toolkit both
-		// exit non-zero with the same usage line, so only the printed command list separates them.
-		'**Decide by the printed command list, not by whether the toolkit is installed.**',
-		// app-kit#200 has landed, so option 1 exists and the skill must not forestall the check above
-		// by saying otherwise (#883). What is asserted here is the half that survives the next
-		// release. The statement about a version is asserted here too, and again in
-		// `verify-ui-shot-document-rule.test.ts` alongside the retired phrasings — deliberately, so
-		// that suite reads as one account of the claim rather than half of it.
-		'the version a project has installed is the only thing that decides',
 	])('states %j', (marker) => {
 		expect(read_skill()).toContain(marker)
 	})
+
+	// The fallback is entered on the line `ui:shot` prints when nothing resolved, so the skill quotes
+	// the command's own header — a reworded header turns this red rather than stranding the fallback.
+	it('quotes the header ui:shot prints when no command resolved', () => {
+		const header = ui_shot.describe_missing([]).replace(/^ui:shot: /u, '')
+
+		expect(read_skill()).toContain(header)
+	})
+
+	// The resolution order lives in `ui-shot.ts` alone; a skill that listed the candidates again would
+	// send the reader back to the hand probe `ui:shot` replaced.
+	it.each(['pnpm josh-app shot', 'pnpm josh-game shot', 'Decide by the printed command list'])(
+		'no longer instructs the hand probe %j',
+		(marker) => {
+			expect(read_skill()).not.toContain(marker)
+		},
+	)
 
 	it('does not offer a hand-rolled script as the fallback', () => {
 		expect(read_skill()).toContain('Never stand up a preview server by hand')
