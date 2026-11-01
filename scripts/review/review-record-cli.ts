@@ -54,7 +54,7 @@ const RECORDED_LINE = 'Recorded: the review round for this issue is in the ledge
 const REUSED_LINE =
 	'Reused: josh ship takes this round as its round 1 — the files this round covers hold still since the record. A default branch the ship’s sync merges in moves them only where it changed a file this round covers, and the ship then reviews round 1 again itself.'
 const DELTA_LINE =
-	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every file moved since the record is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
+	'Reused, delta to round 2: josh ship takes this round as its round 1 and does not review it again — every moved path a round executes is one round 2 reads after the commit, or the ship’s own round 1 stopped on it.'
 
 // The condition that re-runs round 1, and the path that met it, named rather than listed among every
 // condition that could (joshuafolkken/kit#4941).
@@ -74,7 +74,9 @@ function review_again_line(
 function reuse_line(answer: ReuseAnswer, is_refused: boolean): string {
 	if (answer.reuse === 'again') return review_again_line(answer.cause, is_refused)
 
-	return answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+	const line = answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
+
+	return answer.note === undefined ? line : `${line} — ${answer.note}`
 }
 
 const NOT_REQUIRED_LINE =

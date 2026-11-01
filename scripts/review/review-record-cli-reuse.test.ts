@@ -27,6 +27,7 @@ const TEST_DIR = mkdtempSync(path.join(tmpdir(), 'review-record-reuse-'))
 const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4763
 const NOT_REUSED = 'Not reused'
+const REUSED_DELTA = 'Reused, delta to round 2:'
 const RUN_REVIEW = 'run:review'
 const RUN_REVIEW_STEP = `pnpm josh ${RUN_REVIEW}`
 
@@ -135,9 +136,30 @@ describe('review_record_cli.run --check — a round whose delta is left to round
 		const { code, out } = await check_output()
 
 		expect(code).toBe(0)
-		expect(out).toContain('Reused, delta to round 2:')
+		expect(out).toContain(REUSED_DELTA)
 		expect(out).not.toContain(NOT_REUSED)
 		expect(out).not.toContain(RUN_REVIEW)
+	})
+})
+
+// joshuafolkken/kit#5674: a reuse that passed over unexecuted moves names them, as the ship's reason does.
+describe('review_record_cli.run --check — a reuse that passed over unexecuted moves', () => {
+	const note = 'moved on no path a round executes: docs/guide.md'
+
+	it('adds the note to the held line', async () => {
+		reusable_mock.mockReset().mockResolvedValue({ reuse: 'held', note })
+		const { out } = await check_output()
+
+		expect(out).toContain('Reused:')
+		expect(out).toContain(` — ${note}`)
+	})
+
+	it('adds the note to the delta line', async () => {
+		reusable_mock.mockReset().mockResolvedValue({ reuse: 'delta', note })
+		const { out } = await check_output()
+
+		expect(out).toContain(REUSED_DELTA)
+		expect(out).toContain(` — ${note}`)
 	})
 })
 

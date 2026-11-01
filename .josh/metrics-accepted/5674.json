@@ -1,0 +1,7 @@
+{
+	"reason": "review:record --check appends the reuse note to its reused line (#5674)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 1
+	}
+}
