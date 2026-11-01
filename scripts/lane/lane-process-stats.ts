@@ -1,5 +1,5 @@
 import type { LedgerEntry, LoadEntry } from './lane-ledger'
-import type { ProcessKind } from './lane-process-load'
+import { lane_process_load, type ProcessKind } from './lane-process-load'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // What the period's machine load was made of: the process kinds the load samples carried
@@ -13,13 +13,10 @@ import { lane_stats, type StatsWindow } from './lane-stats'
 // **CPU is in cores** — `ps`'s share of one core over a hundred — so the column reads against the load
 // average and the machine's core count without a conversion.
 
-const COLUMNS = [
-	'process',
-	'cpu mean (cores)',
-	'cpu peak (cores)',
-	'rss peak (GB)',
-	'samples',
-] as const
+const RSS_PEAK = 'rss peak (GB)'
+const SAMPLES = 'samples'
+const COLUMNS = ['process', 'cpu mean (cores)', 'cpu peak (cores)', RSS_PEAK, SAMPLES] as const
+const RESIDENT_COLUMNS = ['resident apps', 'rss median (GB)', RSS_PEAK, SAMPLES] as const
 const PERCENT_PER_CORE = 100
 const MB_PER_GB = 1024
 const DECIMALS = 1
@@ -76,16 +73,42 @@ function by_mean_cpu(left: KindRow, right: KindRow): number {
 	return mean_cores(right) - mean_cores(left)
 }
 
+function to_table(columns: ReadonlyArray<string>, rows: ReadonlyArray<Array<string>>): string {
+	return [
+		lane_stats.to_row(columns),
+		lane_stats.to_row(columns.map(() => '---')),
+		...rows.map((row) => lane_stats.to_row(row)),
+	].join('\n')
+}
+
+// The resident apps' summed size over the samples that recorded it (joshuafolkken/kit#5658), so a period
+// run with the IDE and browser closed reads against one run with them open. Older samples carry none,
+// and a period with none prints no table, leaving the output as it was.
+function resident_tables(samples: ReadonlyArray<LoadEntry>): Array<string> {
+	const sizes = samples.flatMap((sample) => sample.resident_mb ?? [])
+
+	if (sizes.length === 0) return []
+
+	const gigabytes = sizes.map((size) => size / MB_PER_GB)
+	const label = lane_process_load.RESIDENT_APPS.join(' + ')
+	const row = [label, cell(lane_stats.median(gigabytes)), cell(lane_stats.peak(gigabytes))]
+
+	return [to_table(RESIDENT_COLUMNS, [[...row, String(sizes.length)]])]
+}
+
 // The period's table: `entries` is the whole ledger, filtered here to `window`. A period whose samples
 // carried no breakdown prints the header alone.
 function table(entries: ReadonlyArray<LedgerEntry>, window: StatsWindow): string {
-	const rows = group(lane_stats.in_window(entries, window).filter(is_load)).toSorted(by_mean_cpu)
+	const samples = lane_stats.in_window(entries, window).filter(is_load)
+	const rows = group(samples).toSorted(by_mean_cpu)
 
 	return [
-		lane_stats.to_row(COLUMNS),
-		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...rows.map((row) => lane_stats.to_row(kind_cells(row))),
-	].join('\n')
+		to_table(
+			COLUMNS,
+			rows.map((row) => kind_cells(row)),
+		),
+		...resident_tables(samples),
+	].join('\n\n')
 }
 
 const lane_process_stats = { table }

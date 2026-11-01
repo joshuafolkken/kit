@@ -40,7 +40,7 @@ function rounded(megabytes: number | undefined): number | undefined {
 }
 
 async function sample(at: string): Promise<LoadEntry> {
-	const [memory, lanes, processes] = await Promise.all([
+	const [memory, lanes, reading] = await Promise.all([
 		machine_capacity.read_memory(),
 		read_lanes(),
 		lane_process_load.read(),
@@ -54,7 +54,8 @@ async function sample(at: string): Promise<LoadEntry> {
 		available_mb: rounded(memory.available_mb),
 		swapped_mb: rounded(memory.swapped_mb),
 		lanes,
-		processes,
+		processes: reading?.processes,
+		resident_mb: reading?.resident_mb,
 	}
 }
 

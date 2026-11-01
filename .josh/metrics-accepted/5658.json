@@ -1,0 +1,7 @@
+{
+	"reason": "#5658 records the resident apps' RSS in load samples and prints its median and peak in lane:stats",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 52
+	}
+}

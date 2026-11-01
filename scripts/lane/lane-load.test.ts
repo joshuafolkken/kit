@@ -43,11 +43,15 @@ async function read_admission(): Promise<number | undefined> {
 }
 
 const PROCESSES = [{ kind: 'vitest', cpu_percent: 300, rss_mb: 1024, count: 4 }]
+const RESIDENT_MB = 7680
 
 beforeEach(() => {
 	hanging_execa.reset()
 	vi.spyOn(lane_registry, 'list_lanes').mockResolvedValue([])
-	vi.spyOn(lane_process_load, 'read').mockResolvedValue(PROCESSES)
+	vi.spyOn(lane_process_load, 'read').mockResolvedValue({
+		processes: PROCESSES,
+		resident_mb: RESIDENT_MB,
+	})
 })
 
 afterEach(() => {
@@ -88,6 +92,24 @@ describe('lane_load.sample', () => {
 		stub_platform('win32')
 
 		await expect(lane_load.sample(AT)).resolves.toMatchObject({ processes: PROCESSES })
+	})
+})
+
+// joshuafolkken/kit#5658: the resident apps' size rides on the same sample as the load.
+describe('lane_load.sample resident apps', () => {
+	it('carries the resident apps size beside the load', async () => {
+		stub_platform('win32')
+
+		await expect(lane_load.sample(AT)).resolves.toMatchObject({ resident_mb: RESIDENT_MB })
+	})
+
+	it('records neither breakdown when ps does not answer', async () => {
+		stub_platform('win32')
+		vi.mocked(lane_process_load.read).mockResolvedValue(undefined)
+
+		const entry = await lane_load.sample(AT)
+
+		expect([entry.processes, entry.resident_mb]).toStrictEqual([undefined, undefined])
 	})
 })
 
