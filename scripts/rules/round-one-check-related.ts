@@ -29,7 +29,7 @@ const JOIN_FLAG = /(?:^|\s)--join(?:[=\s]|$)/u
 const READING_MODE_FLAG = /(?:^|\s)--(?:pinned|push)(?:[=\s]|$)/u
 const DETACH_FLAG = /(?:^|\s)--detach(?:[=\s]|$)/u
 
-type RoundEvent = 'brief' | 'close' | 'edit' | 'none'
+type RoundEvent = 'brief' | 'check' | 'close' | 'edit' | 'none'
 
 function review_event(segment: string): RoundEvent {
 	if (JOIN_FLAG.test(segment)) return 'close'
@@ -39,6 +39,7 @@ function review_event(segment: string): RoundEvent {
 
 function segment_event(segment: string): RoundEvent {
 	if (shell_segments.is_josh_command(segment, REVIEW_COMMANDS)) return review_event(segment)
+	if (shell_segments.is_josh_command(segment, CHECK_COMMANDS)) return 'check'
 
 	const is_detach =
 		shell_segments.is_josh_command(segment, SHIP_COMMANDS) && DETACH_FLAG.test(segment)
@@ -58,10 +59,27 @@ function block_events(block: Block): ReadonlyArray<RoundEvent> {
 	return is_edit ? ['edit'] : []
 }
 
+// The calls that ran: a result came back and no guard refused it. The call a hook is deciding is
+// already in the transcript, with no result yet.
+function ran_call_ids(blocks: ReadonlyArray<Block>): ReadonlySet<string> {
+	const results = blocks.filter((block) => block.result_id !== '' && block.refusal_guard === '')
+
+	return new Set(results.map((block) => block.result_id))
+}
+
+// The run's round events, in call order, off the transcript tail; a `check` is one that ran.
+function round_events(tail: string): ReadonlyArray<RoundEvent> {
+	const blocks = time_transcript_line.parse_text(tail).flatMap((line) => line.blocks)
+	const ran = ran_call_ids(blocks)
+
+	return blocks.flatMap((block) =>
+		block_events(block).map((event) => (event === 'check' && !ran.has(block.id) ? 'none' : event)),
+	)
+}
+
 // Whether the tail's last brief was followed by a fix and by neither a join nor a detach.
 function fixes_an_open_round(tail: string): boolean {
-	const blocks = time_transcript_line.parse_text(tail).flatMap((line) => line.blocks)
-	const events = blocks.flatMap((block) => block_events(block))
+	const events = round_events(tail)
 	const brief_at = events.lastIndexOf('brief')
 
 	if (brief_at === -1) return false
@@ -115,6 +133,8 @@ const round_one_check_related = {
 	ROUND_ONE_CHECK_RELATED_REASON,
 	ROW,
 	fixes_an_open_round,
+	round_events,
+	is_candidate,
 }
 
 export { round_one_check_related }
