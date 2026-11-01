@@ -81,7 +81,8 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	// `lane:plan --probe` and the entry probe (joshuafolkken/kit#5211) crossed the 81920 block.
 	// `lane:plan`'s `split` refusal (joshuafolkken/kit#5533) crossed the 86016 block.
 	// `josh run:handoff` (joshuafolkken/kit#5352) crossed the 90112 block.
-	{ path: 'docs/josh-commands-run.md', bytes: 94_208 },
+	// `josh run:stale` (joshuafolkken/kit#5635) crossed the 94208 block.
+	{ path: 'docs/josh-commands-run.md', bytes: 98_304 },
 	// `josh effect:audit` (joshuafolkken/kit#4958) and `issue:priority`'s usage section (joshuafolkken/kit#4960) crossed the 57344 block;
 	// `josh prose:stale` (joshuafolkken/kit#5287) crossed the 61440 block; `josh diff:summary`
 	// (joshuafolkken/kit#5547) crossed the 65536 block.

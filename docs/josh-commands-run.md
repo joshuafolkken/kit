@@ -89,6 +89,25 @@ Runs after every successful `run:hold` claim, and in a `backlogrun`'s once-per-r
 
 **Output / exit codes:** always exits 0. What was cleaned and what was kept (with the reason) goes to stderr; nothing is printed when nothing merged was found.
 
+### `josh run:stale`
+
+<!-- usage: run:stale -->
+
+Remove a stale `in-progress` label no checkout still holds.
+
+```bash
+pnpm josh run:stale
+```
+
+<!-- /usage -->
+
+Removes `in-progress` from an open issue only when nothing holds it. Kept:
+
+- a label inside `epic:next`'s stale window, or of unread age;
+- a checkout (the lane, else the primary one whose run record names the issue) with uncommitted changes, a live, stop-marked or unreadable run record, or a process still in it (`lane-residents.ts`).
+
+**Output / exit codes:** `#N kept — <reason>` or `#N removed — <age>` per issue on stdout; exit 1 on an unreadable listing, else 0.
+
 ### `josh run:carry`
 
 <!-- usage: run:carry -->
@@ -807,7 +826,7 @@ The third line is what the run is doing now: a spinner, its age, then the kind's
 - **Watching** — nothing running and no stage: `24′10″  🔭 watching — pool empty`, counted from the newest thing the run did (a merge, a park, the drain, or the stage it last stood at).
 - **Ended** — the newest thing the run did, in that event's words, timed up to the end: `42″  🔚 backlog drained`.
 
-Below the header: the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (percent, `┊` at even pace, `↻` reset, `≈N` tasks left at the mean done-task spend of the last ten, a task that spent under 1% counted as none; read off lane logs and Codex rollout files, no API asked; folded with `u`), then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
+Below the header: the `📈 throughput` section, `24h` in hourly cells and `7d` in 12-hour cells (a sparkline of closes per cell scaled to the row's peak, `┊` a stopped cell; `⚡` closes per active hour over complete cells, `🟢` active hours, `✅` closes, `🏔` the peak cell's rate and start, `🔄` closes this hour; folded with `t`); then the `⛽ usage` section, Claude's and Codex's 5h and 7d gauges (percent, `┊` at even pace, `↻` reset, `≈N` tasks left at the mean done-task spend of the last ten, a task that spent under 1% counted as none; read off lane logs and Codex rollout files, no API asked; folded with `u`), then a row per touched child (phase icon, elapsed time, CPU and memory), then an earlier run's lane holding a place (drawn alike — its running row marked `🧳` in its phase's place — never counted as the run's) and `❔` a lane with no lane state record (counted in use, its state unknown), the children not yet started under one `⏳ queued` heading, waiting and parked children, and the newest filings, parks and notes, with a legend at the foot.
 
 `⏳ queued` lists the rows in the order `backlog:plan --waves` plays them, with no wave headings: a batch starts each row once a lane and its declared paths are free, so the icon a row leads with is what it waits on. An epic's children stay gathered under the epic.
 

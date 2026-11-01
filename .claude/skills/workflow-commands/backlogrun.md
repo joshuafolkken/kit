@@ -60,10 +60,10 @@ reference is read as a section").
    - A merge answered `over`: `backlogrun-progress.md` → "The hand-off".
    - A unit gone silent: `backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
    - A child that cannot finish: `backlogrun-park.md` → "park and continue".
-7. **End the record when the run ends** — `run:report`, then `run:carry --end` (or `--end --stopped
-   "<reason>"`) and `run:wake --stop`: `backlogrun-steps.md` → "End the record when the run ends".
+7. **End the record when the run ends** — `pnpm josh run:report --end` (or `--end --stopped
+   "<reason>"`): `backlogrun-steps.md` → "End the record when the run ends".
    - An empty plan is not that end; the driver's idle watch decides it. A person stops a run from the
-     terminal with `pnpm josh backlogrun --stop`, which makes both calls.
+     terminal with `pnpm josh backlogrun --stop`, which ends the run without the report.
    - The last merge: `backlogrun-progress.md` → "Who sends the summary, and who propagates", then
      `followup.md` → "When `pnpm josh release` runs".
 

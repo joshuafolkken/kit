@@ -60,7 +60,7 @@ asked; the person starts it, or the `josh: run board` task in `.vscode/tasks.jso
 off-screen, start `pnpm josh run:board --every <minutes>` in the background (`docs/josh-commands-run.md`).
 
 **A stop is the only interrupt**: a `backlogrun` that has stopped ends with
-`pnpm josh run:carry --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
+`pnpm josh run:report --end --stopped "<reason>"`, which sends one ⏸️ confirmation; a parked child sends
 its own (`backlogrun-park.md`).
 
 ### Who starts it, and what counts as a report
