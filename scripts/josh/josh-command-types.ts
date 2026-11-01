@@ -252,10 +252,13 @@ const ESLINT_COMMIT_CACHE_FLAGS = content_cache_flags(ESLINT_COMMIT_CACHE_FILE)
 // `josh lint:rule`'s own cache and report directory, under `node_modules` so no ignore rule has to
 // name it: its `--rule` override changes every entry's config hash, so on the gate's file each run
 // would leave the gate a cold lint. The workers are its `--concurrency`, and its registration claims
-// the whole-tree scan's cores and memory once per worker.
+// the whole-tree scan's cores and memory once per worker. A `--paths` run lints on a cache of its
+// own, since eslint keeps only the entries a run visited and a subset would leave the whole run cold.
 const LINT_RULE_DIRECTORY = 'node_modules/.cache/josh/lint-rule'
 const LINT_RULE_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache`
 const LINT_RULE_CACHE_FLAGS = content_cache_flags(LINT_RULE_CACHE_FILE)
+const LINT_RULE_PATHS_CACHE_FILE = `${LINT_RULE_DIRECTORY}/.eslintcache-paths`
+const LINT_RULE_PATHS_CACHE_FLAGS = content_cache_flags(LINT_RULE_PATHS_CACHE_FILE)
 const LINT_RULE_WORKERS = 2
 
 export type { CommandCategory, CommandEntry, CommandUsage, GateCacheSpec }
@@ -285,6 +288,8 @@ export {
 	LINT_RULE_CACHE_FILE,
 	LINT_RULE_CACHE_FLAGS,
 	LINT_RULE_DIRECTORY,
+	LINT_RULE_PATHS_CACHE_FILE,
+	LINT_RULE_PATHS_CACHE_FLAGS,
 	LINT_RULE_WORKERS,
 	OPTIONAL_ENV_FILE_FLAGS,
 	PRETTIER_CACHE_FILE,

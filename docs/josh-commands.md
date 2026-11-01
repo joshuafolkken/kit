@@ -87,15 +87,18 @@ Keeps caches of its own, apart from the gate's.
 
 <!-- usage: lint:rule -->
 
-Run one eslint rule over the whole repository on a cache of its own and write the rule's violations to a file.
+Run one eslint rule over the whole repository, or with --paths a subset, on a cache of its own and write the rule's violations to a file.
 
 ```bash
 pnpm josh lint:rule kit/no-measurement-comment
 pnpm josh lint:rule kit/no-measurement-comment --config eslint.tmp.config.js       # a temporary config
 pnpm josh lint:rule kit/no-measurement-comment --output .josh/tmp/violations.txt
+pnpm josh lint:rule kit/no-measurement-comment --paths scripts/lint/*.ts           # only these paths, on a subset cache and report
 ```
 
 <!-- /usage -->
+
+- Check a rule while changing it with `--paths <path>...` on a few files, then run the whole repository once. A whole run takes minutes, and each change to the rule or its config misses the cache for every file. A `--paths` run uses its own cache, JSON report and default output (`<rule>.paths.txt`), so the whole run's files stay as they were.
 
 ### `josh lines`
 
