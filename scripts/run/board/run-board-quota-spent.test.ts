@@ -20,26 +20,28 @@ function reading(five_hour: number, seven_day: number, shift_ms = 0): QuotaReadi
 
 describe('run_board_quota_spent.spent_of', () => {
 	it("reads each window's rise from a file's first reading to its last", () => {
-		expect(spent_of(reading(10, 40), reading(16, 42))).toEqual({
+		expect(spent_of([reading(10, 40), reading(12, 41)], reading(16, 42))).toEqual({
 			[FIVE_HOURS]: 6,
 			[SEVEN_DAYS]: 2,
 		})
 	})
 
-	it('tells nothing for a file holding one reading, or none at its head or tail', () => {
+	it('reads a file holding one reading as spending none, and one with none as telling nothing', () => {
 		const only = reading(10, 40)
 
-		expect(spent_of(only, only)).toEqual({})
-		expect(spent_of(undefined, only)).toEqual({})
-		expect(spent_of(only, undefined)).toEqual({})
+		expect(spent_of([only], only)).toEqual({ [FIVE_HOURS]: 0, [SEVEN_DAYS]: 0 })
+		expect(spent_of([], only)).toEqual({})
+		expect(spent_of([only], undefined)).toEqual({})
 	})
 
-	it('leaves out a window that reset between the readings, keeping one whose reset jittered', () => {
-		const reset = spent_of(reading(80, 40), reading(5, 42, FIVE_HOURS * MINUTE_MS))
-		const jittered = spent_of(reading(10, 40), reading(13, 40, MINUTE_MS))
+	it('measures a window that reset from the first reading inside its last reset', () => {
+		const shift_ms = FIVE_HOURS * MINUTE_MS
+		const heads = [reading(80, 40), reading(2, 41, shift_ms), reading(4, 41, shift_ms)]
+		const jittered = spent_of([reading(10, 40)], reading(13, 40, MINUTE_MS))
 
-		expect(reset).toEqual({ [SEVEN_DAYS]: 2 })
-		expect(jittered).toEqual({ [FIVE_HOURS]: 3 })
+		expect(spent_of(heads, reading(5, 42, shift_ms))).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 2 })
+		expect(spent_of([reading(80, 40)], reading(5, 42, shift_ms))).toEqual({ [SEVEN_DAYS]: 2 })
+		expect(jittered).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 0 })
 	})
 })
 
@@ -64,18 +66,19 @@ describe('run_board_quota_spent.claude_done and codex_done', () => {
 })
 
 describe('run_board_quota_spent.per_task_of', () => {
-	it("takes each window's median over the files that tell one", () => {
+	it("takes each window's mean over the files that tell one, a spend of none included", () => {
 		const spends = [
-			{ [FIVE_HOURS]: 2, [SEVEN_DAYS]: 1 },
+			{ [FIVE_HOURS]: 2, [SEVEN_DAYS]: 0 },
 			{ [FIVE_HOURS]: 9 },
 			{ [FIVE_HOURS]: 4, [SEVEN_DAYS]: 3 },
 		]
 
-		expect(per_task_of(spends)).toEqual({ [FIVE_HOURS]: 4, [SEVEN_DAYS]: 2 })
+		expect(per_task_of(spends)).toEqual({ [FIVE_HOURS]: 5, [SEVEN_DAYS]: 1.5 })
 	})
 
-	it('tells nothing where no file tells a spend', () => {
+	it('tells nothing where no file tells a spend, or none of them rose', () => {
 		expect(per_task_of([{}, {}])).toEqual({})
 		expect(per_task_of([])).toEqual({})
+		expect(per_task_of([{ [SEVEN_DAYS]: 0 }, { [SEVEN_DAYS]: 0 }])).toEqual({})
 	})
 })

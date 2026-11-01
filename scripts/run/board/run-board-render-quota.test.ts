@@ -203,6 +203,22 @@ describe('run_board_render_quota.usage_part tasks left', () => {
 	})
 })
 
+describe('run_board_render_quota.usage_part spend under one percent', () => {
+	it('counts the tasks left off a mean spend under one percent', () => {
+		const told = reading([window_of(SEVEN_DAYS, 68, HOUR_MS)])
+		const quotas = { claude: { ...told, per_task: { [SEVEN_DAYS]: 2 / 3 } }, codex: QUOTAS.codex }
+
+		expect(usage_part({ quotas, now_ms: NOW_MS })?.summary).toBe('claude —/68 ≈—/48 · codex —/45')
+	})
+
+	it('counts a whole number of tasks a fractional mean spend divides into', () => {
+		const told = reading([window_of(SEVEN_DAYS, 65, HOUR_MS)])
+		const quotas = { claude: { ...told, per_task: { [SEVEN_DAYS]: 7 / 3 } }, codex: QUOTAS.codex }
+
+		expect(usage_part({ quotas, now_ms: NOW_MS })?.summary).toBe('claude —/65 ≈—/15 · codex —/45')
+	})
+})
+
 describe('run_board_render_quota.usage_part hold and age', () => {
 	it.each([11, 45])(
 		'dims only the age annotation after %s minutes on repeated draws',
