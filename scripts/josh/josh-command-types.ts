@@ -135,7 +135,7 @@ const ESLINT_RELATED_CACHE_FILE = '.eslintcache.related'
 const PRETTIER_CACHE_FILE = '.prettiercache'
 const PRETTIER_RELATED_CACHE_FILE = '.prettiercache.related'
 // The pre-commit hook's own, because a staged-files run on the gate's file degrades it: cspell prunes
-// every entry the run did not visit (measured 892 KB down to 18 KB), and `eslint --quiet` stores a
+// every entry the run did not visit, and `eslint --quiet` stores a
 // report without its warnings under the same config hash the gate reads.
 const CSPELL_COMMIT_CACHE_FILE = '.cspellcache.commit'
 const ESLINT_COMMIT_CACHE_FILE = '.eslintcache.commit'

@@ -51,7 +51,7 @@ describe('security_audit_provision_logic.build_download_url', () => {
 	})
 })
 
-// Measured: the asset is ~55 MB and a 300 KB/s link needs over three minutes for it. A SessionStart
+// The asset is large enough that a slow link needs minutes for it. A SessionStart
 // hook is waited on, so the automatic attempt gives up long before that and says what to run, while
 // `--force` is someone asking for the download and willing to wait for it.
 describe('security_audit_provision_logic.build_download_timeout', () => {

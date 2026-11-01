@@ -4,7 +4,7 @@ import { lstatSync } from 'node:fs'
 //
 // **`run:board` redraws every second, and most of what it reads has not changed since the last
 // redraw.** A process's app name, a ledger's parsed lines and a work tree's git config were computed
-// again on every pass, and on a saturated machine those passes stopped the spinner for 45–200ms. The
+// again on every pass, and on a saturated machine those passes stopped the spinner visibly. The
 // stamp is what says "this has changed": a file's `file_stamp`, or a constant where the key alone
 // decides the answer.
 
