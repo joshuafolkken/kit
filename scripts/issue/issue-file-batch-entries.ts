@@ -21,6 +21,15 @@ const FRONT_MATTER = /^---\n(?<block>[\s\S]*?)\n---\n/u
 const HEADING_MARKER = /^#+\s*/u
 const BODY_EXTENSION = '.md'
 const FIELD_SEPARATOR = ':'
+const CRLF = /\r\n/gu
+// One pair of matching quotes around a whole value: `title: "Quoted"` is the title `Quoted`.
+const QUOTED = /^(?<quote>["'])(?<value>.*)\k<quote>$/u
+
+function value_of(raw: string): string {
+	const value = raw.trim()
+
+	return QUOTED.exec(value)?.groups?.['value'] ?? value
+}
 
 function fields_of(block: string): ReadonlyMap<string, string> {
 	const fields = new Map<string, string>()
@@ -28,7 +37,7 @@ function fields_of(block: string): ReadonlyMap<string, string> {
 	for (const line of block.split('\n')) {
 		const index = line.indexOf(FIELD_SEPARATOR)
 
-		if (index > 0) fields.set(line.slice(0, index).trim(), line.slice(index + 1).trim())
+		if (index > 0) fields.set(line.slice(0, index).trim(), value_of(line.slice(index + 1)))
 	}
 
 	return fields
@@ -43,12 +52,12 @@ function split_front_matter(text: string): Split {
 }
 
 function entry_of(text: string, source: string): BatchEntry {
-	const { fields, rest } = split_front_matter(text.trimStart())
+	const { fields, rest } = split_front_matter(text.replaceAll(CRLF, '\n').trimStart())
 	const distinct = fields.get('distinct')
 	const title = fields.get('title')
 
 	if (title !== undefined) return { source, title, body: rest.trimStart(), distinct }
-	const [first = '', ...remaining] = rest.split('\n')
+	const [first = '', ...remaining] = rest.trimStart().split('\n')
 
 	return {
 		source,

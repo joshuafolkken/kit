@@ -143,4 +143,12 @@ describe('issue_file_batch.run — the arguments around --batch', () => {
 		)
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
+
+	it('refuses a directory holding no .md body file', async () => {
+		const directory = batch_of('empty', [])
+
+		expect(await issue_file_batch.run([BATCH_FLAG, directory])).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no *.md body files'))
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
 })

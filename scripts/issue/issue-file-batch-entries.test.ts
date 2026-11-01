@@ -39,6 +39,31 @@ describe('issue_file_batch_entries.entry_of — the title, body and distinct of 
 	})
 })
 
+describe('issue_file_batch_entries.entry_of — front matter written other ways', () => {
+	it('reads the title from the first body line when the front matter has no title', () => {
+		const text = `---\ndistinct: 12\n---\n\n# ${TITLE}\n\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE)).toStrictEqual({
+			source: SOURCE,
+			title: TITLE,
+			body: BODY,
+			distinct: '12',
+		})
+	})
+
+	it('reads the front matter of a CRLF body file', () => {
+		const text = `---\r\ntitle: ${TITLE}\r\n---\r\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE).title).toBe(TITLE)
+	})
+
+	it('drops one pair of quotes around a front matter value', () => {
+		const text = `---\ntitle: "${TITLE}"\n---\n${BODY}`
+
+		expect(issue_file_batch_entries.entry_of(text, SOURCE).title).toBe(TITLE)
+	})
+})
+
 describe('issue_file_batch_entries.entries_of — the body files of a directory', () => {
 	it('reads every .md file in name order and skips other files', async () => {
 		writeFileSync(path.join(work, 'b.md'), 'Second\nbody b\n')

@@ -79,8 +79,27 @@ function summary_of(outcomes: ReadonlyArray<Outcome>): string {
 	].join('\n')
 }
 
+async function entries_in(directory: string): Promise<ReadonlyArray<BatchEntry>> {
+	try {
+		return await issue_file_batch_entries.entries_of(directory)
+	} catch (error) {
+		console.error(
+			`Could not read the batch directory ${directory}: ${error_text.message_of(error)}`,
+		)
+
+		return []
+	}
+}
+
 async function run_batch(directory: string, shared: ReadonlyArray<string>): Promise<number> {
-	const entries = await issue_file_batch_entries.entries_of(directory)
+	const entries = await entries_in(directory)
+
+	if (entries.length === 0) {
+		console.error(`issue:file --batch — no *.md body files in ${directory}; nothing filed.`)
+
+		return FAILURE_EXIT_CODE
+	}
+
 	const outcomes = await file_all(entries, shared)
 
 	console.info(summary_of(outcomes))
@@ -104,15 +123,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	try {
-		return await run_batch(directory, argv.toSpliced(index, BATCH_FLAG_WIDTH))
-	} catch (error) {
-		console.error(
-			`Could not read the batch directory ${directory}: ${error_text.message_of(error)}`,
-		)
-
-		return FAILURE_EXIT_CODE
-	}
+	return await run_batch(directory, argv.toSpliced(index, BATCH_FLAG_WIDTH))
 }
 
 const issue_file_batch = { is_batch, run }
