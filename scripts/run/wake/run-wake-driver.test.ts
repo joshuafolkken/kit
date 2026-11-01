@@ -17,9 +17,9 @@ const EPIC_OUTPUT = 'epic #1\nresume: --owner 1'
 const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
 const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
-const CUT_COMMAND = 'pnpm josh run:carry --cut'
+const HAND_BACK = 'then end the turn, which hands the loop back'
 const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}"`
-const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", then hand the loop back with ${CUT_COMMAND}`
+const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -199,7 +199,7 @@ test('tells an epic judgment session how to advance the named carry', () => {
 })
 
 test.each([
-	['launch #2500\nresume: --owner 1', CUT_COMMAND],
+	['launch #2500\nresume: --owner 1', HAND_BACK],
 	[
 		'retrospective\nresume: --owner 1',
 		'pnpm josh run:carry --retrospective --summary "<result>", ',

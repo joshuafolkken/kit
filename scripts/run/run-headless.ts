@@ -16,6 +16,7 @@ import { run_carry, type CarryRead, type RunCarry } from '#scripts/run/carry/run
 
 const HEADLESS_ENV_KEY = 'JOSH_RUN_HEADLESS'
 const HEADLESS_VALUE = '1'
+const SESSION_CUT = { cuts: 1 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
@@ -51,12 +52,16 @@ function is_driving(read: CarryRead | undefined): boolean {
 	return read?.kind === 'carried' && read.carry.is_handed_off !== true
 }
 
-async function read_carry_here(): Promise<CarryRead | undefined> {
+async function carry_target_here(): Promise<string | undefined> {
 	const repository = await run_carry.repository_directory()
 
-	return repository === undefined
-		? undefined
-		: run_carry.read_carry(run_carry.carry_path(repository))
+	return repository === undefined ? undefined : run_carry.carry_path(repository)
+}
+
+async function read_carry_here(): Promise<CarryRead | undefined> {
+	const target = await carry_target_here()
+
+	return target === undefined ? undefined : run_carry.read_carry(target)
 }
 
 // The live record itself, whoever owns it — the run's scope (`--only`, the named list) is the run's,
@@ -125,9 +130,39 @@ async function must_keep_waiting(
 	return await is_backlog_parent(source, ancestry)
 }
 
+// **A headless parent's turn-end hands the loop back itself** (joshuafolkken/kit#5739). Its turn-end is
+// its process's end, and the `run:wake` driver holds the lanes between wakes, so the `run:carry --cut`
+// a woken session closed its branch with is written here — through `run_carry.apply_change`, the
+// writer `--cut` uses — on a record the session still drives; one it cut or ended by hand is left as
+// it is. Answers `must_keep_waiting` after the write: only a record that changed before the write
+// keeps the session waiting, and the stop rule then asks for the cut by hand as before.
+async function write_cut(
+	source: EnvironmentSource,
+	ancestry: () => ReadonlySet<number>,
+): Promise<void> {
+	const target = await carry_target_here()
+	const carry = await driving_carry(source, ancestry)
+
+	if (target !== undefined && carry !== undefined) {
+		run_carry.apply_change(target, carry, SESSION_CUT)
+	}
+}
+
+async function hand_back_at_turn_end(
+	source: EnvironmentSource = process.env,
+	ancestry: () => ReadonlySet<number> = lane_reap.own_ancestry,
+): Promise<boolean> {
+	if (!is_headless_parent(source)) return false
+
+	await write_cut(source, ancestry)
+
+	return await must_keep_waiting(source, ancestry)
+}
+
 const run_headless = {
 	HEADLESS_ENV_KEY,
 	current_carry,
+	hand_back_at_turn_end,
 	driven_here,
 	driving_carry,
 	environment,

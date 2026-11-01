@@ -52,14 +52,15 @@ function details_tail(details: string): string {
 }
 
 // **The hand-off names its next move, so the woken session never searches the procedure for it.**
-// Whatever the branch, the session acts on it and hands the loop back to the supervisor with a cut;
-// only a person's stop ends the run instead.
+// Whatever the branch, the session acts on it and ends its turn, whose stop hook writes the cut that
+// hands the loop back to the supervisor (`run_headless.hand_back_at_turn_end`); only a person's stop
+// ends the run instead.
 //
 // **The claim comes first.** The supervisor hands the record off before the
 // wake, so until the session adopts it with `--resume` every count it writes — `--merged`, `--done`,
-// the closing `--cut` — is refused as advancing a handed-off budget, and the supervisor, seeing no
-// claim, ends the run as a failed wake.
-const HAND_BACK = 'then hand the loop back with pnpm josh run:carry --cut'
+// the closing cut — is refused as advancing a handed-off budget, and the supervisor, seeing no claim,
+// ends the run as a failed wake.
+const HAND_BACK = 'then end the turn, which hands the loop back'
 const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	[
 		'retrospective',
