@@ -1,0 +1,8 @@
+{
+	"reason": "One pointer line to josh lint:rule in measurement.md, the Issue's requested change (#5665)",
+	"date": "2026-11-01",
+	"growth": {
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 253
+	}
+}
