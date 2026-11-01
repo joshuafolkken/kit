@@ -1,0 +1,7 @@
+{
+	"reason": "test:related cap bounds the change's summed reach (#5702): +3 code lines for the budget walk",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 3
+	}
+}
