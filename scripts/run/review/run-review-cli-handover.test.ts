@@ -1,4 +1,5 @@
 import type { Emit } from '#scripts/review/review-brief-cli'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_review } from './run-review'
 import { run_review_cli } from './run-review-cli'
@@ -52,6 +53,7 @@ vi.mock('./run-review-steps', () => ({
 const ISSUE = 4850
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
+const PRINT_EXIT_CODE = 7
 const SHIP_STEP = 'ship --detach --review'
 
 const output = { stderr: [] as Array<string> }
@@ -64,6 +66,7 @@ beforeEach(() => {
 	output.stderr = []
 	branch.mockResolvedValue(`${String(ISSUE)}-lane`)
 	brief_run.mockResolvedValue(SUCCESS_EXIT_CODE)
+	vi.spyOn(run_step_section, 'print_once').mockReturnValue(SUCCESS_EXIT_CODE)
 	vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 	vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
 		output.stderr.push(String(chunk))
@@ -105,6 +108,7 @@ describe('run_review_cli.run — opens never asked', () => {
 		expect(await run_review_cli.run([run_review.CODE_ONLY_FLAG])).toBe(SUCCESS_EXIT_CODE)
 		expect(handed_over).not.toHaveBeenCalled()
 		expect(brief_run).toHaveBeenCalledWith([])
+		expect(run_step_section.print_once).not.toHaveBeenCalled()
 	})
 
 	it('briefs a branch that names no issue without asking', async () => {
@@ -112,5 +116,28 @@ describe('run_review_cli.run — opens never asked', () => {
 
 		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
 		expect(handed_over).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5626: the open prints the section that governs it once its argv is accepted, and a
+// print that fails stops the open before any brief.
+describe('run_review_cli.run — the governing section', () => {
+	it('prints the run:review section before the brief', async () => {
+		handed_over.mockResolvedValue(false)
+
+		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(run_step_section.print_once).toHaveBeenCalledExactlyOnceWith('run:review')
+	})
+
+	it('stops with the print exit code, minting no brief', async () => {
+		vi.mocked(run_step_section.print_once).mockReturnValue(PRINT_EXIT_CODE)
+
+		expect(await run_review_cli.run([])).toBe(PRINT_EXIT_CODE)
+		expect(brief_run).not.toHaveBeenCalled()
+	})
+
+	it('prints nothing for a refused argv, only its usage line', async () => {
+		expect(await run_review_cli.run(['--nope'])).toBe(FAILURE_EXIT_CODE)
+		expect(run_step_section.print_once).not.toHaveBeenCalled()
 	})
 })

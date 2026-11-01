@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown labels what a reserved-run wrapped, chained commands kept (#5653)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 24
+	}
+}
