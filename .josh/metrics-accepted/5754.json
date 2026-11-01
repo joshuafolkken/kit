@@ -1,0 +1,7 @@
+{
+	"reason": "New epic split check (#5754): epic-split-reach.ts refuses a split whose child creates a scripts module only a sibling names",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 85
+	}
+}

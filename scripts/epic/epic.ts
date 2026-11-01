@@ -19,6 +19,7 @@ import { epic_notify } from './epic-notify'
 import { epic_reconcile } from './epic-reconcile'
 import { epic_remove } from './epic-remove'
 import { epic_run } from './epic-run'
+import { epic_split_reach } from './epic-split-reach'
 
 const ARGV_OFFSET = 2
 const FLAGS = '[--ordered] [--rationale-file <path|->] [--origin <owner/repo#N>] [--notify]'
@@ -34,6 +35,17 @@ const USAGE = [
 const FAILURE_EXIT_CODE = 1
 const SUCCESS_EXIT_CODE = 0
 
+// Whether a split's child could not merge alone, its refusal printed — read before creation and
+// promotion write anything, the two forms a split files its epic through. `--add` places an issue
+// filed on its own and `epic:bundle` groups related ones, so neither is a split.
+async function is_split_stranded(children: ReadonlyArray<number>): Promise<boolean> {
+	const refusal = await epic_split_reach.refusal_of(children)
+
+	if (refusal !== undefined) console.error(refusal)
+
+	return refusal !== undefined
+}
+
 async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 	const parsed = epic_cli.parse_promote_arguments(argv)
 
@@ -42,6 +54,8 @@ async function run_promotion(argv: ReadonlyArray<string>): Promise<number> {
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
 
 	const exit_code = await epic_run.promote_epic({
 		epic_number: parsed.epic_number,
@@ -186,6 +200,8 @@ async function run_creation(argv: ReadonlyArray<string>): Promise<number> {
 
 		return FAILURE_EXIT_CODE
 	}
+
+	if (await is_split_stranded(parsed.children)) return FAILURE_EXIT_CODE
 
 	const epic_number = await epic_run.create_epic_number({
 		title: parsed.title,
