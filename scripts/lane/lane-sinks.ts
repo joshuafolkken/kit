@@ -4,6 +4,7 @@ import { lane_breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_laps } from './lane-breakdown-laps'
 import type { LedgerEntry } from './lane-ledger'
 import { lane_net_time } from './lane-net-time'
+import { lane_sinks_issues, type OpenIssue } from './lane-sinks-issues'
 import { lane_stage_stats } from './lane-stage-stats'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
@@ -16,7 +17,7 @@ const DEFAULT_MINUTES = 30
 // Where a lap's notes start — `scoped pair (run 2: …)`, `josh gate (reused ×2)` — dropped so every
 // lane's run of a step sums into one row.
 const NOTE_LEAD = ' ('
-const COLUMNS = ['stage', 'total min', 'lanes', 'median min']
+const COLUMNS = ['stage', 'total min', 'lanes', 'median min', 'open issues']
 
 interface Sink {
 	name: string
@@ -80,23 +81,30 @@ function sinks_of(records: SinkRecords, issues: ReadonlyArray<number>): Array<Si
 		.toSorted((left, right) => total_ms(right) - total_ms(left))
 }
 
-function sink_row(sink: Sink): string {
+function sink_row(sink: Sink, issues: ReadonlyArray<OpenIssue> | undefined): string {
 	return lane_stats.to_row([
 		sink.name,
 		lane_stage_stats.cell(total_ms(sink)),
 		String(sink.per_lane_ms.length),
 		lane_stage_stats.cell(lane_stats.median(sink.per_lane_ms)),
+		lane_sinks_issues.cell(sink.name, issues),
 	])
 }
 
-// The table of the stages the lanes of `window` over `minutes` spent their time in.
-function table(records: SinkRecords, window: StatsWindow, minutes: number): string {
+// The table of the stages the lanes of `window` over `minutes` spent their time in, each beside the
+// open Issues that name it (`undefined` when the listing was unreadable).
+function table(
+	records: SinkRecords,
+	window: StatsWindow,
+	minutes: number,
+	issues: ReadonlyArray<OpenIssue> | undefined,
+): string {
 	const sinks = sinks_of(records, over_issues(records, window, minutes))
 
 	return [
 		lane_stats.to_row(COLUMNS),
 		lane_stats.to_row(COLUMNS.map(() => '---')),
-		...sinks.map((sink) => sink_row(sink)),
+		...sinks.map((sink) => sink_row(sink, issues)),
 	].join('\n')
 }
 

@@ -30,7 +30,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => '' } }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
-vi.mock('#scripts/run/run-step-section', () => ({ run_step_section: { print_section: () => 0 } }))
+vi.mock('#scripts/run/run-step-section', () => ({
+	run_step_section: { print_section: () => 0, print_once: () => 0 },
+}))
 vi.mock('#scripts/run/run-halfrun-resume', () => ({
 	run_halfrun_resume: { is_pending: async () => false },
 }))
