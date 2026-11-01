@@ -1,0 +1,7 @@
+{
+	"reason": "run:report --end folds the end-of-run record into one command (#5639)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 109
+	}
+}

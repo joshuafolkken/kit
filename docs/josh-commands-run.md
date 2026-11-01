@@ -691,8 +691,10 @@ The key sees only the tree, so `--fresh` runs a command that reads state outside
 Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends.
 
 ```bash
-pnpm josh run:report             # print the report; the same text josh notify sends
-pnpm josh run:report --handoff   # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report                              # print the report; the same text josh notify sends
+pnpm josh run:report --handoff                    # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report --end                        # end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage
+pnpm josh run:report --end --stopped "<reason>"   # end a run that stopped: run:carry --end --stopped sends the confirmation
 ```
 
 <!-- /usage -->

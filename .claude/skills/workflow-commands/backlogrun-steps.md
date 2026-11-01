@@ -70,10 +70,10 @@ record is the parent loop's; a lane never touches it**. Count with `--merged <N>
 | `busy` / `mismatch` / `unreadable` / `unknown` | **Stop; do not open a lane** — report what it printed; never resume into another invocation's record |
 | `over` | **End the conversation**; retype the invocation in a fresh session |
 | `standing` | **Stop; do not open a lane**: report `pnpm josh backlogrun --restart` (continue the run) and `pnpm josh run:carry --end` (discard it) for the person to choose — a crash from a run-tooling defect this run has since fixed you resume yourself (`upstream-interrupt.md` → "実行中のリポジトリ自身のラン機構の不具合") |
-**End the record when the run ends** — `pnpm josh run:report`, then `pnpm josh run:carry --end`, **never
-batched with it**, and `pnpm josh run:wake --stop` in the same turn. **A run that ends by _stopping_**
-(a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:carry --end --stopped
-"<one-line reason>"`** instead, which sends the one ⏸️ confirmation.
+**End the record when the run ends** — `pnpm josh run:report --end`: the report, `run:carry --end`,
+then `run:wake --stop`, stopping at the first failed stage, which it names. **A run that ends by
+_stopping_** (a `stop` verdict or the consecutive-failure guard) **ends with `pnpm josh run:report
+--end --stopped "<one-line reason>"`** instead, which sends the one ⏸️ confirmation.
 
 **A driver hand-off of `epic #N` is a named epic**: settle it by `backlogrun-progress.md` → "Running a
 named epic's children", never the root as a standalone `fullrun`, then ask `pnpm josh epic:next <E>` —
@@ -140,7 +140,7 @@ verdicts and stops are the driver's own.
 
 | Step | Where it is defined |
 | --- | --- |
-| `run:carry --begin` + `run:wake --start` before the plan; `run:carry --end` + `run:wake --stop` at the end | "The session cut is inside the invocation" above |
+| `run:carry --begin` + `run:wake --start` before the plan; `run:report --end` at the end | "The session cut is inside the invocation" above |
 | `pnpm josh ms`, `pnpm josh latest:if-required`, `lane:prune` in the primary checkout before the first lane | `backlogrun-lanes.md` → "Once per repository, before the first lane opens" |
 | `josh latest` on `required` only, once, never in a lane | `backlogrun-child.md` → "`josh latest` runs once per session, not once per child" |
 | `pnpm josh run:hold <N>`'s preflight, before each child not in a lane | `docs/josh-commands-run.md` → "`josh run:hold`" |
