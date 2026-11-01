@@ -1,7 +1,7 @@
 {
-	"reason": "New missing-required-context rule for the PR checks wait (#5774); is_required_match moved, not duplicated",
+	"reason": "Grace window for a missing required context (round-1 medium): absence memory per head and its tests",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 23
+		"scripts.code_lines": 53
 	}
 }

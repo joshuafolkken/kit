@@ -74,9 +74,10 @@ function is_review_blocked(review_decision: string | undefined): boolean {
 //
 // **`BLOCKED` is deliberately not here.** GitHub reports it while a required check is merely queued,
 // which is every healthy pull request for its first seconds. Treating it as a conflict is safe only
-// after the checks have settled; there is no such moment on this path, and a green-but-`BLOCKED`
-// pull request (branch protection requiring a review, which this repository does not set)
-// therefore reaches the timeout rather than a named failure.
+// after the checks have settled; there is no such moment on this path. A required context with no
+// check-run is named once the gap outlasts a grace window (`git-pr-checks-missing.ts`), while a
+// green-but-`BLOCKED` pull request held by a required review (which this repository does not set)
+// still reaches the timeout.
 function is_merge_conflict(merge_state_status: string | undefined): boolean {
 	return merge_state_status === MERGE_STATE_DIRTY
 }
