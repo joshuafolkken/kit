@@ -1,0 +1,7 @@
+{
+	"reason": "#5622 adds the session-lang run:handoff line for a consultation-model prompt (new module + tests)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 65
+	}
+}

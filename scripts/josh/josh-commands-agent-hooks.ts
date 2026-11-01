@@ -51,7 +51,7 @@ const AGENT_HOOK_COMMANDS: Record<string, CommandEntry> = {
 	'session:lang': {
 		script: 'scripts/josh/session-language-main.ts',
 		description:
-			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, and the run:board reply rule while a backlogrun is live (otherwise nothing)',
+			'Claude Code hook: print a non-default JOSH_SESSION_LANG for the session context, the run:board reply rule while a backlogrun is live, and the run:handoff line for a workflow keyword on a consultation model (otherwise nothing)',
 		category: 'Development',
 		reference: ['', 'automation', ['none']],
 		usage: {
