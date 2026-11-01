@@ -96,10 +96,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			'Run main:merge, review:selfcheck, check:related and run:review in one call, stopping at the first refusal with its next action',
+			'Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
-			'<issue> [--from <stage>] [--unpinned-ok "<reason>"]',
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>]',
 			'automation',
 			['processes', 'files', 'git', 'network'],
 		],
@@ -116,6 +116,14 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '<N> --unpinned-ok "only logs"',
 					note: 'forwarded to run:review as given',
+				},
+				{
+					arguments: '<N> --join',
+					note: 'once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition',
+				},
+				{
+					arguments: '<N> --join --fixing',
+					note: 'the same, when round 1 has fixes to make',
 				},
 			],
 		},
