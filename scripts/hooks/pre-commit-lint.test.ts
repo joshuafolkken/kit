@@ -141,7 +141,12 @@ describe('pre_commit_lint.run — switched off', () => {
 	)
 })
 
-const STALE_RED = { output: 'stale', exit_code: 1, elapsed_ms: 0 }
+const STALE_RED: Awaited<ReturnType<typeof eslint_daemon.run_or_cold>> = {
+	output: 'stale',
+	exit_code: 1,
+	elapsed_ms: 0,
+	daemon: 'daemon reused',
+}
 
 // joshuafolkken/kit#4358: eslint runs warm or cold through `eslint_daemon.run_or_cold`, inside the
 // eslint reservation.

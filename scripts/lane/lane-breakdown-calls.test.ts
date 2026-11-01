@@ -21,6 +21,9 @@ const GIT_STATUS = 'git status'
 const GIT_LOG = 'git log'
 const GH_VIEW = 'gh issue view 1'
 const RUN_PREP = 'pnpm josh run:prep 1'
+const LINT_LABEL = 'lint:related'
+const LINT_RELATED = `pnpm josh ${LINT_LABEL}`
+const LINT_DETAIL = 'prettier 1.0 s · eslint 400.0 s · 12 file(s) · daemon started · cache absent'
 
 const BREAKDOWN: Breakdown = {
 	stages: [
@@ -50,6 +53,10 @@ function call(minute: number, minutes: number, input: Partial<ToolCall>): ToolCa
 		output: '',
 		...input,
 	}
+}
+
+function timing_output(detail: string): string {
+	return `Checking formatting...\njosh lint:related timing — ${detail}\n`
 }
 
 function bash(minute: number, minutes: number, command: string): ToolCall {
@@ -126,6 +133,39 @@ describe('lane_breakdown_implement.plan_calls', () => {
 			{ label: 'run:prep', count: 1, ms: 3 * MINUTE_MS },
 			{ label: 'Read', count: 1, ms: 2 * MINUTE_MS },
 			{ label: 'run:entry', count: 1, ms: MINUTE_MS },
+		])
+	})
+})
+
+// joshuafolkken/kit#5712: the row a lane's slow first `lint:related` is read on.
+describe('lane_breakdown_implement.plan_calls lint:related detail', () => {
+	it('carries the lint:related timing line onto its group and the printed row', () => {
+		const calls = [call(1, 7, { command: LINT_RELATED, output: timing_output(LINT_DETAIL) })]
+
+		const groups = lane_breakdown_implement.plan_calls(calls, BREAKDOWN)
+
+		expect(groups).toStrictEqual([
+			{ label: LINT_LABEL, count: 1, ms: 7 * MINUTE_MS, detail: LINT_DETAIL },
+		])
+		expect(groups.map((group) => lane_breakdown_calls.group_text(group))).toStrictEqual([
+			`lint:related ×1 7.0 min (${LINT_DETAIL})`,
+		])
+	})
+
+	it('carries each lint:related group its own longest call timing line', () => {
+		const chained_detail =
+			'prettier 0.5 s · eslint 2.0 s · 1 file(s) · daemon reused · cache present'
+		const calls = [
+			call(1, 2, { command: LINT_RELATED, output: timing_output(LINT_DETAIL) }),
+			call(4, 5, {
+				command: `${LINT_RELATED} && pnpm josh test:related`,
+				output: timing_output(chained_detail),
+			}),
+		]
+
+		expect(lane_breakdown_implement.plan_calls(calls, BREAKDOWN)).toStrictEqual([
+			{ label: 'lint:related + test:related', count: 1, ms: 5 * MINUTE_MS, detail: chained_detail },
+			{ label: LINT_LABEL, count: 1, ms: 2 * MINUTE_MS, detail: LINT_DETAIL },
 		])
 	})
 })

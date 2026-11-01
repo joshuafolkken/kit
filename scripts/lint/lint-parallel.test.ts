@@ -5,7 +5,9 @@ import {
 	PRETTIER_CACHE_FLAGS,
 } from '#scripts/josh/josh-command-types'
 import { lane_cache_run } from '#scripts/lane/lane-cache-run'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { DaemonState } from './eslint-daemon'
+import type { LintRunTiming } from './lint-parallel'
 
 vi.mock('execa', () => ({
 	execa: vi.fn(),
@@ -15,7 +17,9 @@ vi.mock('#scripts/lane/lane-cache-run', () => ({
 		run: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
 	},
 }))
-vi.mock('./eslint-daemon', () => ({ eslint_daemon: { run_or_cold: vi.fn() } }))
+vi.mock('./eslint-daemon', () => ({
+	eslint_daemon: { run_or_cold: vi.fn() },
+}))
 vi.mock('./eslint-cache-dependencies', () => ({
 	eslint_cache_dependencies: {
 		guard: vi.fn(async (_cache_file: string, work: () => Promise<unknown>) => await work()),
@@ -33,6 +37,7 @@ const mocked_execa = vi.mocked(execa_module.execa)
 const mocked_cache_run = vi.mocked(lane_cache_run.run)
 
 type ExecaResult = Awaited<ReturnType<typeof execa_module.execa>>
+type Write = typeof process.stdout.write
 
 // execa's resolved Result is a large interface; the lint check only reads
 // `all` and `exitCode`, so a minimal stub is bridged through `unknown`.
@@ -124,6 +129,9 @@ describe('whole-tree eslint in CI', () => {
 
 const TARGET = 'scripts/thing.ts'
 const RELATED_CACHE_FILE = '.eslintcache.related'
+// Read from the test's working directory, the repository root: one file always there, one never.
+const PRESENT_CACHE_FILE = 'package.json'
+const NO_CACHE_FILE = '.eslintcache.never-written'
 
 describe('run_lint_checks', () => {
 	it('runs the targets it was given instead of the whole tree', async () => {
@@ -155,16 +163,23 @@ describe('run_lint_checks', () => {
 	})
 })
 
+const ESLINT = ['exec', 'eslint', TARGET]
+const PRETTIER = ['exec', 'prettier', TARGET]
+const WARM = { warm_daemon: true }
+const LINT_RELATED_LABEL = 'josh lint:related'
+const DAEMON_REUSED: DaemonState = 'daemon reused'
+
 // joshuafolkken/kit#4358: only a run that asks for it reaches the warm daemon; the fallback to the
 // cold process is `eslint_daemon.run_or_cold`'s own.
 describe('run_lint_checks — the warm eslint daemon', () => {
-	const ESLINT = ['exec', 'eslint', TARGET]
-	const PRETTIER = ['exec', 'prettier', TARGET]
-	const WARM = { warm_daemon: true }
-
 	it('lints through the daemon when asked, spawning only prettier', async () => {
 		mocked_execa.mockResolvedValueOnce(fake_result(0))
-		mocked_run_or_cold.mockResolvedValueOnce({ exit_code: 1, output: 'x', elapsed_ms: 0 })
+		mocked_run_or_cold.mockResolvedValueOnce({
+			exit_code: 1,
+			output: 'x',
+			elapsed_ms: 0,
+			daemon: DAEMON_REUSED,
+		})
 		vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
 
 		expect(await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)).toBe(1)
@@ -179,6 +194,67 @@ describe('run_lint_checks — the warm eslint daemon', () => {
 		await run_lint_parallel_checks()
 
 		expect(mocked_run_or_cold).not.toHaveBeenCalled()
+	})
+})
+
+// A clean warm run whose eslint took `eslint_ms` with the daemon as `daemon`, its stdout captured.
+function mock_warm_run(eslint_ms: number, daemon: DaemonState): MockInstance<Write> {
+	mocked_execa.mockResolvedValueOnce(fake_result(0))
+	mocked_run_or_cold.mockResolvedValueOnce({
+		exit_code: 0,
+		output: '',
+		elapsed_ms: eslint_ms,
+		daemon,
+	})
+
+	return vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+}
+
+function timing_of(targets: string): LintRunTiming {
+	return { label: LINT_RELATED_LABEL, targets }
+}
+
+// joshuafolkken/kit#5712: the line a lane's slow first `lint:related` is diagnosed by, naming what the
+// run did with the daemon — a stale one restarted is not one reused.
+describe('run_lint_checks — the timing line', () => {
+	it('prints the timing line with the targets, daemon and cache it names', async () => {
+		const write = mock_warm_run(2000, 'daemon restarted')
+		const timing = timing_of('3 file(s)')
+
+		await run_lint_checks(PRETTIER, ESLINT, NO_CACHE_FILE, { ...WARM, timing })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringMatching(
+				/^josh lint:related timing — prettier \d+\.\d s · eslint 2\.0 s · 3 file\(s\) · daemon restarted · cache absent\n$/u,
+			),
+		)
+	})
+
+	it('reads a daemon started and a present cache on the timing line', async () => {
+		const write = mock_warm_run(0, 'daemon started')
+
+		await run_lint_checks(PRETTIER, ESLINT, PRESENT_CACHE_FILE, { ...WARM, timing: timing_of('1') })
+
+		expect(write).toHaveBeenCalledWith(
+			expect.stringContaining('· 1 · daemon started · cache present\n'),
+		)
+	})
+
+	it('prints no timing line for a run that names none', async () => {
+		const write = mock_warm_run(0, DAEMON_REUSED)
+
+		await run_lint_checks(PRETTIER, ESLINT, RELATED_CACHE_FILE, WARM)
+
+		expect(write).not.toHaveBeenCalledWith(expect.stringContaining('timing —'))
+	})
+
+	it('forwards the whole-tree run’s timing, naming its cold process', async () => {
+		mocked_execa.mockResolvedValue(fake_result(0))
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		await run_lint_parallel_checks({ warm_daemon: false, timing: timing_of('whole tree') })
+
+		expect(write).toHaveBeenCalledWith(expect.stringContaining('· whole tree · cold process · '))
 	})
 })
 

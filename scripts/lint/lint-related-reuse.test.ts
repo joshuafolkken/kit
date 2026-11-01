@@ -1,6 +1,7 @@
 import { metrics_totals } from '#scripts/gate/metrics-totals'
 import { scoped_green } from '#scripts/gate/scoped-green'
 import { tree_verdict, type TreeVerdict } from '#scripts/gate/tree-verdict'
+import { changed_paths } from '#scripts/git/changed-paths'
 import { git_command } from '#scripts/git/git-command'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lint_parallel } from './lint-parallel'
@@ -48,6 +49,8 @@ const GROWTH_NOTICE = 'josh metrics: 1 total(s) grew past the merge-base'
 const SOURCE = 'scripts/a.ts'
 const BEFORE_TREE = { files: { [SOURCE]: 'digest' }, base: 'a22b3479' }
 const FAILED = 1
+// A real file, since the narrowing drops a path the tree does not hold.
+const NARROWED_SOURCE = 'scripts/lint/lint-related.ts'
 
 function kept(exit_code: number): TreeVerdict {
 	return { tree: 'b'.repeat(64), exit_code, tail: '\nkept lint tail\n', at: 'then' }
@@ -105,5 +108,30 @@ describe('lint_related.run_related_lint on a tree it has not answered for', () =
 		expect(entry).toMatchObject({ before: BEFORE_TREE, exit_code: 0 })
 		expect(entry?.tail).toContain(GROWTH_NOTICE)
 		expect(written_output()).toContain(entry?.tail)
+	})
+})
+
+// joshuafolkken/kit#5712: each fresh run names the targets its timing line reports.
+describe('lint_related.run_related_lint — the timing line it asks for', () => {
+	const LABEL = 'josh lint:related'
+
+	it('names the whole tree on the cold fallback', async () => {
+		await lint_related.run_related_lint([])
+
+		expect(lint_parallel.run_lint_parallel_checks).toHaveBeenCalledExactlyOnceWith({
+			warm_daemon: false,
+			timing: { label: LABEL, targets: 'whole tree' },
+		})
+	})
+
+	it('names the file count on the warm narrowed run', async () => {
+		vi.mocked(changed_paths.read_changed_paths).mockResolvedValueOnce([NARROWED_SOURCE])
+
+		await lint_related.run_related_lint([])
+
+		expect(vi.mocked(lint_parallel.run_lint_checks).mock.calls[0]?.[3]).toStrictEqual({
+			warm_daemon: true,
+			timing: { label: LABEL, targets: '1 file(s)' },
+		})
 	})
 })
