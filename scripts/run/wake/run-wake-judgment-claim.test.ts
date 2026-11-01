@@ -11,7 +11,7 @@ import { run_wake_driver } from './run-wake-driver'
 import { run_wake_handoff } from './run-wake-handoff'
 
 // joshuafolkken/kit#3238: a session woken on a judgment branch is handed a record the supervisor has
-// already handed off. Followed as the hand-off material words it — claim, act, cut — the session's
+// already handed off. Followed as the hand-off material words it — claim, act, then the turn-end's cut — the session's
 // counts land and the supervisor reads the wake as claimed; skipping the claim is refused outright.
 
 vi.mock('#scripts/git/git-command', () => ({

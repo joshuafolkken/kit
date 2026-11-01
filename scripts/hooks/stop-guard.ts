@@ -109,20 +109,21 @@ function session_lang(): string {
 // Which session this is — a headless parent, a lane child, a kit-launched agent, the `backlogrun`
 // parent — the facts that say whether a person is there to answer.
 async function session_role_facts(): Promise<
-	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'headless_waiting' | 'lane_child'>
+	Pick<StopContext, 'backlog_parent' | 'headless_agent' | 'lane_child'>
 > {
 	return {
-		headless_waiting: await run_headless.must_keep_waiting(),
 		lane_child: lane_child_marker.is_child_of(process.cwd()),
 		headless_agent: agent_headless.is_headless(),
 		backlog_parent: await run_headless.is_backlog_parent(),
 	}
 }
 
+type PassContext = Omit<StopContext, 'headless_waiting'>
+
 async function build_context(
 	transcript_path: string,
 	payload_tail: { stop_hook_active: boolean; message: string },
-): Promise<StopContext> {
+): Promise<PassContext> {
 	const tail = transcript_tail(transcript_path)
 
 	return {
@@ -145,6 +146,20 @@ async function build_context(
 	}
 }
 
+// **A headless parent's cut is written only once no other rule refuses the stop**
+// (joshuafolkken/kit#5739). Its turn-end is its process's end, so the stop is where
+// `run_headless.hand_back_at_turn_end` hands the loop back; a cut written before another refusal would
+// hand off a record the continued session still counts on. The headless wait is asked only after the
+// write, where it means the write lost.
+async function hand_back_outcome(context: PassContext): Promise<StopOutcome> {
+	const released = stop_rules.stop_outcome({ ...context, headless_waiting: false })
+	if (released.reason !== undefined) return released
+
+	const is_waiting = await run_headless.hand_back_at_turn_end()
+
+	return is_waiting ? stop_rules.stop_outcome({ ...context, headless_waiting: true }) : released
+}
+
 async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcome> {
 	const payload = stop_rules.parse_stop_payload(raw_payload)
 
@@ -155,7 +170,7 @@ async function stop_outcome_for_payload(raw_payload: string): Promise<StopOutcom
 		message: payload.last_assistant_message ?? '',
 	})
 
-	return stop_rules.stop_outcome(context)
+	return await hand_back_outcome(context)
 }
 
 async function outcome_of(raw_payload: string): Promise<StopOutcome> {
