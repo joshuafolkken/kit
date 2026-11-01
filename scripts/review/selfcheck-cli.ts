@@ -141,6 +141,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await guarded(process.argv.slice(FIRST_ARGUMENT))
 }
 
-const selfcheck_cli = { change_hunks, child_environment, guarded, run, untracked_hunks }
+const selfcheck_cli = { change_hunks, child_environment, guarded, run, sections, untracked_hunks }
 
 export { selfcheck_cli }
