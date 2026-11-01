@@ -168,3 +168,36 @@ describe('size_estimate.is_issue_over_cap', () => {
 		expect(size_estimate.is_issue_over_cap({ body: UNDER_GUIDE })).toBe(false)
 	})
 })
+
+// joshuafolkken/kit#5758: a decision that widens the scope restates the estimate `lane:plan` reads.
+describe('size_estimate.stated_line', () => {
+	it('reads the estimate line a decision record states', () => {
+		const record = ['### Bundle #5710', '', `  ${estimate(11, 300)}`, '- 理由: 同梱'].join('\n')
+
+		expect(size_estimate.stated_line(record)).toBe(estimate(11, 300))
+	})
+
+	it('reads none from a record without a parsable estimate', () => {
+		expect(size_estimate.stated_line('### Hold\n\n- 規模見積もり: 多い')).toBeUndefined()
+		expect(size_estimate.stated_line(['```', estimate(11, 300), '```'].join('\n'))).toBeUndefined()
+	})
+})
+
+describe('size_estimate.restated', () => {
+	it('replaces the background estimate so declared_size reads the new one', () => {
+		const body = size_estimate.restated(body_with(estimate(2, 60)), estimate(11, 300))
+
+		expect(size_estimate.declared_size(body)).toMatchObject({ files: 11, lines: 300 })
+		expect(body).toBe(body_with(estimate(11, 300)))
+	})
+
+	it('leaves an estimate outside the background section alone', () => {
+		const body = ['## 背景', '', 'x', '', '## 現象', '', estimate(2, 60)].join('\n')
+
+		expect(size_estimate.restated(body, estimate(11, 300))).toBe(body)
+	})
+
+	it('leaves a body that declares no estimate unchanged', () => {
+		expect(size_estimate.restated(body_with(), estimate(11, 300))).toBe(body_with())
+	})
+})

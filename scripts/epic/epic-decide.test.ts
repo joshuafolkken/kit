@@ -99,6 +99,65 @@ describe('epic_decide.decide — rerun', () => {
 	})
 })
 
+// joshuafolkken/kit#5758: a decision that widens a child's scope restates its body estimate, so
+// `lane:plan` does not read the estimate filed before the decision.
+const OLD_SIZE = '- 規模見積もり: 約 2 ファイル / 60 行（テスト除く）'
+const NEW_SIZE = '- 規模見積もり: 約 11 ファイル / 300 行（テスト除く）'
+
+function child_body(size: string): string {
+	return ['## 背景', BLANK, size, BLANK, '## 現象'].join('\n')
+}
+
+function read_child(size: string): void {
+	mocked_read.mockImplementation(async (issue_number) => {
+		await Promise.resolve()
+		if (issue_number !== String(CHILD)) return epic_json(EPIC_BODY)
+
+		return JSON.stringify({ number: CHILD, labels: [], body: child_body(size) })
+	})
+}
+
+async function decide_widening(): Promise<number> {
+	return await epic_decide.decide({
+		epic_number: EPIC_NUMBER,
+		children: [CHILD],
+		decision: `${RECORD}\n${NEW_SIZE}`,
+	})
+}
+
+describe('epic_decide.decide — size estimate', () => {
+	it('replaces the child body estimate with the one the record states', async () => {
+		read_child(OLD_SIZE)
+
+		expect(await decide_widening()).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_edit).toHaveBeenCalledWith(String(CHILD), child_body(NEW_SIZE))
+		expect(mocked_clear).toHaveBeenCalledWith(String(CHILD), NEEDS_DECISION_LABEL)
+	})
+
+	it('does not rewrite a child that already declares the stated estimate', async () => {
+		read_child(NEW_SIZE)
+
+		expect(await decide_widening()).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_edit).not.toHaveBeenCalledWith(String(CHILD), expect.anything())
+	})
+
+	it('keeps needs-decision when the child cannot be read', async () => {
+		mocked_read.mockImplementation(async (issue_number) => {
+			await Promise.resolve()
+
+			return issue_number === String(CHILD) ? undefined : epic_json(EPIC_BODY)
+		})
+
+		expect(await decide_widening()).toBe(FAILURE_EXIT_CODE)
+		expect(mocked_clear).not.toHaveBeenCalled()
+	})
+
+	it('reads no child body when the record states no estimate', async () => {
+		expect(await decide()).toBe(SUCCESS_EXIT_CODE)
+		expect(mocked_read).not.toHaveBeenCalledWith(String(CHILD))
+	})
+})
+
 describe('epic_decide.decide — refused before any write', () => {
 	it('refuses a child the epic does not track', async () => {
 		expect(await decide([CHILD, UNTRACKED])).toBe(FAILURE_EXIT_CODE)
