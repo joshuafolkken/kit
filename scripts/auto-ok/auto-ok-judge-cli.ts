@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
-import { RUN_LANE_LABEL, RUN_SOLO_LABEL } from '#scripts/issue/issue-labels'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
+import { issue_run_verdict } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { auto_ok_judge_read } from './auto-ok-judge-read'
@@ -24,8 +24,7 @@ const USAGE =
 const OPTIONS = {
 	apply: { type: 'string' },
 	decline: { type: 'string' },
-	lane: { type: 'boolean' },
-	solo: { type: 'boolean' },
+	...issue_run_verdict.RUN_LABEL_OPTIONS,
 	reason: { type: 'string' },
 } as const
 
@@ -36,14 +35,8 @@ type JudgeRequest =
 	| { kind: 'apply'; issue: string; run_label: string }
 	| { kind: 'decline'; issue: string; reason: string }
 
-function run_label_of(values: Values): string | undefined {
-	if (values.lane === values.solo) return undefined
-
-	return values.lane === true ? RUN_LANE_LABEL : RUN_SOLO_LABEL
-}
-
 function apply_request(issue: string, values: Values): JudgeRequest | undefined {
-	const run_label = run_label_of(values)
+	const run_label = issue_run_verdict.run_label_of(values)
 
 	return run_label === undefined ? undefined : { kind: 'apply', issue, run_label }
 }

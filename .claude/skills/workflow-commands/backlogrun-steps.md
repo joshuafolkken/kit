@@ -102,8 +102,9 @@ since a labelled issue is never offered — from one `pnpm josh issue:read <N>
 - **A person's judgement** — apply `needs-decision` (`backlogrun-park.md` → "Only a person's judgement
   carries `needs-decision`").
 - **Order and isolate** — a native `blocked-by` where one must land first; `run:solo` on all three
-  `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**, commenting the
-  reason.
+  `backlogrun-lanes.md` → "A solo run" conditions, **every other one `run:lane`**, in one call with
+  the reason (`--clear` folds in the answered park): `pnpm josh backlog:triage`
+  (`docs/josh-commands-backlog.md` → "`josh backlog:triage`").
 - **`priority:critical` / `priority:high`** are applied at filing by `pnpm josh issue:file` from the
   body's `- 優先度:` declaration (`issue-template.md`); **only a person removes them**.
 - **Report `pnpm josh backlog:plan --waves`** with the plan, never an order derived by hand; then start
@@ -123,7 +124,7 @@ section the row names:
 
 | Handed back | What the session does | Read |
 | --- | --- | --- |
-| `triage` | Label each issue stderr names `run:solo` or `run:lane` (`blocked-by` where one must land first) | "Resolve what the plan can resolve" above |
+| `triage` | Answer each issue stderr names with `pnpm josh backlog:triage --apply <N> --lane\|--solo --reason "<why>"` (`blocked-by` where one must land first) | "Resolve what the plan can resolve" above |
 | `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` | `docs/josh-commands-backlog.md` → "`josh auto-ok:judge`" |
 | `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
 | `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |
