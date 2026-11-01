@@ -4,6 +4,7 @@ import path from 'node:path'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { vi } from 'vitest'
 
 // joshuafolkken/kit#5003: a `josh ship --review` given no `--unpinned-ok` carries the reason recorded for
@@ -11,11 +12,16 @@ import { vi } from 'vitest'
 // `with_recorded_reason`). A ship CLI suite run in a lane that recorded one read it, and its `--review`
 // cases failed. `isolate` answers no record; `with_record` puts one for this branch where the real reader
 // looks, so a case can show the suite stays apart from the checkout it runs in.
+//
+// `isolate` also prints no governing section, so a suite reads the ship's own report as its first
+// line, whatever this session printed before.
 
 const RECORDED_REASON = 'a reason an earlier ship on this branch recorded'
+const SUCCESS_EXIT_CODE = 0
 
 function isolate(): void {
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
+	vi.spyOn(run_step_section, 'print_once').mockReturnValue(SUCCESS_EXIT_CODE)
 }
 
 // `run(argv)` — the ship CLI — with this branch's record in place.
