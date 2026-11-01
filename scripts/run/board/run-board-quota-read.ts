@@ -29,10 +29,11 @@ const PERCENT = 100
 const TAIL_BYTES = 262_144
 const TAIL_GROWTH = 8
 const TAIL_LIMIT_BYTES = TAIL_BYTES * TAIL_GROWTH * TAIL_GROWTH
-// The newest files a provider's reading is looked for in, newest first.
-const FILES_TRIED = 3
-// The newest lane logs read for their launch's provider, bounding the reads when Codex ran them all.
-const LOGS_SCANNED = FILES_TRIED * FILES_TRIED
+// The done files a provider's spend per task is averaged over (joshuafolkken/kit#5618), and the newest
+// files looked through for them, newest first — bounding the reads when few are done or Claude's.
+const SAMPLE_SIZE = 10
+const SCAN_FACTOR = 3
+const FILES_SCANNED = SAMPLE_SIZE * SCAN_FACTOR
 const MS_PER_DAY = MINUTES_PER_DAY * MINUTES_PER_HOUR * MS_PER_SECOND
 const CLAUDE_MARK = '"rate_limit_event"'
 const CODEX_MARK = '"rate_limits":{'
@@ -198,13 +199,13 @@ function codex_reading(text: string): QuotaReading | undefined {
 	return readings_in(text, codex_line).at(-1)
 }
 
-// The first event's reading, which a file's head is read for.
-function claude_first(text: string): QuotaReading | undefined {
-	return readings_in(text, claude_line)[0]
+// Every event's reading, oldest first, which a file's head is read for.
+function claude_heads(text: string): Array<QuotaReading> {
+	return readings_in(text, claude_line)
 }
 
-function codex_first(text: string): QuotaReading | undefined {
-	return readings_in(text, codex_line)[0]
+function codex_heads(text: string): Array<QuotaReading> {
+	return readings_in(text, codex_line)
 }
 
 async function names_in(directory: string): Promise<Array<string>> {
@@ -243,9 +244,9 @@ function sorted(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
 	return files.toSorted((left, right) => right.mtime_ms - left.mtime_ms)
 }
 
-// The `FILES_TRIED` newest of `files`, newest first.
+// The `FILES_SCANNED` newest of `files`, newest first.
 function newest(files: ReadonlyArray<QuotaFile>): Array<QuotaFile> {
-	return sorted(files).slice(0, FILES_TRIED)
+	return sorted(files).slice(0, FILES_SCANNED)
 }
 
 function is_lane_log(name: string): boolean {
@@ -267,9 +268,24 @@ function is_claude_launch(text: string): boolean {
 	return provider === undefined || provider === agent_provider.ANTHROPIC_PROVIDER
 }
 
+// Whether a log's last launch ran Claude, by its path and `mtime`: a log is read whole once per write.
+const CLAUDE_LAUNCHES = new Map<string, { mtime_ms: number; is_claude: boolean }>()
+
+async function read_claude_launch(file: QuotaFile): Promise<boolean> {
+	const known = CLAUDE_LAUNCHES.get(file.path)
+
+	if (known?.mtime_ms === file.mtime_ms) return known.is_claude
+
+	const is_claude = is_claude_launch(await readFile(file.path, 'utf8'))
+
+	CLAUDE_LAUNCHES.set(file.path, { mtime_ms: file.mtime_ms, is_claude })
+
+	return is_claude
+}
+
 async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 	try {
-		return is_claude_launch(await readFile(file.path, 'utf8')) ? [file] : []
+		return (await read_claude_launch(file)) ? [file] : []
 	} catch {
 		return []
 	}
@@ -278,10 +294,10 @@ async function claude_log(file: QuotaFile): Promise<Array<QuotaFile>> {
 // The newest logs of lane children Claude ran, in the run-state directory. A Codex child logs under
 // the same name and writes no `rate_limit_event`, so its logs are passed over by their last header.
 async function claude_files(root: string = durable_state.root()): Promise<Array<QuotaFile>> {
-	const scanned = sorted(await files_in(root, is_lane_log)).slice(0, LOGS_SCANNED)
+	const scanned = newest(await files_in(root, is_lane_log))
 	const claude = await Promise.all(scanned.map(async (file) => await claude_log(file)))
 
-	return claude.flat().slice(0, FILES_TRIED)
+	return claude.flat()
 }
 
 function is_rollout(name: string): boolean {
@@ -300,11 +316,12 @@ function codex_home(): string {
 	return process.env['CODEX_HOME'] ?? codex_home_source.default_home()
 }
 
-// The newest rollout files of today's and yesterday's — never the whole `sessions` tree. A session signed
-// in with an API key writes only `rate_limits: null`, so the newest alone may hold no reading.
+// The newest rollout files of the last `DAYS_PER_WEEK` days — never the whole `sessions` tree. A session
+// signed in with an API key writes only `rate_limits: null`, so the newest alone may hold no reading.
 async function codex_files(now_ms: number, home = codex_home()): Promise<Array<QuotaFile>> {
 	const sessions = path.join(home, 'sessions')
-	const days = [now_ms, now_ms - MS_PER_DAY].map((ms) => day_directory(sessions, ms))
+	const back = Array.from({ length: DAYS_PER_WEEK }, (_, day) => now_ms - day * MS_PER_DAY)
+	const days = back.map((ms) => day_directory(sessions, ms))
 	const found = await Promise.all(days.map(async (day) => await files_in(day, is_rollout)))
 
 	return newest(found.flat())
@@ -352,15 +369,17 @@ async function reading_in(
 }
 
 const run_board_quota_read = {
+	FILES_SCANNED,
 	FIVE_HOURS_MINUTES,
+	SAMPLE_SIZE,
 	SEVEN_DAYS_MINUTES,
 	TAIL_BYTES,
 	TAIL_LIMIT_BYTES,
 	claude_files,
-	claude_first,
+	claude_heads,
 	claude_reading,
 	codex_files,
-	codex_first,
+	codex_heads,
 	codex_reading,
 	read_head,
 	read_tail,

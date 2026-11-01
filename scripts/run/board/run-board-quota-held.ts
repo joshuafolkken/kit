@@ -13,18 +13,19 @@ import { run_board_quota_spent, type Spent } from './run-board-quota-spent'
 // (`run-board-held.ts`), and a provider's newest file it finds unchanged since the last read — the same
 // path and `mtime` — is not opened again. A provider's newest file may hold no reading (a Codex child's
 // lane log, a rollout of an API-key session), so the reading is the newest that holds one. A done
-// file's head is read too, for the spend per task of `run-board-quota-spent.ts`.
+// file's head is read too, for the spend per task of `run-board-quota-spent.ts`, and files are read
+// newest first until enough done ones tell it.
 
 const QUOTA_INTERVAL_MS = 60_000
 const PROVIDERS: ReadonlyArray<QuotaProvider> = ['claude', 'codex']
 const NO_QUOTAS: Quotas = { claude: undefined, codex: undefined }
 
 // Where a provider's readings come from: its newest files, newest first, the windows a tail of one
-// holds, those its head's first event held, and whether a tail ends a done file.
+// holds, those each event of its head held, and whether a tail ends a done file.
 interface QuotaSource {
 	find: () => Promise<Array<QuotaFile>>
 	reading_of: (text: string) => QuotaReading | undefined
-	first_of: (text: string) => QuotaReading | undefined
+	heads_of: (text: string) => Array<QuotaReading>
 	is_done: (tail: string) => boolean
 }
 
@@ -82,7 +83,27 @@ async function file_mark(
 
 	const head = await ports.read_head(file.path, run_board_quota_read.TAIL_BYTES)
 
-	return { file, reading, spent: run_board_quota_spent.spent_of(source.first_of(head), reading) }
+	return { file, reading, spent: run_board_quota_spent.spent_of(source.heads_of(head), reading) }
+}
+
+function is_told(mark: QuotaMark): boolean {
+	return Object.keys(mark.spent).length > 0
+}
+
+// The marks of `files`, newest first, read one by one until `SAMPLE_SIZE` of them tell a spend: a
+// file not done, or holding no reading, is passed over (joshuafolkken/kit#5618).
+async function sampled(
+	files: ReadonlyArray<QuotaFile>,
+	mark_of: (file: QuotaFile) => Promise<QuotaMark>,
+	told = 0,
+): Promise<Array<QuotaMark>> {
+	const [file, ...rest] = files
+
+	if (file === undefined || told >= run_board_quota_read.SAMPLE_SIZE) return []
+
+	const mark = await mark_of(file)
+
+	return [mark, ...(await sampled(rest, mark_of, is_told(mark) ? told + 1 : told))]
 }
 
 // The newest file's reading that holds windows, with each window's spend per task where told.
@@ -104,9 +125,7 @@ async function fresh_reading(
 	const source = ports.sources[provider]
 	const files = await source.find()
 	const marked = marks.get(provider) ?? []
-	const fresh = await Promise.all(
-		files.map(async (file) => await file_mark(file, source, ports, marked)),
-	)
+	const fresh = await sampled(files, async (file) => await file_mark(file, source, ports, marked))
 
 	marks.set(provider, fresh)
 
@@ -147,7 +166,7 @@ function quota_reader(ports: QuotaPorts): () => Promise<Quotas> {
 
 // The production reader: the run-state directory's newest lane logs and Codex's newest rollout files.
 function live_quota_reader(): () => Promise<Quotas> {
-	const { claude_files, claude_first, claude_reading, codex_files, codex_first, codex_reading } =
+	const { claude_files, claude_heads, claude_reading, codex_files, codex_heads, codex_reading } =
 		run_board_quota_read
 
 	return quota_reader({
@@ -155,13 +174,13 @@ function live_quota_reader(): () => Promise<Quotas> {
 			claude: {
 				find: async () => await claude_files(),
 				reading_of: claude_reading,
-				first_of: claude_first,
+				heads_of: claude_heads,
 				is_done: run_board_quota_spent.claude_done,
 			},
 			codex: {
 				find: async () => await codex_files(Date.now()),
 				reading_of: codex_reading,
-				first_of: codex_first,
+				heads_of: codex_heads,
 				is_done: run_board_quota_spent.codex_done,
 			},
 		},
