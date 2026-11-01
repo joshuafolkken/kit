@@ -21,7 +21,7 @@ const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const ENTRY_KEY = vi.hoisted(() => 'entry')
 
 vi.mock('#scripts/run/run-step-section', () => ({
-	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock },
+	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock, print_once: () => 0 },
 }))
 
 vi.mock('#scripts/issue/issue-watch', () => ({

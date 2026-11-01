@@ -16,7 +16,7 @@ stop. A merged Issue is reached too, but the `entry #<N>` line after the stage l
 Where `fullrun` runs `pnpm josh followup` and merges, `prrun` does three things and stops:
 
 1. **Watch the pull request to mergeable** — `pnpm josh followup "<title> #<N>" --no-merge`
-   (`followup.md` → "Run `pnpm josh followup`", read in the same turn): required CI green and the AI
+   (`followup.md` → "Run `pnpm josh followup`", printed by `followup` as it starts): required CI green and the AI
    review findings resolved. A failure stops the run exactly as it stops a `fullrun`.
 2. **Mark the stop — `pnpm josh run:hold <N> --prrun-stop`.** It records the commit the pull request is
    on in this run's own hold, the record `fullrun #<N>` adopts (its prrun resume, `working-tree-hold.md`). **The hold and `in-progress` stay**: the run is not finished until the merge's tail runs.

@@ -4,11 +4,11 @@
 //
 // **Four documents leave the entry read because their first use is a named command, not the entry**.
 // `latest-gate.md` is read
-// when `pnpm josh latest:scope` answers `required`, `followup.md` in the turn that issues
-// `pnpm josh followup`, `chain-rule.md` before the first `pnpm josh gate` launch it governs (the
+// when `pnpm josh latest:scope` answers `required`, `followup.md` as `pnpm josh followup` prints it
+// when it starts, `chain-rule.md` before the first `pnpm josh gate` launch it governs (the
 // section is how that gate starts, overlapped with the review), and `background-commands.md` before
 // the first backgroundable command (`pnpm josh gate`). **They are not deferred or summarized** — the
-// named operational section is fetched in the same turn; only `latest-gate.md` remains whole because
+// named operational section is fetched, or printed by its command, in the same turn; only `latest-gate.md` remains whole because
 // its result branches across that document. `chain-rule.md` governs the `/code-review` → `followup`
 // chain and `background-commands.md` the background execution of the gate, the push and the merge
 // tail — all *after* the first edit, so neither is resident from the entry. `SKILL.md` → §1, "Four
@@ -25,8 +25,9 @@
 // lane child reaches after the entry, so its read is a point-of-use read. Only a lane child reaches
 // it: `fullrun.md` does not name it, so it is charged to the lane child's role alone.
 // **`progress-watcher.md` joins them**: the heartbeat every implementing run starts once its hold is
-// claimed, kept apart from `backlogrun-progress.md` so a single-issue run does not pay for the
-// batch's hand-off and waiting procedure to read it.
+// claimed — its section printed by `run:entry` outside a lane child and by `run:progress --wait` —
+// kept apart from `backlogrun-progress.md` so a single-issue run does not pay for the batch's
+// hand-off and waiting procedure to read it.
 const POINT_OF_USE_FILES: ReadonlySet<string> = new Set([
 	'latest-gate.md',
 	'followup.md',
