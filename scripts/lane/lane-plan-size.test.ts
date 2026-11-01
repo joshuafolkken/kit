@@ -189,6 +189,30 @@ describe('lane_plan_size.oversize on the hunks of a re-plan', () => {
 	})
 })
 
+// joshuafolkken/kit#5672: a narrowing re-plan dropped a cleared, edited file; the plan that restores it
+// counts that file's hunks as planned, while a file no plan ever held still counts.
+describe('lane_plan_size.oversize on the hunks of a re-plan that restores a cleared file', () => {
+	const [restored = '', kept = ''] = files(2)
+	const recorded = { ...plan_of([kept]), cleared: true, cleared_paths: [restored, kept] }
+	const plan = plan_of([restored, kept])
+
+	it('passes 3 hunks in a file an earlier clear held', () => {
+		const signals = { ...QUIET, ...hunks(3, restored) }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a file no plan ever held', () => {
+		const signals = { ...QUIET, hunk_files: [restored, UNPLANNED, UNPLANNED, UNPLANNED] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			limit: 2,
+			measured: 3,
+		})
+	})
+})
+
 describe('lane_plan_size.refusal_text', () => {
 	it.each([
 		['hunks', hunks(17), "17 hunks outside the recorded plan's files (tests excluded), over 16"],
