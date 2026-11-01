@@ -91,6 +91,35 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	// The main line's chain up to the review, folded into one call: `main:merge`, `review:selfcheck`,
+	// `check:related` and `run:review` were four round trips re-billing the run's full context each.
+	'run:chain': {
+		script: 'scripts/run/review/run-chain-cli.ts',
+		description:
+			'Run main:merge, review:selfcheck, check:related and run:review in one call, stopping at the first refusal with its next action',
+		category: 'AI tools',
+		reference: [
+			'<issue> [--from <stage>] [--unpinned-ok "<reason>"]',
+			'automation',
+			['processes', 'files', 'git', 'network'],
+		],
+		usage: {
+			examples: [
+				{
+					arguments: '<N>',
+					note: 'after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review',
+				},
+				{
+					arguments: '<N> --from check:related',
+					note: 'resume at the stage a stop named, once the run settled it',
+				},
+				{
+					arguments: '<N> --unpinned-ok "only logs"',
+					note: 'forwarded to run:review as given',
+				},
+			],
+		},
+	},
 	// The post-merge sequence a run closed on, folded into one call: commit the
 	// observation ledger, read the completion citations and decide the release scope. `observations:flush`,
 	// `issue:cite` and `release:scope` were three round trips re-billing the run's full context each.

@@ -25,6 +25,9 @@ import { stop_guard_fixture } from './stop-guard-fixture'
 
 const SWITCH_KEY = stop_rules.SWITCH_ENV_KEY
 const LANG_KEY = session_language.ENV_KEY
+const LANGUAGE_REFUSAL = '⛔ session language'
+const JAPANESE_REPLY =
+	'ゲートは通過し、PR を作成しました。レビューで修正すべき指摘はありませんでした。'
 const { UNREAD_TRANSCRIPT, decide_in, quiet_world } = stop_guard_fixture
 
 afterEach(() => {
@@ -116,15 +119,37 @@ describe('write_stop_decision — the report checks are gated on a run record', 
 	})
 })
 
-it('keeps a named epic session waiting when its child lane is in flight', async () => {
+it('keeps a named epic session waiting when its hand-back cut could not be written', async () => {
 	quiet_world()
-	vi.mocked(run_headless.must_keep_waiting).mockResolvedValue(true)
+	vi.mocked(run_headless.hand_back_at_turn_end).mockResolvedValue(true)
 	const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 	const payload = JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT })
 
 	await write_stop_decision(payload)
 
 	expect(String(write.mock.calls[0]?.[0])).toContain('⛔ headless parent:')
+})
+
+// joshuafolkken/kit#5739: the cut is the stop's own, so a stop another rule refuses writes none.
+describe('write_stop_decision — the headless hand-back', () => {
+	it('hands the loop back and lets the stop through once nothing else refuses it', async () => {
+		quiet_world()
+		const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true)
+
+		await write_stop_decision(JSON.stringify({ transcript_path: UNREAD_TRANSCRIPT }))
+
+		expect(run_headless.hand_back_at_turn_end).toHaveBeenCalledOnce()
+		expect(write.mock.calls.join('')).not.toContain('⛔')
+	})
+
+	it('writes no cut when another rule refuses the stop', async () => {
+		vi.stubEnv(agent_headless.KEY, undefined)
+
+		const written = await decide_in(write_stop_decision, 'en', JAPANESE_REPLY)
+
+		expect(written.join('')).toContain(LANGUAGE_REFUSAL)
+		expect(run_headless.hand_back_at_turn_end).not.toHaveBeenCalled()
+	})
 })
 
 // joshuafolkken/kit#2470: the configured language reaches both the check and the refusal's wording.
@@ -140,13 +165,9 @@ describe('write_stop_decision — the session language is wired', () => {
 	})
 
 	it('sends back a Japanese reply in an en session, naming en', async () => {
-		const written = await decide_in(
-			write_stop_decision,
-			'en',
-			'ゲートは通過し、PR を作成しました。レビューで修正すべき指摘はありませんでした。',
-		)
+		const written = await decide_in(write_stop_decision, 'en', JAPANESE_REPLY)
 
-		expect(written.join('')).toContain('⛔ session language')
+		expect(written.join('')).toContain(LANGUAGE_REFUSAL)
 		expect(written.join('')).toContain('JOSH_SESSION_LANG: en')
 	})
 

@@ -286,6 +286,10 @@ pnpm josh issue:plan 4134 --body-file plan.md --title "Add issue:plan" --planned
 
 A plan without `### 影響を受ける既存の利用者` (entries, or `なし（<reason>）`) is refused.
 
+When a dispatched lane child plans its own issue, without `--repo`, the recorded plan then runs `lane:plan` on its backticked paths outside `### 影響を受ける既存の利用者`. It prints the command and the verdict, and exits with `lane:plan`'s code (`2` yield, `3` split). On `wait` (`1`), re-run the printed command, not `issue:plan`.
+
+A plan naming no path prints `pnpm josh lane:plan <N> <path>...` for the child to finish (`scripts/lane/lane-plan-auto.ts`). Outside a lane child, `kickoff`'s plan records no lane plan.
+
 ### `josh plan:consumers`
 
 <!-- usage: plan:consumers -->
@@ -891,6 +895,8 @@ pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 <!-- /usage -->
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
+
+The woken session claims the record, acts, and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 
 A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 
