@@ -8,6 +8,7 @@ import { run_board_gather } from './run-board-gather'
 import { run_board_labels } from './run-board-labels'
 import type { BoardPlan } from './run-board-layout'
 import type { BoardPorts, BoardState } from './run-board-state'
+import type { ThroughputRow } from './run-board-throughput'
 import { run_board_tick } from './run-board-tick'
 
 // joshuafolkken/kit#3430: what one redraw reads, and what it draws when a plan read fails or no run has
@@ -222,6 +223,32 @@ describe('run_board_tick.tick — the run’s own scope', () => {
 		await tick(FRESH_STATE, ports)
 
 		expect(frames.at(-1)).toContain(' 0/1 ')
+	})
+})
+
+// joshuafolkken/kit#5710: the 📈 throughput rows the local read derived are drawn on the frame.
+const THROUGHPUT = '📈 throughput'
+
+describe('run_board_tick.tick throughput', () => {
+	it('draws the throughput rows the local read handed it, and no section without them', async () => {
+		const row: ThroughputRow = {
+			label: '24h',
+			cells: [],
+			window_ms: 0,
+			active_ms: 0,
+			done: 0,
+			per_hour: undefined,
+			peak: undefined,
+			now: undefined,
+		}
+		const read = harness({ ...LOCAL, throughput: [row] }, [plan_titled('a')])
+		const none = harness(LOCAL, [plan_titled('a')])
+
+		await tick(FRESH_STATE, read.ports)
+		await tick(FRESH_STATE, none.ports)
+
+		expect(read.frames.at(-1)).toContain(THROUGHPUT)
+		expect(none.frames.at(-1)).not.toContain(THROUGHPUT)
 	})
 })
 
