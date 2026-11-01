@@ -1,0 +1,7 @@
+{
+	"reason": "#5656: run:review reads round 2's inert predicate over the change since the base — a base-blob comment-only reader and the interaction reading with its reason",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 72
+	}
+}

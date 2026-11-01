@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { git_command } from '#scripts/git/git-command'
 import ts from 'typescript'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { review_code_tree } from './review-code-tree'
@@ -20,6 +21,7 @@ const HOOK = '.claude/hooks/guard.js'
 const DELETED = 'src/gone.ts'
 const BASE = '0123456789abcdef0123456789abcdef01234567'
 const CODE = 'const value = 1\n'
+const CHANGED_CODE = 'const value = 2\n'
 
 function write(relative: string, text: string): void {
 	mkdirSync(path.dirname(path.join(ROOT, relative)), { recursive: true })
@@ -32,6 +34,17 @@ function stamp_of(files: Record<string, string>): {
 	base: string
 } {
 	return { taken_at: '', files, base: BASE }
+}
+
+// `git show <base>:<path>` answering from `files` with the final newline stripped, as `git_spawn.read`
+// returns it, and failing for a path the base does not hold.
+function base_holds(files: Record<string, string>): void {
+	vi.spyOn(git_command, 'show_file').mockImplementation(async (spec) => {
+		const text = files[spec.slice(BASE.length + 1)]
+		if (text === undefined) throw new Error(`fatal: path not in ${spec}`)
+
+		return text.replace(/\n$/u, '')
+	})
 }
 
 afterEach(() => {
@@ -69,7 +82,7 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 		const before = review_code_tree.tree_of(ROOT, [SOURCE, OTHER_SOURCE], ts)
 
 		write(SOURCE, `// Explained.\n${CODE}`)
-		write(OTHER_SOURCE, 'const value = 2\n')
+		write(OTHER_SOURCE, CHANGED_CODE)
 		const after = review_code_tree.tree_of(ROOT, [SOURCE, OTHER_SOURCE], ts)
 
 		expect(review_code_tree.comment_only(stamp_of(before), after, BASE)).toStrictEqual([SOURCE])
@@ -95,6 +108,37 @@ describe('review_code_tree.comment_only — the paths whose code the fixes left 
 		expect(review_code_tree.comment_only(stamp_of({ [SOURCE]: 'digest' }), {}, BASE)).toStrictEqual(
 			[],
 		)
+	})
+})
+
+// joshuafolkken/kit#5656: before round 1 has recorded anything, the base's blobs stand in for the
+// snapshot.
+describe('review_code_tree.comment_only_since — the paths whose code the base already had', () => {
+	it('names a file whose change is only a comment, and not one whose code changed', async () => {
+		base_holds({ [SOURCE]: CODE, [OTHER_SOURCE]: CODE })
+		write(SOURCE, `// Explained.\n${CODE}`)
+		write(OTHER_SOURCE, CHANGED_CODE)
+
+		expect(
+			await review_code_tree.comment_only_since(BASE, [SOURCE, OTHER_SOURCE], ROOT, ts),
+		).toStrictEqual([SOURCE])
+	})
+
+	it('names neither a file new since the base nor a documentation path', async () => {
+		base_holds({ [DOCUMENT]: '# Guide\n' })
+		write(SOURCE, CODE)
+		write(DOCUMENT, '# Guide\n')
+
+		expect(
+			await review_code_tree.comment_only_since(BASE, [SOURCE, DOCUMENT], ROOT, ts),
+		).toStrictEqual([])
+	})
+
+	it('names nothing where TypeScript cannot be resolved from the project', async () => {
+		base_holds({ [SOURCE]: CODE })
+		write(SOURCE, CODE)
+
+		expect(await review_code_tree.comment_only_since(BASE, [SOURCE], ROOT)).toStrictEqual([])
 	})
 })
 
