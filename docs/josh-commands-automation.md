@@ -40,6 +40,10 @@ pnpm josh rename lane_ledger lane_ledger_write --import '#scripts/lane/lane-ledg
 Only bindings and module specifiers change; strings, comments, `obj.old` and property keys stay. Each file's count is printed, then the files are formatted as the edit hook would.
 A file with no replacement, missing, or not TypeScript or JavaScript is named, nothing is written, exit 1.
 
+**The same name on both sides moves its named import** (`pnpm josh rename A A --import <from> <to> <file...>`).
+Only that name leaves the declaration, which keeps its other names and gains an `import` from `<to>` below it; a name alone in its declaration takes the new specifier. A type-only name stays type-only.
+A file already importing the name from `<to>` is refused as already bound.
+
 ### `josh format:edited`
 
 <!-- usage: format:edited -->

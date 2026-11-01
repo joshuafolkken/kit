@@ -3,7 +3,13 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { format_edited_payload } from '#scripts/hooks/format-edited-file'
-import { rename_identifier, type RenameRequest, type TypeScriptApi } from './rename-identifier'
+import { import_move } from './import-move'
+import {
+	rename_identifier,
+	type RenameRequest,
+	type RenameResult,
+	type TypeScriptApi,
+} from './rename-identifier'
 
 // `josh rename <old> <new> [--import <old-specifier> <new-specifier>] <file...>` — one identifier, and
 // the import specifier it moved with, renamed across files in one call (joshuafolkken/kit#5236), where
@@ -60,12 +66,19 @@ function split_import(argv: ReadonlyArray<string>): SplitArguments | undefined {
 	return { specifier: [from, to], rest: argv.toSpliced(at, 1 + SPECIFIER_COUNT) }
 }
 
+// The same name with no module to move it to would change nothing, so it is refused as a usage error.
+function is_request(request: RenameRequest): boolean {
+	const { old_name, new_name, specifier = ['', ''] } = request
+	if (!IDENTIFIER.test(old_name) || !IDENTIFIER.test(new_name)) return false
+
+	return old_name !== new_name || specifier[0] !== specifier[1]
+}
+
 function arguments_of(split: SplitArguments): RenameArguments | undefined {
 	const [old_name = '', new_name = '', ...files] = split.rest
+	const request = { old_name, new_name, specifier: split.specifier }
 
-	if (!IDENTIFIER.test(old_name) || !IDENTIFIER.test(new_name)) return undefined
-
-	return { request: { old_name, new_name, specifier: split.specifier }, files }
+	return is_request(request) ? { request, files } : undefined
 }
 
 function parse(argv: ReadonlyArray<string>): RenameArguments | undefined {
@@ -81,11 +94,22 @@ function refuse(reason: string, files: ReadonlyArray<string>): number {
 	return FAILURE_EXIT_CODE
 }
 
+// The same name on both sides moves its named import to the new module instead of renaming it.
+function rewrite_of(api: TypeScriptApi, file: string, request: RenameRequest): RenameResult {
+	const { old_name: name, new_name, specifier } = request
+	const text = readFileSync(file, 'utf8')
+
+	if (name !== new_name || specifier === undefined) {
+		return rename_identifier.rewrite(api, file, text, request)
+	}
+
+	const [from, to] = specifier
+
+	return import_move.rewrite(api, file, text, { name, from, to })
+}
+
 function rename_all(api: TypeScriptApi, parsed: RenameArguments): ReadonlyArray<FileRename> {
-	return parsed.files.map((file) => ({
-		file,
-		...rename_identifier.rewrite(api, file, readFileSync(file, 'utf8'), parsed.request),
-	}))
+	return parsed.files.map((file) => ({ file, ...rewrite_of(api, file, parsed.request) }))
 }
 
 async function write_all(
