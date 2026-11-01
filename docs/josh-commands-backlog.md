@@ -797,6 +797,28 @@ Sections: **Ready now** (runnable children grouped by repository, in the order t
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
 
+### `josh backlog:triage`
+
+<!-- usage: backlog:triage -->
+
+Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label.
+
+```bash
+pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
+pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear   # its question answered
+```
+
+**Options:**
+
+- `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.
+- `--clear` — first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.
+
+<!-- /usage -->
+
+The triage step of `backlogrun-steps.md` → "Resolve what the plan can resolve", in one call.
+Without `--clear` a `needs-decision` issue keeps its park, so a question left for a person is never offered once labelled.
+The comment lands before the label, as `auto-ok:judge`'s does. Prints `triage #N — <label>`; a failed write exits 1 naming it.
+
 ### `josh backlog:budget`
 
 <!-- usage: backlog:budget -->

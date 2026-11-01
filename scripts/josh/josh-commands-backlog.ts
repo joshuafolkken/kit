@@ -69,6 +69,35 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			examples: [{ arguments: '[--max <n>] [--idle <minutes>] [--only]' }],
 		},
 	},
+	'backlog:triage': {
+		script: 'scripts/backlog/backlog-triage-cli.ts',
+		description:
+			"Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label",
+		category: 'AI tools',
+		reference: [
+			'--apply <n> (--lane | --solo) --reason <text> [--clear]',
+			'automation',
+			['files', 'network'],
+		],
+		usage: {
+			examples: [
+				{ arguments: '--apply 912 --lane --reason "<why>"' },
+				{ arguments: '--apply 913 --solo --reason "<why>" --clear', note: 'its question answered' },
+			],
+			flags: [
+				{
+					names: ['--apply <N> --lane|--solo --reason <text>'],
+					description:
+						"comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.",
+				},
+				{
+					names: ['--clear'],
+					description:
+						'first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.',
+				},
+			],
+		},
+	},
 	'backlog:plan': {
 		script: 'scripts/backlog/backlog-plan-cli.ts',
 		description:

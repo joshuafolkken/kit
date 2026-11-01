@@ -1,0 +1,8 @@
+{
+	"reason": "New backlog:triage command (#5636): shared run-label module, the command, its --clear and its doc pointer",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 130,
+		"ai_cost.on_demand_bytes": 189
+	}
+}

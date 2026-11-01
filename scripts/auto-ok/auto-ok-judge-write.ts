@@ -3,6 +3,7 @@ import { issue_label_schema } from '#scripts/git/git-schemas'
 import { parse_json_object_or_undefined } from '#scripts/git/parse-json-array'
 import { issue_auto_ok, type AutoOkDecision } from '#scripts/issue/issue-auto-ok'
 import { AUTO_OK_LABEL, has_label_name } from '#scripts/issue/issue-labels'
+import { issue_run_verdict } from '#scripts/issue/issue-run-verdict'
 import { session_cite } from '#scripts/issue/session-cite'
 import { z } from 'zod'
 import { auto_ok_judge } from './auto-ok-judge'
@@ -62,17 +63,6 @@ function settled_of(read: IssueRead): string | undefined {
 		: undefined
 }
 
-async function apply_labels(issue: string, run_label: string): Promise<string | undefined> {
-	for (const label of [run_label, AUTO_OK_LABEL]) {
-		// eslint-disable-next-line no-await-in-loop -- the run label must land before `auto-ok`
-		const write = await git_gh_command.issue_apply_label(issue, label)
-
-		if (!write.is_applied) return `could not apply \`${label}\`: ${write.reason}`
-	}
-
-	return undefined
-}
-
 async function record(issue: string, decision: AutoOkDecision, body: string): Promise<number> {
 	try {
 		await git_gh_command.issue_comment(issue, auto_ok_judge.comment_of(decision, body))
@@ -104,7 +94,7 @@ async function apply_to(issue: string, run_label: string, read: IssueRead): Prom
 		return FAILURE_EXIT_CODE
 	}
 
-	const problem = await apply_labels(issue, run_label)
+	const problem = await issue_run_verdict.apply_labels(issue, [run_label, AUTO_OK_LABEL])
 
 	return problem === undefined ? SUCCESS_EXIT_CODE : refused(issue, `${problem}; ${RETRY_HINT}`)
 }
