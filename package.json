@@ -37,7 +37,7 @@
 		"prepare": "(command -v lefthook >/dev/null 2>&1 && { lefthook install || echo 'lefthook install failed: git hooks are NOT installed. A set core.hooksPath is the usual cause. See https://github.com/joshuafolkken/kit/blob/main/docs/init.md#corehookspath-stops-lefthook-installing-anything' >&2; } || true)",
 		"build": "tsx scripts/build/build.ts",
 		"prepack": "tsx scripts/version/publishable-range-check.ts && pnpm build",
-		"josh": "tsx scripts/josh/josh.ts"
+		"josh": "node --import tsx scripts/josh/josh.ts"
 	},
 	"files": [
 		"dist",
