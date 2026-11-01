@@ -1,0 +1,8 @@
+{
+	"reason": "#5743: the supervisor adopts the carry record for the woken session and moves it to the launched pid (run-wake-handoff.ts hand_to/hand_on), reading it at work only once its forced-id transcript exists (has_session_begun) so the grace/retry/warning path still holds; the preflight's hand_off recovery is kept alongside",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 45,
+		"ai_cost.on_demand_bytes": 92
+	}
+}

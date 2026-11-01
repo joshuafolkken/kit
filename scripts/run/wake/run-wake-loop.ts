@@ -44,8 +44,9 @@ interface LoopPorts {
 	// fresh UUID. The same id is recorded on the wake record, which is how `josh time --run` later knows
 	// the session was one this supervisor started.
 	new_session_id: () => string
-	// Hands the carry record from the supervisor-owned driver to a judgment session.
-	hand_off: () => void
+	// Hands the carry record from the supervisor-owned driver to the judgment session `session_id`
+	// names, adopting it for that session (`run-wake-handoff.ts`).
+	hand_off: (session_id: string) => void
 	// Runs the deterministic backlog driver. A normal completion never calls `wake`.
 	drive: () => Promise<DriveResult>
 	wake: (invocation: string, session_id: string, material: string) => LaunchResult
@@ -91,8 +92,8 @@ function wake_failure_note(wake: RunWake): string {
 	return `woke a session for "${wake.invocation}" ${attempts} time(s) and none of them claimed the carry record; the last one was ${last}, which may still be running`
 }
 
-// The hand-off is written before the launch, never after: a successor that boots fast enough to run
-// `--begin` before a post-launch write would read the record un-handed-off and be answered `standing`.
+// The hand-off is written before the launch, never after: a session that boots fast enough to count
+// before a post-launch write would meet a record still the supervisor's.
 async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> {
 	const driven = await ports.drive()
 	if (driven.kind === 'finished') return stopped('ended')
@@ -101,7 +102,7 @@ async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> 
 
 	const session_id = ports.new_session_id()
 
-	ports.hand_off()
+	ports.hand_off(session_id)
 
 	const result = ports.wake(wake.invocation, session_id, driven.material)
 
@@ -110,7 +111,7 @@ async function wake_step(wake: RunWake, ports: LoopPorts): Promise<StepOutcome> 
 	return { kind: 'continue', wake: run_wake.count_wake(wake, ports.now(), result.pid, session_id) }
 }
 
-// A `wait` means the woken session has claimed the carry record, so the wake mark is cleared and the
+// A `wait` means the woken session is at work on the carry record, so the wake mark is cleared and the
 // next cut starts the grace window afresh — **and it is the only pass on which `woke` may grow**,
 // because arriving here is the supervisor observing that a record it was
 // waiting on has been taken over. A `pending` keeps what is there, because the window it is measured

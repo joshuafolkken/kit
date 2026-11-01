@@ -56,10 +56,10 @@ function details_tail(details: string): string {
 // hands the loop back to the supervisor (`run_headless.hand_back_at_turn_end`); only a person's stop
 // ends the run instead.
 //
-// **The claim comes first.** The supervisor hands the record off before the
-// wake, so until the session adopts it with `--resume` every count it writes — `--merged`, `--done`,
-// the closing cut — is refused as advancing a handed-off budget, and the supervisor, seeing no claim,
-// ends the run as a failed wake.
+// **The record is the session's before it wakes** (`run-wake-handoff.ts`), so the move names no claim.
+// It does say not to `--begin`: over a record the session already owns, that answers `standing`.
+const ALREADY_CLAIMED =
+	"the carry record is already this session's, so run no pnpm josh run:carry --begin;"
 const HAND_BACK = 'then end the turn, which hands the loop back'
 const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 	[
@@ -74,32 +74,22 @@ const NEXT_BY_VERDICT: ReadonlyArray<readonly [string, string]> = [
 ]
 const NEXT_DEFAULT = `act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
 
-function next_move(verdict: string, invocation: string): string {
+function next_move(verdict: string): string {
 	const found = NEXT_BY_VERDICT.find(([prefix]) => verdict.startsWith(prefix))
 
-	return `\nNext: first claim the carry record with ${run_carry.claim_command(invocation)}, then ${found?.[1] ?? NEXT_DEFAULT}`
+	return `\nNext: ${ALREADY_CLAIMED} ${found?.[1] ?? NEXT_DEFAULT}`
 }
 
-function handoff_material(
-	verdict: string,
-	resume: string,
-	invocation: string,
-	details: string,
-): string {
+function handoff_material(verdict: string, resume: string, details: string): string {
 	const context = details === '' ? '' : `\nDetails: ${details_tail(details)}`
 	const epic = verdict.startsWith('epic #')
 		? '\nThe named item is an epic. Follow backlogrun-steps.md named epic procedure; do not launch the epic root as a fullrun child. After all children merge or park, record the root with pnpm josh run:carry --done <epic-number> before continuing to the next named item.'
 		: ''
 
-	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict, invocation)}${context}`
+	return `Driver result: ${verdict}\n${resume}${epic}${next_move(verdict)}${context}`
 }
 
-function driver_result(
-	out: string,
-	read: CarryRead,
-	invocation: string,
-	details = '',
-): DriveResult {
+function driver_result(out: string, read: CarryRead, details = ''): DriveResult {
 	const lines = out.split('\n')
 	const verdict = lines[FIRST_LINE]
 
@@ -110,7 +100,7 @@ function driver_result(
 		return { kind: 'failed', note: `backlog:drive returned an incomplete result: ${out}` }
 	}
 
-	return { kind: 'judgment', material: handoff_material(verdict, resume, invocation, details) }
+	return { kind: 'judgment', material: handoff_material(verdict, resume, details) }
 }
 
 // **The cause is the driver's stdout `error …` line, so it leads the note.** `backlog:drive` prints an
@@ -127,15 +117,11 @@ function failure_note(result: JoshResult): string {
 	return [cause_of(result.out), details_tail(result.err ?? '')].filter(Boolean).join('\n')
 }
 
-function read_result(
-	result: JoshResult | undefined,
-	target: string,
-	invocation: string,
-): DriveResult {
+function read_result(result: JoshResult | undefined, target: string): DriveResult {
 	if (result === undefined) return { kind: 'released' }
 	if (result.code !== SUCCESS) return { kind: 'failed', note: failure_note(result) }
 
-	return driver_result(result.out, run_carry.read_carry(target), invocation, result.err)
+	return driver_result(result.out, run_carry.read_carry(target), result.err)
 }
 
 // **A record this process already owns is claimed again.** A driver that failed leaves the record
@@ -259,7 +245,7 @@ async function drive_with(
 		is_parent_planning,
 	)
 
-	return await announced(read_result(result, target, read.carry.invocation))
+	return await announced(read_result(result, target))
 }
 
 async function drive(

@@ -193,8 +193,8 @@ itself. A judgment handoff carries the driver's verdict, affected issue, diagnos
 output and resume flags. The carry record keeps a restarted supervisor from counting a merge into
 another live owner's run.
 
-**A failure is visible rather than silent.** A judgment wake that never claims the carry record is
-retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
+**A failure is visible rather than silent.** A judgment wake whose session never begins work on the carry
+record is retried, and once the retries are spent the supervisor stops and sends a `warning` Telegram; a carry
 record that cannot be read ends it the same way. A `failed` stop while the carry record is
 still resumable restarts the supervisor in place after one interval, up to three times; only the
 failure past that bound sends the warning, its note counting the restarts. `none` and a

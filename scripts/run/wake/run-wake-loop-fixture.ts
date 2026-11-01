@@ -37,6 +37,9 @@ interface Calls {
 	// Every hand-off and launch in call order, so a test can pin that the hand-off lands first
 	// (joshuafolkken/kit#2437).
 	order: Array<string>
+	// The session ids the record was handed to, so a test can pin it goes to the session then woken
+	// (joshuafolkken/kit#5743).
+	handed: Array<string>
 }
 
 interface Recorder extends Calls {
@@ -70,8 +73,9 @@ function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResul
 		// the record-only decision; the idle tests override this port.
 		has_work: async () => true,
 		new_session_id: () => `sid-${String(calls.session_ids.length + 1)}`,
-		hand_off: () => {
+		hand_off: (session_id) => {
 			calls.order.push(HAND_OFF_CALL)
+			calls.handed.push(session_id)
 		},
 		drive: async () => ({ kind: 'judgment', material: HANDOFF_MATERIAL }),
 		wake: wake_port(calls, launch),
@@ -85,7 +89,7 @@ function ports_of(remaining: Array<CarryRead>, calls: Calls, launch: LaunchResul
 // A scripted sequence of carry reads, one per pass, so a whole run of the supervisor is expressed as
 // what the record said over time. Running past the end reads as the run having ended.
 function recorder(reads: ReadonlyArray<CarryRead>, launch: LaunchResult = LAUNCHED): Recorder {
-	const calls: Calls = { wakes: [], materials: [], session_ids: [], order: [] }
+	const calls: Calls = { wakes: [], materials: [], session_ids: [], order: [], handed: [] }
 
 	return { ...calls, ports: ports_of([...reads], calls, launch) }
 }
