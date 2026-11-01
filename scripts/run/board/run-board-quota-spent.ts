@@ -3,11 +3,11 @@ import { z } from 'zod'
 import type { QuotaReading, QuotaWindow } from './run-board-quota-read'
 
 // How much of each usage window one task spends (joshuafolkken/kit#5508). A lane child works one
-// issue, so once its file is done the rise from its first reading to its last is that task's spend;
-// a file still being written has spent only part of it, so it tells nothing. The windows are
-// reported in whole percents, so a file whose readings did not rise spent under one percent and is
-// counted as spending none (joshuafolkken/kit#5618); a window that reset while the file was written is
-// measured from the first reading inside its last reset.
+// issue, so each done file is one task; a file still being written has done only part of it, so it
+// tells nothing. The windows are shared by every session, so the sample's rise is measured once
+// across its done files and divided by them (joshuafolkken/kit#5770): a file whose readings did not
+// rise is still a task done (joshuafolkken/kit#5618), and a window that reset is measured inside the
+// newest file's last reset.
 
 const MS_PER_MINUTE = 60_000
 // A window whose two resets lie within half its length is the same window, its reset only jittered.
@@ -31,8 +31,10 @@ function codex_done(tail: string): boolean {
 	return json_value.parse_with(last_line(tail), CODEX_END) !== undefined
 }
 
-// Each window's spend in one file, by its length in minutes.
+// Each window's spend per task, by its length in minutes.
 type Spent = Readonly<Record<number, number>>
+// A done file's readings, its head's oldest first and its tail's last; a file not done holds none.
+type QuotaSpan = ReadonlyArray<QuotaReading>
 
 function is_same_window(start: QuotaWindow, end: QuotaWindow): boolean {
 	const drift = Math.abs(end.resets_ms - start.resets_ms)
@@ -40,48 +42,44 @@ function is_same_window(start: QuotaWindow, end: QuotaWindow): boolean {
 	return start.minutes === end.minutes && drift < (end.minutes * MS_PER_MINUTE) / HALF
 }
 
-// The window `end` closes, as the first of `heads` (oldest first) inside the same reset read it.
-function window_start(
-	end: QuotaWindow,
-	heads: ReadonlyArray<QuotaReading>,
-): QuotaWindow | undefined {
-	return heads.flatMap((head) => head.windows).find((window) => is_same_window(window, end))
+function span_of(heads: ReadonlyArray<QuotaReading>, tail: QuotaReading | undefined): QuotaSpan {
+	return tail === undefined ? [] : [...heads, tail]
 }
 
-function window_spent(
-	end: QuotaWindow,
-	heads: ReadonlyArray<QuotaReading>,
-): Array<[number, number]> {
-	const start = window_start(end, heads)
-
-	if (start === undefined) return []
-
-	return [[end.minutes, Math.max(end.used_percent - start.used_percent, 0)]]
+// The windows each span's last reading holds, newest span first.
+function ends_of(spans: ReadonlyArray<QuotaSpan>): Array<QuotaWindow> {
+	return spans.flatMap((span) => span.at(-1)?.windows ?? [])
 }
 
-// The rise of each window from a file's first reading inside its last reset to its last reading;
-// `heads` are the readings a file's head holds, oldest first.
-function spent_of(heads: ReadonlyArray<QuotaReading>, tail: QuotaReading | undefined): Spent {
-	if (tail === undefined) return {}
-
-	return Object.fromEntries(tail.windows.flatMap((window) => window_spent(window, heads)))
+// The windows of `span` inside the same reset as `end`.
+function windows_in(span: QuotaSpan, end: QuotaWindow): Array<QuotaWindow> {
+	return span.flatMap((reading) => reading.windows).filter((window) => is_same_window(window, end))
 }
 
-function mean_of(spends: ReadonlyArray<Spent>, minutes: number): Array<[number, number]> {
-	const told = spends.flatMap((spent) => spent[minutes] ?? [])
-	const total = told.reduce((sum, spent) => sum + spent, 0)
+// The meter is shared by every session, so concurrent lanes each rise by all of their overlap: the
+// sample's rise is read once across its files, from the lowest reading to the highest inside the
+// newest file's last reset, and shared by the files read inside it (joshuafolkken/kit#5770).
+function rise_per_task(spans: ReadonlyArray<QuotaSpan>, minutes: number): Array<[number, number]> {
+	const end = ends_of(spans).find((window) => window.minutes === minutes)
 
-	return total > 0 ? [[minutes, total / told.length]] : []
+	if (end === undefined) return []
+
+	const told = spans.map((span) => windows_in(span, end)).filter((windows) => windows.length > 0)
+	const used = told.flat().map((window) => window.used_percent)
+	const rise = Math.max(...used) - Math.min(...used)
+
+	return rise > 0 ? [[minutes, rise / told.length]] : []
 }
 
-// Each window's mean spend over the files that tell one; a window none of them rose in tells nothing.
-function per_task_of(spends: ReadonlyArray<Spent>): Spent {
-	const lengths = new Set(spends.flatMap((spent) => Object.keys(spent).map(Number)))
+// Each window's spend per task over the spans of the sample's done files, newest first; a window that
+// did not rise across them tells nothing.
+function per_task_of(spans: ReadonlyArray<QuotaSpan>): Spent {
+	const lengths = new Set(ends_of(spans).map((window) => window.minutes))
 
-	return Object.fromEntries([...lengths].flatMap((minutes) => mean_of(spends, minutes)))
+	return Object.fromEntries([...lengths].flatMap((minutes) => rise_per_task(spans, minutes)))
 }
 
-const run_board_quota_spent = { claude_done, codex_done, per_task_of, spent_of }
+const run_board_quota_spent = { claude_done, codex_done, per_task_of, span_of }
 
 export { run_board_quota_spent }
-export type { Spent }
+export type { QuotaSpan, Spent }
