@@ -44,7 +44,7 @@ const REPEAT_CHECK_RELATED_REASON =
 // unmeasured rather than scored on an act that does not exist (`lane-split-park.ts`).
 const ROW = {
 	id: 'repeat-check-related',
-	is_trigger: bash_triggers.on_bash_command(round_one_check_related.is_candidate),
+	is_trigger: bash_triggers.on_bash_command(round_one_check_related.is_full_reach_candidate),
 	reason: REPEAT_CHECK_RELATED_REASON,
 	decide,
 	about: {

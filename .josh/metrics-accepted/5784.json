@@ -1,7 +1,7 @@
 {
-	"reason": "check:related --touched path and its guard exemption (#5784)",
+	"reason": "check:related --touched path, guard exemption scoped to repeat-check-related (#5784)",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 31
+		"scripts.code_lines": 37
 	}
 }
