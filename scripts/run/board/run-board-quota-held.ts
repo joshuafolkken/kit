@@ -6,7 +6,7 @@ import {
 	type QuotaReading,
 	type Quotas,
 } from './run-board-quota-read'
-import { run_board_quota_spent, type Spent } from './run-board-quota-spent'
+import { run_board_quota_spent, type QuotaSpan } from './run-board-quota-spent'
 
 // The usage-limit gauges' readings as the board holds them (joshuafolkken/kit#5395): a redraw draws
 // the held readings and reads no file; once a minute one read runs in the background
@@ -36,11 +36,11 @@ interface QuotaPorts {
 	now: () => number
 }
 
-// A file a provider was last read off, what its tail read and what it spent.
+// A file a provider was last read off, what its tail read and, once done, the readings it holds.
 interface QuotaMark {
 	file: QuotaFile
 	reading: QuotaReading | undefined
-	spent: Spent
+	span: QuotaSpan
 }
 
 type QuotaMarks = Map<QuotaProvider, ReadonlyArray<QuotaMark>>
@@ -79,15 +79,15 @@ async function file_mark(
 
 	const { reading, is_done } = await tail_of(file, source, ports)
 
-	if (!is_done) return { file, reading, spent: {} }
+	if (!is_done) return { file, reading, span: [] }
 
 	const head = await ports.read_head(file.path, run_board_quota_read.TAIL_BYTES)
 
-	return { file, reading, spent: run_board_quota_spent.spent_of(source.heads_of(head), reading) }
+	return { file, reading, span: run_board_quota_spent.span_of(source.heads_of(head), reading) }
 }
 
 function is_told(mark: QuotaMark): boolean {
-	return Object.keys(mark.spent).length > 0
+	return (mark.span.at(-1)?.windows.length ?? 0) > 0
 }
 
 // The marks of `files`, newest first, read one by one until `SAMPLE_SIZE` of them tell a spend: a
@@ -112,7 +112,7 @@ function reading_with(marks: ReadonlyArray<QuotaMark>): QuotaReading | undefined
 
 	if (reading === undefined) return undefined
 
-	const per_task = run_board_quota_spent.per_task_of(marks.map((mark) => mark.spent))
+	const per_task = run_board_quota_spent.per_task_of(marks.map((mark) => mark.span))
 
 	return Object.keys(per_task).length === 0 ? reading : { ...reading, per_task }
 }
