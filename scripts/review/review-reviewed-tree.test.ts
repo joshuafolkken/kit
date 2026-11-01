@@ -35,7 +35,7 @@ vi.mock('./review-attest', () => ({
 }))
 vi.mock('./review-checkout', () => ({ review_checkout: { read_checkout: checkout_mock } }))
 vi.mock('./review-round-one-blobs', () => ({
-	review_round_one_blobs: { capture: () => undefined, carried_delta: () => undefined },
+	review_round_one_blobs: { capture: () => undefined, carried_each: () => undefined },
 }))
 
 const { review_reviewed_tree } = await import('./review-reviewed-tree')

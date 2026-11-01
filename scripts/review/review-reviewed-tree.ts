@@ -46,7 +46,7 @@ function settled_files(
 }
 
 // Swallowed: no record re-runs the ship's round 1 over the whole change — wider, never narrower. The
-// blobs let a sync's change to a covered document carry onto the new base (`carried_paths`).
+// blobs let a sync's change to a covered document carry onto the new base (`carry`).
 async function record(unsettled: ReadonlyArray<string> = []): Promise<void> {
 	try {
 		const { files, base } = await gate_tree.read_gate_tree()
@@ -123,22 +123,36 @@ function unsettled_by(cause: string, path?: string): Standing {
 // (joshuafolkken/kit#4984): documentation, a prompt or an inert path — a generated usage heading main
 // rewrote beside the lane's own. Its recorded blob carried onto the new base reproduces the file now
 // only where main's change is all that moved it (`review-round-one-blobs.ts`); a lane edit since the
-// record, a carry git cannot make, or a path a recorded High cites stays moved.
+// record, or a path a recorded High cites, stays moved. **A carry git cannot make** — a merge conflict,
+// or a file the branch added — still leaves a path no round executes (joshuafolkken/kit#5791): it is
+// passed over too, and named in the reuse note (`noted`), as a lane move of one is.
 function is_carry_candidate(stamp: FileMapStamp, path: string): boolean {
 	const is_settled = Object.hasOwn(stamp.files, path) && stamp.files[path] !== UNSETTLED_DIGEST
 
 	return is_settled && review_round2.is_unexecuted(path, [])
 }
 
-function carried_paths(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
+// `passed`: the synced paths that are no move; `noted`: those of them git could not carry. Each path
+// is carried on its own, so one git cannot carry never passes over a lane edit beside it.
+interface SyncedCarry {
+	passed: ReadonlyArray<string>
+	noted: ReadonlyArray<string>
+}
+
+function carry(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): SyncedCarry {
 	const candidates = parts.synced.filter((path) => is_carry_candidate(stamp, path))
 	const { blobs, base: from } = stamp
-	const delta =
+	const answers =
 		candidates.length === 0
 			? undefined
-			: review_round_one_blobs.carried_delta({ blobs, from, to: tree.base, paths: candidates })
+			: review_round_one_blobs.carried_each({ blobs, from, to: tree.base, paths: candidates })
 
-	return delta === undefined ? [] : candidates.filter((path) => !delta.includes(path))
+	if (answers === undefined) return { passed: [], noted: [] }
+
+	return {
+		passed: candidates.filter((path) => answers[path] !== false),
+		noted: candidates.filter((path) => answers[path] === undefined),
+	}
 }
 
 function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
@@ -219,16 +233,16 @@ async function standing(
 
 	if (parts === undefined) return unsettled_by(CAUSE.UNREAD)
 
-	const carried = carried_paths(stamp, tree, parts)
+	const { passed, noted } = carry(stamp, tree, parts)
 	const synced = parts.synced.find(
-		(path) => Object.hasOwn(stamp.files, path) && !carried.includes(path),
+		(path) => Object.hasOwn(stamp.files, path) && !passed.includes(path),
 	)
 
 	if (synced !== undefined) return unsettled_by(CAUSE.SYNCED, synced)
 
-	const moved = moved_files(stamp, tree, parts).filter((path) => !carried.includes(path))
+	const moved = moved_files(stamp, tree, parts).filter((path) => !passed.includes(path))
 
-	return noted_standing(stamp, moved, tree, briefed)
+	return noted_standing(stamp, [...moved, ...noted], tree, briefed)
 }
 
 async function movement(

@@ -5,7 +5,7 @@ const read_mock = vi.hoisted(() => vi.fn())
 const write_mock = vi.hoisted(() => vi.fn())
 const gate_tree_mock = vi.hoisted(() => vi.fn())
 const git_read_mock = vi.hoisted(() => vi.fn())
-const carried_delta_mock = vi.hoisted(() => vi.fn())
+const carried_each_mock = vi.hoisted(() => vi.fn())
 const capture_mock = vi.hoisted(() => vi.fn())
 
 vi.mock('#scripts/gate/gate-tree', () => ({ gate_tree: { read_gate_tree: gate_tree_mock } }))
@@ -21,7 +21,7 @@ vi.mock('./review-checkout', () => ({
 	review_checkout: { read_checkout: async () => ({ root: '/lanes/4984' }) },
 }))
 vi.mock('./review-round-one-blobs', () => ({
-	review_round_one_blobs: { capture: capture_mock, carried_delta: carried_delta_mock },
+	review_round_one_blobs: { capture: capture_mock, carried_each: carried_each_mock },
 }))
 
 const { review_reviewed_tree } = await import('./review-reviewed-tree')
@@ -31,6 +31,7 @@ const { review_reviewed_tree } = await import('./review-reviewed-tree')
 
 const FILE = 'a.ts'
 const DOC = 'docs/josh-commands.md'
+const EDITED = 'docs/edited.md'
 const BLOBS = { [FILE]: 'blob-a', [DOC]: 'blob-d' }
 const STAMP: FileMapStamp = {
 	taken_at: '2026-10-26T00:00:00.000Z',
@@ -39,6 +40,7 @@ const STAMP: FileMapStamp = {
 	blobs: BLOBS,
 }
 const SYNCED_CAUSE = 'the default branch changed a file the round covers'
+const UNEXECUTED_NOTE = 'passed over documentation, a prompt or an inert path no round executes'
 
 const { HELD, UNSETTLED } = review_reviewed_tree.MOVEMENT
 
@@ -46,7 +48,7 @@ function arrange_synced_document(): void {
 	read_mock.mockReset().mockReturnValue(STAMP)
 	gate_tree_mock.mockReset().mockResolvedValue({ files: { [FILE]: 'x', [DOC]: 'e' }, base: 'new' })
 	git_read_mock.mockReset().mockResolvedValue(`${DOC}\0main.ts\0`)
-	carried_delta_mock.mockReset().mockReturnValue([])
+	carried_each_mock.mockReset().mockReturnValue({ [DOC]: true })
 }
 
 describe('review_reviewed_tree.standing_here on a base the sync moved under a covered document', () => {
@@ -54,7 +56,7 @@ describe('review_reviewed_tree.standing_here on a base the sync moved under a co
 
 	it('answers held when the default branch alone moved the covered document', async () => {
 		expect(await review_reviewed_tree.standing_here()).toStrictEqual({ movement: HELD })
-		expect(carried_delta_mock).toHaveBeenCalledWith({
+		expect(carried_each_mock).toHaveBeenCalledWith({
 			blobs: BLOBS,
 			from: STAMP.base,
 			to: 'new',
@@ -63,14 +65,50 @@ describe('review_reviewed_tree.standing_here on a base the sync moved under a co
 	})
 
 	it.each([
-		['the lane edited it since the record', [DOC]],
-		['git could not carry the recorded blob', undefined],
-	])('answers synced on the covered document when %s', async (_case, delta) => {
-		carried_delta_mock.mockReturnValue(delta)
+		['the lane edited it since the record', { [DOC]: false }],
+		['git could not read the sides', undefined],
+	])('answers synced on the covered document when %s', async (_case, answers) => {
+		carried_each_mock.mockReturnValue(answers)
 
 		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
 			movement: UNSETTLED,
 			cause: `${SYNCED_CAUSE}: ${DOC}`,
+		})
+	})
+})
+
+// joshuafolkken/kit#5791: the #5757 ship — a document the branch added has no blob on one side, so git
+// cannot carry it, yet round 2 would not execute it either; round 1 stands, its note naming the path.
+describe('review_reviewed_tree.standing_here on a covered document git could not carry', () => {
+	beforeEach(arrange_synced_document)
+
+	it('answers held with the document passed over in the note', async () => {
+		carried_each_mock.mockReturnValue({ [DOC]: undefined })
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
+			movement: HELD,
+			note: `${UNEXECUTED_NOTE}: ${DOC}`,
+		})
+	})
+
+	it('answers synced on a lane-edited document beside it', async () => {
+		read_mock.mockReturnValue({ ...STAMP, files: { ...STAMP.files, [EDITED]: 'b' } })
+		git_read_mock.mockResolvedValue(`${DOC}\0${EDITED}\0`)
+		carried_each_mock.mockReturnValue({ [DOC]: undefined, [EDITED]: false })
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
+			movement: UNSETTLED,
+			cause: `${SYNCED_CAUSE}: ${EDITED}`,
+		})
+	})
+
+	it('answers synced on a covered runtime file beside it', async () => {
+		carried_each_mock.mockReturnValue({ [DOC]: undefined })
+		git_read_mock.mockResolvedValue(`${DOC}\0${FILE}\0`)
+
+		expect(await review_reviewed_tree.standing_here()).toStrictEqual({
+			movement: UNSETTLED,
+			cause: `${SYNCED_CAUSE}: ${FILE}`,
 		})
 	})
 })
@@ -93,7 +131,7 @@ describe('review_reviewed_tree.standing_here on a base the sync moved under a fi
 		const standing = await review_reviewed_tree.standing_here()
 
 		expect(standing.movement).toBe(UNSETTLED)
-		expect(carried_delta_mock).not.toHaveBeenCalled()
+		expect(carried_each_mock).not.toHaveBeenCalled()
 	})
 
 	// Round 2's carried delta leaves out what the default branch changed, so round 1 reads it again.
