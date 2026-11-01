@@ -28,6 +28,19 @@ const JOIN_FLAG = /(?:^|\s)--join(?:[=\s]|$)/u
 // The `run:review` modes that read a running check rather than write a brief.
 const READING_MODE_FLAG = /(?:^|\s)--(?:pinned|push)(?:[=\s]|$)/u
 const DETACH_FLAG = /(?:^|\s)--detach(?:[=\s]|$)/u
+// The mid-run `check:related --touched` is never the full-reach run `repeat-check-related` counts;
+// round 1's fixes still take none, touched or not.
+const TOUCHED_FLAG = /(?:^|\s)--touched(?:[=\s]|$)/u
+
+type SegmentTest = (segment: string) => boolean
+
+function is_check_related(segment: string): boolean {
+	return shell_segments.is_josh_command(segment, CHECK_COMMANDS)
+}
+
+function is_full_reach_check(segment: string): boolean {
+	return is_check_related(segment) && !TOUCHED_FLAG.test(segment)
+}
 
 type RoundEvent = 'brief' | 'check' | 'close' | 'edit' | 'none'
 
@@ -39,7 +52,7 @@ function review_event(segment: string): RoundEvent {
 
 function segment_event(segment: string): RoundEvent {
 	if (shell_segments.is_josh_command(segment, REVIEW_COMMANDS)) return review_event(segment)
-	if (shell_segments.is_josh_command(segment, CHECK_COMMANDS)) return 'check'
+	if (is_full_reach_check(segment)) return 'check'
 
 	const is_detach =
 		shell_segments.is_josh_command(segment, SHIP_COMMANDS) && DETACH_FLAG.test(segment)
@@ -89,18 +102,20 @@ function fixes_an_open_round(tail: string): boolean {
 	return since_brief.has('edit') && !since_brief.has('close')
 }
 
-function runs_check_related(command: string): boolean {
-	return shell_segments
-		.segments_of(command)
-		.some((segment) => shell_segments.is_josh_command(segment, CHECK_COMMANDS))
-}
-
 // **The command test comes first and the world is consulted second**: a person working in a lane
 // carries no mark and sees no refusal.
-function is_candidate(command: string): boolean {
-	if (!runs_check_related(command)) return false
+function runs_in_lane_child(command: string, is_counted: SegmentTest): boolean {
+	if (shell_segments.segments_of(command).every((segment) => !is_counted(segment))) return false
 
 	return lane_child_marker.is_child_of(process.cwd())
+}
+
+function is_candidate(command: string): boolean {
+	return runs_in_lane_child(command, is_check_related)
+}
+
+function is_full_reach_candidate(command: string): boolean {
+	return runs_in_lane_child(command, is_full_reach_check)
 }
 
 // Refused on every occurrence while the round stays open: the way on is the join, never a reissue.
@@ -134,7 +149,7 @@ const round_one_check_related = {
 	ROW,
 	fixes_an_open_round,
 	round_events,
-	is_candidate,
+	is_full_reach_candidate,
 }
 
 export { round_one_check_related }

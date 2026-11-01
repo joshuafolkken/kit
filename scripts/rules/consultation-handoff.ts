@@ -36,8 +36,12 @@ const is_entry_call = josh_call_of(['run:entry', 'run:hold'])
 const is_handoff_call = josh_call_of(['run:handoff'])
 
 // An unnamed model stays silent rather than guessing. The `session-lang` prompt hook asks it too.
-function is_consultation_main(tail: string, payload_model: string | undefined): boolean {
-	const model = main_model_reader.main_model(tail, payload_model)
+function is_consultation_main(
+	tail: string,
+	payload_model: string | undefined,
+	recorded_model?: string,
+): boolean {
+	const model = main_model_reader.main_model(tail, payload_model, recorded_model)
 
 	return model !== undefined && agent_consultation_model.consultation_provider(model) !== undefined
 }

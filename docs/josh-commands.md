@@ -205,7 +205,8 @@ Run related lint, type and dotfile spelling checks in parallel, and the unit tes
 
 ```bash
 pnpm josh check:related
-pnpm josh check:related --full   # whole outputs
+pnpm josh check:related --full      # whole outputs
+pnpm josh check:related --touched   # mid-run: test:related --touched, no green record
 ```
 
 <!-- /usage -->
