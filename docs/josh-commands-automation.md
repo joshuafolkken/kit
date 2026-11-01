@@ -882,7 +882,7 @@ It fronts the `josh latest` chain.
 
 <!-- usage: command:derive -->
 
-Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings.
+Write every artifact the command map derives — usage spans, catalog, snapshot — and print page bytes against their ceilings.
 
 ```bash
 pnpm josh command:derive   # after adding, renaming or describing a command

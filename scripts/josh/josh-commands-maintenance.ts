@@ -101,7 +101,7 @@ const MAINTENANCE_COMMANDS: Record<string, CommandEntry> = {
 	'command:derive': {
 		script: 'tools/document/command-derive.ts',
 		description:
-			'Write every artifact the command map derives — usage spans, catalog, snapshot, docs/why.md counts — and print page bytes against their ceilings',
+			'Write every artifact the command map derives — usage spans, catalog, snapshot — and print page bytes against their ceilings',
 		category: 'Maintenance',
 		reference: ['', 'maintainer', ['files']],
 		// Kit-only: the pages it writes are kit's own documentation, and the script lives under the
