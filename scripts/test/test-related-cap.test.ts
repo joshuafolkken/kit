@@ -79,7 +79,7 @@ describe('test_related_cap.capped_importers at and past the cap', () => {
 
 		expect(capped.over_cap).toEqual([WIDE_MODULE])
 		expect(scope_of(workspace, capped).files).toEqual([path.join(workspace, DIRECT_TEST)])
-		expect(test_related_cap.over_cap_line(capped.over_cap)).toContain('1 over cap')
+		expect(test_related_cap.over_cap_line(capped)).toContain('1 over cap')
 	})
 
 	it('leaves a file at the cap to vitest, as before', async () => {
@@ -93,7 +93,33 @@ describe('test_related_cap.capped_importers at and past the cap', () => {
 
 		expect(capped.over_cap).toEqual([])
 		expect(scope_of(workspace, capped).files).toEqual([path.join(workspace, WIDE_MODULE)])
-		expect(test_related_cap.over_cap_line(capped.over_cap)).toBeUndefined()
+		expect(test_related_cap.over_cap_line(capped)).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5699: the line names the hub and how many test files ran in place of its reach.
+describe('test_related_cap.over_cap_line naming the hub', () => {
+	let fixture: FixtureWorkspace
+
+	beforeEach(async () => {
+		fixture = await open_fixture()
+	})
+
+	afterEach(async () => {
+		await git_fixture_workspace.close_workspace(fixture)
+	})
+
+	it('names the hub and the test files run in place of its reach', async () => {
+		const capped = await test_related_cap.capped_importers(
+			fixture.workspace,
+			[WIDE_MODULE],
+			false,
+			reader_of(MAX_TEST_FILES + 1),
+		)
+
+		expect(test_related_cap.over_cap_line(capped)).toContain(
+			`hub ${WIDE_MODULE} — 1 test files run`,
+		)
 	})
 })
 
@@ -190,5 +216,14 @@ describe('test_related_cap.over_cap_of', () => {
 		]
 
 		expect(test_related_cap.over_cap_of(counts)).toEqual([WIDE_MODULE])
+	})
+
+	it('orders them widest reach first, so the first is the hub', () => {
+		const counts = [
+			{ file: MIDDLE_MODULE, count: MAX_TEST_FILES + 1 },
+			{ file: WIDE_MODULE, count: MAX_TEST_FILES + 2 },
+		]
+
+		expect(test_related_cap.over_cap_of(counts)).toEqual([WIDE_MODULE, MIDDLE_MODULE])
 	})
 })

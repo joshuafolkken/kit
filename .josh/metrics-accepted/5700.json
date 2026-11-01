@@ -1,0 +1,7 @@
+{
+	"reason": "#5700: run:entry reads a plan comment as planned, and its investigation section skips the investigator on a planned issue",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 9
+	}
+}

@@ -10,6 +10,8 @@ const yield_mock = vi.hoisted(() => vi.fn())
 const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const open_pr_mock = vi.hoisted(() => vi.fn())
+const labels_mock = vi.hoisted(() => vi.fn((): Array<string> => []))
+const fit_mock = vi.hoisted(() => vi.fn((_prep: { is_planned?: boolean }) => 'report'))
 
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
@@ -19,7 +21,7 @@ vi.mock('#scripts/issue/issue-state-cli', () => ({
 	issue_state_cli: {
 		read_issue: async () => ({
 			kind: 'state',
-			state: { state: 'OPEN', labels: [], is_human_review: false },
+			state: { state: 'OPEN', labels: labels_mock(), is_human_review: false },
 		}),
 	},
 }))
@@ -38,7 +40,10 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 		to_parts: () => ({ state: { state: 'OPEN' } }),
 	},
 }))
-vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: () => 'report' } }))
+vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
+vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
+	backlog_plan_comment: { read_plan: async () => undefined },
+}))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
 vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
 vi.mock('#scripts/run/run-step-section', () => ({
@@ -126,5 +131,29 @@ describe('run_entry_cli.run — the entry probe of a lane child', () => {
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(yield_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5700: a lane dispatched again after a yield starts at the recorded plan, and the
+// report it prints tells it to skip the investigator.
+describe('run_entry_cli.run — a lane dispatched again after a yield', () => {
+	it('starts past the plan and hands the report the planned stage when the plan is recorded', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(['run:lane', 'run:planned'])
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('at: planned · to: fullrun · start: implement')
+		expect(fit_mock.mock.calls[0]?.[0]).toMatchObject({ is_planned: true })
+	})
+
+	it('starts from the plan as before when no plan was recorded before the yield', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(['run:lane'])
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.join('\n')).toContain('at: fresh · to: fullrun · start: plan')
+		expect(fit_mock.mock.calls[0]?.[0]).toMatchObject({ is_planned: false })
 	})
 })

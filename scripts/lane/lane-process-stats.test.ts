@@ -64,7 +64,7 @@ describe('lane_process_stats.table resident apps', () => {
 		expect(resident.split('\n')).toStrictEqual([
 			'| resident apps | rss median (GB) | rss peak (GB) | samples |',
 			'| --- | --- | --- | --- |',
-			'| Google Chrome.app + Visual Studio Code.app | 2.0 | 3.0 | 3 |',
+			'| summed | 2.0 | 3.0 | 3 |',
 		])
 	})
 
