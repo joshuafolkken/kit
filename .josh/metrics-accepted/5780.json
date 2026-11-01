@@ -1,0 +1,7 @@
+{
+	"reason": "Name the block a timed-out merge wait was on, in its error cause, the ship park and the board row (#5780); mostly regression tests",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 59
+	}
+}
