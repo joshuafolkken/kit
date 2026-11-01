@@ -33,9 +33,10 @@ const CHAIN_RULE = 'chain-rule.md'
 const CHAIN = reference(CHAIN_RULE, 'Run the review-to-merge chain')
 const PROGRESS = 'backlogrun-progress.md'
 // The chain's own commands, which print their row themselves (`print_once`); `run:step` prints the
-// `ship` row too, for the `ship --review` it hands.
+// `ship` row too, for the `ship --review` it hands. `followup` and `run:progress` print theirs too.
 const SHIP = 'ship'
 const REVIEW = 'run:review'
+const PROGRESS_WATCHER = 'run:progress'
 
 // Keyed on a verdict token, or on the josh subcommand a command action runs. An action with no row —
 // `wait`, `stop`, a `decide:` line — has no rule to read beyond its own line.
@@ -45,6 +46,7 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[run_step.HUMAN_REVIEW, reference('needs-human-review.md', '`needs-human-review`')],
 	[run_step.UPDATE_DEPS, reference('latest-gate.md', 'The dependency update')],
 	['followup', reference('followup.md', 'Run `pnpm josh followup`')],
+	[PROGRESS_WATCHER, reference('progress-watcher.md', 'Progress while the run is quiet')],
 	['run:merge', reference(PROGRESS, "Running a named epic's children")],
 	['backlog:next', reference('backlogrun-steps.md', 'The loop')],
 	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
@@ -121,6 +123,7 @@ function print_for(
 const run_step_section = {
 	ENTRY,
 	GOVERNING_SECTIONS,
+	PROGRESS: PROGRESS_WATCHER,
 	LANE_CHILD_SECTIONS,
 	key_of,
 	print_for,

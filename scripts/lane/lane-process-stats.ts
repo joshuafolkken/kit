@@ -1,5 +1,5 @@
 import type { LedgerEntry, LoadEntry } from './lane-ledger'
-import { lane_process_load, type ProcessKind } from './lane-process-load'
+import type { ProcessKind } from './lane-process-load'
 import { lane_stats, type StatsWindow } from './lane-stats'
 
 // What the period's machine load was made of: the process kinds the load samples carried
@@ -17,6 +17,9 @@ const RSS_PEAK = 'rss peak (GB)'
 const SAMPLES = 'samples'
 const COLUMNS = ['process', 'cpu mean (cores)', 'cpu peak (cores)', RSS_PEAK, SAMPLES] as const
 const RESIDENT_COLUMNS = ['resident apps', 'rss median (GB)', RSS_PEAK, SAMPLES] as const
+// Not the names: a sample sums the apps `JOSH_LANE_RESIDENT_APPS` named when it ran, which the ledger does
+// not keep, so names read at print time could label sizes another set of apps made (joshuafolkken/kit#5690).
+const RESIDENT_LABEL = 'summed'
 const PERCENT_PER_CORE = 100
 const MB_PER_GB = 1024
 const DECIMALS = 1
@@ -90,8 +93,7 @@ function resident_tables(samples: ReadonlyArray<LoadEntry>): Array<string> {
 	if (sizes.length === 0) return []
 
 	const gigabytes = sizes.map((size) => size / MB_PER_GB)
-	const label = lane_process_load.RESIDENT_APPS.join(' + ')
-	const row = [label, cell(lane_stats.median(gigabytes)), cell(lane_stats.peak(gigabytes))]
+	const row = [RESIDENT_LABEL, cell(lane_stats.median(gigabytes)), cell(lane_stats.peak(gigabytes))]
 
 	return [to_table(RESIDENT_COLUMNS, [[...row, String(sizes.length)]])]
 }

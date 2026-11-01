@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { lane_process_load } from './lane-process-load'
 
 // joshuafolkken/kit#3874: load 93 with 1.6 lanes working, and nothing on record to say what made it —
@@ -22,6 +22,10 @@ const LISTING = [
 
 beforeEach(() => {
 	execa.mockReset()
+})
+
+afterEach(() => {
+	vi.unstubAllEnvs()
 })
 
 const KIND_CASES: Array<[string, string]> = [
@@ -112,8 +116,35 @@ describe('lane_process_load.resident_mb', () => {
 	})
 })
 
+// joshuafolkken/kit#5690: `JOSH_LANE_RESIDENT_APPS` names the resident apps.
+describe('lane_process_load.resident_apps', () => {
+	it('keeps the default names when the variable is unset', () => {
+		vi.stubEnv('JOSH_LANE_RESIDENT_APPS', undefined)
+
+		expect(lane_process_load.resident_apps()).toStrictEqual(lane_process_load.RESIDENT_APPS)
+	})
+
+	it('names no app when the variable is empty', () => {
+		expect(lane_process_load.resident_apps('')).toStrictEqual([])
+	})
+
+	it('reads several comma-separated names, trimmed', () => {
+		expect(lane_process_load.resident_apps('Firefox.app, Zed.app,')).toStrictEqual([
+			'Firefox.app',
+			'Zed.app',
+		])
+	})
+
+	it('reads the variable from the environment', () => {
+		vi.stubEnv('JOSH_LANE_RESIDENT_APPS', 'Zed.app')
+
+		expect(lane_process_load.resident_apps()).toStrictEqual(['Zed.app'])
+	})
+})
+
 describe('lane_process_load.read', () => {
 	it('summarizes the live listing', async () => {
+		vi.stubEnv('JOSH_LANE_RESIDENT_APPS', undefined)
 		execa.mockResolvedValue({ stdout: LISTING })
 
 		const reading = await lane_process_load.read()
@@ -125,6 +156,15 @@ describe('lane_process_load.read', () => {
 			expect.any(Array),
 			expect.objectContaining({ env: { LC_ALL: 'C' } }),
 		)
+	})
+
+	it('sums the apps the environment names', async () => {
+		vi.stubEnv('JOSH_LANE_RESIDENT_APPS', 'eslint.js')
+		execa.mockResolvedValue({ stdout: LISTING })
+
+		const reading = await lane_process_load.read()
+
+		expect(reading?.resident_mb).toBe(1024)
 	})
 
 	it('answers nothing when ps does not answer', async () => {

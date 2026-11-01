@@ -12,6 +12,12 @@ vi.mock('node:util', async (import_original) => ({
 	parseArgs: vi.fn().mockReturnValue({ values: {}, positionals: [] }),
 }))
 
+const print_section_mock = vi.hoisted(() => vi.fn())
+
+vi.mock('./followup-section', () => ({
+	followup_section: { print_section: print_section_mock },
+}))
+
 vi.mock('./git-pr-followup', () => ({
 	git_pr_followup: { run: vi.fn<() => Promise<void>>().mockResolvedValue() },
 }))
@@ -163,6 +169,30 @@ vi.mock('./git-followup-merged', () => ({
 const { git_followup_workflow } = await import('./git-followup-workflow')
 const { git_followup_flush } = await import('./git-followup-flush')
 const { lane_size_record } = await import('#scripts/lane/lane-size-record')
+// Read at load, before the suite's per-test mock clearing can reset it.
+const prints_at_import = print_section_mock.mock.calls.length
+
+// joshuafolkken/kit#5645. The import ran `main` with no `--help`, so it opened on its governing section.
+describe('main — followup opens on its governing section', () => {
+	it('prints the section once', () => {
+		expect(prints_at_import).toBe(1)
+	})
+
+	it('answers --help alone, with no governing section', () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		print_section_mock.mockClear()
+
+		expect(git_followup_workflow.answer_help_or_open({ help: true })).toBe(true)
+		expect(print_section_mock).not.toHaveBeenCalled()
+	})
+
+	it('opens any other invocation on the section and carries on', () => {
+		print_section_mock.mockClear()
+
+		expect(git_followup_workflow.answer_help_or_open({})).toBe(false)
+		expect(print_section_mock).toHaveBeenCalledOnce()
+	})
+})
 
 // joshuafolkken/kit#3023. A pull request a person merged by hand is finished by re-running `followup`;
 // the gates guard a merge this run no longer makes, and a ledger commit would land on a merged branch.
