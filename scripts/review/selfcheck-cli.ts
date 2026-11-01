@@ -11,6 +11,7 @@ import type { Hunk } from '#scripts/test/test-pinned-logic'
 import { execa } from 'execa'
 import { prose_stale_read } from './prose-stale-read'
 import { prose_stale_scan } from './prose-stale-scan'
+import { review_interaction } from './review-interaction'
 import { review_untouched_readers } from './review-untouched-readers'
 import { selfcheck_commands, type ProbeResult, type Runner } from './selfcheck-commands'
 import { selfcheck_report, type Sections } from './selfcheck-report'
@@ -101,8 +102,9 @@ async function sections(root: string, base: string): Promise<Sections> {
 	const paths = [...new Set(hunks.map((hunk) => hunk.file))]
 	const stale = prose_stale_scan.report(await prose_stale_read.references(root, hunks))
 	const readers = await review_untouched_readers.read({ root, base, paths })
+	const interaction = review_interaction.due_paths(paths, root)
 
-	return { stale, readers, commands: await run_commands(root, hunks) }
+	return { stale, readers, interaction, commands: await run_commands(root, hunks) }
 }
 
 function refuse(message: string): number {
@@ -139,6 +141,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = await guarded(process.argv.slice(FIRST_ARGUMENT))
 }
 
-const selfcheck_cli = { change_hunks, child_environment, guarded, run, untracked_hunks }
+const selfcheck_cli = { change_hunks, child_environment, guarded, run, sections, untracked_hunks }
 
 export { selfcheck_cli }
