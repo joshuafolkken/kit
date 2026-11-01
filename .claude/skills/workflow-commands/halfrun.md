@@ -34,9 +34,9 @@ back with fixes, treat each as a new round: implement, re-run `pnpm josh gate`, 
 mirror `fullrun new` (1)–(8): derive an English title (or use the provided one) → create the Issue
 (`pnpm josh issue:file "<title>" --body-file <body-file>`, with the labels
 `kickoff.md` → "Words typed after `new`" maps, body per
-`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:hold --adopt <N>` (as `fullrun new` (3)) → post the agreed plan → stash
+`prompts/collaboration-workflow/issue-template.md`; its duplicate scan is read per `issue-scout.md`) → `pnpm josh run:entry <N> --to halfrun --adopt` (as `fullrun new` (3)) → post the agreed plan → stash
 any pre-existing changes with `pnpm josh stash:push "halfrun new: pre-existing changes"`, popped
 after `stashed` with `pnpm josh stash:pop "halfrun new: pre-existing changes"` →
-`pnpm josh ms` → `pnpm josh run:prep <N>`, and on `latest: required` `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
+`pnpm josh ms` → on the entry's `latest: required`, `pnpm josh latest:if-required` → implement → run the gate (as above, `pnpm
 josh test:e2e` run by **you**) → `pnpm josh run:hold <N> --halfrun-stop` (it sends the `confirmation`)
 → **stop**.
