@@ -132,28 +132,27 @@ function is_carry_candidate(stamp: FileMapStamp, path: string): boolean {
 	return is_settled && review_round2.is_unexecuted(path, [])
 }
 
-// `passed`: the synced paths that are no move; `noted`: those of them no carry reproduced.
-interface Carry {
+// `passed`: the synced paths that are no move; `noted`: those of them git could not carry. Each path
+// is carried on its own, so one git cannot carry never passes over a lane edit beside it.
+interface SyncedCarry {
 	passed: ReadonlyArray<string>
 	noted: ReadonlyArray<string>
 }
 
-function carry(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Carry {
+function carry(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): SyncedCarry {
 	const candidates = parts.synced.filter((path) => is_carry_candidate(stamp, path))
-
-	if (candidates.length === 0) return { passed: [], noted: [] }
-
 	const { blobs, base: from } = stamp
-	const delta = review_round_one_blobs.carried_delta({
-		blobs,
-		from,
-		to: tree.base,
-		paths: candidates,
-	})
+	const answers =
+		candidates.length === 0
+			? undefined
+			: review_round_one_blobs.carried_each({ blobs, from, to: tree.base, paths: candidates })
 
-	if (delta === undefined) return { passed: candidates, noted: candidates }
+	if (answers === undefined) return { passed: [], noted: [] }
 
-	return { passed: candidates.filter((path) => !delta.includes(path)), noted: [] }
+	return {
+		passed: candidates.filter((path) => answers[path] !== false),
+		noted: candidates.filter((path) => answers[path] === undefined),
+	}
 }
 
 function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
