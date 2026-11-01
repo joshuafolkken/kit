@@ -51,28 +51,50 @@ function body_of(notice: PlanNotice): string {
 	return [...items, run_stage.next_line(KICKOFF, notice.issue_number)].join('\n')
 }
 
-// `--repo` names the repository the URL points at; without it, the checkout's own. The send reads the
-// title from that URL unless `--title` already named it.
-async function values_of(notice: PlanNotice): Promise<CliValues> {
-	const slug = notice.repo ?? (await git_gh_repo.repo_get_name_with_owner())
-	const url =
-		slug === undefined ? {} : { 'issue-url': issue_cite.issue_url(slug, notice.issue_number) }
-	const title = notice.title === undefined ? {} : { 'issue-title': notice.title }
-
-	return { 'task-type': 'planning', body: body_of(notice), ...url, ...title }
+// A `planning` Telegram with its body already written. **One send for every planning announcement** —
+// `issue:plan --planned` here and `epic --notify` (`epic-notify.ts`) — so the URL, the title and the
+// failure handling cannot drift apart.
+interface PlanningMessage {
+	issue_number: string
+	body: string
+	title: string | undefined
+	repo: string | undefined
+	command: string
 }
 
-// A failed send warns and leaves the recorded plan standing: the plan is the run's record, the
-// message only its announcement.
-async function send(notice: PlanNotice): Promise<void> {
+// The repository a message's URLs point at: `repo` when named, else the checkout's own.
+async function slug_of(repo: string | undefined): Promise<string | undefined> {
+	return repo ?? (await git_gh_repo.repo_get_name_with_owner())
+}
+
+// The send reads the title from the URL unless the message already names it.
+async function values_of(message: PlanningMessage): Promise<CliValues> {
+	const slug = await slug_of(message.repo)
+	const url =
+		slug === undefined ? {} : { 'issue-url': issue_cite.issue_url(slug, message.issue_number) }
+	const title = message.title === undefined ? {} : { 'issue-title': message.title }
+
+	return { 'task-type': 'planning', body: message.body, ...url, ...title }
+}
+
+// A failed send warns and leaves what the command recorded standing: the plan or the epic is the
+// run's record, the message only its announcement.
+async function send_planning(message: PlanningMessage): Promise<void> {
 	try {
-		await telegram_test.send_values(await values_of(notice))
+		await telegram_test.send_values(await values_of(message))
 	} catch (error) {
-		console.error(`⚠️  issue:plan could not send the planning notification: ${String(error)}`)
+		console.error(
+			`⚠️  ${message.command} could not send the planning notification: ${String(error)}`,
+		)
 	}
 }
 
-const issue_plan_notify = { summary_of, send }
+// `--repo` names the repository the URL points at; without it, the checkout's own.
+async function send(notice: PlanNotice): Promise<void> {
+	await send_planning({ ...notice, body: body_of(notice), command: 'issue:plan' })
+}
 
-export type { PlanNotice }
+const issue_plan_notify = { summary_of, send, send_planning, slug_of }
+
+export type { PlanNotice, PlanningMessage }
 export { issue_plan_notify }

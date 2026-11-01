@@ -1,4 +1,4 @@
-import type { CommandEntry } from './josh-command-types'
+import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
 const REPO = '--repo <owner/repo>'
 const EXCLUDE = '--exclude <N>'
@@ -11,6 +11,8 @@ const JUST_MERGED = 'skip the issue just merged'
 const EPIC_COMMANDS: Record<string, CommandEntry> = {
 	epic: {
 		script: 'scripts/epic/epic.ts',
+		// `--notify` sends the `planning` Telegram (epic-notify.ts), which reads `.env`.
+		tsx_arguments: OPTIONAL_ENV_FILE_FLAGS,
 		description: 'Create an epic issue from its child issue numbers',
 		category: 'AI tools',
 		reference: ['<title> <issue...> [--ordered]', 'automation', ['network']],

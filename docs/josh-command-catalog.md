@@ -56,6 +56,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh sync` · `josh sy` | — | developer | files | Sync config files |
 | `josh sync:scope` | `[--staged] [--json]` | automation | none | Say whether this change touches a file josh sync distributes |
 | `josh ui:routes` | `[--staged]` | automation | none | List the screenshot-target routes the current change touches |
+| `josh ui:shot` | `<route> [route...]` | automation | processes | Capture routes with this project's own screenshot command |
 | `josh uninstall` · `josh un` | `[--profile basic\|full] [--yes]` | developer | files, processes | Remove what kit added to a project and list what is left to review by hand |
 
 ## Workflow
