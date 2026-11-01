@@ -1000,7 +1000,7 @@ pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck:
 
 <!-- /usage -->
 
-Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it.
+Self-check questions 2, 4 and 10 (`prompts/review.md`) as one run. Question 4 lists readers to read and never fails it; where the interaction review is due, it also prints that pass's three questions over the due paths.
 
 ### `josh diff:summary`
 

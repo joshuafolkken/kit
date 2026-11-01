@@ -1,14 +1,18 @@
+import { review_interaction } from './review-interaction'
 import type { Readers, ReadersRead } from './review-untouched-readers'
 import type { CommandsReport } from './selfcheck-commands'
 
 // `josh review:selfcheck`'s report (joshuafolkken/kit#5540): one block per question, then one verdict
 // line. **Question 4 never fails the verdict** — a reader outside the diff is something to open, not a
 // defect — so the line counts it beside the two that can fail. A search that could not answer is exit
-// 2, never read as "none found".
+// 2, never read as "none found". Where the interaction review is due, question 4 also asks that pass's
+// three questions over the due paths, so the author answers them before round 1 (joshuafolkken/kit#5766).
 
 interface Sections {
 	stale: { text: string; exit_code: number }
 	readers: ReadersRead
+	// The paths the interaction review is due on — `review_interaction.due_paths`.
+	interaction: ReadonlyArray<string>
 	commands: CommandsReport
 }
 
@@ -46,6 +50,12 @@ function block(heading: string, lines: ReadonlyArray<string>): string {
 	return [heading, ...(lines.length > 0 ? lines : [NONE_LINE])].join('\n')
 }
 
+function interaction_lines(due: ReadonlyArray<string>): Array<string> {
+	if (due.length === 0) return []
+
+	return [...review_interaction.QUESTIONS, ...due.map((file) => `- ${file}`)]
+}
+
 function stale_count(stale: Sections['stale']): number {
 	return stale.text === STALE_OK ? 0 : stale.text.split('\n').length
 }
@@ -75,6 +85,7 @@ function report(sections: Sections): SelfcheckReport {
 			sections.stale.text === STALE_OK ? [] : [sections.stale.text],
 		),
 		block('## q4 readers outside the diff', reader_lines(sections.readers)),
+		block('## q4 interaction review questions', interaction_lines(sections.interaction)),
 		block('## q10 commands run', sections.commands.lines),
 	]
 

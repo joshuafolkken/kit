@@ -1,4 +1,9 @@
 import {
+	collect_missing_contexts,
+	describe_missing_context,
+	is_required_match,
+} from './git-pr-checks-missing'
+import {
 	CHECK_STATUS_FAIL,
 	CHECK_STATUS_MISSING,
 	CHECK_STATUS_PASS,
@@ -37,25 +42,12 @@ const MERGE_STATE_UNSTABLE = 'UNSTABLE'
 // that no amount of waiting resolves, so it ends the wait rather than polling through it.
 const MERGE_STATE_DIRTY = 'DIRTY'
 const REVIEW_CHANGES_REQUESTED = 'CHANGES_REQUESTED'
-// GitHub reports a check-suite job as `<App> / <Job>` (e.g. `CodeRabbit / Review`). A required
-// check name matches that suite when it is the `<App>` segment, so the required-check list stays the
-// bare app name even after the provider renames its job.
-const CHECK_SUITE_SEPARATOR = ' / '
 const FAILURE_MESSAGE_PREFIX = 'PR checks failed'
 const FAILURE_REASON_REVIEW = 'review requested changes'
 const FAILURE_REASON_CHECKS = 'failed checks'
 const FAILURE_REASON_CONFLICT = 'merge conflict'
 
 type PrEvaluation = 'success' | 'pending' | 'failure'
-
-// A required check matches either its exact context name or a check-suite job nested under it
-// (`<required> / <job>`). The separator keeps the prefix anchored, so an unrelated context such as
-// `CodeRabbitNightly` does not satisfy a required `CodeRabbit`.
-function is_required_match(check_name: string, required_name: string): boolean {
-	if (check_name === required_name) return true
-
-	return check_name.startsWith(`${required_name}${CHECK_SUITE_SEPARATOR}`)
-}
 
 function find_required_check(
 	checks: ReadonlyArray<RollupCheck>,
@@ -82,9 +74,10 @@ function is_review_blocked(review_decision: string | undefined): boolean {
 //
 // **`BLOCKED` is deliberately not here.** GitHub reports it while a required check is merely queued,
 // which is every healthy pull request for its first seconds. Treating it as a conflict is safe only
-// after the checks have settled; there is no such moment on this path, and a green-but-`BLOCKED`
-// pull request (branch protection requiring a review, which this repository does not set)
-// therefore reaches the timeout rather than a named failure.
+// after the checks have settled; there is no such moment on this path. A required context with no
+// check-run is named once the gap outlasts a grace window (`git-pr-checks-missing.ts`), while a
+// green-but-`BLOCKED` pull request held by a required review (which this repository does not set)
+// still reaches the timeout.
 function is_merge_conflict(merge_state_status: string | undefined): boolean {
 	return merge_state_status === MERGE_STATE_DIRTY
 }
@@ -212,6 +205,9 @@ function collect_failure_reasons(snapshot: PrStateSnapshot): Array<string> {
 	if (is_review_blocked(snapshot.review_decision)) reasons.push(FAILURE_REASON_REVIEW)
 	const failed = collect_blocking_failures(snapshot)
 	if (failed.length > 0) reasons.push(`${FAILURE_REASON_CHECKS}: ${failed.join(', ')}`)
+	reasons.push(
+		...collect_missing_contexts(snapshot).map((context) => describe_missing_context(context)),
+	)
 
 	return reasons
 }
@@ -223,11 +219,12 @@ function describe_pr_failure(snapshot: PrStateSnapshot): string {
 	return `${FAILURE_MESSAGE_PREFIX} (${reasons.join('; ')}).`
 }
 
+// A required context with no check-run fails like a failed check (`git-pr-checks-missing.ts`).
 function evaluate_pr_state(snapshot: PrStateSnapshot): PrEvaluation {
 	const statuses = read_required_statuses(snapshot.rollup)
 	const failure = evaluate_failure_state({
 		review_decision: snapshot.review_decision,
-		failed_checks: collect_blocking_failures(snapshot),
+		failed_checks: [...collect_blocking_failures(snapshot), ...collect_missing_contexts(snapshot)],
 		merge_state_status: snapshot.merge_state_status,
 	})
 

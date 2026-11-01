@@ -1,0 +1,9 @@
+{
+	"reason": "review:selfcheck prints the interaction review's questions where it is due (#5766)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 13,
+		"rules.lines": 1,
+		"ai_cost.on_demand_bytes": 116
+	}
+}
