@@ -13,7 +13,12 @@ const PLANNED_AT = '2026-10-31T00:00:00.000Z'
 const TEST_FILE = 'scripts/lane/lane-plan-size.test.ts'
 const UNPLANNED = 'scripts/lane/unplanned.ts'
 const LANE_DIRECTORY = 'scripts/lane/'
-const QUIET: PlanSignals = { hunk_files: [], lines_ratio: undefined, split_filed: false }
+const QUIET: PlanSignals = {
+	hunk_files: [],
+	committed_files: [],
+	lines_ratio: undefined,
+	split_filed: false,
+}
 
 // `count` probed hunks, all in `file`.
 function hunks(count: number, file = UNPLANNED): Pick<PlanSignals, 'hunk_files'> {
@@ -209,6 +214,48 @@ describe('lane_plan_size.oversize on the hunks of a re-plan that restores a clea
 			reason: 'hunks',
 			limit: 2,
 			measured: 3,
+		})
+	})
+})
+
+// joshuafolkken/kit#5684: a record narrowed before #5672 is cleared with no `cleared_paths`; the files the
+// branch committed stand in for that history, while a file neither committed nor planned still counts.
+describe('lane_plan_size.oversize on the hunks of a re-plan of a cleared record with no history', () => {
+	const [committed = '', kept = ''] = files(2)
+	const recorded = { ...plan_of([kept, TEST_FILE]), cleared: true }
+	const plan = plan_of([kept, TEST_FILE])
+
+	it('passes 3 hunks in a code file the branch committed', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed, kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toBeUndefined()
+	})
+
+	it('still answers hunks for 3 hunks in a file the branch never committed', () => {
+		const signals = { ...QUIET, ...hunks(3), committed_files: [committed, kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), recorded, signals)).toMatchObject({
+			reason: 'hunks',
+			limit: 2,
+			measured: 3,
+		})
+	})
+
+	it('still answers hunks in a committed file when the record never cleared', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed, kept] }
+		const uncleared = plan_of([kept, TEST_FILE])
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), uncleared, signals)).toMatchObject({
+			reason: 'hunks',
+		})
+	})
+
+	it('reads the recorded history, not the commits, once the record has one', () => {
+		const signals = { ...QUIET, ...hunks(3, committed), committed_files: [committed] }
+		const narrowed = { ...recorded, cleared_paths: [kept] }
+
+		expect(lane_plan_size.oversize(plan, declared(1, 15), narrowed, signals)).toMatchObject({
+			reason: 'hunks',
 		})
 	})
 })
