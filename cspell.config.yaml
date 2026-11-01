@@ -96,6 +96,10 @@ words:
   - unscored
   - hardlink
   - pageouts
+  # find(1) actions named by the consultation shell guard.
+  - execdir
+  - okdir
+  - fprint
   # Names and established technical terms quoted in the historical release audit.
   - execa
   - Threlte

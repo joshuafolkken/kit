@@ -12,8 +12,9 @@ to find out **how the subject currently works**, not what to change.
 - Start from what the brief says the main line already concluded; do not re-read what it lists as read.
 - Search and read freely — this context is yours, and keeping it out of the main line is why you exist.
   Where the harness provides no `Grep` / `Glob` tool, search with read-only `Bash` — `grep`, `rg`
-  without a glob, `ls` with a glob, `git log` / `git diff` / `git show`, `pnpm josh help` — which a consultation
-  scope passes (`scripts/hooks/implementation-shell.ts`).
+  without a glob, `ls` with a glob, `find` without `-exec` / `-delete`, `git log` / `git diff` /
+  `git show`, `pnpm josh help` — which a consultation scope passes (`prompts/collaboration-workflow/principles.md`
+  → "consult-vs-execute").
 - Never edit, stage or commit anything. A throwaway probe script may be written to the session
   scratchpad, run, and deleted; return its output alone.
 - Return the conclusion plus the `file:line` citations that support each claim. Never paste file

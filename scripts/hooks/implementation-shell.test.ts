@@ -185,7 +185,7 @@ describe('the named refusal rule', () => {
 		['echo changed > notes.ts', 'redirect to `notes.ts`'],
 		['sed -i s/x/y/ notes.ts', '`sed` is neither a read-only program nor a consultation operation'],
 		['echo changed | tee notes.ts', '`tee` to a runtime path'],
-		['git log scripts/*.ts', 'glob or brace expansion in `git`'],
+		['git log scripts/*.ts', 'glob, brace or variable expansion in `git`'],
 		['pnpm josh rename old new notes.ts', 'pnpm josh help rename'],
 	])('names the rule %s matched', (command, rule) => {
 		expect(implementation_shell.refusal(command)).toContain(rule)
@@ -193,6 +193,64 @@ describe('the named refusal rule', () => {
 
 	it('names no rule for a read', () => {
 		expect(implementation_shell.refusal('grep -n pattern app.ts')).toBeUndefined()
+	})
+})
+
+// joshuafolkken/kit#5638: a read with no write target passes in every spelling a consultation uses.
+describe('read-only consultation shell spellings', () => {
+	it.each([
+		'pnpm view typescript version',
+		'pnpm view typescript',
+		'npm view typescript version',
+		"gh api graphql -f query='{ viewer { login } }'",
+		'gh api repos/owner/repo/issues -f state=open -X GET',
+		'gh api repos/owner/repo --method=GET',
+		'gh api repos/owner/repo -F per_page=5',
+		'pnpm -s josh issue:read 5642',
+		'cd /tmp/other-repo && grep -n pattern notes.md',
+		'cd scripts && ls',
+		'for f in a.md b.md; do grep -n pattern $f; done',
+		'for f in /tmp/notes/*.md; do wc -l "$f"; done',
+		'for f in a.md b.md\ndo\n\tgrep -n pattern $f\ndone',
+		'wc -l scripts/hooks/implementation-shell.ts',
+		"find scripts -name '*.ts' -type f",
+		'time grep -rn pattern scripts',
+	])('passes %s', (command) => {
+		expect(implementation_shell.refusal(command)).toBeUndefined()
+	})
+})
+
+const NEITHER = 'is neither a read-only program nor a consultation operation'
+const CD_WRITE = 'a write beside `cd`'
+const GIT_LOOP_EXPANSION = 'variable expansion in `git`'
+const ENV_ASSIGNMENT = 'an environment assignment'
+
+describe('read-only consultation shell spelling refusals', () => {
+	it.each([
+		['gh api -X DELETE repos/owner/repo/issues/1', NEITHER],
+		['gh api --method PATCH repos/owner/repo -f title=x', NEITHER],
+		['gh api --method=put repos/owner/repo', NEITHER],
+		['gh api repos/owner/repo/issues/1 -X GET --method DELETE', NEITHER],
+		['npx done', NEITHER],
+		['pnpm -s for x', NEITHER],
+		['true;GIT_EXTERNAL_DIFF=/tmp/x git diff', ENV_ASSIGNMENT],
+		["find . -name x -exec rm '{}' +", NEITHER],
+		['find . -delete', NEITHER],
+		['find . -fprint notes.ts', NEITHER],
+		['FOO=1 gh api repos/owner/repo', ENV_ASSIGNMENT],
+		['cd scripts && echo changed > notes.md', CD_WRITE],
+		['cd scripts && echo changed | tee notes.md', CD_WRITE],
+		['for f in --output=app.ts; do git diff $f; done', GIT_LOOP_EXPANSION],
+		['for f in --output=app.ts; do git diff "$f"; done', GIT_LOOP_EXPANSION],
+		['for p in rm; do $p app.ts; done', 'variable expansion in `$p`'],
+		['for f in app.ts; do echo x > $f; done', 'redirect to `$f`'],
+		['for f in a; do echo $HOME; done', 'a variable expansion'],
+		['for f in a; do grep -n x $f; done > app.ts', 'redirect to `app.ts`'],
+		['time node scripts/probe.ts', '`node` is neither'],
+		['pnpm josh lint:related', 'pnpm josh help lint:related'],
+		['pnpm exec view notes.md', NEITHER],
+	])('refuses %s on %s', (command, rule) => {
+		expect(implementation_shell.refusal(command)).toContain(rule)
 	})
 })
 

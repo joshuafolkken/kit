@@ -74,6 +74,14 @@ describe('git_argv.arguments_of', () => {
 		])
 	})
 
+	// joshuafolkken/kit#5638: pnpm's own flags stand before the program, a value-taking one with its value.
+	it.each(['pnpm -s josh issue:read 5', 'pnpm -C /tmp/repo josh issue:read 5'])(
+		'skips the pnpm flags of %s',
+		(segment) => {
+			expect(git_argv.arguments_of(segment, 'josh')).toStrictEqual(['issue:read', '5'])
+		},
+	)
+
 	it('reads an escaped quote outside quotes as a plain character, opening no span', () => {
 		expect(
 			git_argv.arguments_of(String.raw`git push origin a\'b --force 'x'`, 'git'),
