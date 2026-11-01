@@ -137,6 +137,7 @@ describe('review_record_cli.run --check — a round whose delta is left to round
 
 		expect(code).toBe(0)
 		expect(out).toContain(REUSED_DELTA)
+		expect(out).toContain('every moved path a round executes is one round 2 reads')
 		expect(out).not.toContain(NOT_REUSED)
 		expect(out).not.toContain(RUN_REVIEW)
 	})
