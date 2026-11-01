@@ -7,13 +7,16 @@ import { run_review_cli } from './run-review-cli'
 // joshuafolkken/kit#4850: a lane child that had recorded round 1 reopened `josh run:review` and was
 // handed a round-2 brief. Its open is refused, pointing at the ship; nothing is launched.
 
-const { branch, brief_run, handed_over, launch_gate, launch_pinned } = vi.hoisted(() => ({
-	branch: vi.fn<() => Promise<string>>(),
-	brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
-	handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
-	launch_gate: vi.fn(() => ({ kind: 'launched' })),
-	launch_pinned: vi.fn(() => ({ kind: 'launched' })),
-}))
+const { branch, brief_run, handed_over, launch_gate, launch_pinned, wait_gate } = vi.hoisted(
+	() => ({
+		wait_gate: vi.fn(async () => 'red'),
+		branch: vi.fn<() => Promise<string>>(),
+		brief_run: vi.fn<(argv: ReadonlyArray<string>, emit?: Emit) => Promise<number>>(),
+		handed_over: vi.fn<(issue: number) => Promise<boolean>>(),
+		launch_gate: vi.fn(() => ({ kind: 'launched' })),
+		launch_pinned: vi.fn(() => ({ kind: 'launched' })),
+	}),
+)
 
 vi.mock('#scripts/git/git-command', () => ({ git_command: { branch } }))
 vi.mock('#scripts/josh/stamp-file', () => ({
@@ -37,11 +40,13 @@ vi.mock('#scripts/review/review-interaction', async (import_original) => {
 })
 vi.mock('#scripts/review/review-lane-handover', () => ({
 	review_lane_handover: {
-		is_handed_over: handed_over,
+		is_reopen_refused: handed_over,
 		refusal: (issue: number) => `REFUSED #${String(issue)} pnpm josh ship --detach --review`,
 	},
 }))
-vi.mock('./run-review-join-read', () => ({ run_review_join_read: { mark_due: vi.fn() } }))
+vi.mock('./run-review-join-read', () => ({
+	run_review_join_read: { mark_due: vi.fn(), read: async () => undefined },
+}))
 vi.mock('./run-review-pinned-steps', () => ({
 	run_review_pinned_steps: { launch: launch_pinned, clear: vi.fn() },
 }))
@@ -52,7 +57,13 @@ vi.mock('./run-review-steps', () => ({
 			await Promise.resolve()
 		}),
 		write_timing_start: vi.fn(),
+		wait_for_gate_finish: wait_gate,
+		complete_timing: () => undefined,
+		read_gate_log: () => undefined,
 	},
+}))
+vi.mock('#scripts/gate/check-related-unplanned', () => ({
+	check_related_unplanned: { show: vi.fn(async () => undefined) },
 }))
 
 const ISSUE = 4850
@@ -97,7 +108,17 @@ describe('run_review_cli.run — a lane child after its recorded round 1', () =>
 		expect(launch_pinned).not.toHaveBeenCalled()
 	})
 
-	it('briefs as before when the round is not handed over (no record, or outside a lane)', async () => {
+	// joshuafolkken/kit#5655: the refusal guards the open alone; the join that closes round 1 still runs.
+	it('still joins the pair after an attested round 1', async () => {
+		handed_over.mockResolvedValue(true)
+
+		await run_review_cli.run(['--join'])
+
+		expect(wait_gate).toHaveBeenCalledOnce()
+		expect(handed_over).not.toHaveBeenCalled()
+	})
+
+	it('briefs as before when round 1 is not attested (an interrupted review, or outside a lane)', async () => {
 		handed_over.mockResolvedValue(false)
 
 		expect(await run_review_cli.run([])).toBe(SUCCESS_EXIT_CODE)
