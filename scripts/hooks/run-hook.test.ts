@@ -6,6 +6,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	realpathSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs'
@@ -20,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 const RUN_HOOK_SOURCE = fileURLToPath(new URL('run-hook.sh', import.meta.url))
 const REPOSITORY_ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const LAUNCHER = 'scripts/hooks/run-hook.sh'
+const GATE = 'tools/hooks/hook-bundle-ready.ts'
 const INSTALLED_PACKAGE = 'node_modules/@joshuafolkken/kit'
 const REFUSED = 2
 // A whole launch starts real git and node processes, which the full suite's load can slow past the
@@ -45,6 +47,8 @@ function stub_script(name: string): string {
 
 const GATE_STUB = stub_script('gate')
 const BUNDLE_STUB = stub_script('bundle')
+const COMPILE_CACHE_NAME = 'kit-hook-compile'
+const COMPILE_CACHE_STUB = "process.stdout.write(process.env.NODE_COMPILE_CACHE ?? '')\n"
 const DISPATCHER_STUB = "process.stdout.write(`dispatcher ${process.argv.slice(2).join(' ')}`)\n"
 
 interface LaunchResult {
@@ -70,7 +74,7 @@ function create_package(package_root: string, has_bundles = true): void {
 
 	mkdirSync(path.dirname(launcher_path), { recursive: true })
 	copyFileSync(RUN_HOOK_SOURCE, launcher_path)
-	write_file(path.join(package_root, 'tools/hooks/hook-bundle-ready.ts'), GATE_STUB)
+	write_file(path.join(package_root, GATE), GATE_STUB)
 	write_file(path.join(package_root, 'dist/josh.js'), DISPATCHER_STUB)
 	if (has_bundles) write_file(path.join(package_root, 'dist/hooks/demo-hook.js'), BUNDLE_STUB)
 }
@@ -162,6 +166,18 @@ describe('run-hook.sh in kit checkout', () => {
 		const result = launch(LAUNCHER, { STUB_EXIT: String(REFUSED) })
 
 		expect(result).toMatchObject({ status: REFUSED, stdout: GATE_RAN, node_launches: 1 })
+	})
+
+	it('hands the gate a compile cache under the checkout node_modules/.cache', () => {
+		write_file(GATE, COMPILE_CACHE_STUB)
+		mkdirSync(path.join(workspace.root, 'node_modules'))
+
+		const cache_directory = launch(LAUNCHER).stdout
+
+		expect(path.basename(cache_directory)).toBe(COMPILE_CACHE_NAME)
+		expect(realpathSync(path.resolve(cache_directory, '..', '..'))).toBe(
+			realpathSync(path.join(workspace.root, 'node_modules')),
+		)
 	})
 })
 
