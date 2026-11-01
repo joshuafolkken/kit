@@ -45,6 +45,8 @@ A file with no replacement, missing, or not TypeScript or JavaScript is named, n
 Only that name leaves the declaration, which keeps its other names and gains an `import` from `<to>` below it; a name alone in its declaration takes the new specifier. A type-only name stays type-only.
 Comments in the braces stay. A file importing the name twice from `<from>` is refused as having no replacement.
 
+A file that already imports names from `<to>` gets the name in that declaration instead, and a declaration left empty is removed; `import type { … }` takes only a type-only name.
+
 ### `josh format:edited`
 
 <!-- usage: format:edited -->

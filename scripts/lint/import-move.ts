@@ -11,10 +11,12 @@ import {
 //
 // **Only the named import moves, never the declaration's other names.** `import { a, b } from 'x'`
 // moving `b` keeps `import { a } from 'x'` and adds `import { b } from 'y'` below it; a declaration
-// the name was alone in takes the new specifier instead. A type-only name stays type-only. Only the
-// name and its comma are cut, so a comment in the braces stays. Nothing but import declarations is
-// read, so strings, keys and other uses of the name are never touched. A name imported twice from the
-// old module is not guessed at: the file counts as untouched.
+// the name was alone in takes the new specifier instead. A file already importing names from the new
+// module gets the name in that declaration instead, and a declaration it leaves empty goes
+// (joshuafolkken/kit#5800); `import type { … }` takes only a type-only name. A type-only name stays
+// type-only. Only the name and its comma are cut, so a comment in the braces stays. Nothing but
+// import declarations is read, so strings, keys and other uses of the name are never touched. A name
+// imported twice from the old module is not guessed at: the file counts as untouched.
 
 const BLANK = /[\t ]/u
 
@@ -96,12 +98,71 @@ function type_keyword(api: TypeScriptApi, clause: ts.ImportClause): string {
 	return clause.phaseModifier === api.SyntaxKind.TypeKeyword ? 'type ' : ''
 }
 
+function is_type_only(keyword: string, element: ts.ImportSpecifier): boolean {
+	return keyword !== '' || element.isTypeOnly
+}
+
 function insert_edit(moving: Moving, keyword: string, to: string): Replacement {
 	const { declaration, element } = moving
-	const is_type = keyword !== '' || element.isTypeOnly
+	const is_type = is_type_only(keyword, element)
 	const text = `\nimport ${is_type ? 'type ' : ''}{ ${bare_text(element)} } from ${quoted(declaration, to)}`
 
 	return { start: declaration.getEnd(), end: declaration.getEnd(), text }
+}
+
+// A declaration from the new module with named imports the name can join: `import type { … }` takes
+// a type-only name alone.
+function accepts(api: TypeScriptApi, declaration: ts.ImportDeclaration, is_type: boolean): boolean {
+	const clause = declaration.importClause
+
+	if (clause === undefined || elements_of(api, declaration).length === 0) return false
+
+	return is_type || type_keyword(api, clause) === ''
+}
+
+// The moved name after the joined declaration's last one; a type-only name joining a value
+// declaration keeps an inline `type`.
+function joined_text(
+	api: TypeScriptApi,
+	last: ts.ImportSpecifier,
+	element: ts.ImportSpecifier,
+	is_type: boolean,
+): string {
+	const inline = is_type && type_keyword(api, last.parent.parent) === '' ? 'type ' : ''
+
+	return `, ${inline}${bare_text(element)}`
+}
+
+// The moved name appended to the new module's existing declaration (joshuafolkken/kit#5800), so the
+// file never imports the same module twice.
+function merge_edit(
+	api: TypeScriptApi,
+	moving: Moving,
+	keyword: string,
+	to: string,
+): Replacement | undefined {
+	const { declaration, element } = moving
+	const is_type = is_type_only(keyword, element)
+	const into = imports_from(api, declaration.getSourceFile(), to).find(
+		(candidate) => candidate !== declaration && accepts(api, candidate, is_type),
+	)
+	const last = into === undefined ? undefined : elements_of(api, into).at(-1)
+	if (last === undefined) return undefined
+
+	return {
+		start: last.getEnd(),
+		end: last.getEnd(),
+		text: joined_text(api, last, element, is_type),
+	}
+}
+
+// The whole declaration with its line break, for a name that was alone in it and joined another.
+function drop_edit(declaration: ts.ImportDeclaration): Replacement {
+	const { text } = declaration.getSourceFile()
+	const end = declaration.getEnd()
+	const line_end = text.charAt(end) === '\n' ? end + 1 : end
+
+	return { start: declaration.getStart(), end: line_end, text: '' }
 }
 
 function specifier_edit(declaration: ts.ImportDeclaration, to: string): Replacement {
@@ -164,19 +225,32 @@ function cut_edits(api: TypeScriptApi, element: ts.ImportSpecifier): ReadonlyArr
 	]
 }
 
+// A declaration the name was alone in: it joins another and goes, else it takes the new specifier.
+function alone_edits(
+	declaration: ts.ImportDeclaration,
+	merge: Replacement | undefined,
+	to: string,
+): ReadonlyArray<Replacement> {
+	if (merge === undefined) return [specifier_edit(declaration, to)]
+
+	return [drop_edit(declaration), merge]
+}
+
 function edits_of(
 	api: TypeScriptApi,
 	moving: Moving,
 	clause: ts.ImportClause,
 	to: string,
 ): ReadonlyArray<Replacement> {
-	const { declaration, element } = moving
-	const insert = insert_edit(moving, type_keyword(api, clause), to)
+	const { element } = moving
+	const keyword = type_keyword(api, clause)
+	const merge = merge_edit(api, moving, keyword, to)
+	const add = merge ?? insert_edit(moving, keyword, to)
 
-	if (element.parent.elements.length > 1) return [...cut_edits(api, element), insert]
-	if (clause.name === undefined) return [specifier_edit(declaration, to)]
+	if (element.parent.elements.length > 1) return [...cut_edits(api, element), add]
+	if (clause.name === undefined) return alone_edits(moving.declaration, merge, to)
 
-	return [{ start: clause.name.getEnd(), end: element.parent.getEnd(), text: '' }, insert]
+	return [{ start: clause.name.getEnd(), end: element.parent.getEnd(), text: '' }, add]
 }
 
 // Never `is_taken`: the name keeps its local binding, so the move binds nothing new.
