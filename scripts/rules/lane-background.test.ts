@@ -276,12 +276,13 @@ describe('lane_background.ROW — delivery', () => {
 		expect(lane_background.LANE_BACKGROUND_REASON).toContain('issued in the foreground')
 	})
 
-	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711).
+	// A launched ship is waited on, so a stop returns to this session (joshuafolkken/kit#4711); `ship
+	// --detach` runs the first wait chunk itself and only a `pending` is re-issued (joshuafolkken/kit#5625).
 	it.each([
-		['refusal', lane_background.LANE_BACKGROUND_REASON],
-		['foreground note', lane_background.FOREGROUND_NOTE],
-	])('the %s sends a launched ship to josh ship:wait', (_name, text) => {
-		expect(text).toContain('josh ship:wait')
+		['refusal', lane_background.LANE_BACKGROUND_REASON, 'runs `josh ship:wait` itself'],
+		['foreground note', lane_background.FOREGROUND_NOTE, '`josh ship:wait` on its `pending`'],
+	])('the %s leaves the first wait to the launched ship', (_name, text, wording) => {
+		expect(text).toContain(wording)
 	})
 })
 

@@ -1,6 +1,4 @@
-#!/usr/bin/env tsx
 import { setTimeout as sleep } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { poll } from '#scripts/lib/poll'
 import { run_ship_detach } from './run-ship-detach'
@@ -37,7 +35,6 @@ interface Waited {
 
 const CHUNK_MS = 270_000
 const POLL_MS = 2000
-const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh ship:wait <N>'
@@ -97,6 +94,13 @@ async function wait_for(repository: string, issue: string, chunk_ms = CHUNK_MS):
 	return waited
 }
 
+// The chunk counts from the process start, not the wait's: both clocks it is sized against start at the
+// session's call, and a `ship --detach` reaches the wait only after its preflight (joshuafolkken/kit#5625).
+// None left reads `pending` at once, so the re-issue gets fresh clocks.
+function chunk_left(): number {
+	return CHUNK_MS - performance.now()
+}
+
 // Each verdict carries what the session does next, so the instruction lives with the command.
 function next_action(issue: string): Record<Verdict, string> {
 	return {
@@ -129,15 +133,11 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	report(issue, await wait_for(repository, issue))
+	report(issue, await wait_for(repository, issue, chunk_left()))
 
 	return SUCCESS_EXIT_CODE
 }
 
 const run_ship_wait_cli = { CHUNK_MS, VERDICT, run, wait_for }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-	process.exitCode = await run(process.argv.slice(ARGV_OFFSET))
-}
 
 export { run_ship_wait_cli }

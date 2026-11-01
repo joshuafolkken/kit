@@ -1,0 +1,7 @@
+{
+	"reason": "Lane-child step 0 fold: ship --detach runs cost --cut and one ship:wait chunk timed from process start; run:chain skips main:merge in a lane child (#5625)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}

@@ -96,7 +96,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 	'run:chain': {
 		script: 'scripts/run/review/run-chain-cli.ts',
 		description:
-			'Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action',
+			'Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action',
 		category: 'AI tools',
 		reference: [
 			'<issue> [--from <stage>] [--unpinned-ok "<reason>"] | <issue> --join [--fixing] [--from <stage>]',
@@ -107,7 +107,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{
 					arguments: '<N>',
-					note: 'after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review',
+					note: 'after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review',
 				},
 				{
 					arguments: '<N> --from check:related',
@@ -165,7 +165,10 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 			examples: [
 				{ arguments: '"<title> #<N>" --body-file <evidence.md>' },
 				{ arguments: '"<title> #<N>" --review', note: 'both review rounds inside the ship' },
-				{ arguments: '--detach "<title> #<N>"', note: 'hand the ship to a supervisor' },
+				{
+					arguments: '--detach "<title> #<N>"',
+					note: 'hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk',
+				},
 				{ arguments: '--log <N>', note: "a detached ship's log" },
 			],
 			flags: [
@@ -194,7 +197,7 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	'ship:wait': {
-		script: 'scripts/run/ship/run-ship-wait-cli.ts',
+		script: 'scripts/run/ship/run-ship-wait-main.ts',
 		description:
 			'Wait on a detached ship through its gate and review round 1, so a stop there returns to this session (returned | passed | ended | pending)',
 		category: 'AI tools',

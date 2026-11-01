@@ -1,3 +1,4 @@
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_chain_cli } from './run-chain-cli'
@@ -38,6 +39,7 @@ function stop_at(name: string): void {
 }
 
 beforeEach(() => {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(false)
 	josh_run_mock.mockReset()
 	josh_run_mock.mockResolvedValue({ code: 0, out: '' })
 	vi.spyOn(split_resolution, 'ledger_refusal').mockResolvedValue(undefined)
@@ -62,6 +64,17 @@ describe('run_chain_cli.run — the chain', () => {
 		expect(ran()).toStrictEqual(MAIN_LINE)
 		expect(info_lines).toContain(
 			'run:chain 5630 — ran main:merge → review:selfcheck → check:related → run:review',
+		)
+	})
+
+	it('runs the review stages without main:merge in a lane child', async () => {
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(true)
+
+		await expect(run_chain_cli.run([ISSUE])).resolves.toBe(0)
+
+		expect(ran()).toStrictEqual(MAIN_LINE.slice(1))
+		expect(info_lines).toContain(
+			'run:chain 5630 — ran review:selfcheck → check:related → run:review',
 		)
 	})
 

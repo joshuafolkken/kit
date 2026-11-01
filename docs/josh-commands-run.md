@@ -615,7 +615,7 @@ Ship a change in one call: gate, commit/push/PR, the CI-wait merge and the repor
 ```bash
 pnpm josh ship "<title> #<N>" --body-file <evidence.md>
 pnpm josh ship "<title> #<N>" --review                    # both review rounds inside the ship
-pnpm josh ship --detach "<title> #<N>"                    # hand the ship to a supervisor
+pnpm josh ship --detach "<title> #<N>"                    # hand the ship to a supervisor; on `launched` and `cost --cut` `under`, wait one `ship:wait` chunk
 pnpm josh ship --log <N>                                  # a detached ship's log
 ```
 
@@ -908,10 +908,10 @@ The watcher is fresh when `run:progress` has pinged its life record within three
 
 <!-- usage: run:chain -->
 
-Run main:merge, review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
+Run main:merge (not in a lane child), review:selfcheck, check:related and run:review in one call, or with --join the half after the review (run:review --join, review:attest --check, review:record --from-slot), stopping at the first refusal with its next action.
 
 ```bash
-pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main, answer the self-check, run the scoped pair, open the review
+pnpm josh run:chain <N>                             # after `run:cut <N>` alone: merge main (not in a lane child), answer the self-check, run the scoped pair, open the review
 pnpm josh run:chain <N> --from check:related        # resume at the stage a stop named, once the run settled it
 pnpm josh run:chain <N> --unpinned-ok "only logs"   # forwarded to run:review as given
 pnpm josh run:chain <N> --join                      # once the review returns: join the gate, attest the round, record a round with no findings — a finding stops for its fix and disposition
