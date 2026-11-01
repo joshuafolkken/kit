@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url'
 import { find_local_bin_upwards } from '#scripts/build/local-bin'
 import { TOOLKIT_BINS, type_check_step } from '#scripts/gate/type-check-step'
+import { find_package_directory } from '#scripts/josh/package-directory'
 import { package_manifest } from '#scripts/lib/package-manifest'
 import { execa } from 'execa'
 import { z } from 'zod'
@@ -17,8 +18,12 @@ const FAILURE_EXIT_CODE = 1
 
 const SCRIPTS_MANIFEST_SCHEMA = z.object({ scripts: z.record(z.string(), z.string()).optional() })
 
+// The nearest `package.json` upwards, the one `pnpm run` itself would read from `directory`.
 function read_scripts(directory: string): ReadonlyArray<string> {
-	const manifest = package_manifest.read_manifest_if_valid(directory, SCRIPTS_MANIFEST_SCHEMA)
+	const manifest = package_manifest.read_manifest_if_valid(
+		find_package_directory(directory),
+		SCRIPTS_MANIFEST_SCHEMA,
+	)
 
 	return Object.keys(manifest?.scripts ?? {})
 }
@@ -73,6 +78,7 @@ async function main(argv: ReadonlyArray<string>, directory: string): Promise<voi
 }
 
 const ui_shot_cli = {
+	main,
 	run,
 	USAGE,
 }

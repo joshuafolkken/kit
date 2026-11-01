@@ -1,7 +1,7 @@
 {
-	"reason": "New josh ui:shot command (scripts/ui/ui-shot.ts and its CLI) adds code",
+	"reason": "New josh ui:shot command (scripts/ui/ui-shot.ts and its CLI) adds code; round-1 fix reads the enclosing package.json",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 136
+		"scripts.code_lines": 141
 	}
 }
