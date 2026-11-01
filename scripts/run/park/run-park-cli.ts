@@ -8,6 +8,7 @@ import { issue_park } from '#scripts/issue/issue-park'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_park } from './run-park'
+import { run_park_release } from './run-park-release'
 
 // `josh run:park <N> --body-file <path>` — park a lane child for a person's decision in one call: the
 // question as a comment, `needs-decision`, and the local record the `lane-park` guard reads.
@@ -17,8 +18,9 @@ import { run_park } from './run-park'
 // (joshuafolkken/kit#4132). One call writes both, and only a park that has both is recorded, so the
 // guard falls silent on exactly the child that left a question behind.
 //
-// **`in-progress` and the hold are not this command's.** A parked child keeps `in-progress`, and every
-// parked ending still owes `pnpm josh run:release <N>` (`backlogrun-park.md` → "park and continue").
+// **Every parked ending owes the release, so the park runs it** (joshuafolkken/kit#5737): once the
+// label and the comment are on, `run_park_release` drops the hold and `in-progress`. A failed release
+// keeps the park.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -58,7 +60,7 @@ async function park(request: CommentRequest, directory: string): Promise<number>
 		`park ${session_cite.issue(issue_number)} — label: ${String(write.is_labelled)} · comment: ${String(write.is_commented)} · recorded: ${String(is_recorded)}`,
 	)
 
-	return is_parked ? SUCCESS_EXIT_CODE : FAILURE_EXIT_CODE
+	return is_parked ? await run_park_release.release(issue_number) : FAILURE_EXIT_CODE
 }
 
 // **The record goes whatever the label answers**: the decision is a person's and already made, so a

@@ -290,15 +290,15 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:cut` in
 Park a lane child for a decision, or clear the park.
 
 ```bash
-pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision and the local record
+pnpm josh run:park 1839 --body-file .josh/tmp/park-1839.md   # comment, needs-decision, the local record, then run:release
 pnpm josh run:park 1839 --clear                              # remove needs-decision and the record
 ```
 
 <!-- /usage -->
 
-The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off. `in-progress` and the hold are left alone — a parked ending still owes `pnpm josh run:release <N>`.
+The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 
-**Output / exit codes:** one `park #<N>` line naming what was written; exit `0` once the label and the comment are both on the issue (or, with `--clear`, once the label is off), `1` otherwise. The record is written only on `0`.
+**Output / exit codes:** one `park #<N>` line naming what was written, then the release's line; exit `0` once the label and the comment are both on the issue and the release succeeded (or, with `--clear`, once the label is off), `1` otherwise. The record is written only once both are on; a failed release keeps it and prints `pnpm josh run:release <N>` to re-run.
 
 ### `josh upstream:interrupt`
 

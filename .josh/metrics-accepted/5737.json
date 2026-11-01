@@ -1,0 +1,8 @@
+{
+	"reason": "run:park releases its own hold in process after a landed park (new run-park-release module that skips another run's hold, .env for its stop Telegram), with the failed-release next-step line (#5737)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 31,
+		"ai_cost.on_demand_bytes": 110
+	}
+}

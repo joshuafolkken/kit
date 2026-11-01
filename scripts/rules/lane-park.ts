@@ -122,8 +122,8 @@ function records_the_park(command: string): boolean {
 }
 
 // The instruction in the shape a refusal can carry: what the stop must leave behind, how to record it,
-// and that the park is the stop itself — no notify follows it, since the `Stop` hook sends one still owed
-// on the hold (`stop-rules.ts` → `needs_notify`). **The park procedure is named, not restated** — the
+// and that the park is the stop itself — no notify follows it: `run:park` releases the hold the `Stop`
+// hook's notify is owed on (`stop-rules.ts` → `needs_notify`). **The park procedure is named, not restated** — the
 // single source is `backlogrun-park.md` → "park and continue", and a second copy here would be the
 // clone `CLAUDE.md` prohibits.
 const LANE_PARK_REASON =
