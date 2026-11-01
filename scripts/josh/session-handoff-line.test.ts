@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { session_handoff_line } from './session-handoff-line'
+import { session_model_record } from './session-model-record'
+import { stamp_file } from './stamp-file'
 
 const { LINE_PREFIX, handoff_line } = session_handoff_line
 
@@ -91,6 +93,20 @@ describe('handoff_line on an unusual payload', () => {
 
 		process.stdin.isTTY = is_tty
 		await expect(read).resolves.toBe('')
+	})
+
+	it.each([
+		[FABLE, true],
+		[OPUS, false],
+	])('reads the model recorded at session start (%s) on an empty transcript', (model, fires) => {
+		const transcript = path.join(WORK_DIRECTORY, `${randomUUID()}.jsonl`)
+
+		writeFileSync(transcript, '')
+		session_model_record.record(JSON.stringify({ transcript_path: transcript, model }))
+		const line = handoff_line(JSON.stringify({ prompt: FULLRUN, transcript_path: transcript }))
+
+		stamp_file.remove_stamp(session_model_record.record_path(transcript))
+		expect(line.includes(LINE_PREFIX)).toBe(fires)
 	})
 
 	it('falls back to the payload model when the transcript cannot be read', () => {
