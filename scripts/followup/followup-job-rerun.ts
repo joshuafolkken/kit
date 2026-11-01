@@ -297,6 +297,8 @@ async function rerun_failed_jobs(branch_name: string): Promise<Array<string>> {
 }
 
 const followup_job_rerun = {
+	actions_api_path,
+	read_actions,
 	rerun_failed_jobs,
 }
 

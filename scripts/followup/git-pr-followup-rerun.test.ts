@@ -1,4 +1,5 @@
 import { PrConflictError } from '#scripts/gh/git-pr-checks-eval'
+import { MissingContextError } from '#scripts/gh/git-pr-checks-missing'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_checks } from './git-pr-followup'
 
@@ -24,24 +25,80 @@ vi.mock('./followup-job-rerun', () => ({
 	followup_job_rerun: { rerun_failed_jobs: vi.fn() },
 }))
 
+vi.mock('./followup-run-rerun', () => ({
+	followup_run_rerun: { recover_missing: vi.fn() },
+}))
+
 const { git_pr_checks } = await import('#scripts/gh/git-pr-checks')
 const { followup_job_rerun } = await import('./followup-job-rerun')
+const { followup_run_rerun } = await import('./followup-run-rerun')
 
 const BRANCH_NAME = '4813-lane'
 const CHECKS_FAILURE = 'PR checks failed (failed checks: Detect E2E).'
+const MISSING_FAILURE = 'PR checks failed (required context Checks has no check-run).'
+const MISSING = { contexts: ['Checks'], head_sha: 'abc123' }
 const RERUN_NAMES = ['Detect E2E']
 const SNAPSHOT = { rollup: [], merge_state_status: undefined, review_decision: undefined }
 
 const wait = vi.mocked(git_pr_checks.wait_for_pr_success)
 const rerun = vi.mocked(followup_job_rerun.rerun_failed_jobs)
+const recover = vi.mocked(followup_run_rerun.recover_missing)
 
-async function run(): Promise<unknown> {
-	return await run_checks({ branch_name: BRANCH_NAME, is_skip_watch: true })
+async function run(reran: Array<string> = []): Promise<unknown> {
+	return await run_checks({ branch_name: BRANCH_NAME, is_skip_watch: true, reran })
+}
+
+function missing_error(): MissingContextError {
+	return new MissingContextError(MISSING_FAILURE, { missing: MISSING })
 }
 
 beforeEach(() => {
 	wait.mockReset()
 	rerun.mockReset()
+	recover.mockReset()
+})
+
+// joshuafolkken/kit#5778: a required job a partial rerun dropped leaves no failed job to retry.
+describe('run_checks — a required context with no check-run', () => {
+	it('reruns the whole run once, not the failed jobs, and waits again', async () => {
+		const reran: Array<string> = []
+
+		wait.mockRejectedValueOnce(missing_error()).mockResolvedValueOnce(SNAPSHOT)
+		recover.mockResolvedValue('rerun')
+
+		await expect(run(reran)).resolves.toStrictEqual(SNAPSHOT)
+		expect(recover).toHaveBeenCalledExactlyOnceWith(MISSING)
+		expect(rerun).not.toHaveBeenCalled()
+		expect(reran).toStrictEqual(MISSING.contexts)
+	})
+
+	it('waits again without a rerun when the job only trailed', async () => {
+		const reran: Array<string> = []
+
+		wait.mockRejectedValueOnce(missing_error()).mockResolvedValueOnce(SNAPSHOT)
+		recover.mockResolvedValue('present')
+
+		await expect(run(reran)).resolves.toStrictEqual(SNAPSHOT)
+		expect(reran).toStrictEqual([])
+	})
+
+	it('fails with the original failure when nothing recovers it', async () => {
+		const error = missing_error()
+
+		wait.mockRejectedValue(error)
+		recover.mockResolvedValue('none')
+
+		await expect(run()).rejects.toBe(error)
+		expect(wait).toHaveBeenCalledOnce()
+	})
+
+	it('does not recover a second time when the context is missing again', async () => {
+		wait.mockRejectedValue(missing_error())
+		recover.mockResolvedValue('rerun')
+
+		await expect(run()).rejects.toThrow(MISSING_FAILURE)
+		expect(recover).toHaveBeenCalledOnce()
+	})
 })
 
 describe('run_checks — a stalled job is rerun once', () => {

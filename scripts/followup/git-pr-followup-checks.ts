@@ -11,10 +11,12 @@ import {
 	is_coderabbit_check,
 	PrConflictError,
 } from '#scripts/gh/git-pr-checks-eval'
+import { MissingContextError } from '#scripts/gh/git-pr-checks-missing'
 import { CHECK_STATUS_PASS, type PrStateSnapshot } from '#scripts/gh/git-pr-checks-parse'
 import { issue_watch_gate } from '#scripts/issue/issue-watch-gate'
 import { json_value } from '#scripts/lib/json-value'
 import { followup_job_rerun } from './followup-job-rerun'
+import { followup_run_rerun } from './followup-run-rerun'
 
 // The check wait and the notes read off its snapshot — split out of `git-pr-followup.ts` when it
 // reached its line limit. `git-pr-followup` re-exports each name it always
@@ -138,6 +140,19 @@ function is_checks_failure(error: unknown): boolean {
 	return error instanceof Error && error.message.startsWith(FAILURE_MESSAGE_PREFIX)
 }
 
+// A required job a partial rerun dropped is recovered by rerunning its whole run, or waited for again
+// when it only trailed (`followup-run-rerun.ts`).
+async function rejudge_missing(
+	input: RunChecksInput,
+	error: MissingContextError,
+): Promise<PrStateSnapshot> {
+	const outcome = await followup_run_rerun.recover_missing(error.missing)
+	if (outcome === 'none') throw error
+	if (outcome === 'rerun') input.reran?.push(...error.missing.contexts)
+
+	return await wait_for_checks(input)
+}
+
 // **A job the runner stopped after every step passed, or one red only on tests outside the change, is
 // rerun once and the wait judged again** (`followup-job-rerun.ts`). The second wait has no rerun of its own, so a job that stops the same way
 // twice — or any other failure — ends the run as before.
@@ -146,6 +161,7 @@ async function rejudge_after_rerun(
 	error: unknown,
 ): Promise<PrStateSnapshot> {
 	if (!is_checks_failure(error)) throw error
+	if (error instanceof MissingContextError) return await rejudge_missing(input, error)
 	const rerun = await followup_job_rerun.rerun_failed_jobs(input.branch_name)
 	if (rerun.length === 0) throw error
 	input.reran?.push(...rerun)
