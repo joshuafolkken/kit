@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { git_gh_issue_list } from '#scripts/gh/git-gh-issue-list'
 import type { RunEvent } from '#scripts/run/event/run-event-stream'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LedgerEntry } from './lane-ledger'
@@ -122,11 +123,18 @@ describe('lane_sinks.sinks_of', () => {
 
 describe('lane_sinks.table', () => {
 	it('prints one row per stage of the lanes over the threshold', () => {
-		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD).split('\n')
+		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD, []).split('\n')
 
-		expect(rows[0]).toBe('| stage | total min | lanes | median min |')
-		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 |')
+		expect(rows[0]).toBe('| stage | total min | lanes | median min | open issues |')
+		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 | none |')
 		expect(rows).toHaveLength(6)
+	})
+
+	it('names the open Issues whose title carries the stage on its row', () => {
+		const issues = [{ number: 7, title: 'Trim the Implement stage' }]
+		const rows = lane_sinks.table(RECORDS, WINDOW, THRESHOLD, issues).split('\n')
+
+		expect(rows[2]).toBe('| implement | 50.0 | 2 | 25.0 | #7 |')
 	})
 })
 
@@ -154,6 +162,7 @@ describe('lane_measure_cli.run — stats --sinks', () => {
 	beforeEach(() => {
 		vi.spyOn(console, 'info').mockReturnValue(undefined)
 		vi.spyOn(console, 'error').mockReturnValue(undefined)
+		vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
 	})
 
 	it('names the sinks form in the usage it prints', () => {
@@ -175,6 +184,7 @@ describe('lane_measure_cli.run — stats --sinks', () => {
 
 		expect(printed).toMatch(/^\| stage \| total min/u)
 		expect(printed).toContain('| 2 |')
+		expect(printed).toContain('| none |')
 	})
 
 	it('reads an explicit threshold, keeping only the lane over it', async () => {
