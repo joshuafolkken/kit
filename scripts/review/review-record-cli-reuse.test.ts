@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { observation_ledger } from '#scripts/observations/observation-ledger'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { review_lane_handover } from './review-lane-handover'
 import { review_record_cli } from './review-record-cli'
 
 // joshuafolkken/kit#4763: a lane resuming on an old record read `Recorded` as "round 1 is done" and
@@ -27,9 +28,14 @@ const NOW = new Date('2026-10-25T00:00:00Z')
 const ISSUE = 4763
 const NOT_REUSED = 'Not reused'
 const RUN_REVIEW = 'run:review'
+const RUN_REVIEW_STEP = `pnpm josh ${RUN_REVIEW}`
 
 afterAll(() => {
 	rmSync(TEST_DIR, { recursive: true, force: true })
+})
+
+beforeEach(() => {
+	vi.spyOn(review_lane_handover, 'is_reopen_refused').mockResolvedValue(false)
 })
 
 function recorded_root(): string {
@@ -67,7 +73,7 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 		expect(code).toBe(0)
 		expect(out).toContain('Recorded:')
 		expect(out).toContain(NOT_REUSED)
-		expect(out).toContain('pnpm josh run:review')
+		expect(out).toContain(RUN_REVIEW_STEP)
 	})
 
 	it('answers reused when the ship takes the recorded round as its round 1', async () => {
@@ -105,6 +111,20 @@ describe('review_record_cli.run --check — why the ship reviews round 1 again',
 
 		expect(out).toContain(`${NOT_REUSED}: josh ship reviews round 1 again — ${cause}.`)
 		expect(out).not.toContain('a file a recorded High cites')
+	})
+})
+
+// joshuafolkken/kit#5655: a lane child's attested round 1 refuses the reopen, so the line names the
+// ship rather than the `run:review` that would be refused.
+describe('review_record_cli.run --check — an attested lane round the ship reviews again', () => {
+	it('names the ship, not run:review', async () => {
+		vi.mocked(review_lane_handover.is_reopen_refused).mockResolvedValue(true)
+		reusable_mock.mockReset().mockResolvedValue({ reuse: 'again' })
+		const { out } = await check_output()
+
+		expect(out).toContain(NOT_REUSED)
+		expect(out).toContain(review_lane_handover.SHIP_REVIEWS_LINE)
+		expect(out).not.toContain(RUN_REVIEW_STEP)
 	})
 })
 

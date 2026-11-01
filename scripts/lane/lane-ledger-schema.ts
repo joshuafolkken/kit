@@ -71,6 +71,8 @@ const load_schema = z.object({
 	// The heaviest process kinds at the instant of the sample (`lane-process-load.ts`), so the load the
 	// core budget's ledger does not explain can be read back by what made it (joshuafolkken/kit#3874).
 	processes: z.array(process_kind_schema).optional(),
+	// The resident apps' summed size (`lane_process_load.RESIDENT_APPS`, joshuafolkken/kit#5658).
+	resident_mb: z.number().optional(),
 })
 // A lane child started on `issue` — the instant its implementation is timed from.
 const dispatch_schema = z.object({

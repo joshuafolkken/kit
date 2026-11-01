@@ -11,7 +11,8 @@ import { lane_stats } from './lane-stats'
 // `lane-plan-size.ts`): the hunks the tree already changed against its base, counted as `josh
 // test:pinned` counts them (modified source files, tests excluded), one file name per hunk so the bar
 // can leave out the files a recorded plan holds — none before the first edit, so a
-// re-plan or the ship's probe is where it bites — the recent lines ratio
+// re-plan or the ship's probe is where it bites — the files the branch committed since that base (the
+// stand-in for a cleared record's missing history, joshuafolkken/kit#5684), the recent lines ratio
 // `lane:stats` prints, and whether this lane already filed a split child. A diff or ledger it cannot
 // read counts as nothing, so an unmeasured axis never refuses.
 
@@ -30,18 +31,35 @@ function hunk_files(diff: string): Array<string> {
 	return test_pinned_logic.parse_hunks(diff).map((hunk) => hunk.file)
 }
 
-async function diff_of(base: string): Promise<string> {
+type TreeProbe = Pick<PlanSignals, 'hunk_files' | 'committed_files'>
+
+const NO_PROBE: TreeProbe = { hunk_files: [], committed_files: [] }
+
+async function read_or_empty(arguments_: Array<string>): Promise<string> {
 	try {
-		return await git_spawn.read([...DIFF_ARGUMENTS, base])
+		return await git_spawn.read(arguments_)
 	} catch {
 		return ''
 	}
 }
 
-async function hunks_of(): Promise<Array<string>> {
+function names_of(output: string): Array<string> {
+	return output.split('\n').filter((name) => name !== '')
+}
+
+async function probe_of(base: string): Promise<TreeProbe> {
+	const [diff, committed] = await Promise.all([
+		read_or_empty([...DIFF_ARGUMENTS, base]),
+		read_or_empty(['diff', '--name-only', `${base}...HEAD`]),
+	])
+
+	return { hunk_files: hunk_files(diff), committed_files: names_of(committed) }
+}
+
+async function tree_of(): Promise<TreeProbe> {
 	const base = await change_base.resolved_through_merge()
 
-	return base === undefined ? [] : hunk_files(await diff_of(base))
+	return base === undefined ? NO_PROBE : await probe_of(base)
 }
 
 async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
@@ -52,23 +70,23 @@ async function entries_of(): Promise<ReadonlyArray<LedgerEntry>> {
 
 function signals_from(
 	issue: number,
-	hunks: ReadonlyArray<string>,
+	tree: TreeProbe,
 	entries: ReadonlyArray<LedgerEntry>,
 	now_ms: number,
 ): PlanSignals {
 	const window = lane_stats.window_of(RATIO_PERIOD_DAYS, now_ms)
 
 	return {
-		hunk_files: hunks,
+		...tree,
 		lines_ratio: lane_size_stats.lines_ratio(entries, window),
 		split_filed: split_resolution.split_issues(entries).has(issue),
 	}
 }
 
 async function signals_of(issue: number): Promise<PlanSignals> {
-	const [hunks, entries] = await Promise.all([hunks_of(), entries_of()])
+	const [tree, entries] = await Promise.all([tree_of(), entries_of()])
 
-	return signals_from(issue, hunks, entries, Date.now())
+	return signals_from(issue, tree, entries, Date.now())
 }
 
 const lane_plan_signals = { hunk_files, signals_from, signals_of }

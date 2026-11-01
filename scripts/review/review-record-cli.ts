@@ -58,12 +58,21 @@ const DELTA_LINE =
 
 // The condition that re-runs round 1, and the path that met it, named rather than listed among every
 // condition that could (joshuafolkken/kit#4941).
-function review_again_line(cause = 'the reuse question gave no reason'): string {
-	return `Not reused: josh ship reviews round 1 again — ${cause}. Run \`pnpm josh run:review\` and the round-1 \`/code-review\` here (chain-rule.md step 0).`
+// A lane child whose attested round 1 refuses the reopen (joshuafolkken/kit#5655) is named the ship,
+// which reviews round 1 again itself, rather than the `run:review` it would be refused.
+function review_again_line(
+	cause = 'the reuse question gave no reason',
+	is_refused = false,
+): string {
+	const next = is_refused
+		? review_lane_handover.SHIP_REVIEWS_LINE
+		: 'Run `pnpm josh run:review` and the round-1 `/code-review` here (chain-rule.md step 0).'
+
+	return `Not reused: josh ship reviews round 1 again — ${cause}. ${next}`
 }
 
-function reuse_line(answer: ReuseAnswer): string {
-	if (answer.reuse === 'again') return review_again_line(answer.cause)
+function reuse_line(answer: ReuseAnswer, is_refused: boolean): string {
+	if (answer.reuse === 'again') return review_again_line(answer.cause, is_refused)
 
 	return answer.reuse === 'delta' ? DELTA_LINE : REUSED_LINE
 }
@@ -216,8 +225,9 @@ interface CheckMode {
 // than reading "recorded" as "done".
 async function code_recorded(issue: number): Promise<string> {
 	const answer = await review_lane_handover.answer_here(issue)
+	const is_refused = await review_lane_handover.is_reopen_refused(issue)
 
-	return [RECORDED_LINE, reuse_line(answer)].join('\n')
+	return [RECORDED_LINE, reuse_line(answer, is_refused)].join('\n')
 }
 
 async function interaction_recorded(): Promise<string> {

@@ -32,13 +32,17 @@ import { lane_plan, type LanePlan } from './lane-plan'
 // re-plan that restores a file a narrowing re-plan dropped is not refused on its edits. The files this
 // plan lists count too (joshuafolkken/kit#5679): the files axis is read first, so a plan that reaches
 // the hunks axis passed it, and the re-plan the ship's `unplanned` stop asks for is not refused on the
-// hunks of the files it adds.
+// hunks of the files it adds. A cleared record with no `cleared_paths` — one narrowed before #5672, or a
+// lane's first cleared plan — has the files this lane's branch has committed stand in for that history
+// (joshuafolkken/kit#5684): only the ship commits, and its preflight held each commit to the plan of its time.
 
 type SplitReason = 'files' | 'hunks' | 'lines'
 
-// What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk.
+// What `lane:plan` measured beside the plan (`lane-plan-signals.ts`); one `hunk_files` entry per hunk,
+// one `committed_files` entry per file the branch changed between its base and `HEAD`.
 interface PlanSignals {
 	hunk_files: ReadonlyArray<string>
+	committed_files: ReadonlyArray<string>
 	lines_ratio: number | undefined
 	split_filed: boolean
 }
@@ -103,19 +107,30 @@ function files_over(
 	return { reason: 'files', declared, limit, kept, split_off: files.slice(limit), tests }
 }
 
+// The files an earlier clear held — the recorded history, else, for a cleared record that predates it,
+// the files the branch committed.
+function earlier_cleared(
+	recorded: LanePlan | undefined,
+	signals: PlanSignals,
+): ReadonlyArray<string> {
+	if (recorded?.cleared_paths !== undefined) return recorded.cleared_paths
+
+	return recorded?.cleared === true ? signals.committed_files : []
+}
+
 // Matched by the ship's `unplanned` rule — a claim ending in `/` holds every file under it — against a
 // wider set: this plan's files and a path an earlier clear of this lane held count as planned too, while
 // the ship's stop reads the recorded `paths` alone (joshuafolkken/kit#5672, joshuafolkken/kit#5679).
 // A directory this plan claims is left out: the files axis counts it as one file, so it passed nothing.
 function unplanned_hunks(
-	hunk_files: ReadonlyArray<string>,
+	signals: PlanSignals,
 	plan: LanePlan,
 	recorded: LanePlan | undefined,
 ): number {
 	const listed = plan.paths.filter((path) => !path.endsWith('/'))
-	const planned = [...listed, ...(recorded?.paths ?? []), ...(recorded?.cleared_paths ?? [])]
+	const planned = [...listed, ...(recorded?.paths ?? []), ...earlier_cleared(recorded, signals)]
 
-	return run_ship_planned.unplanned_of(planned, hunk_files).length
+	return run_ship_planned.unplanned_of(planned, signals.hunk_files).length
 }
 
 function hunks_over(declared: number, hunks: number): MeasureOver | undefined {
@@ -142,7 +157,7 @@ function measure_over(
 		? undefined
 		: lines_over(declared.lines, signals.lines_ratio)
 
-	return hunks_over(declared.files, unplanned_hunks(signals.hunk_files, plan, recorded)) ?? lines
+	return hunks_over(declared.files, unplanned_hunks(signals, plan, recorded)) ?? lines
 }
 
 // `undefined` while every axis stays within its bar, or no size is declared; files first, then hunks, then lines.

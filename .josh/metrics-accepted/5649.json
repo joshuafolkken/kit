@@ -1,0 +1,7 @@
+{
+	"reason": "lane:breakdown pause rows name what the lane redid after each pause (#5649)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 47
+	}
+}

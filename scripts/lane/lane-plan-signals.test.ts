@@ -52,8 +52,11 @@ describe('lane_plan_signals.signals_from', () => {
 	it('reads the period lines ratio and no split child off a ledger of merged sizes', () => {
 		const entries = [...sized(1, 100, 150), ...sized(2, 100, 250)]
 
-		expect(lane_plan_signals.signals_from(ISSUE, ['a.ts'], entries, NOW)).toStrictEqual({
+		const tree = { hunk_files: ['a.ts'], committed_files: ['b.ts'] }
+
+		expect(lane_plan_signals.signals_from(ISSUE, tree, entries, NOW)).toStrictEqual({
 			hunk_files: ['a.ts'],
+			committed_files: ['b.ts'],
 			lines_ratio: 2,
 			split_filed: false,
 		})
@@ -62,8 +65,11 @@ describe('lane_plan_signals.signals_from', () => {
 	it('answers no ratio on an empty ledger, and a split child the lane filed', () => {
 		const filed: LedgerEntry = { kind: 'split-filed', at: RECENT, issue: ISSUE, child: '#9' }
 
-		expect(lane_plan_signals.signals_from(ISSUE, [], [filed], NOW)).toStrictEqual({
+		const tree = { hunk_files: [], committed_files: [] }
+
+		expect(lane_plan_signals.signals_from(ISSUE, tree, [filed], NOW)).toStrictEqual({
 			hunk_files: [],
+			committed_files: [],
 			lines_ratio: undefined,
 			split_filed: true,
 		})
