@@ -1,7 +1,7 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { broad_investigation } from './broad-investigation'
 
 // joshuafolkken/kit#5351: which tool calls are broad investigation. The shell half has its own test
@@ -26,6 +26,10 @@ function file_of(lines: number): string {
 
 const AT_CAP = file_of(READ_LINE_CAP)
 const PAST_CAP = file_of(READ_LINE_CAP + 1)
+
+afterAll(() => {
+	rmSync(FIXTURES, { recursive: true, force: true })
+})
 
 function dispatch(input: Record<string, unknown>): { name: string; input: unknown } {
 	return { name: 'Agent', input: { prompt: PROMPT, ...input } }

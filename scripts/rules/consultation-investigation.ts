@@ -75,7 +75,7 @@ const ROW = row('consultation-investigation', ANTHROPIC_PROVIDER, 'an `investiga
 	title: 'Consultation main line delegates investigation (Claude)',
 	topic: TOPIC,
 	fires:
-		'a broad investigation call — `Glob`, `WebFetch`, an unbounded `Read`, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on Fable. Every occurrence',
+		'a broad investigation call — `Glob`, `WebFetch`, a `Read` past the line cap, a tree `Grep` or shell search, an investigation dispatch inheriting the model — on Fable. Every occurrence',
 	quiet: QUIET,
 })
 

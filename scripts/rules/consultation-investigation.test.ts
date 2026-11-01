@@ -128,7 +128,11 @@ describe('consultation-investigation — a Fable main line', () => {
 describe('consultation-investigation — the reason', () => {
 	it('names the investigation model and a narrow example', () => {
 		expect(ROW.reason).toContain(OPUS)
-		expect(ROW.reason).toContain(`<= ${String(NARROW_LIMIT)}`)
+		expect(ROW.reason).toContain(`<= ${String(NARROW_LIMIT)} lines`)
+	})
+
+	it('names a whole-file `Read` within the cap as narrow (#5804)', () => {
+		expect(ROW.reason).toContain('`Read` of a file or an `offset` / `limit` range')
 	})
 
 	it('scores an investigator dispatch as keeping the rule', () => {
