@@ -194,6 +194,8 @@ const test_related_schema = z.object({
 	trigger_files: z.array(z.string()).optional(),
 	// The changed files past the reach cap, run by their direct importers alone (joshuafolkken/kit#5532).
 	over_cap: z.number().optional(),
+	// The one of them of the widest reach, the hub that put the run past the cap (joshuafolkken/kit#5699).
+	over_cap_hub: z.string().optional(),
 	elapsed_ms: z.number(),
 })
 // One `josh test:pinned` run that probed (joshuafolkken/kit#5078): `held` hunks the verdict cache

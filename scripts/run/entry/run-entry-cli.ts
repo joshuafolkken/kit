@@ -335,7 +335,7 @@ async function proceed(
 
 	const code = emit_fitted(
 		{ issue_number, hold, cost, verdict: run_entry.stage_verdict(state, reads.verdict) },
-		reads.prep,
+		{ ...reads.prep, is_planned: state === run_stage.PLANNED },
 	)
 
 	// The entry's own read — the split assessment every run answers before its work — printed here so

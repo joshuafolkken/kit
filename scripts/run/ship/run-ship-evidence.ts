@@ -66,6 +66,6 @@ function with_evidence(draft: string, block: string): string {
 	return after === '' ? `${before}\n\n${block}` : `${before}\n\n${block}\n${after}`
 }
 
-const run_ship_evidence = { TAIL_LINES, block_of, with_evidence }
+const run_ship_evidence = { TAIL_LINES, block_of, tail_of, with_evidence }
 
 export { run_ship_evidence }

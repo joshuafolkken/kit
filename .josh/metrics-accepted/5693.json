@@ -1,0 +1,7 @@
+{
+	"reason": "ship:evidence reuses a recorded run on the same tree (record_target, execute_once, --fresh) plus its tests #5693",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 39
+	}
+}
