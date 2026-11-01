@@ -127,6 +127,7 @@ const PLAIN_CALLS: ReadonlyArray<readonly [string, number]> = [
 	// Printed through `session_cite.text` or `issue_citation.linkify` by the caller that prints it.
 	['epic/epic-audit-checks.ts', 1],
 	['epic/epic-bundle-format.ts', 1],
+	['lane/lane-sinks-issues.ts', 1],
 	['epic/epic-bundle-evidence.ts', 2],
 	['epic/epic-bundle.ts', 3],
 	['epic/epic-next-views.ts', 1],

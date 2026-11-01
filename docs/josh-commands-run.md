@@ -1067,6 +1067,9 @@ pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 ne
 lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
 (`lane-sinks.ts`).
 
+The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
+listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
+
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.
 
