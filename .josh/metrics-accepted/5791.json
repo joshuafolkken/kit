@@ -1,0 +1,7 @@
+{
+	"reason": "#5791: per-path carry (carried_each) so a synced document git could not carry is passed over and noted without passing over a lane edit beside it",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 28
+	}
+}
