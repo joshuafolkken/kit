@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { repo_party } from '#scripts/discovery/repo-party'
@@ -11,6 +11,7 @@ import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { issue_file_batch } from './issue-file-batch'
 import { issue_file_cap } from './issue-file-cap'
+import { issue_file_cli } from './issue-file-cli'
 import { issue_file_fold } from './issue-file-fold'
 import { issue_scout_cli } from './issue-scout-cli'
 
@@ -24,6 +25,7 @@ const ISSUE_URL = `https://github.com/${HERE}/issues/2900`
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const BATCH_FLAG = '--batch'
+const BODY_FILE_FLAG = '--body-file'
 const FIRST = 'First filing'
 const SECOND = 'Second filing'
 const THIRD = 'Third filing'
@@ -48,7 +50,9 @@ const work = mkdtempSync(path.join(tmpdir(), 'issue-file-batch-'))
 const exec_gh_api = vi.spyOn(git_gh_exec, 'exec_gh_api')
 const info = vi.spyOn(console, 'info')
 
-vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue({ report: 'Duplicates: none', candidates: [] })
+const SCOUT_REPORT = 'Duplicates: none'
+
+vi.spyOn(issue_scout_cli, 'scout').mockResolvedValue({ report: SCOUT_REPORT, candidates: [] })
 vi.spyOn(epic_bundle_cli, 'report_for').mockResolvedValue(SUCCESS_EXIT_CODE)
 vi.spyOn(repository_labels, 'ensure_labels').mockReturnValue([])
 vi.spyOn(git_gh_issue_list, 'issue_list').mockResolvedValue({ json: '[]', is_capped: false })
@@ -69,6 +73,20 @@ function batch_of(name: string, bodies: ReadonlyArray<readonly [string, string]>
 
 function requests(): Array<unknown> {
 	return exec_gh_api.mock.calls.map((call): unknown => JSON.parse(call[0].body ?? '{}'))
+}
+
+// One body file holding the three valid filings, split at `%%%` lines.
+function separated_file(name: string): string {
+	const file = path.join(work, `${name}.md`)
+	const parts = [FIRST, SECOND, THIRD].map((title) => `---\ntitle: ${title}\n---\n${VALID_BODY}`)
+
+	writeFileSync(file, parts.join('%%%\n'))
+
+	return file
+}
+
+function scout_prints(): Array<unknown> {
+	return info.mock.calls.filter((call) => String(call[0]).includes(SCOUT_REPORT))
 }
 
 // The create requests to expect, one per title, in filing order.
@@ -130,10 +148,61 @@ describe('issue_file_batch.run — several body files in one call', () => {
 	})
 })
 
+// joshuafolkken/kit#5675: one `%%%`-separated file is a batch too, and every filing's scout report is
+// printed together once before the first filing rather than inside each.
+describe('issue_file_batch.run — one separated file and the combined scout report', () => {
+	it('files the three parts of one separated file in one call', async () => {
+		expect(await issue_file_batch.run([BATCH_FLAG, separated_file('three')])).toBe(
+			SUCCESS_EXIT_CODE,
+		)
+		expect(requests()).toMatchObject(filed(FIRST, SECOND, THIRD))
+	})
+
+	it('prints every filing scout report once, together, before the first filing', async () => {
+		await issue_file_batch.run([BATCH_FLAG, separated_file('scout')])
+
+		// Three up front, then the two after the first filing again, unprinted: they name nothing new.
+		expect(issue_scout_cli.scout).toHaveBeenCalledTimes(5)
+		expect(scout_prints()).toStrictEqual([
+			[expect.stringMatching(/1\] — First[\s\S]*2\] — Second[\s\S]*3\] — Third filing\n.*none/u)],
+		])
+		expect(info.mock.invocationCallOrder[0]).toBeLessThan(
+			exec_gh_api.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+})
+
+describe('issue_file_batch.run — after the first filing of a batch', () => {
+	it('removes the body files it wrote once the batch is filed', async () => {
+		const file_issue = vi.spyOn(issue_file_cli, 'file_issue')
+
+		await issue_file_batch.run([BATCH_FLAG, separated_file('cleanup')])
+		const body_files = file_issue.mock.calls.map(([argv]) => argv[argv.indexOf(BODY_FILE_FLAG) + 1])
+
+		expect(body_files).toHaveLength(3)
+		expect(body_files.filter((file) => file !== undefined && existsSync(file))).toStrictEqual([])
+	})
+
+	it('holds a later filing the scout after an earlier filing finds a duplicate of', async () => {
+		const unclear = { report: 'Duplicates: 1 candidate(s)', candidates: [2900] }
+		const clear = { report: SCOUT_REPORT, candidates: [] }
+
+		vi.mocked(issue_scout_cli.scout)
+			.mockResolvedValueOnce(clear)
+			.mockResolvedValueOnce(clear)
+			.mockResolvedValueOnce(clear)
+			.mockResolvedValueOnce(unclear)
+
+		expect(await issue_file_batch.run([BATCH_FLAG, separated_file('held')])).toBe(FAILURE_EXIT_CODE)
+		expect(requests()).toMatchObject(filed(FIRST, THIRD))
+		expect(info).toHaveBeenCalledWith(unclear.report)
+	})
+})
+
 describe('issue_file_batch.run — the arguments around --batch', () => {
 	it('answers is_batch only for an argument list carrying --batch', () => {
 		expect(issue_file_batch.is_batch([BATCH_FLAG, work])).toBe(true)
-		expect(issue_file_batch.is_batch(['Title', '--body-file', 'b.md'])).toBe(false)
+		expect(issue_file_batch.is_batch(['Title', BODY_FILE_FLAG, 'b.md'])).toBe(false)
 	})
 
 	it('refuses --batch with no directory, and a directory that cannot be read', async () => {
@@ -148,7 +217,7 @@ describe('issue_file_batch.run — the arguments around --batch', () => {
 		const directory = batch_of('empty', [])
 
 		expect(await issue_file_batch.run([BATCH_FLAG, directory])).toBe(FAILURE_EXIT_CODE)
-		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no *.md body files'))
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('no filing in'))
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 })

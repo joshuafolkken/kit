@@ -28,7 +28,7 @@ import { issue_priority } from './issue-priority'
 import { issue_release_cli } from './issue-release-cli'
 import { issue_sample_required } from './issue-sample-required'
 import { issue_sample_source } from './issue-sample-source'
-import { issue_scout_cli } from './issue-scout-cli'
+import { issue_scout_cli, type ScoutOutcome } from './issue-scout-cli'
 import { issue_wip } from './issue-wip'
 import { size_estimate } from './size-estimate'
 
@@ -67,6 +67,7 @@ interface Filing {
 	body: string
 	target: string
 	current: string
+	scouted?: ScoutOutcome | undefined
 }
 
 async function read_body(path: string): Promise<string | undefined> {
@@ -145,17 +146,20 @@ function point_listings_at(filing: Filing): void {
 	process.env[GH_REPO_VARIABLE] = filing.target
 }
 
-// The scout's report is printed whatever it finds, and the filing is held until every candidate it
-// names is declared separate.
-async function is_scout_clear(filing: Filing): Promise<boolean> {
+async function scout_filing(filing: Filing): Promise<ScoutOutcome | undefined> {
 	point_listings_at(filing)
-	const outcome = await issue_scout_cli.scout(
-		{ title: filing.args.title, body: filing.body },
-		filing.target,
-	)
+
+	return await issue_scout_cli.scout({ title: filing.args.title, body: filing.body }, filing.target)
+}
+
+// The scout's report is printed whatever it finds — by `issue:file --batch` for a filing it scouted —
+// and the filing is held until every candidate it names is declared separate.
+async function is_scout_clear(filing: Filing): Promise<boolean> {
+	const outcome = filing.scouted ?? (await scout_filing(filing))
 
 	if (outcome === undefined) return false
-	console.info(outcome.report)
+	if (filing.scouted === undefined) console.info(outcome.report)
+	point_listings_at(filing)
 	const answered = issue_file.acknowledged(filing.args, filing.target, filing.current)
 	const open = issue_file.unacknowledged(outcome.candidates, answered)
 
@@ -336,7 +340,8 @@ async function is_run_clear(filing: Filing): Promise<boolean> {
 // Every step the caller answers from the body and the arguments, cheapest first, each tier's refusals
 // printed at once and fixed in one reissue: the local checks (the body's own refusals and the run
 // label) before anything asks GitHub, then the start condition's citation and the WIP count, then the
-// duplicate scout's search, run only once nothing else refuses. The labels, or `undefined` when any refused.
+// duplicate scout's search, run only once nothing else refuses (`--batch` scouts every filing up
+// front). The labels, or `undefined` when any refused.
 async function labels_in_one_pass(filing: Filing): Promise<ReadonlyArray<string> | undefined> {
 	const is_body_clear = await is_admitted(filing)
 	const labels = labels_of(filing)
@@ -377,7 +382,10 @@ async function filing_of(args: FileArguments): Promise<Filing | string> {
 
 // The filed Issue's URL, or `undefined` once any step refused — every refusal already printed. The
 // caller that sequences a filing (`upstream:interrupt`) reads the URL from here, not from stdout.
-async function file_issue(argv: ReadonlyArray<string>): Promise<string | undefined> {
+async function file_issue(
+	argv: ReadonlyArray<string>,
+	scouted?: ScoutOutcome,
+): Promise<string | undefined> {
 	const args = issue_file.parse(argv)
 
 	if (args === undefined) {
@@ -394,7 +402,15 @@ async function file_issue(argv: ReadonlyArray<string>): Promise<string | undefin
 		return undefined
 	}
 
-	return await file(filing)
+	return await file({ ...filing, scouted })
+}
+
+// The scout `file_issue` would run, for `issue:file --batch` to run for every filing before the first.
+async function scout(argv: ReadonlyArray<string>): Promise<ScoutOutcome | undefined> {
+	const args = issue_file.parse(argv)
+	const filing = args === undefined ? undefined : await filing_of(args)
+
+	return typeof filing === 'object' ? await scout_filing(filing) : undefined
 }
 
 async function run(argv: ReadonlyArray<string>): Promise<number> {
@@ -408,6 +424,7 @@ const issue_file_cli = {
 	file_issue,
 	record,
 	run,
+	scout,
 }
 
 export { issue_file_cli }
