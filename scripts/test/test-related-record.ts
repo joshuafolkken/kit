@@ -137,14 +137,18 @@ function reuse_record(reuse: TestReuse | undefined): Partial<TestRelatedRecord> 
 	}
 }
 
-// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699).
+// How many files the cap narrowed, and the hub of them (joshuafolkken/kit#5699). The hub is the widest
+// of the run's own change (joshuafolkken/kit#5756): the cap reads the whole input, a main merge and the
+// map's tree among it, and a file the lane never edited is no hub of its run.
 function over_cap_record(
 	over_cap: ReadonlyArray<string> | undefined,
+	own: ReadonlyArray<string>,
 ): Pick<TestRelatedRecord, 'over_cap' | 'over_cap_hub'> {
 	if (over_cap === undefined) return {}
-	const [hub] = over_cap
+	const hub = over_cap.find((file) => own.includes(file))
+	const count = { over_cap: over_cap.length }
 
-	return hub === undefined ? { over_cap: 0 } : { over_cap: over_cap.length, over_cap_hub: hub }
+	return hub === undefined ? count : { ...count, over_cap_hub: hub }
 }
 
 function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
@@ -157,7 +161,7 @@ function record_of(input: RunInput, result: RunResult): TestRelatedRecord {
 		since_map: since_map.length,
 		readers: readers_of(input, new Set([...own, ...synced, ...since_map])),
 		...triggers_of(input),
-		...over_cap_record(input.over_cap),
+		...over_cap_record(input.over_cap, own),
 		elapsed_ms: Math.round(result.elapsed_ms),
 	}
 
