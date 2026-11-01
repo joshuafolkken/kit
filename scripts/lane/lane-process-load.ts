@@ -29,6 +29,10 @@ const KB_PER_MB = 1024
 // Enough to name what dominates and the runner-up behind it, short enough for one ledger line a minute.
 const TOP_KINDS = 5
 const OTHER_KIND = 'other'
+// The apps a person keeps open beside a run, matched as command-line substrings: every Chrome and VS Code
+// helper runs out of its `.app` bundle, so the bundle name catches them all — and only them: Playwright's
+// `Google Chrome for Testing.app` is not the person's browser.
+const RESIDENT_APPS: ReadonlyArray<string> = ['Google Chrome.app', 'Visual Studio Code.app']
 
 const KIND_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
 	['vscode', /Visual Studio Code|Code Helper|\.vscode\/extensions\//u],
@@ -52,18 +56,59 @@ interface ProcessKind {
 	count: number
 }
 
+interface ProcessSnapshot {
+	processes: Array<ProcessKind>
+	resident_mb?: number | undefined
+}
+
+interface LineReading {
+	command_line: string
+	cpu_percent: number
+	rss_mb: number
+}
+
 function kind_of(command_line: string): string {
 	return KIND_PATTERNS.find(([, pattern]) => pattern.test(command_line))?.[0] ?? OTHER_KIND
 }
 
-// One line of `ps`'s listing as its kind and readings; a header or a cut-short line reads as nothing.
-function process_of(line: string): Omit<ProcessKind, 'count'> | undefined {
+// One line of `ps`'s listing as its command line and readings; a header or a cut-short line reads as nothing.
+function line_of(line: string): LineReading | undefined {
 	const [rss, cpu, ...command] = line.trim().split(FIELD_SEPARATOR)
 	const reading = { cpu_percent: Number(cpu), rss_mb: Number(rss) / KB_PER_MB }
 
 	if (command.length === 0 || Number.isNaN(reading.cpu_percent + reading.rss_mb)) return undefined
 
-	return { kind: kind_of(command.join(' ')), ...reading }
+	return { command_line: command.join(' '), ...reading }
+}
+
+function process_of(line: string): Omit<ProcessKind, 'count'> | undefined {
+	const reading = line_of(line)
+
+	if (reading === undefined) return undefined
+
+	return {
+		kind: kind_of(reading.command_line),
+		cpu_percent: reading.cpu_percent,
+		rss_mb: reading.rss_mb,
+	}
+}
+
+function is_resident(
+	reading: LineReading | undefined,
+	names: ReadonlyArray<string>,
+): reading is LineReading {
+	return reading !== undefined && names.some((name) => reading.command_line.includes(name))
+}
+
+// The resident size of every process a resident app runs, summed, so `lane:stats` can set a day the apps
+// were closed beside a day they were not (joshuafolkken/kit#5658); `undefined` with no names to match.
+function resident_mb(listing: string, names: ReadonlyArray<string>): number | undefined {
+	if (names.length === 0) return undefined
+
+	const readings = listing.split('\n').map((line) => line_of(line))
+	const resident = readings.filter((reading) => is_resident(reading, names))
+
+	return Math.round(resident.reduce((total, reading) => total + reading.rss_mb, 0))
 }
 
 function add_line(totals: Map<string, ProcessKind>, line: string): void {
@@ -101,25 +146,29 @@ function summarize(listing: string): Array<ProcessKind> {
 }
 
 // `undefined` where `ps` did not answer, so the sample records no breakdown rather than an empty one.
-async function read(): Promise<Array<ProcessKind> | undefined> {
+async function read(
+	names: ReadonlyArray<string> = RESIDENT_APPS,
+): Promise<ProcessSnapshot | undefined> {
 	try {
 		const { stdout } = await execa('ps', PS_ARGUMENTS, {
 			env: PS_ENVIRONMENT,
 			timeout: PROBE_TIMEOUT_MS,
 		})
 
-		return summarize(stdout)
+		return { processes: summarize(stdout), resident_mb: resident_mb(stdout, names) }
 	} catch {
 		return undefined
 	}
 }
 
 const lane_process_load = {
+	RESIDENT_APPS,
 	TOP_KINDS,
 	kind_of,
 	read,
+	resident_mb,
 	summarize,
 }
 
-export type { ProcessKind }
+export type { ProcessKind, ProcessSnapshot }
 export { lane_process_load }

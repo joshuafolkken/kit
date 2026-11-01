@@ -38,7 +38,7 @@ const info = vi.spyOn(console, 'info')
 const budgets = vi.spyOn(line_budget, 'budgets_for')
 const signals_of = vi.spyOn(lane_plan_signals, 'signals_of')
 const record_split_notice = vi.spyOn(lane_ledger_write, 'record_split_notice')
-const QUIET = { hunk_files: [], lines_ratio: undefined, split_filed: false }
+const QUIET = { hunk_files: [], committed_files: [], lines_ratio: undefined, split_filed: false }
 const PROBED = 'scripts/lane/probed.ts'
 const DECLARED = '## 背景\n\n- 規模見積もり: 約 1 ファイル / 20 行（テスト除く）\n'
 
