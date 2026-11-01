@@ -84,6 +84,7 @@ describe('review_record_cli.run --check — whether josh ship reuses the round',
 		expect(code).toBe(0)
 		expect(out).toContain('Reused:')
 		expect(out).not.toContain(RUN_REVIEW)
+		expect(out).not.toContain('undefined')
 	})
 
 	it('asks the shared predicate with the issue', async () => {
