@@ -17,6 +17,8 @@ import { execa } from 'execa'
 //    subcommand and the usage line it prints is read, exactly as the `verify-ui` skill decides
 //    whether a `shot` command exists. Presence of the toolkit is not presence of the command:
 //    app-kit gained `check:ci` in one version and `shot` in another.
+//
+// `josh ui:shot` resolves its `shot` command through the same bins and the same probe.
 
 const DEFAULT_TYPE_CHECK_ARGS: ReadonlyArray<string> = ['josh', 'check']
 // Ordered: `check:ci` is the strict variant a gate wants; `check` is the fast dev-loop one, taken
@@ -83,7 +85,8 @@ async function resolve_type_check_args(start_directory: string): Promise<Readonl
 
 const type_check_step = {
 	parse_usage_commands,
+	read_toolkit_commands,
 	resolve_type_check_args,
 }
 
-export { DEFAULT_TYPE_CHECK_ARGS, type_check_step }
+export { DEFAULT_TYPE_CHECK_ARGS, TOOLKIT_BINS, type_check_step }
