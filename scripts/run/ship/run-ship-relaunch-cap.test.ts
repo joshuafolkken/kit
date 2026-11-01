@@ -22,6 +22,7 @@ const { run_ship_relaunch_cap } = await import('./run-ship-relaunch-cap')
 
 const ISSUE = '3999'
 const OTHER = '4001'
+const BLOCKED = 'BLOCKED: Checks missing'
 const { MAX_SHIP_STOP_RELAUNCHES, STOP_KIND } = run_ship_relaunch_cap
 const { MECHANICAL, REVIEW } = STOP_KIND
 
@@ -148,18 +149,50 @@ describe('run_ship_relaunch_cap.park', () => {
 	// joshuafolkken/kit#5780: a park on a timed-out merge wait names the missing context, which
 	// `run:board` reads off the park event.
 	it('records and comments the block a timed-out merge wait named as the cause', async () => {
-		const blocked = 'BLOCKED: Checks missing'
+		expect(await run_ship_relaunch_cap.park(ISSUE, 'followup', BLOCKED)).toBe(true)
 
-		expect(await run_ship_relaunch_cap.park(ISSUE, 'followup', blocked)).toBe(true)
-
-		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(blocked)
-		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ${blocked})`)
+		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(BLOCKED)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ${BLOCKED})`)
 	})
 
 	it('reports no park and tells nobody when the label was refused', async () => {
 		add_label_mock.mockResolvedValue(false)
 
 		expect(await run_ship_relaunch_cap.park(ISSUE, 'gate')).toBe(false)
+		expect(emit_mock).not.toHaveBeenCalled()
+		expect(warn_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5775: a timed-out merge wait parks at once, so its comment names no cap.
+describe('run_ship_relaunch_cap.park_timed_out', () => {
+	it('parks a timed-out merge wait, naming the timeout rather than the cap', async () => {
+		expect(await run_ship_relaunch_cap.park_timed_out(ISSUE, 'followup')).toBe(true)
+
+		const comment = String(comment_mock.mock.calls[0]?.[1])
+
+		expect(comment).toContain('the merge wait at `followup` timed out')
+		expect(comment).not.toContain('stop cap was exceeded')
+		expect(emit_mock).toHaveBeenCalledWith(
+			'park',
+			`#${ISSUE} parked (run:stalled: merge-wait timeout)`,
+		)
+		expect(warn_mock).toHaveBeenCalledWith(
+			expect.objectContaining({ issue_title: `Merge wait timed out #${ISSUE}` }),
+		)
+	})
+
+	it('names the block the wait logged as the cause', async () => {
+		await run_ship_relaunch_cap.park_timed_out(ISSUE, 'followup', BLOCKED)
+
+		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(`Cause: \`${BLOCKED}\``)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ${BLOCKED})`)
+	})
+
+	it('tells nobody when its park label was refused', async () => {
+		add_label_mock.mockResolvedValue(false)
+
+		expect(await run_ship_relaunch_cap.park_timed_out(ISSUE, 'followup')).toBe(false)
 		expect(emit_mock).not.toHaveBeenCalled()
 		expect(warn_mock).not.toHaveBeenCalled()
 	})
