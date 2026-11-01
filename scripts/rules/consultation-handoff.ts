@@ -35,12 +35,16 @@ function josh_call_of(names: ReadonlyArray<string>): (command: string) => boolea
 const is_entry_call = josh_call_of(['run:entry', 'run:hold'])
 const is_handoff_call = josh_call_of(['run:handoff'])
 
-// An unnamed model stays silent rather than guessing; a delegated unit enters no run.
-function is_not_consultation_main(tail: string, _call: unknown, run: GuardRun): boolean {
-	if (run.is_unit === true) return true
-	const model = main_model_reader.main_model(tail, run.model)
+// An unnamed model stays silent rather than guessing. The `session-lang` prompt hook asks it too.
+function is_consultation_main(tail: string, payload_model: string | undefined): boolean {
+	const model = main_model_reader.main_model(tail, payload_model)
 
-	return model === undefined || agent_role_profile.consultation_provider(model) === undefined
+	return model !== undefined && agent_role_profile.consultation_provider(model) !== undefined
+}
+
+// A delegated unit enters no run.
+function is_not_consultation_main(tail: string, _call: unknown, run: GuardRun): boolean {
+	return run.is_unit === true || !is_consultation_main(tail, run.model)
 }
 
 const ROW: DeliveredRule = {
@@ -59,6 +63,12 @@ const ROW: DeliveredRule = {
 	},
 }
 
-const consultation_handoff = { ROW, is_entry_call, is_handoff_call }
+const consultation_handoff = {
+	HANDOFF_DOC,
+	ROW,
+	is_consultation_main,
+	is_entry_call,
+	is_handoff_call,
+}
 
 export { consultation_handoff }
