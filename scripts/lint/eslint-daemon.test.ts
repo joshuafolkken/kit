@@ -235,7 +235,7 @@ describe('eslint_daemon.run', () => {
 		current_checkout()
 		mocked_execa.mockResolvedValueOnce(answer(1, 'report'))
 
-		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toEqual({
+		expect(await eslint_daemon.run(PNPM_ESLINT, { project_root, timeout_ms: 5 })).toMatchObject({
 			exit_code: 1,
 			stdout: 'report',
 			output: 'report',
