@@ -179,6 +179,21 @@ describe('lane_implement_stats.table — the lane first lint:related row', () =>
 		expect(table).toMatch(/^\| lane first lint:related \| 2 \| 5(?:\.0)? \| 8(?:\.0)? \| {2}\|$/mu)
 	})
 
+	// joshuafolkken/kit#5785: a chained call's duration holds test:related and cspell:dot too.
+	it('counts a solo lint:related, not an earlier call that chained it with other checks', () => {
+		const calls = [
+			call(0, {
+				command: `${LINT_RELATED} && pnpm josh test:related && pnpm josh cspell:dot`,
+				duration_ms: 9 * MINUTE_MS,
+			}),
+			call(10, { command: LINT_RELATED, duration_ms: 3 * MINUTE_MS }),
+			call(20, { command: SHIP }),
+		]
+		const table = lane_implement_stats.table(calls, WINDOW, NO_PAUSE)
+
+		expect(table).toMatch(/^\| lane first lint:related \| 1 \| 3(?:\.0)? \| 3(?:\.0)? \| {2}\|$/mu)
+	})
+
 	it('prints no row when no lane ran lint:related', () => {
 		expect(lane_implement_stats.table(LANE_CALLS, WINDOW, NO_PAUSE)).not.toContain('lint:related')
 	})

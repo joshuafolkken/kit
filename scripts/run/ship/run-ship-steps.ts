@@ -1,4 +1,5 @@
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
+import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
 import { run_ship_lap } from './run-ship-lap'
@@ -117,12 +118,18 @@ function wait_mark(target: string | undefined): WaitMark {
 	}
 }
 
-// The merge, then the ship body draft goes with it (`run-ship-body-draft.ts`).
+async function remove_run_records(issue_number: string): Promise<void> {
+	await run_ship_body_draft.remove(issue_number)
+	await run_investigation_record.remove(issue_number)
+}
+
+// The merge, then the ship body draft and the investigation record go with it
+// (`run-ship-body-draft.ts`, `run-investigation-record.ts`).
 async function followup_stage(args: ShipArguments): Promise<StepResult> {
 	const mark = wait_mark(await run_ship_probe.record_target(args.number))
 	const result = await run_ship_sync.followup_stage(args.title, args.notify, mark)
 
-	if (result.code === SUCCESS_EXIT_CODE) await run_ship_body_draft.remove(args.number)
+	if (result.code === SUCCESS_EXIT_CODE) await remove_run_records(args.number)
 
 	return result
 }

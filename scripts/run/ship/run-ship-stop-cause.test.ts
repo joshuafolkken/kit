@@ -251,3 +251,19 @@ describe('run_ship_stop_cause.details_of — the findings of a review stop, whol
 		expect(run_ship_stop_cause.details_of('review')).toStrictEqual([])
 	})
 })
+
+// joshuafolkken/kit#5780: a timed-out merge wait logs what it was blocked on under its failure.
+describe('run_ship_stop_cause.blocked_cause_of — the block a timed-out wait named', () => {
+	const TIMEOUT = `${git_error.FAILURE_PREFIX} Timed out while waiting for PR checks to complete.`
+
+	it('reads the cause logged under the failure the stage ended on', () => {
+		const body = `${TIMEOUT}\n\n${git_error.DETAILS_PREFIX} BLOCKED: Checks missing\n`
+
+		expect(run_ship_stop_cause.blocked_cause_of(body)).toBe('BLOCKED: Checks missing')
+	})
+
+	it('reads none from a failure with no blocked cause', () => {
+		expect(run_ship_stop_cause.blocked_cause_of(`${TIMEOUT}\n`)).toBeUndefined()
+		expect(run_ship_stop_cause.blocked_cause_of(RED_CHECK)).toBeUndefined()
+	})
+})

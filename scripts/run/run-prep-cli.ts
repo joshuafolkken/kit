@@ -8,6 +8,7 @@ import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { error_text } from '#scripts/lib/error-message'
 import { run_ship_preflight } from '#scripts/run/ship/run-ship-preflight'
 import { latest_scope_cli } from '#scripts/version/latest-scope-cli'
+import { run_investigation_record, type InvestigationRecord } from './run-investigation-record'
 import { run_prep, type PrepParts } from './run-prep'
 import { run_prep_locate } from './run-prep-locate'
 import { run_prep_summary } from './run-prep-summary'
@@ -44,6 +45,7 @@ interface PrepReads {
 	has_changes: boolean
 	locations: string
 	ship_problems: ReadonlyArray<string>
+	investigation: InvestigationRecord | undefined
 }
 
 // Exactly one issue number, or the call is refused: `run:prep` prepares one run, and a second number
@@ -97,16 +99,18 @@ async function lane_has_changes(): Promise<boolean> {
 }
 
 async function gather(issue_number: string): Promise<PrepReads> {
-	const [content, state, has_changes, ship_problems] = await Promise.all([
+	const [content, state, has_changes, ship_problems, investigation] = await Promise.all([
 		issue_read_cli.read_block(issue_number),
 		issue_state_cli.read_issue(issue_number),
 		lane_has_changes(),
 		run_ship_preflight.ahead(issue_number),
+		run_investigation_record.load(issue_number),
 	])
 	// Located from the body just read, so it waits for that read rather than joining the batch above.
 	const locations = await run_prep_locate.locate(content.kind === 'ok' ? content.block : '')
+	const latest = latest_decision()
 
-	return { content, state, latest: latest_decision(), has_changes, locations, ship_problems }
+	return { content, state, latest, has_changes, locations, ship_problems, investigation }
 }
 
 function content_body(issue_number: string, content: BlockRead): string {
@@ -127,6 +131,7 @@ function to_parts(issue_number: string, reads: PrepReads): PrepParts {
 		has_changes: reads.has_changes,
 		locations: reads.locations,
 		ship_problems: reads.ship_problems,
+		investigation: reads.investigation,
 	}
 }
 

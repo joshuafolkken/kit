@@ -122,3 +122,17 @@ describe('wait_for_pr_success with an unreadable poll', () => {
 		await expect(wait_with(steps)).rejects.toThrow(SONAR_QUBE)
 	})
 })
+
+// joshuafolkken/kit#5780: the timeout carried nothing of the last read, so a park on it named no cause.
+describe('wait_for_pr_success running out of budget on a blocked pull request', () => {
+	it('keeps the timeout message and names the missing required context in its cause', async () => {
+		const blocked = make_pr_snapshot({
+			merge_state_status: 'BLOCKED',
+			required_contexts: ['Checks', SONAR_QUBE],
+		})
+
+		await expect(wait_with([blocked], EXACT_ATTEMPTS)).rejects.toStrictEqual(
+			new Error(PR_CHECKS_TIMEOUT_MESSAGE, { cause: 'BLOCKED: Checks missing' }),
+		)
+	})
+})
