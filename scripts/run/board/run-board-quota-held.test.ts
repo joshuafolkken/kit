@@ -52,7 +52,7 @@ function source_of(file: () => Found): QuotaSource {
 		},
 		reading_of: (text) =>
 			text === EMPTY_FILE ? undefined : reading_at(SPENT_FILES[text]?.[1] ?? WINDOW.used_percent),
-		first_of: (text) => reading_at(SPENT_FILES[text]?.[0] ?? WINDOW.used_percent),
+		heads_of: (text) => [reading_at(SPENT_FILES[text]?.[0] ?? WINDOW.used_percent)],
 		is_done: (tail) => tail !== RUNNING_FILE,
 	}
 }
@@ -218,7 +218,7 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 })
 
 describe('run_board_quota_held.quota_reader — spend per task', () => {
-	it("carries each window's median spend over the newest files on the newest reading", async () => {
+	it("carries each window's mean spend over the newest files on the newest reading", async () => {
 		const { files, ports } = fixture_of()
 
 		files.claude = ['a_log', 'b_log', 'c_log', EMPTY_FILE].map((file, index) => ({
@@ -228,8 +228,21 @@ describe('run_board_quota_held.quota_reader — spend per task', () => {
 
 		const { claude, codex } = await quota_reader(ports)()
 
-		expect(claude).toEqual({ ...reading_at(46), per_task: { [WINDOW.minutes]: 3 } })
+		expect(claude).toEqual({ ...reading_at(46), per_task: { [WINDOW.minutes]: 11 / 3 } })
 		expect(codex).not.toHaveProperty('per_task')
+	})
+
+	it('counts a done file whose readings did not rise as spending none', async () => {
+		const { files, ports } = fixture_of()
+
+		files.claude = [CLAUDE_FILE, CLAUDE_FILE, 'b_log'].map((file, index) => ({
+			path: file,
+			mtime_ms: 50 - index,
+		}))
+
+		const { claude } = await quota_reader(ports)()
+
+		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 2 / 3 })
 	})
 
 	it('leaves out the spend of a file still being written', async () => {
@@ -243,5 +256,34 @@ describe('run_board_quota_held.quota_reader — spend per task', () => {
 		const { claude } = await quota_reader(ports)()
 
 		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 6 })
+	})
+})
+
+describe('run_board_quota_held.quota_reader — the sample of done files', () => {
+	it('reads past the newest files still being written to the done ones after them', async () => {
+		const { files, ports } = fixture_of()
+
+		files.claude = [RUNNING_FILE, RUNNING_FILE, RUNNING_FILE, 'a_log'].map((file, index) => ({
+			path: file,
+			mtime_ms: 50 - index,
+		}))
+
+		const { claude } = await quota_reader(ports)()
+
+		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 6 })
+	})
+
+	it('stops reading once SAMPLE_SIZE done files tell a spend', async () => {
+		const { files, read_tail, ports } = fixture_of()
+		const { SAMPLE_SIZE } = run_board_quota_read
+
+		files.claude = Array.from({ length: SAMPLE_SIZE + 2 }, (_, index) => ({
+			path: 'a_log',
+			mtime_ms: 50 - index,
+		}))
+		files.codex = undefined
+		await quota_reader(ports)()
+
+		expect(read_tail).toHaveBeenCalledTimes(SAMPLE_SIZE)
 	})
 })

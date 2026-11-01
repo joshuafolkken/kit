@@ -209,18 +209,19 @@ describe('run_board_quota_read.codex_reading time', () => {
 	})
 })
 
-describe('run_board_quota_read first readings', () => {
-	const { claude_first, codex_first } = run_board_quota_read
+describe('run_board_quota_read head readings', () => {
+	const { claude_heads, codex_heads } = run_board_quota_read
 
-	it("reads a file head's first event, past a line its byte limit cut", () => {
+	it('reads every event of a file head oldest first, past a line its byte limit cut', () => {
 		const text = [claude_line(0.1), claude_line(0.42), claude_line(0.5).slice(0, 20)].join('\n')
 		const rollout = [codex_line(NONE), primary_line(3), primary_line(9)].join('\n')
+		const used = claude_heads(text).map((reading) => reading.windows[0]?.used_percent)
 
-		expect(claude_first(text)?.windows[0]?.used_percent).toBe(10)
-		expect(codex_first(rollout)?.windows).toEqual([
+		expect(used).toEqual([10, 42])
+		expect(codex_heads(rollout)[0]?.windows).toEqual([
 			{ minutes: 300, used_percent: 3, resets_ms: RESET_MS },
 		])
-		expect(claude_first(ASSISTANT)).toBeUndefined()
+		expect(claude_heads(ASSISTANT)).toEqual([])
 	})
 })
 
@@ -311,9 +312,10 @@ describe('run_board_quota_read.claude_files by provider', () => {
 describe('run_board_quota_read.claude_files bound', () => {
 	const root_of = temporary_root()
 
-	it('reads no further than the newest nine lane logs for their provider', async () => {
+	it('reads no further than the newest FILES_SCANNED lane logs for their provider', async () => {
 		const root = root_of()
-		const codex = Array.from({ length: 9 }, async (_, index) => {
+		const { FILES_SCANNED } = run_board_quota_read
+		const codex = Array.from({ length: FILES_SCANNED }, async (_, index) => {
 			await launched(lane_log(root, index + 2), 200 + index, [OPENAI])
 		})
 
@@ -322,15 +324,27 @@ describe('run_board_quota_read.claude_files bound', () => {
 
 		expect(await claude_files(root)).toEqual([])
 	})
+
+	it('judges a log by its launch once per write, by its path and mtime', async () => {
+		const root = root_of()
+		const log = await launched(lane_log(root, 1), 100, [ANTHROPIC])
+
+		await claude_files(root)
+		await launched(log, 100, [OPENAI])
+		const cached = await claude_files(root)
+
+		expect(cached.map((file) => file.path)).toEqual([log])
+		await launched(log, 200, [OPENAI])
+		expect(await claude_files(root)).toEqual([])
+	})
 })
 
 describe('run_board_quota_read files', () => {
 	const root_of = temporary_root()
 
-	it('finds the three newest lane logs newest first, and none in a missing directory', async () => {
+	it('finds the lane logs newest first, past the newest three, and none in a missing directory', async () => {
 		const root = root_of()
-
-		await written(lane_log(root, 1), 100)
+		const oldest = await written(lane_log(root, 1), 100)
 		const older = await written(lane_log(root, 2), 200)
 		const newer = await written(lane_log(root, 3), 300)
 		const newest = await written(lane_log(root, 4), 400)
@@ -338,20 +352,21 @@ describe('run_board_quota_read files', () => {
 		await written(path.join(root, 'josh-other-5.log'), 500)
 		const found = await claude_files(root)
 
-		expect(found.map((file) => file.path)).toEqual([newest, newer, older])
+		expect(found.map((file) => file.path)).toEqual([newest, newer, older, oldest])
 		expect(await claude_files(path.join(root, 'missing'))).toEqual([])
 	})
 
-	it('finds the newest rollout files of today and yesterday, never older days', async () => {
+	it('finds the newest rollout files of the last seven days, never older days', async () => {
 		const root = root_of()
 		const sessions = path.join(root, 'sessions', '2026', '10')
 		const yesterday = await written(path.join(sessions, '28', 'rollout-a.jsonl'), 200)
 		const today = await written(path.join(sessions, '29', 'rollout-c.jsonl'), 100)
+		const week = await written(path.join(sessions, '23', 'rollout-b.jsonl'), 50)
 
-		await written(path.join(sessions, '27', 'rollout-b.jsonl'), 300)
+		await written(path.join(sessions, '22', 'rollout-d.jsonl'), 300)
 		const found = await codex_files(NOW_MS, root)
 
-		expect(found.map((file) => file.path)).toEqual([yesterday, today])
+		expect(found.map((file) => file.path)).toEqual([yesterday, today, week])
 		expect(await codex_files(NOW_MS, path.join(root, 'missing'))).toEqual([])
 	})
 })
