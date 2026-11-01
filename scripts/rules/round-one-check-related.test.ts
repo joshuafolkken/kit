@@ -126,6 +126,13 @@ describe('the round-one-check-related delivery in a lane child — refused', () 
 		expect(delivered_rules.delivery(payload_of('open', CHECK, OPEN_ROUND))).toBe(REASON)
 	})
 
+	// joshuafolkken/kit#5784: the touched run is exempt from repeat-check-related only.
+	it('refuses check:related --touched on a fixed round before the join', () => {
+		const payload = payload_of('touched', `${CHECK} --touched`, OPEN_ROUND)
+
+		expect(delivered_rules.delivery(payload)).toBe(REASON)
+	})
+
 	it('refuses the `cr` alias on every occurrence', () => {
 		const payload = payload_of('alias', 'pnpm josh cr', OPEN_ROUND)
 

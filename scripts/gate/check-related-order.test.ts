@@ -47,6 +47,19 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+// joshuafolkken/kit#5784: the touched unit stage waits on lint:related as the full reach does.
+describe('check_related_order.lint_first — test:related --touched', () => {
+	it('never starts test:related --touched on a red lint:related', async () => {
+		const touched = 'test:related --touched'
+		const execute = vi.fn(red_lint)
+		const ordered = check_related_order.lint_first(execute, [LINT_COMMAND, touched])
+		const [, test] = await Promise.all([ordered(LINT_COMMAND), ordered(touched)])
+
+		expect(test).toMatchObject({ command: touched, is_skipped: true })
+		expect(execute).toHaveBeenCalledExactlyOnceWith(LINT_COMMAND)
+	})
+})
+
 // joshuafolkken/kit#5387: a red lint:related still let a full-reach test:related run its minutes out.
 describe('check_related_order.lint_first', () => {
 	it('never starts test:related on a red lint:related and reports it not run', async () => {
