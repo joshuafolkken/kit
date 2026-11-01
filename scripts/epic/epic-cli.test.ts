@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BEFORE_FLAG, epic_cli, ORDER_AFTER_FLAG, ORDER_BEFORE_FLAG } from './epic-cli'
+import { BEFORE_FLAG, epic_cli, NOTIFY_FLAG, ORDER_AFTER_FLAG, ORDER_BEFORE_FLAG } from './epic-cli'
 
 const PROMOTE = '--promote'
 const EPIC = '858'
@@ -76,6 +76,17 @@ describe('epic_cli.parse_create_arguments — flags', () => {
 
 		expect(parsed?.origin).toBe(ORIGIN_REFERENCE)
 		expect(parsed?.children).toStrictEqual([101])
+	})
+
+	it('sends no planning Telegram unless --notify is given', () => {
+		expect(epic_cli.parse_create_arguments([TITLE, '101'])?.is_notified).toBe(false)
+	})
+
+	it('reads --notify as a switch, not as a child', () => {
+		const parsed = epic_cli.parse_create_arguments([TITLE, '101', NOTIFY_FLAG, '102'])
+
+		expect(parsed?.is_notified).toBe(true)
+		expect(parsed?.children).toStrictEqual([101, 102])
 	})
 })
 
@@ -164,6 +175,12 @@ describe('epic_cli.parse_promote_arguments — the flags', () => {
 
 		expect(parsed?.title).toBe(TITLE)
 		expect(parsed?.children).toEqual([101])
+	})
+
+	it('accepts --notify with the same meaning as a creation', () => {
+		expect(epic_cli.parse_promote_arguments([PROMOTE, EPIC, CHILD, NOTIFY_FLAG])?.is_notified).toBe(
+			true,
+		)
 	})
 
 	it('refuses a blank --title rather than dropping the rename', () => {

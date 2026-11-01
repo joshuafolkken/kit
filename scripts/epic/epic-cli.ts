@@ -33,14 +33,17 @@ const ORDER_AFTER_FLAG = '--order-after'
 // from a file, or from stdin as `-`. The text is a judgement, so the caller writes it; what the command
 // contributes is placing it in the epic's `## Decisions` and on each child.
 const DECISION_FLAG = '--decision-file'
+// The split path's `planning` Telegram — the epic, every child's URL and the run command — sent by the
+// command once the epic exists rather than composed by hand (`epic-notify.ts`).
+const NOTIFY_FLAG = '--notify'
 // Which flags each form knows, and which of them consume the argument after them — per form, for the
 // reason `epic-cli-argv.ts` gives.
 const CREATE_FORM: FormFlags = {
-	switches: [ORDERED_FLAG],
+	switches: [ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG],
 }
 const PROMOTE_FORM: FormFlags = {
-	switches: [PROMOTE_FLAG, ORDERED_FLAG],
+	switches: [PROMOTE_FLAG, ORDERED_FLAG, NOTIFY_FLAG],
 	value_flags: [RATIONALE_FLAG, ORIGIN_FLAG, TITLE_FLAG],
 }
 const RECONCILE_FORM: FormFlags = { switches: [RECONCILE_FLAG] }
@@ -57,6 +60,7 @@ interface CreateArguments {
 	title: string
 	children: Array<number>
 	is_ordered: boolean
+	is_notified: boolean
 	rationale_path?: string | undefined
 	origin?: string | undefined
 }
@@ -67,6 +71,7 @@ interface PromoteArguments {
 	epic_number: number
 	children: Array<number>
 	is_ordered: boolean
+	is_notified: boolean
 	rationale_path?: string | undefined
 	origin?: string | undefined
 	title?: string | undefined
@@ -75,9 +80,10 @@ interface PromoteArguments {
 // The flags a creation and a promotion share, read the same way for both.
 function read_batch_flags(
 	parsed: EpicArgv,
-): Pick<CreateArguments, 'is_ordered' | 'rationale_path' | 'origin'> {
+): Pick<CreateArguments, 'is_ordered' | 'is_notified' | 'rationale_path' | 'origin'> {
 	return {
 		is_ordered: is_switch_set(parsed, ORDERED_FLAG),
+		is_notified: is_switch_set(parsed, NOTIFY_FLAG),
 		rationale_path: read_flag_value(parsed, RATIONALE_FLAG),
 		origin: read_flag_value(parsed, ORIGIN_FLAG),
 	}
@@ -392,6 +398,7 @@ export {
 	AFTER_FLAG,
 	BEFORE_FLAG,
 	DECISION_FLAG,
+	NOTIFY_FLAG,
 	ORDER_AFTER_FLAG,
 	ORDER_BEFORE_FLAG,
 	ORDERED_FLAG,

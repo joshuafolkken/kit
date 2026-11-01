@@ -1,0 +1,7 @@
+{
+	"reason": "epic --notify: announce, its promotion-outcome mapping and the missing-epic warning, single-sourced on issue:plan's planning send",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 73
+	}
+}
