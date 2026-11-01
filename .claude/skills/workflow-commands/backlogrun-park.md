@@ -102,17 +102,13 @@ and occupies a lane. **A session that detects a stale child removes the label it
 reports it, before continuing. **The rule therefore applies to any open issue in the repository, not
 only to this epic's children** (`epic:next` names the holders on standard error).
 
-**Age alone is not the test.** Past the 90-minute window, check what holds it: a `halfrun` stopped for
-manual verification, a run paused mid-child, and a `needs-human-review` child hold it legitimately.
-**All three leave uncommitted work in the checkout**, so `git status` there decides: a dirty tree means
-the hold is real — leave the label and report.
-
-**A closed issue's labels are neither a finding nor something to clean up** (no lane, never offered).
-**Do not report it, and do not strip it.**
-
 ```bash
-gh api -X DELETE repos/{owner}/{repo}/issues/<N>/labels/in-progress 2>/dev/null || true
+pnpm josh run:stale
 ```
+
+It removes the label only where nothing holds it, keeps a real hold (a dirty checkout, a live run),
+and leaves a closed issue alone; report each `kept` / `removed` line. The test is
+`docs/josh-commands-run.md` → "`josh run:stale`".
 
 ## A prerequisite discovered mid-run
 
