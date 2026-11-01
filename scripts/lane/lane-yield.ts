@@ -79,7 +79,7 @@ function is_yielded(events: ReadonlyArray<RunEvent>, issue: string): boolean {
 	return newest !== undefined && is_yield_note(newest)
 }
 
-const lane_yield = { YIELD_REASON, YIELD_TEXT, is_yield, is_yielded, record_yield }
+const lane_yield = { YIELD_REASON, YIELD_TEXT, is_yield, is_yield_note, is_yielded, record_yield }
 
 export { lane_yield }
 export type { YieldAt }

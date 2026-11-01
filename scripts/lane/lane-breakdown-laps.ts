@@ -8,7 +8,7 @@ import type { ToolCall } from './lane-transcript-calls'
 // ship wrote for its inner steps (`run-ship-lap.ts`), the lane's core-budget waits and the checks of
 // the lane's gates, each under the stage it ended in, and the time between two ship stages split by
 // the park it went to (`lane-breakdown-pause.ts`), else by the Bash the lane child ran there, by the
-// implementation's kinds (`lane-breakdown-implement.ts`).
+// implementation's kinds, and the rest as its editing and thinking (`lane-breakdown-implement.ts`).
 // A lap and a wait or a check inside it overlap — the gate's wait for cores and its checks, run side
 // by side, are part of its `josh gate` lap — so a stage's laps can add up to more.
 
@@ -127,7 +127,7 @@ function between_of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array
 
 	return lane_breakdown.ranked([
 		...paused.flat(),
-		...lane_breakdown_implement.bash_kinds(calls, unpaused),
+		...lane_breakdown_implement.bash_kinds(calls, unpaused, breakdown.waits),
 	])
 }
 
