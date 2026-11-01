@@ -76,3 +76,25 @@ describe('issue_file_batch_entries.entries_of — the body files of a directory'
 		expect(entries[0]?.source).toBe(path.join(work, 'a.md'))
 	})
 })
+
+// joshuafolkken/kit#5675: one file split at `%%%` lines is the same batch as a directory.
+describe('issue_file_batch_entries.entries_of — one file split at %%% lines', () => {
+	it('reads each part as one filing, front matter or first-line title alike', async () => {
+		const file = path.join(work, 'batch.txt')
+
+		writeFileSync(
+			file,
+			`---\ntitle: ${TITLE}\ndistinct: 7\n---\n${BODY}%%%\r\n# Second\nb\n%%%  \nThird\nc\n%%%\n`,
+		)
+		const entries = await issue_file_batch_entries.entries_of(file)
+
+		expect(entries.map((entry) => entry.title)).toStrictEqual([TITLE, 'Second', 'Third'])
+		expect(entries[0]).toStrictEqual({
+			source: `${file}[1]`,
+			title: TITLE,
+			body: BODY,
+			distinct: '7',
+		})
+		expect(entries[2]?.source).toBe(`${file}[3]`)
+	})
+})
