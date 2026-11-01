@@ -1,0 +1,7 @@
+{
+	"reason": "#5804: a limitless Read is judged by the file's line count, and line_count stops counting a final newline as a line",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 7
+	}
+}

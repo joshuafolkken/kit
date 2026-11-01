@@ -90,7 +90,7 @@ function dispatch(input: Record<string, unknown>): Record<string, unknown> {
 
 describe('consultation-investigation — a Fable main line', () => {
 	it.each([
-		['a `Read` with no limit', 'Read', { file_path: ONE_FILE }],
+		['a `Read` with no limit of a file past the cap', 'Read', { file_path: ONE_FILE }],
 		['a `Read` past the cap', 'Read', { file_path: ONE_FILE, limit: BROAD_LIMIT }],
 		['a recursive grep of a directory', 'Bash', { command: TREE_GREP }],
 		['a `Glob`', 'Glob', { pattern: '**/*.ts' }],
@@ -128,7 +128,11 @@ describe('consultation-investigation — a Fable main line', () => {
 describe('consultation-investigation — the reason', () => {
 	it('names the investigation model and a narrow example', () => {
 		expect(ROW.reason).toContain(OPUS)
-		expect(ROW.reason).toContain(`<= ${String(NARROW_LIMIT)}`)
+		expect(ROW.reason).toContain(`<= ${String(NARROW_LIMIT)} lines`)
+	})
+
+	it('names a whole-file `Read` within the cap as narrow (#5804)', () => {
+		expect(ROW.reason).toContain('`Read` of a file or an `offset` / `limit` range')
 	})
 
 	it('scores an investigator dispatch as keeping the rule', () => {

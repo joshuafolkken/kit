@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { afterAll, describe, expect, it } from 'vitest'
 import { broad_investigation } from './broad-investigation'
 
 // joshuafolkken/kit#5351: which tool calls are broad investigation. The shell half has its own test
@@ -7,6 +10,26 @@ import { broad_investigation } from './broad-investigation'
 const { READ_LINE_CAP, is_broad_investigation, is_delegated_investigation } = broad_investigation
 const ONE_FILE = 'package.json'
 const PROMPT = 'Find where the guard reads the transcript'
+const FIXTURES = mkdtempSync(path.join(tmpdir(), 'broad-investigation-'))
+
+// A file of `lines` lines, each ending in a newline.
+function file_of(lines: number): string {
+	const file = path.join(FIXTURES, `lines-${String(lines)}.txt`)
+
+	writeFileSync(
+		file,
+		Array.from({ length: lines }, (_line, index) => `${String(index)}\n`).join(''),
+	)
+
+	return file
+}
+
+const AT_CAP = file_of(READ_LINE_CAP)
+const PAST_CAP = file_of(READ_LINE_CAP + 1)
+
+afterAll(() => {
+	rmSync(FIXTURES, { recursive: true, force: true })
+})
 
 function dispatch(input: Record<string, unknown>): { name: string; input: unknown } {
 	return { name: 'Agent', input: { prompt: PROMPT, ...input } }
@@ -16,7 +39,11 @@ describe('broad_investigation.is_broad_investigation — the broad', () => {
 	it.each([
 		['a `Glob`', { name: 'Glob', input: { pattern: '**/*.ts' } }],
 		['a `WebFetch`', { name: 'WebFetch', input: { url: 'https://example.com' } }],
-		['a `Read` with no limit', { name: 'Read', input: { file_path: ONE_FILE } }],
+		[
+			'a `Read` with no limit of a file past the cap',
+			{ name: 'Read', input: { file_path: PAST_CAP } },
+		],
+		['a `Read` with no file', { name: 'Read', input: {} }],
 		[
 			'a `Read` past the cap',
 			{ name: 'Read', input: { file_path: ONE_FILE, limit: READ_LINE_CAP + 1 } },
@@ -38,6 +65,10 @@ describe('broad_investigation.is_broad_investigation — the narrow', () => {
 		[
 			'a `Read` within the cap',
 			{ name: 'Read', input: { file_path: ONE_FILE, limit: READ_LINE_CAP } },
+		],
+		[
+			'a `Read` with no limit of a file within the cap',
+			{ name: 'Read', input: { file_path: AT_CAP } },
 		],
 		['a `Grep` of one file', { name: 'Grep', input: { pattern: 'guard', path: ONE_FILE } }],
 		['a narrow `Bash`', { name: 'Bash', input: { command: `grep -n guard ${ONE_FILE}` } }],

@@ -45,8 +45,12 @@ function is_directory(file: string): boolean {
 	return statSync(resolved(file), { throwIfNoEntry: false })?.isDirectory() === true
 }
 
+// A final newline ends the last line rather than starting another.
 function line_count(file: string): number {
-	return is_file(file) ? readFileSync(resolved(file), 'utf8').split('\n').length : 0
+	if (!is_file(file)) return 0
+	const text = readFileSync(resolved(file), 'utf8')
+
+	return text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
 }
 
 function is_recursive_flag(flag: string): boolean {
@@ -116,8 +120,13 @@ function ends_past_cap(operands: ReadonlyArray<string>, flags: ReadonlyArray<str
 	return counted_lines(operands, flags) > READ_LINE_CAP
 }
 
+// A whole-file read of this file runs past the cap; a missing file reads nothing.
+function is_past_cap(file: string): boolean {
+	return line_count(file) > READ_LINE_CAP
+}
+
 function cat_reads_past_cap(operands: ReadonlyArray<string>): boolean {
-	return operands.some((operand) => line_count(operand) > READ_LINE_CAP)
+	return operands.some((operand) => is_past_cap(operand))
 }
 
 const COMMAND_TESTS: ReadonlyMap<string, CommandTest> = new Map([
@@ -169,6 +178,6 @@ function is_broad_command(command: string): boolean {
 	return shell_segments.segments_of(command).some((pipeline) => is_broad_pipeline(pipeline))
 }
 
-const broad_investigation_shell = { READ_LINE_CAP, is_broad_command, is_file }
+const broad_investigation_shell = { READ_LINE_CAP, is_broad_command, is_file, is_past_cap }
 
 export { broad_investigation_shell }
