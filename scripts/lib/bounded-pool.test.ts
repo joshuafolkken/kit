@@ -60,8 +60,9 @@ describe('bounded_pool.bounded_map', () => {
 		expect(peak).toBe(LIMIT)
 	})
 
-	// A wave implementation idles the whole batch behind its slowest member: with these durations it
-	// would start the third task at 30ms rather than at 10ms, when the second one's slot came free.
+	// A wave implementation idles the whole batch behind its slowest member: with these test inputs it
+	// would start the third task when the first wave ended rather than when the second one's slot came
+	// free.
 	it('refills a slot as soon as one task ends, rather than waiting for the wave', async () => {
 		const started: Array<number> = []
 		const durations = [SLOW_MS, QUICK_MS, BRIEF_MS]

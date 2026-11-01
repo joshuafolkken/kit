@@ -1,8 +1,8 @@
 // Enforce the comment rule of prompts/coding-standards.md → 基本方針: a comment states why, so the
-// history of how the code got here and measured values with a unit
-// ("about 16,000 tokens", "1.9 seconds") are reported — git history and the Issue hold both. An Issue
-// citation such as `joshuafolkken/kit#5282` is allowed: it is where the why is recorded. The two
-// checks are separate rules so a repository can switch each on once its own comments are clean.
+// history of how the code got here and measured values with a time, size or token unit are
+// reported — git history and the Issue hold both. An Issue citation such as `joshuafolkken/kit#5282`
+// is allowed: it is where the why is recorded. The two checks are separate rules so a repository can
+// switch each on once its own comments are clean.
 
 // A bare adverb can refer to an earlier event in the current run; a comma marks historical narration.
 // Passive constructions and present-perfect verbs describe a purpose, so the look-behind skips them.
@@ -23,9 +23,9 @@ const PURPOSE_PATTERNS = [
 	/\bused to (?=(?:the|this|that|these|those|an?|it)\b)/giu,
 ]
 
-// A number with a time, size or token unit, `12k tokens` and `10-second` included. The look-behind
-// keeps `#1234` and the tail of a longer number or identifier from matching. A bare `s` is left out:
-// it would read `1990s` and `502s` as durations.
+// A number with a time, size or token unit, a `k` multiplier and a hyphenated unit included. The
+// look-behind keeps `#1234` and the tail of a longer number or identifier from matching. A bare `s`
+// is left out: it would read `1990s` and `502s` as durations.
 const MEASUREMENT_PATTERNS = [
 	/(?<![#\w.,])\d[\d.,]*[\s-]?(?:ms|secs?|mins?)(?!\w)/u,
 	/(?<![#\w.,])\d[\d.,]*[\s-]?(?:seconds?|minutes?|hours?)(?!\w)/u,

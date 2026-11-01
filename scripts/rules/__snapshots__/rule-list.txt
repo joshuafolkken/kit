@@ -92,6 +92,10 @@
   - fires: `pnpm josh pretool:guard` — a broad shell investigation on Codex Astra. Every occurrence
   - silent: a main line on any other model, or a narrow check (`Read` with `offset` / `limit` <= 200, `grep -n <pattern> <one file>`)
   - not automated: which reading is narrow enough to keep is the author’s call
+- **Consultation main line hands a run to run:handoff** (`consultation-handoff`, `docs/josh-commands-run.md` → "josh run:handoff")
+  - fires: `pnpm josh pretool:guard` — `pnpm josh run:entry` / `run:hold` on Fable or Codex Astra. Every occurrence
+  - silent: a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
   - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
   - silent: not a lane child — the parent owns the run budget
