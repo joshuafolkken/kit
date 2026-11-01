@@ -162,7 +162,7 @@ describe('review_reviewed_tree.movement', () => {
 		['a runtime file changed', STAMP, { [FILE]: 'y' }, DELTA],
 		['a runtime file was added', STAMP, { [FILE]: 'x', [ADDED]: 'z' }, DELTA],
 		['git answered nothing', STAMP, {}, UNSETTLED],
-		['a prompt round 2 passes over was added', STAMP, { [FILE]: 'x', [PROMPT]: 'p' }, UNSETTLED],
+		['a prompt round 2 passes over was added', STAMP, { [FILE]: 'x', [PROMPT]: 'p' }, HELD],
 	])('answers the movement when %s', async (_case, stamp, files, expected) => {
 		expect(await review_reviewed_tree.movement(stamp, { files, base: BASE })).toBe(expected)
 	})

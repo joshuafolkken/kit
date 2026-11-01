@@ -17,11 +17,24 @@ describe('run_entry_cli.parse_request — an issue number and an optional --to c
 		expect(run_entry_cli.parse_request([ISSUE])).toStrictEqual({
 			issue_number: ISSUE,
 			command: 'fullrun',
+			is_adopt: false,
 		})
 		expect(run_entry_cli.parse_request([ISSUE, '--to', 'halfrun'])?.command).toBe('halfrun')
 	})
 
+	// joshuafolkken/kit#5629: a `new` run's entry once its Issue is filed.
 	it.each([
+		[[ISSUE, '--adopt']],
+		[[ISSUE, '--adopt', '--to', 'prrun']],
+		[[ISSUE, '--to', 'prrun', '--adopt']],
+	])('reads --adopt before or after --to: %j', (argv) => {
+		expect(run_entry_cli.parse_request(argv)?.is_adopt).toBe(true)
+	})
+
+	it.each([
+		[[ISSUE, '--adopt', '--adopt']],
+		[[ISSUE, '--to', 'kickoff', '--adopt']],
+		[[ISSUE, '--to', '--adopt']],
 		[[ISSUE, '--to']],
 		[[ISSUE, '--to', 'ship']],
 		[[ISSUE, '--from', 'prrun']],

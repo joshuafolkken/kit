@@ -275,11 +275,12 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Open a run in one call: claim the tree, read the budget, bundle the reads, decide the pre-implementation step',
 		category: 'AI tools',
-		reference: ['<issue> [--to <command>]', 'automation', ['git', 'network', 'files']],
+		reference: ['<issue> [--to <command>] [--adopt]', 'automation', ['git', 'network', 'files']],
 		usage: {
 			examples: [
 				{ arguments: '<N>', note: 'a `fullrun`' },
 				{ arguments: '<N> --to halfrun', note: 'a run that goes as far as `halfrun`' },
+				{ arguments: '<N> --adopt', note: "a `new` run's entry once <N> is filed" },
 			],
 		},
 	},
