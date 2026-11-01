@@ -51,3 +51,31 @@ describe('lane_process_stats.table', () => {
 		expect(table).toContain('cpu mean (cores)')
 	})
 })
+
+// joshuafolkken/kit#5658: the resident apps' size beside the load, to compare a day they were closed.
+describe('lane_process_stats.table resident apps', () => {
+	it('prints the resident apps median and peak beside the samples that recorded them', () => {
+		const entries = [1024, 3072, 2048, undefined].map((resident_mb, index) => ({
+			...sample(NOW - index - 1),
+			resident_mb,
+		}))
+		const [, resident = ''] = lane_process_stats.table(entries, WINDOW).split('\n\n', 2)
+
+		expect(resident.split('\n')).toStrictEqual([
+			'| resident apps | rss median (GB) | rss peak (GB) | samples |',
+			'| --- | --- | --- | --- |',
+			'| Google Chrome.app + Visual Studio Code.app | 2.0 | 3.0 | 3 |',
+		])
+	})
+
+	it('leaves the output unchanged when no sample recorded the resident apps', () => {
+		const processes = [{ kind: 'vitest', cpu_percent: 100, rss_mb: 1024, count: 1 }]
+		const table = lane_process_stats.table([sample(NOW - 1, processes)], WINDOW)
+
+		expect(table.split('\n')).toStrictEqual([
+			'| process | cpu mean (cores) | cpu peak (cores) | rss peak (GB) | samples |',
+			'| --- | --- | --- | --- | --- |',
+			'| vitest | 1.0 | 1.0 | 1.0 | 1 |',
+		])
+	})
+})
