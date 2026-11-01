@@ -31,10 +31,12 @@ import { run_board_render_processes } from './run-board-render-processes'
 import { run_board_render_quota } from './run-board-render-quota'
 import { run_board_render_section } from './run-board-render-section'
 import { run_board_render_tail } from './run-board-render-tail'
+import { run_board_render_throughput } from './run-board-render-throughput'
 import { run_board_render_time } from './run-board-render-time'
 import { run_board_render_title, type RowCut, type RowFit } from './run-board-render-title'
 import { run_board_row_yield } from './run-board-row-yield'
 import type { Thanks } from './run-board-thanks-csv'
+import type { ThroughputRow } from './run-board-throughput'
 
 // The whole `run:board` screen as lines — pure, so what a person sees is tested apart from the
 // terminal. The header says where the run is; under it the run's own rows, then the ones waiting on a
@@ -73,6 +75,8 @@ interface BoardView extends FrameBounds {
 	// The reviewers thanked above the legend, and the link a name with a page is wrapped in.
 	thanks?: Thanks | undefined
 	link?: Link | undefined
+	// The 📈 throughput rows; none draws no section.
+	throughput?: ReadonlyArray<ThroughputRow> | undefined
 }
 
 // What every row of one frame is drawn with: the header, how wide the time column is, so a
@@ -395,6 +399,7 @@ function render(view: BoardView): Array<string> {
 	const above = [...run_board_header.header_lines(header), ...resume_lines(view.resume)]
 	const parts = {
 		above,
+		throughput: run_board_render_throughput.throughput_part(view.throughput),
 		usage: run_board_render_quota.usage_part({ ...header, hold: header.quota_hold }),
 		...plan_parts(header, notes, view.size),
 		processes: run_board_render_processes.processes_part(header),
