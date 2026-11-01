@@ -1,8 +1,8 @@
 {
-	"reason": "run:park releases its own hold in process after a landed park (new run-park-release module that skips another run's hold, .env for its stop Telegram), with the failed-release next-step line (#5737)",
+	"reason": "run:park runs the release itself (run-park-release.ts), with a guard for an unreadable git directory found in round 2",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 31,
+		"scripts.code_lines": 38,
 		"ai_cost.on_demand_bytes": 110
 	}
 }

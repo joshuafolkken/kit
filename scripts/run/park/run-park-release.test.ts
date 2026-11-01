@@ -56,6 +56,14 @@ describe('run_park_release.release', () => {
 		)
 	})
 
+	it('runs run:release when the git directory cannot be read', async () => {
+		directory_mock.mockRejectedValue(new Error('git rev-parse failed'))
+		release_mock.mockResolvedValue(1)
+
+		await expect(run_park_release.release(ISSUE)).resolves.toBe(1)
+		expect(release_mock).toHaveBeenCalledWith(['--release', ISSUE])
+	})
+
 	// A split lane parks a leftover child of its own issue: that tree's hold is its own run's.
 	it('releases nothing when the hold names another run', async () => {
 		read_mock.mockReturnValue(held_by(OTHER_ISSUE))

@@ -9,12 +9,23 @@ import { run_hold_cli } from '#scripts/run/hold/run-hold-cli'
 // own issue, and the parent parks a child from a checkout a sequential child holds. Releasing as the
 // parked issue would answer `held` there and leave a re-run that can never succeed, so the park
 // releases nothing and the holder's own ending releases its tree.
+//
+// A git directory that cannot be read names no other run: the release runs and reports its own
+// failure, so the park still exits non-zero with the re-run line rather than an escaped rejection.
 
 const SUCCESS_EXIT_CODE = 0
 const RELEASE_FLAG = '--release'
 
+async function read_worktree_directory(): Promise<string | undefined> {
+	try {
+		return await run_hold.worktree_directory()
+	} catch {
+		return undefined
+	}
+}
+
 async function is_held_by_other_run(issue_number: string): Promise<boolean> {
-	const directory = await run_hold.worktree_directory()
+	const directory = await read_worktree_directory()
 
 	if (directory === undefined) return false
 
