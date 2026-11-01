@@ -13,7 +13,9 @@ import { check_related_section, type CheckResult } from './check-related-section
 import { check_related_unplanned } from './check-related-unplanned'
 import { gate_labels } from './gate-labels'
 import { gate_log } from './gate-log'
+import type { GateTree } from './gate-tree'
 import { metrics_totals } from './metrics-totals'
+import { tree_verdict } from './tree-verdict'
 import { verification_tail } from './verification-tail'
 
 const COMMAND = 'check:related'
@@ -33,6 +35,7 @@ const CHECKS: ReadonlyArray<string> = [
 	'cspell:dot',
 ]
 const REUSED = 'reused'
+const VERDICT_RECORD = tree_verdict.record_path('check-related')
 const METRICS_STOP =
 	'`josh ship`\'s pre-detach stops on the metrics notice above unless the branch approval already names the total; settle it first (`pnpm josh metrics --accept --reason "<why>"`); the accept needs no `check:related` re-run, as the notice changed no exit code'
 
@@ -198,7 +201,16 @@ function report_notices(notices: ReadonlyArray<string | undefined>): void {
 	}
 }
 
-function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): void {
+function verdict_tail(
+	results: ReadonlyArray<CheckResult>,
+	log: { path: string | undefined },
+	verdict: string,
+): string {
+	return `\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`
+}
+
+// Returns the tail it printed, which `tree-verdict.ts` keeps for a re-run on the same tree.
+function report_results(results: ReadonlyArray<CheckResult>, options: ReportOptions = {}): string {
 	const { is_full, log_target = LOG_PATH, pinned_notice, reused = new Set<string>() } = options
 
 	report_reused(reused)
@@ -212,11 +224,11 @@ function report_results(results: ReadonlyArray<CheckResult>, options: ReportOpti
 	report_notices([metrics, pinned_notice, options.unplanned_notice])
 
 	const log = { path: write_log(results, log_target) }
-	const verdict = verdict_line(results, metrics !== undefined, reused)
+	const tail = verdict_tail(results, log, verdict_line(results, metrics !== undefined, reused))
 
-	process.stdout.write(
-		`\n${verification_tail.format_tail({ failures: failure_lines(results), log, verdict })}`,
-	)
+	process.stdout.write(tail)
+
+	return tail
 }
 
 function exit_code(results: ReadonlyArray<CheckResult>): number {
@@ -229,13 +241,10 @@ function exit_code(results: ReadonlyArray<CheckResult>): number {
 // not move, or a run outside a lane child, starts nothing. A verdict that check already reached on this
 // tree is printed above the verdict line, waited for when this run started it (`check-related-pinned.ts`).
 // A check whose green record still holds is not run (`check-related-reuse.ts`).
-async function run_all(
-	root?: string,
-	execute: CheckExecutor = execute_check,
-	is_full = false,
-): Promise<number> {
-	const is_started = await review_record_pinned.restart_in_lane(root)
-	const tree = await check_related_reuse.read_tree()
+async function results_not_reused(
+	tree: GateTree,
+	execute: CheckExecutor,
+): Promise<{ results: Array<CheckResult>; reused: ReadonlySet<string> }> {
 	const reused = await check_related_reuse.reusable(CHECKS, tree)
 	const results = await run_checks(
 		execute,
@@ -243,14 +252,48 @@ async function run_all(
 	)
 
 	await check_related_reuse.record(results, tree)
-	report_results(results, {
+
+	return { results, reused }
+}
+
+async function run_fresh(
+	tree: GateTree,
+	root: string | undefined,
+	execute: CheckExecutor,
+	is_full: boolean,
+): Promise<number> {
+	const is_started = await review_record_pinned.restart_in_lane(root)
+	const { results, reused } = await results_not_reused(tree, execute)
+	const tail = report_results(results, {
 		is_full,
 		pinned_notice: await check_related_pinned.notice(root, is_started),
 		unplanned_notice: await check_related_unplanned.notice(),
 		reused,
 	})
+	const code = exit_code(results)
 
-	return exit_code(results)
+	await tree_verdict.record(
+		{ before: tree, exit_code: code, tail },
+		check_related_reuse.read_tree,
+		VERDICT_RECORD,
+	)
+
+	return code
+}
+
+// A tree this run already answered for, green or red, is answered again with no check run
+// (`tree-verdict.ts`).
+async function run_all(
+	root?: string,
+	execute: CheckExecutor = execute_check,
+	is_full = false,
+): Promise<number> {
+	const tree = await check_related_reuse.read_tree()
+	const kept = tree_verdict.read(tree, VERDICT_RECORD)
+
+	if (kept !== undefined) return tree_verdict.replay(kept, VERDICT_RECORD)
+
+	return await run_fresh(tree, root, execute, is_full)
 }
 
 const check_related = {

@@ -4,6 +4,7 @@ import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import type { GateTree } from './gate-tree'
+import { tree_verdict } from './tree-verdict'
 
 // The live branch's lane:plan record never reaches these runs.
 vi.mock('./check-related-unplanned', () => ({
@@ -40,6 +41,19 @@ function stub_run(): void {
 	vi.spyOn(check_related_pinned, 'notice').mockResolvedValue(undefined)
 	vi.spyOn(check_related_reuse, 'read_tree').mockResolvedValue(TREE)
 	vi.spyOn(check_related_reuse, 'record').mockResolvedValue()
+	vi.spyOn(tree_verdict, 'read').mockReturnValue(undefined)
+	vi.spyOn(tree_verdict, 'record').mockResolvedValue()
+}
+
+function keep(exit_code: number): void {
+	const tail = `\nkept tail ${String(exit_code)}\n`
+
+	vi.spyOn(tree_verdict, 'read').mockReturnValue({
+		tree: 'a'.repeat(64),
+		exit_code,
+		tail,
+		at: 'now',
+	})
 }
 
 describe('check_related.run_all reuses a check whose green record still holds', () => {
@@ -103,5 +117,45 @@ describe('check_related.run_all reads and records the reuse on one tree', () => 
 		const { code } = await run(FAILED_EXIT_CODE)
 
 		expect(code).toBe(FAILED_EXIT_CODE)
+	})
+
+	it('keeps the verdict it printed against the tree it read', async () => {
+		reuse([])
+
+		const { code } = await run()
+
+		expect(tree_verdict.record).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ before: TREE, exit_code: code }),
+			check_related_reuse.read_tree,
+			expect.any(String),
+		)
+	})
+})
+
+// joshuafolkken/kit#5657: a re-run on a tree this command already answered for ran all four again.
+describe('check_related.run_all on a tree it already answered for', () => {
+	beforeEach(stub_run)
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('runs no check and prints the kept green verdict', async () => {
+		keep(0)
+
+		const { code, ran, text } = await run()
+
+		expect(code).toBe(0)
+		expect(ran).toStrictEqual([])
+		expect(text).toMatch(/^reused: tree a{12} green at now\n\nkept tail 0\n$/u)
+		expect(review_record_pinned.restart_in_lane).not.toHaveBeenCalled()
+	})
+
+	it('answers a kept red verdict red', async () => {
+		keep(FAILED_EXIT_CODE)
+
+		const { code, ran } = await run()
+
+		expect(code).toBe(FAILED_EXIT_CODE)
+		expect(ran).toStrictEqual([])
 	})
 })

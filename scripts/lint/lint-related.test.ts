@@ -25,7 +25,7 @@ vi.mock('./lint-parallel', () => ({
 // gate records. What belongs to this suite is that the recorder is reached with this run's verdict
 // and its arguments; what the recorder then does with them is `scoped-green.test.ts`.
 vi.mock('#scripts/gate/scoped-green', () => ({
-	scoped_green: { read_before: vi.fn(), record_if_green: vi.fn() },
+	scoped_green: { is_unmoved: vi.fn(), read_before: vi.fn(), record_if_green: vi.fn() },
 }))
 // Mocked so no case reads this checkout's real green record; unset, it answers "read the whole branch".
 vi.mock(import('#scripts/gate/since-green'), async (import_original) => {
