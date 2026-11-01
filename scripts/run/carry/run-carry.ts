@@ -475,7 +475,7 @@ function busy_message(carry: RunCarry): string {
 	return `A live run holds this budget — ${describe_carry(carry)}, owner pid ${String(carry.owner_pid)} still running. Nothing was established. Wait for that run, or end its record with \`${END_COMMAND}\` once you know it is over.`
 }
 
-// The adoption command, shared by the standing refusal and the judgment wake's hand-off.
+// The adoption command the standing refusal names.
 // It names no `--owner`: the command takes the session's own pid from its environment, so the
 // adoption still declares an owner without a `$PPID` expansion a shell guard refuses.
 function claim_command(invocation: string): string {

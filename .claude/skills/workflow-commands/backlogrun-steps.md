@@ -118,8 +118,9 @@ never `needs-human-review` (`needs-human-review.md`), the priority labels only t
 
 **The loop is computed, not walked by hand** — the `run:wake` supervisor runs `pnpm josh backlog:drive`
 (`docs/josh-commands-backlog.md` → "`josh backlog:drive`"). A session reaches this section only when
-the `Driver result:` line hands a branch back: claim with `pnpm josh run:carry --resume "<invocation>"`,
-act on the row, then end the turn — its `Stop` hook writes the cut that hands the loop back
+the `Driver result:` line hands a branch back. The supervisor has already claimed the carry record for
+the session (`run-wake-handoff.ts`), so it claims nothing and never runs `run:carry --begin`: act on
+the row, then end the turn — its `Stop` hook writes the cut that hands the loop back
 (`run_headless.hand_back_at_turn_end`). Read only the one
 section the row names:
 

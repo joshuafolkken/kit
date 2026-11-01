@@ -18,8 +18,9 @@ const WINDOW_OUTPUT = 'window\nresume: --owner 1'
 const BUSY_OUTPUT = 'merge busy #2509\nresume: --owner 1'
 const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
 const HAND_BACK = 'then end the turn, which hands the loop back'
-const CLAIM_COMMAND = `pnpm josh run:carry --resume "${INVOCATION}"`
-const DEFAULT_NEXT = `first claim the carry record with ${CLAIM_COMMAND}, then act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
+const ALREADY_CLAIMED =
+	"the carry record is already this session's, so run no pnpm josh run:carry --begin;"
+const DEFAULT_NEXT = `${ALREADY_CLAIMED} act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -145,7 +146,6 @@ test('hands on only the tail of a long stderr, after the verdict, resume line an
 	const result = run_wake_driver.driver_result(
 		EPIC_OUTPUT,
 		{ kind: 'none' },
-		INVOCATION,
 		`${'early output\n'.repeat(LONG_STDERR_REPEAT)}why it stopped`,
 	)
 
@@ -184,13 +184,13 @@ test('falls back to the driver stdout when a failed drive printed no error line'
 })
 
 test('refuses an incomplete driver result without waking an agent', () => {
-	expect(run_wake_driver.driver_result('', { kind: 'none' }, INVOCATION)).toMatchObject({
+	expect(run_wake_driver.driver_result('', { kind: 'none' })).toMatchObject({
 		kind: 'failed',
 	})
 })
 
 test('tells an epic judgment session how to advance the named carry', () => {
-	const result = run_wake_driver.driver_result(EPIC_OUTPUT, { kind: 'none' }, INVOCATION)
+	const result = run_wake_driver.driver_result(EPIC_OUTPUT, { kind: 'none' })
 
 	expect(result).toMatchObject({ kind: 'judgment' })
 	if (result.kind !== 'judgment') return
@@ -206,19 +206,14 @@ test.each([
 	],
 	['merge human-review #2500\nresume: --owner 1', 'needs-human-review.md'],
 	[EPIC_OUTPUT, 'Named issues run first, in order'],
-])('claims the carry record, then names the next move for a judgment branch: %j', (out, next) => {
-	const result = run_wake_driver.driver_result(out, { kind: 'none' }, INVOCATION)
+])('names the next move without a claim for a judgment branch: %j', (out, next) => {
+	const result = run_wake_driver.driver_result(out, { kind: 'none' })
 
 	expect(result.kind).toBe('judgment')
 	if (result.kind !== 'judgment') return
-	expect(result.material).toContain(
-		`\nNext: first claim the carry record with ${CLAIM_COMMAND}, then `,
-	)
+	expect(result.material).toContain(`\nNext: ${ALREADY_CLAIMED} `)
+	expect(result.material).not.toContain('--resume')
 	expect(result.material.slice(result.material.indexOf('\nNext: '))).toContain(next)
-})
-
-test('builds the claim command the standing refusal also prints', () => {
-	expect(run_carry.claim_command(INVOCATION)).toBe(CLAIM_COMMAND)
 })
 
 async function no_pause(): Promise<void> {
