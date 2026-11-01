@@ -29,23 +29,29 @@ type Reuse = (typeof REUSE)[keyof typeof REUSE]
 const { MOVEMENT } = review_reviewed_tree
 
 // The reuse, and on `again` why (joshuafolkken/kit#4941): `review:record --check` prints it, so a lane
-// reads which condition re-runs round 1 rather than a list of every condition that could.
+// reads which condition re-runs round 1 rather than a list of every condition that could. On a reuse,
+// `note` names the moves no round reads that it passed over (joshuafolkken/kit#5662).
 interface ReuseAnswer {
 	reuse: Reuse
 	cause?: string | undefined
+	note?: string | undefined
 }
 
 const STALE_CAUSE = "the issue changed after the recorded round's brief"
 const UNRECORDED_CAUSE = 'no review round is recorded for this issue'
 
-async function recorded_answer(issue: number): Promise<ReuseAnswer> {
-	const { movement, cause } = await review_reviewed_tree.standing_here()
+function reused_with(kind: Reuse, note: string | undefined): ReuseAnswer {
+	return note === undefined ? { reuse: kind } : { reuse: kind, note }
+}
 
-	if (movement === MOVEMENT.HELD) return { reuse: REUSE.HELD }
+async function recorded_answer(issue: number): Promise<ReuseAnswer> {
+	const { movement, cause, note } = await review_reviewed_tree.standing_here()
+
+	if (movement === MOVEMENT.HELD) return reused_with(REUSE.HELD, note)
 
 	const is_delta = movement === MOVEMENT.DELTA || review_reviewed_tree.is_stopped_on(issue)
 
-	return is_delta ? { reuse: REUSE.DELTA } : { reuse: REUSE.AGAIN, cause }
+	return is_delta ? reused_with(REUSE.DELTA, note) : { reuse: REUSE.AGAIN, cause }
 }
 
 // **A recorded round 1 is reused while the tree it was recorded on holds still** — a lane's review
@@ -53,8 +59,9 @@ async function recorded_answer(issue: number): Promise<ReuseAnswer> {
 // (joshuafolkken/kit#4878): round 2 reads that delta from the round-1 brief's stamp after the commit, so
 // round 1 run again would read it twice. **The ship's own round 1 that stopped on a finding** is reused
 // however the lane's fix moved the tree, for the same reason. A High-cited file's fix is such a move
-// where round 2's delta holds it (joshuafolkken/kit#4941). Any other move — a doc, a revert — is
-// reviewed again, from that record (`review-reviewed-tree.ts`). An issue that changed after that
+// where round 2's delta holds it (joshuafolkken/kit#4941), and a doc, a prompt or an inert path no
+// round executes is passed over (joshuafolkken/kit#5662). Any other move — a revert — is reviewed
+// again, from that record (`review-reviewed-tree.ts`). An issue that changed after that
 // round's brief is never reused: the recorded round never read it, and `josh followup` refuses the merge on it
 // (joshuafolkken/kit#4221).
 async function answer(issue: number, is_stale: boolean): Promise<ReuseAnswer> {

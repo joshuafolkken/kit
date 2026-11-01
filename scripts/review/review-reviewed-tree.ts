@@ -2,6 +2,7 @@ import { gate_tree, type GateTree } from '#scripts/gate/gate-tree'
 import { moved_paths, type MovedParts } from '#scripts/gate/moved-paths'
 import { PROJECT_ROOT } from '#scripts/init/init-paths'
 import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
+import { path_decision } from '#scripts/josh/path-decision'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { release_approval_prune } from '#scripts/release/release-approval-prune'
 import { test_declared_logic } from '#scripts/test/test-declared-logic'
@@ -15,7 +16,8 @@ import { review_stamps } from './review-stamps'
 // `review:record` wrote the round, its fixes included (joshuafolkken/kit#4620). A lane reviews before
 // `josh ship`, so the ship's round 1 asks this record whether the tree moved since: unmoved, the
 // recorded round is the ship's; moved only where round 2 reads, it is still the ship's and round 2
-// reads the delta (joshuafolkken/kit#4878); else round 1 reads the delta from here.
+// reads the delta (joshuafolkken/kit#4878); a move no round executes is passed over
+// (joshuafolkken/kit#5662); else round 1 reads the delta from here.
 //
 // **Taken at the record, not the brief**. A round that fixed findings approved its own edits, so the
 // briefed tree is not what its verdict covers: a file reverted to the briefed bytes would drop out of a
@@ -93,16 +95,19 @@ type Movement = (typeof MOVEMENT)[keyof typeof MOVEMENT]
 
 // The movement, and on `unsettled` the condition that decided it, with the path that met it where one
 // did — printed by `review:record --check` so a lane reads why the ship reviews round 1 again
-// (joshuafolkken/kit#4941).
+// (joshuafolkken/kit#4941). On `held` / `delta`, `note` names the moves passed over as no round's read.
 interface Standing {
 	movement: Movement
 	cause?: string
+	note?: string
 }
+
+const UNEXECUTED_NOTE = 'passed over documentation, a prompt or an inert path no round executes'
 
 const CAUSE = {
 	NO_RECORD: 'no reviewed tree was recorded',
 	SKIPPED:
-		'a move round 2 would not read — documentation, a prompt, an inert path, a revert to the briefed bytes, or a file outside the change',
+		'a move round 2 would not read — a revert to the briefed bytes, a file outside the change, or documentation, a prompt or an inert path a recorded High cites',
 	SYNCED: 'the default branch changed a file the round covers',
 	UNFIXED:
 		"a file a recorded High cites still holds its round-1 brief bytes, so no fix is in round 2's delta",
@@ -138,6 +143,20 @@ function carried_paths(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): 
 
 function moved_files(stamp: FileMapStamp, tree: GateTree, parts: MovedParts): Array<string> {
 	return parts.changed.filter((path) => !is_no_move(stamp, tree, path))
+}
+
+// **A lane move round 2 would not execute is no move either** (joshuafolkken/kit#5662): documentation,
+// a prompt or an inert path edited after the record is skipped by round 2 (`review-round2.ts` →
+// `is_unexecuted`, the single source), so round 1 run again would be the only read of it — a review
+// the ship pays minutes for over a path no round executes. A path a recorded High cites stays moved.
+function is_unexecuted_move(stamp: FileMapStamp, path: string): boolean {
+	return stamp.files[path] !== UNSETTLED_DIGEST && review_round2.is_unexecuted(path, [])
+}
+
+function unexecuted_note(paths: ReadonlyArray<string>): string | undefined {
+	if (paths.length === 0) return undefined
+
+	return `${UNEXECUTED_NOTE}: ${path_decision.format_path_list(paths)}`
 }
 
 // **Round 2 reads a move only where its own delta holds it**: it diffs from the round-1 brief's stamp
@@ -177,6 +196,20 @@ function moved_standing(
 	return unsettled_by(unread_cause(stamp, unread), unread)
 }
 
+function noted_standing(
+	stamp: FileMapStamp,
+	moved: ReadonlyArray<string>,
+	tree: GateTree,
+	briefed: FileMapStamp | undefined,
+): Standing {
+	const unexecuted = moved.filter((path) => is_unexecuted_move(stamp, path))
+	const read = moved.filter((path) => !unexecuted.includes(path))
+	const answer = moved_standing(stamp, read, tree, briefed)
+	const note = unexecuted_note(unexecuted)
+
+	return note === undefined || answer.movement === MOVEMENT.UNSETTLED ? answer : { ...answer, note }
+}
+
 async function standing(
 	stamp: FileMapStamp,
 	tree: GateTree,
@@ -195,7 +228,7 @@ async function standing(
 
 	const moved = moved_files(stamp, tree, parts).filter((path) => !carried.includes(path))
 
-	return moved_standing(stamp, moved, tree, briefed)
+	return noted_standing(stamp, moved, tree, briefed)
 }
 
 async function movement(

@@ -1,0 +1,7 @@
+{
+	"reason": "Round-1 reuse passes over documentation, prompt and inert moves since the record, naming them on the ship's reason line (#5662)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
