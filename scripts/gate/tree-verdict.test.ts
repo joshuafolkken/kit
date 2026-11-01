@@ -29,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	vi.restoreAllMocks()
+	vi.unstubAllEnvs()
 })
 
 afterAll(() => {
@@ -55,6 +56,14 @@ describe('tree_verdict.read', () => {
 		expect(tree_verdict.read({ ...TREE, base: undefined }, target)).toBeUndefined()
 		expect(tree_verdict.read(undefined, target)).toBeUndefined()
 	})
+
+	it('answers nothing once an environment value a check reads changes', async () => {
+		vi.stubEnv('TZ', 'UTC')
+		await tree_verdict.record(GREEN, same_tree, target)
+		vi.stubEnv('TZ', 'Asia/Tokyo')
+
+		expect(tree_verdict.read(TREE, target)).toBeUndefined()
+	})
 })
 
 describe('tree_verdict.record', () => {
@@ -75,6 +84,18 @@ describe('tree_verdict.replay', () => {
 		expect(kept && tree_verdict.replay(kept, target)).toBe(0)
 		expect(String(write.mock.calls[0]?.[0])).toMatch(
 			/^reused: tree [\da-f]{12} green at \S+\n\n✔ josh lint:related passed\n$/u,
+		)
+	})
+
+	it('prints a notice asked again between the reuse line and the kept tail', async () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+
+		await tree_verdict.record(GREEN, same_tree, target)
+		const kept = tree_verdict.read(TREE, target)
+
+		expect(kept && tree_verdict.replay(kept, target, 'live notice')).toBe(0)
+		expect(String(write.mock.calls[0]?.[0])).toMatch(
+			/^reused: tree [\da-f]{12} green at \S+\n\nlive notice\n\n✔ josh lint:related passed\n$/u,
 		)
 	})
 

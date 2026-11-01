@@ -1,7 +1,7 @@
 {
-	"reason": "tree-verdict memo for lint:related / check:related (#5657)",
+	"reason": "Per-tree verdict reuse for lint:related and check:related (#5657), plus the round-1 review fixes: notices kept in the replayed tail and the tool and env fingerprint in the tree key",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 102
+		"scripts.code_lines": 103
 	}
 }

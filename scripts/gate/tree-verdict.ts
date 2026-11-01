@@ -5,6 +5,7 @@ import { z } from 'zod'
 import type { GateTree } from './gate-tree'
 import { input_fingerprint } from './input-fingerprint'
 import { scoped_green } from './scoped-green'
+import { verification_inputs } from './verification-inputs'
 
 // **A bare related check asked again of a tree it already answered for answers at once**
 // (joshuafolkken/kit#5657): a cut and resume, or a re-check after a review, re-ran `josh lint:related`
@@ -36,10 +37,13 @@ function record_path(name: string): string {
 	return stamp_file.stamp_path(`josh-tree-verdict-${name}-`, PROJECT_ROOT)
 }
 
+// The tools and environment every declared check reads join the files and the base
+// (`verification-inputs.ts`), so a tool upgrade or a changed `TZ` runs the checks again.
 function tree_hash(tree: GateTree): string {
 	const files = Object.entries(tree.files).map(([file, digest]) => `${file}\t${digest}`)
+	const inputs = verification_inputs.fingerprint(verification_inputs.DECLARED_LABELS)
 
-	return input_fingerprint.of_entries([...files, `base\t${tree.base ?? ''}`])
+	return input_fingerprint.of_entries([...files, `base\t${tree.base ?? ''}`, `inputs\t${inputs}`])
 }
 
 function read_record(target: string): TreeVerdict | undefined {
@@ -65,8 +69,11 @@ function reused_line(verdict: TreeVerdict, target: string): string {
 	return is_green ? line : `${line} — remove ${target} to run it again`
 }
 
-function replay(verdict: TreeVerdict, target: string): number {
-	process.stdout.write(`${reused_line(verdict, target)}\n${verdict.tail}`)
+// `live` is a notice the caller asks again rather than keeps, as an answer that can change on this tree.
+function replay(verdict: TreeVerdict, target: string, live?: string): number {
+	const notice = live === undefined ? '' : `\n${live}\n`
+
+	process.stdout.write(`${reused_line(verdict, target)}\n${notice}${verdict.tail}`)
 
 	return verdict.exit_code
 }

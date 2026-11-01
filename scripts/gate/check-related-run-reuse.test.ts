@@ -1,9 +1,12 @@
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { review_record_pinned } from '#scripts/review/review-record-pinned'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { check_related, type CheckResult } from './check-related'
 import { check_related_pinned } from './check-related-pinned'
 import { check_related_reuse } from './check-related-reuse'
 import type { GateTree } from './gate-tree'
+import { metrics_totals } from './metrics-totals'
 import { tree_verdict } from './tree-verdict'
 
 // The live branch's lane:plan record never reaches these runs.
@@ -157,5 +160,40 @@ describe('check_related.run_all on a tree it already answered for', () => {
 
 		expect(code).toBe(FAILED_EXIT_CODE)
 		expect(ran).toStrictEqual([])
+	})
+
+	it('asks the test:pinned notice again rather than replaying it', async () => {
+		keep(0)
+		vi.mocked(check_related_pinned.notice).mockResolvedValue('pinned answer')
+
+		const { text } = await run()
+
+		expect(check_related_pinned.notice).toHaveBeenCalledExactlyOnceWith(ROOT, false)
+		expect(text).toMatch(/^reused: tree a{12} green at now\n\npinned answer\n\nkept tail 0\n$/u)
+	})
+})
+
+describe('check_related.report_results keeps what a replay on the same tree prints', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it('keeps the metrics and unplanned notices with the tail, the pinned one printed above them', () => {
+		const write = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+		const output = `${metrics_totals.NOTICE_HEADING} grew`
+		const results = [{ command: LINT, exit_code: 0, output }]
+		const pinned_notice = 'pinned notice'
+		const unplanned_notice = 'unplanned notice'
+		const kept = check_related.report_results(results, {
+			pinned_notice,
+			unplanned_notice,
+			log_target: path.join(tmpdir(), 'check-related-run-reuse.log'),
+		})
+		const text = write.mock.calls.map(([chunk]) => String(chunk)).join('')
+
+		expect(
+			[output, unplanned_notice, pinned_notice].map((part) => kept.includes(part)),
+		).toStrictEqual([true, true, false])
+		expect(text.endsWith(`\n${pinned_notice}\n${kept}`)).toBe(true)
 	})
 })
