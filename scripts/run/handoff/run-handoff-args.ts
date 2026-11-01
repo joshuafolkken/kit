@@ -16,6 +16,9 @@ const WORKFLOW_KEYWORDS = ['kickoff', 'fullrun', 'halfrun', 'prrun'] as const
 
 type WorkflowKeyword = (typeof WORKFLOW_KEYWORDS)[number]
 
+// Widened so `.includes()` takes any token; the guard below narrows it back.
+const WORKFLOW_KEYWORD_TOKENS: ReadonlyArray<string | undefined> = WORKFLOW_KEYWORDS
+
 interface WorkflowHandoff {
 	kind: 'workflow'
 	keyword: WorkflowKeyword
@@ -30,7 +33,7 @@ type HandoffArguments =
 	| { kind: 'refused'; note: string }
 
 function is_workflow_keyword(token: string | undefined): token is WorkflowKeyword {
-	return WORKFLOW_KEYWORDS.some((keyword) => keyword === token)
+	return WORKFLOW_KEYWORD_TOKENS.includes(token)
 }
 
 function refused(note: string): HandoffArguments {
