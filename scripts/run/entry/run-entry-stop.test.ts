@@ -96,6 +96,17 @@ describe('run_entry_stop.stop — the stop carries its own chores', () => {
 	})
 })
 
+describe('run_entry_stop.stop — a stop that left something behind', () => {
+	it('offers the alternatives the notice carries in place of the default', async () => {
+		const stop_ports = ports({ is_sent: true })
+		const alternatives = ['Leave the Issue for a later session — the stash is kept']
+
+		await run_entry_stop.stop({ ...notice(false), alternatives }, stop_ports)
+
+		expect(stop_ports.notify).toHaveBeenCalledWith(expect.objectContaining({ alternatives }))
+	})
+})
+
 describe('run_entry_stop.stop — what it withholds', () => {
 	// A failed release must leave the agent still asked to release, so the released note is withheld.
 	it('prints the release failure note when the release does not succeed', async () => {
