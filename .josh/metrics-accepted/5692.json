@@ -1,0 +1,8 @@
+{
+	"reason": "lint:rule --paths (#5692): subset option parsing, separate cache/report scope, and one measurement.md sentence the Issue requires",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 59,
+		"ai_cost.on_demand_bytes": 132
+	}
+}
