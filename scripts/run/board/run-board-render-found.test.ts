@@ -244,9 +244,9 @@ describe('run_board_render — a merged row’s finished investigation', () => {
 // a mechanism's minutes.
 describe('run_board_render — a merged row’s keyed result from before #4929', () => {
 	it('says `∅` and the reason, not the largest mechanism', () => {
-		const line = done_line(ended('none: all small — under 2%: test:pinned 7.2 min: restarted'))
+		const line = done_line(ended('none: all small — test:pinned 7.2 min: restarted'))
 
-		expect(line).toMatch(/52′ {2}🔍 ∅ all small — und…$/u)
+		expect(line).toMatch(/52′ {2}🔍 ∅ all small — tes…$/u)
 		expect(line).not.toContain('7′')
 	})
 })
