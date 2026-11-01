@@ -1,0 +1,7 @@
+{
+	"reason": "#5684 adds the committed-files probe that stands in for a pre-#5672 cleared record's missing history",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 20
+	}
+}
