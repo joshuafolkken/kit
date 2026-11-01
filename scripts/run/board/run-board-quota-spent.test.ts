@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { QuotaReading } from './run-board-quota-read'
 import { run_board_quota_spent } from './run-board-quota-spent'
 
-const { claude_done, codex_done, per_task_of, spent_of } = run_board_quota_spent
+const { claude_done, codex_done, per_task_of, span_of } = run_board_quota_spent
 const FIVE_HOURS = 300
 const SEVEN_DAYS = 10_080
 const RESET_MS = 1_800_000_000_000
@@ -18,30 +18,20 @@ function reading(five_hour: number, seven_day: number, shift_ms = 0): QuotaReadi
 	}
 }
 
-describe('run_board_quota_spent.spent_of', () => {
-	it("reads each window's rise from a file's first reading to its last", () => {
-		expect(spent_of([reading(10, 40), reading(12, 41)], reading(16, 42))).toEqual({
-			[FIVE_HOURS]: 6,
-			[SEVEN_DAYS]: 2,
-		})
+// One done file's span: a head reading and a tail reading of the same meters.
+function file(from: [number, number], to: [number, number]): ReadonlyArray<QuotaReading> {
+	return span_of([reading(...from)], reading(...to))
+}
+
+describe('run_board_quota_spent.span_of', () => {
+	it("holds a done file's head readings, oldest first, then its tail", () => {
+		const heads = [reading(10, 40), reading(12, 41)]
+
+		expect(span_of(heads, reading(16, 42))).toEqual([...heads, reading(16, 42)])
 	})
 
-	it('reads a file holding one reading as spending none, and one with none as telling nothing', () => {
-		const only = reading(10, 40)
-
-		expect(spent_of([only], only)).toEqual({ [FIVE_HOURS]: 0, [SEVEN_DAYS]: 0 })
-		expect(spent_of([], only)).toEqual({})
-		expect(spent_of([only], undefined)).toEqual({})
-	})
-
-	it('measures a window that reset from the first reading inside its last reset', () => {
-		const shift_ms = FIVE_HOURS * MINUTE_MS
-		const heads = [reading(80, 40), reading(2, 41, shift_ms), reading(4, 41, shift_ms)]
-		const jittered = spent_of([reading(10, 40)], reading(13, 40, MINUTE_MS))
-
-		expect(spent_of(heads, reading(5, 42, shift_ms))).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 2 })
-		expect(spent_of([reading(80, 40)], reading(5, 42, shift_ms))).toEqual({ [SEVEN_DAYS]: 2 })
-		expect(jittered).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 0 })
+	it('holds nothing for a file whose tail holds no reading', () => {
+		expect(span_of([reading(10, 40)], undefined)).toEqual([])
 	})
 })
 
@@ -66,19 +56,48 @@ describe('run_board_quota_spent.claude_done and codex_done', () => {
 })
 
 describe('run_board_quota_spent.per_task_of', () => {
-	it("takes each window's mean over the files that tell one, a spend of none included", () => {
-		const spends = [
-			{ [FIVE_HOURS]: 2, [SEVEN_DAYS]: 0 },
-			{ [FIVE_HOURS]: 9 },
-			{ [FIVE_HOURS]: 4, [SEVEN_DAYS]: 3 },
-		]
+	it('shares the meter rise of two concurrent lanes between them, not counting it twice', () => {
+		const spans = [file([10, 40], [16, 46]), file([10, 40], [16, 46])]
 
-		expect(per_task_of(spends)).toEqual({ [FIVE_HOURS]: 5, [SEVEN_DAYS]: 1.5 })
+		expect(per_task_of(spans)).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 3 })
 	})
 
-	it('tells nothing where no file tells a spend, or none of them rose', () => {
-		expect(per_task_of([{}, {}])).toEqual({})
+	it('shares the meter rise of three overlapping lanes, a third each where each saw it all', () => {
+		const spans = [file([12, 41], [19, 49]), file([10, 40], [18, 48]), file([11, 40], [17, 47])]
+
+		expect(per_task_of(spans)).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 3 })
+	})
+
+	it('reads lanes run one after another as the mean of their rises, a spend of none included', () => {
+		const spans = [file([16, 43], [16, 43]), file([7, 41], [16, 43]), file([2, 40], [7, 41])]
+
+		expect(per_task_of(spans)).toEqual({ [FIVE_HOURS]: 14 / 3, [SEVEN_DAYS]: 1 })
+	})
+
+	it("measures a window that reset from the newest file's last reset only", () => {
+		const shift_ms = FIVE_HOURS * MINUTE_MS
+		const after = span_of([reading(2, 41, shift_ms)], reading(5, 42, shift_ms))
+		const across = span_of([reading(80, 40), reading(1, 40, shift_ms)], reading(2, 41, shift_ms))
+		const before = file([60, 38], [80, 40])
+
+		expect(per_task_of([after, across, before])).toEqual({ [FIVE_HOURS]: 2, [SEVEN_DAYS]: 4 / 3 })
+	})
+
+	it('counts a done file whose head holds no reading as a task done', () => {
+		const spans = [span_of([], reading(16, 46)), file([10, 40], [16, 46])]
+
+		expect(per_task_of(spans)).toEqual({ [FIVE_HOURS]: 3, [SEVEN_DAYS]: 3 })
+	})
+
+	it('reads a reset that only jittered as the same window', () => {
+		const spans = [span_of([reading(10, 40)], reading(13, 40, MINUTE_MS))]
+
+		expect(per_task_of(spans)).toEqual({ [FIVE_HOURS]: 3 })
+	})
+
+	it('tells nothing where no file holds a reading, or none of the windows rose', () => {
+		expect(per_task_of([[], []])).toEqual({})
 		expect(per_task_of([])).toEqual({})
-		expect(per_task_of([{ [SEVEN_DAYS]: 0 }, { [SEVEN_DAYS]: 0 }])).toEqual({})
+		expect(per_task_of([file([4, 40], [4, 40]), file([4, 40], [4, 40])])).toEqual({})
 	})
 })

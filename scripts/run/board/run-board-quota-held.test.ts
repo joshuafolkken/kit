@@ -218,7 +218,7 @@ describe('run_board_quota_held.quota_reader — a newest file holding no reading
 })
 
 describe('run_board_quota_held.quota_reader — spend per task', () => {
-	it("carries each window's mean spend over the newest files on the newest reading", async () => {
+	it("carries the newest files' shared rise per done file on the newest reading", async () => {
 		const { files, ports } = fixture_of()
 
 		files.claude = ['a_log', 'b_log', 'c_log', EMPTY_FILE].map((file, index) => ({
@@ -228,11 +228,11 @@ describe('run_board_quota_held.quota_reader — spend per task', () => {
 
 		const { claude, codex } = await quota_reader(ports)()
 
-		expect(claude).toEqual({ ...reading_at(46), per_task: { [WINDOW.minutes]: 11 / 3 } })
+		expect(claude).toEqual({ ...reading_at(46), per_task: { [WINDOW.minutes]: 26 / 3 } })
 		expect(codex).not.toHaveProperty('per_task')
 	})
 
-	it('counts a done file whose readings did not rise as spending none', async () => {
+	it('counts a done file whose readings did not rise among the files the rise is shared by', async () => {
 		const { files, ports } = fixture_of()
 
 		files.claude = [CLAUDE_FILE, CLAUDE_FILE, 'b_log'].map((file, index) => ({
@@ -242,7 +242,7 @@ describe('run_board_quota_held.quota_reader — spend per task', () => {
 
 		const { claude } = await quota_reader(ports)()
 
-		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 2 / 3 })
+		expect(claude?.per_task).toEqual({ [WINDOW.minutes]: 4 })
 	})
 
 	it('leaves out the spend of a file still being written', async () => {
