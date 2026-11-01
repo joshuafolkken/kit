@@ -90,6 +90,34 @@ function describe_missing_context(context: string): string {
 	return `required context ${context} has no check-run`
 }
 
+// **The failure a missing context ends the wait with**, typed so `followup` can rerun the whole run
+// that lost the job (joshuafolkken/kit#5778): no failed job is left for `rerun-failed-jobs` to retry.
+interface MissingContexts {
+	contexts: ReadonlyArray<string>
+	head_sha: string
+}
+
+class MissingContextError extends Error {
+	override name = 'MissingContextError'
+	readonly missing: MissingContexts
+
+	constructor(message: string, options: ErrorOptions & { missing: MissingContexts }) {
+		super(message, options)
+		this.missing = options.missing
+	}
+}
+
+// Read after the verdict named the gap, so the grace window it asks again has already run out.
+function missing_context_error(
+	message: string,
+	snapshot: PrStateSnapshot,
+): MissingContextError | undefined {
+	const contexts = collect_missing_contexts(snapshot)
+	if (contexts.length === 0 || snapshot.head_sha === undefined) return undefined
+
+	return new MissingContextError(message, { missing: { contexts, head_sha: snapshot.head_sha } })
+}
+
 // **Why a wait that ran out of budget was still waiting** (joshuafolkken/kit#5780): the required checks
 // and the base branch's required contexts the last read showed no check-run for — or, with none
 // absent, the merge state GitHub held the pull request in. Read without the grace window, since the
@@ -120,5 +148,8 @@ export {
 	forget_missing_contexts,
 	is_blocked_cause,
 	is_required_match,
+	missing_context_error,
 	MISSING_GRACE_MS,
+	MissingContextError,
+	type MissingContexts,
 }

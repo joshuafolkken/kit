@@ -39,8 +39,14 @@ function model_of_tail(tail: string): string | undefined {
 	return undefined
 }
 
-function main_model(tail: string, payload_model: string | undefined): string | undefined {
-	return payload_model ?? model_of_tail(tail)
+// `recorded_model` is the one the session started on (`session-model-record.ts`), answered only when
+// nothing newer names one — a first prompt, before any assistant entry (joshuafolkken/kit#5761).
+function main_model(
+	tail: string,
+	payload_model: string | undefined,
+	recorded_model?: string,
+): string | undefined {
+	return payload_model ?? model_of_tail(tail) ?? recorded_model
 }
 
 const main_model_reader = { main_model }
