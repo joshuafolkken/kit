@@ -627,17 +627,20 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship` in de
 
 <!-- usage: review:submit -->
 
-Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them.
+Write a reviewer's findings, read from stdin, where the ship or review:record --from-slot reads them; --review lints the review in the same call.
 
 ```bash
-pnpm josh review:submit < findings.txt                 # the /code-review slot
-pnpm josh review:submit --interaction < findings.txt   # the interaction review slot
-pnpm josh review:submit --none                         # a review with no findings
+pnpm josh review:submit < findings.txt                      # the /code-review slot
+pnpm josh review:submit --interaction < findings.txt        # the interaction review slot
+pnpm josh review:submit --none                              # a review with no findings
+pnpm josh review:submit --review review.md < findings.txt   # lint the review and submit the findings in one call
 ```
 
 **Options:**
 
 - `--none` — a review with no findings; empty stdin without it is refused.
+- `--review <file>` — the reviewer's markdown review, linted against the rubric's output format in the same call; a violation and a grammar refusal are reported together, and nothing is written while either stands.
+- `--round <1|2>` — the rubric shape `--review` is linted against; round 1 by default.
 
 <!-- /usage -->
 

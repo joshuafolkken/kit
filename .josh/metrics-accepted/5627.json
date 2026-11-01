@@ -1,0 +1,9 @@
+{
+	"reason": "#5627: review:submit --review lints the review in the submit call — a new argv module, its lint wiring, and the reviewer step that now names both in one bullet",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 86,
+		"ai_cost.on_demand_bytes": 11,
+		"prose.long_paragraphs": 1
+	}
+}
