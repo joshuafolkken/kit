@@ -672,13 +672,17 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` 
 Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code).
 
 ```bash
-pnpm josh ship:evidence <N> -- pnpm josh <command>   # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> -- pnpm josh <command>           # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> --fresh -- pnpm josh <command>   # runs it even when this tree already holds a recorded run of it
 ```
 
 <!-- /usage -->
 
 The command runs with `NO_COLOR`; its invocation is written as a code span and the last 40 lines of its combined output in a fence, at the end of the draft's `## 実機証跡` section, the shape `josh ship`'s preflight reads.
 A draft is required: `josh run:prep <N>` writes it.
+
+A command already run on this tree with the same arguments is not run again: its recorded output tail and exit code are written, under a `reused: tree <hash> … at <time>` line in the draft (`scripts/gate/tree-verdict.ts`).
+The key sees only the tree, so `--fresh` runs a command that reads state outside it (GitHub, a server) again.
 
 ### `josh run:report`
 
@@ -1050,13 +1054,21 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold.
 
 ```bash
-pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 7           # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 net min
 ```
 
 <!-- /usage -->
+
+`--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
+lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
+(`lane-sinks.ts`).
+
+A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
+only, not by Bash kind, since a transcript call names no lane.
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and

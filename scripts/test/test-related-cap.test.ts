@@ -7,8 +7,8 @@ import type { ReachedCount } from './test-pinned-reach'
 import { test_related_cap, type CappedImporters, type CountReader } from './test-related-cap'
 import { related_scope, type RelatedScope } from './test-related-scope'
 
-// joshuafolkken/kit#5532: a changed file whose imports reach more test files than the cap runs only the
-// tests importing it directly, and the run's summary names it.
+// joshuafolkken/kit#5532: a change whose imports reach more test files than the cap runs only the tests
+// importing its widest files directly, and the run's summary names them.
 
 const { MAX_TEST_FILES } = test_pinned_logic
 const PACKAGE_FILE = 'package.json'
@@ -225,5 +225,25 @@ describe('test_related_cap.over_cap_of', () => {
 		]
 
 		expect(test_related_cap.over_cap_of(counts)).toEqual([WIDE_MODULE, MIDDLE_MODULE])
+	})
+
+	// joshuafolkken/kit#5702: the cap bounds the change's summed reach, not one file's.
+	it('narrows the widest of files each under the cap whose reach sums past it', () => {
+		const counts = [
+			{ file: MIDDLE_MODULE, count: MAX_TEST_FILES - 1 },
+			{ file: LONE_MODULE, count: 1 },
+			{ file: WIDE_MODULE, count: MAX_TEST_FILES },
+		]
+
+		expect(test_related_cap.over_cap_of(counts)).toEqual([WIDE_MODULE])
+	})
+
+	it('narrows nothing when the summed reach fits the cap', () => {
+		const counts = [
+			{ file: MIDDLE_MODULE, count: MAX_TEST_FILES - 1 },
+			{ file: LONE_MODULE, count: 1 },
+		]
+
+		expect(test_related_cap.over_cap_of(counts)).toEqual([])
 	})
 })
