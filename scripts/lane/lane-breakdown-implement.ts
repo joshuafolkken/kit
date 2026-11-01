@@ -135,11 +135,13 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 	}
 }
 
-// The longest call groups of the start to plan (joshuafolkken/kit#5539).
+// The longest call groups of the start to plan (joshuafolkken/kit#5539), a `lint:related` among them
+// with its timing line (joshuafolkken/kit#5712).
 function plan_calls(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<CallGroup> {
 	const placed = placed_of(calls, breakdown.plan ?? [])
+	const timed = placed.flatMap(([call, span]) => timed_part(call, span))
 
-	return lane_breakdown_calls.top_of(placed.flatMap(([call, span]) => timed_part(call, span)))
+	return lane_breakdown_calls.with_lint_detail(lane_breakdown_calls.top_of(timed), timed)
 }
 
 // The Bash calls started inside `spans`, by the implementation's kinds — the fixes, re-ships and checks

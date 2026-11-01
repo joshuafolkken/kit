@@ -66,6 +66,8 @@ describe('lane_measure_cli.run — refusals', () => {
 		[['sample', '--unknown']],
 		[['stats']],
 		[['stats', '--period', '-1']],
+		[['stats', '--period', '1', '30']],
+		[['stats', '--period', '1', '--sinks', '0']],
 		[['value']],
 		[['value', 'edit']],
 		[['value', 'nope', '--since', SINCE]],

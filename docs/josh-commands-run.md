@@ -1054,13 +1054,21 @@ pnpm josh lane:sample   # one machine-load reading
 
 <!-- usage: lane:stats -->
 
-Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used.
+Print one table row of lane throughput, gate duration and machine load over a period, the per-stage durations of a lane under it, the wait after each ship stop reason under those, the duration and reuse count of each gate check, and each check's core claim against the cores it used, or with --sinks the stage totals of the lanes over a net-minute threshold.
 
 ```bash
-pnpm josh lane:stats --period 7   # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 7           # a 7-day period's stage medians and maxima
+pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 net min
 ```
 
 <!-- /usage -->
+
+`--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
+lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
+(`lane-sinks.ts`).
+
+A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
+only, not by Bash kind, since a transcript call names no lane.
 
 Under the stage table, the implement stage is broken down from the lane transcripts up to each lane's first `josh ship`
 (`lane-implement-stats.ts`): `plan` before the first edit, then `read`, `edit`, `check` (a scoped check or gate) and
@@ -1125,7 +1133,7 @@ pnpm josh lane:breakdown 4970   # the breakdown the overrun investigation commen
 
 The stages — start to plan, implement, each ship stage, between ship stages — add up to `lane:net`'s minutes; the waits it takes out are one line apart. The implementation splits by its tool calls' kind, what no call spent being editing & thinking. A lane the ledger holds no dispatch and merge of exits non-zero (`lane-breakdown.ts`).
 
-A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column.
+A subagent call counts under the agent it dispatched (`subagent: reviewer`), a backgrounded one at no time with its count beside it; `lane:stats` adds one such row per type under its implement sub-stages, its untimed calls in the `backgrounded` column. Between the two, its `lane first lint:related` row takes each lane's first timed `lint:related`, over the lanes that ran one.
 
 Under `implement` and `start to plan`, each line is one call group, at most three per row, longest first: `<row> › <label> ×<count> <minutes>` (`test › test:related ×3 8.7 min`), the row left out under `start to plan`.
 
