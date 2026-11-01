@@ -176,12 +176,16 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 		description:
 			'Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code)',
 		category: 'AI tools',
-		reference: ['<N> -- <command...>', 'automation', ['files', 'processes']],
+		reference: ['<N> [--fresh] -- <command...>', 'automation', ['files', 'processes']],
 		usage: {
 			examples: [
 				{
 					arguments: '<N> -- pnpm josh <command>',
 					note: 'the run picks which command is the evidence; the format is written for it',
+				},
+				{
+					arguments: '<N> --fresh -- pnpm josh <command>',
+					note: 'runs it even when this tree already holds a recorded run of it',
 				},
 			],
 		},

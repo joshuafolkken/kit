@@ -670,13 +670,17 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh ship:wait` 
 Run a command and append its invocation and output tail to the ship body draft’s live-evidence section (exits with the command’s code).
 
 ```bash
-pnpm josh ship:evidence <N> -- pnpm josh <command>   # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> -- pnpm josh <command>           # the run picks which command is the evidence; the format is written for it
+pnpm josh ship:evidence <N> --fresh -- pnpm josh <command>   # runs it even when this tree already holds a recorded run of it
 ```
 
 <!-- /usage -->
 
 The command runs with `NO_COLOR`; its invocation is written as a code span and the last 40 lines of its combined output in a fence, at the end of the draft's `## 実機証跡` section, the shape `josh ship`'s preflight reads.
 A draft is required: `josh run:prep <N>` writes it.
+
+A command already run on this tree with the same arguments is not run again: its recorded output tail and exit code are written, under a `reused: tree <hash> … at <time>` line in the draft (`scripts/gate/tree-verdict.ts`).
+The key sees only the tree, so `--fresh` runs a command that reads state outside it (GitHub, a server) again.
 
 ### `josh run:report`
 
