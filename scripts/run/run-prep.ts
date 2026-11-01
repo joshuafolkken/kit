@@ -1,5 +1,6 @@
 import { delegation_policy } from '#scripts/delegation/delegation-policy'
 import { issue_state, type IssueState } from '#scripts/issue/issue-state'
+import type { InvestigationRecord } from './run-investigation-record'
 
 // `josh run:prep <N>` — the reads a `fullrun` makes before its first edit, assembled into one report.
 // This joins the issue body and comments, the state and `human_review` line, and the dependency-update
@@ -31,6 +32,12 @@ const INVESTIGATION_BODY = `Delegate before the first read — the guard refuses
 // investigator (joshuafolkken/kit#5700).
 const INVESTIGATION_PLANNED_BODY =
 	'Skip the investigator — the plan is recorded (`run:planned` or a plan comment): the recorded plan in the issue (body or plan comment) is the investigation; read in the main line only the files this run will edit.'
+// The investigator's conclusion an earlier read of this run saved (`run-investigation-record.ts`), so
+// the implement phase reads it rather than delegating the same reading again (joshuafolkken/kit#5765).
+const INVESTIGATION_SAVED_LEAD =
+	'Skip the investigator — its conclusion is saved below; read in the main line only the files this run will edit, and delegate only what it does not answer:'
+const INVESTIGATION_SAVE_STEP =
+	"Save the investigator's conclusion (its `file:line` citations) with the Write tool to"
 const SHIP_HEADER = '=== ship preconditions ==='
 const SHIP_MET = 'met — nothing `josh ship` refuses on as the tree stands'
 const SHIP_UNMET =
@@ -57,6 +64,9 @@ interface PrepParts {
 	// Whether the entry's stage read the issue as planned (`run_stage.PLANNED`) — set by `run:entry`,
 	// which owns the stage; a bare `run:prep` leaves it unset.
 	is_planned?: boolean
+	// The investigation record — where it goes and what an earlier read saved; unset where no git
+	// directory answers.
+	investigation?: InvestigationRecord | undefined
 }
 
 function human_review_value(state: IssueState | undefined): string {
@@ -94,6 +104,20 @@ function ship_body(problems: ReadonlyArray<string>): string {
 	return [SHIP_UNMET, ...problems.map((problem) => `  - ${problem}`)].join('\n')
 }
 
+function save_step(record: InvestigationRecord | undefined): string {
+	return record === undefined ? '' : ` ${INVESTIGATION_SAVE_STEP} \`${record.path}\`.`
+}
+
+// Saved findings first, being this run's own; then a recorded plan; else delegate and save the answer.
+function investigation_body(parts: PrepParts): string {
+	const findings = parts.investigation?.findings
+
+	if (findings !== undefined) return `${INVESTIGATION_SAVED_LEAD}\n${findings}`
+	if (parts.is_planned === true) return INVESTIGATION_PLANNED_BODY
+
+	return `${INVESTIGATION_BODY}${save_step(parts.investigation)}`
+}
+
 function format_report(parts: PrepParts): string {
 	return [
 		summary(parts),
@@ -101,10 +125,7 @@ function format_report(parts: PrepParts): string {
 		section(STATE_HEADER, state_body(parts)),
 		section(LATEST_HEADER, `${parts.latest_scope}${LATEST_JOINER}${parts.latest_reason}`),
 		section(LOCATIONS_HEADER, parts.locations),
-		section(
-			INVESTIGATION_HEADER,
-			parts.is_planned === true ? INVESTIGATION_PLANNED_BODY : INVESTIGATION_BODY,
-		),
+		section(INVESTIGATION_HEADER, investigation_body(parts)),
 		section(SHIP_HEADER, ship_body(parts.ship_problems)),
 	].join(SECTION_SEPARATOR)
 }
@@ -113,6 +134,8 @@ const run_prep = {
 	CONTENT_HEADER,
 	INVESTIGATION_HEADER,
 	INVESTIGATION_PLANNED_BODY,
+	INVESTIGATION_SAVED_LEAD,
+	INVESTIGATION_SAVE_STEP,
 	LATEST_HEADER,
 	LOCATIONS_HEADER,
 	SHIP_HEADER,

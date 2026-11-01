@@ -123,6 +123,17 @@ describe('run_board_status.statuses_of withdrawn', () => {
 		expect(statuses.get(3433)?.reason).toBe('needs-decision')
 		expect(statuses.get(3409)).not.toHaveProperty('reason')
 	})
+
+	// joshuafolkken/kit#5780: run:merge's bare park after the ship-stop cap's park keeps the cap's cause.
+	it("keeps a park's reason through the bare park that repeats it", () => {
+		const events = [
+			event_at(1, T0, KIND.PARK, '#3409 parked (run:stalled: BLOCKED: Checks missing)'),
+			event_at(2, T1, KIND.PARK, PARK_3409),
+		]
+		const statuses = run_board_status.statuses_of(events, NO_LANES)
+
+		expect(statuses.get(3409)?.reason).toBe('BLOCKED: Checks missing → fullrun #3409')
+	})
 })
 
 describe('run_board_status.statuses_of lanes', () => {

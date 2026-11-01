@@ -1,0 +1,7 @@
+{
+	"reason": "Import-specifier normalization for the interaction inert check (#5789): a new 36-line module and digest plumbing",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 36
+	}
+}

@@ -57,6 +57,7 @@ const BODY_PATH = 'scratchpad/evidence.md'
 const RESUME = { title: TITLE, flags: ['--body-file', BODY_PATH], is_review: true }
 const LANE = { issue: ISSUE, directory: '/lanes/2428', profile: undefined }
 const OUTPUT = 'FAIL scripts/run/ship/run-ship.test.ts'
+const TIMED_OUT = '❌ Error: Timed out\n💡 Details: BLOCKED: Checks missing'
 const CONTEXT = { excerpt: [OUTPUT], changed: [CHANGED_FILE], more_changed: 0 }
 const ARGS = {
 	number: ISSUE,
@@ -265,12 +266,15 @@ describe('run_ship_return.return_control after the broker stopped serving', () =
 
 // joshuafolkken/kit#3999: a child that keeps stopping is parked past the cap rather than relaunched forever.
 describe('run_ship_return.return_control past the ship-stop cap', () => {
+	// joshuafolkken/kit#5780: with the block a timed-out merge wait logged as the park's cause.
 	it('parks the issue for the stopped stage and relaunches nothing', async () => {
 		is_over_mock.mockResolvedValue(true)
 
-		expect(await run_ship_return.return_control(ISSUE, 'round-2', RESUME, OUTPUT)).toBe('parked')
-		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
-		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'round-2')
+		expect(await run_ship_return.return_control(ISSUE, 'followup', RESUME, TIMED_OUT)).toBe(
+			'parked',
+		)
+		expect(is_over_mock).toHaveBeenCalledWith(ISSUE, 'followup')
+		expect(park_mock).toHaveBeenCalledWith(ISSUE, 'followup', 'BLOCKED: Checks missing')
 		expect(relaunch_mock).not.toHaveBeenCalled()
 		expect(request_mock).not.toHaveBeenCalled()
 	})
