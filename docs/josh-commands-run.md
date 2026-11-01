@@ -1131,6 +1131,8 @@ The `ship followup` line names the check its CI wait waited on last, and when it
 Each ship stage lists its inner steps under it, longest first: the `ship-lap` rows `josh ship` writes and the lane's core-budget waits (`lane-breakdown-laps.ts`).
 `between ship stages` lists the child's Bash there by kind. `lane:stats` prints each step's median and maximum under the stage table (`lane-ship-lap-stats.ts`).
 
+A stretch between ship stages that a park fell in is named after the park instead: `pause for #<M>` or `park (<reason>)`, net of its wait (`lane-breakdown-pause.ts`).
+
 ### `josh lane:plan`
 
 <!-- usage: lane:plan -->
