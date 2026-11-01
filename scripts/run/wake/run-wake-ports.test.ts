@@ -6,6 +6,7 @@ import { agent_role_profile } from '#scripts/agent/agent-role-profile'
 import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
+import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_event_stream } from '#scripts/run/event/run-event-stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -85,6 +86,35 @@ describe('the supervisor waking a judgment session', () => {
 		expect(result.kind).toBe('failed')
 		expect(run_wake_session.launch).not.toHaveBeenCalled()
 		expect(stages()).toStrictEqual([])
+	})
+})
+
+// joshuafolkken/kit#5743: the record is the woken session's from its first command, named by the
+// transcript its forced id writes before the launch and by the launched process after it.
+describe('the supervisor handing the record to a judgment session', () => {
+	it('adopts the record for the session before the launch and names its process after it', () => {
+		const ports = run_wake_ports.ports_for(context(), PROFILE)
+
+		run_carry.begin_carry(context().carry_target, INVOCATION, run_carry.NO_OWNER, new Date())
+		ports.hand_off(SID)
+		vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: SESSION_PID })
+		ports.wake(INVOCATION, SID, MATERIAL)
+
+		const read = run_carry.read_carry(context().carry_target)
+
+		expect(read.kind === 'carried' ? read.carry.owner_pid : undefined).toBe(SESSION_PID)
+		expect(read.kind === 'carried' ? read.carry.owner_transcript : '').toMatch(`${SID}.jsonl`)
+	})
+
+	it('reads the launched session as not at work until its transcript is written', () => {
+		const ports = run_wake_ports.ports_for(context(), PROFILE)
+
+		run_carry.begin_carry(context().carry_target, INVOCATION, run_carry.NO_OWNER, new Date())
+		ports.hand_off(SID)
+		vi.spyOn(run_wake_session, 'launch').mockReturnValue({ kind: 'launched', pid: process.ppid })
+		ports.wake(INVOCATION, SID, MATERIAL)
+
+		expect(ports.is_owner_live(ports.read_carry())).toBe(false)
 	})
 })
 

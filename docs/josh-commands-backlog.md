@@ -896,7 +896,7 @@ pnpm josh backlog:drive [--max <n>] [--idle <minutes>] [--only]
 
 An open carry record supplies the start time, merged count and named issues. The first stdout line is a hand-back (`merge <token> #N`, `launch #N`, `offer`, `judge`, `watch`, `triage`, `retrospective` or `window`) or `stop <reason>`; the second carries resume flags. A `run` that owes a judgment opens its lanes first, then hands `triage` back in the same pass.
 
-The woken session claims the record, acts, and ends its turn; its `Stop` hook writes the cut that hands the loop back.
+The supervisor claims the record for the session it wakes; the session acts and ends its turn; its `Stop` hook writes the cut that hands the loop back.
 
 A pass launches every free lane it seats side by side, not one after another. A refused launch is answered after the others settle, which stay in flight; only one launch at a time holds the `josh latest` stash.
 
