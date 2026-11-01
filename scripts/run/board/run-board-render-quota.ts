@@ -34,6 +34,8 @@ const FIRST_COLUMN = INDENT.length + NAME_WIDTH
 const COUNT_MARK = '≈'
 // The widest count the column holds.
 const MAX_COUNT = 999
+// A mean spend is a fraction (`7 / 3`), so a whole count can divide to just under itself.
+const COUNT_EPSILON = 1e-9
 const NONE = '—'
 // `—` under a percent's last digit.
 const NONE_CELL = `  ${NONE}`
@@ -143,7 +145,7 @@ function count_of(window: QuotaWindow, now_ms: number, per_task?: number): numbe
 
 	const left = PERCENT - current(window, now_ms).used_percent
 
-	return Math.min(MAX_COUNT, Math.max(0, Math.floor(left / per_task)))
+	return Math.min(MAX_COUNT, Math.max(0, Math.floor(left / per_task + COUNT_EPSILON)))
 }
 
 function per_task_in(reading: QuotaReading | undefined, window: QuotaWindow): number | undefined {

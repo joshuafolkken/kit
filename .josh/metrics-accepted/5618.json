@@ -1,0 +1,7 @@
+{
+	"reason": "#5618 widens the usage board's spend sample (sequential sampling, launch cache, reset-aware start); +lines are the feature",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 32
+	}
+}
