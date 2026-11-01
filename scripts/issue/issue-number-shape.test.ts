@@ -63,6 +63,18 @@ describe('issue_number_shape.single_of', () => {
 	)
 })
 
+// joshuafolkken/kit#5352: a shell drops an unquoted `#12`, so a typed bare number is read as the issue.
+describe('issue_number_shape.issue_token', () => {
+	it.each([
+		{ token: '12', expected: '#12' },
+		{ token: '#12', expected: '#12' },
+		{ token: '0', expected: '0' },
+		{ token: 'new', expected: 'new' },
+	])('reads $token as $expected', ({ token, expected }) => {
+		expect(issue_number_shape.issue_token(token)).toBe(expected)
+	})
+})
+
 describe('the issue-number shape is declared once', () => {
 	it('finds no copy of the pattern in another script', () => {
 		expect(source_files().filter((file) => has_issue_copy(file))).toStrictEqual([])

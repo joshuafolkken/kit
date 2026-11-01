@@ -1,0 +1,8 @@
+{
+	"reason": "new josh run:handoff command (#5352): args/final/launch/cli modules, backlogrun subprocess port, working-tree hold check sharing run:entry's claim rule (run-hold-block), bare-number issue tokens, registry entry and docs section",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 339,
+		"ai_cost.on_demand_bytes": 194
+	}
+}

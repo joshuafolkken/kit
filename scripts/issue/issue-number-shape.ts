@@ -13,6 +13,7 @@
 
 const ISSUE_NUMBER_PATTERN = /^[1-9]\d*$/u
 const BAD_ISSUE_MESSAGE = 'Not an issue number: '
+const ISSUE_PREFIX = '#'
 
 function is_issue_number(value: string): boolean {
 	return ISSUE_NUMBER_PATTERN.test(value)
@@ -31,9 +32,16 @@ function single_of(positionals: ReadonlyArray<string>): string | undefined {
 	return is_single && ISSUE_NUMBER_PATTERN.test(issue_number) ? issue_number : undefined
 }
 
+// A shell reads an unquoted `#12` as a comment, so a command that takes typed issues reads a bare `12`
+// as `#12`; any other token is left as typed.
+function issue_token(token: string): string {
+	return ISSUE_NUMBER_PATTERN.test(token) ? `${ISSUE_PREFIX}${token}` : token
+}
+
 const issue_number_shape = {
 	ISSUE_NUMBER_PATTERN,
 	is_issue_number,
+	issue_token,
 	require_issue_number,
 	single_of,
 }

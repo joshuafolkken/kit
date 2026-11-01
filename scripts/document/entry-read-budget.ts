@@ -52,7 +52,8 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'halfrun', bytes: 49_152 },
 	{ entry: 'prrun', bytes: 57_344 },
 	{ entry: 'backlogrun', bytes: 86_016 },
-	{ entry: LANE_CHILD, bytes: 45_056 },
+	// The `run:handoff` row of the workflow skill's shared table (joshuafolkken/kit#5352) crossed the 45056 block.
+	{ entry: LANE_CHILD, bytes: 49_152 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
