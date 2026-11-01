@@ -36,6 +36,10 @@
   - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an `Edit` / `Write` that follows `run:review`'s (or `run:chain`'s) brief, before `run:review --join`, `run:chain --join` or `ship --detach`. Every occurrence
   - silent: no fix since the brief, already joined or detached, or not a lane child
   - not automated: the right act is another command, whose arguments the call does not carry
+- **One check:related before the brief** (`repeat-check-related`, `.claude/skills/workflow-commands/chain-rule.md` → "A lane child")
+  - fires: `pnpm josh pretool:guard` — `pnpm josh check:related` (`josh cr`) in a lane child after an earlier one, with no `run:review` (or `run:chain`) brief and no `ship --detach` since. Every occurrence
+  - silent: the first since the last detach, a brief since, or not a lane child
+  - not automated: the right act is another command, whose arguments the call does not carry
 - **Piped verification** (`piped-verification`, `output-bounds.md`)
   - fires: `pnpm josh pretool:guard` — a pass/fail josh check (`gate` / `check*` / `lint*` / `cspell*` / `test*` / `eval` / `overrides` / `ranges`) in front of a pipe — rewritten under `set -o pipefail` when every filter reads to the end (`tail`, a full-reading `grep`, `cut`, `sort`, `uniq`, `wc`, `tee`, an `awk` / `sed` that cannot exit early and carries no `<` / `>` / `&`), refused otherwise
   - silent: the exit code reaches the caller — a failure reads as a failure
