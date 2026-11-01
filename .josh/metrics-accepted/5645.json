@@ -1,0 +1,8 @@
+{
+	"reason": "#5645: followup and run:progress --wait print their governing sections, so readers drop the separate doc:section fetch",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 33,
+		"ai_cost.on_demand_bytes": 226
+	}
+}
