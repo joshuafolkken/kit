@@ -39,11 +39,11 @@ function unrecorded(): string {
 	return root_with('inert', `${review_finding_ledger.zero_round_line(DATE, ISSUE)}\n`)
 }
 
-// This checkout's change is `paths`, and `comment_only` the ones whose code the base already had.
-function change_since_base(paths: Array<string>, comment_only: Array<string>): void {
+// This checkout's change is `paths`, and `inert` the ones whose code the base already had.
+function change_since_base(paths: Array<string>, inert: Array<string>): void {
 	vi.spyOn(changed_paths, 'read_changed_paths').mockResolvedValue(paths)
 	vi.spyOn(change_base, 'resolved_through_merge').mockResolvedValue(BASE)
-	vi.spyOn(review_code_tree, 'comment_only_since').mockResolvedValue(comment_only)
+	vi.spyOn(review_code_tree, 'inert_since').mockResolvedValue(inert)
 }
 
 describe('review_interaction.due_paths', () => {
@@ -102,14 +102,15 @@ describe('review_interaction.reading — a due change that leaves what executes 
 		vi.restoreAllMocks()
 	})
 
-	it('is `not-required` with the inert line and no merge-gate refusal for a comment-only due change', async () => {
+	it('is `not-required` with the inert line and no merge-gate refusal for a comment- or import-only due change', async () => {
 		change_since_base([...DUE], [...DUE])
 		const answer = await review_interaction.reading(ISSUE, unrecorded())
 
 		expect(answer.status).toBe(NOT_REQUIRED)
 		expect(answer.inert_line).toContain('Interaction review not due')
+		expect(answer.inert_line).toContain('import specifiers')
 		expect(answer.inert_line).toContain(DUE[0])
-		expect(review_code_tree.comment_only_since).toHaveBeenCalledWith(BASE, DUE)
+		expect(review_code_tree.inert_since).toHaveBeenCalledWith(BASE, DUE)
 		expect(await review_interaction.refusal(ISSUE, unrecorded())).toBeUndefined()
 	})
 
