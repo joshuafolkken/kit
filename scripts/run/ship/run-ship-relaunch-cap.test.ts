@@ -145,6 +145,17 @@ describe('run_ship_relaunch_cap.park', () => {
 		)
 	})
 
+	// joshuafolkken/kit#5780: a park on a timed-out merge wait names the missing context, which
+	// `run:board` reads off the park event.
+	it('records and comments the block a timed-out merge wait named as the cause', async () => {
+		const blocked = 'BLOCKED: Checks missing'
+
+		expect(await run_ship_relaunch_cap.park(ISSUE, 'followup', blocked)).toBe(true)
+
+		expect(String(comment_mock.mock.calls[0]?.[1])).toContain(blocked)
+		expect(emit_mock).toHaveBeenCalledWith('park', `#${ISSUE} parked (run:stalled: ${blocked})`)
+	})
+
 	it('reports no park and tells nobody when the label was refused', async () => {
 		add_label_mock.mockResolvedValue(false)
 

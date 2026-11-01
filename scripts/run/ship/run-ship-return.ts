@@ -210,8 +210,11 @@ async function relaunched_or_brokered(lane: LaneInfo, stop: ShipStop): Promise<R
 
 // A child that stopped more often than the cap allows is parked instead of relaunched
 // (`run-ship-relaunch-cap.ts`); a park the label refused leaves the stop recorded, as before.
-async function parked(issue: string, reason: string): Promise<ReturnOutcome> {
-	if (await run_ship_relaunch_cap.park(issue, reason)) return 'parked'
+// A timed-out merge wait's block, named in the stage output, becomes the park's cause.
+async function parked(issue: string, reason: string, output: StageOutput): Promise<ReturnOutcome> {
+	const blocked = run_ship_stop_cause.blocked_cause_of(output.body)
+
+	if (await run_ship_relaunch_cap.park(issue, reason, blocked)) return 'parked'
 
 	note('the lane child was not relaunched past the ship-stop cap, and the park label was refused')
 
@@ -249,7 +252,7 @@ async function stopped(
 
 	const reason = run_ship_stage.stop_reason(stage, resume.conflicts)
 
-	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason)
+	if (await run_ship_relaunch_cap.is_over(issue, reason)) return await parked(issue, reason, output)
 
 	const findings = run_ship_stop_cause.details_of(stage, { ...resume, ...output })
 	const context = await run_ship_stop_context.build(issue, output.body, findings)

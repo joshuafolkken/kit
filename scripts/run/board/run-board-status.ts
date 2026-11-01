@@ -156,10 +156,22 @@ function settled_as(previous: ItemStatus | undefined, state: ItemState): ItemSta
 	return { state, started_ms: previous?.started_ms, ...kept_of(previous) }
 }
 
+// A bare ending that repeats the one before keeps that one's reason: `run:merge` writes a bare park
+// after the ship-stop cap's park named its cause (joshuafolkken/kit#5780).
+function kept_reason(
+	previous: ItemStatus | undefined,
+	state: ItemState,
+): Pick<ItemStatus, 'reason'> {
+	return previous?.state === state && previous.reason !== undefined
+		? { reason: previous.reason }
+		: {}
+}
+
 function ended(previous: ItemStatus | undefined, state: ItemState, event: RunEvent): ItemStatus {
 	return {
 		...settled_as(previous, state),
 		ended_ms: moment(event),
+		...kept_reason(previous, state),
 		...run_board_ending_reason.recorded_of(event),
 	}
 }

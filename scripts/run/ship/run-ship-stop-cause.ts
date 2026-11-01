@@ -1,6 +1,7 @@
 import { api_auth } from '#scripts/agent/api-auth'
 import { UNREADABLE_COMMENTS_STOP } from '#scripts/gh/git-gh-comments-unreadable'
 import { gh_retry } from '#scripts/gh/git-gh-retry'
+import { is_blocked_cause } from '#scripts/gh/git-pr-checks-missing'
 import { NO_CHECKS_MESSAGE } from '#scripts/gh/git-pr-checks-watch'
 import { git_error } from '#scripts/git/git-error'
 import type { StopRecord } from '#scripts/lane/lane-ledger-schema'
@@ -170,7 +171,20 @@ function record_of(issue: number, stage: Stage, failed: StoppedOutput = NO_OUTPU
 	}
 }
 
-const run_ship_stop_cause = { CAUSE, cause_of, details_of, is_review, record_of }
+// What a merge wait that timed out was still blocked on, as the failure's logged cause names it
+// (`git-pr-checks-missing.ts` → `blocked_cause`) — the park's cause (joshuafolkken/kit#5780).
+function blocked_cause_of(body: string): string | undefined {
+	return final_failures(body).find(is_blocked_cause)
+}
+
+const run_ship_stop_cause = {
+	CAUSE,
+	blocked_cause_of,
+	cause_of,
+	details_of,
+	is_review,
+	record_of,
+}
 
 export type { Cause }
 export { run_ship_stop_cause }

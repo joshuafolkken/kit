@@ -32,6 +32,13 @@ describe('run_board_ending_reason.reason_of', () => {
 		).toStrictEqual(['review failed → fullrun #13', 'ship-stop cap → fullrun #13', 'fullrun #13'])
 	})
 
+	// joshuafolkken/kit#5780: a park on a timed-out merge wait names the missing required context.
+	it('reads a park on a timed-out merge wait as the missing context and the resume action', () => {
+		expect(reasons(KIND.PARK, ['#13 parked (run:stalled: BLOCKED: Checks missing)'])).toStrictEqual(
+			['BLOCKED: Checks missing → fullrun #13'],
+		)
+	})
+
 	it('reads a withdraw reason after its prefix, and none where it gives none', () => {
 		expect(
 			reasons(KIND.WITHDRAW, [

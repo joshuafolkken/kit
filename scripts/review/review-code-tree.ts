@@ -6,6 +6,7 @@ import type { FileMapStamp } from '#scripts/josh/file-map-stamp'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { comment_ranges, type TypeScriptApi } from './comment-ranges'
+import { import_specifiers } from './import-specifiers'
 import { review_stamps } from './review-stamps'
 
 // The second map round 1 records beside `review-tree.ts`'s: for each source file, the digest of its
@@ -46,15 +47,23 @@ function load_typescript(root: string): TypeScriptApi | undefined {
 	}
 }
 
+type Digest = (text: string, relative: string) => string | undefined
+
 function text_digest(api: TypeScriptApi, text: string, relative: string): string | undefined {
 	const code = comment_ranges.strip(api, text, is_svelte(relative))
 
 	return code === undefined ? undefined : stamp_file.digest(code)
 }
 
-function code_digest(api: TypeScriptApi, root: string, relative: string): string | undefined {
+// The digest that also leaves out where each binding is imported from (joshuafolkken/kit#5789).
+function inert_digest(api: TypeScriptApi): Digest {
+	return (text, relative) =>
+		text_digest(api, import_specifiers.blank(api, text, relative), relative)
+}
+
+function code_digest(digest: Digest, root: string, relative: string): string | undefined {
 	try {
-		return text_digest(api, readFileSync(path.join(root, relative), 'utf8'), relative)
+		return digest(readFileSync(path.join(root, relative), 'utf8'), relative)
 	} catch {
 		return undefined
 	}
@@ -63,17 +72,33 @@ function code_digest(api: TypeScriptApi, root: string, relative: string): string
 // A path absent at `base` (a new file) or that does not parse there has no digest. `git show`'s
 // output arrives with its final newline stripped, which the working-tree file still ends in.
 async function base_digest(
-	api: TypeScriptApi,
+	digest: Digest,
 	base: string,
 	relative: string,
 ): Promise<string | undefined> {
 	try {
 		const text = await git_command.show_file(`${base}:${relative}`)
 
-		return text_digest(api, `${text}\n`, relative)
+		return digest(`${text}\n`, relative)
 	} catch {
 		return undefined
 	}
+}
+
+function digests_of(
+	root: string,
+	paths: ReadonlyArray<string>,
+	digest: Digest,
+): Record<string, string> {
+	const entries = paths
+		.filter((relative) => is_source(relative))
+		.flatMap((relative) => {
+			const value = code_digest(digest, root, relative)
+
+			return value === undefined ? [] : [[relative, value] as const]
+		})
+
+	return Object.fromEntries(entries)
 }
 
 // A path that is deleted, does not parse, or is not a source file has no entry — and a path with no
@@ -84,15 +109,8 @@ function tree_of(
 	api: TypeScriptApi | undefined = load_typescript(root),
 ): Record<string, string> {
 	if (api === undefined) return {}
-	const entries = paths
-		.filter((relative) => is_source(relative))
-		.flatMap((relative) => {
-			const digest = code_digest(api, root, relative)
 
-			return digest === undefined ? [] : [[relative, digest] as const]
-		})
-
-	return Object.fromEntries(entries)
+	return digests_of(root, paths, (text, relative) => text_digest(api, text, relative))
 }
 
 async function read(paths: ReadonlyArray<string>, root?: string): Promise<Record<string, string>> {
@@ -134,10 +152,11 @@ function comment_only(
 	)
 }
 
-// The paths whose code is what it was at `base` — whose difference from it, if any, is in comments.
-// Read before round 1 has recorded anything, so it compares against the base's blobs rather than a
-// round-1 snapshot (joshuafolkken/kit#5656).
-async function comment_only_since(
+// The paths whose code is what it was at `base` — whose difference from it, if any, is in comments or
+// in a binding import's module specifier. Read before round 1 has recorded anything, so it compares
+// against the base's blobs rather than a round-1 snapshot (joshuafolkken/kit#5656). Round 1's own
+// record keeps the comment-only digest, so round 2 still reads an import a fix moved.
+async function inert_since(
 	base: string,
 	paths: ReadonlyArray<string>,
 	root?: string,
@@ -146,10 +165,11 @@ async function comment_only_since(
 	const checkout = root ?? (await git_command.repository_root())
 	const typescript = api ?? load_typescript(checkout)
 	if (typescript === undefined) return []
-	const tree = tree_of(checkout, paths, typescript)
+	const digest = inert_digest(typescript)
+	const tree = digests_of(checkout, paths, digest)
 	const sources = Object.keys(tree)
 	const digests = await Promise.all(
-		sources.map(async (relative) => await base_digest(typescript, base, relative)),
+		sources.map(async (relative) => await base_digest(digest, base, relative)),
 	)
 
 	return sources.filter((relative, index) => digests[index] === tree[relative])
@@ -157,7 +177,7 @@ async function comment_only_since(
 
 const review_code_tree = {
 	comment_only,
-	comment_only_since,
+	inert_since,
 	load_typescript,
 	read,
 	record,

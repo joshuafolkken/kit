@@ -43,7 +43,7 @@ const ROLE_LINES = [
 ]
 
 const INERT_LINE_PREFIX =
-	'Interaction review not due: every run-tooling path this change touches leaves what executes unchanged (round 2’s inert reading — in these directories, a comment-only edit)'
+	'Interaction review not due: every run-tooling path this change touches leaves what executes unchanged (round 2’s inert reading — in these directories, an edit to comments or import specifiers only)'
 
 type InteractionStatus = 'ok' | 'missing' | 'not-required'
 
@@ -75,8 +75,8 @@ function brief_block(targets: ReadonlyArray<string>): string {
 async function inert_line(due: ReadonlyArray<string>): Promise<string | undefined> {
 	const base = await change_base.resolved_through_merge()
 	if (base === undefined) return undefined
-	const comment_only = await review_code_tree.comment_only_since(base, due)
-	const is_inert = due.every((relative) => review_round2.is_unexecuted(relative, comment_only))
+	const inert = await review_code_tree.inert_since(base, due)
+	const is_inert = due.every((relative) => review_round2.is_unexecuted(relative, inert))
 
 	return is_inert ? `${INERT_LINE_PREFIX}: ${due.join(', ')}` : undefined
 }

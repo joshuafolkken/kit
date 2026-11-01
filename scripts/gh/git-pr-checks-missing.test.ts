@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { describe_pr_failure, evaluate_pr_state } from './git-pr-checks-eval'
 import { make_pr_snapshot, PASSING_ROLLUP, SONAR_QUBE } from './git-pr-checks-fixture'
 import {
+	blocked_cause,
 	collect_missing_contexts,
 	forget_missing_contexts,
+	is_blocked_cause,
 	MISSING_GRACE_MS,
 } from './git-pr-checks-missing'
 
@@ -120,5 +122,27 @@ describe('evaluate_pr_state — a required context with no check-run', () => {
 
 	it('keeps waiting while the context may still register', () => {
 		expect(evaluate_pr_state(missing_checks_snapshot({ rollup: PENDING_ROLLUP }))).toBe('pending')
+	})
+})
+
+// joshuafolkken/kit#5780: a wait that ran out of budget names what it was still blocked on.
+describe('blocked_cause — what a timed-out wait was blocked on', () => {
+	it('names the required contexts and checks the last read had no check-run for', () => {
+		const snapshot = missing_checks_snapshot({ rollup: PENDING_ROLLUP })
+
+		expect(blocked_cause(snapshot, [SONAR_QUBE])).toBe(`BLOCKED: ${CHECKS} missing`)
+		expect(blocked_cause(snapshot, ['E2E'])).toBe(`BLOCKED: E2E, ${CHECKS} missing`)
+	})
+
+	it('falls back to the merge state when nothing required is absent', () => {
+		expect(blocked_cause(make_pr_snapshot({ merge_state_status: BLOCKED }), [SONAR_QUBE])).toBe(
+			`mergeStateStatus: ${BLOCKED}`,
+		)
+	})
+
+	it('reads its own lines back as a blocked cause, and nothing else', () => {
+		expect(is_blocked_cause(`BLOCKED: ${CHECKS} missing`)).toBe(true)
+		expect(is_blocked_cause(`mergeStateStatus: ${BLOCKED}`)).toBe(true)
+		expect(is_blocked_cause('Timed out while waiting for PR checks to complete.')).toBe(false)
 	})
 })

@@ -1,0 +1,7 @@
+{
+	"reason": "#5765 adds the investigation record, its run:prep section and its removal after the merge (+61 code lines)",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 61
+	}
+}
