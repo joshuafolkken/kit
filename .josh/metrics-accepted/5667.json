@@ -1,0 +1,7 @@
+{
+	"reason": "#5667: triage steps name backlog:triage --blocked-by <M>, wording fixed by the acceptance criteria",
+	"date": "2026-11-01",
+	"growth": {
+		"ai_cost.on_demand_bytes": 55
+	}
+}
