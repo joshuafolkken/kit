@@ -23,6 +23,7 @@ const WIDE = 80
 const RULE_WIDTH = 50
 const NONE: ReadonlySet<SectionKey> = new Set()
 const ALL: ReadonlyArray<SectionKey> = [
+	'throughput',
 	'usage',
 	'lanes',
 	'processes',
@@ -40,6 +41,8 @@ const PROCESSES = '💻 processes'
 const GROUPS = '▶ 1.0 ── 🌐 2.0'
 const USAGE = '⛽ usage'
 const USAGE_SUMMARY = 'claude 42/68 · codex —/45'
+const THROUGHPUT = '📈 throughput'
+const THROUGHPUT_SUMMARY = '24h 4.0/h · 7d 2.9/h'
 
 function rows(count: number, stage: YieldStage): Array<PlanLine> {
 	return Array.from({ length: count }, (_, index) => ({
@@ -77,6 +80,7 @@ function opened(plan: PlanSection): string {
 
 describe('run_board_fold.toggled', () => {
 	it.each([
+		{ key: 't', section: 'throughput' },
 		{ key: 'u', section: 'usage' },
 		{ key: 'l', section: 'lanes' },
 		{ key: 'p', section: 'processes' },
@@ -187,6 +191,30 @@ describe('run_board_fold.fold_parts usage', () => {
 	})
 })
 
+// joshuafolkken/kit#5710: the 📈 throughput section folds, opens and widens like the usage gauges.
+describe('run_board_fold throughput', () => {
+	const throughput: DetailPart = {
+		head: heading_lines(THROUGHPUT),
+		lines: [{ text: '  24h  ▁▂▃', is_detail: false }],
+		label: THROUGHPUT,
+		summary: THROUGHPUT_SUMMARY,
+	}
+
+	it('folds the throughput to each row’s closes per hour, and opens it led by ▾', () => {
+		const folded = fold_parts(parts_of({ throughput }), new Set(['throughput'])).throughput
+		const open = fold_parts(parts_of({ throughput }), NONE).throughput
+
+		expect(folded?.head).toStrictEqual(['', shut(THROUGHPUT, THROUGHPUT_SUMMARY)])
+		expect(open?.head.at(-1)?.startsWith(`▾ ${THROUGHPUT}`)).toBe(true)
+	})
+
+	it('runs the throughput rule on to the frame’s rule width', () => {
+		const lines = bounded(parts_of({ throughput, rule_width: WIDE }), { folded: NONE })
+
+		expect(width_of(lines.find((line) => line.includes(THROUGHPUT)) ?? '')).toBe(WIDE)
+	})
+})
+
 describe('run_board_fold.fold_parts long summary', () => {
 	it('ends a folded line on a rule even where its summary runs past the rule width', () => {
 		const summary = GROUPS.repeat(RULE_WIDTH)
@@ -272,6 +300,6 @@ describe('run_board_fold.bounded rule width', () => {
 
 describe('run_board_fold.KEYS_LINE', () => {
 	it('names every key once', () => {
-		expect(KEYS_LINE).toBe(' u l p f q w d: fold · a: all · Ctrl-C: quit')
+		expect(KEYS_LINE).toBe(' t u l p f q w d: fold · a: all · Ctrl-C: quit')
 	})
 })

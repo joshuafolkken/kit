@@ -275,6 +275,7 @@ function frame_of(state: BoardState, local: LocalRead, layout: BoardLayout, redr
 			run_board_layout.listed_parks(layout),
 		),
 		resume: local.resume,
+		throughput: local.throughput,
 		thanks: state.thanks,
 		link: redraw.ports.link,
 		...bounds,

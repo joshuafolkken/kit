@@ -1,0 +1,7 @@
+{
+	"reason": "Throughput derivation (#5708) and rendering (#5710) bundled in one PR, plus round-1 fixes: DST-safe cells, t fold key, rows derived in the local read",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 280
+	}
+}

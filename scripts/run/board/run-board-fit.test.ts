@@ -193,6 +193,25 @@ describe('run_board_fit.fit usage', () => {
 	})
 })
 
+// joshuafolkken/kit#5710: the 📈 throughput rows stand between the header and the ⛽ usage gauges, and
+// give way whole before them.
+describe('run_board_fit.fit throughput', () => {
+	it('draws the throughput above the usage gauges and drops it before them', () => {
+		const throughput = { head: ['', '📈'], lines: [{ text: '  24h', is_detail: false }] }
+		const usage = { head: ['', '⛽'], lines: [{ text: '  claude', is_detail: false }] }
+		const parts = parts_of([issues(2)], { throughput, usage })
+		const [rates, gauges] = [
+			['', '📈', '  24h'],
+			['', '⛽', '  claude'],
+		]
+		const rows = ['', '  1', '  2']
+
+		expect(fit_wide(parts, 11)).toStrictEqual([...HEADER, ...rates, ...gauges, ...rows])
+		expect(fit_wide(parts, 8)).toStrictEqual([...HEADER, ...gauges, ...rows])
+		expect(fit_wide(parts, 5)).toStrictEqual([...HEADER, ...rows])
+	})
+})
+
 // joshuafolkken/kit#4099: the parts give way from the frame's bottom up — a running, a decision, a
 // parked and a not-yet-started row above three notes, a 🔗 waiting and a finished row under them, the
 // thanks, the legend and the footer — 24 lines whole.

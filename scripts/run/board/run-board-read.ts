@@ -27,6 +27,7 @@ import type { QuotaProvider } from './run-board-quota-read'
 import { run_board_roots } from './run-board-roots'
 import { run_board_scope } from './run-board-scope'
 import { run_board_span, type BoardSpan } from './run-board-span'
+import { run_board_throughput, type ThroughputRow } from './run-board-throughput'
 import { run_board_usual, type UsualTimes } from './run-board-usual'
 
 // What `run:board` reads locally each tick: the run's span and scope, its events and its open lanes.
@@ -39,6 +40,9 @@ interface LocalRead {
 	// What the run was asked to do, from its invocation.
 	scope: NamedPlan
 	events: ReadonlyArray<RunEvent>
+	// The 📈 throughput rows, read off the whole stream, every run's, before it is narrowed to this run;
+	// derived here so the redraw thread is never handed the stream itself.
+	throughput?: ReadonlyArray<ThroughputRow> | undefined
 	lanes: ReadonlyArray<string>
 	// The open lanes as their lane state records sort them — this run's, an earlier run's and the ones
 	// with no record — with what each is doing (`run-board-lane-state.ts`).
@@ -292,6 +296,7 @@ async function read_local(table?: TableRead): Promise<LocalRead | undefined> {
 		...span_fields(span),
 		scope: run_board_scope.scope_of(span.invocation),
 		...(await span_events_here(events, span, table, carry)),
+		throughput: run_board_throughput.rows_of(events, Date.now()),
 		lanes: lanes.map((lane) => lane.issue),
 		lane_states,
 		resume,

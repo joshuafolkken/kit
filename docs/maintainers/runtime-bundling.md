@@ -7,6 +7,25 @@ own process (joshuafolkken/kit#1342). A consumer pays twice. Its `josh` bin is t
 for every script command — about 0.16 s per call on top of the command's own work
 (joshuafolkken/kit#3328).
 
+## kit's own checkout — tsx as a loader, never `dist/`
+
+kit's `pnpm josh` script is `node --import tsx scripts/josh/josh.ts` (joshuafolkken/kit#5632): tsx is
+registered as a loader in the one node process, where the `tsx` CLI started a second node process
+to run the dispatcher. It reads the sources on every call, so an edit is never run through a stale
+build.
+
+The gate's steps and lefthook's commands are `pnpm josh <command>` calls, so they take the
+same path. `dist/josh.js` is not used here: every command not yet pre-built would spawn a tsx child
+from it, slower than the in-process import (`rule:list`: about 550 ms against 300 ms).
+
+Measured on 2026-11-01 (node 26.12.1, macOS), `pnpm josh doc:section CLAUDE.md Communication`, 15
+runs interleaved between the two scripts:
+
+| Script                                | Median | Fastest |
+| ------------------------------------- | -----: | ------: |
+| Before (`tsx scripts/josh/josh.ts`)   | 263 ms |  236 ms |
+| After (`node --import tsx …/josh.ts`) | 204 ms |  187 ms |
+
 ## The policy
 
 **Reduce tsx at runtime one command at a time, starting with the most frequently called.** A command
