@@ -10,7 +10,7 @@ import { review_interaction } from './review-interaction'
 // its finding. A status git could not read prints nothing — the merge gate still refuses a missing pass.
 
 const NOT_REQUIRED_LINE =
-	'No interaction review is due: the change touches no run tooling, or this checkout keeps no ledger.'
+	'No interaction review is due: the change touches no run tooling, changes only comments in it, or this checkout keeps no ledger.'
 const DUE_HEAD = 'Interaction review now due'
 
 // An interaction reviewer that already ran beside round 1 is only recorded, never run twice.

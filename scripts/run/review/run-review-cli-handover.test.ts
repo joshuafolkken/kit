@@ -28,7 +28,12 @@ vi.mock('#scripts/review/review-brief-cli', () => ({
 vi.mock('#scripts/review/review-interaction', async (import_original) => {
 	const { review_interaction } = await import_original<Record<'review_interaction', object>>()
 
-	return { review_interaction: { ...review_interaction, status: async () => 'not-required' } }
+	return {
+		review_interaction: {
+			...review_interaction,
+			reading: async () => ({ status: 'not-required' }),
+		},
+	}
 })
 vi.mock('#scripts/review/review-lane-handover', () => ({
 	review_lane_handover: {
