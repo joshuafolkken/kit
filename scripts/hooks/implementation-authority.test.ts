@@ -96,6 +96,37 @@ describe('shell implementation authority', () => {
 	})
 })
 
+// joshuafolkken/kit#5793: the refusal names the rule it matched, so a false refusal is diagnosable.
+describe('the named refusal rule', () => {
+	it.each([
+		['custom-editor notes.md', '`custom-editor` is neither a read-only program'],
+		['ls scripts/*.ts | xargs custom-editor', '`xargs` is neither a read-only program'],
+		['pnpm josh gate', '`josh gate` is not read-only'],
+	])('names the rule %s matched', (command, rule) => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+
+		expect(implementation_authority.reason(shell_payload(command))).toContain(
+			`Matched rule: ${rule}`,
+		)
+	})
+
+	it('names the unverified patch input', () => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+
+		expect(implementation_authority.reason(payload([], 'apply_patch'))).toContain(
+			'Matched rule: `apply_patch` input.',
+		)
+	})
+
+	it('passes a consultation grep of the repository', () => {
+		vi.stubEnv(agent_session_role.KEY, 'scheduler')
+
+		expect(
+			implementation_authority.reason(shell_payload('grep -rn pattern scripts')),
+		).toBeUndefined()
+	})
+})
+
 // joshuafolkken/kit#5534: a finding quotes code in backticks, which a single-quoted argument leaves
 // as text, so the reviewer's findings path stays open while any other destination stays refused.
 const FINDING = "printf '%s\\n' 'Run `josh followup` before $(merge) with FOO=1'"

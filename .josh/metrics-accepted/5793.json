@@ -1,0 +1,7 @@
+{
+	"reason": "#5793: josh-read-only module (one read-only judgement for josh invocations from the registry) and per-segment glob/grep handling with named refusal rules in the consultation shell guard",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 57
+	}
+}
