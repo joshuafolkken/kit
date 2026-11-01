@@ -19,8 +19,9 @@ const WAKE_PREFIX = 'josh-run-wake-'
 // The output of every session this starts, appended per repository so a silent death is diagnosable.
 const WAKE_LOG_PREFIX = durable_state.PREFIX.WAKE_LOG
 const WAKE_LOG_SUFFIX = '.log'
-// How long a woken session has to claim the carry record — the only launch-failure detector, since a
-// claim also catches a session that dies in boot or never picks the run up. It covers a slow cold start.
+// How long a woken session has to be seen at work on the carry record (`run-wake-handoff.ts` →
+// `has_session_begun`) — the only launch-failure detector, since it also catches a session that dies or
+// hangs in boot and never picks the run up. It covers a slow cold start.
 const WAKE_GRACE_MS = 600_000
 // Retried before failing: stopping ends a run nobody is watching.
 const MAX_WAKE_ATTEMPTS = 3
@@ -38,8 +39,8 @@ interface RunWake {
 	// Read back by `--list` and `--stop`; the start-time token tells a reissued pid from the original.
 	pid: number
 	process_start?: string | undefined
-	// Cuts served, counted when a woken session claims the record (not at the spawn), so an unclaimed
-	// wake leaves `woke` behind `cuts`. A dead-owner recovery is a wake without a cut, so `woke >= cuts`.
+	// Cuts served, counted when a woken session is seen at work on the record (not at the spawn), so a
+	// wake that never began leaves `woke` behind `cuts`. A dead-owner recovery is a wake without a cut, so `woke >= cuts`.
 	// Observed at a poll, so it lags a claim by up to one interval.
 	woke: number
 	// The grace window is measured from this; cleared when the woken session claims the record.

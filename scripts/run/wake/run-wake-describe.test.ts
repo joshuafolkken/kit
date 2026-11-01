@@ -164,7 +164,7 @@ describe('run_wake_describe.describe_wake — the wait line on a handed-off reco
 		carry_spy.mockReturnValue({ kind: 'carried', carry: HANDED_OFF })
 
 		expect(wait_line({ ...WAKE, woke_at: NOW.toISOString(), attempts: 1 })).toBe(
-			`waiting: the woken session has until ${at(run_wake.WAKE_GRACE_MS)} to claim the carry record`,
+			`waiting: the woken session has until ${at(run_wake.WAKE_GRACE_MS)} to begin work on the carry record`,
 		)
 	})
 

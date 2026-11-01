@@ -4,7 +4,7 @@ import { backlogrun_launch } from '#scripts/backlog/backlogrun-launch'
 import { lane_close } from '#scripts/lane/lane-close'
 import { lane_withdraw_closed } from '#scripts/lane/lane-withdraw-closed'
 import { poll } from '#scripts/lib/poll'
-import { run_carry } from '#scripts/run/carry/run-carry'
+import { run_carry, type CarryOwner, type RunCarry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
 import { run_headless } from '#scripts/run/run-headless'
 import type { WakeContext } from './run-wake-describe'
@@ -34,6 +34,18 @@ function say_session_running(context: WakeContext): void {
 	run_event_setup.emit_to(context.event_target, run_event_setup.STAGE.SESSION, new Date())
 }
 
+function session_owner(
+	context: WakeContext,
+	profile: AgentProfile,
+	session_id: string,
+): CarryOwner {
+	return run_wake_handoff.session_owner({
+		worktree: context.worktree,
+		session_id,
+		provider: profile.provider,
+	})
+}
+
 function wake_session(
 	context: WakeContext,
 	invocation: string,
@@ -51,7 +63,14 @@ function wake_session(
 	const target = { cwd: context.worktree, env: environment, log_path: context.log_target }
 	const result = run_wake_session.launch({ argv: built.argv, ...target, profile }, note_to_stderr)
 
-	if (result.kind === 'launched') say_session_running(context)
+	if (result.kind === 'launched') {
+		run_wake_handoff.hand_on(
+			context.carry_target,
+			session_owner(context, profile, session.id),
+			result.pid,
+		)
+		say_session_running(context)
+	}
 
 	return result
 }
@@ -63,6 +82,10 @@ async function retry_closes(): Promise<void> {
 	const notes = await lane_withdraw_closed.withdraw_closed()
 
 	for (const note of notes) note_to_stderr(note)
+}
+
+function is_session_at_work(carry: RunCarry): boolean {
+	return run_carry.is_held_by_another(carry) && run_wake_handoff.has_session_begun(carry)
 }
 
 // **A record this supervisor owns itself is not a session at work.** A failed driver leaves the record
@@ -83,11 +106,11 @@ function ports_for(
 	return {
 		is_code_stale,
 		read_carry: () => run_carry.read_carry(context.carry_target),
-		is_owner_live: (read) => read.kind === 'carried' && run_carry.is_held_by_another(read.carry),
+		is_owner_live: (read) => read.kind === 'carried' && is_session_at_work(read.carry),
 		has_work: async () => true,
 		new_session_id: () => randomUUID(),
-		hand_off: () => {
-			run_wake_handoff.hand_off(context.carry_target)
+		hand_off: (session_id) => {
+			run_wake_handoff.hand_to(context.carry_target, session_owner(context, profile, session_id))
 		},
 		drive: async () => await run_wake_driver.drive(context.carry_target, poll.sleep, is_planning),
 		wake: (invocation, session_id, material) =>

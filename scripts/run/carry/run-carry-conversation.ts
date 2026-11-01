@@ -30,9 +30,16 @@ const CONVERSATION_QUIET_MS = 600_000
 
 type Environment = Readonly<Record<string, string | undefined>>
 
+// The transcript a session writes under `directory` — the one name both the session reading its own
+// and the supervisor naming a session it is about to wake (`run-wake-handoff.ts`) build.
+function transcript_of(session_id: string, directory: string): string {
+	return path.join(directory, `${session_id}${cost_transcript.TRANSCRIPT_EXTENSION}`)
+}
+
 // The calling session's own transcript, or `undefined` outside a session or when its file cannot be
 // found. **The id comes from the environment, which a detached supervisor never inherits**
-// (`agent-session-environment.ts` strips it), so a record the supervisor adopts names no transcript.
+// (`agent-session-environment.ts` strips it), so a record the supervisor adopts for itself names no
+// transcript.
 function own_transcript(
 	environment: Environment = process.env,
 	directories: ReadonlyArray<string> = cost_transcript.transcript_directories(process.cwd()),
@@ -41,9 +48,9 @@ function own_transcript(
 
 	if (session_id === undefined) return undefined
 
-	const name = `${session_id}${cost_transcript.TRANSCRIPT_EXTENSION}`
-
-	return directories.map((directory) => path.join(directory, name)).find((file) => existsSync(file))
+	return directories
+		.map((directory) => transcript_of(session_id, directory))
+		.find((file) => existsSync(file))
 }
 
 function modified_ms(transcript: string): number | undefined {
@@ -89,6 +96,7 @@ function reclaim_owner(carry: RunCarry, owner: CarryOwner): RunCarry {
 
 const run_carry_conversation = {
 	CONVERSATION_QUIET_MS,
+	transcript_of,
 	own_transcript,
 	is_conversation_live,
 	is_same_conversation,
