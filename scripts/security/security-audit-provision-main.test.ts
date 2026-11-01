@@ -32,12 +32,22 @@ describe('security-audit-provision-main', () => {
 	it('pins the owner and records the model only at session start', async () => {
 		await main_entry_fixture.run_entry(ENTRY, [])
 
+		expect(pin).not.toHaveBeenCalled()
 		expect(record_from_stdin).not.toHaveBeenCalled()
 
 		await main_entry_fixture.run_entry(ENTRY, ['--session-start'])
 
 		expect(pin).toHaveBeenCalledOnce()
 		expect(record_from_stdin).toHaveBeenCalledOnce()
+	})
+
+	it('records the model alone on a clear start, provisioning nothing', async () => {
+		vi.clearAllMocks()
+		await main_entry_fixture.run_entry(ENTRY, ['--session-model'])
+
+		expect(record_from_stdin).toHaveBeenCalledOnce()
+		expect(pin).not.toHaveBeenCalled()
+		expect(run).not.toHaveBeenCalled()
 	})
 
 	it('is the source the session-start hook bundle is built from', () => {
