@@ -16,6 +16,7 @@ import { markdown_section } from './markdown-section'
 const BACKGROUND_HEADING = '## 背景'
 const EPIC_HEADING = '## Split rationale'
 const PREFIX = '- 規模見積もり:'
+const HEADING_PREFIX = '## '
 const { REASON_PREFIX } = split_assess
 const DECLARATION = `${PREFIX} 約 <N> ファイル / <M> 行（テスト除く）`
 // Full- or half-width parentheses alike: the two read the same to the person typing the line.
@@ -35,6 +36,46 @@ function declared(body: string, prefix: string): string | undefined {
 		.find((text) => text.startsWith(prefix))
 
 	return line?.slice(prefix.length).trim()
+}
+
+function is_estimate_line(text: string): boolean {
+	const trimmed = text.trim()
+
+	return trimmed.startsWith(PREFIX) && VALUE_PATTERN.test(trimmed.slice(PREFIX.length).trim())
+}
+
+// joshuafolkken/kit#5758: a decision that widens an Issue's scope states the new estimate in its
+// record; this is that line, trimmed, or `undefined` when the record states none that parses.
+function stated_line(record: string): string | undefined {
+	return markdown_section
+		.unfenced_lines(record)
+		.find((text) => is_estimate_line(text))
+		?.trim()
+}
+
+// The index of the estimate line `parse` reads — the first under the background heading, before the
+// next heading — or -1.
+function declared_index(visible: ReadonlyArray<string>): number {
+	const start = visible.findIndex((text) => text.trim() === BACKGROUND_HEADING) + 1
+	if (start === 0) return -1
+	const section = visible.slice(start)
+	const end = section.findIndex((text) => text.trimStart().startsWith(HEADING_PREFIX))
+	const bounded = end === -1 ? section : section.slice(0, end)
+	const at = bounded.findIndex((text) => text.trimStart().startsWith(PREFIX))
+
+	return at === -1 ? -1 : start + at
+}
+
+// `body` with its declared estimate line replaced by `line`, keeping the line's indentation; unchanged
+// when it declares none.
+function restated(body: string, line: string): string {
+	const lines = [...markdown_section.lines_of(body)]
+	const at = declared_index(markdown_section.unfenced_lines(body))
+	const current = lines[at]
+	if (current === undefined) return body
+	lines[at] = `${current.slice(0, current.indexOf(PREFIX))}${line}`
+
+	return lines.join('\n')
 }
 
 function is_epic(body: string): boolean {
@@ -143,7 +184,9 @@ const size_estimate = {
 	over_cap,
 	over_guide,
 	problems,
+	restated,
 	route_of,
+	stated_line,
 }
 
 export { size_estimate }
