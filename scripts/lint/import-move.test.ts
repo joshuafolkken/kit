@@ -110,6 +110,18 @@ describe('import_move.rewrite — cuts only the name and its comma', () => {
 		)
 	})
 
+	it('skips a comma inside a comment after the name', () => {
+		expect(moved("import { b /* x, y */, d } from './x'\n")).toBe(
+			"import { d } from './x'\nimport { b } from './y'\n",
+		)
+	})
+
+	it('skips a comma inside a comment before the last name', () => {
+		expect(moved("import { a /* x, y */, b } from './x'\n")).toBe(
+			"import { a /* x, y */ } from './x'\nimport { b } from './y'\n",
+		)
+	})
+
 	it('cuts a name that is not the last one with the comma after it', () => {
 		expect(moved("import { b, c } from './x'\n")).toBe(
 			"import { c } from './x'\nimport { b } from './y'\n",

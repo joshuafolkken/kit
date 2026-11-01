@@ -130,19 +130,32 @@ function blank_start(text: string, at: number): number {
 	return start
 }
 
+// The first token after `node`, skipping comments, so a comma inside a comment is never taken for it.
+function comma_after(api: TypeScriptApi, node: ts.Node): number {
+	const { text } = node.getSourceFile()
+	const scanner = api.createScanner(api.ScriptTarget.Latest, true)
+
+	scanner.setText(text, node.getEnd())
+	scanner.scan()
+
+	return scanner.getTokenStart()
+}
+
 // The name and the comma that separates it — the one after it, else (the last name, with no trailing
 // comma) the one before it. What sits between, a comment included, stays for the formatter.
-function cut_edits(element: ts.ImportSpecifier): ReadonlyArray<Replacement> {
+function cut_edits(api: TypeScriptApi, element: ts.ImportSpecifier): ReadonlyArray<Replacement> {
 	const { elements } = element.parent
 	const { text } = element.getSourceFile()
+	const at = elements.indexOf(element)
+	const previous = elements[at - 1]
 
-	if (elements.at(-1) !== element || elements.hasTrailingComma) {
-		const after = text.indexOf(',', element.getEnd()) + 1
+	if (previous === undefined || elements.hasTrailingComma || at < elements.length - 1) {
+		const after = comma_after(api, element) + 1
 
 		return [{ start: element.getStart(), end: blank_end(text, after), text: '' }]
 	}
 
-	const before = text.lastIndexOf(',', element.getStart())
+	const before = comma_after(api, previous)
 	const start = blank_start(text, element.getStart())
 
 	return [
@@ -160,7 +173,7 @@ function edits_of(
 	const { declaration, element } = moving
 	const insert = insert_edit(moving, type_keyword(api, clause), to)
 
-	if (element.parent.elements.length > 1) return [...cut_edits(element), insert]
+	if (element.parent.elements.length > 1) return [...cut_edits(api, element), insert]
 	if (clause.name === undefined) return [specifier_edit(declaration, to)]
 
 	return [{ start: clause.name.getEnd(), end: element.parent.getEnd(), text: '' }, insert]

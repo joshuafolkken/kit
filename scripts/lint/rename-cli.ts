@@ -36,7 +36,8 @@ const SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([
 	'.cjs',
 ])
 const IDENTIFIER = /^[$A-Z_a-z][\w$]*$/u
-const USAGE = `Usage: josh rename <old-identifier> <new-identifier> [${IMPORT_FLAG} <old-specifier> <new-specifier>] <file...>`
+const USAGE = `Usage: josh rename <old-identifier> <new-identifier> [${IMPORT_FLAG} <old-specifier> <new-specifier>] <file...>
+       (an identical old and new identifier with ${IMPORT_FLAG} moves that named import to the new specifier)`
 
 interface RenameArguments {
 	request: RenameRequest
