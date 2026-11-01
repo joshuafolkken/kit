@@ -16,6 +16,9 @@ const labels_mock = vi.hoisted(() => vi.fn((): Array<string> => []))
 const fit_mock = vi.hoisted(() => vi.fn((_prep: { is_planned?: boolean }) => 'report'))
 const halfrun_adopt_mock = vi.hoisted(() => vi.fn(async () => true))
 const halfrun_pending_mock = vi.hoisted(() => vi.fn(async () => false))
+const plan_at_entry_mock = vi.hoisted(() =>
+	vi.fn(async (): Promise<number | undefined> => undefined),
+)
 
 vi.mock('#scripts/run/run-open-pr', () => ({ run_open_pr: { is_pending: open_pr_mock } }))
 
@@ -45,6 +48,9 @@ vi.mock('#scripts/run/run-prep-cli', () => ({
 	},
 }))
 vi.mock('./run-entry-spill', () => ({ run_entry_spill: { fit: fit_mock } }))
+vi.mock('./run-entry-lane-plan', () => ({
+	run_entry_lane_plan: { run_at_entry: plan_at_entry_mock },
+}))
 vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: async () => undefined },
 }))
@@ -71,6 +77,8 @@ const ISSUE = '5171'
 const FRESH = { code: OK, out: 'fresh' }
 const HELD = { code: OK, out: 'hold' }
 const UNDER = { code: OK, out: 'under' }
+const GIVEN_BACK = 'lane given back at the entry'
+const PLANNED_LABELS = ['run:lane', 'run:planned']
 
 const info_lines: Array<string> = []
 
@@ -105,7 +113,7 @@ describe('run_entry_cli.run — the entry probe of a lane child', () => {
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(2)
 		expect(yield_mock).toHaveBeenCalledExactlyOnceWith(Number(ISSUE))
-		expect(info_lines.at(-1)).toContain('lane given back at the entry')
+		expect(info_lines.at(-1)).toContain(GIVEN_BACK)
 		expect(info_lines.join('\n')).not.toContain('report')
 		expect(record_baseline_mock).not.toHaveBeenCalled()
 		expect(print_section_mock).not.toHaveBeenCalled()
@@ -139,6 +147,41 @@ describe('run_entry_cli.run — the entry probe of a lane child', () => {
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(yield_mock).not.toHaveBeenCalled()
+		expect(plan_at_entry_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5741: a planned issue's `lane:plan` runs at the entry, and its yield stops the entry
+// the way the probe's does.
+describe('run_entry_cli.run — lane:plan at the entry of a planned issue', () => {
+	it('stops before the report when the entry lane:plan gives the lane back', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(PLANNED_LABELS)
+		plan_at_entry_mock.mockResolvedValueOnce(2)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(2)
+		expect(plan_at_entry_mock).toHaveBeenCalledExactlyOnceWith(ISSUE, 'planned')
+		expect(info_lines.at(-1)).toContain(GIVEN_BACK)
+		expect(print_section_mock).not.toHaveBeenCalled()
+	})
+
+	it('runs on to the report on any other lane:plan verdict', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(PLANNED_LABELS)
+		plan_at_entry_mock.mockResolvedValueOnce(3)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(info_lines.at(-1)).toContain('report')
+	})
+
+	it('runs no lane:plan once the probe has given the lane back', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(true)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(2)
+		expect(plan_at_entry_mock).not.toHaveBeenCalled()
 	})
 })
 
@@ -191,7 +234,7 @@ describe('run_entry_cli.run — a lane dispatched again after a yield', () => {
 	it('starts past the plan and hands the report the planned stage when the plan is recorded', async () => {
 		is_child_mock.mockReturnValue(true)
 		yield_mock.mockResolvedValue(false)
-		labels_mock.mockReturnValue(['run:lane', 'run:planned'])
+		labels_mock.mockReturnValue(PLANNED_LABELS)
 
 		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
 		expect(info_lines.join('\n')).toContain('at: planned · to: fullrun · start: implement')
