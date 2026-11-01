@@ -26,6 +26,7 @@ const ANY_PATH = /.*/
 // eslint-disable-next-line require-unicode-regexp
 const BARE_SPECIFIER = /^[^./#]/
 const NODE_BUILTIN_PREFIX = 'node:'
+const ENTRY_POINT_KIND = 'entry-point'
 const SCOPE_PREFIX = '@'
 const SCOPED_NAME_SEGMENTS = 2
 const NODE_MODULES_SEGMENT = `${path.sep}node_modules${path.sep}`
@@ -53,8 +54,8 @@ const INLINED_PACKAGES: ReadonlySet<string> = new Set(['execa', 'js-yaml', 'semv
 // graphs file by file from node_modules was most of a bundle's import time on every tool call
 // (joshuafolkken/kit#5641). Every other bare dependency stays a runtime import the consumer resolves
 // from kit's node_modules, exactly as the library bundles do — `typescript` alone would grow the
-// bundles tenfold. No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed directly), a hook
-// bundle is always launched as `node <path>`.
+// bundles tenfold. No shebang banner is added: unlike `dist/josh.js` (the `bin.josh` entry, executed
+// directly), a hook bundle is always launched as `node <path>`.
 interface HookBundle {
 	source: string
 	out: string
@@ -114,8 +115,10 @@ function package_name(specifier: string): string {
 }
 
 // An import inside node_modules belongs to an inlined package's graph — an external package is never
-// loaded — so it is inlined with it.
+// loaded — so it is inlined with it. An entry point is never external: a Windows absolute path such as
+// `C:\…` also reads as bare.
 function is_external(args: OnResolveArgs): boolean {
+	if (args.kind === ENTRY_POINT_KIND) return false
 	if (args.path.startsWith(NODE_BUILTIN_PREFIX)) return true
 
 	return !INLINED_PACKAGES.has(package_name(args.path)) && !is_dependency_file(args.importer)

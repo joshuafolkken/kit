@@ -2,6 +2,6 @@
 	"reason": "Inline the hook bundles' light dependencies to cut the PreToolUse per-call import cost (#5641): a dependency-boundary esbuild plugin",
 	"date": "2026-11-01",
 	"growth": {
-		"scripts.code_lines": 37
+		"scripts.code_lines": 39
 	}
 }
