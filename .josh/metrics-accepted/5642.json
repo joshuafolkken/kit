@@ -1,0 +1,7 @@
+{
+	"reason": "#5642: registry test pin module (test-related-pins.ts) and its hooks in the cap, touched scope and followup verdict",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 27
+	}
+}
