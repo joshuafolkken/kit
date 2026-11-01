@@ -51,7 +51,7 @@ const COUNT_WORDS: ReadonlyArray<string> = [
 // run by, which the pointer has to precede.
 const STEP_MARKERS: ReadonlyArray<[string, string]> = [
 	['0. **A lane child**', '`pnpm josh check:related`'],
-	['1. Run `pnpm josh main:merge`', 'run the final scoped lint/test pair'],
+	['1. **Issue `pnpm josh run:cut <N>` alone first**', 'the scoped lint/test pair'],
 ]
 
 // Unwrapped, since a stem or a pointer wraps at whatever column the prose wraps at.
@@ -128,7 +128,7 @@ describe('the self-check question 1 and josh test:pinned', () => {
 
 		expect(step).toContain('self-check"; 1: `--join`\'s `test:pinned`')
 		expect(step).toContain(
-			'it starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
+			'`run:review` starts `pnpm josh test:pinned` and `pnpm josh gate` in the background',
 		)
 		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
 		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.

@@ -116,7 +116,7 @@ describe('run_step_cli.run — a lane child', () => {
 		await run_step_cli.run([ISSUE])
 
 		expect(printed_lines().join('\n')).toContain('0. **A lane child**')
-		expect(printed_lines().join('\n')).not.toContain('1. Run `pnpm josh main:merge`.')
+		expect(printed_lines().join('\n')).not.toContain('`pnpm josh run:chain <N>` runs `main:merge`')
 	})
 
 	it('prints no lane:plan command away from implement', async () => {
