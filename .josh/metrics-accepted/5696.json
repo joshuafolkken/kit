@@ -1,0 +1,8 @@
+{
+	"reason": "#5696 adds the ship followup marker, run:entry's watcher-section print and its share of the entry spill budget",
+	"date": "2026-11-01",
+	"growth": {
+		"scripts.code_lines": 35,
+		"ai_cost.on_demand_bytes": 78
+	}
+}

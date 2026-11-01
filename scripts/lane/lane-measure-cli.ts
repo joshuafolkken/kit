@@ -10,6 +10,7 @@ import { lane_capacity } from './lane-capacity'
 import { lane_net_read } from './lane-net-read'
 import { lane_sampler, type MeasureContext } from './lane-sampler'
 import { lane_sinks } from './lane-sinks'
+import { lane_sinks_issues } from './lane-sinks-issues'
 import { lane_stats, type StatsWindow } from './lane-stats'
 import { lane_stats_tables, type PeriodRecords } from './lane-stats-tables'
 import { lane_transcript_stats } from './lane-transcript-stats'
@@ -200,7 +201,9 @@ async function stats_text(
 			events: await lane_net_read.read_events(context),
 		}
 
-		return lane_sinks.table(sources, window, request.sinks)
+		const issues = await lane_sinks_issues.read()
+
+		return session_cite.text(lane_sinks.table(sources, window, request.sinks, issues))
 	}
 
 	const records = await period_records(context, window)

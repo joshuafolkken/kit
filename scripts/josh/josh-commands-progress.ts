@@ -40,7 +40,7 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 				{
 					names: ['--wait'],
 					description:
-						'start once in the background: each report goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.',
+						'start once in the background: as it starts it prints `progress-watcher.md` → "Progress while the run is quiet" once per session (a repeat names it in one line — `run:entry` has printed it first outside a lane child); each report then goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.',
 				},
 				{
 					names: ['--hours <n>'],

@@ -145,7 +145,7 @@ describe('operational shell reads and records', () => {
 		'git -C /tmp/repo diff --stat',
 		'git diff -- app.ts',
 		'pnpm josh review:attest nonce',
-		'pnpm josh review:lint',
+		'pnpm josh review:brief',
 		'pnpm josh backlog:plan --waves',
 		'gh pr view 123',
 		'cat app.ts 2>&1',

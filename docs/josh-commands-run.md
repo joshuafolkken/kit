@@ -691,8 +691,10 @@ The key sees only the tree, so `--fresh` runs a command that reads state outside
 Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends.
 
 ```bash
-pnpm josh run:report             # print the report; the same text josh notify sends
-pnpm josh run:report --handoff   # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report                              # print the report; the same text josh notify sends
+pnpm josh run:report --handoff                    # print the backlogrun hand-off report and send it as the confirmation
+pnpm josh run:report --end                        # end the run: the report, run:carry --end, run:wake --stop — stops at a failed stage
+pnpm josh run:report --end --stopped "<reason>"   # end a run that stopped: run:carry --end --stopped sends the confirmation
 ```
 
 <!-- /usage -->
@@ -754,7 +756,7 @@ pnpm josh run:progress --interval 20 --repo joshuafolkken/app-kit --hours 4
 - `--mark` — record that a real report happened without printing a line (keeps the last line for `run:wake --list`).
 - `--path` — print the ambient heartbeat log's path and exit. Every heartbeat line is mirrored there, so `tail -F "$(pnpm josh run:progress --path)"` follows the run across a `backlogrun` session cut. Reads no run state, so it answers in a lane child too.
 - `--interval <min>` — silence interval (default 20; also `JOSH_PROGRESS_INTERVAL_MINUTES`, then `josh.progress_interval_minutes`).
-- `--wait` — start once in the background: each report goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.
+- `--wait` — start once in the background: as it starts it prints `progress-watcher.md` → "Progress while the run is quiet" once per session (a repeat names it in one line — `run:entry` has printed it first outside a lane child); each report then goes to the event stream and ambient log, never stdout; exits only on an arrival, `josh followup` ending the run, or `--hours`.
 - `--hours <n>` — how long the watcher lives (default 8 with `--wait`, 1 otherwise).
 - `--repo <owner/name>` — scopes the read.
 
@@ -1066,6 +1068,9 @@ pnpm josh lane:stats --period 1 --sinks   # stage totals of the lanes over 30 ne
 `--sinks [<minutes>]` (default 30) prints one table instead: per `lane:breakdown` stage and lap of the period's merged
 lanes over that many net minutes, the total, the lane count and the median per lane, the longest total first
 (`lane-sinks.ts`).
+
+The `open issues` column lists each open Issue whose title contains the stage name (case-insensitive), from one
+listing: `none` when no title names it, `unread` when the listing failed (`lane-sinks-issues.ts`).
 
 A lap overlaps its stage, so those rows do not add up to the lanes' time. The time between ship stages is split by park
 only, not by Bash kind, since a transcript call names no lane.

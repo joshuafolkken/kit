@@ -1,8 +1,10 @@
 import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { capped_print_part } from '#scripts/document/capped-print-part'
+import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { run_prep, type PrepParts } from '#scripts/run/run-prep'
-import { afterEach, describe, expect, it } from 'vitest'
+import { run_step_section_once } from '#scripts/run/run-step-section-once'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_entry_spill } from './run-entry-spill'
 
 // The cap `.claude/settings.json` declares for this checkout — the figure the issue measured against.
@@ -49,8 +51,35 @@ function spill_file(report: string): string {
 	return file
 }
 
+// The bundle's own cases run as a lane child, where no watcher section shares the result.
+beforeEach(() => {
+	vi.spyOn(lane_child_marker, 'is_child_of').mockReturnValue(true)
+	vi.spyOn(run_step_section_once, 'is_recorded').mockReturnValue(false)
+})
+
 afterEach(() => {
 	for (const directory of written.splice(0)) rmSync(directory, { recursive: true, force: true })
+	vi.restoreAllMocks()
+})
+
+// joshuafolkken/kit#5696: outside a lane child `run:entry` also prints the progress watcher's section.
+describe('run_entry_spill.report_budget — the sections printed after the bundle', () => {
+	it('leaves less outside a lane child than inside one', () => {
+		const inside = run_entry_spill.report_budget(root)
+
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(false)
+
+		expect(run_entry_spill.report_budget(root)).toBeLessThan(inside)
+	})
+
+	it('counts no watcher section once this session printed it', () => {
+		const inside = run_entry_spill.report_budget(root)
+
+		vi.mocked(lane_child_marker.is_child_of).mockReturnValue(false)
+		vi.mocked(run_step_section_once.is_recorded).mockReturnValue(true)
+
+		expect(run_entry_spill.report_budget(root)).toBe(inside)
+	})
 })
 
 describe('run_entry_spill.fit — a bundle under the budget', () => {
