@@ -9,7 +9,8 @@ visibly broken, so the completion gate needs someone to look at the rendered res
 
 **Where the screenshot command came from.** `shot` shipped in app-kit 0.86.0
 (joshuafolkken/app-kit#200); game-kit carries none yet. Either statement is true only of a version,
-which is why the skill decides by the printed command list rather than by these facts.
+which is why `josh ui:shot` decides by the printed command list rather than by these facts, and the
+skill names no candidate of its own.
 
 **Why the E2E capture is a fallback, not a workaround.** A screenshot added to a Playwright spec is a
 real capture and committed test code: it leaves the project with a screenshot the next run can take
