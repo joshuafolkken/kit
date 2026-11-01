@@ -4,6 +4,9 @@ dist/
 build/
 .pnpm-store/
 
+# Append-only ledgers josh writes line by line; Prettier reads a `__` in a recorded path as emphasis
+.josh/observations/
+
 # Package manager lock files
 package-lock.json
 pnpm-lock.yaml
