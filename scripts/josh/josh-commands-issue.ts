@@ -163,8 +163,16 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-fold-existing-cli.ts',
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
-		reference: ['<assessment.json> [--json]', 'automation', ['none']],
-		usage: { examples: [{ arguments: 'assessment.json --json' }] },
+		reference: ['<assessment.json> [--json | --apply <N>]', 'automation', ['none']],
+		usage: {
+			examples: [
+				{ arguments: 'assessment.json --json' },
+				{
+					arguments: 'assessment.json --apply 5848',
+					note: 'write the fold to the issue once its body still reads as assessed, apply its priority floor, and verify the re-read.',
+				},
+			],
+		},
 	},
 	'issue:cite': {
 		script: 'scripts/issue/issue-cite-main.ts',
