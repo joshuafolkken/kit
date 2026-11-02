@@ -299,7 +299,11 @@ async function take_cut(target: string, request: CutCommand): Promise<number> {
 }
 
 // The verdicts that leave nothing to act on beyond carrying on, so no section follows them.
-const TRIVIAL_VERDICTS: ReadonlySet<string> = new Set([NOT_A_LANE_VERDICT, FRESH_VERDICT])
+const TRIVIAL_VERDICTS: ReadonlySet<string> = new Set([
+	NOT_A_LANE_VERDICT,
+	UNDER_THRESHOLD_VERDICT,
+	FRESH_VERDICT,
+])
 
 // The section is printed after the token, never instead of it, and the token's exit code stands.
 function with_section(key: string, code: number): number {

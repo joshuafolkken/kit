@@ -6,8 +6,16 @@ import { run_cut_cli_fixture } from './run-cut-cli-fixture'
 // joshuafolkken/kit#5953: a non-trivial verdict is followed by the `pre-gate-cut.md` section it acts on,
 // so a lane child never opens the whole document; `not-a-lane` and `fresh` leave nothing to act on.
 
-const { ISSUE, WITH_HANDOFF, find_open_lane, print_section, verdict, existing_cut } =
-	run_cut_cli_fixture
+const {
+	CONTEXT_UNDER,
+	ISSUE,
+	WITH_HANDOFF,
+	find_open_lane,
+	print_section,
+	session_verdict,
+	verdict,
+	existing_cut,
+} = run_cut_cli_fixture
 
 run_cut_cli_fixture.install()
 
@@ -26,6 +34,15 @@ describe('the section run:cut prints after its verdict', () => {
 		expect(print_section).not.toHaveBeenCalled()
 	})
 
+	it('prints no section when the context is under the threshold', async () => {
+		session_verdict.mockReturnValue(CONTEXT_UNDER)
+
+		await run_cut_cli.run([ISSUE])
+
+		expect(verdict()).toBe(run_cut_cli.UNDER_THRESHOLD_VERDICT)
+		expect(print_section).not.toHaveBeenCalled()
+	})
+
 	it('prints no section on not-a-lane', async () => {
 		find_open_lane.mockResolvedValue(undefined)
 
@@ -35,7 +52,9 @@ describe('the section run:cut prints after its verdict', () => {
 		expect(verdict()).toBe(run_cut_cli.NOT_A_LANE_VERDICT)
 		expect(print_section).not.toHaveBeenCalled()
 	})
+})
 
+describe('the section run:cut --resume prints after its verdict', () => {
 	it('prints "Resuming" after a resume', async () => {
 		existing_cut()
 
