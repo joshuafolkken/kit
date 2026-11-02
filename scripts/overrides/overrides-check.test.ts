@@ -6,7 +6,11 @@ const PROCESS_EXIT_CALLED = 'process.exit called'
 const SVELTE_SNAPSHOT = '{"svelte":"^5.55.7"}'
 const PACKAGE_JSON_WITHOUT_PNPM = '{"name":"app-kit"}'
 const WORKSPACE_YAML_WITH_SVELTE = 'overrides:\n  svelte: ^5.55.7\n'
-const USAGE = 'Usage: josh overrides [--save]'
+const USAGE = 'Usage: josh overrides [--save] [--diff <base>[...<head>]]'
+const ADOPT_RANGE = 'main...5853-lane'
+const DEV_ENGINES_KEPT = 'devEngines: kept'
+const WORKSPACE_WITH_ESBUILD = 'overrides:\n  esbuild@<=0.24.2: ">=0.25.0"\n'
+const KEPT_SOURCES = { package_json: '{}', workspace_yaml: WORKSPACE_WITH_ESBUILD }
 
 const fs_mock = vi.hoisted(() => {
 	const state: {
@@ -44,11 +48,13 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 vi.mock('#scripts/version/development-engines-verdict', () => ({
-	development_engines_verdict: { report: vi.fn() },
+	development_engines_verdict: { report: vi.fn(), describe: vi.fn(() => DEV_ENGINES_KEPT) },
 }))
+vi.mock('./overrides-diff', () => ({ overrides_diff: { read_sources: vi.fn() } }))
 
 const { writeFileSync: write_file_sync } = await import('node:fs')
 const { development_engines_verdict } = await import('#scripts/version/development-engines-verdict')
+const { overrides_diff } = await import('./overrides-diff')
 const { run_overrides_check, main } = await import('./overrides-check')
 
 // Every spy here is one mock for the whole file — uncleared, a call an earlier test made satisfies a
@@ -197,5 +203,66 @@ describe('overrides-check — the argument line', () => {
 			main([])
 		}).toThrow(PROCESS_EXIT_CALLED)
 		expect(development_engines_verdict.report).toHaveBeenCalledOnce()
+	})
+})
+
+// joshuafolkken/kit#5853: the dependency-update check read `git diff` by eye, in another form after
+// `josh adopt`; `--diff` answers both with the same two verdict lines.
+describe('overrides-check — --diff against a git revision', () => {
+	it('prints both verdicts for an update not yet committed (--diff HEAD)', () => {
+		vi.mocked(overrides_diff.read_sources).mockReturnValue({
+			before: KEPT_SOURCES,
+			after: KEPT_SOURCES,
+		})
+		main(['--diff', 'HEAD'])
+
+		expect(overrides_diff.read_sources).toHaveBeenCalledWith('HEAD')
+		expect(development_engines_verdict.describe).toHaveBeenCalledWith('{}', '{}')
+		expect(console.info).toHaveBeenCalledWith(DEV_ENGINES_KEPT)
+		expect(console.info).toHaveBeenCalledWith(
+			'✔ overrides unchanged since HEAD (1 from pnpm-workspace.yaml).',
+		)
+		expect(development_engines_verdict.report).not.toHaveBeenCalled()
+	})
+
+	it('exits 1 naming the removed override after josh adopt (--diff <base>...<head>)', () => {
+		const removed = { package_json: '{}', workspace_yaml: '' }
+
+		vi.mocked(overrides_diff.read_sources).mockReturnValue({ before: KEPT_SOURCES, after: removed })
+
+		expect(() => {
+			main([`--diff=${ADOPT_RANGE}`])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(console.info).toHaveBeenCalledWith(DEV_ENGINES_KEPT)
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining(`✖ overrides changed since ${ADOPT_RANGE}`),
+		)
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining('- removed: esbuild@<=0.24.2'),
+		)
+		expect(process.exit).toHaveBeenCalledWith(1)
+	})
+})
+
+describe('overrides-check — --diff refusals', () => {
+	it('refuses a range that resolves to no commit', () => {
+		vi.mocked(overrides_diff.read_sources).mockReturnValue(undefined)
+
+		expect(() => {
+			main(['--diff', 'no-such-ref'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(console.error).toHaveBeenCalledWith(
+			expect.stringContaining('cannot resolve no-such-ref'),
+		)
+		expect(process.exit).toHaveBeenCalledWith(1)
+	})
+
+	it('refuses --save beside --diff with usage, writing no snapshot', () => {
+		expect(() => {
+			main(['--save', '--diff', 'HEAD'])
+		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(console.error).toHaveBeenCalledWith(USAGE)
+		expect(write_file_sync).not.toHaveBeenCalled()
+		expect(overrides_diff.read_sources).not.toHaveBeenCalled()
 	})
 })

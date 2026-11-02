@@ -20,17 +20,14 @@ declarations, but an absent package field says nothing about workspace overrides
 ## 2. The check is a command you run, not a conclusion you reach
 
 ```bash
-git diff -- pnpm-workspace.yaml package.json
+pnpm josh overrides --diff HEAD                # an update not yet committed
+pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which committed and returned
 ```
 
-(after `josh adopt`, which has already committed and returned to the default branch:
-`git diff <default>...<branch> -- pnpm-workspace.yaml package.json`). Confirm both overrides blocks
-are untouched **and** `devDependencies` still respect the effective overrides. A removed, modified or
-over-bumped entry: restore it immediately, investigate, and report — never keep it without approval.
-
-`josh latest` prints its verdict as its last overrides line (`✔ overrides unchanged (<n> from
-<file>)` or `⚠ overrides changed`); `pnpm josh overrides` compares against a saved snapshot —
-**quote what one printed.**
+**Quote the two verdict lines it prints** — the `devEngines` line (§3) and `✔ overrides unchanged
+since <range> (…)`, or `✖ overrides changed since <range>` with each added, removed or changed entry.
+A removed, modified or over-bumped entry: restore it immediately, investigate, and report — never
+keep it without approval.
 
 ## 3. `devEngines` — the one expected change
 
