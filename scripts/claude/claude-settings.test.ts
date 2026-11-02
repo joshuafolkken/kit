@@ -386,6 +386,8 @@ const GIT_RULES_SOURCE = 'prompts/collaboration-workflow/operating-rules.md'
 const GIT_RULES_MARKERS: ReadonlyArray<string> = [
 	'deny は規則より狭い',
 	'ツールが通したことを許可と読まない',
+	// joshuafolkken/kit#5878: the tree pre-check is the one bundled read-only command.
+	'作業ツリーの前提で動く前に `pnpm josh tree:status` をその場で実行する',
 ]
 
 // joshuafolkken/kit#2996 made `.claude/settings.json` the single source of the pattern list: the
@@ -430,6 +432,12 @@ describe(`${GIT_RULES_SOURCE} — the deny rule reaches the Git Rules source`, (
 describe.each(AI_DOCS)('%s — points at the Git Rules source', (document_path) => {
 	it('names operating-rules.md → "git-rules"', () => {
 		expect(read_repo_file(document_path)).toContain(`\`${GIT_RULES_SOURCE}\` → "git-rules"`)
+	})
+
+	it('names `pnpm josh tree:status` as the tree pre-check', () => {
+		expect(read_repo_file(document_path)).toContain(
+			'run `pnpm josh tree:status` live before any tree assumption',
+		)
 	})
 })
 
