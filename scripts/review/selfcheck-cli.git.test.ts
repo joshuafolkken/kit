@@ -1,9 +1,12 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { change_base } from '#scripts/git/change-base'
+import { git_command } from '#scripts/git/git-command'
 import { git_fixture_workspace, type FixtureWorkspace } from '#scripts/git/git-fixture-workspace'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prose_stale_read } from './prose-stale-read'
 import { prose_stale_scan } from './prose-stale-scan'
+import { review_interaction, type InteractionStatus } from './review-interaction'
 import { selfcheck_cli } from './selfcheck-cli'
 
 // joshuafolkken/kit#5540, with real git: an untracked file is read as wholly added, the way
@@ -17,6 +20,7 @@ const MOVED_FROM = 'a.ts'
 const MOVED_DECLARATION = 'function moved_name(): void {}\n'
 const RUN_DIRECTORY = 'scripts/run'
 const RUN_FILE = `${RUN_DIRECTORY}/new.ts`
+const ISSUE = 5832
 
 const { git, MAIN_BRANCH } = git_fixture_workspace
 
@@ -47,6 +51,14 @@ async function commit_base(): Promise<void> {
 	await git(fixture.root, ['commit', '--no-verify', '-m', 'base'])
 }
 
+// A committed base, then a run-tooling file the change adds.
+async function add_run_file(): Promise<void> {
+	await writeFile(path.join(fixture.root, NEW_FILE), 'base\n')
+	await commit_base()
+	await mkdir(path.join(fixture.root, RUN_DIRECTORY), { recursive: true })
+	await writeFile(path.join(fixture.root, RUN_FILE), 'const value = 1\n')
+}
+
 describe('selfcheck_cli.untracked_hunks against real git', () => {
 	it(
 		'reads an untracked file as wholly added and leaves an ignored one out',
@@ -74,14 +86,46 @@ describe('selfcheck_cli.sections against real git', () => {
 	it(
 		'names a run-tooling file the change adds as due for the interaction questions',
 		async () => {
-			await writeFile(path.join(fixture.root, NEW_FILE), 'base\n')
-			await commit_base()
-			await mkdir(path.join(fixture.root, RUN_DIRECTORY), { recursive: true })
-			await writeFile(path.join(fixture.root, RUN_FILE), 'const value = 1\n')
+			await add_run_file()
 
 			const { interaction } = await selfcheck_cli.sections(fixture.root, 'HEAD')
 
 			expect(interaction).toEqual([RUN_FILE])
+		},
+		TIMEOUT_MS,
+	)
+})
+
+// joshuafolkken/kit#5832: only `--interaction-answered` records the due change's interaction round.
+async function status_after(argv: ReadonlyArray<string>): Promise<InteractionStatus> {
+	await add_run_file()
+	process.chdir(fixture.root)
+	vi.spyOn(change_base, 'resolved').mockResolvedValue('HEAD')
+	vi.spyOn(git_command, 'branch').mockResolvedValue(`${String(ISSUE)}-lane`)
+	vi.spyOn(console, 'info').mockReturnValue(undefined)
+
+	expect(await selfcheck_cli.run(argv)).toBe(0)
+
+	return await review_interaction.status_of(ISSUE, [RUN_FILE], fixture.root)
+}
+
+describe('selfcheck_cli.run against real git — a due run-tooling change', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	it(
+		'records the interaction round with --interaction-answered',
+		async () => {
+			expect(await status_after(['--interaction-answered'])).toBe('ok')
+		},
+		TIMEOUT_MS,
+	)
+
+	it(
+		'records nothing without it',
+		async () => {
+			expect(await status_after([])).toBe('not-required')
 		},
 		TIMEOUT_MS,
 	)
