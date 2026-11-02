@@ -22,6 +22,7 @@ const BETWEEN_STAGE = 'between ship stages'
 const SHIP_LEAD = 'ship '
 const PRE_DETACH_STAGE = `${SHIP_LEAD}${lane_ledger.PRE_DETACH_STAGE}`
 const FOLLOWUP_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.FOLLOWUP}`
+const ROUND_TWO_STAGE = `${SHIP_LEAD}${run_ship_stage.STAGE.ROUND_TWO}`
 
 // One stage's net milliseconds.
 interface Stage {
@@ -228,6 +229,17 @@ function of(
 	}
 }
 
+// The stage `at_ms` fell in — the plan, the implementation or a ship stage, by the spans `of` cut — or
+// `undefined` outside them; `josh cost:audit` attributes a request's tokens by it
+// (joshuafolkken/kit#5936).
+function stage_at(breakdown: Breakdown, at_ms: number): string | undefined {
+	const plan = (breakdown.plan ?? []).map((span) => ({ ...span, stage: PLAN_STAGE }))
+	const implement = breakdown.implement.map((span) => ({ ...span, stage: IMPLEMENT_STAGE }))
+	const segments = [...plan, ...implement, ...breakdown.ship]
+
+	return segments.find((segment) => is_inside(at_ms, segment))?.stage
+}
+
 function minutes_text(ms: number): string {
 	return `${(ms / MS_PER_MINUTE).toFixed(1)} min`
 }
@@ -247,12 +259,14 @@ const lane_breakdown = {
 	IMPLEMENT_STAGE,
 	PLAN_STAGE,
 	PRE_DETACH_STAGE,
+	ROUND_TWO_STAGE,
 	covered_ms,
 	is_ship_stage,
 	longest_of,
 	minutes_text,
 	of,
 	ranked,
+	stage_at,
 }
 
 export { lane_breakdown }

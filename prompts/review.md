@@ -11,10 +11,11 @@ Review policy: the level, the round count, and what happens to a finding after t
 
 ## When to run
 
-When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, round 1 runs before the commit, round 2
-in `ship --review` (`.claude/skills/workflow-commands/chain-rule.md`). Launch a `reviewer` agent
-type (round 2: `reviewer-verification`), never nested, with the model `pnpm josh review:brief` prints.
-Reviewer's last step → `pnpm josh review:submit --review <absolute-path>` (`.claude/agents/reviewer.md`).
+When: `CLAUDE.md` → "Pre-commit Self-Review"; in a workflow, the order is what `run:chain` and
+`run:review` print (`.claude/skills/workflow-commands/chain-rule.md` → "Run the review-to-merge
+chain"): a `reviewer` agent type (round 2: `reviewer-verification`), never nested, with the model
+`pnpm josh review:brief` prints
+(`.claude/agents/reviewer.md`).
 
 Re-run after fixes until **no high or medium findings remain or the round cap below is reached** (the
 first review counts), whichever comes first. Round 2 is a verification pass over the fixes
@@ -106,15 +107,10 @@ the child rather than buying a further round.
 pnpm josh review:round2 --record <N>   # → required | skip ; the reason on stderr
 ```
 
-Ask once round 1's fixes are in and the round is recorded with each finding's disposition
-(`pnpm josh review:record`'s usage), before the commit. Round 1 is closed only when the ledger shows
-every round-1 High/Medium as `fixed` or `false-positive`. Anything else, including a missing round-1
-snapshot, answers `required`.
-
-`skip` has two arms, and the reason line says which fired — A, an empty fix delta; B, one that leaves what executes unchanged (the path set: `scripts/review/review-round2.ts` → `is_unexecuted`).
-
-`--record <N>` records a skipped round on the Issue itself: a comment under `## Round 2 skipped`
-naming which arm fired and quoting the reason line verbatim, written once however often it is asked.
+Ask once round 1's fixes are in and recorded (`pnpm josh review:record`'s usage), before the commit;
+the reason line says why. The `required` cases and the two `skip` arms are defined in
+`scripts/review/review-round2.ts` (`decide`, `is_unexecuted`); the skip comment `--record` posts, in
+`scripts/review/review-round2-skip-comment.ts`.
 
 ### Three-way disposition after the cap
 
