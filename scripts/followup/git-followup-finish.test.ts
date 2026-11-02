@@ -56,6 +56,15 @@ vi.mock('#scripts/run/progress/run-progress-clock', () => ({
 	},
 }))
 
+// The real step would run `main:sync` in the primary checkout of the repository executing this
+// suite (joshuafolkken/kit#5941).
+vi.mock('#scripts/josh/josh-run', () => ({
+	josh_command: {
+		josh_run_at: vi.fn(async () => ({ code: 0, out: '' })),
+		require_success: vi.fn(),
+	},
+}))
+
 const { git_next_issues } = await import('#scripts/issue/git-next-issues')
 const { git_followup_finish } = await import('./git-followup-finish')
 

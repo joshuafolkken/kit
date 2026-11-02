@@ -13,6 +13,7 @@ import { review_attest } from '#scripts/review/review-attest'
 import { review_record } from '#scripts/review/review-record'
 import { detached_launch } from '#scripts/run/detached-launch'
 import { run_event_stream_emit } from '#scripts/run/event/run-event-stream-emit'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { split_resolution } from '#scripts/split/split-resolution'
 import { afterAll, beforeEach, vi } from 'vitest'
 import { run_cut } from './run-cut'
@@ -80,6 +81,9 @@ const record_check = vi.spyOn(review_record, 'check')
 // The digest is read off the session's real transcript; no case carries one unless it says so
 // once (joshuafolkken/kit#5040).
 const own_digest = vi.spyOn(run_cut_digest, 'own_digest').mockReturnValue(undefined)
+// The section a verdict is followed by is `run_step_section`'s own print; spied so `verdict()` still
+// reads the token, and so a case can pin which section followed it (joshuafolkken/kit#5953).
+const print_section = vi.spyOn(run_step_section, 'print_once').mockReturnValue(0)
 const info = vi.spyOn(console, 'info').mockReturnValue()
 
 const errors = vi.spyOn(console, 'error').mockReturnValue()
@@ -188,6 +192,7 @@ const run_cut_cli_fixture = {
 	is_attested_on,
 	record_check,
 	own_digest,
+	print_section,
 	emit,
 	verdict,
 	printed_errors,

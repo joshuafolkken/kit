@@ -148,6 +148,15 @@ vi.mock('./git-followup-flush', () => ({
 	git_followup_flush: { commit_ledger_step: vi.fn() },
 }))
 
+// **Mocked for the same reason** (joshuafolkken/kit#5941): `main` runs at import time, so the real
+// tail step would run `main:sync` in the primary checkout of the repository executing this suite.
+vi.mock('#scripts/josh/josh-run', () => ({
+	josh_command: {
+		josh_run_at: vi.fn(async () => ({ code: 0, out: '' })),
+		require_success: vi.fn(),
+	},
+}))
+
 // **Mocked for the same reason** (joshuafolkken/kit#5384): `main` runs at import time, so the real
 // record would read the Issue from GitHub and append a size line to this checkout's ledger.
 vi.mock('#scripts/lane/lane-size-record', () => ({
