@@ -162,6 +162,27 @@ describe('the unit environment blanks inherited ship and lane marks without a li
 	})
 })
 
+// joshuafolkken/kit#5863: a lane exporting `JOSH_WORKER_SHIP_MODEL` turned every fixture that resolves a
+// profile off its default model, so the gate went red there alone.
+describe('the unit environment blanks the agent profile keys', () => {
+	it('blanks every inherited key a profile is read from', () => {
+		const inherited = Object.fromEntries(
+			agent_role_profile.PROFILE_KEYS.map((key) => [key, 'claude-sonnet-5-5']),
+		)
+		const environment = unit_environment(inherited)
+
+		expect(agent_role_profile.PROFILE_KEYS).toContain('JOSH_WORKER_SHIP_MODEL')
+		for (const key of agent_role_profile.PROFILE_KEYS) expect(environment[key]).toBe('')
+	})
+
+	it('leaves a key that only resembles one alone', () => {
+		const environment = unit_environment({ JOSH_MODEL: 'opus', JOSH_WORKER_MODELS: 'opus' })
+
+		expect(Object.hasOwn(environment, 'JOSH_MODEL')).toBe(false)
+		expect(Object.hasOwn(environment, 'JOSH_WORKER_MODELS')).toBe(false)
+	})
+})
+
 // joshuafolkken/kit#4301: execa and zod were the suite's two largest import costs, paid again by every
 // isolated file; an optimizer without them would silently pay them again.
 describe('the dependency optimizer pre-bundles the packages most test files load', () => {
