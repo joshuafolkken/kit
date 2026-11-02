@@ -100,4 +100,12 @@ describe('lane_measure_cli.run — value cell --where', () => {
 		await expect(lane_measure_cli.run(filtered, staged_context())).resolves.toBe(0)
 		expect(console.info).toHaveBeenCalledWith('1.50')
 	})
+
+	it('reads a row --where misses as 0 under --zero', async () => {
+		const where = ['--table', 'stage', '--where', 'stage=gate', '--column', 'runs', '--zero']
+		const filtered = ['value', 'cell', '--since', SINCE, ...where]
+
+		await expect(lane_measure_cli.run(filtered, staged_context())).resolves.toBe(0)
+		expect(console.info).toHaveBeenCalledWith('0.00')
+	})
 })

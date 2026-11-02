@@ -43,7 +43,7 @@ const USAGE = [
 	'       josh lane:stats --period <days> [--limit <lane-limit>]',
 	'       josh lane:stats --period <days> --sinks [<minutes>]',
 	`       josh lane:value <${lane_value.NAMES.join('|')}> --since <instant>`,
-	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] --since <instant>`,
+	`       josh lane:value ${CELL_METRIC} --table <title> [--row <label>] [--where <header>=<text>] --column <header> [--item <label>] [--zero] --since <instant>`,
 	'       josh lane:net <issue>',
 ].join('\n')
 
@@ -60,6 +60,7 @@ const VALUE_OPTIONS = {
 	column: { type: 'string' },
 	where: { type: 'string' },
 	item: { type: 'string' },
+	zero: { type: 'boolean' },
 } as const
 // `--where <header>=<text>`: the header ends at the first `=`, so the text may hold one.
 const WHERE_SEPARATOR = '='
@@ -245,6 +246,7 @@ interface AddressFlags {
 	column?: string | undefined
 	where?: string | undefined
 	item?: string | undefined
+	zero?: boolean | undefined
 }
 
 function since_of(text = ''): number | undefined {
@@ -280,7 +282,7 @@ function address_of(flags: AddressFlags): CellAddress | undefined {
 
 	if (table === undefined || column === undefined || where === undefined) return undefined
 
-	return { table, column, row: flags.row, where: where.filter, item: flags.item }
+	return { table, column, row: flags.row, where: where.filter, item: flags.item, zero: flags.zero }
 }
 
 function request_of(

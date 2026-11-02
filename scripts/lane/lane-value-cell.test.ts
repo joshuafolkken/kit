@@ -91,6 +91,12 @@ describe('lane_value_cell.value — where and item', () => {
 		['an item of a list cell', { ...CAUSES, row: 'preflight', item: 'pre-detach' }, 37],
 		['an item a list omits as 0', { ...CAUSES, row: 'preflight', item: 'stale' }, 0],
 		['an item of an empty list as 0', { ...CAUSES, row: 'review', item: 'unpinned' }, 0],
+		[
+			'a row --zero finds missing as 0',
+			{ ...REQUIRED, where: { ...LIVE, text: 'gone' }, zero: true },
+			0,
+		],
+		['a row --zero finds as its cell', { ...REQUIRED, where: LIVE, zero: true }, 12],
 	])('reads %s', (_case, address, expected) => {
 		expect(lane_value_cell.value(MEASURED, address)).toBe(expected)
 	})
@@ -99,6 +105,8 @@ describe('lane_value_cell.value — where and item', () => {
 		['a row that still repeats', REQUIRED],
 		['a --where column no table has', { ...REQUIRED, where: { column: 'gate', text: 'live' } }],
 		['an item of a cell that is no list', { ...CAUSES, row: 'merge', item: 'timed out' }],
+		['--zero on a table no title names', { ...REQUIRED, table: 'round 3', zero: true }],
+		['--zero on a row of a non-number', { ...CAUSES, row: 'merge', zero: true }],
 	])('answers undefined for an address of %s', (_case, address) => {
 		expect(lane_value_cell.value(MEASURED, address)).toBeUndefined()
 	})

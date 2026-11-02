@@ -4,7 +4,8 @@
 //
 // A table is named by its first header cell and a row by its first cell; `where` narrows the rows by
 // another column, for a table whose first cell repeats or is itself a count (joshuafolkken/kit#5947).
-// `item` reads one count out of a `label N, label N` list cell, `0` when the list omits it. **The
+// `item` reads one count out of a `label N, label N` list cell, `0` when the list omits it; `zero`
+// reads a named table with no matching row as `0`. **The
 // address must name one cell** — two tables share the `check` title, so an address that matches more
 // than one numeric cell answers `undefined`, as a missing or non-numeric one does, never a guess.
 
@@ -31,6 +32,7 @@ interface CellAddress {
 	row?: string | undefined
 	where?: CellFilter | undefined
 	item?: string | undefined
+	zero?: boolean | undefined
 }
 
 type Cells = ReadonlyArray<string>
@@ -67,12 +69,17 @@ function is_addressed(cells: Cells, header: Cells, address: CellAddress): boolea
 	return where === undefined || cells[header.indexOf(where.column)] === where.text
 }
 
-// The cell texts at the address in one table — none when its title or column differs.
+// A table the address names: its title and its column.
+function is_table(rows: ReadonlyArray<Cells>, address: CellAddress): boolean {
+	const [header = []] = rows
+
+	return header[0] === address.table && header.includes(address.column)
+}
+
+// The cell texts at the address in one table the address names.
 function texts_in(rows: ReadonlyArray<Cells>, address: CellAddress): ReadonlyArray<string> {
 	const [header = []] = rows
 	const column = header.indexOf(address.column)
-
-	if (column === -1 || header[0] !== address.table) return []
 
 	return rows
 		.slice(HEADER_ROWS)
@@ -95,12 +102,22 @@ function read_text(text: string, item: string | undefined): string | undefined {
 	return item === undefined ? text : item_count(text, item)
 }
 
+function numbers_in(texts: ReadonlyArray<string>, item: string | undefined): ReadonlyArray<string> {
+	return texts
+		.map((text) => read_text(text, item))
+		.filter((text): text is string => text !== undefined && NUMBER_PATTERN.test(text))
+}
+
 // The one numeric cell at `address` across `tables`, or `undefined` for none, many or a non-number.
+// With `zero`, a named table no row of which matches reads `0`: a count table prints only the rows
+// that occurred, so the count's success state is the row it leaves out.
 function value(tables: ReadonlyArray<string>, address: CellAddress): number | undefined {
-	const numbers = blocks_of(tables)
-		.flatMap((rows) => texts_in(rows, address))
-		.map((text) => read_text(text, address.item))
-		.filter((text) => text !== undefined && NUMBER_PATTERN.test(text))
+	const named = blocks_of(tables).filter((rows) => is_table(rows, address))
+	const texts = named.flatMap((rows) => texts_in(rows, address))
+
+	if (address.zero === true && named.length > 0 && texts.length === 0) return 0
+
+	const numbers = numbers_in(texts, address.item)
 
 	return numbers.length === 1 ? Number(numbers[0]) : undefined
 }

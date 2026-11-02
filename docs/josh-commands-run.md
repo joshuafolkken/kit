@@ -1240,12 +1240,14 @@ The value is the output's last line, two decimals, so a measurement Issue declar
 
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
 
-`--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`, for a first cell that repeats; `--row` may be left out, and `--column` may name the first column. `--item <label>` reads `<label>`'s count from a `label N, label N` list cell, `0` when the list omits it:
+`--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`; `--row` may be left out, and `--column` may name the first column.
+
+`--item <label>` reads `<label>`'s exact count from a `label N, label N` list cell (`unpinned (noticed)` is its own label), `0` when the list omits it. `--zero` reads a named table with no matching row as `0`:
 
 ```bash
-pnpm josh lane:value cell --table "round 2" --row required --where code=live --column decisions --since 2026-11-02T00:00Z   # round 2 required for live
-pnpm josh lane:value cell --table stop --row preflight --column causes --item unpinned --since 2026-11-02T00:00Z            # preflight stops caused by unpinned
-pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --since 2026-11-02T00:00Z                     # merged lanes measured
+pnpm josh lane:value cell --table "round 2" --row required --where code=live --column decisions --zero --since 2026-11-02T00:00Z   # round 2 required for live
+pnpm josh lane:value cell --table stop --row preflight --column causes --item unpinned --since 2026-11-02T00:00Z                   # preflight stops caused by unpinned, not noticed
+pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --since 2026-11-02T00:00Z                            # merged lanes measured
 ```
 
 #### `josh lane:net`
