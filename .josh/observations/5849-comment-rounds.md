@@ -1,0 +1,3 @@
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:224 | 2026-11-02 | #5849
+- rf:project-conventions | low | scripts/josh/josh-commands-ai.ts:224 | 2026-11-02 | #5849
+- rf:comments | low | docs/josh-commands-automation.md:1087 | 2026-11-02 | #5849

@@ -1,0 +1,5 @@
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:256 | 2026-11-02 | #5952
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:121 | 2026-11-02 | #5952
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:258 | 2026-11-02 | #5952
+- rf:bug-risks | low | scripts/document/read-set-cli.ts:256 | 2026-11-02 | #5952
+- rf:performance | low | tools/cost-audit/cost-audit-cli.ts:121 | 2026-11-02 | #5952

@@ -1,0 +1,6 @@
+- rf:assumptions | low | .claude/skills/workflow-commands/target-repository.md:51 | 2026-11-02 | #5879
+- rf:comments | low | .claude/skills/workflow-commands/target-repository.md:51 | 2026-11-02 | #5879
+- rf:project-conventions | low | .claude/skills/workflow-commands/kickoff.md:34 | 2026-11-02 | #5879
+- rf:assumptions | low | .claude/skills/workflow-commands/kickoff.md:34 | 2026-11-02 | #5879
+- rf:tests | low | scripts/rules/issue-comments-rule.test.ts:48 | 2026-11-02 | #5879
+- rf:none | none | - | 2026-11-02 | #5879
