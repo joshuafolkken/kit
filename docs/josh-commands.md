@@ -1066,10 +1066,11 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 <!-- usage: lane:resolve -->
 
-Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue).
+Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue); --record posts that resolution comment once the lane is pushed.
 
 ```bash
-pnpm josh lane:resolve 3769   # prints `conflict docs/a.md` on a hand-resolvable conflict
+pnpm josh lane:resolve 3769                      # prints `conflict docs/a.md` on a hand-resolvable conflict
+pnpm josh lane:resolve 3769 --record docs/a.md   # posts the `## Lane conflict resolved` comment once the lane is pushed
 ```
 
 <!-- /usage -->
@@ -1078,8 +1079,9 @@ pnpm josh lane:resolve 3769   # prints `conflict docs/a.md` on a hand-resolvable
 - The merge is `josh main:merge`'s (`main_merge.merge`), so the files it regenerates resolve themselves and its refusals hold.
 - Condition 2 is read per conflicted path off `git diff --unified=0` from the merge base to each side: both sides rewriting one base line overlaps; adjacent rewrites, pure insertions and a hunk both sides made identically do not. An overlap aborts the merge, so the park finds a clean tree.
 - Conditions 1 and 4 stay the run's: a specification question, and the gate and review after a resolution.
+- `--record [<path>...]` posts the resolution comment condition 3 counts — `## Lane conflict resolved` and one bullet per path — and merges nothing. It refuses on another branch, while a merge is unconcluded, and while HEAD differs from origin's `<issue>-lane`, so a resolution that never left the checkout is never counted.
 
-**Output / exit codes:** one line on stdout, exit 0 — `resolved`, `conflict <paths>`, `step-back 2 <paths>` or `step-back 3`. A refused merge, an unreadable comment thread or a git failure: stderr, exit 1.
+**Output / exit codes:** one line on stdout, exit 0 — `resolved`, `conflict <paths>`, `step-back 2 <paths>` or `step-back 3`; under `--record`, `recorded <comment url>`. A refused merge or record, an unreadable comment thread or a git failure: stderr, exit 1.
 
 ### `josh lane:pause` / `josh lane:resume`
 
