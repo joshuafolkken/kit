@@ -184,6 +184,7 @@ describe('epic_bundle_apply.apply_decision — ask', () => {
 
 		expect(result).toBe(SUCCESS_EXIT_CODE)
 		expect(console.info).toHaveBeenCalledWith(epic_bundle_apply.UNAPPLIED_LINES.ask)
+		expect(epic_bundle_apply.UNAPPLIED_LINES.ask).toContain('declare a cycle')
 		expect(mocked_add).not.toHaveBeenCalled()
 	})
 })

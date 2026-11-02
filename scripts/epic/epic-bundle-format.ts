@@ -79,11 +79,16 @@ const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
 	'ask',
 ])
 
-// The spread and, when there is one, the epic `ask` recommends — what `--apply` places the issue in.
+// A cycle recommends nothing, so `--apply` places nothing there and the headline's "recommended one"
+// has to be named as absent rather than left for the reader to look for.
+const NO_RECOMMENDATION_LINE =
+	'  Recommended: none — the epics declare a cycle; place it with `pnpm josh epic --add <E> <N> --decision-file <path>`'
+
+// The spread and the epic `ask` recommends — what `--apply` places the issue in.
 function format_epics(decision: BundleDecision): Array<string> {
 	if (decision.epics.length <= 1) return []
 	const involved = `  Epics involved: ${format_numbers(decision.epics)}`
-	if (decision.recommended === undefined) return [involved]
+	if (decision.recommended === undefined) return [involved, NO_RECOMMENDATION_LINE]
 
 	return [involved, `  Recommended: ${issue_cite.plain(decision.recommended)}`]
 }
@@ -114,7 +119,9 @@ function format_decision(
 const epic_bundle_format = {
 	ACTION_LINES,
 	ALREADY_TRACKED_LINE,
+	NO_RECOMMENDATION_LINE,
 	format_numbers,
+	format_epics,
 	format_order,
 	format_decision,
 	members_of,

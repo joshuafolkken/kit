@@ -39,3 +39,33 @@ describe('epic_bundle_format.format_decision', () => {
 		expect(report).toContain('Order: none declared')
 	})
 })
+
+describe('epic_bundle_format.format_epics', () => {
+	const SPREAD: BundleDecision = { ...DECISION, action: 'ask', epics: [880, 893] }
+	const INVOLVED_LINE = '  Epics involved: #880, #893'
+
+	it('names the recommended epic', () => {
+		expect(epic_bundle_format.format_epics({ ...SPREAD, recommended: 893 })).toStrictEqual([
+			INVOLVED_LINE,
+			'  Recommended: #893',
+		])
+	})
+
+	it('says none is recommended on a cycle', () => {
+		expect(epic_bundle_format.format_epics(SPREAD)).toStrictEqual([
+			INVOLVED_LINE,
+			epic_bundle_format.NO_RECOMMENDATION_LINE,
+		])
+	})
+
+	it('prints nothing for a single epic', () => {
+		expect(epic_bundle_format.format_epics({ ...SPREAD, epics: [893] })).toStrictEqual([])
+	})
+
+	it('points the ask headline at --apply, which places and records in one step', () => {
+		const report = epic_bundle_format.format_decision(SPREAD, issue(894), [], true)
+
+		expect(report).toContain('place it in the recommended one and record why')
+		expect(report).toContain('`epic:bundle --apply` does both')
+	})
+})

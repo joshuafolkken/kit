@@ -152,11 +152,7 @@ function format_epic(decision: BundleDecision): Array<string> {
 		lines.push(`  Related: ${epic_bundle_cli.format_numbers(decision.candidates)}`)
 	}
 
-	if (decision.epics.length > 1) {
-		lines.push(`  Epics involved: ${epic_bundle_cli.format_numbers(decision.epics)}`)
-	}
-
-	return lines
+	return [...lines, ...epic_bundle_cli.format_epics(decision)]
 }
 
 // A draft cites nothing where a citation counts, so the epic half has nothing to decide from: its two
@@ -400,6 +396,7 @@ const issue_scout_cli = {
 	NO_REFERENCE_LINE,
 	CLOSED_UNREADABLE_LINE,
 	CLOSED_CEILING_LINE,
+	format_epic,
 	read_arguments,
 	with_draft_body,
 	scout,
