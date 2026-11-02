@@ -107,7 +107,7 @@ describe('issue_sample_required.problem — a criterion read through lane:breakd
 		],
 		[
 			'names the command as what changes (#5886)',
-			body_of(SOME_FILES, ['- [ ] `lane:breakdown` を受け入れ条件で読む本文が拒まれる（テスト）']),
+			body_of(SOME_FILES, ['- [ ] `lane:breakdown` を受け入れ条件で読む本文が拒まれる']),
 		],
 		[
 			'changes its output, verified by a test (#5216)',
@@ -117,6 +117,20 @@ describe('issue_sample_required.problem — a criterion read through lane:breakd
 		],
 	])('passes one that %s', (_case, body) => {
 		expect(issue_sample_required.problem(body)).toBeUndefined()
+	})
+})
+
+describe('issue_sample_required.problem — the wordings around lane:breakdown', () => {
+	it('refuses a ledger read that mentions a test outside its closing note', () => {
+		const criterion = '- [ ] `lane:breakdown` で子行が親行を説明し、既存テストが通る'
+
+		expect(issue_sample_required.problem(body_of(SOME_FILES, [criterion]))).toBeDefined()
+	})
+
+	it.each(['では', 'できる', 'です'])('passes "`lane:breakdown` %s" as no ledger read', (word) => {
+		const criterion = `- [ ] \`lane:breakdown\` ${word} start to plan が plan までの分になる`
+
+		expect(issue_sample_required.problem(body_of(SOME_FILES, [criterion]))).toBeUndefined()
 	})
 })
 
