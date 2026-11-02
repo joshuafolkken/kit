@@ -604,6 +604,22 @@ Related: [`josh observations:flush`](#josh-observationsflush), [`josh issue:lint
 
 Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh measure:rerun` in detail".
 
+### `josh observation:depth`
+
+<!-- usage: observation:depth -->
+
+Print the depth test's depth for a subject path.
+
+```bash
+pnpm josh observation:depth scripts/lane/lane-plan.ts
+```
+
+<!-- /usage -->
+
+It prints `d0`, `d1` or `d2` alone on stdout, and the row it applied, with the prefix it matched, on stderr. `d1` and deeper are the `<depth>` [`josh observation:record`](#josh-observationrecord) takes; `d0` is filed, never recorded.
+
+The path may be absolute or relative to the caller's directory; one outside the repository is refused with exit 1. The deepest row whose prefix the path starts with wins; a path no row claims is `d0`. The rows: `scripts/observations/observation-depth.ts`.
+
 ### `josh observation:record`
 
 <!-- usage: observation:record -->
@@ -1056,6 +1072,20 @@ Detail: `docs/maintainers/josh-commands-automation-rationale.md` → "`josh pre-
 ## AI tools
 
 Helpers for AI-assisted development workflows.
+
+### `josh pin:verify`
+
+<!-- usage: pin:verify -->
+
+Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites.
+
+```bash
+pnpm josh pin:verify actions/checkout v4.2.2 11bd71901bbe5b1630ceea73d27597364c9af683   # → match / mismatch / unreadable
+```
+
+<!-- /usage -->
+
+Resolves the tag through `repos/<owner>/<repo>/commits/refs/tags/<tag>` (fully qualified, so a branch never answers; an annotated tag peeled to its commit) and compares it with the SHA. Prints one line on stdout: `match` / `mismatch` with the resolved SHA, or `unreadable` with the `gh` failure reason — the `match` line is what a `--coderabbit-ignore-reason` cites. Only `match` exits zero.
 
 ### `josh repo:party`
 

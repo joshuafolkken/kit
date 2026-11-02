@@ -69,6 +69,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh main:sync` · `josh ms` | — | developer | git, network | Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane) |
 | `josh measure:rerun` | `<issue-number>` | automation | network, processes, files | Re-run a merged issue’s baseline command and print the before/after pair |
 | `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...` | automation | notifications | Send Telegram notification |
+| `josh observation:depth` | `<path>` | automation | none | Print the depth test's depth for a subject path |
 | `josh observation:record` | `<key> <depth> <where> <what> [--checkout <path>]` | automation | files | Record an observation sighting and answer whether it is now filed |
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
@@ -188,6 +189,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:value` · `josh lva` | `<metric> --since <instant>` | maintainer | none | Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit) |
 | `josh lane:withdraw` · `josh lwd` | `<issue> --reason <text>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and close the lane, leaving its issue open for the next run — booked withdrawn, not as an outage or a failure |
 | `josh oracle:list` | — | automation | none | Print the decision oracles — commands that answer a rule question mechanically |
+| `josh pin:verify` | `<owner/repo> <tag> <sha>` | automation | none | Check that a tag resolves to the commit a SHA pin names, printing a line a bypass reason cites |
 | `josh pkg:scout` | `<keywords> [--size <n>]` | automation | network | Rank package candidates by measured metrics so the Package-First tier decision is read, not judged |
 | `josh plan:consumers` | `<identifier...>` | automation | none | List every existing reference to each identifier a plan adds or changes, by kind, and draft the plan's existing-consumers section |
 | `josh prose:stale` | — | automation | none | List each removed declared or exported name, josh command, UPPER_CASE constant or .md heading that docs, prompts or comments still name |
