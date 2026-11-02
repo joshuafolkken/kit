@@ -29,6 +29,12 @@ describe('josh read-only invocations', () => {
 	])('refuses %j and names its usage read', (args) => {
 		expect(josh_read_only.refusal(args)).toContain(`pnpm josh help ${args[0] ?? ''}`)
 	})
+
+	it('names both read-only declarations an entry can make in its refusal', () => {
+		expect(josh_read_only.refusal(['gate'])).toContain(
+			'its entry is not declared read-only and it carries no read-only flag its entry declares',
+		)
+	})
 })
 
 describe('josh help requests', () => {
