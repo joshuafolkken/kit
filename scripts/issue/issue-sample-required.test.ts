@@ -81,16 +81,20 @@ describe('issue_sample_required.problem — the wordings of the period after a c
 })
 
 // joshuafolkken/kit#5886: #5860 as filed read `lane:breakdown` citing no change and estimating one file.
-describe('issue_sample_required.problem — a criterion read through lane:breakdown', () => {
-	const CONTENDED =
-		'- [ ] 競合下のレーン 1 件以上の `lane:breakdown` で、子行の合計が親行の 80% 以上を説明する'
-	const NO_BREAKDOWN_VALUE = '- 計測宣言なし: `lane:breakdown` の最終行は 1 つの数値にならない'
+const CONTENDED =
+	'- [ ] 競合下のレーン 1 件以上の `lane:breakdown` で、子行の合計が親行の 80% 以上を説明する'
+const NO_BREAKDOWN_VALUE = '- 計測宣言なし: `lane:breakdown` の最終行は 1 つの数値にならない'
 
+describe('issue_sample_required.problem — a criterion read through lane:breakdown', () => {
 	it.each([
 		['#5860 as filed, citing no change and changing a file', body_of(SOME_FILES, [CONTENDED])],
 		[
 			'one reading its output by command',
 			body_of(NO_FILES, ['- [ ] `pnpm josh lane:breakdown <N>` で review 段が 5 分以下']),
+		],
+		[
+			'one reading it through its output',
+			body_of(SOME_FILES, ['- [ ] 競合下のレーンの `lane:breakdown` の出力で子行が親行を説明する']),
 		],
 	])('refuses %s with no start condition', (_case, body) => {
 		expect(issue_sample_required.problem(body)).toContain(issue_sample_gate.DECLARATION)
@@ -104,6 +108,12 @@ describe('issue_sample_required.problem — a criterion read through lane:breakd
 		[
 			'names the command as what changes (#5886)',
 			body_of(SOME_FILES, ['- [ ] `lane:breakdown` を受け入れ条件で読む本文が拒まれる（テスト）']),
+		],
+		[
+			'changes its output, verified by a test (#5216)',
+			body_of(SOME_FILES, [
+				'- [ ] `pnpm josh lane:breakdown 5171` で `start to plan` が plan までの分になる（単体テストで固定）',
+			]),
 		],
 	])('passes one that %s', (_case, body) => {
 		expect(issue_sample_required.problem(body)).toBeUndefined()
