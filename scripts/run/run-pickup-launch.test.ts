@@ -56,9 +56,15 @@ describe('run:pickup launching the offered children', () => {
 		expect(josh_run_mock).toHaveBeenCalledTimes(1)
 		expect(result.lines).toStrictEqual(['epic:next: triage'])
 	})
+})
 
-	it('names the exit code when a refused launch printed no reason', async () => {
-		josh_run_mock.mockResolvedValueOnce(answer('23')).mockResolvedValueOnce(answer('', 1))
+describe('run:pickup naming why a launch was refused', () => {
+	it('names the exit code when a refused launch printed only pnpm lines', async () => {
+		josh_run_mock
+			.mockResolvedValueOnce(answer('23'))
+			.mockResolvedValueOnce(
+				answer('', 1, '$ node --import tsx scripts/josh/josh.ts lane:dispatch 23\n[ELIFECYCLE] x'),
+			)
 
 		const result = await run_pickup_launch.launch(['20'])
 

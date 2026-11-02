@@ -112,6 +112,7 @@ describe('run:pickup with nothing to poll', () => {
 		'refuses %j, not an epic number, with the usage line',
 		async (value) => {
 			expect(await run_pickup_cli.run(['20', value])).toBe(1)
+			expect(console.error).toHaveBeenCalledWith('Usage: josh run:pickup [<epic>...]')
 			expect(list_lanes_mock).not.toHaveBeenCalled()
 			expect(launch_mock).not.toHaveBeenCalled()
 		},

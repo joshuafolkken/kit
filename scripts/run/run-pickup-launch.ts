@@ -9,7 +9,7 @@ import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 // after another, so each `lane:launch` reads the seats the one before it took.
 
 const SUCCESS_EXIT_CODE = 0
-const PNPM_FAILURE_NOTE = '[ELIFECYCLE]'
+const PNPM_LINE_MARKS = ['[ELIFECYCLE]', '$ ']
 const UNREADABLE_REPO = 'epic:next not asked — the repository is unreadable'
 
 interface PickupLaunch {
@@ -17,9 +17,14 @@ interface PickupLaunch {
 	is_refused: boolean
 }
 
-// The step's own last stderr line, past the `[ELIFECYCLE]` note pnpm appends to a failed command.
+// The step's own last stderr line, past pnpm's own lines: the `$ <script>` echo of each nested
+// `pnpm josh` call and the `[ELIFECYCLE]` note it appends to a failed command.
+function is_pnpm_line(line: string): boolean {
+	return PNPM_LINE_MARKS.some((mark) => line.startsWith(mark))
+}
+
 function reason(result: JoshResult): string {
-	const lines = (result.err ?? '').split('\n').filter((line) => !line.startsWith(PNPM_FAILURE_NOTE))
+	const lines = (result.err ?? '').split('\n').filter((line) => !is_pnpm_line(line))
 	const last = lines.at(-1) ?? ''
 
 	return last === '' ? `exit ${String(result.code)}` : last
