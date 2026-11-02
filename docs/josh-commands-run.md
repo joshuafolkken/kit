@@ -530,7 +530,8 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+A lane child whose plan `lane:plan` has not cleared gets `pnpm josh lane:plan <N> <paths>` under `implement`, its plan comment's paths (`<path>...` with none) — already run when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+All three print it with a line naming `--imports`.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
@@ -1227,7 +1228,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 
 <!-- usage: lane:value -->
 
-Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item --zero), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
 
 ```bash
 pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant
@@ -1246,6 +1247,16 @@ pnpm josh read:set fullrun --bytes          # total bytes the fullrun entry read
 ```
 
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
+
+`--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`; `--row` may be left out, and `--column` may name the first column.
+
+`--item <label>` reads `<label>`'s exact count from a `label N, label N` list cell (`unpinned (noticed)` is its own label), `0` when the list omits it. `--zero` reads a named table with no matching row as `0`:
+
+```bash
+pnpm josh lane:value cell --table "round 2" --row required --where code=live --column decisions --zero --since 2026-11-02T00:00Z   # round 2 required for live
+pnpm josh lane:value cell --table stop --row preflight --column causes --item unpinned --since 2026-11-02T00:00Z                   # preflight stops caused by unpinned, not noticed
+pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --since 2026-11-02T00:00Z                            # merged lanes measured
+```
 
 #### `josh lane:net`
 

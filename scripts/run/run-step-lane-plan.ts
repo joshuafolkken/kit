@@ -7,15 +7,20 @@ import { lane_plan_auto } from '#scripts/lane/lane-plan-auto'
 // before it ran `lane:plan`, since nothing it read named the step first (joshuafolkken/kit#4923).
 // The paths are its plan comment's; with none, the child names its own.
 
-// The command to print under `implement`, or `undefined` when not a lane child or its plan is cleared.
-async function line_for(issue_number: string, is_lane_child: boolean): Promise<string | undefined> {
+// The lines to print under `implement` — the command, then `lane_plan_auto`'s `--imports` hint — or
+// none when not a lane child or its plan is cleared.
+async function lines_for(
+	issue_number: string,
+	is_lane_child: boolean,
+): Promise<ReadonlyArray<string>> {
 	const issue = Number(issue_number)
 
-	if (!is_lane_child || !lane_plan.is_uncleared(issue, process.cwd())) return undefined
+	if (!is_lane_child || !lane_plan.is_uncleared(issue, process.cwd())) return []
+	const paths = await backlog_plan_comment.plan_paths(issue)
 
-	return lane_plan_auto.command_of(issue_number, await backlog_plan_comment.plan_paths(issue))
+	return [lane_plan_auto.command_of(issue_number, paths), lane_plan_auto.IMPORTS_HINT]
 }
 
-const run_step_lane_plan = { line_for }
+const run_step_lane_plan = { lines_for }
 
 export { run_step_lane_plan }
