@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -192,6 +193,32 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 	})
 })
 
+// joshuafolkken/kit#5928: `--imports` names the modules the new code imports; they are probed, never held.
+describe('lane:plan — the modules a plan imports', () => {
+	it('names an imported module with a main guard, holding only the planned paths', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		const entry = fileURLToPath(new URL('lane-plan-cli.ts', import.meta.url))
+
+		const argv = [String(LATER), FREE_FILE, '--imports', entry, PRIORITY]
+
+		expect(await lane_plan_cli.run(argv, DIRECTORY)).toBe(SUCCESS)
+		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([FREE_FILE])
+		expect(error).toHaveBeenCalledWith(`import blocked: ${entry} — main guard`)
+	})
+
+	it('prints only the verdict when no imported module is blocked', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		const importable = fileURLToPath(new URL('lane-plan-check.ts', import.meta.url))
+
+		await lane_plan_cli.run([String(LATER), FREE_FILE, '--imports', importable], DIRECTORY)
+
+		expect(error).not.toHaveBeenCalled()
+		expect(info.mock.calls).toEqual([['clear']])
+	})
+})
+
 describe('lane:plan — what it refuses', () => {
 	it.each([
 		['no path', []],
@@ -199,6 +226,13 @@ describe('lane:plan — what it refuses', () => {
 	])('prints the usage for a call with %s', async (_case, paths) => {
 		expect(await lane_plan_cli.run([String(LATER), ...paths], DIRECTORY)).toBe(FAILURE)
 		expect(error).toHaveBeenCalledWith(lane_plan_cli.USAGE)
+	})
+
+	it('prints the usage naming `--imports` for a call that imports but plans no path', async () => {
+		expect(await lane_plan_cli.run([String(LATER), '--imports', FREE_FILE], DIRECTORY)).toBe(
+			FAILURE,
+		)
+		expect(error).toHaveBeenCalledWith(expect.stringContaining('[--imports <path> ...]'))
 	})
 
 	it('prints the usage naming `--probe` for a probe with no path, never holding the flag as a path', async () => {

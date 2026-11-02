@@ -1315,7 +1315,7 @@ A lane child runs it once its work summary settles, before the first edit, namin
 
 A lane whose plan was cleared, or else recorded first, holds the files, so two lanes never yield to each other; `backlog:next` reads the same record, so a candidate waits on a running lane's plan, read in place of its body. A file under `docs/` never clashes: the lane's sync with main resolves a shared document.
 
-A lane child's `issue:plan` runs it on the recorded plan's backticked paths, so a plan naming them needs no separate call (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
+A lane child's `issue:plan` runs it on the recorded plan's backticked paths (`docs/josh-commands-backlog.md` → "`josh issue:plan`").
 
 On a clash the child gives its lane back instead of polling with its seat taken:
 
@@ -1326,15 +1326,15 @@ On a clash the child gives its lane back instead of polling with its seat taken:
 
 `--probe` answers the same check and writes nothing. A lane child's `run:entry` runs it once, before the issue report, on the paths dispatch gated on; on a clash it gives the lane back as above and exits 2.
 
-A `run:planned` candidate's plan comment (the latest trusted comment carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body, so a candidate whose plan names a running lane's file is held back before dispatch and a path its body only cites holds nothing.
+A `run:planned` candidate's plan comment (the latest trusted one carrying `### 影響を受ける既存の利用者`) declares its paths in place of its body: one naming a running lane's file is held back before dispatch; a path its body only cites holds nothing.
 
 A plan over twice the files its `- 規模見積もり:` declares (tests excluded) answers `split`, exit 3, unrecorded, naming the files to file with `--route split`; an undeclared issue never does.
 
-So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. A re-plan of a plan that met the size bar, or cleared, skips the lines check. Each `split` writes a `split-notice` with its reason to the lane ledger.
+So does a tree whose changed hunks pass twice the declared files, or whose declared lines times the recent lines ratio pass 200 — until the lane files a split child. A re-plan of a plan that met the size bar, or cleared, skips the lines check. Each `split` writes a `split-notice` with its reason to the lane ledger. The hunks count skips a file the recorded plan lists.
 
-The hunks count skips a file the recorded plan already lists, so a re-plan within its files never answers `split` on hunks.
+`--imports <path>...`, last, probes imported modules: a main guard or top-level `main()` prints `import blocked: <path> — <reason>` and a `run:split <N> --prerequisite <P>` hint.
 
-**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
+**Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash (issue, planned file, overlapped path, holder) on stderr: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
 

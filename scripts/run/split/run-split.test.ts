@@ -10,6 +10,20 @@ const state = vi.hoisted(() => ({
 	stashes: [] as Array<string>,
 	comments: [] as Array<string>,
 	calls: [] as Array<string>,
+	is_lane: false,
+}))
+
+vi.mock('#scripts/run/pause/run-set-aside-commit', () => ({
+	run_set_aside_commit: {
+		is_lane: async () => state.is_lane,
+		message_of: (message: string) => `wip: ${message}`,
+		is_committed: async () => state.calls.includes('commit'),
+		commit: async () => {
+			state.calls.push('commit')
+
+			return 'committed'
+		},
+	},
 }))
 
 vi.mock('#scripts/git/stash/stash-push-cli', () => ({
@@ -76,7 +90,7 @@ const SET_ASIDE_AND_PLACE = ['stash', 'comment', 'epic', 'audit', 'release']
 const TRACKED = { epic: 20, lists_children: false }
 
 beforeEach(() => {
-	Object.assign(state, { stashes: [], comments: [], calls: [] })
+	Object.assign(state, { stashes: [], comments: [], calls: [], is_lane: false })
 	vi.spyOn(git_stash, 'list').mockImplementation(async () =>
 		state.stashes.map((subject, index) => ({ selector: `stash@{${String(index)}}`, subject })),
 	)
@@ -149,6 +163,27 @@ describe('run_split.split — no epic tracks the issue', () => {
 	})
 })
 
+describe('run_split.split — on the lane branch', () => {
+	it('stashes a split the children take over, never a WIP commit that strands the lane', async () => {
+		state.is_lane = true
+
+		await run_split.split(INDEPENDENT)
+
+		expect(state.calls).toStrictEqual(SET_ASIDE_AND_PLACE)
+		expect(state.comments[0]).toContain('stash:pop')
+	})
+
+	it('commits a parked split, which resumes on its own lane', async () => {
+		state.is_lane = true
+		tracking_with.mockRejectedValue(new Error('cut short'))
+
+		await run_split.split(INDEPENDENT)
+
+		expect(state.calls).toStrictEqual(['commit', 'comment', 'park', 'release'])
+		expect(state.comments[0]).toContain('pnpm josh main:merge')
+	})
+})
+
 describe('run_split.split — the listing cannot tell', () => {
 	it('parks the issue with `needs-decision` instead of placing the children', async () => {
 		const reason = 'the epic listing was cut short'
@@ -183,7 +218,7 @@ describe('run_split.split — a failing step keeps the hold', () => {
 		const result = await run_split.split(INDEPENDENT)
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'place' })
-		expect(result.done.map(({ step }) => step)).toStrictEqual(['stash', 'comment'])
+		expect(result.done.map(({ step }) => step)).toStrictEqual(['set-aside', 'comment'])
 		expect(audit_run).not.toHaveBeenCalled()
 		expect(state.calls).not.toContain('release')
 	})
