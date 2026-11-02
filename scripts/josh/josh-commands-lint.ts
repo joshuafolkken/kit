@@ -55,11 +55,15 @@ const LINT_COMMANDS: Record<string, CommandEntry> = {
 	'report:template': {
 		script: 'scripts/report/report-template-cli.ts',
 		description:
-			'Print the work summary or completion report skeleton in the session language: summary | done',
+			"Print the work summary, completion report or lane child's summary skeleton in the session language: summary | done | child",
 		category: 'AI tools',
-		reference: ['summary|done [<path>...]', 'automation', ['files']],
+		reference: ['summary|done|child [<path>...]', 'automation', ['files']],
 		usage: {
-			examples: [{ arguments: 'summary scripts/report/report-lint.ts' }, { arguments: 'done' }],
+			examples: [
+				{ arguments: 'summary scripts/report/report-lint.ts' },
+				{ arguments: 'done' },
+				{ arguments: 'child' },
+			],
 		},
 	},
 	cases: {

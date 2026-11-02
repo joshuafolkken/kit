@@ -1,11 +1,13 @@
 #!/usr/bin/env tsx
 import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
+import { josh_environment_file } from '#scripts/josh/josh-environment-file'
 import { run_invocation } from '#scripts/run/run-invocation'
 import { backlog_named } from './backlog-named'
 import { backlog_next } from './backlog-next'
 import { backlog_plan, type NamedPlan } from './backlog-plan'
 import { backlog_plan_read, type OpenListing, type Plan } from './backlog-plan-read'
+import { backlog_plan_words } from './backlog-plan-words'
 import { backlog_rank } from './backlog-rank'
 import { backlog_scope } from './backlog-scope'
 import { backlog_waves } from './backlog-waves'
@@ -107,8 +109,10 @@ function print_plan(plan: Plan, listing: OpenListing, view: PlanView): void {
 	const rows = backlog_scope.out_of_scope(listing.rows, plan.result, scope)
 
 	const ordered = backlog_rank.offer_order(plan.result, plan.repo, plan.scope.yielded)
+	// The sections are relayed as printed, so they print in the session language.
+	const localized = { ...context, words: backlog_plan_words.session_words() }
 
-	console.info(backlog_plan.format_plan(ordered, rows, context, view.named))
+	console.info(backlog_plan.format_plan(ordered, rows, localized, view.named))
 }
 
 async function report(plan: Plan, view: PlanView): Promise<number> {
@@ -185,6 +189,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 // `process.exitCode` rather than `process.exit()`, the reason `backlog:next` records: the plan is
 // several kilobytes on standard output, and exiting outright can cut the pipe before it has drained.
 async function main(argv: ReadonlyArray<string>): Promise<void> {
+	josh_environment_file.load_environment_file()
 	process.exitCode = await run(argv)
 }
 

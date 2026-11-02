@@ -475,18 +475,19 @@ Prints `ok` (exit 0), or the violations one per line plus one line naming the te
 
 <!-- usage: report:template -->
 
-Print the work summary or completion report skeleton in the session language: summary | done.
+Print the work summary, completion report or lane child's summary skeleton in the session language: summary | done | child.
 
 ```bash
 pnpm josh report:template summary scripts/report/report-lint.ts
 pnpm josh report:template done
+pnpm josh report:template child
 ```
 
 <!-- /usage -->
 
 It uses the label table `josh report:lint` checks, so it passes the lint in any language.
 
-Each path fills the target or changed-file line and, for `summary`, a change block whose "if it breaks" tier opens with the abnormal cases `josh cases` owes for that path. Any other kind prints the usage and exits 1.
+Each path fills the target or changed-file line and, for `summary`, a change block whose "if it breaks" tier opens with the abnormal cases `josh cases` owes for that path. `child` prints the cause / fix / result lines `report:lint --child-summary` checks and ignores paths. Any other kind prints the usage and exits 1.
 
 ### `josh stash:push`
 
@@ -827,7 +828,7 @@ Wave 3  #2774 #2766 #2769   (parallel)
 ```
 
 Sections: **Ready now** (runnable children grouped by repository, in the order the offer walks them — an issue that yielded its lane first, then the rank — so each wave keeps this order; a `run:solo` row is marked `[run:solo]`, one with neither `run:solo` nor `run:lane` `[untriaged]`), **Waiting** (each withheld child naming what it waits on),
-**Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each naming its label), **Out of scope** (every open issue the backlog will not run, with the reason).
+**Waiting on a person** (parked children — `needs-decision`, `run:stalled` or `already-done` — each naming its label), **Out of scope** (every open issue the backlog will not run, with the reason). The title, headings and row notes print in the session language (`JOSH_SESSION_LANG`, `ja` else English); `--waves` and the out-of-scope reasons stay English.
 
 Detail: `docs/maintainers/josh-commands-backlog-rationale.md` → "`josh backlog:plan` in detail".
 
