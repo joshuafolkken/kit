@@ -145,6 +145,16 @@ function over_guide(body: string, route: string | undefined): SizeMeasurement | 
 	return is_excused(body, route) ? undefined : estimate
 }
 
+// joshuafolkken/kit#5935: a split filing passes the guide at filing, yet a lane still lands past its
+// doubled declaration, so `backlog:next` warns on the declared estimate of a split child over the
+// guide; `undefined` under it, on any other route, or with no parsable estimate.
+function split_over_guide(body: string, route: string | undefined): SizeMeasurement | undefined {
+	if (route !== SPLIT_ROUTE_LABEL) return undefined
+	const estimate = parse(body)
+
+	return estimate?.verdict === split_assess.SPLIT_VERDICT ? estimate : undefined
+}
+
 // The declared estimate when it is over the cap; a declared reason does not excuse it, only a split
 // filing does (joshuafolkken/kit#5502). `issue:file` and `backlog:next` both judge through it.
 function over_cap(body: string, route: string | undefined): SizeMeasurement | undefined {
@@ -207,6 +217,7 @@ const size_estimate = {
 	problems,
 	restated,
 	route_of,
+	split_over_guide,
 	stated_line,
 }
 
