@@ -119,6 +119,18 @@ describe('epic_bundle_cli — the `ask` verdict', () => {
 		expect(spread.reason).not.toContain('without asking')
 		expect(spread.reason).toContain('record why')
 	})
+
+	it('recommends the epic tracking the most related issues and prints it', () => {
+		const body = epic_bundle_fixture.in_acceptance('refers to #2, #3 and #4')
+		const spread = epic_bundle.decide_bundle(issue(1, { body }), [
+			issue(2, { epic: 10 }),
+			issue(3, { epic: 20 }),
+			issue(4, { epic: 20 }),
+		])
+
+		expect(spread.recommended).toBe(20)
+		expect(render(spread, issue(1))).toContain('Recommended: #20')
+	})
 })
 
 // joshuafolkken/kit#947: the referenced-issue read is the second half of the fix, and its failure

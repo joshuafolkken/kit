@@ -39,17 +39,16 @@ Could not confirm which epic already tracks these — do not place this issue in
 It prints no children or order. What survives the cut is a membership that *was* found (the table's
 first row).
 
-**`pnpm josh epic:bundle <N> --apply` writes `add_to_epic` / `create_epic`**; `ask` is placed below.
-
-**Placing an issue is not merging epics.** Choosing between two candidate epics is Tier A: take the one
-you recommend and write the decision (taken, rejected, why, date) on **both** the issue and the epic's
-`## Decisions`. **Merging two epics is a different action, and nothing here proposes it.**
+**`pnpm josh epic:bundle <N> --apply` writes `add_to_epic` / `create_epic`, and `ask` into its
+`Recommended:` epic** (most related issues, older on a tie), recording the decision on **both** the
+issue and the epic's `## Decisions`. **Placing is Tier A; merging epics is not proposed here.**
 
 **An epic and its own parent do not produce the spread verdict** — the issue goes to the inner epic.
 **The narrowing drops parents, never peers**: an unrelated epic beside a nested chain, or a cyclic
-declaration, still asks. Stop (Tier B) only where the epics left are genuinely too close to separate.
+declaration (no `Recommended:`, so `--apply` writes nothing), still asks. Stop (Tier B) only where
+the epics left are genuinely too close to separate.
 
-**Write both halves in the one call that places the issue: `pnpm josh epic --add <E> <N...>
+**By hand, write both halves in one call: `pnpm josh epic --add <E> <N...>
 --decision-file <path|->`.** It appends to the epic's `## Decisions` and comments the same text on
 each child added. **Never hand-edit the epic body to add the entry.** Refused before anything is
 written:
