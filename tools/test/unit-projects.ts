@@ -54,6 +54,8 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // lane that sets `JOSH_WORKER_SHIP_MODEL` would otherwise move every fixture that resolves a profile off
 // its default model. The keys `agent-role-profile.ts` reads are its `PROFILE_KEYS`, which the suite pins
 // to this pattern; importing them here would pull the profile resolution into the config's import graph.
+// The pattern also blanks the eval runner's `JOSH_EVAL_MODEL` and the lane agent's
+// `JOSH_LANE_AGENT_*`, which no unit fixture reads from `process.env`.
 //
 // **Every inherited ship mark and every lane mark is blanked without a list here**
 // (joshuafolkken/kit#5029): the supervisor sets `JOSH_SHIP_RETRY_PENDING` around a retried attempt,
