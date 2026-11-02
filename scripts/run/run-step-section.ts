@@ -41,6 +41,10 @@ const PROGRESS_WATCHER = 'run:progress'
 // the reader never opens the whole document. The pause's names every entry's branch — `fullrun` /
 // `halfrun` stop, `backlogrun` continues — since all of them pause; a lane child's park is its stop.
 const PRE_GATE_CUT = 'pre-gate-cut.md'
+// `run:cut` prints the section its non-trivial verdict follows (joshuafolkken/kit#5953): taking the cut
+// has its own key, and the resume keeps the subcommand's, which `run:step` hands as `run:cut --resume`.
+const CUT = 'run:cut take'
+const RESUME = 'run:cut'
 const PARK = 'run:park'
 const PAUSE = 'run:pause'
 const PARK_AND_CONTINUE = reference('backlogrun-park.md', 'park and continue')
@@ -63,7 +67,8 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[PROGRESS_WATCHER, reference('progress-watcher.md', 'Progress while the run is quiet')],
 	['run:merge', EPIC_CHILDREN],
 	['backlog:next', LOOP],
-	['run:cut', reference(PRE_GATE_CUT, 'Resuming')],
+	[CUT, reference(PRE_GATE_CUT, 'Taking the cut')],
+	[RESUME, reference(PRE_GATE_CUT, 'Resuming')],
 	[SHIP, CHAIN],
 	[REVIEW, CHAIN],
 	[RETROSPECTIVE_KEY, RETROSPECTIVE],
@@ -173,12 +178,14 @@ function print_for(
 }
 
 const run_step_section = {
+	CUT,
 	DRIVER_SECTIONS,
 	ENTRY,
 	GOVERNING_SECTIONS,
 	PARK,
 	PAUSE,
 	PROGRESS: PROGRESS_WATCHER,
+	RESUME,
 	RETROSPECTIVE: RETROSPECTIVE_KEY,
 	LANE_CHILD_SECTIONS,
 	driver_sections,

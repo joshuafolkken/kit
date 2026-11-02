@@ -311,9 +311,7 @@ instruction verbatim and a curated list of what is done, what remains, and what 
 alone. It is passed by path with `--handoff <path>`, never inlined, so a
 backtick or `$` in the instruction is not executed. The record stays small; the resume prints the handoff to stderr, and a resume that finds no instruction is refused `incomplete`.
 
-The relaunched child's effort is lowered for a pre-gate resume, the role default for an `--impl` resume.
-
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
+**Output / exit codes:** stdout is one token, then its `pre-gate-cut.md` section unless `not-a-lane` / `fresh`. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
 
 **The dispatch mark:** `lane:dispatch` starts each child generation with `JOSH_LANE_CHILD` set to
 the lane's issue number (`scripts/lane/lane-child-marker.ts`).

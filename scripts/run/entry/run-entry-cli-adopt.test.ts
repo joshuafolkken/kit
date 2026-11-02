@@ -144,6 +144,22 @@ describe('run_entry_cli.run --adopt — the stops before the reads', () => {
 	})
 })
 
+// joshuafolkken/kit#5953: the section `run:cut --resume` prints after its token reaches the session.
+// Here rather than beside the other resume cases, as `run-entry-cli.test.ts` is at the length cap.
+describe('run_entry_cli.run — a carried cut relays the section after its token', () => {
+	it('prints the section after the resume line, claiming nothing', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: 'resume\n## Resuming\n' })
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
+		expect(info).toHaveBeenNthCalledWith(1, expect.stringContaining('— resume: resume'))
+		expect(info).toHaveBeenNthCalledWith(2, '## Resuming')
+		expect(info).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('run_entry_cli.run --adopt — a refused call', () => {
 	it('names --adopt in the usage line it prints', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
