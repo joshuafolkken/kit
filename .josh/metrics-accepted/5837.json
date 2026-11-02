@@ -1,0 +1,7 @@
+{
+	"reason": "#5837 adds the lane:resolve command (verdict, hunk-overlap judgement, CLI and its command entry)",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 159
+	}
+}

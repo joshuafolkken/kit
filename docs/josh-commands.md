@@ -1062,6 +1062,25 @@ pnpm josh lane:withdraw 3769 --reason "folded into a broader issue"
 
 **Output / exit codes:** every explanation on stderr; exit 0 once the withdrawal finished. No open lane or an unreadable state: nothing written, exit 1. Work that cannot be stashed leaves the lane in place, exit 1.
 
+### `josh lane:resolve`
+
+<!-- usage: lane:resolve -->
+
+Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue).
+
+```bash
+pnpm josh lane:resolve 3769   # prints `conflict docs/a.md` on a hand-resolvable conflict
+```
+
+<!-- /usage -->
+
+- The merge-conflict path of `backlogrun-recovery.md`, judged by a command. Step-back condition 3 is read first, before any merge: a trusted Issue comment starting `## Lane conflict resolved` means this child already spent its one resolution.
+- The merge is `josh main:merge`'s (`main_merge.merge`), so the files it regenerates resolve themselves and its refusals hold.
+- Condition 2 is read per conflicted path off `git diff --unified=0` from the merge base to each side: both sides rewriting one base line overlaps; adjacent rewrites and pure insertions do not. An overlap aborts the merge, so the park finds a clean tree.
+- Conditions 1 and 4 stay the run's: a specification question, and the gate and review after a resolution.
+
+**Output / exit codes:** one line on stdout, exit 0 — `resolved`, `conflict <paths>`, `step-back 2 <paths>` or `step-back 3`. A refused merge, an unreadable comment thread or a git failure: stderr, exit 1.
+
 ### `josh lane:pause` / `josh lane:resume`
 
 <!-- usage: lane:pause -->
