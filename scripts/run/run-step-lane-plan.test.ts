@@ -9,6 +9,7 @@ vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 }))
 
 const { run_step_lane_plan } = await import('./run-step-lane-plan')
+const { lane_plan_auto } = await import('#scripts/lane/lane-plan-auto')
 
 // joshuafolkken/kit#4923: a planned lane child retried a refused Edit before it ran `lane:plan`,
 // since nothing it read named that step before the first edit.
@@ -22,38 +23,49 @@ beforeEach(() => {
 	plan_paths_mock.mockResolvedValue([])
 })
 
-describe('run_step_lane_plan.line_for', () => {
+async function command_line(): Promise<string | undefined> {
+	const [command] = await run_step_lane_plan.lines_for(ISSUE, true)
+
+	return command
+}
+
+describe('run_step_lane_plan.lines_for', () => {
 	it('names the plan comment’s paths for a lane child whose plan is not cleared', async () => {
 		plan_paths_mock.mockResolvedValue(PLANNED)
 
-		expect(await run_step_lane_plan.line_for(ISSUE, true)).toBe(
-			`pnpm josh lane:plan ${ISSUE} ${PLANNED.join(' ')}`,
-		)
+		expect(await command_line()).toBe(`pnpm josh lane:plan ${ISSUE} ${PLANNED.join(' ')}`)
 	})
 
 	it('quotes a path the shell would read as syntax', async () => {
 		plan_paths_mock.mockResolvedValue(['src/routes/(app)/+layout.svelte', 'src/app.css'])
 
-		expect(await run_step_lane_plan.line_for(ISSUE, true)).toBe(
+		expect(await command_line()).toBe(
 			`pnpm josh lane:plan ${ISSUE} 'src/routes/(app)/+layout.svelte' src/app.css`,
 		)
 	})
 
 	it('leaves the paths to the child when the issue has no plan comment', async () => {
-		expect(await run_step_lane_plan.line_for(ISSUE, true)).toBe(
-			`pnpm josh lane:plan ${ISSUE} <path>...`,
-		)
+		expect(await command_line()).toBe(`pnpm josh lane:plan ${ISSUE} <path>...`)
+	})
+
+	// joshuafolkken/kit#5934: with `--imports` unnamed, a lane child skipped the import probe of #5928.
+	it('follows the command with one line that names --imports', async () => {
+		const lines = await run_step_lane_plan.lines_for(ISSUE, true)
+
+		expect(lines).toHaveLength(2)
+		expect(lines[1]).toBe(lane_plan_auto.IMPORTS_HINT)
+		expect(lines[1]).toContain('--imports <path>...')
 	})
 
 	it('names nothing once the plan is cleared', async () => {
 		uncleared_mock.mockReturnValue(false)
 
-		expect(await run_step_lane_plan.line_for(ISSUE, true)).toBeUndefined()
+		expect(await run_step_lane_plan.lines_for(ISSUE, true)).toStrictEqual([])
 		expect(plan_paths_mock).not.toHaveBeenCalled()
 	})
 
 	it('names nothing outside a lane child', async () => {
-		expect(await run_step_lane_plan.line_for(ISSUE, false)).toBeUndefined()
+		expect(await run_step_lane_plan.lines_for(ISSUE, false)).toStrictEqual([])
 		expect(uncleared_mock).not.toHaveBeenCalled()
 	})
 })

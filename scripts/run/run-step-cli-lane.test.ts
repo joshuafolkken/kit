@@ -20,7 +20,7 @@ const FOREIGN_CARRY = {
 	},
 }
 const lane_child_mock = vi.hoisted(() => vi.fn(() => true))
-const lane_plan_line_mock = vi.hoisted(() => vi.fn())
+const lane_plan_lines_mock = vi.hoisted(() => vi.fn())
 const to_parts_mock = vi.hoisted(() => vi.fn())
 const read_carry_mock = vi.hoisted(() => vi.fn())
 
@@ -43,7 +43,7 @@ vi.mock('#scripts/lane/lane-child-marker', () => ({
 	lane_child_marker: { is_child_of: lane_child_mock, marked_issue: () => undefined },
 }))
 vi.mock('./run-step-lane-plan', () => ({
-	run_step_lane_plan: { line_for: lane_plan_line_mock },
+	run_step_lane_plan: { lines_for: lane_plan_lines_mock },
 }))
 
 const { run_step_cli } = await import('./run-step-cli')
@@ -61,6 +61,7 @@ const PARTS: PrepParts = {
 	ship_problems: [],
 }
 const LANE_PLAN_LINE = `pnpm josh lane:plan ${ISSUE} scripts/lane/lane-overrun-mechanisms-cli.ts`
+const IMPORTS_HINT = 'Append `--imports <path>...`'
 const info_mock = vi.fn()
 
 function stream(events: ReadonlyArray<RunEvent>): void {
@@ -78,7 +79,7 @@ beforeEach(() => {
 	lane_child_mock.mockReturnValue(true)
 	to_parts_mock.mockReturnValue(PARTS)
 	read_carry_mock.mockReturnValue({ kind: 'carried', carry: { started_at: RUN_START } })
-	lane_plan_line_mock.mockResolvedValue(undefined)
+	lane_plan_lines_mock.mockResolvedValue([])
 	stream([])
 })
 
@@ -102,13 +103,17 @@ describe('run_step_cli.run — a lane child', () => {
 		expect(printed_lines()[0]).toBe(run_step.IMPLEMENT)
 	})
 
-	it('prints the lane:plan command right under implement', async () => {
-		lane_plan_line_mock.mockResolvedValue(LANE_PLAN_LINE)
+	it('prints the lane:plan command and its --imports hint right under implement', async () => {
+		lane_plan_lines_mock.mockResolvedValue([LANE_PLAN_LINE, IMPORTS_HINT])
 
 		await run_step_cli.run([ISSUE])
 
-		expect(printed_lines().slice(0, 2)).toStrictEqual([run_step.IMPLEMENT, LANE_PLAN_LINE])
-		expect(lane_plan_line_mock).toHaveBeenCalledWith(ISSUE, true)
+		expect(printed_lines().slice(0, 3)).toStrictEqual([
+			run_step.IMPLEMENT,
+			LANE_PLAN_LINE,
+			IMPORTS_HINT,
+		])
+		expect(lane_plan_lines_mock).toHaveBeenCalledWith(ISSUE, true)
 	})
 
 	// joshuafolkken/kit#5016: the whole chain under implement led a lane child into step 1's main:merge.
@@ -120,14 +125,14 @@ describe('run_step_cli.run — a lane child', () => {
 	})
 
 	it('prints no lane:plan command away from implement', async () => {
-		lane_plan_line_mock.mockResolvedValue(LANE_PLAN_LINE)
+		lane_plan_lines_mock.mockResolvedValue([LANE_PLAN_LINE])
 		stream([{ pos: 1, at: RUN_START, kind: 'ship-stop', text: `#${ISSUE} gate failed` }])
 
 		await run_step_cli.run([ISSUE])
 
 		expect(printed_lines()[0]).toBe(`pnpm josh ship --log ${ISSUE}`)
 		expect(printed_lines()).not.toContain(LANE_PLAN_LINE)
-		expect(lane_plan_line_mock).not.toHaveBeenCalled()
+		expect(lane_plan_lines_mock).not.toHaveBeenCalled()
 	})
 })
 

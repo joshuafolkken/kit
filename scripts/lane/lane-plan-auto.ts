@@ -10,6 +10,11 @@ import { lane_plan_check } from './lane-plan-check'
 
 const SUCCESS_EXIT_CODE = 0
 const PATH_PLACEHOLDER = '<path>...'
+// Printed under every `lane:plan` command a child is shown: `--imports` probes the main guards of the
+// modules the new code imports (joshuafolkken/kit#5928), and unnamed, a lane child went on to implement
+// without it (joshuafolkken/kit#5934).
+const IMPORTS_HINT =
+	'Append `--imports <path>...` naming the existing modules the new code imports — lane:plan probes their main guards before the first edit.'
 
 // The `lane:plan` command for `paths`, `<path>...` standing in when there are none.
 function command_of(issue_number: string, paths: ReadonlyArray<string>): string {
@@ -26,7 +31,7 @@ function paths_of(plan: string): ReadonlyArray<string> {
 }
 
 // Runs `lane:plan`'s check on the plan's paths and returns its exit code, its verdict printed under the
-// command it stands for; with none readable, prints the command and returns success. The check is
+// command it stands for and the `--imports` hint; with none readable, prints those two and returns success. The check is
 // `lane-plan-check.ts`'s, imported past `lane-plan-cli.ts`'s main guard.
 async function run_from_plan(
 	issue_number: string,
@@ -37,11 +42,12 @@ async function run_from_plan(
 	const lane = lane_plan_check.plan_of([issue_number, ...paths], new Date())
 
 	console.info(command_of(issue_number, paths))
+	console.info(IMPORTS_HINT)
 	if (lane === undefined) return SUCCESS_EXIT_CODE
 
 	return await lane_plan_check.check_plan(lane_plan_check.placed(lane, directory), directory)
 }
 
-const lane_plan_auto = { command_of, paths_of, run_from_plan }
+const lane_plan_auto = { IMPORTS_HINT, command_of, paths_of, run_from_plan }
 
 export { lane_plan_auto }
