@@ -84,6 +84,18 @@ function read_named(name: string, root: string): string | undefined {
 	return markdown
 }
 
+// The section's text, resolved exactly as `run` resolves it, for a caller that carries it rather than
+// prints it; `undefined` where the document or the heading does not resolve.
+function section_text(
+	name: string,
+	heading: string,
+	root: string = process.cwd(),
+): string | undefined {
+	const markdown = document_section.read_optional(resolve_document(name, root))
+
+	return markdown === undefined ? undefined : document_section.section(markdown, heading)?.text
+}
+
 function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number {
 	const name = argv[FILE_ARGUMENT]
 	const heading = argv[HEADING_ARGUMENT]
@@ -99,6 +111,6 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 	return markdown === undefined ? FAILURE_EXIT_CODE : print_section(markdown, heading, root)
 }
 
-const document_section_cli = { FAILURE_EXIT_CODE, USAGE, resolve_document, run }
+const document_section_cli = { FAILURE_EXIT_CODE, USAGE, resolve_document, run, section_text }
 
 export { document_section_cli }

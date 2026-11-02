@@ -2,9 +2,12 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { agent_role_profile } from '#scripts/agent/agent-role-profile'
+import { agent_safe_text } from '#scripts/agent/agent-safe-text'
+import { document_section_cli } from '#scripts/document/document-section-cli'
 import { josh_command } from '#scripts/josh/josh-run'
 import { run_carry } from '#scripts/run/carry/run-carry'
 import { run_event_setup } from '#scripts/run/event/run-event-setup'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { run_wake_driver } from './run-wake-driver'
 
@@ -20,7 +23,7 @@ const TRIAGE_OUTPUT = 'triage\nresume: --owner 1'
 const HAND_BACK = 'then end the turn, which hands the loop back'
 const ALREADY_CLAIMED =
 	"the carry record is already this session's, so run no pnpm josh run:carry --begin;"
-const DEFAULT_NEXT = `${ALREADY_CLAIMED} act on the result by backlogrun-steps.md → "The loop", ${HAND_BACK}`
+const DEFAULT_NEXT = `${ALREADY_CLAIMED} act on the result by the sections below, ${HAND_BACK}`
 const scratch = { directory: '', target: '' }
 
 beforeEach(() => {
@@ -61,7 +64,7 @@ test('claims the carry record and supplies a judgment branch with its resume mat
 
 	expect(result).toStrictEqual({
 		kind: 'judgment',
-		material: `Driver result: ${OUTPUT}\nNext: ${DEFAULT_NEXT}\nDetails: budget spent`,
+		material: `Driver result: ${OUTPUT}\nNext: ${DEFAULT_NEXT}\n${run_step_section.driver_sections('merge over #2509')}\nDetails: budget spent`,
 	})
 	expect(run_carry.read_carry(scratch.target)).toMatchObject({
 		kind: 'carried',
@@ -151,7 +154,7 @@ test('hands on only the tail of a long stderr, after the verdict, resume line an
 
 	expect(result.kind).toBe('judgment')
 	if (result.kind !== 'judgment') return
-	expect(result.material.length).toBeLessThan(agent_role_profile.MAX_VALUE_LENGTH)
+	expect(result.material.length).toBeLessThan(agent_safe_text.MAX_PROMPT_LENGTH)
 	expect(result.material).toMatch(
 		/^Driver result: epic #1\nresume: --owner 1\nThe named item is an epic/u,
 	)
@@ -202,10 +205,13 @@ test.each([
 	['launch #2500\nresume: --owner 1', HAND_BACK],
 	[
 		'retrospective\nresume: --owner 1',
-		'pnpm josh run:carry --retrospective --summary "<result>", ',
+		'prints (the retrospective below), close it with pnpm josh run:carry --retrospective --summary "<result>", ',
 	],
-	['merge human-review #2500\nresume: --owner 1', 'needs-human-review.md'],
-	[EPIC_OUTPUT, 'Named issues run first, in order'],
+	[
+		'merge human-review #2500\nresume: --owner 1',
+		'stopped before its commit for a person (the section below)',
+	],
+	[EPIC_OUTPUT, 'follow the named-issue sections below'],
 ])('names the next move without a claim for a judgment branch: %j', (out, next) => {
 	const result = run_wake_driver.driver_result(out, { kind: 'none' })
 
@@ -214,6 +220,30 @@ test.each([
 	expect(result.material).toContain(`\nNext: ${ALREADY_CLAIMED} `)
 	expect(result.material).not.toContain('--resume')
 	expect(result.material.slice(result.material.indexOf('\nNext: '))).toContain(next)
+})
+
+// joshuafolkken/kit#5920: the woken session spends no `doc:section` turn — each governing section's
+// text rides in the hand-off, after the next move and before the details.
+test.each([
+	...run_step_section.DRIVER_SECTIONS.map(
+		([prefix, sections]) => [`${prefix}1`, sections] as const,
+	),
+	['offer', [{ document: 'backlogrun-steps.md', heading: 'The loop' }]] as const,
+])('carries the governing sections of a %j hand-off', (verdict, sections) => {
+	const result = run_wake_driver.driver_result(
+		`${verdict}\nresume: --owner 1`,
+		{ kind: 'none' },
+		'x',
+	)
+	const material = result.kind === 'judgment' ? result.material : ''
+
+	for (const section of sections) {
+		const text = document_section_cli.section_text(section.document, section.heading)
+
+		expect(text).toBeDefined()
+		expect(material.indexOf(text ?? '')).toBeLessThan(material.indexOf('\nDetails: '))
+		expect(material.indexOf(text ?? '')).toBeGreaterThan(material.indexOf('\nNext: '))
+	}
 })
 
 async function no_pause(): Promise<void> {

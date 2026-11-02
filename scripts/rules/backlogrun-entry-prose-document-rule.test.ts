@@ -37,7 +37,7 @@ const RELOCATED_BODIES: ReadonlyArray<SingleSourceRule> = [
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
-		marker: 'Read only the one section the row names',
+		marker: 'The hand-off carries the sections its row needs',
 		canonical: `${SKILL_DIR}/backlogrun-steps.md`,
 	},
 	{
