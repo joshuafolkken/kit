@@ -1,7 +1,7 @@
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { path_decision } from '#scripts/josh/path-decision'
 import { release_plan } from './release-plan'
-import { release_request, type ReleaseRequest } from './release-request'
+import { release_request, type ReleaseRequestLines } from './release-request'
 
 // **Whether a release is owed is a command's answer, not a judgement**.
 //
@@ -32,7 +32,7 @@ const UNKNOWN_SCOPE = 'unknown'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NOTHING_PENDING_REASON = 'main has taken no merge since the version last changed'
-const RELEASE_HINT = 'run `pnpm josh release` on the default branch of the primary checkout'
+const RELEASE_HINT = release_request.RELEASE_COMMAND
 // **Not `skip`.** An unreadable version, a fetch that could not run or a base the search cannot
 // resolve is not "nothing is waiting to ship", and reporting it as one lets a release go missing
 // quietly.
@@ -62,7 +62,7 @@ function decide(pending: number | undefined): Decision {
 // `required` carries the open release Issue and the request line beside the verdict, so the run
 // cites the Issue without searching for it. The verdict stays alone on stdout; the rest joins the
 // reason on stderr, and `--json` carries all of it in the one object.
-function print_required(decision: Decision, request: ReleaseRequest, is_json: boolean): void {
+function print_required(decision: Decision, request: ReleaseRequestLines, is_json: boolean): void {
 	if (is_json) {
 		console.info(
 			JSON.stringify({ [JSON_KEY]: decision.scope, reason: decision.reason, ...request }),

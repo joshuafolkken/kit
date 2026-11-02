@@ -10,14 +10,14 @@ const RELEASE_COMMAND = 'run `pnpm josh release` on the default branch of the pr
 
 type OpenRelease = number | typeof NONE | undefined
 
-interface ReleaseRequest {
+interface ReleaseRequestLines {
 	release_issue: string
 	request: string
 }
 
 // `undefined` (the listing or the repository was unreadable) reports `unknown`, never `none`: a
 // request that drops the release Issue the listing failed to show cites nothing a person can close.
-function request_of(open: OpenRelease, target: string): ReleaseRequest {
+function request_of(open: OpenRelease, target: string): ReleaseRequestLines {
 	if (open === undefined) return { release_issue: UNKNOWN, request: `request: ${RELEASE_COMMAND}` }
 
 	if (open === NONE) return { release_issue: NONE, request: `request: ${RELEASE_COMMAND}` }
@@ -28,7 +28,7 @@ function request_of(open: OpenRelease, target: string): ReleaseRequest {
 	return { release_issue: cite, request: `request: ${RELEASE_COMMAND} — it closes ${cite}` }
 }
 
-async function read(): Promise<ReleaseRequest> {
+async function read(): Promise<ReleaseRequestLines> {
 	const target = await git_gh_repo.repo_get_name_with_owner()
 
 	if (target === undefined) return request_of(undefined, '')
@@ -38,5 +38,5 @@ async function read(): Promise<ReleaseRequest> {
 
 const release_request = { read, request_of, RELEASE_COMMAND, UNKNOWN }
 
-export type { ReleaseRequest }
+export type { ReleaseRequestLines }
 export { release_request }

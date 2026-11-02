@@ -1,12 +1,15 @@
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
-import { release_request, type ReleaseRequest } from './release-request'
+import { release_request, type ReleaseRequestLines } from './release-request'
 import { release_scope_cli } from './release-scope-cli'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
-const REQUEST: ReleaseRequest = { release_issue: '[#4321](url)', request: 'request: release it' }
+const REQUEST: ReleaseRequestLines = {
+	release_issue: '[#4321](url)',
+	request: 'request: release it',
+}
 
 function given_pending(pending: number | undefined): void {
 	vi.spyOn(git_followup_pending, 'read_pending').mockResolvedValue(pending)
@@ -83,12 +86,12 @@ describe('release_scope_cli.run cites the open release Issue', () => {
 		expect(info).toHaveBeenCalledWith(expect.stringContaining('"request":"request: release it"'))
 	})
 
-	it('looks no release Issue up when nothing is waiting to ship', async () => {
+	it.each([0, undefined])('looks no release Issue up when the count is %s', async (pending) => {
 		vi.spyOn(console, 'info').mockImplementation(() => undefined)
 		vi.spyOn(console, 'error').mockImplementation(() => undefined)
 		const read = given_request()
 
-		given_pending(0)
+		given_pending(pending)
 
 		await release_scope_cli.run([])
 		expect(read).not.toHaveBeenCalled()

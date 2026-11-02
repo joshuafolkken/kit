@@ -113,5 +113,5 @@ pnpm josh release:scope          # → required | skip | unknown
 outward-facing and effectively irreversible, so Tier C. A person types it in the primary checkout, on
 the default branch, with a clean tree.
 
-**On `required`, it prints `release_issue: #N|none|unknown` and the `request:` line** — citing the
+**On `required`, it prints `release_issue: [#N](url)|none|unknown` and the `request:` line** — citing the
 open release Issue `issue:release <N>` links blockers to, or naming `pnpm josh release` alone.
