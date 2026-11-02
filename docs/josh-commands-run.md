@@ -65,6 +65,8 @@ pnpm josh run:pause 1091 --for 1102   # pause 1091 until 1102 lands
 
 <!-- /usage -->
 
+A pause that lands prints `prerequisite.md` → "Each entry's branch, and the pause" after its step lines (one line naming it once this session printed it).
+
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:pause` in detail".
 
 ### `josh run:split`
@@ -123,6 +125,23 @@ Runs after every successful `run:hold` claim, and in a `backlogrun`'s once-per-r
 "Closed by a merge" is read from the issue's REST timeline: its latest closed/reopened event is `closed` as completed (not `not_planned` or `duplicate`) and a merged pull request cross-references it.
 
 **Output / exit codes:** always exits 0. What was cleaned and what was kept (with the reason) goes to stderr; nothing is printed when nothing merged was found.
+
+### `josh run:prime`
+
+<!-- usage: run:prime -->
+
+Prepare the primary checkout once before a backlogrun’s first lane: main:sync, latest:if-required, the update stashed, lane:prune, run:tidy.
+
+```bash
+pnpm josh run:prime   # prints `latest <scope>` and `stash <message>|clean`
+```
+
+<!-- /usage -->
+
+A `backlogrun`'s once-per-repository preparation in one call, in the primary checkout, never per lane. The steps run in order: `main:sync`, `latest:if-required`, then on `required` `stash:push "backlogrun: josh latest before lanes"`, `lane:prune` and `run:tidy`.
+
+- Stdout: two lines, `latest skip|required` and `stash backlogrun: josh latest before lanes` or `stash clean`. A `stash` other than `clean` is popped by the first lane's `lane:launch --stash` with that message. Each step's own output goes to stderr.
+- Failure: a failed step stops the run with a non-zero exit, and the steps after it do not run. A stash already pushed is kept.
 
 ### `josh run:stale`
 
@@ -334,6 +353,8 @@ pnpm josh run:park 1839 --clear                              # remove needs-deci
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 
 A park from inside a lane appends the lane directory, its held seat and `pnpm josh lane:close <N>` to the comment.
+
+A released park prints `backlogrun-park.md` → "park and continue" after the release's line — a lane child `pre-gate-cut.md` → "A lane child records its park before it stops" — or one line naming it once this session printed it. A section that does not resolve exits `1` with the park landed; do not re-run the park.
 
 **Output / exit codes:** one `park #<N>` line naming what was written, then the release's line; exit `0` once the label and the comment are both on the issue and the release succeeded (or, with `--clear`, once the label is off), `1` otherwise. The record is written only once both are on; a failed release keeps it and prints `pnpm josh run:release <N>` to re-run.
 

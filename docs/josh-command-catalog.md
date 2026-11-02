@@ -225,6 +225,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
 | `josh run:pickup` | `[<epic>...]` | automation | processes | Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line |
 | `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
+| `josh run:prime` | — | automation | git, network, files, processes | Prepare the primary checkout once before a backlogrun’s first lane: main:sync, latest:if-required, the update stashed, lane:prune, run:tidy |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff \| --end [--stopped "<reason>"]]` | automation | files, network, processes | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |

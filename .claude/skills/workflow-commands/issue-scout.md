@@ -25,7 +25,7 @@ pnpm josh issue:file "<title>" --body-file <complete-draft.md> --distinct 2801,2
   line, named in `--distinct`, and the filing carries on.
 - **`none` is an answer.** The command reports no candidate rather than the closest miss.
 - **`Epic:` front-loads the placement.** Its recommendation is `epic:bundle`'s, which makes
-  `add_to_epic` / `create_epic` Tier A and `ask` a stop, in exactly the reading `into-target.md`'s
+  `add_to_epic` / `create_epic` / `ask` Tier A, in exactly the reading `into-target.md`'s
   `into <target>` suffix would have given by hand. Where the user typed `into <target>`, that naming wins.
 - **`Epic: not asked` is not `Epic: none`.** The epic half decides from the issue numbers the body
   names in its acceptance criteria or its `parent: #N` line; a background mention does not count.

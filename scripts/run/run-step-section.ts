@@ -37,6 +37,13 @@ const PROGRESS = 'backlogrun-progress.md'
 const SHIP = 'ship'
 const REVIEW = 'run:review'
 const PROGRESS_WATCHER = 'run:progress'
+// `run:park` and `run:pause` print the subsection their ending follows (joshuafolkken/kit#5842), so
+// the reader never opens the whole document. The pause's names every entry's branch — `fullrun` /
+// `halfrun` stop, `backlogrun` continues — since all of them pause; a lane child's park is its stop.
+const PRE_GATE_CUT = 'pre-gate-cut.md'
+const PARK = 'run:park'
+const PAUSE = 'run:pause'
+const PARK_AND_CONTINUE = reference('backlogrun-park.md', 'park and continue')
 // Rows both tables carry — the step's and the driver's.
 const STEPS = 'backlogrun-steps.md'
 const LOOP = reference(STEPS, 'The loop')
@@ -56,11 +63,13 @@ const GOVERNING_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[PROGRESS_WATCHER, reference('progress-watcher.md', 'Progress while the run is quiet')],
 	['run:merge', EPIC_CHILDREN],
 	['backlog:next', LOOP],
-	['run:cut', reference('pre-gate-cut.md', 'Resuming')],
+	['run:cut', reference(PRE_GATE_CUT, 'Resuming')],
 	[SHIP, CHAIN],
 	[REVIEW, CHAIN],
 	[RETROSPECTIVE_KEY, RETROSPECTIVE],
 	['run:carry', reference(PROGRESS, 'The hand-off')],
+	[PARK, PARK_AND_CONTINUE],
+	[PAUSE, reference('prerequisite.md', "Each entry's branch, and the pause")],
 ])
 
 // **A lane child reads its own step of the chain, never the whole of it** (joshuafolkken/kit#5016):
@@ -73,6 +82,7 @@ const LANE_CHILD_SECTIONS: ReadonlyMap<string, SectionReference> = new Map([
 	[run_step.IMPLEMENT, LANE_CHILD_STEP],
 	[SHIP, LANE_CHILD_STEP],
 	[REVIEW, LANE_CHILD_STEP],
+	[PARK, reference(PRE_GATE_CUT, 'A lane child records its park before it stops')],
 ])
 
 // **A `backlog:drive` verdict handed to a session carries its governing sections** (joshuafolkken/kit#5920):
@@ -83,7 +93,7 @@ const DRIVER_SECTIONS: ReadonlyArray<readonly [string, ReadonlyArray<SectionRefe
 	['merge human-review', [HUMAN_REVIEW]],
 	['triage', [LOOP, reference(STEPS, 'Resolve what the plan can resolve')]],
 	['judge', [LOOP, reference('docs/josh-commands-backlog.md', '`josh auto-ok:judge`')]],
-	['launch #', [LOOP, reference('backlogrun-park.md', 'park and continue')]],
+	['launch #', [LOOP, PARK_AND_CONTINUE]],
 	['merge', [LOOP, EPIC_CHILDREN]],
 	[
 		'epic #',
@@ -166,7 +176,10 @@ const run_step_section = {
 	DRIVER_SECTIONS,
 	ENTRY,
 	GOVERNING_SECTIONS,
+	PARK,
+	PAUSE,
 	PROGRESS: PROGRESS_WATCHER,
+	RETROSPECTIVE: RETROSPECTIVE_KEY,
 	LANE_CHILD_SECTIONS,
 	driver_sections,
 	key_of,

@@ -164,14 +164,10 @@ Branch 2 only:
      after the parent closes it answers `none` permanently.
   2. Act on the printed `epic:bundle` answer with `pnpm josh epic:bundle <new> --apply` — never a
      hand edit of the epic body, which leaves the task list and `blocked-by` relations disagreeing
-     (`epic:next` returns `error`). Tier A, no confirmation:
-     - `add_to_epic` / `create_epic` → `--apply` writes it, with any recorded order.
-     - `ask` (candidates across two or more epics) → `--apply` writes nothing; place it in the
-       recommended epic with `pnpm josh epic --add <E> <new> --decision-file <path>`
-       (`.claude/skills/epic-commands/epic-bundle.md`).
-     - `none` → nothing.
-     - Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and report what it said; a
-       `none` after such a warning is not "nothing to bundle".
+     (`epic:next` returns `error`). Tier A, no confirmation; what each answer does is
+     `.claude/skills/epic-commands/SKILL.md` → "`josh epic:bundle <N>` — does this new issue belong
+     with one already filed?". Non-zero exit, or any ⚠ warning above `Nothing to bundle.` → stop and
+     report what it said; a `none` after such a warning is not "nothing to bundle".
 
 **A confirmed High is never deferred** — it blocks the merge, never fixed-in-place, filed or dropped.
 If one still stands after round 2, do not start a third: stop, send a `confirmation` Telegram, and put

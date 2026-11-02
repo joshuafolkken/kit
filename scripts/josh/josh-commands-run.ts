@@ -1,5 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 import { PAUSE_COMMANDS } from './josh-commands-pause'
+import { PRIME_COMMANDS } from './josh-commands-prime'
 import { PROGRESS_COMMANDS } from './josh-commands-progress'
 
 const OWNER = '--owner <pid>'
@@ -81,13 +82,7 @@ const RUN_COMMANDS: Record<string, CommandEntry> = {
 		},
 	},
 	...PAUSE_COMMANDS,
-	'run:tidy': {
-		script: 'scripts/run/tidy/run-tidy-main.ts',
-		description: 'Close merged lanes and drop stashes whose issues are all merged',
-		category: 'AI tools',
-		reference: ['', 'automation', ['git', 'network', 'files']],
-		usage: { examples: [{ arguments: '' }] },
-	},
+	...PRIME_COMMANDS,
 	'run:carry': {
 		script: 'scripts/run/carry/run-carry-cli.ts',
 		// `--stopped` sends the stop confirmation, so the Telegram credentials come from `.env` as for
