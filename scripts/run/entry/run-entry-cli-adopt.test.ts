@@ -88,6 +88,19 @@ describe('run_entry_cli.run --adopt — the bare hold is re-keyed, then the #N e
 	)
 })
 
+describe('run_entry_cli.run <N> — a #N entry synchronizes its tree as a new entry does (joshuafolkken/kit#5943)', () => {
+	it('claims the tree, then syncs it before the reads', async () => {
+		josh_run_mock
+			.mockResolvedValueOnce(FRESH)
+			.mockResolvedValueOnce(HELD)
+			.mockResolvedValueOnce(UNDER)
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(sync_mock).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ is_adopt: false }))
+		expect(gather_mock).toHaveBeenCalledTimes(1)
+	})
+})
+
 describe('run_entry_cli.run --adopt — the tree sync before the reads', () => {
 	it('stops on a failed sync, releasing the adopted record and notifying', async () => {
 		josh_run_mock
@@ -128,6 +141,22 @@ describe('run_entry_cli.run --adopt — the stops before the reads', () => {
 		expect(await run_entry_cli.run([ISSUE, '--adopt'])).not.toBe(OK)
 		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
 		expect(gather_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5953: the section `run:cut --resume` prints after its token reaches the session.
+// Here rather than beside the other resume cases, as `run-entry-cli.test.ts` is at the length cap.
+describe('run_entry_cli.run — a carried cut relays the section after its token', () => {
+	it('prints the section after the resume line, claiming nothing', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		josh_run_mock.mockResolvedValueOnce({ code: OK, out: 'resume\n## Resuming\n' })
+
+		expect(await run_entry_cli.run([ISSUE])).toBe(OK)
+		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
+		expect(info).toHaveBeenNthCalledWith(1, expect.stringContaining('— resume: resume'))
+		expect(info).toHaveBeenNthCalledWith(2, '## Resuming')
+		expect(info).toHaveBeenCalledTimes(2)
 	})
 })
 

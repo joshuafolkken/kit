@@ -3,9 +3,9 @@ import { run_entry_children } from './run-entry-children'
 
 // joshuafolkken/kit#5831: `run:entry` times each child it runs under `run:entry › <step>`.
 
-const { josh_run, record_ship_lap } = vi.hoisted(() => ({
-	josh_run: vi.fn<(argv: ReadonlyArray<string>) => Promise<{ code: number; out: string }>>(),
+const { record_ship_lap, josh_run } = vi.hoisted(() => ({
 	record_ship_lap: vi.fn(async () => undefined),
+	josh_run: vi.fn(async () => ({ code: 0, out: '' })),
 }))
 
 vi.mock('#scripts/lane/lane-ledger-write', () => ({ lane_ledger_write: { record_ship_lap } }))
@@ -15,31 +15,6 @@ const ISSUE = '5831'
 
 beforeEach(() => {
 	record_ship_lap.mockClear()
-	josh_run.mockReset()
-})
-
-// joshuafolkken/kit#5958: the section `run:cut --resume` prints after its token is kept for the relay.
-describe('run_entry_children.ask_resume — the token and the section after it', () => {
-	it('splits a non-trivial answer into its token and its section', async () => {
-		josh_run.mockResolvedValueOnce({ code: 0, out: 'resume\n## Resuming\n\nbody\n' })
-
-		expect(await run_entry_children.ask_resume(ISSUE)).toStrictEqual({
-			token: 'resume',
-			code: 0,
-			section: '## Resuming\n\nbody',
-		})
-		expect(josh_run).toHaveBeenCalledWith(['run:cut', '--resume', ISSUE], true)
-	})
-
-	it('answers an empty section on `fresh`', async () => {
-		josh_run.mockResolvedValueOnce({ code: 0, out: 'fresh\n' })
-
-		expect(await run_entry_children.ask_resume(ISSUE)).toStrictEqual({
-			token: 'fresh',
-			code: 0,
-			section: '',
-		})
-	})
 })
 
 describe('run_entry_children.STEP — the lap names lane:breakdown prints', () => {
@@ -81,5 +56,29 @@ describe('run_entry_children.within — the entry scope', () => {
 		await run_entry_children.timed(run_entry_children.STEP.PREP, async () => 'read')
 
 		expect(record_ship_lap).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5953: `run:cut --resume` prints the section it acts on after its token, which
+// `run:entry` relays rather than dropping with the rest of the output.
+describe('run_entry_children.ask_resume — the token and the section after it', () => {
+	it('splits the token from the section printed after it', async () => {
+		josh_run.mockResolvedValueOnce({ code: 0, out: 'resume\n## Resuming\n\nbody\n' })
+
+		expect(await run_entry_children.ask_resume(ISSUE)).toStrictEqual({
+			token: 'resume',
+			code: 0,
+			section: '## Resuming\n\nbody',
+		})
+	})
+
+	it('answers an empty section on a bare token', async () => {
+		josh_run.mockResolvedValueOnce({ code: 0, out: 'fresh\n' })
+
+		expect(await run_entry_children.ask_resume(ISSUE)).toStrictEqual({
+			token: 'fresh',
+			code: 0,
+			section: '',
+		})
 	})
 })

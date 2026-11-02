@@ -15,7 +15,7 @@ File Issues with `pnpm josh issue:file` (it applies the classification labels); 
    into the body when it is blank and its author has write access, otherwise into a comment; its
    `### 影響を受ける既存の利用者` section is drafted with `pnpm josh plan:consumers` — `kickoff.md` step 4).
    In a lane child it runs `lane:plan` on the plan's paths: `docs/josh-commands-backlog.md` → "`josh issue:plan`".
-4. Synchronize as `entry-sequence.md` → "The ordered entry sequence" directs, then update dependencies only where the `run:prep` report answers
+4. `run:entry` has synchronized the tree; update dependencies only where the `run:prep` report answers
    `latest: required` — `latest-gate.md` is its single source. Load the `dependency-update` skill
    after an update. **A dispatched lane child skips entry synchronization**; ship syncs before its gate.
 5. Implement. The `plan` event `run:board` draws 📝 from is written by code — by `run:entry` for a
@@ -41,7 +41,7 @@ with the labels `kickoff.md` → "Words typed after `new`" maps (per
 that covers the same work stops the run rather than filing a second Issue (`issue-scout.md`). Capture
 `<N>`. (3) `pnpm josh run:entry <N> --adopt` — the `#N` entry with the bare hold re-keyed to `<N>`
 (`run:hold --adopt`) for its claim; before its reads it stashes pre-existing changes, synchronizes
-per `entry-sequence.md` and pops the stash, and a failed step stops with the stash kept, naming it
+as every entry does and pops the stash, and a failed step stops with the stash kept, naming it
 (`scripts/run/entry/run-entry-sync.ts`); every later stop releases with `run:release <N>`. (4) Record the
 agreed plan in the session language: `pnpm josh issue:plan <N> --body-file <path>` (its consumers
 section as in `kickoff.md` step 4). (5) On (3)'s `latest: required` run

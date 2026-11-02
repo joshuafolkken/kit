@@ -36,11 +36,10 @@ interface EntryRequest {
 	is_adopt: boolean
 }
 
-// `section` is what `run:cut --resume` prints after its token — the `pre-gate-cut.md` section a
-// non-trivial answer is acted on by — and empty on `fresh`.
 interface Resume {
 	token: string
 	code: number
+	// The `pre-gate-cut.md` section `run:cut --resume` prints after a non-trivial token, empty on `fresh`.
 	section: string
 }
 
@@ -102,9 +101,9 @@ async function ask_resume(issue_number: string): Promise<Resume> {
 			await josh_command.josh_run(['run:cut', '--resume', issue_number], should_forward_stderr),
 	)
 
-	const [token = '', ...rest] = asked.out.split(NEWLINE)
+	const [token = '', ...section] = asked.out.split(NEWLINE)
 
-	return { token, code: asked.code, section: rest.join(NEWLINE).trim() }
+	return { token, code: asked.code, section: section.join(NEWLINE).trim() }
 }
 
 const run_entry_children = {

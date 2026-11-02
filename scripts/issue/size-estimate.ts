@@ -15,7 +15,7 @@ import { markdown_section } from './markdown-section'
 //
 // joshuafolkken/kit#5654: lanes land at twice their declaration at the median (`lane:stats`, files
 // and lines alike), so the guide and the cap judge the declaration multiplied by
-// `DECLARED_GROWTH_FACTOR`. `parse` keeps the declared counts: `lane:plan` reads them as declared.
+// `split_assess.DECLARED_GROWTH_FACTOR`. `parse` keeps the declared counts: `lane:plan` reads them as declared.
 
 const BACKGROUND_HEADING = '## 背景'
 const EPIC_HEADING = '## Split rationale'
@@ -31,7 +31,7 @@ const MISSING = `missing size estimate: declare \`${DECLARATION}\` under ${BACKG
 const EXAMPLE = `${PREFIX} 約 3 ファイル / 60 行（テスト除く）`
 const MALFORMED = `\`${PREFIX}\` must be written ${DECLARATION}\n${EXAMPLE}`
 const estimate_schema = z.object({ files: z.coerce.number(), lines: z.coerce.number() })
-const DECLARED_GROWTH_FACTOR = 2
+const { DECLARED_GROWTH_FACTOR } = split_assess
 
 function declared(body: string, prefix: string): string | undefined {
 	const background = markdown_section.section_lines(body, BACKGROUND_HEADING).join('\n')

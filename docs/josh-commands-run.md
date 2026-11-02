@@ -311,9 +311,7 @@ instruction verbatim and a curated list of what is done, what remains, and what 
 alone. It is passed by path with `--handoff <path>`, never inlined, so a
 backtick or `$` in the instruction is not executed. The record stays small; the resume prints the handoff to stderr, and a resume that finds no instruction is refused `incomplete`.
 
-The relaunched child's effort is lowered for a pre-gate resume, the role default for an `--impl` resume.
-
-**Output / exit codes:** stdout is one token. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
+**Output / exit codes:** stdout is one token, then its `pre-gate-cut.md` section unless `not-a-lane` / `fresh`. `run:cut <N>`: `cut`, `not-a-lane`, `unready`, `busy`, `failed` or `bad-handoff`. `run:cut --resume <N>`: `fresh`, `resume`, `resume-impl`, `stale`, `busy`, `handed-off`, `incomplete` or `over`.
 
 **The dispatch mark:** `lane:dispatch` starts each child generation with `JOSH_LANE_CHILD` set to
 the lane's issue number (`scripts/lane/lane-child-marker.ts`).
@@ -462,7 +460,7 @@ It runs `run:hold`, `cost --cut` (skipped in a lane child), `run:prep` and `run:
 
 `--adopt` claims by `run:hold --adopt <N>` instead — a `new` run's bare hold re-keyed to the Issue it filed; `none` or `busy` stops as a held tree does.
 
-After the budget and before the reads, `--adopt` synchronizes the tree (skipped in a lane child): `stash:push "<command> new #<N>: pre-existing changes"`, `main:sync` (primary checkout) or `main:merge` (linked), then `stash:pop` after `stashed`. A failed step exits non-zero, keeps and names the stash, releases the hold and sends the `confirmation` Telegram.
+After the budget and before the reads, the entry synchronizes the tree (skipped in a lane child): `stash:push "<command> [new] #<N>: pre-existing changes"`, `main:sync` (primary checkout) or `main:merge` (linked), then `stash:pop` after `stashed`. A failed step exits non-zero, keeps and names the stash, releases the hold and sends the `confirmation` Telegram.
 
 `--to kickoff|halfrun|prrun|fullrun` names how far the run goes (default `fullrun`); the first line, `stage #<N> — at: … · to: … · start: …`, says where it starts. The stage table is `docs/how-to/run-issues.md`.
 
@@ -1239,6 +1237,13 @@ pnpm josh lane:value cell --table "test:related scope" --row related --column "m
 
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
+Two figures outside `lane:value` print the number alone as the last line; `--density` with no lane-child request prints nothing and exits non-zero too:
+
+```bash
+pnpm josh cost:audit --density --period 7   # lane-child calls per request over the period
+pnpm josh read:set fullrun --bytes          # total bytes the fullrun entry reads
+```
+
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
 
 `--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`; `--row` may be left out, and `--column` may name the first column.
@@ -1398,6 +1403,7 @@ Print what an entry point reads before it starts, and what that read costs.
 pnpm josh read:set                     # every entry point
 pnpm josh read:set backlogrun          # one of them
 pnpm josh read:set backlogrun --json
+pnpm josh read:set fullrun --bytes     # its total read bytes alone, as the last line
 ```
 
 <!-- /usage -->
@@ -1562,11 +1568,13 @@ Report AI cost over a period by session kind, tool category and guard, with cost
 ```bash
 pnpm josh cost:audit               # the last 7 days against the 7 before
 pnpm josh cost:audit --period 30   # the last 30 days against the 30 before
+pnpm josh cost:audit --density     # the lane-child calls per request alone, as the last line
 ```
 
 **Options:**
 
 - `--period <days>` — the length of each period, a positive whole number of days (default 7).
+- `--density` — print only the period's lane-child density (calls per request, two decimals), so a measurement Issue declares it; no lane-child request prints nothing and exits 1.
 
 <!-- /usage -->
 

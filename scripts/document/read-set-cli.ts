@@ -23,6 +23,7 @@ const ARGV_OFFSET = 2
 const FAILURE_EXIT_CODE = 1
 const FLAG_PREFIX = '-'
 const JSON_FLAG = '--json'
+const BYTES_FLAG = '--bytes'
 const JSON_INDENT = 2
 const NOTHING = 0
 const PERCENT = 100
@@ -34,7 +35,7 @@ const DOLLAR_DECIMALS = 2
 // size*, because an entry-read token rides every request as cached context. Printed rather than
 // assumed, so a reader checks the assumption instead of guessing it.
 const PREMISE = `  $ = cost per run, assuming a ${String(read_set_pricing.ASSUMED_REQUESTS)}-request run (each entry-read token re-read from cache per request)`
-const USAGE = 'Usage: josh read:set [<entry>] [--json]'
+const USAGE = 'Usage: josh read:set [<entry>] [--json | --bytes]'
 const WHOLE_LABEL = 'whole — every referenced file read in full'
 const SCOPED_LABEL = 'scoped — referenced sections only'
 const TOTAL_READ_LABEL = 'total read — scoped entry plus point-of-use reached'
@@ -249,8 +250,14 @@ function costed_entry(root: string, entry: string): ReadSetCost {
 	return entry_read_set.costed(root, entry)
 }
 
-function printed(reports: ReadonlyArray<ReadSetCost>, is_json: boolean): string {
-	if (is_json) return JSON.stringify(reports, undefined, JSON_INDENT)
+// `--bytes` prints each entry's total read bytes alone, unformatted, so one named entry's figure is
+// the output's last line — the number a measurement Issue declares (`measure-declaration.ts`).
+function printed(reports: ReadonlyArray<ReadSetCost>, argv: ReadonlyArray<string>): string {
+	if (argv.includes(JSON_FLAG)) return JSON.stringify(reports, undefined, JSON_INDENT)
+
+	if (argv.includes(BYTES_FLAG)) {
+		return reports.map((report) => String(total_read(report).bytes)).join('\n')
+	}
 
 	return reports.flatMap((report) => report_lines(report)).join('\n')
 }
@@ -267,7 +274,7 @@ function run(argv: ReadonlyArray<string>, root: string = process.cwd()): number 
 
 	const reports = wanted.map((entry) => costed_entry(root, entry))
 
-	console.info(printed(reports, argv.includes(JSON_FLAG)))
+	console.info(printed(reports, argv))
 
 	return 0
 }
@@ -277,6 +284,7 @@ function main(argv: ReadonlyArray<string>): void {
 }
 
 const read_set_cli = {
+	BYTES_FLAG,
 	FETCH_RULE,
 	JSON_FLAG,
 	POINT_OF_USE_LABEL,

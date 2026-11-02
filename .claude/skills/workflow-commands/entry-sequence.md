@@ -32,9 +32,7 @@ short-circuits with a non-zero exit. The numbered steps are the detail behind ea
    `human_review` stop (`needs-human-review.md`) and the dependency decision are read off it.
 5. Honor prep's stop and update verdicts first. **`start: gate` skips `run:step`, planning and implementation**;
    enter the verification chain. Otherwise run `pnpm josh run:step <N>` and follow its step list.
-   Before implementing, synchronize: **primary checkout → `pnpm josh ms`;
-   linked checkout → `pnpm josh main:merge`**.
-   On `latest: required`, run `pnpm josh latest:if-required` (`latest-gate.md`). Later actions and their
+   `run:entry` has already merged main (`docs/josh-commands-run.md` → "`josh run:entry`"). On `latest: required`, run `pnpm josh latest:if-required` (`latest-gate.md`). Later actions and their
    point-of-use reads come from `run:step` and `SKILL.md` (`residency.md` → "順序の問い").
 
 **Start the progress watcher once the hold is claimed** — `pnpm josh run:progress --wait` in the

@@ -132,8 +132,14 @@ describe('lane_plan_size.oversize on the hunks and lines axes', () => {
 		expect(signalled(declared(4, 100), { lines_ratio: 1.8 })).toBeUndefined()
 	})
 
-	it('projects with the default ratio when the period has none', () => {
-		expect(signalled(declared(4, 120), {})).toMatchObject({ reason: 'lines', measured: 216 })
+	it('projects with the declared growth factor when the period has none', () => {
+		expect(signalled(declared(4, 120), {})).toMatchObject({ reason: 'lines', measured: 240 })
+	})
+
+	// joshuafolkken/kit#5945: the fallback is the filing guide's factor, so the two bars meet at 100 lines.
+	it('passes 100 declared lines and answers lines at 101 when the period has none', () => {
+		expect(signalled(declared(4, 100), {})).toBeUndefined()
+		expect(signalled(declared(4, 101), {})).toMatchObject({ reason: 'lines', measured: 202 })
 	})
 
 	it('stands the lines axis down once the lane filed a split child', () => {

@@ -188,10 +188,9 @@ async function stop_untrusted(
 }
 
 // Anything but `fresh` is `run:cut --resume`'s answer to act on (`pre-gate-cut.md`), not a new run: the
-// token, the section it printed and its exit code are passed through, and nothing is claimed or read.
+// token, the section it acts on and its exit code are passed through, and nothing is claimed or read.
 function resume_report(issue_number: string, resume: Resume): number {
 	console.info(`entry ${session_cite.issue(issue_number)} — resume: ${resume.token}`)
-
 	if (resume.section !== '') console.info(resume.section)
 
 	return resume.code
@@ -384,7 +383,7 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 	}
 
 	const cost = await check_cost()
-	// A `new` run's entry synchronizes the tree it adopted before reading the issue.
+	// The entry synchronizes the tree with main before reading the issue (a lane child's ship does it).
 	const stop =
 		cost === run_entry.COST_OVER
 			? COST_STOP

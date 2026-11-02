@@ -20,6 +20,9 @@ const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const ENTRY_KEY = vi.hoisted(() => 'entry')
 
+// The sync's own steps are `run-entry-sync.test.ts`'s; its call on a #N entry, `run-entry-cli-adopt.test.ts`'s.
+vi.mock('./run-entry-sync', () => ({ run_entry_sync: { sync: async () => undefined } }))
+
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock, print_once: () => 0 },
 }))
@@ -87,10 +90,6 @@ const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trust
 
 function stage_line(state: string, command: string, start: string): string {
 	return `stage ${CITED} — at: ${state} · to: ${command} · start: ${start}`
-}
-
-function last_line(): string {
-	return info_lines.at(-1) ?? ''
 }
 
 function calls(): ReadonlyArray<ReadonlyArray<string>> {
@@ -250,19 +249,18 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(info_lines[1]).toContain('cost: over · verdict: -')
 		expect(mark_mock).not.toHaveBeenCalled()
 		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
-		expect(last_line()).toBe(lane_park.COMMAND_NOTIFY_MARKER)
+		expect(info_lines.at(-1)).toBe(lane_park.COMMAND_NOTIFY_MARKER)
 	})
 })
 
 // joshuafolkken/kit#2760: an implementation cut outside a lane keeps its hold, so claiming first
 // refused the fresh session `busy` by its own run's hold and the resume was never asked.
 describe('run_entry_cli.run — a carried cut is resumed before the hold is claimed', () => {
-	// joshuafolkken/kit#5958: the section printed after the token is relayed to the resumed run.
 	it.each([
-		['resume-impl', OK, ['## Resuming\n\nbody']],
-		['over', 1, []],
-	])('answers %j with its exit code and claims nothing', async (token, exit, section) => {
-		josh_run_mock.mockResolvedValueOnce({ code: exit, out: [token, ...section].join('\n') })
+		['resume-impl', OK],
+		['over', 1],
+	])('answers %j with its exit code and claims nothing', async (token, exit) => {
+		josh_run_mock.mockResolvedValueOnce({ code: exit, out: token })
 
 		const code = await run_entry_cli.run([ISSUE])
 
@@ -270,7 +268,7 @@ describe('run_entry_cli.run — a carried cut is resumed before the hold is clai
 		expect(calls()).toStrictEqual([['run:cut', '--resume', ISSUE]])
 		expect(read_issue_mock).not.toHaveBeenCalled()
 		expect(gather_mock).not.toHaveBeenCalled()
-		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`, ...section])
+		expect(info_lines).toStrictEqual([`entry ${CITED} — resume: ${token}`])
 	})
 })
 

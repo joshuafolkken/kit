@@ -43,7 +43,7 @@ describe('split-assessment.md states the lane:plan growth bar', () => {
 	it('names the factor with lane:plan in the question section', () => {
 		const document = read_repo_file(SPLIT_ASSESSMENT)
 
-		expect(split_assess.PLAN_GROWTH_FACTOR).toBe(2)
+		expect(split_assess.DECLARED_GROWTH_FACTOR).toBe(2)
 		expect(document).toContain('`lane:plan` answers `split` past\ntwice the declared files')
 	})
 })
