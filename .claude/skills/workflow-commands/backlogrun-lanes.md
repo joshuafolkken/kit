@@ -54,15 +54,10 @@ are not predicted").
 
 ### Once per repository, before the first lane opens
 
-In the **primary checkout**, in order, never per lane: `pnpm josh ms`; `pnpm josh latest:if-required`
-(`backlogrun-child.md` → "`josh latest` runs once per session, not once per
-child"); `pnpm josh lane:prune`; `pnpm josh run:tidy`.
-
-**The rewritten lock file reaches a pull request through the first lane.** Only if the update rewrote
-anything: `pnpm josh stash:push "backlogrun: josh latest before lanes"` in the primary checkout, and
-record it on the first child's Issue. **The first lane's `pnpm josh lane:launch "$n" --stash
-"backlogrun: josh latest before lanes"` pops it by message.** **Under
-`backlog:drive` the driver passes `--stash`, never you**; the push stays the parent's.
+`pnpm josh run:prime` in the **primary checkout**, never per lane — its steps are
+`docs/josh-commands-run.md` → "`josh run:prime`". **A `stash` line other than `clean` is the first
+lane's: record it on the first child's Issue and pass its message to `pnpm josh lane:launch "$n" --stash
+"<message>"`**; under `backlog:drive` the driver passes `--stash`, never you.
 
 ### Opening one lane and dispatching its child
 

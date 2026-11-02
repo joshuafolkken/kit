@@ -69,19 +69,10 @@ creates the epic. Errors stop the run; warnings are read and passed. Fixing a fi
 
 ## `josh latest` runs once per session, not once per child
 
-Run once, the first time the loop hands back a child number, before implementing it:
-
-```bash
-pnpm josh stash:push "backlogrun: ms #<N>"   # `clean` when nothing changed
-pnpm josh ms
-pnpm josh stash:pop "backlogrun: ms #<N>"    # only after `stashed` above
-pnpm josh latest:if-required                 # stash → josh latest → pop; nothing on `skip`
-```
-
-On `required`, load the `dependency-update` skill; `latest-gate.md` is the single source. A resumed
-`backlogrun` asks again. **The lock file lands with the first child's `pnpm josh git -y`**; fix a
-failing bump forward. **Never inside a lane** (`pnpm josh latest:guard` refuses) — the parent runs it
-in the primary checkout (`backlogrun-lanes.md` → "Once per repository, before the first lane opens").
+It is a step of `pnpm josh run:prime` (`backlogrun-lanes.md` → "Once per repository, before the first
+lane opens"). On `latest required`, load the `dependency-update` skill; `latest-gate.md` is the single
+source. A resumed `backlogrun` asks again; fix a failing bump forward. **Never inside a lane**
+(`pnpm josh latest:guard` refuses).
 
 ## Preflight — the child's claim asks it
 
