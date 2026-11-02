@@ -10,8 +10,8 @@ import type { ScoutOutcome } from './issue-scout-cli'
 // one `%%%`-separated file, in one call, each through the whole `issue:file` filing with the shared
 // flags appended. Every filing's scout runs first and its reports print together once. A filing a step
 // refuses stays unfiled while the rest go on; the summary names each filed URL and each refused body,
-// and any refusal exits 1. `issue-file-main.ts` hands an argument list without `--batch` to
-// `issue_file_cli.run`.
+// and any refusal exits 1. `--check` is refused before any read. `issue-file-main.ts` hands an
+// argument list without `--batch` to `issue_file_cli.run`.
 
 interface Planned {
 	entry: BatchEntry
@@ -30,6 +30,10 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const MISSING_SOURCE_MESSAGE =
 	'`--batch` needs a directory of body files, or one file split at `%%%` lines, after it.'
+// A `--check` filing never answers a URL, so the summary would read every clean filing as refused.
+const CHECK_FLAG = '--check'
+const CHECK_REFUSED_MESSAGE =
+	'`--batch` does not take `--check`: run `josh issue:file "<title>" --body-file <path> --check` per body file.'
 const SCOUT_UNANSWERED = 'The scout could not answer — the filing scouts again.'
 
 function argv_of(
@@ -184,6 +188,12 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	if (source === undefined) {
 		console.error(MISSING_SOURCE_MESSAGE)
+
+		return FAILURE_EXIT_CODE
+	}
+
+	if (argv.includes(CHECK_FLAG)) {
+		console.error(CHECK_REFUSED_MESSAGE)
 
 		return FAILURE_EXIT_CODE
 	}
