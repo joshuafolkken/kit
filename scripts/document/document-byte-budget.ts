@@ -118,8 +118,7 @@ const DOCUMENT_BYTE_BUDGET: ReadonlyArray<DocumentBudget> = [
 	{ path: 'prompts/collaboration-workflow/wip-cap.md', bytes: 8192 },
 	{ path: 'prompts/refactoring.md', bytes: 8192 },
 	{ path: 'prompts/review-rubric.md', bytes: 12_288 },
-	// Self-check 2's `josh prose:stale` pointer (joshuafolkken/kit#5287) crossed the 12288 block.
-	{ path: 'prompts/review.md', bytes: 16_384 },
+	{ path: 'prompts/review.md', bytes: 12_288 },
 	{ path: 'prompts/sonar-hotspot-handling.md', bytes: 8192 },
 	{ path: 'prompts/testing-guide.md', bytes: 12_288 },
 ]
