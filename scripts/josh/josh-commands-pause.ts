@@ -1,6 +1,6 @@
 import { OPTIONAL_ENV_FILE_FLAGS, type CommandEntry } from './josh-command-types'
 
-// `run:pause` and `run:stale`, split out of `josh-commands-run.ts` so that file stays under its
+// `run:pause`, `run:stale` and `tree:status`, split out of `josh-commands-run.ts` so that file stays under its
 // 300-code-line limit, as `PROGRESS_COMMANDS` is. `RUN_COMMANDS` spreads this in after `run:release`,
 // so the map keeps the order the run reads them in.
 
@@ -28,6 +28,14 @@ const PAUSE_COMMANDS: Record<string, CommandEntry> = {
 		description: 'Remove a stale `in-progress` label no checkout still holds',
 		category: 'AI tools',
 		reference: ['', 'automation', ['git', 'network', 'files']],
+		usage: { examples: [{ arguments: '' }] },
+	},
+	'tree:status': {
+		script: 'scripts/run/tree-status-cli.ts',
+		description:
+			'Bundle the working tree’s read-only pre-check: branch, status, stash list, run hold',
+		category: 'AI tools',
+		reference: ['', 'automation', ['git', 'files']],
 		usage: { examples: [{ arguments: '' }] },
 	},
 }
