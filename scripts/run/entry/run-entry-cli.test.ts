@@ -20,6 +20,9 @@ const record_baseline_mock = vi.hoisted(() => vi.fn())
 const print_section_mock = vi.hoisted(() => vi.fn(() => 0))
 const ENTRY_KEY = vi.hoisted(() => 'entry')
 
+// The sync's own steps are `run-entry-sync.test.ts`'s; its call on a #N entry, `run-entry-cli-adopt.test.ts`'s.
+vi.mock('./run-entry-sync', () => ({ run_entry_sync: { sync: async () => undefined } }))
+
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: { ENTRY: ENTRY_KEY, print_section: print_section_mock, print_once: () => 0 },
 }))
@@ -87,10 +90,6 @@ const TRUSTED_READS = { content: { kind: 'ok', block: '', trust: { is_body_trust
 
 function stage_line(state: string, command: string, start: string): string {
 	return `stage ${CITED} — at: ${state} · to: ${command} · start: ${start}`
-}
-
-function last_line(): string {
-	return info_lines.at(-1) ?? ''
 }
 
 function calls(): ReadonlyArray<ReadonlyArray<string>> {
@@ -250,7 +249,7 @@ describe('run_entry_cli.run — a stop short-circuits before the reads it would 
 		expect(info_lines[1]).toContain('cost: over · verdict: -')
 		expect(mark_mock).not.toHaveBeenCalled()
 		expect(calls().at(-1)).toStrictEqual(RELEASE_CALL)
-		expect(last_line()).toBe(lane_park.COMMAND_NOTIFY_MARKER)
+		expect(info_lines.at(-1)).toBe(lane_park.COMMAND_NOTIFY_MARKER)
 	})
 })
 
