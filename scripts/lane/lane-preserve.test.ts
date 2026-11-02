@@ -73,3 +73,24 @@ describe('lane_preserve.preserve_lane', () => {
 		expect(comment_mock).not.toHaveBeenCalled()
 	})
 })
+
+describe('lane_preserve.preserve_lane — a directory with no .git', () => {
+	beforeEach(() => {
+		vi.restoreAllMocks()
+		comment_mock.mockReset()
+	})
+
+	it('answers true untouched — the remnant of an interrupted close holds nothing git could keep', async () => {
+		const push = lane_with_changes(true)
+		const directory = mkdtempSync(path.join(tmpdir(), 'lane-preserve-bare-'))
+
+		vi.spyOn(lane_close, 'resolve_lane').mockResolvedValue({
+			existing: undefined,
+			targets: { directory, branch: ISSUE },
+		})
+
+		await expect(lane_preserve.preserve_lane(ISSUE, OCCASION, CAUSE)).resolves.toBe(true)
+		expect(push).not.toHaveBeenCalled()
+		expect(comment_mock).not.toHaveBeenCalled()
+	})
+})
