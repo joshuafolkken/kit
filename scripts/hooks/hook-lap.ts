@@ -3,7 +3,15 @@
 // timed where josh dispatches it, and records only under a lap scope a parent handed down
 // (`run-ship-lap.ts` → `environment`); the lap module is loaded for a hook alone.
 
-const GIT_STEP = { TEST_RED: 'test red', COMMIT: 'commit', PUSH: 'push', PR: 'pr' } as const
+const GIT_STEP = {
+	PREFLIGHT: 'preflight',
+	STAGING: 'staging',
+	ISSUE: 'issue',
+	TEST_RED: 'test red',
+	COMMIT: 'commit',
+	PUSH: 'push',
+	PR: 'pr',
+} as const
 const HOOK_CATEGORY = 'Git hooks'
 const LINT_COMMAND = 'pre-commit-lint'
 const RESERVED_COMMAND = 'reserved-run'
@@ -35,13 +43,17 @@ async function timed_command(
 	if (category !== HOOK_CATEGORY) return await run()
 	const { run_ship_lap } = await import('#scripts/run/ship/run-ship-lap')
 
-	return await run_ship_lap.timed(step_of(command, args), async () => {
-		// The hook's own lap holds the scope, so the processes it starts — the unit suite among them —
-		// do not inherit it and time their own steps under it a second time.
-		process.env[run_ship_lap.ENVIRONMENT_KEY] = ''
+	return await run_ship_lap.timed(
+		step_of(command, args),
+		async () => {
+			// The hook's own lap holds the scope, so the processes it starts — the unit suite among them —
+			// do not inherit it and time their own steps under it a second time.
+			process.env[run_ship_lap.ENVIRONMENT_KEY] = ''
 
-		return await run()
-	})
+			return await run()
+		},
+		{ startup: false },
+	)
 }
 
 const hook_lap = { GIT_STEP, step_of, timed_command }

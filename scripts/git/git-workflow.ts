@@ -225,15 +225,22 @@ async function execute_workflow(
 
 	// Unattended, nobody can fix a precondition between stages — so all are asked before staging.
 	if (is_non_interactive) {
-		await git_preflight.check({
-			cli_input: cli_issue_input,
-			will_open_pr: values['skip-pr'] !== true,
+		await run_ship_lap.timed(GIT_STEP.PREFLIGHT, async () => {
+			await git_preflight.check({
+				cli_input: cli_issue_input,
+				will_open_pr: values['skip-pr'] !== true,
+			})
 		})
 	}
 
-	await git_staging.check_and_confirm_staging(values.yes === true)
+	await run_ship_lap.timed(GIT_STEP.STAGING, async () => {
+		await git_staging.check_and_confirm_staging(values.yes === true)
+	})
 
-	const issue_info = await prepare_issue_info(cli_issue_input, is_non_interactive)
+	const issue_info = await run_ship_lap.timed(
+		GIT_STEP.ISSUE,
+		async () => await prepare_issue_info(cli_issue_input, is_non_interactive),
+	)
 	const confirmations = await get_workflow_confirmations(is_non_interactive, values)
 	const commit_message = build_commit_message(issue_info, commit_suffix)
 
