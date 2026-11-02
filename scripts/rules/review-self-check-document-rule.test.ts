@@ -123,17 +123,16 @@ describe('the self-check question 1 and josh test:pinned', () => {
 		)
 	})
 
-	// joshuafolkken/kit#5938: the gate now runs in front of round 1, so only test:pinned stays beside it.
-	it('the chain rule says run:review runs test:pinned beside the gate and how it carries on past it', () => {
+	// joshuafolkken/kit#5966: how run:review carries test:pinned past the gate, and the join's
+	// `--unpinned-ok` note (kit#4920), are what the commands print, so step 1–2 point at their sources.
+	it('the chain rule points at what run:review and its join print about test:pinned', () => {
 		const step = read_unwrapped(CHAIN_RULE)
 
 		expect(step).toContain('self-check"; 1: `--join`\'s `test:pinned`')
 		expect(step).toContain(
-			'`run:review` starts `pnpm josh test:pinned` in the background, runs `pnpm josh gate` and, once it is green, writes',
+			"`run:review`'s brief paths and prompts (`scripts/run/review/run-review-cli.ts`)",
 		)
-		expect(step).toContain('on a red gate, `3` on an `unpinned` line')
-		// joshuafolkken/kit#4920: the stop note names the call that passes the reason without a re-run.
-		expect(step).toContain('`3` on an `unpinned` line (its note names the `--unpinned-ok` call)')
+		expect(step).toContain('follow what it prints (`scripts/run/review/run-chain-join.ts`)')
 	})
 })
 

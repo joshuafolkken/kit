@@ -1,7 +1,9 @@
 import { cost_pricing } from '#scripts/cost-runtime/cost-pricing'
 import type { UsageRecord } from '#scripts/cost-runtime/cost-usage'
+import type { Breakdown } from '#scripts/lane/lane-breakdown'
 import { guard_friction } from '#tools/retrospective/guard-friction'
 import { cost_audit_density, type Density } from './cost-audit-density'
+import { cost_audit_phase, type PhaseRow } from './cost-audit-phase'
 import type { AuditSession } from './cost-audit-read'
 import { cost_audit_rewrite, type Rewrites } from './cost-audit-rewrite'
 import { cost_audit_tool } from './cost-audit-tool'
@@ -55,6 +57,8 @@ interface Audit {
 	tools: ReadonlyArray<AuditRow>
 	guards: ReadonlyArray<AuditRow>
 	rewrites: { current: Rewrites; previous: Rewrites }
+	// The current period's lane requests by phase (joshuafolkken/kit#5936).
+	phases: ReadonlyArray<PhaseRow>
 }
 
 interface AuditInput {
@@ -62,6 +66,8 @@ interface AuditInput {
 	days: number
 	now_ms: number
 	merges: MergeCounts | undefined
+	// Each lane's stages by its Issue, for the phase table; absent, every lane request is unattributed.
+	breakdowns?: ReadonlyMap<number, Breakdown>
 }
 
 interface PeriodCost {
@@ -161,6 +167,16 @@ function rewrites_inside(sessions: ReadonlyArray<AuditSession>, window: AuditWin
 	return cost_audit_rewrite.rewrites_in(sessions, (at_ms) => is_inside(at_ms, window))
 }
 
+function phases_inside(input: AuditInput, window: AuditWindow): Array<PhaseRow> {
+	const breakdowns = input.breakdowns ?? new Map<number, Breakdown>()
+
+	return cost_audit_phase.rows_of({
+		sessions: inside(input.sessions, window),
+		reviews: input.sessions,
+		breakdowns,
+	})
+}
+
 function audit(input: AuditInput): Audit {
 	const [current_window, previous_window] = windows_of(input.days, input.now_ms)
 	const current = period_cost(input.sessions, current_window)
@@ -182,6 +198,7 @@ function audit(input: AuditInput): Audit {
 			current: rewrites_inside(input.sessions, current_window),
 			previous: rewrites_inside(input.sessions, previous_window),
 		},
+		phases: phases_inside(input, current_window),
 	}
 }
 

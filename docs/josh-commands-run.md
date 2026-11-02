@@ -1585,6 +1585,8 @@ It prints the total, the merged pull requests and the cost per merge (omitted wh
 
 Under the cost per merge, `lane-child density` gives the lane children's tool calls per request and their share of single-call requests, beside the period before.
 
+Before the closing line, `Lane children by phase` gives the lane children's cost and four token kinds for the current period by the stage `lane_breakdown` places each request in, the implementation split into read, edit, check and review-fix; it is not marked for regressions.
+
 It exits `0` on a report, and `1` with the usage on a bad `--period`.
 
 ### `josh eval`

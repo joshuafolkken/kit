@@ -1,11 +1,13 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { parse_json } from '#scripts/git/parse-json-array'
+import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
+import { lane_net_read } from '#scripts/lane/lane-net-read'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { z } from 'zod'
 import { cost_audit, type Audit, type AuditWindow, type MergeCounts } from './cost-audit'
 import { cost_audit_format } from './cost-audit-format'
-import { cost_audit_read } from './cost-audit-read'
+import { cost_audit_read, type AuditSession } from './cost-audit-read'
 
 // `josh cost:audit [--period <days>]` — what AI work cost over a period, by session kind, tool
 // category and guard, with the cost per merged pull request, set against the period before it. It
@@ -72,11 +74,31 @@ async function read_merges(days: number, now_ms: number): Promise<MergeCounts | 
 	}
 }
 
+// Each lane's stages by its Issue, read off the ledger and the run events `josh lane:breakdown` reads; a
+// lane the ledger holds no dispatch and merge of has none.
+async function read_breakdowns(
+	sessions: ReadonlyArray<AuditSession>,
+): Promise<Map<number, Breakdown>> {
+	const [entries, events] = await Promise.all([
+		lane_net_read.read_ledger({}),
+		lane_net_read.read_events({}),
+	])
+	const issues = new Set(sessions.flatMap((session) => session.issue ?? []))
+	const pairs = [...issues].map(
+		(issue) => [issue, lane_breakdown.of(entries, events, issue)] as const,
+	)
+
+	return new Map(pairs.filter((pair): pair is [number, Breakdown] => pair[1] !== undefined))
+}
+
 async function measure(cwd: string, days: number, now_ms: number): Promise<Audit> {
 	const sessions = cost_audit_read.load(cwd, cost_audit.since_ms(days, now_ms))
-	const merges = await read_merges(days, now_ms)
+	const [merges, breakdowns] = await Promise.all([
+		read_merges(days, now_ms),
+		read_breakdowns(sessions),
+	])
 
-	return cost_audit.audit({ sessions, days, now_ms, merges })
+	return cost_audit.audit({ sessions, days, now_ms, merges, breakdowns })
 }
 
 // The default period's summary line, for `josh retrospective`, with the filing line a regression adds.

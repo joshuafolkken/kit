@@ -139,7 +139,7 @@ describe('run_step_section — the sections the retrospective, a park and a paus
 
 describe('run_step_section — a lane child reads its own step of the chain', () => {
 	const implement = { kind: 'verdict' as const, line: run_step.IMPLEMENT }
-	const MAIN_MERGE_STEP = '`pnpm josh run:chain <N>` runs `main:merge`'
+	const MAIN_MERGE_STEP = '`pnpm josh run:chain <N>` in one Bash call'
 	const LANE_CHILD_HEADING = /^## A lane child — step 0\n\n0\. \*\*A lane child\*\*/u
 
 	it.each([...run_step_section.LANE_CHILD_SECTIONS])(

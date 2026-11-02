@@ -6,18 +6,17 @@ This is the execution contract for `fullrun` and `backlogrun`, and for `prrun` u
 Review results and successful pushes are never turn boundaries.
 
 1. **Issue `pnpm josh run:cut <N>` alone first** — the pre-gate cut (a no-op outside a lane). Then
-   `pnpm josh run:chain <N>` runs `main:merge`, the self-check (`prompts/review.md` → "Before round 1 —
-   the implementer's self-check"; 1: `run:review --join`, 2/4/10: `review:selfcheck`), the scoped
-   lint/test pair `check:related` and `run:review` in one Bash call (`timeout` 600000); a stop prints its next step
-   (`--from <stage>` resumes). `run:review` starts `pnpm josh test:pinned` in the background,
-   runs `pnpm josh gate` and, once it is green, writes the `/code-review` brief to a file, printing its path and prompt; two briefs take two `reviewer`s side by side, the second recorded with
-   `review:record --from-slot --interaction`. Launch the `/code-review` subagent as the `reviewer`
-   agent type (`kit:reviewer` in a consumer) with that prompt verbatim and its `model` — the alias the brief prints beside its `model=` id (`(opus)` → `opus`)
+   `pnpm josh run:chain <N>` in one Bash call (`timeout` 600000), the self-check (`prompts/review.md` →
+   "Before round 1 — the implementer's self-check") answered before the scoped lint/test pair it runs;
+   follow what it prints — its stages
+   (`scripts/run/review/run-chain.ts`), a stop's `next:` line (`--from <stage>` resumes) and
+   `run:review`'s brief paths and prompts (`scripts/run/review/run-review-cli.ts`). Launch the
+   `/code-review` subagent as the `reviewer` agent type (`kit:reviewer` in a consumer) with that prompt
+   verbatim and its `model` — the alias the brief prints beside its `model=` id (`(opus)` → `opus`)
    (`.claude/agents/reviewer.md`; never a guessed type name).
    Never load the review skill in the main line.
-2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes) joins,
-   attests and, on a clean slot, records (below); a stop prints its next. The join exits non-zero on a red gate, `3` on an `unpinned` line (its note names the `--unpinned-ok` call). Fix any red check, then rerun the affected scoped check
-   and gate. Never version-bump a child (`pnpm josh release` decides).
+2. Once the review returns, `pnpm josh run:chain <N> --join` (`--fixing`: round-1 fixes); follow what
+   it prints (`scripts/run/review/run-chain-join.ts`). Never version-bump a child (`pnpm josh release` decides).
 3. A bare `run:review --join` takes `review:attest --check` first; `missing` or
    `mismatch` discards the round uncounted; rerun against the brief's checkout. A review error receives a
    `confirmation` Telegram and stops.
@@ -71,9 +70,8 @@ Recommendations are informational; severity decides. A CodeRabbit rate-limit war
 These are the gate → review → PR → merge facts other documents cite; this file is their single source
 (`prompts/review.md` carries the review _policy_, `prompts/review-rubric.md` the rubric).
 
-- **The gate runs in front of round 1** — `run:review` writes no brief until it is green, so round 1
-  and its snapshot read the tree the gate passed. A red gate is fixed and `run:review` re-run. Round 2
-  runs beside the ship's gate.
+- **The gate runs in front of round 1** — `run:review` prints the gate's note and writes no brief on
+  any gate state but green (step 1); round 2 runs beside the ship's gate.
 - **origin/main is merged in before the gate** — `pnpm josh main:merge` (in a lane, ship's sync) is the last edit, so the scoped
   pair and the gate run once over it (in a lane, ship's, after `run:review`'s over the unmerged tree); a conflict fires `backlogrun-recovery.md` → "Conflicts are not
   predicted" early. **This is the one place a conflicted merge's procedure is written**: `main:merge`

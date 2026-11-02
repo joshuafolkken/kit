@@ -1,6 +1,7 @@
 import { figure_format } from '#scripts/lib/figure-format'
 import type { Audit, AuditRow } from './cost-audit'
 import { cost_audit_density, type Density } from './cost-audit-density'
+import type { PhaseRow } from './cost-audit-phase'
 import { cost_audit_rewrite, type RewriteCount } from './cost-audit-rewrite'
 
 // The printed form of a `josh cost:audit` result: the full report the command prints, and the one
@@ -14,6 +15,8 @@ const NO_PREVIOUS = 'new'
 const FILING_PREFIX = 'File a cost regression: '
 const FILING_ROW_SEPARATOR = ', '
 const FILING_SUFFIX = ' — reproduce with `pnpm josh cost:audit`'
+const PHASE_TITLE =
+	'Lane children by phase (this period: cost — billed input / cache read / cache write / output tokens)'
 
 interface AuditSection {
 	name: string
@@ -100,6 +103,23 @@ function rewrite_lines(audit: Audit): Array<string> {
 	]
 }
 
+function phase_line(row: PhaseRow): string {
+	const { input, cache_read, cache_write, output } = row.tokens
+	const tokens = [input, cache_read, cache_write, output].map((count) =>
+		figure_format.format_tokens(count),
+	)
+
+	return `  ${row.key}: ${figure_format.format_usd(row.usd)} — ${tokens.join(' / ')}`
+}
+
+// The current period's lane requests by phase (joshuafolkken/kit#5936), set apart from the regression
+// rows: it is read against a change aimed at one phase, not filed on.
+function phase_lines(audit: Audit): Array<string> {
+	const body = audit.phases.length === 0 ? ['  none'] : audit.phases.map((row) => phase_line(row))
+
+	return ['', PHASE_TITLE, ...body]
+}
+
 function section_lines(section: AuditSection): Array<string> {
 	const body = section.rows.length === 0 ? ['  none'] : section.rows.map((row) => row_line(row))
 
@@ -134,6 +154,7 @@ function report_lines(audit: Audit): Array<string> {
 		density_line(audit),
 		...sections_of(audit).flatMap((section) => section_lines(section)),
 		...rewrite_lines(audit),
+		...phase_lines(audit),
 		'',
 		`Regressions: ${regression_text(audit)}`,
 	]
