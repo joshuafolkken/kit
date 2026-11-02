@@ -61,7 +61,7 @@ interface Segment extends LaneSpan {
 	stage: string
 }
 
-// A ship stage's name, or the Bash between ship stages.
+// A ship stage's name, or the between-ship-stages bucket's.
 function is_ship_stage(name: string): boolean {
 	return name.startsWith(SHIP_LEAD) || name === BETWEEN_STAGE
 }

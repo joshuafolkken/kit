@@ -213,6 +213,17 @@ describe('issue_file_batch.run — the arguments around --batch', () => {
 		expect(exec_gh_api).not.toHaveBeenCalled()
 	})
 
+	// joshuafolkken/kit#5861: a `--check` filing never answers a URL, so the summary read every clean
+	// filing as refused.
+	it('refuses --batch with --check before reading or filing anything, and says why', async () => {
+		const directory = batch_of('check', [[FIRST, VALID_BODY]])
+
+		expect(await issue_file_batch.run([BATCH_FLAG, directory, '--check'])).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('does not take `--check`'))
+		expect(issue_scout_cli.scout).not.toHaveBeenCalled()
+		expect(exec_gh_api).not.toHaveBeenCalled()
+	})
+
 	it('refuses a directory holding no .md body file', async () => {
 		const directory = batch_of('empty', [])
 

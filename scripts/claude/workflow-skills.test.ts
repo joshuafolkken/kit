@@ -178,9 +178,9 @@ describe(`${DEPENDENCY_SKILL} — carries the post-update verification`, () => {
 	const content = read_skill_file(DEPENDENCY_SKILL)
 
 	it.each([
-		'git diff -- pnpm-workspace.yaml package.json',
+		'pnpm josh overrides --diff <default>...<branch>',
 		'**pnpm 11 and 12 read effective overrides only from `pnpm-workspace.yaml`.**',
-		'**quote what one printed.**',
+		'**Quote its verdict lines**',
 		'`devEngines: restore (<reason>)` — restore + ask',
 		'never touch `overrides`',
 		'never touch `devEngines`',

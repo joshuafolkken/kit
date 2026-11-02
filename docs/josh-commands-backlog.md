@@ -148,7 +148,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
-- `--check` — run steps 1–7, create nothing; exit 1 on a refusal.
+- `--check` — run steps 1–7, create nothing; exit 1 on a refusal. `--batch` refuses it.
 
 <!-- /usage -->
 
