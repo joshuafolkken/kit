@@ -22,6 +22,7 @@ import { execa } from 'execa'
 
 const PNPM = 'pnpm'
 const JOSH = 'josh'
+const SUCCESS_EXIT_CODE = 0
 const NONZERO_EXIT = 1
 const FORWARDED_STDERR = ['pipe', 'inherit'] as const
 
@@ -78,7 +79,17 @@ async function josh_run_at(args: ReadonlyArray<string>, cwd: string): Promise<Jo
 	return await run_with_options(args, false, { cwd })
 }
 
-const josh_command = { josh_run, josh_run_at }
+// A step whose failure ends the composite: its stderr, else its stdout, else the exit code is the
+// error's message.
+function require_success(result: JoshResult, command: string): void {
+	if (result.code === SUCCESS_EXIT_CODE) return
+
+	const reason = [result.err, result.out].find((text) => text?.trim())
+
+	throw new Error(reason ?? `${command} exited ${String(result.code)}`)
+}
+
+const josh_command = { josh_run, josh_run_at, require_success }
 
 export type { JoshResult }
 export { josh_command }
