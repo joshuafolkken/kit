@@ -120,19 +120,19 @@ never `needs-human-review` (`needs-human-review.md`), the priority labels only t
 the `Driver result:` line hands a branch back. The supervisor has already claimed the carry record for
 the session (`run-wake-handoff.ts`), so it claims nothing and never runs `run:carry --begin`: act on
 the row, then end the turn — its `Stop` hook writes the cut that hands the loop back
-(`run_headless.hand_back_at_turn_end`). Read only the one
-section the row names:
+(`run_headless.hand_back_at_turn_end`). The hand-off carries the sections its row needs
+(`scripts/run/run-step-section.ts`) wherever the document ships, so the session searches none:
 
-| Handed back | What the session does | Read |
-| --- | --- | --- |
-| `triage` | Answer each issue stderr names with `pnpm josh backlog:triage --apply <N> --lane\|--solo --reason "<why>"` (`--blocked-by <M>` where `#M` must land first, with or without the label) | "Resolve what the plan can resolve" above |
-| `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` | `docs/josh-commands-backlog.md` → "`josh auto-ok:judge`" |
-| `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** | — |
-| `launch #N` | Read the lane's log and park `#N` | `backlogrun-park.md` → "park and continue" |
-| `merge [<token>] #N` | `environment` ends the run; the others re-read the child | `backlogrun-progress.md` → "Running a named epic's children" |
-| `epic #N` | A named epic's turn | "The session cut is inside the invocation" above |
-| `watch` | The retrospective is owed (`run:step`) | `retrospective.md` |
-| `window` | Hand the loop back as is | — |
+| Handed back | What the session does |
+| --- | --- |
+| `triage` | Answer each issue stderr names with `pnpm josh backlog:triage --apply <N> --lane\|--solo --reason "<why>"` (`--blocked-by <M>` where `#M` must land first, with or without the label) |
+| `judge` | For each number `pnpm josh auto-ok:judge` prints, read the issue (`pnpm josh issue:read <N>`) and answer `--apply <N> --lane\|--solo` or `--decline <N> --reason "<why>"` |
+| `offer` | Report what stderr printed — a failed offer, or a named issue whose state stayed unreadable; **never pick an issue by hand** |
+| `launch #N` | Read the lane's log and park `#N` |
+| `merge [<token>] #N` | `environment` ends the run; the others re-read the child |
+| `epic #N` | A named epic's turn |
+| `watch` | The retrospective is owed (`run:step`) |
+| `window` | Hand the loop back as is |
 
 **A candidate only in another repository is never a token** — report it with its checkout. The budgets,
 verdicts and stops are the driver's own.
