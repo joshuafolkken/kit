@@ -70,11 +70,24 @@ async function tracked_in(
 	return { epic, fetched }
 }
 
-// The epic tracking `#issue`, `undefined` for none, or a throw when the listing cannot tell.
-async function tracking_epic_of(issue: string): Promise<number | undefined> {
-	const { epic } = await tracked_in(issue)
+interface ChildrenTracking {
+	epic: number
+	// Whether the same epic already lists every one of the children as a row of its own.
+	lists_children: boolean
+}
 
-	return epic
+// The epic tracking `#issue`, `undefined` for none, or a throw when the listing cannot tell.
+async function tracking_with(
+	issue: string,
+	children: ReadonlyArray<string>,
+): Promise<ChildrenTracking | undefined> {
+	const { epic, fetched } = await tracked_in(issue)
+	if (epic === undefined) return undefined
+
+	return {
+		epic,
+		lists_children: children.every((child) => is_listed_by(fetched.epics, child, epic)),
+	}
 }
 
 async function tracking_epic(request: BlockedByRequest): Promise<Tracking | undefined> {
@@ -170,7 +183,7 @@ async function record(request: BlockedByRequest): Promise<string> {
 	return 'recorded'
 }
 
-const epic_blocked_by = { record, listing_epics, tracking_epic_of }
+const epic_blocked_by = { record, listing_epics, tracking_with }
 
-export type { BlockedByRequest }
+export type { BlockedByRequest, ChildrenTracking }
 export { epic_blocked_by }

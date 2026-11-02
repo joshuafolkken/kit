@@ -50,9 +50,9 @@ vi.mock('#scripts/run/hold/run-hold-cli', () => ({
 	},
 }))
 
-const tracking_epic_of = vi.hoisted(() => vi.fn())
+const tracking_with = vi.hoisted(() => vi.fn())
 
-vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { tracking_epic_of } }))
+vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { tracking_with } }))
 
 const epic_run = vi.hoisted(() => vi.fn())
 const epic_create = vi.hoisted(() => vi.fn())
@@ -73,13 +73,14 @@ const INDEPENDENT = { issue: '10', children: CHILDREN, is_ordered: false, title:
 const ORDERED = { ...INDEPENDENT, is_ordered: true }
 const NEEDS_DECISION = 'needs-decision'
 const SET_ASIDE_AND_PLACE = ['stash', 'comment', 'epic', 'audit', 'release']
+const TRACKED = { epic: 20, lists_children: false }
 
 beforeEach(() => {
 	Object.assign(state, { stashes: [], comments: [], calls: [] })
 	vi.spyOn(git_stash, 'list').mockImplementation(async () =>
 		state.stashes.map((subject, index) => ({ selector: `stash@{${String(index)}}`, subject })),
 	)
-	tracking_epic_of.mockReset().mockResolvedValue(undefined)
+	tracking_with.mockReset().mockResolvedValue(undefined)
 	epic_run.mockReset().mockImplementation(async () => {
 		state.calls.push('epic')
 
@@ -104,7 +105,7 @@ beforeEach(() => {
 
 describe('run_split.split — an epic already tracks the issue', () => {
 	it('adds the children to it through `epic --add` and audits it', async () => {
-		tracking_epic_of.mockResolvedValue(20)
+		tracking_with.mockResolvedValue(TRACKED)
 
 		const result = await run_split.split(INDEPENDENT)
 
@@ -115,7 +116,7 @@ describe('run_split.split — an epic already tracks the issue', () => {
 	})
 
 	it('chains an ordered split after the issue with `--after`', async () => {
-		tracking_epic_of.mockResolvedValue(20)
+		tracking_with.mockResolvedValue(TRACKED)
 
 		await run_split.split(ORDERED)
 
@@ -152,7 +153,7 @@ describe('run_split.split — the listing cannot tell', () => {
 	it('parks the issue with `needs-decision` instead of placing the children', async () => {
 		const reason = 'the epic listing was cut short'
 
-		tracking_epic_of.mockRejectedValue(new Error(reason))
+		tracking_with.mockRejectedValue(new Error(reason))
 
 		const result = await run_split.split(INDEPENDENT)
 
@@ -164,7 +165,7 @@ describe('run_split.split — the listing cannot tell', () => {
 	})
 
 	it('fails the park step, keeping the hold, when the label is not applied', async () => {
-		tracking_epic_of.mockRejectedValue(new Error('down'))
+		tracking_with.mockRejectedValue(new Error('down'))
 		park_apply.mockResolvedValue({ is_labelled: false, is_commented: false })
 
 		const result = await run_split.split(INDEPENDENT)
@@ -176,7 +177,7 @@ describe('run_split.split — the listing cannot tell', () => {
 
 describe('run_split.split — a failing step keeps the hold', () => {
 	it('fails the place step when `epic --add` refuses', async () => {
-		tracking_epic_of.mockResolvedValue(20)
+		tracking_with.mockResolvedValue(TRACKED)
 		epic_run.mockResolvedValue(1)
 
 		const result = await run_split.split(INDEPENDENT)
@@ -203,5 +204,20 @@ describe('run_split.split — a failing step keeps the hold', () => {
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'audit' })
 		expect(state.calls).not.toContain('release')
+	})
+})
+
+describe('run_split.split — a rerun after a later step failed', () => {
+	it('places nothing again when the tracking epic already lists every child', async () => {
+		tracking_with.mockResolvedValue({ epic: 30, lists_children: true })
+
+		const result = await run_split.split(INDEPENDENT)
+
+		expect(tracking_with).toHaveBeenCalledWith('10', CHILDREN)
+		expect(result).toMatchObject({ kind: 'epic', epic: 30 })
+		expect(epic_run).not.toHaveBeenCalled()
+		expect(epic_create).not.toHaveBeenCalled()
+		expect(audit_run).toHaveBeenCalledWith(['30'])
+		expect(state.calls).toStrictEqual(['stash', 'comment', 'audit', 'release'])
 	})
 })

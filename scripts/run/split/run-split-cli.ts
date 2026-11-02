@@ -41,12 +41,19 @@ function parse_request(argv: ReadonlyArray<string>): SplitRequest | undefined {
 	return { issue, children, is_ordered: is_ordered === true, title }
 }
 
+// A missing `--title` is refused before any write, so the same command would only refuse again.
+function rerun_hint(step: string): string {
+	if (step === 'title') return 'Rerun with `--title <title>`.'
+
+	return `Rerun the same \`pnpm josh run:split\` to continue from ${step}.`
+}
+
 function report_failure(result: SplitResult & { kind: 'failed' }): number {
 	const steps = result.done.map(({ step }) => step).join(', ')
 
 	console.error(`✖ ${result.step} failed: ${result.reason}`)
 	console.error(`Done: ${steps.length === 0 ? 'nothing' : steps}.`)
-	console.error(`Rerun the same \`pnpm josh run:split\` to continue from ${result.step}.`)
+	console.error(rerun_hint(result.step))
 
 	return FAILURE_EXIT_CODE
 }

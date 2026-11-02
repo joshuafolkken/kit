@@ -84,7 +84,9 @@ describe('run_split_cli.run — the verdict', () => {
 		expect(await run_split_cli.run(ONE_CHILD)).toBe(0)
 		expect(infos).toStrictEqual([NEEDS_DECISION])
 	})
+})
 
+describe('run_split_cli.run — a failure', () => {
 	it('names the failed step, what was done, and the rerun that continues', async () => {
 		split.mockResolvedValue({
 			kind: 'failed',
@@ -98,6 +100,17 @@ describe('run_split_cli.run — the verdict', () => {
 			'✖ place failed: down',
 			'Done: stash.',
 			'Rerun the same `pnpm josh run:split` to continue from place.',
+		])
+	})
+
+	it('asks for `--title` instead of the same rerun when the title refusal wrote nothing', async () => {
+		split.mockResolvedValue({ kind: 'failed', step: 'title', reason: 'no epic', done: [] })
+
+		expect(await run_split_cli.run(ONE_CHILD)).toBe(1)
+		expect(errors).toStrictEqual([
+			'✖ title failed: no epic',
+			'Done: nothing.',
+			'Rerun with `--title <title>`.',
 		])
 	})
 })

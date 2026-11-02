@@ -92,7 +92,8 @@ already tracking `<issue>` (`--after <issue>` when `--ordered`), or a new epic `
 that epic audited with `epic:audit`. The last line is `epic #<E>`. An epic listing that cannot tell
 whether an epic tracks `<issue>` parks it with `needs-decision` instead, and the last line is
 `needs-decision`. Without `--title` and with no tracking epic it refuses before writing anything; a
-failed step keeps the hold.
+failed step keeps the hold. A rerun whose tracking epic already lists every child places nothing
+again and goes on to the audit.
 
 ### `josh run:tidy`
 

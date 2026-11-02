@@ -1,6 +1,6 @@
 import { epic_command } from '#scripts/epic/epic'
 import { epic_audit_cli } from '#scripts/epic/epic-audit-cli'
-import { epic_blocked_by } from '#scripts/epic/epic-blocked-by'
+import { epic_blocked_by, type ChildrenTracking } from '#scripts/epic/epic-blocked-by'
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { NEEDS_DECISION_LABEL } from '#scripts/issue/issue-labels'
 import { issue_park } from '#scripts/issue/issue-park'
@@ -32,18 +32,18 @@ interface SplitRequest {
 }
 
 type Placement =
-	{ kind: 'tracked'; epic: number } | { kind: 'none' } | { kind: 'unknown'; reason: string }
+	({ kind: 'tracked' } & ChildrenTracking) | { kind: 'none' } | { kind: 'unknown'; reason: string }
 
 type SplitResult =
 	| { kind: 'epic'; epic: number; done: ReadonlyArray<StepReport> }
 	| { kind: 'needs-decision'; done: ReadonlyArray<StepReport> }
 	| { kind: 'failed'; step: string; reason: string; done: ReadonlyArray<StepReport> }
 
-async function placement_of(issue: string): Promise<Placement> {
+async function placement_of(request: SplitRequest): Promise<Placement> {
 	try {
-		const epic = await epic_blocked_by.tracking_epic_of(issue)
+		const tracking = await epic_blocked_by.tracking_with(request.issue, request.children)
 
-		return epic === undefined ? { kind: 'none' } : { kind: 'tracked', epic }
+		return tracking === undefined ? { kind: 'none' } : { kind: 'tracked', ...tracking }
 	} catch (error) {
 		return { kind: 'unknown', reason: error_text.message_of(error) }
 	}
@@ -78,7 +78,12 @@ function create_argv(request: SplitRequest, title: string): Array<string> {
 	return [title, request.issue, ...request.children, ...order]
 }
 
-async function add_to(request: SplitRequest, epic: number): Promise<number> {
+// An epic already listing every child is a rerun past a later failed step — the first run's own epic,
+// whether it added the children or created it — so `epic --add`, which refuses an add with nothing
+// new, is not asked again.
+async function add_to(request: SplitRequest, tracking: ChildrenTracking): Promise<number> {
+	const { epic } = tracking
+	if (tracking.lists_children) return epic
 	const code = await epic_command.run(add_argv(request, epic))
 
 	if (code !== SUCCESS_EXIT_CODE) {
@@ -168,12 +173,12 @@ const NO_TITLE_REASON =
 	'no epic tracks the issue, so `--title` is required to create one; nothing was written'
 
 async function split(request: SplitRequest): Promise<SplitResult> {
-	const placement = await placement_of(request.issue)
+	const placement = await placement_of(request)
 
 	if (placement.kind === 'unknown') return await park_after_aside(request, placement.reason)
 
 	if (placement.kind === 'tracked') {
-		return await place_and_audit(request, async () => await add_to(request, placement.epic))
+		return await place_and_audit(request, async () => await add_to(request, placement))
 	}
 
 	const { title } = request
