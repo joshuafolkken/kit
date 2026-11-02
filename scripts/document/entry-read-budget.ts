@@ -50,12 +50,13 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	{ entry: 'kickoff', bytes: 36_864 },
 	{ entry: 'fullrun', bytes: 53_248 },
 	{ entry: 'halfrun', bytes: 49_152 },
-	{ entry: 'prrun', bytes: 57_344 },
+	{ entry: 'prrun', bytes: 53_248 },
 	// joshuafolkken/kit#5843 removed the duplicated backlogrun procedures, lowering the read by a block;
-	// joshuafolkken/kit#5920 moved the loop's section pointers into the driver hand-off, by another.
-	{ entry: 'backlogrun', bytes: 77_824 },
-	// The `run:handoff` row of the workflow skill's shared table (joshuafolkken/kit#5352) crossed the 45056 block.
-	{ entry: LANE_CHILD, bytes: 49_152 },
+	// joshuafolkken/kit#5920 moved the loop's section pointers into the driver hand-off, by another;
+	// joshuafolkken/kit#5946 moved the lane child's step 0 out of the chain section, by another
+	// (and lowered `prrun` and the lane child by one block each).
+	{ entry: 'backlogrun', bytes: 73_728 },
+	{ entry: LANE_CHILD, bytes: 45_056 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
