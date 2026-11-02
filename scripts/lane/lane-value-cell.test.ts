@@ -56,3 +56,50 @@ describe('lane_value_cell.value', () => {
 		expect(lane_value_cell.value(TABLES, address)).toBeUndefined()
 	})
 })
+
+// joshuafolkken/kit#5947: the cost epic's follow-up measurements — a row whose first cell repeats, a
+// table whose first cell is a count, and one count out of a `label N, label N` list cell.
+const ROUND_TWO = [
+	'| round 2 | code | decisions |',
+	DIVIDER,
+	'| required | live | 12 |',
+	'| required | stale | 4 |',
+	'| skipped | live | 2 |',
+].join('\n')
+const STOP = [
+	'| stop | runs | causes |',
+	DIVIDER,
+	'| preflight | 120 | unpinned 83, pre-detach 37 |',
+	'| review | 0 | - |',
+	'| merge | 5 | timed out |',
+].join('\n')
+const LANES = 'measured lanes'
+const SIZE = [
+	`| ${LANES} | files actual / declared median | lines |`,
+	DIVIDER,
+	'| 210 | 1.10 | 0.90 |',
+].join('\n')
+const MEASURED = [ROUND_TWO, STOP, SIZE]
+const LIVE = { column: 'code', text: 'live' }
+const CAUSES = { table: 'stop', column: 'causes' }
+const REQUIRED = { table: 'round 2', row: 'required', column: 'decisions' }
+
+describe('lane_value_cell.value — where and item', () => {
+	it.each([
+		['a row --where narrows', { ...REQUIRED, where: LIVE }, 12],
+		['the first column with no row named', { table: LANES, column: LANES }, 210],
+		['an item of a list cell', { ...CAUSES, row: 'preflight', item: 'pre-detach' }, 37],
+		['an item a list omits as 0', { ...CAUSES, row: 'preflight', item: 'stale' }, 0],
+		['an item of an empty list as 0', { ...CAUSES, row: 'review', item: 'unpinned' }, 0],
+	])('reads %s', (_case, address, expected) => {
+		expect(lane_value_cell.value(MEASURED, address)).toBe(expected)
+	})
+
+	it.each([
+		['a row that still repeats', REQUIRED],
+		['a --where column no table has', { ...REQUIRED, where: { column: 'gate', text: 'live' } }],
+		['an item of a cell that is no list', { ...CAUSES, row: 'merge', item: 'timed out' }],
+	])('answers undefined for an address of %s', (_case, address) => {
+		expect(lane_value_cell.value(MEASURED, address)).toBeUndefined()
+	})
+})

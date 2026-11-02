@@ -1,0 +1,7 @@
+{
+	"reason": "lane:value cell gains --where and --item so the cost epic's follow-up measurements read as one number (#5947)",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 37
+	}
+}

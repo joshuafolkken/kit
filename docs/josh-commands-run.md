@@ -1227,7 +1227,7 @@ Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh lane:sample
 
 <!-- usage: lane:value -->
 
-Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --column), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
+Print one lane measurement since an instant as a single number: cell (a lane:stats table cell, --table --row --where --column --item), lint-unmoved (median s of a lint:related that found nothing moved), metrics-stops (pre-detach metrics stops per lane), lint-core-wait (lint:related core-budget wait, min per lane), edit (median s of one Edit).
 
 ```bash
 pnpm josh lane:value edit --since 2026-10-23T03:29Z                                                                    # the median Edit time since an instant
@@ -1239,6 +1239,14 @@ pnpm josh lane:value cell --table "test:related scope" --row related --column "m
 The value is the output's last line, two decimals, so a measurement Issue declares it (`- 計測宣言:`); a period with no sample prints nothing there and exits non-zero. Per lane divides by the lanes that made a tool call in the period, not their sessions — a lane runs at least a child and a ship-reviewer session.
 
 `cell` reads the tables `lane:stats` prints over the same window: `--table` is a table's first header cell, `--row` a row's first cell. An address matching no numeric cell, or more than one (the check and claim tables share `check`), exits non-zero.
+
+`--where <header>=<text>` keeps the rows whose `<header>` cell is `<text>`, for a first cell that repeats; `--row` may be left out, and `--column` may name the first column. `--item <label>` reads `<label>`'s count from a `label N, label N` list cell, `0` when the list omits it:
+
+```bash
+pnpm josh lane:value cell --table "round 2" --row required --where code=live --column decisions --since 2026-11-02T00:00Z   # round 2 required for live
+pnpm josh lane:value cell --table stop --row preflight --column causes --item unpinned --since 2026-11-02T00:00Z            # preflight stops caused by unpinned
+pnpm josh lane:value cell --table "measured lanes" --column "measured lanes" --since 2026-11-02T00:00Z                     # merged lanes measured
+```
 
 #### `josh lane:net`
 
