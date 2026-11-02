@@ -530,7 +530,8 @@ on stderr) in a lane child or when no record is this session's.
 
 When `run:prep`'s ship preconditions are unmet, `run:step` prints that same block on stderr, so stdout stays the action lines.
 
-A lane child whose plan `lane:plan` has not cleared gets a second line under `implement`: `pnpm josh lane:plan <N> <paths>`, the paths its plan comment names (`<path>...` when it has none) — the step before its first edit, already taken when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+A lane child whose plan `lane:plan` has not cleared gets `pnpm josh lane:plan <N> <paths>` under `implement`, its plan comment's paths (`<path>...` with none) — already run when `issue:plan` ran it on the recorded plan, or `run:entry` on a `run:planned` issue's plan comment.
+All three print it with a line naming `--imports`.
 
 In a **dispatched lane child** (read from the dispatch mark, `lane-child-marker.ts`) a merge or an
 outage position prints `stop` rather than `run:merge <N>`: `run:merge` is the
