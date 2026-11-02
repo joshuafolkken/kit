@@ -29,7 +29,6 @@ const {
 const { CONSULTATION_MODELS, consultation_provider } = agent_consultation_model
 
 const {
-	ANTHROPIC_MODEL,
 	DEFAULT_PROFILES,
 	EFFORT_SCHEMA,
 	IMPLEMENTATION_PHASE,
@@ -74,13 +73,13 @@ const PROVIDER_PROFILES = { anthropic: DEFAULT_PROFILES, openai: OPENAI_PROFILES
 // first only checks that the first round's findings were fixed, so its model and effort are set apart:
 // its own keys win, then the reviewer's, then its own default.
 const FIRST_REVIEW_ROUND = 1
-// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*` scenario its
-// pass/fail equals Opus's (100% agreement), and Opus passes all 4.
-const VERIFICATION_MODEL = 'claude-sonnet-5-5'
+const SONNET_MODEL = 'claude-sonnet-5-5'
 const VERIFICATION_PROFILES: Readonly<Record<AgentProvider, AgentProfile>> = {
 	anthropic: {
 		...DEFAULT_PROFILES.reviewer,
-		model: VERIFICATION_MODEL,
+		// Sonnet holds the verification pass by the eval criterion: on every `verification-fix-*`
+		// scenario its pass/fail equals Opus's (100% agreement), and Opus passes all 4.
+		model: SONNET_MODEL,
 		effort: VERIFICATION_EFFORT,
 	},
 	openai: { ...OPENAI_PROFILES.reviewer, effort: VERIFICATION_EFFORT },
@@ -91,9 +90,11 @@ const VERIFICATION_KEYS = {
 }
 
 // The model a consultation main line hands its investigation to (joshuafolkken/kit#5351); the
-// consultation models themselves are `agent-consultation-model.ts`'s.
+// consultation models themselves are `agent-consultation-model.ts`'s. The Claude one is the pinned id
+// of `.claude/agents/investigator.md`'s `model:` alias, which the Agent tool dispatches on — a test
+// holds the two together (joshuafolkken/kit#5944).
 const INVESTIGATION_MODELS: Readonly<Record<AgentProvider, string>> = {
-	anthropic: ANTHROPIC_MODEL,
+	anthropic: SONNET_MODEL,
 	openai: OPENAI_MODEL,
 }
 const INVESTIGATION_MODEL_KEY = 'JOSH_INVESTIGATION_MODEL'
