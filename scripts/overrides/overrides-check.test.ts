@@ -48,7 +48,11 @@ vi.mock('node:fs', () => ({
 	writeFileSync: vi.fn(),
 }))
 vi.mock('#scripts/version/development-engines-verdict', () => ({
-	development_engines_verdict: { report: vi.fn(), describe: vi.fn(() => DEV_ENGINES_KEPT) },
+	development_engines_verdict: {
+		report: vi.fn(),
+		describe: vi.fn(() => DEV_ENGINES_KEPT),
+		is_intact: vi.fn(() => true),
+	},
 }))
 // Only the git read is replaced; which blocks changed is the real answer for the sources it returns.
 vi.mock(import('./overrides-diff'), async (import_original) => {

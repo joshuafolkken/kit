@@ -5,7 +5,6 @@ import { overrides_check, type OverridesDiff } from './overrides-logic'
 // The dependency-update check read against a git revision (`.claude/skills/dependency-update`
 // §2–§3): the `devEngines` verdict line, then the overrides answer. `josh overrides --diff` and
 // `josh latest:if-required` both print it, so the check has one implementation.
-const ENGINES_RESTORE_PREFIX = 'devEngines: restore'
 
 interface PinVerdict {
 	is_overrides_moved: boolean
@@ -50,7 +49,7 @@ function report(range: string): PinVerdict | undefined {
 
 	return {
 		is_overrides_moved: changed.length > 0,
-		is_engines_moved: engines.startsWith(ENGINES_RESTORE_PREFIX),
+		is_engines_moved: !development_engines_verdict.is_intact(engines),
 	}
 }
 

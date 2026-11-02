@@ -65,14 +65,21 @@ describe('overrides-diff-report — a pin moved', () => {
 		expect(printed(console.info)).not.toContain('✔ overrides unchanged')
 	})
 
-	it('reports devEngines moved on a restore verdict', () => {
-		vi.mocked(development_engines_verdict.describe).mockReturnValue(
-			'devEngines: restore (integrity suffix missing)',
-		)
+	it.each(['devEngines: restore (integrity suffix missing)', 'devEngines: not judged (no HEAD)'])(
+		'reports devEngines moved on %j',
+		(line) => {
+			vi.mocked(development_engines_verdict.describe).mockReturnValue(line)
 
-		const verdict = overrides_diff_report.report('HEAD')
+			const verdict = overrides_diff_report.report('HEAD')
 
-		expect(verdict).toStrictEqual({ is_overrides_moved: false, is_engines_moved: true })
+			expect(verdict).toStrictEqual({ is_overrides_moved: false, is_engines_moved: true })
+		},
+	)
+
+	it('reports devEngines intact on a kept verdict', () => {
+		vi.mocked(development_engines_verdict.describe).mockReturnValue('devEngines: kept')
+
+		expect(overrides_diff_report.report('HEAD')?.is_engines_moved).toBe(false)
 	})
 
 	it('answers undefined when the range resolves to no commit, printing nothing', () => {
