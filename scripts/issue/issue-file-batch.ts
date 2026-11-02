@@ -10,8 +10,8 @@ import type { ScoutOutcome } from './issue-scout-cli'
 // one `%%%`-separated file, in one call, each through the whole `issue:file` filing with the shared
 // flags appended. Every filing's scout runs first and its reports print together once. A filing a step
 // refuses stays unfiled while the rest go on; the summary names each filed URL and each refused body,
-// and any refusal exits 1. `--check` is refused before any read. `issue-file-main.ts` hands an argument list without `--batch` to
-// `issue_file_cli.run`.
+// and any refusal exits 1. `--check` is refused before any read. `issue-file-main.ts` hands an
+// argument list without `--batch` to `issue_file_cli.run`.
 
 interface Planned {
 	entry: BatchEntry
