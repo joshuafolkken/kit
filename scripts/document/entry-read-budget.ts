@@ -56,8 +56,9 @@ const ENTRY_READ_BUDGET: ReadonlyArray<EntryBudget> = [
 	// joshuafolkken/kit#5946 moved the lane child's step 0 out of the chain section, by another
 	// (and lowered `prrun` and the lane child by one block each).
 	{ entry: 'backlogrun', bytes: 73_728 },
-	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole.
-	{ entry: LANE_CHILD, bytes: 40_960 },
+	// joshuafolkken/kit#5953 charged pre-gate-cut.md at the two sections run:cut prints, not whole;
+	// joshuafolkken/kit#5958 dropped the seam's pointer to the cut, lowering it by a block.
+	{ entry: LANE_CHILD, bytes: 36_864 },
 ]
 
 function byte_size(root: string, relative_path: string): number {
