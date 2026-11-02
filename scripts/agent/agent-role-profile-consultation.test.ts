@@ -4,8 +4,8 @@ import { agent_role_profile } from './agent-role-profile'
 // joshuafolkken/kit#5351: the model each provider's main line hands its investigation to.
 
 const KEY = agent_role_profile.INVESTIGATION_MODEL_KEY
-const OVERRIDE = 'claude-sonnet-5-5'
-const OPUS = 'claude-opus-5-5'
+const OVERRIDE = 'claude-opus-5-5'
+const SONNET = 'claude-sonnet-5-5'
 const SOL = 'gpt-6.1-sol'
 const FABLE = 'claude-fable-5-1'
 const ANTHROPIC = 'anthropic'
@@ -40,10 +40,10 @@ describe('agent_role_profile.resolve — a consultation model on a launched role
 
 describe('agent_role_profile.investigation_model — where the investigation goes', () => {
 	it.each([
-		['defaults Claude to its investigation model', ANTHROPIC, {}, OPUS],
+		['defaults Claude to its investigation model', ANTHROPIC, {}, SONNET],
 		['defaults Codex to its investigation model', OPENAI, {}, SOL],
 		['moves the Claude model by its key', ANTHROPIC, { [KEY]: OVERRIDE }, OVERRIDE],
-		['ignores a blank key', ANTHROPIC, { [KEY]: '  ' }, OPUS],
+		['ignores a blank key', ANTHROPIC, { [KEY]: '  ' }, SONNET],
 		['never reads the OpenAI model from env', OPENAI, { [KEY]: OVERRIDE }, SOL],
 	] as const)('%s', (_case, provider, environment, expected) => {
 		expect(agent_role_profile.investigation_model(provider, environment)).toBe(expected)
