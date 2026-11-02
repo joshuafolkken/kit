@@ -12,7 +12,9 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 }))
 vi.mock('#scripts/epic/epic-blocked-by', () => ({ epic_blocked_by: { record: vi.fn() } }))
 vi.mock('#scripts/run/park/run-park', () => ({ run_park: { clear: vi.fn() } }))
+vi.mock('./backlog-triage-unblock', () => ({ backlog_triage_unblock: { remove: vi.fn() } }))
 
+const { backlog_triage_unblock } = await import('./backlog-triage-unblock')
 const { git_gh_command } = await import('#scripts/gh/git-gh-command')
 const { git_gh_issue_write } = await import('#scripts/gh/git-gh-issue-write')
 const { epic_blocked_by } = await import('#scripts/epic/epic-blocked-by')
@@ -22,6 +24,7 @@ const post_comment = vi.mocked(git_gh_command.issue_comment)
 const clear_label = vi.mocked(git_gh_issue_write.issue_clear_label)
 const clear_record = vi.mocked(run_park.clear)
 const record_blocked_by = vi.mocked(epic_blocked_by.record)
+const remove_blocked_by = vi.mocked(backlog_triage_unblock.remove)
 
 const ISSUE = '5636'
 const BLOCKER = '5647'
@@ -33,6 +36,8 @@ const LANE_ARGV = ['--apply', ISSUE, '--lane', '--reason', REASON]
 const CLEAR_ARGV = [...LANE_ARGV, '--clear']
 const BLOCKED_BY_FLAG = '--blocked-by'
 const BLOCKED_ARGV = ['--apply', ISSUE, BLOCKED_BY_FLAG, BLOCKER, '--reason', REASON]
+const UNBLOCK_FLAG = '--unblock'
+const UNBLOCK_ARGV = ['--apply', ISSUE, UNBLOCK_FLAG, BLOCKER, '--reason', REASON]
 
 vi.spyOn(console, 'info').mockImplementation(() => undefined)
 vi.spyOn(console, 'error').mockImplementation(() => undefined)
@@ -63,6 +68,9 @@ beforeEach(() => {
 
 		return 'recorded'
 	})
+	remove_blocked_by.mockImplementation(async (request) => {
+		order.push(`unblock ${request.prerequisite}`)
+	})
 })
 
 describe('josh backlog:triage — the arguments', () => {
@@ -79,6 +87,11 @@ describe('josh backlog:triage — the arguments', () => {
 			['--apply', ISSUE, BLOCKED_BY_FLAG, ISSUE, '--reason', REASON],
 		],
 		['an unknown flag', [...LANE_ARGV, '--force']],
+		['--blocked-by beside --unblock', [...BLOCKED_ARGV, UNBLOCK_FLAG, '5700']],
+		[
+			'the issue unblocked from itself',
+			['--apply', ISSUE, UNBLOCK_FLAG, ISSUE, '--reason', REASON],
+		],
 	])('refuses %s with the usage and writes nothing', async (_case, argv) => {
 		expect(await backlog_triage_cli.run(argv, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
 		expect(console.error).toHaveBeenCalledWith(backlog_triage_cli.USAGE)
@@ -132,8 +145,8 @@ describe('josh backlog:triage --apply', () => {
 })
 
 describe('josh backlog:triage --blocked-by', () => {
-	it('names the flag in the usage', () => {
-		expect(backlog_triage_cli.USAGE).toContain(`[${BLOCKED_BY_FLAG} <M>]`)
+	it('names the flag beside --unblock in the usage', () => {
+		expect(backlog_triage_cli.USAGE).toContain(`[${BLOCKED_BY_FLAG} <M> | ${UNBLOCK_FLAG} <M>]`)
 	})
 
 	it('records the relation in place of a run label', async () => {
@@ -161,5 +174,32 @@ describe('josh backlog:triage --blocked-by', () => {
 		expect(post_comment).not.toHaveBeenCalled()
 		expect(apply_label).not.toHaveBeenCalled()
 		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(refusal))
+	})
+})
+
+describe('josh backlog:triage --unblock', () => {
+	it('removes the relation, then comments the reason', async () => {
+		expect(await backlog_triage_cli.run(UNBLOCK_ARGV, DIRECTORY)).toBe(SUCCESS_EXIT_CODE)
+		expect(order).toStrictEqual([`unblock ${BLOCKER}`, 'comment'])
+		expect(remove_blocked_by).toHaveBeenCalledWith({ issue: ISSUE, prerequisite: BLOCKER })
+		expect(post_comment.mock.calls[0]?.[1]).toContain(`unblocked from #${BLOCKER}`)
+		expect(post_comment.mock.calls[0]?.[1]).toContain(REASON)
+	})
+
+	it('fails naming the write and comments nothing when the relation cannot be removed', async () => {
+		const failure = 'the blocked-by relation was not removed'
+
+		remove_blocked_by.mockRejectedValueOnce(new Error(failure))
+
+		expect(await backlog_triage_cli.run(UNBLOCK_ARGV, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+		expect(post_comment).not.toHaveBeenCalled()
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining(failure))
+	})
+
+	it('fails naming the comment when the reason cannot be commented', async () => {
+		post_comment.mockRejectedValueOnce(new Error('offline'))
+
+		expect(await backlog_triage_cli.run(UNBLOCK_ARGV, DIRECTORY)).toBe(FAILURE_EXIT_CODE)
+		expect(console.error).toHaveBeenCalledWith(expect.stringContaining('could not comment'))
 	})
 })

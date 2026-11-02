@@ -75,7 +75,7 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 			"Apply backlogrun's triage verdict to one issue: clear the park, comment the reason, apply the run label",
 		category: 'AI tools',
 		reference: [
-			'--apply <n> [--lane | --solo] [--blocked-by <m>] --reason <text> [--clear]',
+			'--apply <n> [--lane | --solo] [--blocked-by <m> | --unblock <m>] --reason <text> [--clear]',
 			'automation',
 			['files', 'network'],
 		],
@@ -86,6 +86,10 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 				{
 					arguments: '--apply 914 --blocked-by 912 --reason "<why>"',
 					note: 'the blocker lands first',
+				},
+				{
+					arguments: '--apply 914 --unblock 912 --reason "<why>"',
+					note: 'a dependency a person dropped',
 				},
 			],
 			flags: [
@@ -103,6 +107,11 @@ const BACKLOG_COMMANDS: Record<string, CommandEntry> = {
 					names: ['--blocked-by <M>'],
 					description:
 						'records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.',
+				},
+				{
+					names: ['--unblock <M>'],
+					description:
+						"removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.",
 				},
 			],
 		},

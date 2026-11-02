@@ -10,14 +10,16 @@ import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { error_text } from '#scripts/lib/error-message'
 import { run_park } from '#scripts/run/park/run-park'
+import { backlog_triage_unblock } from './backlog-triage-unblock'
 
-// `josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M>] --reason <text> [--clear]` —
+// `josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]` —
 // backlogrun's triage verdict on one issue in one call (joshuafolkken/kit#5636): the park taken off when
 // `--clear` says its question is answered, the native `blocked-by` relation on `#M`
-// (joshuafolkken/kit#5647), the reason commented, then the run label — at least one of the relation
-// and the label. The flags and the label write are `auto-ok:judge --apply`'s (`issue_run_verdict`);
-// the clear is `run:park --clear`'s; the relation is `run:pause`'s (`epic_blocked_by`), so an epic
-// tracking `#N` declares it too.
+// (joshuafolkken/kit#5647) recorded or removed (joshuafolkken/kit#5818), the reason commented, then the
+// run label — at least one of the relation and the label. The flags and the label write are
+// `auto-ok:judge --apply`'s (`issue_run_verdict`); the clear is `run:park --clear`'s; the relation is
+// `run:pause`'s (`epic_blocked_by`), so an epic tracking `#N` declares it too, and its removal drops
+// that declaration (`backlog_triage_unblock`).
 //
 // **The park comes off only on `--clear`**: an issue left for a person's judgement keeps
 // `needs-decision`, so labelling it never lets `backlog:next` offer an unanswered question.
@@ -31,12 +33,13 @@ const ARGV_OFFSET = 2
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE =
-	'Usage: josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M>] --reason <text> [--clear]'
+	'Usage: josh backlog:triage --apply <N> [--lane | --solo] [--blocked-by <M> | --unblock <M>] --reason <text> [--clear]'
 
 const OPTIONS = {
 	apply: { type: 'string' },
 	...issue_run_verdict.RUN_LABEL_OPTIONS,
 	'blocked-by': { type: 'string' },
+	unblock: { type: 'string' },
 	reason: { type: 'string' },
 	clear: { type: 'boolean' },
 } as const
@@ -45,35 +48,44 @@ interface TriageRequest {
 	issue: string
 	run_label: string | undefined
 	blocker: string | undefined
+	unblock: string | undefined
 	reason: string
 	is_clearing: boolean
 }
 
 type Values = NonNullable<ReturnType<typeof cli_flags.values_of<typeof OPTIONS>>>
 
-// A `--blocked-by` given has to name another issue.
+// A `--blocked-by` or `--unblock` given has to name another issue.
 function is_blocker_valid(issue: string, blocker: string | undefined): boolean {
 	if (blocker === undefined) return true
 
 	return issue_number_shape.is_issue_number(blocker) && blocker !== issue
 }
 
-// `--lane` with `--solo` is no answer, even beside a valid blocker.
-function is_flags_valid(issue: string, values: Values, blocker: string | undefined): boolean {
-	return is_blocker_valid(issue, blocker) && !(values.lane === true && values.solo === true)
+// One relation change at most: recording and removing in one call is no answer.
+function is_relation_valid(issue: string, values: Values): boolean {
+	const { 'blocked-by': blocker, unblock } = values
+
+	if (blocker !== undefined && unblock !== undefined) return false
+
+	return is_blocker_valid(issue, blocker) && is_blocker_valid(issue, unblock)
 }
 
-// The verdict needs a run label, a blocker, or both.
-function verdict_request(issue: string, values: Values, reason: string): TriageRequest | undefined {
-	const blocker = values['blocked-by']
+// `--lane` with `--solo` is no answer, even beside a valid relation.
+function is_flags_valid(issue: string, values: Values): boolean {
+	return is_relation_valid(issue, values) && !(values.lane === true && values.solo === true)
+}
 
-	if (!is_flags_valid(issue, values, blocker)) return undefined
+// The verdict needs a run label, a relation change, or both.
+function verdict_request(issue: string, values: Values, reason: string): TriageRequest | undefined {
+	if (!is_flags_valid(issue, values)) return undefined
 
 	const run_label = issue_run_verdict.run_label_of(values)
+	const { 'blocked-by': blocker, unblock } = values
 
-	return run_label === undefined && blocker === undefined
+	return run_label === undefined && blocker === undefined && unblock === undefined
 		? undefined
-		: { issue, run_label, blocker, reason, is_clearing: values.clear === true }
+		: { issue, run_label, blocker, unblock, reason, is_clearing: values.clear === true }
 }
 
 function labelled_request(issue: string, values: Values): TriageRequest | undefined {
@@ -110,13 +122,15 @@ async function clear_park(request: TriageRequest, directory: string): Promise<bo
 	return await git_gh_issue_write.issue_clear_label(request.issue, NEEDS_DECISION_LABEL)
 }
 
-// The verdict's parts in one line: the run label, then the blocker — whichever were given. `cite`
-// names the blocker for where the line lands: the comment GitHub links, or the session.
+// The verdict's parts in one line: the run label, then the relation change — whichever were given.
+// `cite` names the blocker for where the line lands: the comment GitHub links, or the session.
 function verdict_of(request: TriageRequest, cite: (issue: string) => string): string {
-	const label_part = request.run_label === undefined ? [] : [`\`${request.run_label}\``]
-	const blocker_part = request.blocker === undefined ? [] : [`blocked by ${cite(request.blocker)}`]
+	const { run_label, blocker, unblock } = request
+	const label_part = run_label === undefined ? [] : [`\`${run_label}\``]
+	const blocker_part = blocker === undefined ? [] : [`blocked by ${cite(blocker)}`]
+	const unblock_part = unblock === undefined ? [] : [`unblocked from ${cite(unblock)}`]
 
-	return [...label_part, ...blocker_part].join(' · ')
+	return [...label_part, ...blocker_part, ...unblock_part].join(' · ')
 }
 
 async function comment(request: TriageRequest): Promise<boolean> {
@@ -132,26 +146,43 @@ async function comment(request: TriageRequest): Promise<boolean> {
 	}
 }
 
-// The problem, or `undefined` once the relation is recorded (or none was asked for).
-async function link_blocker(
-	issue: string,
-	blocker: string | undefined,
+// The relation write's rejection as the problem, `failure` naming it.
+async function relation_problem(
+	write: Promise<unknown>,
+	failure: string,
 ): Promise<string | undefined> {
-	if (blocker === undefined) return undefined
-
 	try {
-		await epic_blocked_by.record({ issue, prerequisite: blocker })
+		await write
 
 		return undefined
 	} catch (error) {
-		return `could not record blocked by ${session_cite.issue(blocker)}: ${error_text.message_of(error)}`
+		return `${failure}: ${error_text.message_of(error)}`
 	}
+}
+
+// The problem, or `undefined` once the relation is recorded or removed (or neither was asked for).
+async function change_relation(request: TriageRequest): Promise<string | undefined> {
+	const { issue, blocker, unblock } = request
+
+	if (blocker !== undefined) {
+		return await relation_problem(
+			epic_blocked_by.record({ issue, prerequisite: blocker }),
+			`could not record blocked by ${session_cite.issue(blocker)}`,
+		)
+	}
+
+	if (unblock === undefined) return undefined
+
+	return await relation_problem(
+		backlog_triage_unblock.remove({ issue, prerequisite: unblock }),
+		`could not remove blocked by ${session_cite.issue(unblock)}`,
+	)
 }
 
 // The relation, the comment, then the label — the problem of the first that fails, or `undefined`.
 async function write_verdict(request: TriageRequest): Promise<string | undefined> {
 	const { issue, run_label } = request
-	const link_problem = await link_blocker(issue, request.blocker)
+	const link_problem = await change_relation(request)
 
 	if (link_problem !== undefined) return link_problem
 

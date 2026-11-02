@@ -815,6 +815,7 @@ Apply backlogrun's triage verdict to one issue: clear the park, comment the reas
 pnpm josh backlog:triage --apply 912 --lane --reason "<why>"
 pnpm josh backlog:triage --apply 913 --solo --reason "<why>" --clear     # its question answered
 pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"   # the blocker lands first
+pnpm josh backlog:triage --apply 914 --unblock 912 --reason "<why>"      # a dependency a person dropped
 ```
 
 **Options:**
@@ -822,6 +823,7 @@ pnpm josh backlog:triage --apply 914 --blocked-by 912 --reason "<why>"   # the b
 - `--apply <N> --lane|--solo --reason <text>` — comments the reason, then applies the run label — the flags and the label write are `auto-ok:judge --apply`'s.
 - `--clear` — first takes the park off, as `run:park <N> --clear` does — only once the issue already answers its `needs-decision` question.
 - `--blocked-by <M>` — records the native `blocked-by` relation on `#M` before the comment and the run label, declared in the epic tracking `#N` as `run:pause` does; it stands in for the run label or goes with it.
+- `--unblock <M>` — removes it instead, with the tracking epic's `#M -> #N` declaration (`epic --remove`'s path); `--blocked-by` restores it. A failed write is named, exit 1.
 
 <!-- /usage -->
 

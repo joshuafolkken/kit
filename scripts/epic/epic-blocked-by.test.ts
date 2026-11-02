@@ -43,6 +43,8 @@ const REQUEST = { issue: '10', prerequisite: '11' }
 const EPIC = 7
 const RECORDED_IN_EPIC = 'recorded in epic'
 const BOTH_TRACKED = '- [ ] #10\n- [ ] #11'
+const ISSUE_TRACKED = '- [ ] #10'
+const UNSEEN = 'not read in full'
 
 function epics_of(body: string): void {
 	vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
@@ -90,14 +92,14 @@ describe('epic_blocked_by.record — outside an epic', () => {
 	it('throws on a cut-short epic listing rather than reading it as no epic', async () => {
 		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({ cutoff: 'row_limit', epics: [] })
 
-		await expect(epic_blocked_by.record(REQUEST)).rejects.toThrow('not read in full')
+		await expect(epic_blocked_by.record(REQUEST)).rejects.toThrow(UNSEEN)
 		expect(state.calls).toStrictEqual([])
 	})
 })
 
 describe('epic_blocked_by.record — inside an epic', () => {
 	it('adds an untracked prerequisite through `epic --add --before`', async () => {
-		epics_of('- [ ] #10')
+		epics_of(ISSUE_TRACKED)
 
 		expect(await epic_blocked_by.record(REQUEST)).toContain(RECORDED_IN_EPIC)
 		expect(state.calls).toStrictEqual(['epic'])
@@ -129,5 +131,33 @@ describe('epic_blocked_by.record — inside an epic', () => {
 
 		expect(await epic_blocked_by.record(REQUEST)).toBe('already')
 		expect(state.calls).toStrictEqual(['reconcile'])
+	})
+})
+
+describe('epic_blocked_by.listing_epics', () => {
+	it('returns every epic listing the issue, not only the one the index keeps', async () => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
+			cutoff: 'none',
+			epics: [
+				{ number: EPIC, body: ISSUE_TRACKED },
+				{ number: 8, body: BOTH_TRACKED },
+				{ number: 9, body: '- [ ] #11' },
+			],
+		})
+
+		expect(await epic_blocked_by.listing_epics(REQUEST.issue)).toStrictEqual([EPIC, 8])
+	})
+
+	it('returns no epic when none lists the issue', async () => {
+		expect(await epic_blocked_by.listing_epics(REQUEST.issue)).toStrictEqual([])
+	})
+
+	it('throws on a cut-short epic listing even when an epic lists the issue', async () => {
+		vi.spyOn(epic_index, 'fetch_epics').mockResolvedValue({
+			cutoff: 'row_limit',
+			epics: [{ number: EPIC, body: ISSUE_TRACKED }],
+		})
+
+		await expect(epic_blocked_by.listing_epics(REQUEST.issue)).rejects.toThrow(UNSEEN)
 	})
 })
