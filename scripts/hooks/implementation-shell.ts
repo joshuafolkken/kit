@@ -162,7 +162,7 @@ function is_read_or_operation(segment: string, name: string, args: Array<string>
 	return ARGUMENT_READS.get(name)?.(segment, args) ?? is_operation(name, args)
 }
 
-// A `josh` command outside the operations passes as a help request or on a declared read-only flag.
+// A `josh` command outside the operations passes as a help request, a read-only entry or on a declared read-only flag.
 function program_refusal(segment: string, name: string, args: Array<string>): Refusal {
 	if (is_read_or_operation(segment, name, args)) return undefined
 	if (name === 'josh') return josh_read_only.refusal(args)

@@ -156,6 +156,8 @@ describe('read-only investigation shell', () => {
 		'pnpm josh -h --all',
 		'pnpm josh help ship',
 		'pnpm josh ship --log 5757',
+		'pnpm josh cost:audit --period 14',
+		'pnpm josh read:set fullrun',
 		'pnpm josh lbd 5757',
 	])('passes %s', (command) => {
 		expect(implementation_shell.is_unsafe(command)).toBe(false)

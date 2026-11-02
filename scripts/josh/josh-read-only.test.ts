@@ -9,6 +9,10 @@ describe('josh read-only invocations', () => {
 		[['help', 'ship']],
 		[['--all']],
 		[['ship', '--log', '5757']],
+		[['cost:audit', '--period', '14']],
+		[['ca']],
+		[['read:set', 'fullrun']],
+		[['read:set', 'fullrun', '--bytes']],
 	])('passes %j', (args) => {
 		expect(josh_read_only.refusal(args)).toBeUndefined()
 	})
