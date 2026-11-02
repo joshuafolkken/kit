@@ -81,6 +81,15 @@ const PROGRESS_COMMANDS: Record<string, CommandEntry> = {
 			],
 		},
 	},
+	'run:pickup': {
+		script: 'scripts/run/run-pickup-cli.ts',
+		description: 'Read the open lanes back after a manual cut: each liveness, and the watcher line',
+		category: 'AI tools',
+		reference: ['', 'automation', ['processes']],
+		usage: {
+			examples: [{ arguments: '', note: 'one line per lane, then the watcher line' }],
+		},
+	},
 	'run:handoff': {
 		script: 'scripts/run/handoff/run-handoff-cli.ts',
 		description:

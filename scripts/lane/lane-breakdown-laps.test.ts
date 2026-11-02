@@ -5,7 +5,7 @@ import type { LedgerEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // joshuafolkken/kit#5294: a ship stage of the breakdown splits into the laps the ship wrote inside it
-// and the core-budget waits that ended there; the time between ship stages by the child's Bash.
+// and the core-budget waits that ended there; the time between ship stages by the child's calls.
 
 const MINUTE_MS = 60_000
 const ISSUE = 5294
@@ -79,18 +79,23 @@ function gate(
 	}
 }
 
-function bash(minute: number, minutes: number, command: string): ToolCall {
+// A call of `tool` started at `minute` for `minutes`; an `Agent` call dispatches a `reviewer`.
+function tool_call(minute: number, minutes: number, tool: string): ToolCall {
 	return {
 		session_id: 's',
 		lane: String(ISSUE),
 		started_ms: minute * MINUTE_MS,
 		duration_ms: minutes * MINUTE_MS,
-		tool: 'Bash',
+		tool,
 		background: false,
-		command,
-		subagent: undefined,
+		command: undefined,
+		subagent: tool === 'Agent' ? { type: 'reviewer', model: undefined } : undefined,
 		output: '',
 	}
+}
+
+function bash(minute: number, minutes: number, command: string): ToolCall {
+	return { ...tool_call(minute, minutes, 'Bash'), command }
 }
 
 function minutes_of(
@@ -268,6 +273,57 @@ describe('lane_breakdown_laps.of — between ship stages', () => {
 				[
 					{ name: 'gate', ms: 2 * MINUTE_MS },
 					{ name: EDITING, ms: 2 * MINUTE_MS },
+				],
+			],
+		])
+	})
+})
+
+// joshuafolkken/kit#5834: a subagent, a read and an edit each count under their own kind.
+describe('lane_breakdown_laps.of — the tools between ship stages', () => {
+	it('splits it by the subagents, reads and edits the child ran there', () => {
+		const calls = [
+			tool_call(16, 1.5, 'Agent'),
+			tool_call(17.5, 1, 'Edit'),
+			tool_call(18.5, 0.25, 'Read'),
+		]
+
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['subagent: reviewer', 1.5],
+					[EDITING, 1.25],
+					['edit', 1],
+					['read', 0.25],
+				],
+			],
+		])
+	})
+
+	it('counts a Write under the edit kind', () => {
+		expect(minutes_of([], [tool_call(16, 4, 'Write')])).toStrictEqual([[BETWEEN, [['edit', 4]]]])
+	})
+
+	it('leaves a backgrounded subagent, its time unknown, in the rest', () => {
+		const agent = { ...tool_call(16, 0, 'Agent'), duration_ms: undefined, background: true }
+
+		expect(minutes_of([], [agent])).toStrictEqual([[BETWEEN, [[EDITING, 4]]]])
+	})
+})
+
+// joshuafolkken/kit#5834: a `ship:wait` begun in the ship stage before counts for what it ran past
+// that stage's end.
+describe('lane_breakdown_laps.of — a call begun before the stretch', () => {
+	it('counts the part of a call begun before the stretch that ran inside it', () => {
+		const calls = [bash(15, 3, 'pnpm josh ship:wait 5294')]
+
+		expect(minutes_of([], calls)).toStrictEqual([
+			[
+				BETWEEN,
+				[
+					['ship / ship:wait', 2],
+					[EDITING, 2],
 				],
 			],
 		])

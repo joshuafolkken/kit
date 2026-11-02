@@ -1,6 +1,7 @@
 import { cost_transcript } from '#scripts/cost-runtime/cost-transcript'
 import { lane_breakdown, type Breakdown, type Stage } from './lane-breakdown'
 import { lane_breakdown_calls, type CallGroup } from './lane-breakdown-calls'
+import { lane_implement_stats } from './lane-implement-stats'
 import type { LaneSpan } from './lane-net-time'
 import type { Subagent, ToolCall } from './lane-transcript-calls'
 import { lane_transcript_stats } from './lane-transcript-stats'
@@ -19,11 +20,19 @@ const REMAINDER = 'editing & thinking'
 const OTHER_BASH = 'other bash'
 const BASH_TOOL = 'Bash'
 const READ = 'read'
+const EDIT = 'edit'
 
 const TOOL_KINDS: ReadonlyMap<string, string> = new Map([
 	['Read', READ],
 	['Grep', READ],
 	['Glob', READ],
+])
+
+// Between two ship stages an edit counts as its own kind (joshuafolkken/kit#5834); inside the
+// implementation it stays in the remainder, its editing.
+const BETWEEN_TOOL_KINDS: ReadonlyMap<string, string> = new Map([
+	...TOOL_KINDS,
+	...[...lane_implement_stats.EDIT_TOOLS].map((tool) => [tool, EDIT] as const),
 ])
 
 const COMMAND_KINDS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -56,12 +65,13 @@ function subagent_kind(subagent: Subagent): string {
 	return `subagent: ${subagent.type}`
 }
 
-// The kind a call counts under, `undefined` for one that falls in the remainder (an edit included).
-function kind_of(call: ToolCall): string | undefined {
+// The kind a call counts under, `undefined` for one that falls in the remainder (under `TOOL_KINDS`
+// an edit included).
+function kind_of(call: ToolCall, tool_kinds: ReadonlyMap<string, string>): string | undefined {
 	if (call.tool === BASH_TOOL) return command_kind(call.command ?? '')
 	if (call.subagent !== undefined) return subagent_kind(call.subagent)
 
-	return TOOL_KINDS.get(call.tool ?? '')
+	return tool_kinds.get(call.tool ?? '')
 }
 
 interface TimedPart extends Stage {
@@ -73,21 +83,32 @@ function is_untimed_subagent(call: ToolCall): boolean {
 	return call.background && call.subagent !== undefined
 }
 
-// A call's own milliseconds, cut at the end of the span it started in; a backgrounded subagent call's none.
-function timed_part(call: ToolCall, span: LaneSpan): ReadonlyArray<TimedPart> {
-	const name = kind_of(call)
+function end_ms(call: ToolCall): number {
+	return call.started_ms + (call.duration_ms ?? 0)
+}
+
+// A call's own milliseconds, cut at both ends of `span`; a backgrounded subagent call's none.
+function timed_part(
+	call: ToolCall,
+	span: LaneSpan,
+	tool_kinds: ReadonlyMap<string, string>,
+): ReadonlyArray<TimedPart> {
+	const name = kind_of(call, tool_kinds)
 
 	if (name === undefined) return []
 
-	const ms = Math.min(call.duration_ms ?? 0, span.to_ms - call.started_ms)
+	const from_ms = Math.max(call.started_ms, span.from_ms)
+	const ms = Math.min(end_ms(call), span.to_ms) - from_ms
 	const is_counted = call.duration_ms !== undefined || is_untimed_subagent(call)
 
-	return is_counted ? [{ name, ms, from_ms: call.started_ms, call }] : []
+	return is_counted ? [{ name, ms, from_ms, call }] : []
 }
 
 function untimed_of(placed: ReadonlyArray<readonly [ToolCall, LaneSpan]>): Map<string, number> {
 	const counts = new Map<string, number>()
-	const kinds = placed.filter(([call]) => is_untimed_subagent(call)).map(([call]) => kind_of(call))
+	const kinds = placed
+		.filter(([call]) => is_untimed_subagent(call))
+		.map(([call]) => kind_of(call, TOOL_KINDS))
 
 	for (const kind of kinds) if (kind !== undefined) counts.set(kind, (counts.get(kind) ?? 0) + 1)
 
@@ -124,11 +145,26 @@ function placed_of(
 	})
 }
 
+// Whether `call` ran inside `span` — started in it, or started before and still running at its start.
+function is_overlapping(call: ToolCall, span: LaneSpan): boolean {
+	return call.started_ms < span.to_ms && Math.max(call.started_ms + 1, end_ms(call)) > span.from_ms
+}
+
+// Each span paired with every call that ran inside it, so a call that began before is counted too.
+function overlapping_of(
+	calls: ReadonlyArray<ToolCall>,
+	spans: ReadonlyArray<LaneSpan>,
+): Array<readonly [ToolCall, LaneSpan]> {
+	return spans.flatMap((span) =>
+		calls.filter((call) => is_overlapping(call, span)).map((call) => [call, span] as const),
+	)
+}
+
 // The implementation split by the calls made inside it — parallel calls each count their own time, so
 // the kinds can add up to more — and the remainder, the time no call and no wait covered.
 function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDetail {
 	const placed = placed_of(calls, breakdown.implement)
-	const parts = placed.flatMap(([call, span]) => timed_part(call, span))
+	const parts = placed.flatMap(([call, span]) => timed_part(call, span, TOOL_KINDS))
 	const remainder = {
 		name: REMAINDER,
 		ms: remainder_ms(parts, breakdown.implement, breakdown.waits),
@@ -146,26 +182,26 @@ function of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): ImplementDeta
 // with its timing line (joshuafolkken/kit#5712).
 function plan_calls(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array<CallGroup> {
 	const placed = placed_of(calls, breakdown.plan ?? [])
-	const timed = placed.flatMap(([call, span]) => timed_part(call, span))
+	const timed = placed.flatMap(([call, span]) => timed_part(call, span, TOOL_KINDS))
 
 	return lane_breakdown_calls.with_lint_detail(lane_breakdown_calls.top_of(timed), timed)
 }
 
-// The Bash calls started inside `spans`, by the implementation's kinds — the fixes, re-ships and checks
-// a lane child ran between two ship stages (joshuafolkken/kit#5294) — and what neither those calls nor
-// `waits` covered as the remainder (joshuafolkken/kit#5755), left out when nothing is left. A reader
-// that read no calls (`lane-sinks.ts`) gets no rows: its time is not known to be editing.
-function bash_kinds(
+// The calls run inside `spans`, by the implementation's kinds and an edit's own — the fixes, re-ships,
+// checks, reads, edits and subagents a lane child ran between two ship stages, and the `ship:wait`
+// begun in the stage before, a backgrounded subagent left out as it spent no known time
+// (joshuafolkken/kit#5294, joshuafolkken/kit#5834) — and what neither those
+// calls nor `waits` covered as the remainder (joshuafolkken/kit#5755), left out when nothing is left.
+// A reader that read no calls (`lane-sinks.ts`) gets no rows: its time is not known to be editing.
+function between_kinds(
 	calls: ReadonlyArray<ToolCall>,
 	spans: ReadonlyArray<LaneSpan>,
 	waits: ReadonlyArray<LaneSpan>,
 ): Array<Stage> {
 	if (calls.length === 0) return []
-	const placed = placed_of(
-		calls.filter((call) => call.tool === BASH_TOOL),
-		spans,
-	)
-	const parts = placed.flatMap(([call, span]) => timed_part(call, span))
+	const timed = calls.filter((call) => !is_untimed_subagent(call))
+	const placed = overlapping_of(timed, spans)
+	const parts = placed.flatMap(([call, span]) => timed_part(call, span, BETWEEN_TOOL_KINDS))
 	const remainder = { name: REMAINDER, ms: remainder_ms(parts, spans, waits) }
 
 	return lane_breakdown.ranked(remainder.ms > 0 ? [...parts, remainder] : parts)
@@ -195,7 +231,7 @@ function read(issue: number, breakdown: Breakdown): Array<ToolCall> {
 	return lane_transcript_stats.read_calls(transcript_directories(issue), window)
 }
 
-const lane_breakdown_implement = { bash_kinds, of, plan_calls, read, transcript_directories }
+const lane_breakdown_implement = { between_kinds, of, plan_calls, read, transcript_directories }
 
 export { lane_breakdown_implement }
 export type { ImplementDetail }
