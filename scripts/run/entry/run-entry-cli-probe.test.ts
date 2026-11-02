@@ -13,6 +13,7 @@ const print_once_mock = vi.hoisted(() => vi.fn(() => 0))
 const SECTION = vi.hoisted(() => ({ ENTRY: 'entry', PROGRESS: 'run:progress' }))
 const open_pr_mock = vi.hoisted(() => vi.fn())
 const labels_mock = vi.hoisted(() => vi.fn((): Array<string> => []))
+const emit_plan_mock = vi.hoisted(() => vi.fn())
 const fit_mock = vi.hoisted(() => vi.fn((_prep: { is_planned?: boolean }) => 'report'))
 const halfrun_adopt_mock = vi.hoisted(() => vi.fn(async () => true))
 const halfrun_pending_mock = vi.hoisted(() => vi.fn(async () => false))
@@ -60,7 +61,9 @@ vi.mock('#scripts/backlog/backlog-plan-comment', () => ({
 	backlog_plan_comment: { read_plan: async () => undefined },
 }))
 vi.mock('#scripts/run/run-label', () => ({ run_label: { mark: async () => true } }))
-vi.mock('#scripts/run/event/run-event-plan', () => ({ run_event_plan: { emit_plan: vi.fn() } }))
+vi.mock('#scripts/run/event/run-event-plan', () => ({
+	run_event_plan: { emit_plan: emit_plan_mock },
+}))
 vi.mock('#scripts/run/run-step-section', () => ({
 	run_step_section: {
 		...SECTION,
@@ -171,6 +174,32 @@ describe('run_entry_cli.run — the laps of a lane child entry', () => {
 				['label', 'run:prep', 'lane:plan', 'issue baseline'].map((step) => `run:entry › ${step}`),
 			),
 		)
+	})
+
+	// joshuafolkken/kit#5860: the in-process steps between the children are laps too.
+	it('times the overlap probe and the report as run:entry laps', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+
+		await run_entry_cli.run([ISSUE])
+
+		expect(record_lap_mock.mock.calls.map(([lap]) => lap.step)).toEqual(
+			expect.arrayContaining(['lane:plan probe', 'report'].map((step) => `run:entry › ${step}`)),
+		)
+	})
+
+	// The plan event ends the start to plan in lane:breakdown, so every entry lap ends before it.
+	it('writes the plan event of a planned issue after its last lap', async () => {
+		is_child_mock.mockReturnValue(true)
+		yield_mock.mockResolvedValue(false)
+		labels_mock.mockReturnValue(PLANNED_LABELS)
+		plan_at_entry_mock.mockResolvedValueOnce(3)
+
+		await run_entry_cli.run([ISSUE])
+
+		const [plan_order = 0] = emit_plan_mock.mock.invocationCallOrder
+
+		expect(Math.max(...record_lap_mock.mock.invocationCallOrder)).toBeLessThan(plan_order)
 	})
 })
 

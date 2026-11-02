@@ -7,7 +7,9 @@ import { run_entry } from './run-entry'
 // The josh children `run:entry` spawns, and the laps its steps are timed under (joshuafolkken/kit#5831):
 // the entry runs its whole sequence inside one `run:entry` scope (`within`), so `lane:breakdown`
 // splits the entry's minutes under the start to plan by the child that took them — a contended lane's
-// hold or prep wait, not one `run:entry` row.
+// hold or prep wait, not one `run:entry` row. The in-process steps between the children — the
+// overlap probe and the printed report — are laps too, so the children explain the
+// `run:entry` call group rather than leaving a third of it unnamed (joshuafolkken/kit#5860).
 
 const ENTRY_SCOPE = 'run:entry'
 const STEP = {
@@ -18,8 +20,10 @@ const STEP = {
 	SYNC: 'sync',
 	LABEL: 'label',
 	PREP: 'run:prep',
+	PROBE: 'lane:plan probe',
 	LANE_PLAN: 'lane:plan',
 	BASELINE: 'issue baseline',
+	REPORT: 'report',
 } as const
 const ADOPT_FLAG = '--adopt'
 const NEWLINE = '\n'

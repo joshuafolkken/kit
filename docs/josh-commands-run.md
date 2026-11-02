@@ -883,6 +883,22 @@ pnpm josh run:pickup 5800   # first one line per child the epic offers: launched
 
 With epics named, first `epic:next --lanes` and a `lane:launch` per offered child, one line each: launched, not launched and why, or the verdict (`triage`). Per lane, its `run:liveness` verdict or the `lane:output` to run; then the watcher, printed, never started. Exits 1 when the offer could not be read.
 
+### `josh run:handoff-lanes`
+
+<!-- usage: run:handoff-lanes -->
+
+Chain a backlogrun hand-off: cost --cut, the lane reading, run:carry --cut, run:board --chat and run:report --handoff, answering under, cut, blocked or capped.
+
+```bash
+pnpm josh run:handoff-lanes   # after each child’s merge; prints the verdict line, then its next action
+```
+
+<!-- /usage -->
+
+`blocked` names each in-flight lane with an unreadable seat or no output path; no cut is taken.
+
+**Output / exit codes:** the four verdicts exit 0; a failed step stops the chain with its exit code.
+
 ### `josh run:handoff`
 
 <!-- usage: run:handoff -->

@@ -19,6 +19,7 @@ const ISSUE = '2267'
 const MERGE_COMMAND = 'pnpm josh run:merge 2258'
 const CARRY_COMMAND = 'pnpm josh run:carry --begin "backlogrun #2252" --owner 21461'
 const CUT_COMMAND = 'pnpm josh run:cut 2258'
+const HANDOFF_COMMAND = 'pnpm josh run:handoff-lanes'
 const NOW_MS = 1_700_000_000_000
 const A_LATER_CALL_MS = NOW_MS + 60_000
 const REASON = lane_carry_conflict.LANE_CARRY_CONFLICT_REASON
@@ -85,6 +86,8 @@ describe('invokes_budget_command', () => {
 	it.each([
 		['run:merge', MERGE_COMMAND],
 		['run:carry', CARRY_COMMAND],
+		['run:handoff-lanes', HANDOFF_COMMAND],
+		['run:handoff-lanes under a fresh root', `JOSH_TEMP_ROOT="$(mktemp -d)" ${HANDOFF_COMMAND}`],
 		['a later segment', `git switch main && ${MERGE_COMMAND}`],
 	])('matches %s', (_name, command) => {
 		expect(lane_carry_conflict.invokes_budget_command(command)).toBe(true)

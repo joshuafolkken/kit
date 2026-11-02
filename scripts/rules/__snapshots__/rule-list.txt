@@ -101,7 +101,7 @@
   - silent: a main line on any other model, an unnamed model, a delegated unit, or filing and operating (`issue:file`, `issue:plan`, `epic`)
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child carry commands** (`lane-carry-conflict`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)
-  - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry`. Every occurrence
+  - fires: `pnpm josh pretool:guard` — a dispatched lane child running `pnpm josh run:merge` / `run:carry` / `run:handoff-lanes`. Every occurrence
   - silent: not a lane child — the parent owns the run budget
   - not automated: the right act is another command, whose arguments the call does not carry
 - **Lane child on `git switch main`** (`lane-switch-main`, `.claude/skills/workflow-commands/backlogrun-lanes.md`)

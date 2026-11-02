@@ -258,6 +258,8 @@ function is_settled(decision: StageDecision): boolean {
 
 // A planned issue was planned by `kickoff`, whose entry claims nothing, so the claim that starts past
 // the plan writes the `plan` event `run:board` draws 📝 from.
+// It is the entry's last write: `lane:breakdown` ends the start to plan at that event, so a lap ending
+// after it would leave the stage it ran in (joshuafolkken/kit#5860).
 async function mark_planned(issue_number: string, state: StageState): Promise<void> {
 	if (state === run_stage.PLANNED) await run_event_plan.emit_plan(issue_number)
 }
@@ -270,7 +272,13 @@ async function mark_planned(issue_number: string, state: StageState): Promise<vo
 // (`run-entry-lane-plan.ts`), gives the lane back the same way; any other verdict runs on to the report.
 async function yields_at_entry(issue_number: string, state: StageState): Promise<boolean> {
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
-	if (await lane_plan_check.yield_at_entry(Number(issue_number))) return true
+
+	const is_yielded = await timed(
+		STEP.PROBE,
+		async () => await lane_plan_check.yield_at_entry(Number(issue_number)),
+	)
+
+	if (is_yielded) return true
 
 	const code = await timed(
 		STEP.LANE_PLAN,
@@ -300,6 +308,23 @@ function print_entry_sections(): number {
 	return print_watcher_section()
 }
 
+// The composite report, then the entry's own read — the last thing the entry prints.
+async function print_report(
+	entry: Pick<EntryParts, 'issue_number' | 'hold' | 'cost'>,
+	state: StageState,
+	reads: Reads,
+): Promise<number> {
+	return await timed(STEP.REPORT, async () => {
+		const verdict = run_entry.stage_verdict(state, reads.verdict)
+		const prep = { ...reads.prep, is_planned: state === run_stage.PLANNED }
+		const code = emit_fitted({ ...entry, verdict }, prep)
+
+		if (code !== SUCCESS_EXIT_CODE) return code
+
+		return print_entry_sections()
+	})
+}
+
 // The tree is held and the budget allows the run, so the issue is marked as running before its reads
 // — the label then shows in the `labels:` line the report below carries.
 // The plan event is written only once the run passed the trust gate.
@@ -319,22 +344,17 @@ async function proceed(
 
 	if (await yields_at_entry(issue_number, state)) return yield_report(issue_number, { hold, cost })
 
-	await mark_planned(issue_number, state)
-
 	// The issue the report prints is the one the run has read, so it is the baseline a person's later
 	// update is measured against (`issue-watch.ts`).
 	await timed(STEP.BASELINE, async () => {
 		await issue_watch.record_baseline_here(issue_number)
 	})
 
-	const code = emit_fitted(
-		{ issue_number, hold, cost, verdict: run_entry.stage_verdict(state, reads.verdict) },
-		{ ...reads.prep, is_planned: state === run_stage.PLANNED },
-	)
+	const code = await print_report({ issue_number, hold, cost }, state, reads)
 
-	if (code !== SUCCESS_EXIT_CODE) return code
+	await mark_planned(issue_number, state)
 
-	return print_entry_sections()
+	return code
 }
 
 // A stop after this call claimed the hold, which it releases. It exits non-zero though a failed sync
