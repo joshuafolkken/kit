@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hook_lap } from '#scripts/hooks/hook-lap'
 import { describe, expect, it, vi } from 'vitest'
 import {
 	ALIASES,
@@ -314,6 +315,17 @@ describe('josh_logic.run_command', () => {
 
 	it('reports the unknown-command code for inherited prototype keys like constructor', async () => {
 		await expect(josh_logic.run_command('constructor', [])).resolves.toBe(UNKNOWN_COMMAND_EXIT_CODE)
+	})
+
+	// joshuafolkken/kit#5831: a git hook's dispatch is timed as a lap under the ship's commit.
+	it('dispatches a command through its hook lap, with its category and arguments', async () => {
+		const HOOK_EXIT_CODE = 7
+		const HOOK = 'pre-push-unit'
+		const spy = vi.spyOn(hook_lap, 'timed_command').mockResolvedValue(HOOK_EXIT_CODE)
+
+		await expect(josh_logic.run_command(HOOK, [])).resolves.toBe(HOOK_EXIT_CODE)
+		expect(spy).toHaveBeenCalledWith(HOOK, 'Git hooks', [], expect.any(Function))
+		spy.mockRestore()
 	})
 })
 

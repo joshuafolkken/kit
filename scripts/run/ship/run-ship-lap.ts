@@ -1,17 +1,28 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { ShipLapRecord } from '#scripts/lane/lane-ledger-schema'
 import { lane_ledger_write } from '#scripts/lane/lane-ledger-write'
+import { z } from 'zod'
 
 // The inner steps of a `josh ship` stage, each timed into the lane ledger as a lap, so `lane:breakdown`
 // names what a stage spent its minutes on (joshuafolkken/kit#5294). The stage and the issue are held
 // for the stage's whole run (`within`), so a step deep inside it — the scoped pair the preflight, the
 // review rounds and the gate share — is timed without either being passed down to it. A step run
 // outside a ship stage (the followup's own gate) has no stage to belong to and is not timed.
+// A scope with a parent — `josh git` under the ship's commit, or `run:entry` — names each lap
+// `<parent> › <step>`, and crosses into a child process through `ENVIRONMENT_KEY`, so the hooks git
+// runs are timed under the step that spawned them (joshuafolkken/kit#5831).
 
-interface LapScope {
-	issue: number
-	stage: string
-}
+// A `JOSH_SHIP_*` mark, so the unit suite blanks it with the rest (`tools/test/unit-projects.ts`).
+const ENVIRONMENT_KEY = 'JOSH_SHIP_LAP_SCOPE'
+const PARENT_SEPARATOR = ' › '
+
+const lap_scope_schema = z.object({
+	issue: z.number(),
+	stage: z.string(),
+	parent: z.string().optional(),
+})
+
+type LapScope = z.infer<typeof lap_scope_schema>
 
 type LapSink = (lap: ShipLapRecord) => Promise<void>
 
@@ -33,8 +44,39 @@ async function to_ledger(lap: ShipLapRecord): Promise<void> {
 	await lane_ledger_write.record_ship_lap(lap)
 }
 
-async function within<T>(issue: string, stage: string, run: () => Promise<T>): Promise<T> {
-	return await scope.run({ issue: Number(issue), stage }, run)
+async function within<T>(
+	issue: string,
+	stage: string,
+	run: () => Promise<T>,
+	parent?: string,
+): Promise<T> {
+	return await scope.run({ issue: Number(issue), stage, parent }, run)
+}
+
+// The scope a parent process handed down, `undefined` when none or unreadable.
+function inherited(): LapScope | undefined {
+	const text = process.env[ENVIRONMENT_KEY]
+	if (text === undefined || text === '') return undefined
+
+	try {
+		return lap_scope_schema.safeParse(JSON.parse(text)).data
+	} catch {
+		return undefined
+	}
+}
+
+function current_scope(): LapScope | undefined {
+	return scope.getStore() ?? inherited()
+}
+
+// The environment that times a child process's steps under `parent`, `{}` outside any scope.
+function environment(parent: string): Record<string, string> {
+	const current = current_scope()
+	if (current === undefined) return {}
+
+	return {
+		[ENVIRONMENT_KEY]: JSON.stringify({ issue: current.issue, stage: current.stage, parent }),
+	}
 }
 
 // What a step's own result adds to its lap: why a check read the whole branch, and which run of the
@@ -42,7 +84,10 @@ async function within<T>(issue: string, stage: string, run: () => Promise<T>): P
 type LapNote = Pick<ShipLapRecord, 'fallback' | 'rerun' | 'reused_tree' | 'runs'>
 
 function lap_of(current: LapScope, step: string, started_ms: number, note: LapNote): ShipLapRecord {
-	return { ...current, step, elapsed_ms: performance.now() - started_ms, ...note }
+	const { parent, ...place } = current
+	const name = parent === undefined ? step : `${parent}${PARENT_SEPARATOR}${step}`
+
+	return { ...place, step: name, elapsed_ms: performance.now() - started_ms, ...note }
 }
 
 function no_note(): LapNote {
@@ -61,7 +106,7 @@ async function timed<T>(
 	run: () => Promise<T>,
 	{ sink = to_ledger, note_of = no_note }: LapOptions<T> = {},
 ): Promise<T> {
-	const current = scope.getStore()
+	const current = current_scope()
 
 	if (current === undefined) return await run()
 
@@ -79,7 +124,7 @@ async function timed<T>(
 	}
 }
 
-const run_ship_lap = { STEP, timed, within }
+const run_ship_lap = { ENVIRONMENT_KEY, STEP, environment, timed, within }
 
 export type { LapNote, LapOptions, LapSink }
 export { run_ship_lap }

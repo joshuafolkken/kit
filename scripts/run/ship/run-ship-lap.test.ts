@@ -110,3 +110,54 @@ describe('run_ship_lap.timed — the rerun note', () => {
 		expect(laps[0]).toMatchObject({ runs: 2, rerun: 'moved' })
 	})
 })
+
+// joshuafolkken/kit#5831: a step timed under a parent, in this process or a child it spawned.
+const PARENT = 'josh git'
+const CHILD_STEP = 'commit'
+
+describe('run_ship_lap — a parent scope', () => {
+	it('names a lap within a parent scope `<parent> › <step>`', async () => {
+		const { laps, sink } = sink_of()
+
+		await run_ship_lap.within(
+			ISSUE,
+			STAGE,
+			async () => await run_ship_lap.timed(CHILD_STEP, async () => 'out', { sink }),
+			PARENT,
+		)
+
+		expect(laps.map((lap) => lap.step)).toEqual([`${PARENT} › ${CHILD_STEP}`])
+		expect(laps[0]).not.toHaveProperty('parent')
+	})
+})
+
+describe('run_ship_lap.environment — a scope handed to a child process', () => {
+	it('hands its scope to a child process, which times its steps under the parent', async () => {
+		const { laps, sink } = sink_of()
+		const environment = await run_ship_lap.within(ISSUE, STAGE, async () =>
+			run_ship_lap.environment(PARENT),
+		)
+
+		vi.stubEnv(run_ship_lap.ENVIRONMENT_KEY, environment[run_ship_lap.ENVIRONMENT_KEY])
+		await run_ship_lap.timed(CHILD_STEP, async () => 'out', { sink })
+		vi.unstubAllEnvs()
+
+		expect(laps.map(({ issue, stage, step }) => ({ issue, stage, step }))).toEqual([
+			{ issue: Number(ISSUE), stage: STAGE, step: `${PARENT} › ${CHILD_STEP}` },
+		])
+	})
+
+	it('hands nothing down outside any scope', () => {
+		expect(run_ship_lap.environment(PARENT)).toEqual({})
+	})
+
+	it('times nothing under an unreadable inherited scope', async () => {
+		const { laps, sink } = sink_of()
+
+		vi.stubEnv(run_ship_lap.ENVIRONMENT_KEY, '{not json')
+		await run_ship_lap.timed(CHILD_STEP, async () => 'out', { sink })
+		vi.unstubAllEnvs()
+
+		expect(laps).toEqual([])
+	})
+})
