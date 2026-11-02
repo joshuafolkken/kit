@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 // The depth test's table (`.claude/skills/workflow-commands/observation-filing.md` → "The depth test"),
 // read off the subject's path instead of applied by the agent: the deepest row whose prefix the path
 // starts with wins, and a path no row claims is depth 0 — what a consumer of this package touches.
@@ -50,17 +52,26 @@ const DEEPER_ROWS: ReadonlyArray<DepthRow> = [
 	},
 ]
 
-const LEADING_DOT_SLASH = /^(?:\.\/)+/u
+// A path typed from anywhere — absolute, or relative to the caller's directory — read as the
+// repository-relative POSIX path the rows are written in; `undefined` when it falls outside the root.
+function repository_path(root: string, cwd: string, typed: string): string | undefined {
+	const relative = path.relative(root, path.resolve(cwd, typed)).split(path.sep).join('/')
+
+	if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) return undefined
+
+	return relative
+}
 
 function answer_of(row: DepthRow, matched: string | undefined): DepthAnswer {
 	return { depth: `d${String(row.depth)}`, subject: row.subject, matched }
 }
 
+// `scripts/lane` names the directory `scripts/lane/` does, so a trailing slash is not required.
 function of(subject_path: string): DepthAnswer {
-	const path = subject_path.replace(LEADING_DOT_SLASH, '')
+	const subject = `${subject_path}/`
 
 	for (const row of DEEPER_ROWS) {
-		const matched = row.prefixes.find((prefix) => path.startsWith(prefix))
+		const matched = row.prefixes.find((prefix) => subject.startsWith(prefix))
 
 		if (matched !== undefined) return answer_of(row, matched)
 	}
@@ -68,7 +79,7 @@ function of(subject_path: string): DepthAnswer {
 	return answer_of(CONSUMER_ROW, undefined)
 }
 
-const observation_depth = { of }
+const observation_depth = { of, repository_path }
 
 export { observation_depth }
 export type { DepthAnswer }

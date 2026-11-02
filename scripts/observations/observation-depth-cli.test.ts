@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { observation_depth_cli } from './observation-depth-cli'
 
@@ -21,9 +22,12 @@ afterEach(() => {
 	vi.restoreAllMocks()
 })
 
+const ROOT = path.resolve('/repo')
+const PLACES = { root: ROOT, cwd: ROOT }
+
 describe('observation_depth_cli.run — a subject path', () => {
 	it('prints the depth on stdout and the row it applied on stderr', () => {
-		const code = observation_depth_cli.run(['scripts/lane/lane-plan.ts'])
+		const code = observation_depth_cli.run(['scripts/lane/lane-plan.ts'], PLACES)
 
 		expect(code).toBe(0)
 		expect(info_lines).toStrictEqual(['d1'])
@@ -33,18 +37,35 @@ describe('observation_depth_cli.run — a subject path', () => {
 	})
 
 	it('names the fallback when no deeper row claims the path', () => {
-		observation_depth_cli.run(['prompts/review.md'])
+		observation_depth_cli.run(['prompts/review.md'], PLACES)
 
 		expect(info_lines).toStrictEqual(['d0'])
 		expect(error_lines).toStrictEqual([
 			'prompts/review.md → d0: What a consumer of this package touches (no deeper row claims it)',
 		])
 	})
+
+	it('reads an absolute path as its repository path', () => {
+		observation_depth_cli.run([path.join(ROOT, 'tools/time/time-cli.ts')], PLACES)
+
+		expect(info_lines).toStrictEqual(['d2'])
+		expect(error_lines).toStrictEqual([
+			'tools/time/time-cli.ts → d2: What measures a run (under tools/time/)',
+		])
+	})
 })
 
-describe('observation_depth_cli.run — a usage error', () => {
+describe('observation_depth_cli.run — nothing answered', () => {
+	it('refuses a path outside the root rather than answering d0', () => {
+		const code = observation_depth_cli.run(['../other/file.ts'], PLACES)
+
+		expect(code).toBe(1)
+		expect(info_lines).toStrictEqual([])
+		expect(error_lines).toStrictEqual([`Refused: ../other/file.ts is outside ${ROOT}`])
+	})
+
 	it.each([[[]], [['a', 'b']], [['']]])('exits non-zero with the usage for %j', (argv) => {
-		expect(observation_depth_cli.run(argv)).toBe(1)
+		expect(observation_depth_cli.run(argv, PLACES)).toBe(1)
 		expect(info_lines).toStrictEqual([])
 		expect(error_lines).toStrictEqual([observation_depth_cli.USAGE])
 	})

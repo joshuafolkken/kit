@@ -616,7 +616,9 @@ pnpm josh observation:depth scripts/lane/lane-plan.ts
 
 <!-- /usage -->
 
-It prints `d0`, `d1` or `d2` alone on stdout — the `<depth>` [`josh observation:record`](#josh-observationrecord) takes — and the row it applied, with the prefix it matched, on stderr. The deepest row whose prefix the path starts with wins; a path no row claims is `d0`. The rows: `scripts/observations/observation-depth.ts`.
+It prints `d0`, `d1` or `d2` alone on stdout, and the row it applied, with the prefix it matched, on stderr. `d1` and deeper are the `<depth>` [`josh observation:record`](#josh-observationrecord) takes; `d0` is filed, never recorded.
+
+The path may be absolute or relative to the caller's directory; one outside the repository is refused with exit 1. The deepest row whose prefix the path starts with wins; a path no row claims is `d0`. The rows: `scripts/observations/observation-depth.ts`.
 
 ### `josh observation:record`
 

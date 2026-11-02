@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { observation_depth } from './observation-depth'
 
@@ -56,11 +57,31 @@ describe('observation_depth.of — depth 0, what a consumer touches', () => {
 })
 
 describe('observation_depth.of — the path form', () => {
-	it('reads a leading ./ as the same path and names the prefix it matched', () => {
-		expect(observation_depth.of('./scripts/run/run-step.ts')).toStrictEqual({
+	it('reads a directory without its trailing slash and names the prefix it matched', () => {
+		expect(observation_depth.of('scripts/run')).toStrictEqual({
 			depth: 'd1',
 			subject: ORCHESTRATION,
 			matched: 'scripts/run/',
 		})
 	})
+})
+
+describe('observation_depth.repository_path — a typed path read from the caller', () => {
+	const root = path.resolve('/repo')
+	const run_step = 'scripts/run/run-step.ts'
+
+	it.each([
+		[`./${run_step}`, root],
+		[path.join(root, run_step), path.resolve('/elsewhere')],
+		['run/run-step.ts', path.join(root, 'scripts')],
+	])('reads %s from %s as the repository path', (typed, cwd) => {
+		expect(observation_depth.repository_path(root, cwd, typed)).toBe(run_step)
+	})
+
+	it.each(['../other/file.ts', path.resolve('/elsewhere/file.ts')])(
+		'answers undefined for %s, outside the root',
+		(typed) => {
+			expect(observation_depth.repository_path(root, root, typed)).toBeUndefined()
+		},
+	)
 })
