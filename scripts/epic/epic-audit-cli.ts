@@ -1,5 +1,3 @@
-#!/usr/bin/env tsx
-import { fileURLToPath } from 'node:url'
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { issue_read } from '#scripts/issue/issue-read'
 import { session_cite } from '#scripts/issue/session-cite'
@@ -21,7 +19,6 @@ import { epic_parse, type DependencyLink } from './epic-parse'
 // what.
 
 const FAILURE_EXIT_CODE = 1
-const ARGV_OFFSET = 2
 const USAGE = 'Usage: josh epic:audit <epic-number>'
 // Check 3 filters the issues the children cite down to this owner's repositories, so a repository
 // name it could not read silently dropped every qualified reference and reported nothing. A check
@@ -351,14 +348,6 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	return await report_audit(epic_number, repo)
 }
 
-// `process.exitCode` rather than `process.exit()`: the answer goes to standard output and a write to
-// a pipe is asynchronous on macOS, so exiting can tear the process down before it drains. This
-// command's answer is what a workflow reads and acts on, which is exactly that pipe. The same shape
-// is in `scripts/cost-runtime/cost-main.ts`, which met the truncation first.
-async function main(argv: ReadonlyArray<string>): Promise<void> {
-	process.exitCode = await run(argv)
-}
-
 const epic_audit_cli = {
 	UNREADABLE_REPO,
 	parse_epic_number: epic_issue.parse_epic_number,
@@ -369,8 +358,6 @@ const epic_audit_cli = {
 	audit,
 	run,
 }
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main(process.argv.slice(ARGV_OFFSET))
 
 export type { AuditInput }
 export { epic_audit_cli }

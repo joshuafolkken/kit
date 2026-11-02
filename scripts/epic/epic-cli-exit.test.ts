@@ -19,10 +19,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 const PIPED_ANSWER_COMMANDS = [
 	'epic-next-main.ts',
 	'epic-bundle-main.ts',
-	'epic-audit-cli.ts',
+	'epic-audit-main.ts',
 ] as const
 const PIPED_ANSWER_SOURCES = [
 	...PIPED_ANSWER_COMMANDS,
+	'epic-audit-cli.ts',
 	'epic-next.ts',
 	'epic-bundle-cli.ts',
 ] as const
