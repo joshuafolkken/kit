@@ -998,7 +998,8 @@ Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 w
 Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command.
 
 ```bash
-pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+pnpm josh review:selfcheck                          # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+pnpm josh review:selfcheck --interaction-answered   # → a passing, due run also records the issue's interaction round
 ```
 
 <!-- /usage -->
