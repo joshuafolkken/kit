@@ -40,12 +40,16 @@ function load_snapshot(): Record<string, string> {
 	}
 }
 
-function print_diff(diff: OverridesDiff, heading: string): never {
+function print_diff_lines(diff: OverridesDiff, heading: string): void {
 	console.error(heading)
 
 	for (const line of overrides_check.format_diff_lines(diff)) {
 		console.error(line)
 	}
+}
+
+function print_diff(diff: OverridesDiff, heading: string): never {
+	print_diff_lines(diff, heading)
 
 	return process.exit(1)
 }
@@ -95,14 +99,15 @@ function run_diff(range: string): void {
 	const { before, after } = sources
 
 	console.info(development_engines_verdict.describe(before.package_json, after.package_json))
-	const summary = overrides_check.describe_sources(after)
-	const diff = overrides_check.compare(
-		overrides_check.read_overrides(before),
-		overrides_check.read_overrides(after),
-	)
-	if (diff.is_changed) print_diff(diff, `✖ overrides changed since ${range} (${summary}):`)
+	const changed = overrides_diff.changed_blocks(sources)
 
-	console.info(`✔ overrides unchanged since ${range} (${summary}).`)
+	for (const block of changed) {
+		print_diff_lines(block.diff, `✖ ${block.file} overrides changed since ${range}:`)
+	}
+
+	if (changed.length > 0) process.exit(1)
+
+	console.info(`✔ overrides unchanged since ${range} (${overrides_check.describe_sources(after)}).`)
 }
 
 // A line nobody can read is refused before the snapshot is read or written: a misspelled `--save` that

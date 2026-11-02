@@ -84,3 +84,22 @@ describe('overrides_diff.read_sources — josh adopt (<base>...<head>)', () => {
 		expect(overrides_diff.read_sources(ADOPT_RANGE)).toBeUndefined()
 	})
 })
+
+describe('overrides_diff.changed_blocks — each overrides block, under its own file', () => {
+	const with_package_block = '{"pnpm":{"overrides":{"esbuild":">=0.25.0"}}}'
+
+	it('answers nothing when neither block moved', () => {
+		const sources = { package_json: with_package_block, workspace_yaml: WORKSPACE_WITH_ESBUILD }
+
+		expect(overrides_diff.changed_blocks({ before: sources, after: sources })).toEqual([])
+	})
+
+	it('names package.json when only its ignored block was stripped', () => {
+		const before = { package_json: with_package_block, workspace_yaml: WORKSPACE_WITH_ESBUILD }
+		const after = { package_json: '{}', workspace_yaml: WORKSPACE_WITH_ESBUILD }
+		const changed = overrides_diff.changed_blocks({ before, after })
+
+		expect(changed.map((block) => block.file)).toEqual(['package.json'])
+		expect(changed[0]?.diff.removed).toEqual([{ key: 'esbuild', value: '>=0.25.0' }])
+	})
+})

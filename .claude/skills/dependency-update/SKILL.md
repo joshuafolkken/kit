@@ -25,14 +25,14 @@ pnpm josh overrides --diff <default>...<branch> # after `josh adopt`, which comm
 ```
 
 **Quote the two verdict lines it prints** — the `devEngines` line (§3) and `✔ overrides unchanged
-since <range> (…)`, or `✖ overrides changed since <range>` with each added, removed or changed entry.
-A removed, modified or over-bumped entry: restore it immediately, investigate, and report — never
-keep it without approval.
+since <range> (…)`, or `✖ <file> overrides changed since <range>` for each of the two blocks that
+moved, with each added, removed or changed entry. A removed, modified or over-bumped entry: restore
+it immediately, investigate, and report — never keep it without approval.
 
 ## 3. `devEngines` — the one expected change
 
-**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first, and
-`josh latest` prints it after its pnpm bump — `HEAD`'s `package.json` against the working tree
+**Read the verdict line, never compare by eye.** `pnpm josh overrides` prints it first — against
+`HEAD`, or the `--diff` range's base — and `josh latest` prints it after its pnpm bump
 (`scripts/version/development-engines-verdict.ts`). Quote it:
 
 - `devEngines: unchanged` / `devEngines: kept` — keep. `kept` is the lockstep pnpm bump (the version

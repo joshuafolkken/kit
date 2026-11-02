@@ -1,7 +1,7 @@
 import { git_spawn_sync } from '#scripts/git/git-spawn-sync'
 import { PACKAGE_JSON } from '#scripts/lib/package-manifest'
 import { overrides_files } from './overrides-files'
-import { overrides_check, type OverridesSources } from './overrides-logic'
+import { overrides_check, type OverridesDiff, type OverridesSources } from './overrides-logic'
 
 // The two ends `josh overrides --diff` compares, read from git rather than a snapshot, so the check
 // needs no `--save` before the update ran. `<base>` is an update not yet committed: the revision
@@ -61,6 +61,35 @@ function read_sources(range: string): DiffSources | undefined {
 	)
 }
 
-const overrides_diff = { read_sources }
+interface ChangedBlock {
+	file: string
+	diff: OverridesDiff
+}
 
-export { overrides_diff, type DiffSources }
+// pnpm applies only the workspace block, but an update has to leave the ignored `package.json` one as
+// it found it too, so a change to either is reported under the file it was made in.
+function changed_blocks(sources: DiffSources): Array<ChangedBlock> {
+	const { before, after } = sources
+	const blocks = [
+		{
+			file: overrides_check.WORKSPACE_YAML_PATH,
+			diff: overrides_check.compare(
+				overrides_check.read_overrides(before),
+				overrides_check.read_overrides(after),
+			),
+		},
+		{
+			file: PACKAGE_JSON,
+			diff: overrides_check.compare(
+				overrides_check.read_overrides_from_package(before.package_json),
+				overrides_check.read_overrides_from_package(after.package_json),
+			),
+		},
+	]
+
+	return blocks.filter((block) => block.diff.is_changed)
+}
+
+const overrides_diff = { read_sources, changed_blocks }
+
+export { overrides_diff, type DiffSources, type ChangedBlock }

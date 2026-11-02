@@ -50,7 +50,12 @@ vi.mock('node:fs', () => ({
 vi.mock('#scripts/version/development-engines-verdict', () => ({
 	development_engines_verdict: { report: vi.fn(), describe: vi.fn(() => DEV_ENGINES_KEPT) },
 }))
-vi.mock('./overrides-diff', () => ({ overrides_diff: { read_sources: vi.fn() } }))
+// Only the git read is replaced; which blocks changed is the real answer for the sources it returns.
+vi.mock(import('./overrides-diff'), async (import_original) => {
+	const { overrides_diff: actual } = await import_original()
+
+	return { overrides_diff: { ...actual, read_sources: vi.fn() } }
+})
 
 const { writeFileSync: write_file_sync } = await import('node:fs')
 const { development_engines_verdict } = await import('#scripts/version/development-engines-verdict')
@@ -109,6 +114,9 @@ describe('overrides-check — snapshot differs from current', () => {
 		expect(() => {
 			run_overrides_check(false)
 		}).toThrow(PROCESS_EXIT_CALLED)
+		expect(console.error).toHaveBeenCalledWith(
+			'✖ overrides changed unexpectedly (1 from pnpm-workspace.yaml):',
+		)
 	})
 })
 
@@ -210,14 +218,14 @@ describe('overrides-check — the argument line', () => {
 // `josh adopt`; `--diff` answers both with the same two verdict lines.
 describe('overrides-check — --diff against a git revision', () => {
 	it('prints both verdicts for an update not yet committed (--diff HEAD)', () => {
-		vi.mocked(overrides_diff.read_sources).mockReturnValue({
-			before: KEPT_SOURCES,
-			after: KEPT_SOURCES,
-		})
+		const bumped_manifest = '{"name":"bumped"}'
+		const bumped = { ...KEPT_SOURCES, package_json: bumped_manifest }
+
+		vi.mocked(overrides_diff.read_sources).mockReturnValue({ before: KEPT_SOURCES, after: bumped })
 		main(['--diff', 'HEAD'])
 
 		expect(overrides_diff.read_sources).toHaveBeenCalledWith('HEAD')
-		expect(development_engines_verdict.describe).toHaveBeenCalledWith('{}', '{}')
+		expect(development_engines_verdict.describe).toHaveBeenCalledWith('{}', bumped_manifest)
 		expect(console.info).toHaveBeenCalledWith(DEV_ENGINES_KEPT)
 		expect(console.info).toHaveBeenCalledWith(
 			'✔ overrides unchanged since HEAD (1 from pnpm-workspace.yaml).',
@@ -235,7 +243,7 @@ describe('overrides-check — --diff against a git revision', () => {
 		}).toThrow(PROCESS_EXIT_CALLED)
 		expect(console.info).toHaveBeenCalledWith(DEV_ENGINES_KEPT)
 		expect(console.error).toHaveBeenCalledWith(
-			expect.stringContaining(`✖ overrides changed since ${ADOPT_RANGE}`),
+			`✖ pnpm-workspace.yaml overrides changed since ${ADOPT_RANGE}:`,
 		)
 		expect(console.error).toHaveBeenCalledWith(
 			expect.stringContaining('- removed: esbuild@<=0.24.2'),
