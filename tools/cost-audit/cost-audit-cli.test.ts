@@ -1,6 +1,7 @@
 import { git_gh_command } from '#scripts/gh/git-gh-command'
 import { git_gh_exec } from '#scripts/gh/git-gh-exec'
 import { COMMAND_MAP } from '#scripts/josh/josh-command-map'
+import { lane_breakdown, type Breakdown } from '#scripts/lane/lane-breakdown'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { cost_audit_cli } from './cost-audit-cli'
 import { cost_audit_fixture } from './cost-audit-fixture'
@@ -11,6 +12,9 @@ vi.mock('#scripts/gh/git-gh-command', () => ({
 	git_gh_command: { repo_get_name_with_owner: vi.fn() },
 }))
 vi.mock('./cost-audit-read', () => ({ cost_audit_read: { load: vi.fn() } }))
+vi.mock('#scripts/lane/lane-net-read', () => ({
+	lane_net_read: { read_ledger: vi.fn(() => []), read_events: vi.fn(() => []) },
+}))
 
 const { ms, day, record, session } = cost_audit_fixture
 const NOW_MS = ms(day(14))
@@ -19,6 +23,17 @@ const repo_name = vi.mocked(git_gh_command.repo_get_name_with_owner)
 const load = vi.mocked(cost_audit_read.load)
 // One $2 request three days into the current seven-day period.
 const SESSIONS = [session('fullrun', [record('a', day(10), 2)])]
+const LANE_SESSION = { ...session('fullrun', [record('a', day(10), 2)], [], true), issue: 7 }
+const BREAKDOWN: Breakdown = {
+	stages: [],
+	excluded_ms: 0,
+	slept_ms: 0,
+	yield_ms: 0,
+	waits: [],
+	implement: [],
+	pre_detach: [],
+	ship: [],
+}
 
 describe('cost_audit_cli.read_period — the --period flag', () => {
 	it('defaults to seven days', () => {
@@ -80,6 +95,19 @@ describe('cost_audit_cli.run — the printed report', () => {
 		await cost_audit_cli.run([], '/repo', NOW_MS)
 
 		expect(info).toHaveBeenCalledWith('  merges: not read from GitHub')
+	})
+
+	it("prints a lane request under the phase its lane's breakdown places it in", async () => {
+		const plan = { from_ms: ms(day(9)), to_ms: ms(day(11)) }
+		const breakdown = { ...BREAKDOWN, plan: [plan] }
+		const of = vi.spyOn(lane_breakdown, 'of').mockReturnValue(breakdown)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		load.mockReturnValue([LANE_SESSION])
+		await cost_audit_cli.run([], '/repo', NOW_MS)
+
+		expect(of).toHaveBeenCalledWith([], [], 7)
+		expect(info).toHaveBeenCalledWith(expect.stringMatching(/^ {2}plan: \$2\.0000 — /u))
 	})
 
 	it('prints the usage and exits 1 on a bad period', async () => {

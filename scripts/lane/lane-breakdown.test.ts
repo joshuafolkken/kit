@@ -213,6 +213,29 @@ describe('lane_breakdown.of — ship pre-detach', () => {
 	})
 })
 
+// joshuafolkken/kit#5936: cost:audit attributes a request's tokens by the stage its instant fell in.
+function stage_at_minute(minute: number): string | undefined {
+	const breakdown = lane_breakdown.of(lane(), events_4970(), ISSUE)
+	const at_ms = Date.parse(at(minute))
+
+	return breakdown === undefined ? 'no breakdown' : lane_breakdown.stage_at(breakdown, at_ms)
+}
+
+describe('lane_breakdown.stage_at', () => {
+	it.each([
+		[5, START_TO_PLAN],
+		[30, IMPLEMENT],
+		[65, SHIP_REVIEW],
+		[75, lane_breakdown.ROUND_TWO_STAGE],
+	])('places minute %d in %s', (minute, stage) => {
+		expect(stage_at_minute(minute)).toBe(stage)
+	})
+
+	it('places an instant past the merge in no stage', () => {
+		expect(stage_at_minute(90)).toBeUndefined()
+	})
+})
+
 describe('lane_breakdown.minutes_text', () => {
 	it('writes minutes to one decimal', () => {
 		expect(lane_breakdown.minutes_text(3.5 * MINUTE_MS)).toBe('3.5 min')
