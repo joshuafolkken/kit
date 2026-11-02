@@ -182,6 +182,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh lane:pause` · `josh lps` | `<issue> \| --all` | developer | processes | Suspend a running lane child’s process tree (SIGSTOP) in place, leaving its work tree, branch and issue untouched, and record the pause in the lane’s state and the run’s event stream |
 | `josh lane:plan` | `<issue> <path>... [--probe]` | automation | files, network | Record the files a lane child plans to edit, and give the lane back when a running lane that planned earlier declares or plans one of them — naming the file and that issue |
 | `josh lane:prune` | — | automation | files, git | Close every lane an interruption left without its work tree and every spent lane, then sweep unregistered leftovers under the lanes root |
+| `josh lane:resolve` · `josh lrv` | `<issue>` | developer | git, network, files | Merge the default branch into a lane's branch and print one verdict — resolved, conflict <paths>, or step-back 2 (overlapping hunks, merge aborted) / 3 (a resolution already recorded on the issue) |
 | `josh lane:restart` · `josh lrs` | `<issue>` | developer | files, git, processes, network | Stop a running lane child, stash its uncommitted work and re-dispatch its issue in a fresh session — not counted as an outage or a failure |
 | `josh lane:resume` · `josh lru` | `<issue> \| --all` | developer | processes | Let a paused lane child carry on from where it stopped (SIGCONT) |
 | `josh lane:sample` · `josh lsm` | `[--every <seconds>]` | maintainer | files | Record the machine load (load average, swap, free memory, working lanes) to the lane ledger — a backlogrun samples itself, this is for a reading outside one |
@@ -224,6 +225,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh run:pause` | `<issue> --for <prerequisite>` | automation | git, network, files | Set a run aside while its prerequisite lands first |
 | `josh run:pickup` | `[<epic>...]` | automation | processes | Pick the lanes up after a manual cut: launch what the epics offer, then each liveness and the watcher line |
 | `josh run:prep` | `<issue> [--summary]` | automation | network | Bundle a run’s pre-edit reads: body, comments, state, dependency scope |
+| `josh run:prime` | — | automation | git, network, files, processes | Prepare the primary checkout once before a backlogrun’s first lane: main:sync, latest:if-required, the update stashed, lane:prune, run:tidy |
 | `josh run:progress` | `[--once \| --wait] [--interval <minutes>] [--hours <hours>] [--repo <owner/repo>] [--output <path>] \| --mark \| --path` | automation | files | Report an unattended run’s progress once it has gone quiet for an interval |
 | `josh run:release` | `[issue\|--force]` | automation | files | Release this working tree's run record |
 | `josh run:report` | `[--handoff \| --end [--stopped "<reason>"]]` | automation | files, network, processes | Generate the session-facing report for this invocation from the run’s event stream (merges, parks, cuts) with the release tail — the same text josh notify sends |
