@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { main_guard } from '#scripts/lib/main-guard'
 
 // The static value-import closure walker, single-sourced for the two distribution guards that need it
 // (joshuafolkken/kit#1997): `distribution-boundary.test.ts` walks the runtime seeds to prove they
@@ -67,12 +68,9 @@ function closure(seeds: Array<string>): Set<string> {
 	return visited
 }
 
-// A main guard is a statement at the start of a line, so a comment or a string that only names
-// `process.argv[1]` is not one (joshuafolkken/kit#4186).
-const MAIN_GUARD = /^if \(process\.argv\[1\] ===/mu
-
+// The judgment is `main-guard.ts`'s, which `lane:plan --imports` shares (joshuafolkken/kit#5928).
 function has_main_guard(file: string): boolean {
-	return MAIN_GUARD.test(readFileSync(file, 'utf8'))
+	return main_guard.has_main_guard(readFileSync(file, 'utf8'))
 }
 
 const import_closure = { closure, has_main_guard, imports_of }
