@@ -45,6 +45,11 @@ const SHIP_COMMANDS: Record<string, CommandEntry> = {
 					description:
 						'the caller is `backlog:drive`, which has no context to cut and asks `backlog:offer` itself, so the merge is never handed back `over` and answers `deferred` in place of the next offer.',
 				},
+				{
+					names: ['--stash'],
+					description:
+						"before classifying, stash the lane's uncommitted work and comment the `stash:pop` line on the Issue — the stopped-unit recovery.",
+				},
 			],
 		},
 	},
