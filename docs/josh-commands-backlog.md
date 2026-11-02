@@ -125,7 +125,7 @@ Duplicates are scored by title token overlap: ≥2 significant shared words and 
 
 <!-- usage: issue:file -->
 
-File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle.
+File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle.
 
 ```bash
 pnpm josh issue:file "<title>" --body-file body.md
@@ -148,6 +148,7 @@ pnpm josh issue:file --batch .josh/tmp/deferred.md --route tier-a
 - `--no-auto-ok` — needs a person's judgement (Tier B / C); no `auto-ok`.
 - `--release` — a consumer can use the change only once it is published. The filed issue becomes a blocker of the target's release issue (step 10).
 - `--blocks-finder` — with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.
+- `--check` — run steps 1–7, create nothing; exit 1 on a refusal.
 
 <!-- /usage -->
 
@@ -997,7 +998,8 @@ Prints `file:line kind word` per reference, or `ok`. Exits 1 on a reference, 2 w
 Answer the pre-commit self-check questions 2, 4 and 10 — stale prose, untouched readers, new command examples run — in one command.
 
 ```bash
-pnpm josh review:selfcheck   # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+pnpm josh review:selfcheck                          # → `file:line` per finding, then one `selfcheck: pass|fail` line (exit 0 / 1; 2 on a failure)
+pnpm josh review:selfcheck --interaction-answered   # → a passing, due run also records the issue's interaction round
 ```
 
 <!-- /usage -->

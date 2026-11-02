@@ -95,7 +95,6 @@ describe('issue_file_cli.run — a size estimate over the cap', () => {
 	it('refuses the filing despite a reason declared', async () => {
 		expect(await issue_file_cli.run(argv_of(capped_path))).toBe(FAILURE_EXIT_CODE)
 		expect(refusals()).toContain('exceeds the cap (more than 24 files or 600 lines)')
-		expect(scout).not.toHaveBeenCalled()
 	})
 
 	it('lets it through filed as a split', async () => {

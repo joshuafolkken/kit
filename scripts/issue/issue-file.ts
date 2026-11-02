@@ -50,6 +50,8 @@ interface FileArguments {
 	// `--blocks-finder`: an interrupt the finder cannot go on without, so the finder is recorded as
 	// blocked by it (`issue-file-interrupt.ts`). An interrupt that blocks nobody omits it (`wip-cap.md`).
 	is_blocking_finder: boolean
+	// `--check`: every filing step runs and prints its verdict, and nothing is created on GitHub.
+	is_check: boolean
 }
 
 const OPTIONS = {
@@ -63,6 +65,7 @@ const OPTIONS = {
 	'no-auto-ok': { type: 'boolean' },
 	release: { type: 'boolean' },
 	'blocks-finder': { type: 'boolean' },
+	check: { type: 'boolean' },
 } as const
 
 // The label a `--route` value names, or `undefined` when it names none — read against the route
@@ -143,6 +146,7 @@ function arguments_of(values: ParsedValues, title: string | undefined): FileArgu
 		is_auto_ok_opted_out: values['no-auto-ok'] === true,
 		is_release: values.release === true,
 		is_blocking_finder: values['blocks-finder'] === true,
+		is_check: values.check === true,
 	}
 }
 

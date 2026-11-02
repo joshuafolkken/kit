@@ -143,10 +143,10 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 	'issue:file': {
 		script: 'scripts/issue/issue-file-main.ts',
 		description:
-			'File an Issue with every filing step: filing cap, fold, local checks (lint, Origin, auto-ok label), start condition and WIP cap, then the duplicate scout once none refuses, labels, then epic:bundle',
+			'File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle',
 		category: 'AI tools',
 		reference: [
-			'<title> --body-file <path> | --batch <dir|file> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder]',
+			'<title> --body-file <path> | --batch <dir|file> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]',
 			'automation',
 			['network'],
 		],
@@ -204,6 +204,10 @@ const ISSUE_WRITE_COMMANDS: Record<string, CommandEntry> = {
 					names: [BLOCKS_FINDER],
 					description:
 						'with `--route interrupt`, the finder cannot go on until this issue is done. The finder is recorded as blocked by the filed issue (step 9); under an epic, `epic --reconcile <E>` after `epic --add` declares it.',
+				},
+				{
+					names: ['--check'],
+					description: 'run steps 1–7, create nothing; exit 1 on a refusal.',
 				},
 			],
 		},
