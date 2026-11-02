@@ -48,6 +48,8 @@ Every *file the prerequisite* step below means that filing, and it always happen
 later steps name its number. **Its duplicate scan is read exactly as it is for a `new` entry**
 (`issue-scout.md`).
 
+## Each entry's branch, and the pause
+
 **Each entry point's own branch stays in that entry's file:**
 
 - **A named epic under `backlogrun`** files without confirmation, sets `<M>` — the child in hand —

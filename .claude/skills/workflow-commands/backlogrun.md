@@ -24,7 +24,7 @@ is still that one invocation (`backlogrun-steps.md` → "The session cut is insi
 
 ## The manifest — the ordered flow
 
-A section `run:step` prints is not fetched again. Every other one is read at its step with
+A section a command prints — `run:step`, `run:park`, `run:pause` — is not fetched again. Every other one is read at its step with
 `pnpm josh doc:section <file> "<heading>"` — never a whole document (`SKILL.md` → "A section
 reference is read as a section").
 
@@ -52,7 +52,7 @@ reference is read as a section").
    session only when it needs judgment, its hand-off carrying the sections the branch needs.
    - A merge answered `over`: `backlogrun-progress.md` → "The hand-off".
    - A unit gone silent: `backlogrun-recovery.md` → "A delegated unit that stopped without reporting".
-   - A child that cannot finish: `backlogrun-park.md` → "park and continue".
+   - A child that cannot finish: the driver's `launch #N` hand-off carries the section.
 7. **End the record when the run ends** — `pnpm josh run:report --end` (or `--end --stopped
    "<reason>"`): `backlogrun-steps.md` → "End the record when the run ends".
    - An empty plan is not that end; the driver's idle watch decides it. A person stops a run from the
