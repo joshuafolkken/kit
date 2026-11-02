@@ -20,8 +20,6 @@ const REPORTS: Readonly<Record<RaiseResult, string>> = {
 	failed: 'reaches the high floor, but applying `priority:high` failed.',
 }
 
-const FAILURES: ReadonlySet<RaiseResult> = new Set(['unreadable', 'failed'])
-
 function parse_number(argv: ReadonlyArray<string>): string | undefined {
 	const [first] = argv
 
@@ -41,7 +39,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 
 	const result = await issue_priority_raise.raise(issue_number)
 	const line = `Issue ${session_cite.issue(issue_number)} ${REPORTS[result]}`
-	const is_failure = FAILURES.has(result)
+	const is_failure = issue_priority_raise.is_failure(result)
 
 	if (is_failure) console.error(line)
 	else console.info(line)

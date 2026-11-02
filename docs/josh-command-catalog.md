@@ -159,7 +159,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:comment` | `<issue> --body <text> \| --body-file <path>` | automation | network | Post one comment to an issue from a file, so no shell expands the body |
 | `josh issue:file` | `<title> --body-file <path> \| --batch <dir\|file> [--route <route>] [--label <name>] [--repo <owner/repo>] [--distinct <N,…>] [--found-during <N>] [--over-cap] [--no-auto-ok] [--release] [--blocks-finder] [--check]` | automation | network | File an Issue: filing cap, fold, one pass naming each refusal (lint, Origin, auto-ok, start condition, WIP cap, scout), labels, epic:bundle |
 | `josh issue:fold` | `<title>... [--not-separable] [--json]` | automation | none | Before a second filing: say whether findings from this session fold into one issue |
-| `josh issue:fold-existing` | `<assessment.json> [--json]` | automation | none | Assess whether a complete draft can join an unstarted issue |
+| `josh issue:fold-existing` | `<assessment.json> [--json \| --apply <N>]` | automation | network | Assess whether a complete draft can join an unstarted issue |
 | `josh issue:lint` | `<path>` | automation | files | Check an issue body file for the template's required headings |
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |

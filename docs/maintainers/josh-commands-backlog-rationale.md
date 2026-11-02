@@ -49,7 +49,7 @@ the behavior. joshuafolkken/kit#3280 moved these commands out of the automation 
 
 ## `josh issue:fold-existing` in detail
 
-The JSON carries `content` (`duplicate` / `compatible` / `separate` / `unknown`), `is_open`, `is_unstarted`, `has_pull_request`, `has_complete_read`, `has_dependency_conflict`, `is_separable`, `size_verdict` (`single` / `split`), `existing_body`, `draft_body` and `verification`. Omit any fact you do not know; the answer is then `inspect`. Only on `fold` does the output JSON's `body` carry the proposed addition, with the original body kept. Confirm the original body and comments have not changed since the assessment, update through REST, and re-read with `pnpm josh issue:read <N>`. `separate` returns to the ordinary filing path.
+The JSON carries `content` (`duplicate` / `compatible` / `separate` / `unknown`), `is_open`, `is_unstarted`, `has_pull_request`, `has_complete_read`, `has_dependency_conflict`, `is_separable`, `size_verdict` (`single` / `split`), `existing_body`, `draft_body` and `verification`. Omit any fact you do not know; the answer is then `inspect`. Only on `fold` does the output JSON's `body` carry the proposed addition, with the original body kept. `--apply <N>` writes that body only while the issue's body still reads as `existing_body` (CRLF and trailing whitespace aside), applies the body's priority floor as `issue:priority` does, and re-reads the body to verify it. Each failed step exits 1 and names it. A body changed since the assessment writes nothing. `separate` returns to the ordinary filing path.
 
 ## `josh issue:fold` in detail
 

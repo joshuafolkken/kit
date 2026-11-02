@@ -16,9 +16,10 @@ describe('existing issue fold procedure', () => {
 		expect(PROCEDURE).toContain('linked PRs')
 	})
 
-	it('preserves the original and re-reads the edited issue', () => {
+	it('preserves the original and writes through the verifying apply', () => {
 		expect(PROCEDURE).toContain('keeps the original body')
-		expect(PROCEDURE).toContain('Re-read it')
+		expect(PROCEDURE).toContain('pnpm josh issue:fold-existing assessment.json --apply <N>')
+		expect(PROCEDURE).toContain('verifies the re-read')
 		expect(PROCEDURE).toContain('never creates a new Issue')
 	})
 
