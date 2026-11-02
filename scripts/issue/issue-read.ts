@@ -87,7 +87,9 @@ function parse_raw_fields(json: string): z.infer<typeof issue_fields_schema> | u
 	}
 }
 
-async function parse_issue_fields(json: string): Promise<IssueFields | undefined> {
+// `repo` is the repository the issue was read from, so its authors' write access is asked of that one
+// (joshuafolkken/kit#5851); absent, the session's.
+async function parse_issue_fields(json: string, repo?: string): Promise<IssueFields | undefined> {
 	const parsed = parse_raw_fields(json)
 
 	if (parsed === undefined) return undefined
@@ -96,11 +98,17 @@ async function parse_issue_fields(json: string): Promise<IssueFields | undefined
 		title: parsed.title,
 		state: parsed.state,
 		body: parsed.body ?? '',
-		is_body_trusted: await gh_author_association.trust_of(gh_author_association.author_of(parsed)),
+		is_body_trusted: await gh_author_association.trust_of({
+			...gh_author_association.author_of(parsed),
+			repo,
+		}),
 	}
 }
 
-async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueComment> {
+async function to_comment(
+	raw: z.infer<typeof comment_schema>,
+	repo: string | undefined,
+): Promise<IssueComment> {
 	const login = raw.user?.login
 
 	return {
@@ -110,6 +118,7 @@ async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueCom
 		is_trusted: await gh_author_association.trust_of({
 			login,
 			association: raw.author_association,
+			repo,
 		}),
 	}
 }
@@ -125,6 +134,7 @@ async function to_comment(raw: z.infer<typeof comment_schema>): Promise<IssueCom
 // to `undefined` here, because the block above draws only one distinction: read, or not read.
 async function parse_comments(
 	json: string | undefined,
+	repo?: string,
 ): Promise<ReadonlyArray<IssueComment> | undefined> {
 	if (json === undefined) return undefined
 
@@ -132,7 +142,7 @@ async function parse_comments(
 
 	if (listing.kind !== 'read') return undefined
 
-	return await Promise.all(listing.rows.map(async (row) => await to_comment(row)))
+	return await Promise.all(listing.rows.map(async (row) => await to_comment(row, repo)))
 }
 
 // The bodies a caller may act on — the comments of authors with write access, in order.

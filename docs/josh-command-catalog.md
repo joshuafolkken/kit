@@ -69,6 +69,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh main:sync` · `josh ms` | — | developer | git, network | Checkout default branch, pull latest, and prune merged remote-gone branches (refuses inside a lane) |
 | `josh measure:rerun` | `<issue-number>` | automation | network, processes, files | Re-run a merged issue’s baseline command and print the before/after pair |
 | `josh notify` | `[--task-type <type>] [--body <text> \| --body-file <path>] [--issue-url <url>] [--pr-url <url>] [--issue-title <text>] [--repo-name <name>] [--recommended <text>] [--alternative <text>]...` | automation | notifications | Send Telegram notification |
+| `josh observation:depth` | `<path>` | automation | none | Print the depth test's depth for a subject path |
 | `josh observation:record` | `<key> <depth> <where> <what> [--checkout <path>]` | automation | files | Record an observation sighting and answer whether it is now filed |
 | `josh observations:flush` | — | automation | git, network | Commit the observation ledger as a pull request of its own, and merge it |
 | `josh pr` · `josh gp` | `<message>` | developer | network | Create PR only (skip commit and push) |
@@ -163,7 +164,7 @@ Run `pnpm josh command:derive` to regenerate.
 | `josh issue:measured` | `<issue> --evidence-file <path> [--unmet]` | automation | network, files | Complete a measurement-only issue: post the result, label it measured, close it, release the hold |
 | `josh issue:plan` | `<issue> --body-file <path> [--title <title>] [--planned] [--no-notify] [--repo <owner/name>]` | automation | network | Record a plan: normalize the title, fill a blank body or comment, apply run:planned |
 | `josh issue:priority` | `<issue>` | automation | network | Apply priority:high to an issue whose body reached the high floor after filing |
-| `josh issue:read` | `<issue...>` | automation | network | Print each issue's title, body and every comment on it, in one call |
+| `josh issue:read` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's title, body and every comment on it, in one call |
 | `josh issue:release` | `<issue> [--wait]` | automation | network | Link an Issue to the repository's open release Issue as its blocker (or, with --wait, as waiting on it), filing one when none is open |
 | `josh issue:scout` | `<title> [--body <summary> \| --body-file <path>]` | automation | network | Before filing: say whether an issue like this exists and which epic it belongs to |
 | `josh issue:state` | `<issue...> [--repo <owner/repo>]` | automation | network | Print each issue's state and labels, in the spelling the documents compare against |

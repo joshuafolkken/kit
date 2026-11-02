@@ -20,6 +20,7 @@ const COMMENTS_PATH = `${CURRENT_REPO_ISSUES}/${ISSUE_NUMBER}/comments`
 const COMMENT_LISTING = '[{"body":"a plan comment"}]'
 const READ_FAILED = 'API rate limit exceeded'
 const WATCH_TIMEOUT_MS = 5000
+const OTHER_REPO = 'joshuafolkken/app-kit'
 
 beforeEach(() => {
 	vi.clearAllMocks()
@@ -56,5 +57,17 @@ describe('issue_list_comments', () => {
 		mocked_api.mockRejectedValueOnce(new Error(READ_FAILED))
 
 		await expect(git_gh_issue_read.issue_list_comments(ISSUE_NUMBER)).resolves.toBeUndefined()
+	})
+
+	// joshuafolkken/kit#5851: `issue:read --repo` reads another repository's thread, so the listing must
+	// ask that repository — the same number in the session's repository is a different issue.
+	it('reads the comments of the repository it is given', async () => {
+		mocked_api.mockResolvedValueOnce(COMMENT_LISTING)
+
+		await git_gh_issue_read.issue_list_comments(ISSUE_NUMBER, undefined, OTHER_REPO)
+
+		expect(mocked_api.mock.calls[0]?.[0]).toMatchObject({
+			path: `repos/${OTHER_REPO}/issues/${ISSUE_NUMBER}/comments?per_page=100`,
+		})
 	})
 })
