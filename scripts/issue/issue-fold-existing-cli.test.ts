@@ -7,7 +7,9 @@ vi.mock('node:fs/promises', () => ({ readFile: vi.fn() }))
 
 const PATH = 'assessment.json'
 const APPLY_FLAG = '--apply'
+const FINGERPRINT_FLAG = '--fingerprint'
 const ORIGINAL_CRITERION = 'Original criterion'
+const FINGERPRINT = 'assessed-thread'
 const ASSESSMENT = {
 	content: 'compatible',
 	is_open: true,
@@ -18,6 +20,7 @@ const ASSESSMENT = {
 	is_separable: true,
 	size_verdict: 'single',
 	existing_body: ORIGINAL_CRITERION,
+	comment_fingerprint: FINGERPRINT,
 	draft_body: 'Additional criterion',
 	verification: 'Focused unit test',
 }
@@ -65,7 +68,11 @@ describe('issue_fold_existing_cli.run --apply', () => {
 
 		expect(await issue_fold_existing_cli.run([PATH, APPLY_FLAG, '12'])).toBe(0)
 		expect(apply).toHaveBeenCalledWith(
-			expect.objectContaining({ issue_number: '12', existing_body: ORIGINAL_CRITERION }),
+			expect.objectContaining({
+				issue_number: '12',
+				existing_body: ORIGINAL_CRITERION,
+				comment_fingerprint: FINGERPRINT,
+			}),
 		)
 	})
 
@@ -89,6 +96,24 @@ describe('issue_fold_existing_cli.run --apply', () => {
 	})
 })
 
+describe('issue_fold_existing_cli.run --fingerprint', () => {
+	it("prints the issue's comment fingerprint", async () => {
+		vi.spyOn(issue_fold_apply, 'comment_fingerprint').mockResolvedValue(FINGERPRINT)
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		expect(await issue_fold_existing_cli.run([FINGERPRINT_FLAG, '12'])).toBe(0)
+		expect(info).toHaveBeenCalledWith(FINGERPRINT)
+	})
+
+	it('fails when the comments cannot be read', async () => {
+		vi.spyOn(issue_fold_apply, 'comment_fingerprint').mockResolvedValue(undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		expect(await issue_fold_existing_cli.run([FINGERPRINT_FLAG, '12'])).toBe(1)
+		expect(error.mock.calls.join('\n')).toContain('could not be read')
+	})
+})
+
 describe('issue_fold_existing_cli.run refusals', () => {
 	it.each([
 		[[APPLY_FLAG]],
@@ -102,12 +127,15 @@ describe('issue_fold_existing_cli.run refusals', () => {
 		expect(error.mock.calls.join('\n')).toContain('Usage')
 	})
 
-	it.each(['draft_body', 'verification'])('rejects an empty %s', async (field) => {
-		vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, [field]: ' ' }))
-		vi.spyOn(console, 'error').mockImplementation(() => undefined)
-		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+	it.each(['draft_body', 'verification', 'comment_fingerprint'])(
+		'rejects an empty %s',
+		async (field) => {
+			vi.mocked(readFile).mockResolvedValue(JSON.stringify({ ...ASSESSMENT, [field]: ' ' }))
+			vi.spyOn(console, 'error').mockImplementation(() => undefined)
+			const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
-		expect(await issue_fold_existing_cli.run([PATH])).toBe(1)
-		expect(info).not.toHaveBeenCalled()
-	})
+			expect(await issue_fold_existing_cli.run([PATH])).toBe(1)
+			expect(info).not.toHaveBeenCalled()
+		},
+	)
 })

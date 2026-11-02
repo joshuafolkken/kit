@@ -163,13 +163,21 @@ const ISSUE_COMMANDS: Record<string, CommandEntry> = {
 		script: 'scripts/issue/issue-fold-existing-cli.ts',
 		description: 'Assess whether a complete draft can join an unstarted issue',
 		category: 'AI tools',
-		reference: ['<assessment.json> [--json | --apply <N>]', 'automation', ['network']],
+		reference: [
+			'<assessment.json> [--json | --apply <N>] | --fingerprint <N>',
+			'automation',
+			['network'],
+		],
 		usage: {
 			examples: [
+				{
+					arguments: '--fingerprint 5848',
+					note: "print the comment thread's fingerprint, before reading the issue, for the assessment's `comment_fingerprint`.",
+				},
 				{ arguments: 'assessment.json --json' },
 				{
 					arguments: 'assessment.json --apply 5848',
-					note: 'write the fold to the issue once its body still reads as assessed, apply its priority floor, and verify the re-read.',
+					note: 'write the fold to the issue once its body and comments still read as assessed, apply its priority floor, and verify the re-read.',
 				},
 			],
 		},

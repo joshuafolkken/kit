@@ -23,6 +23,15 @@ describe('existing issue fold procedure', () => {
 		expect(PROCEDURE).toContain('never creates a new Issue')
 	})
 
+	it('records the comment fingerprint instead of a manual comment check', () => {
+		const fingerprint_at = PROCEDURE.indexOf('pnpm josh issue:fold-existing --fingerprint <N>')
+
+		expect(fingerprint_at).toBeGreaterThan(-1)
+		expect(fingerprint_at).toBeLessThan(PROCEDURE.indexOf('pnpm josh issue:read <N>'))
+		expect(PROCEDURE).toContain('the comments as `comment_fingerprint`')
+		expect(PROCEDURE).not.toContain('confirm no comment has arrived')
+	})
+
 	it('documents complete-draft input and the ordinary filing fallback', () => {
 		expect(REFERENCE).toContain('--body-file draft.md')
 		expect(REFERENCE).toContain('`separate` returns to the ordinary filing path')
