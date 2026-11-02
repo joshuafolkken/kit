@@ -1,12 +1,22 @@
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { release_request, type ReleaseRequestLines } from './release-request'
 import { release_scope_cli } from './release-scope-cli'
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 
+const REQUEST: ReleaseRequestLines = {
+	release_issue: '[#4321](url)',
+	request: 'request: release it',
+}
+
 function given_pending(pending: number | undefined): void {
 	vi.spyOn(git_followup_pending, 'read_pending').mockResolvedValue(pending)
+}
+
+function given_request(): MockInstance<typeof release_request.read> {
+	return vi.spyOn(release_request, 'read').mockResolvedValue(REQUEST)
 }
 
 afterEach(() => {
@@ -43,12 +53,52 @@ describe('release_scope_cli.run reports the verdict', () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
 		given_pending(2)
+		given_request()
 
 		await expect(release_scope_cli.run([])).resolves.toBe(SUCCESS_EXIT_CODE)
+		expect(info).toHaveBeenCalledOnce()
 		expect(info).toHaveBeenCalledWith(release_scope_cli.REQUIRED_SCOPE)
 		expect(error).toHaveBeenCalledWith(expect.stringContaining(release_scope_cli.RELEASE_HINT))
 	})
+})
 
+describe('release_scope_cli.run cites the open release Issue', () => {
+	it('prints the release Issue and the request line on required', async () => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+		given_pending(1)
+		given_request()
+
+		await release_scope_cli.run([])
+		expect(error).toHaveBeenCalledWith(`release_issue: ${REQUEST.release_issue}`)
+		expect(error).toHaveBeenCalledWith(REQUEST.request)
+	})
+
+	it('carries the release Issue and the request in the --json object on required', async () => {
+		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+
+		given_pending(1)
+		given_request()
+
+		await release_scope_cli.run(['--json'])
+		expect(info).toHaveBeenCalledWith(expect.stringContaining('"release_issue":"[#4321](url)"'))
+		expect(info).toHaveBeenCalledWith(expect.stringContaining('"request":"request: release it"'))
+	})
+
+	it.each([0, undefined])('looks no release Issue up when the count is %s', async (pending) => {
+		vi.spyOn(console, 'info').mockImplementation(() => undefined)
+		vi.spyOn(console, 'error').mockImplementation(() => undefined)
+		const read = given_request()
+
+		given_pending(pending)
+
+		await release_scope_cli.run([])
+		expect(read).not.toHaveBeenCalled()
+	})
+})
+
+describe('release_scope_cli.run never hides an unreadable count', () => {
 	it('never reads an unreadable count as skip', async () => {
 		const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 

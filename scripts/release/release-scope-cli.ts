@@ -1,6 +1,7 @@
 import { git_followup_pending } from '#scripts/followup/git-followup-pending'
 import { path_decision } from '#scripts/josh/path-decision'
 import { release_plan } from './release-plan'
+import { release_request, type ReleaseRequestLines } from './release-request'
 
 // **Whether a release is owed is a command's answer, not a judgement**.
 //
@@ -31,7 +32,7 @@ const UNKNOWN_SCOPE = 'unknown'
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const NOTHING_PENDING_REASON = 'main has taken no merge since the version last changed'
-const RELEASE_HINT = 'run `pnpm josh release` on the default branch of the primary checkout'
+const RELEASE_HINT = release_request.RELEASE_COMMAND
 // **Not `skip`.** An unreadable version, a fetch that could not run or a base the search cannot
 // resolve is not "nothing is waiting to ship", and reporting it as one lets a release go missing
 // quietly.
@@ -58,6 +59,34 @@ function decide(pending: number | undefined): Decision {
 	return { scope: REQUIRED_SCOPE, reason: `${line} — ${RELEASE_HINT}` }
 }
 
+// `required` carries the open release Issue and the request line beside the verdict, so the run
+// cites the Issue without searching for it. The verdict stays alone on stdout; the rest joins the
+// reason on stderr, and `--json` carries all of it in the one object.
+function print_required(decision: Decision, request: ReleaseRequestLines, is_json: boolean): void {
+	if (is_json) {
+		console.info(
+			JSON.stringify({ [JSON_KEY]: decision.scope, reason: decision.reason, ...request }),
+		)
+
+		return
+	}
+
+	path_decision.print_decision(JSON_KEY, decision.scope, decision.reason, is_json)
+	console.error(`release_issue: ${request.release_issue}`)
+	console.error(request.request)
+}
+
+// Only `required` looks the release Issue up: `skip` and `unknown` owe no request to cite it in.
+async function print_scope(decision: Decision, is_json: boolean): Promise<void> {
+	if (decision.scope === REQUIRED_SCOPE) {
+		print_required(decision, await release_request.read(), is_json)
+
+		return
+	}
+
+	path_decision.print_decision(JSON_KEY, decision.scope, decision.reason, is_json)
+}
+
 async function run(argv: ReadonlyArray<string>): Promise<number> {
 	if (path_decision.has_unknown_flag(argv, KNOWN_FLAGS)) {
 		console.error(USAGE)
@@ -68,7 +97,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 	const decision = decide(await git_followup_pending.read_pending({}))
 	const is_json = argv.includes(path_decision.JSON_FLAG)
 
-	path_decision.print_decision(JSON_KEY, decision.scope, decision.reason, is_json)
+	await print_scope(decision, is_json)
 
 	return SUCCESS_EXIT_CODE
 }
