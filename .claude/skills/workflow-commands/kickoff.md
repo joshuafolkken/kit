@@ -30,8 +30,8 @@
 the tree (`working-tree-hold.md`).
 
 **The target repository is named in front of the Issue reference** — `kickoff kit#new`,
-`kickoff joshuafolkken/kit#<N>` (`target-repository.md`). `kickoff` needs no checkout: name the target in
-every `gh api` path, reads included, and never clone. The exception is the split path's epic — `pnpm josh
+`kickoff joshuafolkken/kit#<N>` (`target-repository.md`). `kickoff` needs no checkout: name the target with
+`--repo <owner/repo>` on every `josh issue:read` and `issue:file` call, and never clone. The exception is the split path's epic — `pnpm josh
 epic` writes only the repository it runs in, and the promote arm stops when that repository is not
 checked out here. A third-party owner is Tier C: stop rather than file.
 
