@@ -28,6 +28,12 @@ const OLD_RULE = 'mandatory, never skip'
 // `latest:if-required` among its steps (`run-prime-cli.test.ts`).
 const PRIMED_DOCUMENT = '.claude/skills/workflow-commands/backlogrun-steps.md'
 const PRIME_COMMAND = 'pnpm josh run:prime'
+// The three places that once spelled the preparation out each point at the command instead.
+const PRIME_POINTER_DOCUMENTS: ReadonlyArray<string> = [
+	PRIMED_DOCUMENT,
+	'.claude/skills/workflow-commands/backlogrun-lanes.md',
+	'.claude/skills/workflow-commands/backlogrun-child.md',
+]
 const FLOW_DOCUMENTS: ReadonlyArray<string> = [
 	'.claude/skills/workflow-commands/SKILL.md',
 	'.claude/skills/workflow-commands/entry-sequence.md',
@@ -48,9 +54,12 @@ describe('the dependency update is routed to the command', () => {
 		expect(read_repo_file(document_path)).toContain(FLOW_COMMAND)
 	})
 
-	it(`${PRIMED_DOCUMENT} names the preparation that runs the update`, () => {
-		expect(read_repo_file(PRIMED_DOCUMENT)).toContain(PRIME_COMMAND)
-	})
+	it.each(PRIME_POINTER_DOCUMENTS)(
+		'%s names the preparation that runs the update',
+		(document_path) => {
+			expect(read_repo_file(document_path)).toContain(PRIME_COMMAND)
+		},
+	)
 
 	it.each(FLOW_DOCUMENTS.filter((document_path) => document_path !== GATE))(
 		'%s does not ask latest:scope again',
