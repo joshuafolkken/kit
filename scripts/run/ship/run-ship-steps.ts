@@ -1,3 +1,4 @@
+import { core_priority } from '#scripts/gate/core-priority'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { run_ship } from './run-ship'
@@ -77,14 +78,21 @@ const SYNC_STEP: Step = {
 // A default branch that moved since the sync stage is merged and gated again before the push
 // (`run_ship_sync.catch_up`, joshuafolkken/kit#4825). A resumed ship with nothing left to push leaves
 // that to the followup, which pushes what it merges; a pushed branch with new work still catches up.
+// The commit's hooks claim cores with priority (`core-priority.ts`): a short closing stage need not
+// queue behind other lanes' heavy checks (joshuafolkken/kit#5767).
 async function commit_stage(args: ShipArguments, state: ShipState): Promise<StepResult> {
 	const stop = run_ship_stage.is_shipped(state) ? undefined : await run_ship_sync.catch_up()
 
 	if (stop !== undefined) return stop
 
 	const argv = ['git', '-y', ...run_ship_stage.commit_flags(state), ...args.body, args.title]
+	const { PRIORITY_ENVIRONMENT } = core_priority
 
-	return await run_ship_lap.timed(run_ship_lap.STEP.COMMIT, async () => await josh(argv))
+	return await run_ship_lap.timed(
+		run_ship_lap.STEP.COMMIT,
+		async () =>
+			await josh_command.josh_run(argv, should_forward_stderr, undefined, PRIORITY_ENVIRONMENT),
+	)
 }
 
 // The gate before the commit, the commit/push/PR before the merge. The gate meets the scoped pair

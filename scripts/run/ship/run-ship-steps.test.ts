@@ -1,4 +1,5 @@
 import { followup_section } from '#scripts/followup/followup-section'
+import { core_priority } from '#scripts/gate/core-priority'
 import { josh_command, type JoshResult } from '#scripts/josh/josh-run'
 import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -151,11 +152,17 @@ describe('run_ship_steps — the gate stage', () => {
 	})
 })
 
-describe('run_ship_steps — the commit, followup and report stages', () => {
-	it('commits with no skip flags on a fresh state', async () => {
+// The commit's hooks claim cores with the priority mark (joshuafolkken/kit#5767).
+describe('run_ship_steps — the commit stage', () => {
+	it('commits with no skip flags on a fresh state, under the core-budget priority mark', async () => {
 		await step_for(STAGE.COMMIT).run(ARGS, FRESH)
 
-		expect(josh_spy).toHaveBeenCalledWith(['git', '-y', '--body', 'text', TITLE], true)
+		expect(josh_spy).toHaveBeenCalledWith(
+			['git', '-y', '--body', 'text', TITLE],
+			true,
+			undefined,
+			core_priority.PRIORITY_ENVIRONMENT,
+		)
 	})
 
 	it('carries the skip flags a resumed ship needs', async () => {
@@ -166,9 +173,13 @@ describe('run_ship_steps — the commit, followup and report stages', () => {
 		expect(josh_spy).toHaveBeenCalledWith(
 			['git', '-y', '--skip-commit', '--skip-push', '--body', 'text', TITLE],
 			true,
+			undefined,
+			core_priority.PRIORITY_ENVIRONMENT,
 		)
 	})
+})
 
+describe('run_ship_steps — the followup and report stages', () => {
 	it('followup passes the title and notify flags; report passes the number and cites', async () => {
 		await step_for(STAGE.FOLLOWUP).run(ARGS, FRESH)
 		await step_for(STAGE.REPORT).run(ARGS, FRESH)
