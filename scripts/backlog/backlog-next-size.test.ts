@@ -72,13 +72,28 @@ describe('backlog:next with an estimate over the split guide', () => {
 		expect(stderr()).not.toContain(OVER_NOTE)
 	})
 
-	it('notes nothing on a split child', async () => {
-		const child = { ...sized(), labels: [{ name: SPLIT_ROUTE_LABEL }] }
+	// joshuafolkken/kit#5935: a split child passes the guide at filing, yet is warned on when offered.
+	it('offers a split child over the guide and notes it to split further', async () => {
+		const child = { ...sized(REASON), labels: [{ name: SPLIT_ROUTE_LABEL }] }
+
+		backlog_fixture.stub_backlog({ opted_in: [child] })
+
+		expect(await backlog_next.run([])).toBe(SUCCESS_EXIT_CODE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stderr()).toContain(OVER_NOTE)
+		expect(stderr()).toContain(`on a \`${SPLIT_ROUTE_LABEL}\` child — split it further`)
+	})
+
+	it('notes nothing on a split child within the guide', async () => {
+		const within = '- 規模見積もり: 約 4 ファイル / 100 行（テスト除く）'
+		const body = ['## 背景', '', within].join('\n')
+		const child = { ...sized(), body, labels: [{ name: SPLIT_ROUTE_LABEL }] }
 
 		backlog_fixture.stub_backlog({ opted_in: [child] })
 		await backlog_next.run([])
 
-		expect(stderr()).not.toContain(OVER_NOTE)
+		expect(stdout()).toBe(String(OLD_ISSUE_NUMBER))
+		expect(stderr()).not.toContain('exceeds the guide')
 	})
 })
 

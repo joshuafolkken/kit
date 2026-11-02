@@ -102,6 +102,23 @@ describe('size_estimate.guide_problem', () => {
 	})
 })
 
+// joshuafolkken/kit#5935: the split child's exemption holds at filing; `backlog:next` warns on it.
+describe('size_estimate.split_over_guide', () => {
+	it('answers a split child over the guide for the offer warning', () => {
+		expect(size_estimate.split_over_guide(OVER_GUIDE, SPLIT_ROUTE)).toEqual({
+			files: 30,
+			lines: 900,
+			verdict: 'split',
+		})
+	})
+
+	it('answers no split warning within the guide or off the split route', () => {
+		expect(size_estimate.split_over_guide(UNDER_GUIDE, SPLIT_ROUTE)).toBeUndefined()
+		expect(size_estimate.split_over_guide(OVER_GUIDE, undefined)).toBeUndefined()
+		expect(size_estimate.split_over_guide(body_with(), SPLIT_ROUTE)).toBeUndefined()
+	})
+})
+
 describe('size_estimate.over_guide', () => {
 	it('answers the estimate over the guide with no reason', () => {
 		const body = body_with(estimate(9, 10))

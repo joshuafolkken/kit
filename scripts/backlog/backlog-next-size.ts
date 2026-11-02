@@ -1,6 +1,7 @@
 import { epic_graph, type EpicChild } from '#scripts/epic/epic-graph'
 import { epic_index } from '#scripts/epic/epic-index'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
+import { SPLIT_ROUTE_LABEL } from '#scripts/issue/issue-labels'
 import { session_cite } from '#scripts/issue/session-cite'
 import { size_estimate } from '#scripts/issue/size-estimate'
 import { split_assess, type SizeMeasurement } from '#scripts/split/split-assess'
@@ -9,19 +10,33 @@ import { backlog_pool } from './backlog-pool'
 
 // An offered Issue whose declared estimate is over the split guide, with no reason it stays one —
 // judged by the same `size_estimate.over_guide` `issue:file` refuses on, so a body edited past the
-// guide after filing is still seen before a lane starts it (joshuafolkken/kit#5384).
+// guide after filing is still seen before a lane starts it (joshuafolkken/kit#5384). A split child
+// passes the guide at filing, yet is warned on here too: lanes land past the doubled declaration
+// (joshuafolkken/kit#5935).
 //
 // One over the cap is not offered at all: it waits on a person to split it, whatever reason it
 // declares (joshuafolkken/kit#5502). `size_estimate.over_cap` is the filing's own bar.
 
+// What the note asks of the issue: a further split for a split child, else the reason it stays one.
+function remedy_of(route: string | undefined): string {
+	return route === SPLIT_ROUTE_LABEL
+		? `on a \`${SPLIT_ROUTE_LABEL}\` child — split it further`
+		: `with no \`${split_assess.REASON_PREFIX}\``
+}
+
+function warned_estimate(body: string, route: string | undefined): SizeMeasurement | undefined {
+	return size_estimate.over_guide(body, route) ?? size_estimate.split_over_guide(body, route)
+}
+
 function note_of(issue: OpenIssueData, repo: string): string | undefined {
 	const labels = issue.labels?.map((label) => label.name) ?? []
-	const estimate = size_estimate.over_guide(issue.body ?? '', size_estimate.route_of(labels))
+	const route = size_estimate.route_of(labels)
+	const estimate = warned_estimate(issue.body ?? '', route)
 
 	if (estimate === undefined) return undefined
 	const cited = session_cite.issue(issue.number, undefined, repo)
 
-	return `${cited} ${size_estimate.exceeded(estimate)} with no \`${split_assess.REASON_PREFIX}\` — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
+	return `${cited} ${size_estimate.exceeded(estimate)} ${remedy_of(route)} — split-assessment.md → "${split_assess.QUESTION_SECTION}"`
 }
 
 // One stderr line per offered number over the guide; the stdout tokens stay bare numbers.
