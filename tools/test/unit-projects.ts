@@ -50,11 +50,19 @@ const MAIN_EXCLUDE: ReadonlyArray<string> = ['scripts/build/packed-consumer.test
 // delivery fixture that sets the lane mark and expects the refusal. A suite about the reviewer passes
 // the role itself.
 //
+// **Every inherited agent model and effort key is blanked by its suffix** (joshuafolkken/kit#5863): a
+// lane that sets `JOSH_WORKER_SHIP_MODEL` would otherwise move every fixture that resolves a profile off
+// its default model. The keys `agent-role-profile.ts` reads are its `PROFILE_KEYS`, which the suite pins
+// to this pattern; importing them here would pull the profile resolution into the config's import graph.
+// The pattern also blanks the eval runner's `JOSH_EVAL_MODEL` and the lane agent's
+// `JOSH_LANE_AGENT_*`, which no unit fixture reads from `process.env`.
+//
 // **Every inherited ship mark and every lane mark is blanked without a list here**
 // (joshuafolkken/kit#5029): the supervisor sets `JOSH_SHIP_RETRY_PENDING` around a retried attempt,
 // and a hand-kept list let it reach the gate's run alone. Any `JOSH_SHIP_*` key the config process
 // inherits is blanked by its prefix, and the lane marks are read from where the launcher composes them.
 const SHIP_MARK = /^JOSH_SHIP_[A-Z0-9_]+$/u
+const PROFILE_KEY = /^JOSH_[A-Z0-9_]+_(?:MODEL|EFFORT)$/u
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
@@ -62,8 +70,8 @@ function blank(keys: ReadonlyArray<string>): Record<string, string> {
 	return Object.fromEntries(keys.map((key) => [key, '']))
 }
 
-function inherited_ship_marks(source: EnvironmentSource): ReadonlyArray<string> {
-	return Object.keys(source).filter((key) => SHIP_MARK.test(key))
+function inherited_marks(source: EnvironmentSource): ReadonlyArray<string> {
+	return Object.keys(source).filter((key) => SHIP_MARK.test(key) || PROFILE_KEY.test(key))
 }
 
 function unit_environment(source: EnvironmentSource): Record<string, string> {
@@ -72,7 +80,7 @@ function unit_environment(source: EnvironmentSource): Record<string, string> {
 			...agent_session_environment.PROXY_KEYS,
 			agent_session_environment.PROXY_CERTIFICATE_KEY,
 		]),
-		...blank(inherited_ship_marks(source)),
+		...blank(inherited_marks(source)),
 		...blank(lane_child_mark_keys.MARK_KEYS),
 		[agent_session_environment.AGENT_PID_KEY]: '',
 		CLAUDE_CODE_SESSION_ID: 'vitest-session',
