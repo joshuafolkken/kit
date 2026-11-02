@@ -868,6 +868,20 @@ On a terminal it draws on the alternate screen, so redraws never grow the scroll
 
 Detail: `docs/maintainers/josh-commands-run-rationale.md` → "`josh run:board` in detail".
 
+### `josh run:pickup`
+
+<!-- usage: run:pickup -->
+
+Read the open lanes back after a manual cut: each liveness, and the watcher line.
+
+```bash
+pnpm josh run:pickup   # one line per lane, then the watcher line
+```
+
+<!-- /usage -->
+
+Per lane, its `run:liveness` verdict or the `lane:output` to run; then the watcher, printed, never started.
+
 ### `josh run:handoff`
 
 <!-- usage: run:handoff -->
