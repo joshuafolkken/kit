@@ -22,6 +22,11 @@ function fail_if(step: string): void {
 	if (state.failing === step) throw new Error(`${step} is down`)
 }
 
+// Off a lane branch, whatever branch the suite runs on: the lane path is `run-set-aside.test.ts`'s.
+vi.mock('#scripts/run/pause/run-set-aside-commit', () => ({
+	run_set_aside_commit: { is_lane: async () => false },
+}))
+
 vi.mock('#scripts/git/stash/stash-push-cli', () => ({
 	stash_push_cli: {
 		set_aside: async ({ message }: { message: string }) => {
@@ -130,12 +135,12 @@ describe('run_pause.pause — the four steps in order', () => {
 		expect(state.blockers).toStrictEqual([11])
 	})
 
-	it('says nothing was stashed on a clean tree', async () => {
+	it('says nothing was set aside on a clean tree', async () => {
 		state.has_work = false
 
 		await run_pause.pause(REQUEST)
 
-		expect(state.comments[0]).toContain('nothing was stashed')
+		expect(state.comments[0]).toContain('nothing was set aside')
 		expect(state.comments[0]).not.toContain('stash:pop')
 	})
 })
@@ -217,7 +222,7 @@ describe('run_pause.pause — a failure stops, and a rerun continues', () => {
 		const result = await run_pause.pause(REQUEST)
 
 		expect(result).toMatchObject({ kind: 'failed', step: 'comment', reason: 'comment is down' })
-		expect(result.done.map(({ step }) => step)).toStrictEqual(['stash'])
+		expect(result.done.map(({ step }) => step)).toStrictEqual(['set-aside'])
 		expect(state.calls).toStrictEqual(['stash'])
 	})
 

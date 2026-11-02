@@ -117,8 +117,9 @@ Something else in **this** repository has to land first: not a split, not an ups
 single source of the distinction, the filing, the pause and the ceiling. Then:
 
 1. **Do not park.** Back to step 1 of the loop; `epic:next` hands back the prerequisite first.
-2. Pop the stash the pause comment names when `epic:next` offers `<M>` again, after its
-   `pnpm josh ms`; expect conflicts.
+2. Resume as the pause comment names when `epic:next` offers `<M>` again: on its lane branch the
+   WIP commit is already there — `pnpm josh main:merge` and continue; a stash is popped after
+   `pnpm josh ms`.
 
 ## Splitting a child mid-run
 

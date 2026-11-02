@@ -61,8 +61,9 @@ later steps name its number. **Its duplicate scan is read exactly as it is for a
   a batch is a different authorization, so the stop stays.
 
 **Once the prerequisite is filed, every entry sets `<M>` aside with `pnpm josh run:pause <M> --for <N>`**
-— the stash, the comment naming its `stash:pop`, the blocked-by and the release; a failure is rerun as
-is (`docs/josh-commands-run.md` → `josh run:pause`). Name the comment's pop in the Telegram too.
+— the set-aside (a WIP commit on `<M>`'s lane branch, a stash off it), the comment naming the resume
+(`main:merge` on the lane, or the `stash:pop`), the blocked-by and the release; a failure is rerun as
+is (`docs/josh-commands-run.md` → `josh run:pause`). Name the comment's resume in the Telegram too.
 
 **Automatic filing is capped at 10 Issues per originating work item** at every entry point;
 `pnpm josh issue:file` refuses the eleventh, and `--found-during <N>` names an origin the checkout
