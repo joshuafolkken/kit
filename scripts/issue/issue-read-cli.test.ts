@@ -112,6 +112,20 @@ describe('issue_read_cli.run — the repository it reads', () => {
 		expect(comments_mock).toHaveBeenCalledWith(ISSUE, undefined, REPO)
 	})
 
+	// The trust lookup follows the read: an author's write access is asked of the repository named.
+	it('judges the authors against the repository --repo names', async () => {
+		const parse_fields = vi.spyOn(issue_read, 'parse_issue_fields')
+		const parse_comments = vi.spyOn(issue_read, 'parse_comments')
+
+		classified_mock.mockResolvedValue(READ)
+		comments_mock.mockResolvedValue(COMMENTS_JSON)
+
+		await issue_read_cli.run([ISSUE, '--repo', REPO])
+
+		expect(parse_fields).toHaveBeenCalledWith(FIELDS_JSON, REPO)
+		expect(parse_comments).toHaveBeenCalledWith(COMMENTS_JSON, REPO)
+	})
+
 	it('reads the session repository when no --repo is given', async () => {
 		classified_mock.mockResolvedValue(READ)
 		comments_mock.mockResolvedValue(COMMENTS_JSON)
@@ -213,6 +227,11 @@ describe('issue_read_cli.run — a number that produced nothing', () => {
 	it('prints the usage and exits non-zero when nothing usable was given', async () => {
 		expect(await issue_read_cli.run([])).toBe(FAILURE)
 		expect(reported()).toContain(issue_read_cli.USAGE)
+	})
+
+	it('names --repo in the usage it prints', async () => {
+		expect(await issue_read_cli.run([ISSUE, '--rep=x'])).toBe(FAILURE)
+		expect(reported()).toContain('[--repo <owner/repo>]')
 	})
 })
 

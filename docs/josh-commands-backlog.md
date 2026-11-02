@@ -22,7 +22,7 @@ pnpm josh issue:read 42 --repo joshuafolkken/app-kit   # an issue in another rep
 
 **Options:**
 
-- `--repo <owner/repo>` — read a child in another repository; applies to every number.
+- `--repo <owner/repo>` — read an issue in another repository; applies to every number.
 
 <!-- /usage -->
 
@@ -74,7 +74,7 @@ pnpm josh issue:state 42 43 --repo joshuafolkken/app-kit   # a child in another 
 
 **Options:**
 
-- `--repo <owner/repo>` — read a child in another repository; applies to every number.
+- `--repo <owner/repo>` — read an issue in another repository; applies to every number.
 
 <!-- /usage -->
 

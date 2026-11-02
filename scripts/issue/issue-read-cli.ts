@@ -101,11 +101,11 @@ async function read_issue(issue_number: string, repo?: string): Promise<NumberRe
 
 	if (read.kind !== 'read') return { kind: read.kind }
 
-	const fields = await issue_read.parse_issue_fields(read.json)
+	const fields = await issue_read.parse_issue_fields(read.json, repo)
 
 	if (fields === undefined) return { kind: 'unreadable' }
 
-	const comments = await issue_read.parse_comments(comments_json)
+	const comments = await issue_read.parse_comments(comments_json, repo)
 
 	return { kind: 'issue', content: { fields, comments } }
 }

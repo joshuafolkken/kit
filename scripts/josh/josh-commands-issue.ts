@@ -5,7 +5,7 @@ const REPO = '--repo <owner/repo>'
 const CONCURRENT = 'several numbers, read concurrently'
 const REPO_FLAG = {
 	names: [REPO],
-	description: 'read a child in another repository; applies to every number.',
+	description: 'read an issue in another repository; applies to every number.',
 }
 const BODY_FILE = '--body-file <path>'
 const JSON_FLAG = { names: ['--json'], description: 'print the verdict and reason as JSON.' }
@@ -15,8 +15,8 @@ const JSON_FLAG = { names: ['--json'], description: 'print the verdict and reaso
 // group-per-file shape `LANE_COMMANDS` and `SPLIT_COMMANDS` already take. `COMMAND_MAP` spreads this
 // in, so nothing downstream sees where an entry lives.
 
-// The synopsis `issue:state` and `issue:cite` share: a list of numbers with an optional cross-repo
-// flag. One constant, so the two cannot drift and the literal is not duplicated.
+// The synopsis `issue:read`, `issue:state` and `issue:cite` share: a list of numbers with an optional
+// cross-repo flag. One constant, so they cannot drift and the literal is not duplicated.
 const ISSUES_WITH_REPO = '<issue...> [--repo <owner/repo>]'
 
 /* eslint-disable @typescript-eslint/naming-convention */
