@@ -28,12 +28,17 @@ interface AuditSession {
 	// Whether the transcript is a dispatched lane child's own session: in a lane checkout's directory and
 	// not a delegated unit, which the kind cannot tell apart when its prompt names `/code-review`.
 	is_lane: boolean
+	// The Issue of the lane checkout whose directory holds the transcript, its delegated units included;
+	// absent outside a lane. The phase table reads the lane's stages by it (joshuafolkken/kit#5936).
+	issue?: number | undefined
 	records: ReadonlyArray<UsageRecord>
 	// The categories of the calls each request issued, keyed by request id; a request absent here
 	// issued none.
 	categories: ReadonlyMap<string, ReadonlyArray<ToolCategory>>
 	lines: ReadonlyArray<TranscriptLine>
 }
+
+const LANE_ISSUE_PATTERN = /-(\d+)$/u
 
 interface SessionParts {
 	records: Array<UsageRecord>
@@ -112,9 +117,24 @@ function session_files(cwd: string, since_ms: number): Array<SessionFile> {
 	return files.filter((file) => file.modified_ms >= since_ms).toReversed()
 }
 
-// A delegated unit's transcript sits below its session's directory, so the test is a path prefix.
-function is_lane_file(file: SessionFile, lanes: ReadonlyArray<string>): boolean {
-	return lanes.some((directory) => file.path.startsWith(`${directory}${path.sep}`))
+// The lane directory holding `file`, `undefined` outside every lane. A delegated unit's transcript sits
+// below its session's directory, so the test is a path prefix.
+function lane_of(file_path: string, lanes: ReadonlyArray<string>): string | undefined {
+	return lanes.find((directory) => file_path.startsWith(`${directory}${path.sep}`))
+}
+
+// A lane directory's Issue: the digits `lane_transcript_directories` matched after its last `-`.
+function issue_of(file_path: string, lanes: ReadonlyArray<string>): number | undefined {
+	const digits = LANE_ISSUE_PATTERN.exec(lane_of(file_path, lanes) ?? '')?.[1]
+
+	return digits === undefined ? undefined : Number(digits)
+}
+
+function file_session(file: SessionFile, lanes: ReadonlyArray<string>): AuditSession {
+	const issue = issue_of(file.path, lanes)
+	const session = session_of(cost_transcript.read_raw(file), file.is_delegated, issue !== undefined)
+
+	return { ...session, issue }
 }
 
 // Every session touched since `since_ms`. A file last written before then holds no request inside the
@@ -124,14 +144,12 @@ function load(cwd: string, since_ms: number): Array<AuditSession> {
 		cost_transcript.session_cwd(cwd),
 		homedir(),
 	)
-	const sessions = session_files(cwd, since_ms).map((file) =>
-		session_of(cost_transcript.read_raw(file), file.is_delegated, is_lane_file(file, lanes)),
-	)
+	const sessions = session_files(cwd, since_ms).map((file) => file_session(file, lanes))
 
 	return dedupe_across(sessions)
 }
 
-const cost_audit_read = { session_of, dedupe_across, load }
+const cost_audit_read = { session_of, dedupe_across, issue_of, load }
 
 export type { AuditSession }
 export { cost_audit_read }

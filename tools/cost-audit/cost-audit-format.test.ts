@@ -7,6 +7,7 @@ function row(key: string, current: number, previous: number, is_regression = fal
 }
 
 const NO_DENSITY = { requests: 0, calls: 0, single: 0 }
+const NO_REGRESSIONS = 'Regressions: none'
 const NO_REWRITES = { after_wait: { count: 0, usd: 0 }, within_ttl: { count: 0, usd: 0 } }
 
 function audit_with(overrides: Partial<Audit> = {}): Audit {
@@ -20,6 +21,7 @@ function audit_with(overrides: Partial<Audit> = {}): Audit {
 		tools: [],
 		guards: [],
 		rewrites: { current: NO_REWRITES, previous: NO_REWRITES },
+		phases: [],
 		...overrides,
 	}
 }
@@ -71,6 +73,25 @@ describe('cost_audit_format.report_lines — the full cache rewrites', () => {
 	})
 })
 
+// joshuafolkken/kit#5936: the lane requests by phase, the four token kinds beside the cost.
+describe('cost_audit_format.report_lines — the phase table', () => {
+	it('prints each phase with its cost and four token kinds', () => {
+		const tokens = { input: 1200, cache_read: 3_400_000, cache_write: 56_000, output: 7800 }
+		const lines = cost_audit_format.report_lines(
+			audit_with({ phases: [{ key: 'implement: read', tokens, usd: 2.5 }] }),
+		)
+
+		expect(lines).toContain('  implement: read: $2.5000 — 1,200 / 3,400,000 / 56,000 / 7,800')
+	})
+
+	it('says none for a period with no lane request, before the closing regressions', () => {
+		const lines = cost_audit_format.report_lines(audit_with())
+		const title = lines.findIndex((line) => line.startsWith('Lane children by phase'))
+
+		expect(lines.slice(title + 1)).toStrictEqual(['  none', '', NO_REGRESSIONS])
+	})
+})
+
 describe('cost_audit_format.report_lines — the printed report', () => {
 	it('prints each row with its change against the previous period', () => {
 		const lines = cost_audit_format.report_lines(audit_with({ kinds: [row('fullrun', 9, 12)] }))
@@ -90,7 +111,7 @@ describe('cost_audit_format.report_lines — the printed report', () => {
 		const lines = cost_audit_format.report_lines(audit_with())
 
 		expect(lines).toContain('  merges: not read from GitHub')
-		expect(lines.at(-1)).toBe('Regressions: none')
+		expect(lines.at(-1)).toBe(NO_REGRESSIONS)
 	})
 
 	it('flags a regression on its row and names it by section in the closing list', () => {
