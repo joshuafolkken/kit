@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { auto_ok_cli } from '#scripts/auto-ok/auto-ok-cli'
 import { git_common_directory } from '#scripts/git/git-common-directory'
 import type { OpenIssueData } from '#scripts/git/git-schemas'
@@ -189,6 +190,30 @@ describe('lane:plan — a plan that overlaps nothing', () => {
 		expect(code).toBe(SUCCESS)
 		expect(info).toHaveBeenCalledWith('clear')
 		expect(record_yield).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5928: `--imports` names the modules the new code imports; they are probed, never held.
+describe('lane:plan — the modules a plan imports', () => {
+	it('names an imported module with a main guard, holding only the planned paths', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		const entry = fileURLToPath(new URL('lane-plan-cli.ts', import.meta.url))
+
+		expect(await lane_plan_cli.run([String(LATER), FREE_FILE, '--imports', entry], DIRECTORY)).toBe(
+			SUCCESS,
+		)
+		expect(lane_plan.read(LATER, DIRECTORY)?.paths).toEqual([FREE_FILE])
+		expect(error).toHaveBeenCalledWith(`import blocked: ${entry} — main guard`)
+	})
+
+	it('prints only the verdict when no imported module is blocked', async () => {
+		fetch_opted_in.mockResolvedValue(HOLDER_LEFT)
+
+		await lane_plan_cli.run([String(LATER), FREE_FILE, '--imports', FREE_FILE], DIRECTORY)
+
+		expect(error).not.toHaveBeenCalled()
+		expect(info.mock.calls).toEqual([['clear']])
 	})
 })
 

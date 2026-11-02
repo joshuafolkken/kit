@@ -1303,6 +1303,10 @@ So does a tree whose changed hunks pass twice the declared files, or whose decla
 
 The hunks count skips a file the recorded plan already lists, so a re-plan within its files never answers `split` on hunks.
 
+`--imports <path>...`, after the planned paths, names the existing modules the new code imports; they are probed, never recorded. Each with a main guard or a top-level `main()` (`scripts/lib/main-guard.ts`) prints `import blocked: <path> — <reason>` on stderr.
+
+The findings end with one line: file the fix as a prerequisite and run `pnpm josh run:split <N> --prerequisite <P>`. No finding prints nothing; the exit code is the plan's either way.
+
 **Output / exit codes:** `clear` on stdout, exit 0, once nothing holds the planned files. `yield`, exit 2, with the clash on stderr — the issue, its planned file, the path it overlaps and the holder: end the session. `wait`, exit 1, on an unreadable listing — run it again. No path: the usage, exit 1.
 
 ## Session and documents
