@@ -73,13 +73,12 @@ unit, run the child in the parent's context and still ask the hand-off at every 
 
 **Only what GitHub does not, in at most 25 lines; the brief states the bound.**
 
-- **Kept**: `Cause` / `Fix` / `Result`; every verification not closed the ordinary way, named as such;
+- **Kept**: the cause / fix / result lines `pnpm josh report:template child` prints; every verification not closed the ordinary way, named as such;
   observations that could bite later — **a child's only route for one** (`observation-filing.md` → "A
   delegated child does not take this route"); decisions not yet logged; what was left undone, on whose
   authority.
 - **Cut**: the changed-file list, per-round review detail, restated rules.
-- Before the final message → `pnpm josh report:lint --child-summary < summary.md` (labels in the
-  session language).
+- Before the final message → `pnpm josh report:lint --child-summary < summary.md`.
 
 The person-facing report (`prompts/collaboration-workflow/report-format.md` → 「完了報告（セッション向け）」)
 is unchanged.
