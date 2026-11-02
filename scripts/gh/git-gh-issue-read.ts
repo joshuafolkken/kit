@@ -353,14 +353,14 @@ async function issue_get_labels_and_body(issue_number: string): Promise<string |
 // is already keyed by a number and wants the rows as served. What the two genuinely share — the path
 // and the page size — is single-sourced in `git-gh-api-path.ts` and read from there by both.
 //
-// No `repo` parameter, unlike the reads above: the auto-close lists its candidate epics from the
-// repository it runs in, so the epic whose comments are read is always a local one. The path builder
-// takes one when a caller that needs it appears.
+// `repo` names the repository like the reads above do — `issue:read --repo` reads another repository's
+// thread (joshuafolkken/kit#5851); absent, it is the repository the command runs in.
 async function issue_list_comments(
 	issue_number: string,
 	timeout_ms?: number,
+	repo?: string,
 ): Promise<string | undefined> {
-	const path = `${git_gh_api_path.issue_comments_api_path(issue_number)}${git_gh_api_path.FULL_PAGE_QUERY}`
+	const path = `${git_gh_api_path.issue_comments_api_path(issue_number, repo)}${git_gh_api_path.FULL_PAGE_QUERY}`
 
 	try {
 		return await git_gh_exec.exec_gh_api({ path, should_paginate: true, timeout_ms })

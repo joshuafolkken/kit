@@ -3,7 +3,6 @@ import { fileURLToPath } from 'node:url'
 import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_watch } from '#scripts/issue/issue-watch'
 import { session_cite } from '#scripts/issue/session-cite'
-import { josh_command } from '#scripts/josh/josh-run'
 import { lane_child_marker } from '#scripts/lane/lane-child-marker'
 import { lane_plan_check } from '#scripts/lane/lane-plan-check'
 import { run_cut_report } from '#scripts/run/cut/run-cut-report'
@@ -25,6 +24,7 @@ import { run_stage_read, type StageRead } from '#scripts/run/run-stage-read'
 import { run_step } from '#scripts/run/run-step'
 import { run_step_section } from '#scripts/run/run-step-section'
 import { run_entry, type EntryParts } from './run-entry'
+import { run_entry_children, type EntryRequest, type Resume } from './run-entry-children'
 import { run_entry_lane_plan } from './run-entry-lane-plan'
 import { run_entry_spill } from './run-entry-spill'
 import { run_entry_stop, type StopNotice } from './run-entry-stop'
@@ -47,11 +47,9 @@ const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
 const USAGE = 'Usage: josh run:entry <issue-number> [--to kickoff|halfrun|prrun|fullrun] [--adopt]'
 const TO_FLAG = '--to'
-const ADOPT_FLAG = '--adopt'
 // The flag and its command.
 const TO_ARGUMENT_COUNT = 2
-const should_forward_stderr = true
-const NEWLINE = '\n'
+const { ADOPT_FLAG, STEP, ask_resume, check_cost, claim_hold, timed } = run_entry_children
 
 const HOLD_STOP_NOTE =
 	'(tree not held — see the reason above; clean up and retry, or release with `pnpm josh run:release`)'
@@ -76,13 +74,6 @@ function parse_number(argv: ReadonlyArray<string>): string | undefined {
 	}
 
 	return first
-}
-
-interface EntryRequest {
-	issue_number: string
-	command: StageCommand
-	// A `new` run's entry once its Issue is filed: the bare hold is re-keyed, not claimed afresh.
-	is_adopt: boolean
 }
 
 // `--to <command>` names how far the run goes; absent, it is `fullrun`.
@@ -119,41 +110,6 @@ function parse_request(argv: ReadonlyArray<string>): EntryRequest | undefined {
 	return is_adopt === undefined ? undefined : { issue_number, command, is_adopt }
 }
 
-function first_line(out: string): string {
-	return out.split(NEWLINE)[0] ?? ''
-}
-
-// `run:hold <N>` prints one token — `hold`, `busy` or `unknown` — and forwards its explanation to
-// stderr, so the composite branches on the token and the reader still sees why. `--fullrun` marks the
-// hold as a run whose implementation cut resumes as `fullrun #N` — a
-// `fullrun`'s, and a `prrun`'s, which runs `fullrun`'s steps; a `halfrun`'s hold is never marked.
-// `--adopt` re-keys a `new` run's bare hold instead (`run:hold --adopt`), answering `none` or `busy`
-// when there is none to hand over — either stops the entry as a held tree does.
-function hold_argv({ issue_number, command, is_adopt }: EntryRequest): Array<string> {
-	if (is_adopt) return ['run:hold', ADOPT_FLAG, issue_number]
-
-	const mark = command === run_stage.HALFRUN ? [] : ['--fullrun']
-
-	return ['run:hold', issue_number, ...mark]
-}
-
-async function claim_hold(request: EntryRequest): Promise<string> {
-	const held = await josh_command.josh_run(hold_argv(request), should_forward_stderr)
-
-	return first_line(held.out)
-}
-
-// A dispatched lane child never asks the session boundary — the parent owns it once per session
-// (`backlogrun-progress.md` → "The hand-off") — so this records `skipped` rather than reading a budget
-// nothing in the lane acts on, the same shape `run:prep` skips `latest` in a lane.
-async function check_cost(): Promise<string> {
-	if (lane_child_marker.is_child_of(process.cwd())) return run_entry.COST_SKIPPED
-
-	const cut = await josh_command.josh_run(['cost', '--cut'], should_forward_stderr)
-
-	return first_line(cut.out)
-}
-
 interface Reads {
 	prep: PrepParts
 	verdict: string
@@ -164,7 +120,7 @@ interface Reads {
 // already share rather than a second copy — the report is `run:prep`'s
 // formatter, the verdict is `run:step`'s `pre_verdict` over the same parts.
 async function gather_reads(issue_number: string): Promise<Reads> {
-	const reads = await run_prep_cli.gather(issue_number)
+	const reads = await timed(STEP.PREP, async () => await run_prep_cli.gather(issue_number))
 	const prep = run_prep_cli.to_parts(issue_number, reads)
 	const verdict = run_step.pre_verdict(run_next.to_input(prep))
 	const trust_stop = run_entry_trust.stop_of(reads.content, reads.state, issue_number)
@@ -229,23 +185,6 @@ async function stop_untrusted(
 	})
 
 	return FAILURE_EXIT_CODE
-}
-
-interface Resume {
-	token: string
-	code: number
-}
-
-// **A resume is asked before the hold is claimed.** An implementation cut outside a lane keeps its
-// hold, so the fresh session's `fullrun #N` would otherwise be refused `busy` by its own run's hold
-// before it ever reached `run:cut --resume` — the hand-off the cut promised could not land.
-async function ask_resume(issue_number: string): Promise<Resume> {
-	const asked = await josh_command.josh_run(
-		['run:cut', '--resume', issue_number],
-		should_forward_stderr,
-	)
-
-	return { token: first_line(asked.out), code: asked.code }
 }
 
 // Anything but `fresh` is `run:cut --resume`'s answer to act on (`pre-gate-cut.md`), not a new run: the
@@ -333,7 +272,10 @@ async function yields_at_entry(issue_number: string, state: StageState): Promise
 	if (!lane_child_marker.is_child_of(process.cwd())) return false
 	if (await lane_plan_check.yield_at_entry(Number(issue_number))) return true
 
-	const code = await run_entry_lane_plan.run_at_entry(issue_number, state)
+	const code = await timed(
+		STEP.LANE_PLAN,
+		async () => await run_entry_lane_plan.run_at_entry(issue_number, state),
+	)
 
 	return code === lane_plan_check.YIELD_EXIT_CODE
 }
@@ -368,7 +310,9 @@ async function proceed(
 ): Promise<number> {
 	const { issue_number } = request
 
-	await run_label.mark(issue_number)
+	await timed(STEP.LABEL, async () => {
+		await run_label.mark(issue_number)
+	})
 	const reads = await gather_reads(issue_number)
 
 	if (reads.trust_stop) return await stop_untrusted(request, { hold, cost }, reads.trust_stop)
@@ -379,7 +323,9 @@ async function proceed(
 
 	// The issue the report prints is the one the run has read, so it is the baseline a person's later
 	// update is measured against (`issue-watch.ts`).
-	await issue_watch.record_baseline_here(issue_number)
+	await timed(STEP.BASELINE, async () => {
+		await issue_watch.record_baseline_here(issue_number)
+	})
 
 	const code = emit_fitted(
 		{ issue_number, hold, cost, verdict: run_entry.stage_verdict(state, reads.verdict) },
@@ -417,7 +363,10 @@ async function claim_run(request: EntryRequest, state: StageState): Promise<numb
 
 	const cost = await check_cost()
 	// A `new` run's entry synchronizes the tree it adopted before reading the issue.
-	const stop = cost === run_entry.COST_OVER ? COST_STOP : await run_entry_sync.sync(request)
+	const stop =
+		cost === run_entry.COST_OVER
+			? COST_STOP
+			: await timed(STEP.SYNC, async () => await run_entry_sync.sync(request))
 
 	if (stop !== undefined) return await stop_claimed(request, { hold, cost }, stop)
 
@@ -443,7 +392,7 @@ async function open_run(request: EntryRequest): Promise<number> {
 
 	if (cut !== undefined) return cut
 
-	const stage = await run_stage_read.read_stage(issue_number)
+	const stage = await timed(STEP.STAGE, async () => await run_stage_read.read_stage(issue_number))
 	const decision = run_stage.decide(stage.state, command)
 
 	console.info(session_cite.text(run_stage.format_decision(issue_number, decision)))
@@ -462,7 +411,7 @@ async function run(argv: ReadonlyArray<string>): Promise<number> {
 		return FAILURE_EXIT_CODE
 	}
 
-	return await open_run(request)
+	return await run_entry_children.within(request.issue_number, async () => await open_run(request))
 }
 
 async function main(argv: ReadonlyArray<string>): Promise<void> {

@@ -79,9 +79,8 @@ function stage_at(segments: ReadonlyArray<Segment>, at_ms: number): string | und
 function grouped(
 	placed: ReadonlyArray<Placed>,
 	segments: ReadonlyArray<Segment>,
+	groups = new Map<string, Array<Stage>>(),
 ): Map<string, Array<Stage>> {
-	const groups = new Map<string, Array<Stage>>()
-
 	for (const { at_ms, part } of placed) {
 		const stage = stage_at(segments, at_ms)
 
@@ -131,9 +130,15 @@ function between_of(calls: ReadonlyArray<ToolCall>, breakdown: Breakdown): Array
 	])
 }
 
+// The start to plan as segments, where `run:entry` times its children (joshuafolkken/kit#5831) — only
+// laps are placed there, so a lane without them prints its start to plan as before.
+function plan_segments(breakdown: Breakdown): Array<Segment> {
+	return (breakdown.plan ?? []).map((span) => ({ ...span, stage: lane_breakdown.PLAN_STAGE }))
+}
+
 /**
- * `issue`'s ship stages split by their laps, and the time between them by the park it went to, else by
- * the lane child's calls (joshuafolkken/kit#5834).
+ * `issue`'s start to plan and ship stages split by their laps, and the time between them by the park it
+ * went to, else by the lane child's calls (joshuafolkken/kit#5834).
  */
 function of(
 	entries: ReadonlyArray<LedgerEntry>,
@@ -141,13 +146,11 @@ function of(
 	breakdown: Breakdown,
 	calls: ReadonlyArray<ToolCall>,
 ): Laps {
-	const placed = entries.flatMap((entry) => [
-		...lap_of(entry, issue),
-		...wait_of(entry, issue),
-		...checks_of(entry, issue),
-	])
+	const lapped = entries.flatMap((entry) => lap_of(entry, issue))
+	const placed = entries.flatMap((entry) => [...wait_of(entry, issue), ...checks_of(entry, issue)])
+	const planned = grouped(lapped, plan_segments(breakdown))
 	const laps = new Map(
-		[...grouped(placed, breakdown.ship)].map(([stage, parts]) => [
+		[...grouped([...lapped, ...placed], breakdown.ship, planned)].map(([stage, parts]) => [
 			stage,
 			lane_breakdown.ranked(counted(parts)),
 		]),

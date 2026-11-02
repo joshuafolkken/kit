@@ -5,6 +5,7 @@ import { run_investigation_record } from '#scripts/run/run-investigation-record'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_ship } from './run-ship'
 import { run_ship_body_draft } from './run-ship-body-draft'
+import { run_ship_lap } from './run-ship-lap'
 import { run_ship_preflight } from './run-ship-preflight'
 import { run_ship_review_steps } from './run-ship-review-steps'
 import { run_ship_scoped } from './run-ship-scoped'
@@ -176,6 +177,22 @@ describe('run_ship_steps — the commit stage', () => {
 			undefined,
 			core_priority.PRIORITY_ENVIRONMENT,
 		)
+	})
+
+	// joshuafolkken/kit#5831: `josh git` times its steps and hooks under the ship's commit stage.
+	it('hands its lap scope to josh git under the commit step', async () => {
+		await run_ship_lap.within('5831', 'commit', async () => {
+			await step_for(STAGE.COMMIT).run(ARGS, FRESH)
+		})
+
+		expect(josh_spy).toHaveBeenCalledWith(expect.any(Array), true, undefined, {
+			...core_priority.PRIORITY_ENVIRONMENT,
+			[run_ship_lap.ENVIRONMENT_KEY]: JSON.stringify({
+				issue: 5831,
+				stage: 'commit',
+				parent: run_ship_lap.STEP.COMMIT,
+			}),
+		})
 	})
 })
 
