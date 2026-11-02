@@ -7,6 +7,7 @@ import { issue_number_shape } from '#scripts/issue/issue-number-shape'
 import { issue_park } from '#scripts/issue/issue-park'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
+import { run_step_section } from '#scripts/run/run-step-section'
 import { run_park } from './run-park'
 import { run_park_lane } from './run-park-lane'
 import { run_park_release } from './run-park-release'
@@ -25,6 +26,9 @@ import { run_park_release } from './run-park-release'
 //
 // **A park from inside a lane names the lane it keeps** (joshuafolkken/kit#5840): `run_park_lane`
 // appends the lane directory, the held seat and the `lane:close` hint to the comment.
+//
+// **A released park prints the section it follows** (joshuafolkken/kit#5842), through
+// `run_step_section.print_once`: "park and continue" for the parent, the park-then-stop for a lane child.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -51,6 +55,15 @@ function clear_issue(argv: ReadonlyArray<string>): string | undefined {
 	return issue_number_shape.single_of(parsed.positionals)
 }
 
+// A released park prints what its caller does next, once per session.
+async function release(issue_number: string, directory: string): Promise<number> {
+	const exit_code = await run_park_release.release(issue_number)
+
+	if (exit_code !== SUCCESS_EXIT_CODE) return exit_code
+
+	return run_step_section.print_once(run_step_section.PARK, directory)
+}
+
 async function park(request: CommentRequest, directory: string): Promise<number> {
 	const { issue_number, body } = request
 
@@ -65,7 +78,7 @@ async function park(request: CommentRequest, directory: string): Promise<number>
 		`park ${session_cite.issue(issue_number)} — label: ${String(write.is_labelled)} · comment: ${String(write.is_commented)} · recorded: ${String(is_recorded)}`,
 	)
 
-	return is_parked ? await run_park_release.release(issue_number) : FAILURE_EXIT_CODE
+	return is_parked ? await release(issue_number, directory) : FAILURE_EXIT_CODE
 }
 
 // **The record goes whatever the label answers**: the decision is a person's and already made, so a

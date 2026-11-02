@@ -11,7 +11,9 @@ const {
 	clear_record_mock,
 	release_mock,
 	lane_note_mock,
+	print_once_mock,
 } = vi.hoisted(() => ({
+	print_once_mock: vi.fn<(key: string, root?: string) => number>(),
 	lane_note_mock: vi.fn<(body: string, directory: string) => string>(),
 	apply_mock:
 		vi.fn<
@@ -34,6 +36,9 @@ vi.mock('#scripts/gh/git-gh-issue-write', () => ({
 vi.mock('./run-park', () => ({ run_park: { record: record_mock, clear: clear_record_mock } }))
 vi.mock('./run-park-release', () => ({ run_park_release: { release: release_mock } }))
 vi.mock('./run-park-lane', () => ({ run_park_lane: { with_lane_note: lane_note_mock } }))
+vi.mock('#scripts/run/run-step-section', () => ({
+	run_step_section: { PARK: 'run:park', print_once: print_once_mock },
+}))
 
 const ISSUE = '4132'
 const LABEL = 'needs-decision'
@@ -56,6 +61,7 @@ beforeEach(() => {
 	clear_record_mock.mockReset()
 	release_mock.mockReset().mockResolvedValue(0)
 	lane_note_mock.mockReset().mockImplementation((body) => body)
+	print_once_mock.mockReset().mockReturnValue(0)
 	vi.spyOn(console, 'info').mockImplementation(() => undefined)
 	vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -141,6 +147,35 @@ describe('run:park release', () => {
 		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
 		expect(record_mock).toHaveBeenCalledWith(ISSUE, DIRECTORY)
 		expect(clear_record_mock).not.toHaveBeenCalled()
+	})
+})
+
+// joshuafolkken/kit#5842: a released park prints "park and continue" once per session.
+describe('run:park section', () => {
+	it('prints the park section after the release', async () => {
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(0)
+		expect(print_once_mock).toHaveBeenCalledExactlyOnceWith('run:park', DIRECTORY)
+		expect(release_mock.mock.invocationCallOrder[0]).toBeLessThan(
+			print_once_mock.mock.invocationCallOrder[0] ?? 0,
+		)
+	})
+
+	it('prints no section when the release fails', async () => {
+		release_mock.mockResolvedValue(1)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+		expect(print_once_mock).not.toHaveBeenCalled()
+	})
+
+	it('fails when the section does not resolve', async () => {
+		print_once_mock.mockReturnValue(1)
+
+		await expect(run_park_cli.run(PARK_ARGV, DIRECTORY)).resolves.toBe(1)
+	})
+
+	it('prints no section for a clear', async () => {
+		await expect(run_park_cli.run([ISSUE, '--clear'], DIRECTORY)).resolves.toBe(0)
+		expect(print_once_mock).not.toHaveBeenCalled()
 	})
 })
 
