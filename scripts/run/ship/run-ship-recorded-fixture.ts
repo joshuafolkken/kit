@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { cost_cli } from '#scripts/cost-runtime/cost-cli'
 import { git_command } from '#scripts/git/git-command'
 import { stamp_file } from '#scripts/josh/stamp-file'
 import { run_review_pinned_accepted } from '#scripts/run/review/run-review-pinned-accepted'
@@ -15,13 +16,19 @@ import { vi } from 'vitest'
 //
 // `isolate` also prints no governing section, so a suite reads the ship's own report as its first
 // line, whatever this session printed before.
+//
+// joshuafolkken/kit#5815: a launched detach reads this session's `cost --cut` verdict
+// (`run-ship-detach-wait.ts`), and on `under` runs a live `ship:wait` against the checkout's branch, so a
+// suite run from an interactive session timed out. `isolate` answers a session that cannot be measured.
 
 const RECORDED_REASON = 'a reason an earlier ship on this branch recorded'
 const SUCCESS_EXIT_CODE = 0
+const UNMEASURABLE_VERDICT = 'unmeasurable'
 
 function isolate(): void {
 	vi.spyOn(run_review_pinned_accepted, 'recorded_reason').mockResolvedValue(undefined)
 	vi.spyOn(run_step_section, 'print_once').mockReturnValue(SUCCESS_EXIT_CODE)
+	vi.spyOn(cost_cli, 'session_verdict').mockReturnValue(UNMEASURABLE_VERDICT)
 }
 
 // `run(argv)` — the ship CLI — with this branch's record in place.
