@@ -14,15 +14,4 @@ Write the assessment as JSON and run `pnpm josh issue:fold-existing <assessment.
 
 ## Appending and re-reading
 
-On `fold`, the proposed `body` keeps the original body and appends the added requirements and how to verify them. Immediately before writing, confirm the body and comments have not changed since the assessment; if they have, assess again.
-
-```bash
-pnpm josh issue:fold-existing assessment.json --json > result.json
-jq -e '.verdict == "fold"' result.json
-jq '{body: .body}' result.json > patch.json
-gh api -X PATCH repos/{owner}/{repo}/issues/<N> --input patch.json
-pnpm josh issue:priority <N>
-pnpm josh issue:read <N>
-```
-
-A body edit applies no label: `pnpm josh issue:priority <N>` applies the body's floor (`issue-template.md` → F). Re-read it and confirm the original requirements, the decisions recorded in comments, the added requirements and the verification all remain. A failed write or re-read means the fold is not complete. A fold never creates a new Issue. `separate` returns to the ordinary filing path, and `inspect` re-reads the missing information.
+On `fold`, confirm no comment has arrived since the assessment, then run `pnpm josh issue:fold-existing assessment.json --apply <N>`. It keeps the original body, appends the added requirements and how to verify them, and writes only while the body still reads as `existing_body`. It applies the body's priority floor (`issue-template.md` → F) and verifies the re-read. Any answer but `folded` means the fold is not complete; on `changed`, read and assess again. A fold never creates a new Issue. `separate` returns to the ordinary filing path, and `inspect` re-reads the missing information.

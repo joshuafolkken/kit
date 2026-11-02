@@ -4,7 +4,11 @@ import { issue_priority_raise } from './issue-priority-raise'
 
 // joshuafolkken/kit#4960: `josh issue:priority <N>` reports the raise and exits on its result.
 
-vi.mock('./issue-priority-raise', () => ({ issue_priority_raise: { raise: vi.fn() } }))
+vi.mock('./issue-priority-raise', async (import_original) => {
+	const original: { issue_priority_raise: typeof issue_priority_raise } = await import_original()
+
+	return { issue_priority_raise: { ...original.issue_priority_raise, raise: vi.fn() } }
+})
 
 const ISSUE_NUMBER = '4960'
 const mocked_raise = vi.mocked(issue_priority_raise.raise)

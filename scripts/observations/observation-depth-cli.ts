@@ -1,4 +1,6 @@
 #!/usr/bin/env tsx
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { observation_depth, type DepthAnswer } from './observation-depth'
 
@@ -14,6 +16,7 @@ const USAGE = 'Usage: josh observation:depth <path>'
 interface DepthPlaces {
 	root: string
 	cwd: string
+	exists: (absolute_path: string) => boolean
 }
 
 function applied_row(subject_path: string, answer: DepthAnswer): string {
@@ -29,14 +32,28 @@ function refuse(message: string): number {
 	return FAILURE_EXIT_CODE
 }
 
-function run(argv: ReadonlyArray<string>, places: DepthPlaces): number {
-	const [typed = ''] = argv
+function typed_of(argv: ReadonlyArray<string>): string | undefined {
+	const [typed] = argv
 
-	if (typed === '' || argv.length !== 1) return refuse(USAGE)
+	if (typed === undefined || typed === '' || argv.length !== 1) return undefined
+
+	return typed
+}
+
+// A path that names nothing is refused rather than answered `d0`: a root-relative path typed from a
+// subdirectory resolves to a path no row claims, and `d0` would file what belongs in the ledger.
+function run(argv: ReadonlyArray<string>, places: DepthPlaces): number {
+	const typed = typed_of(argv)
+
+	if (typed === undefined) return refuse(USAGE)
 
 	const subject_path = observation_depth.repository_path(places.root, places.cwd, typed)
 
 	if (subject_path === undefined) return refuse(`Refused: ${typed} is outside ${places.root}`)
+
+	if (!places.exists(path.join(places.root, subject_path))) {
+		return refuse(`Refused: ${typed} does not exist (a relative path is read from ${places.cwd})`)
+	}
 
 	const answer = observation_depth.of(subject_path)
 
@@ -54,6 +71,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 	process.exitCode = observation_depth_cli.run(process.argv.slice(ARGV_OFFSET), {
 		root,
 		cwd: process.env['INIT_CWD'] ?? root,
+		exists: existsSync,
 	})
 }
 
