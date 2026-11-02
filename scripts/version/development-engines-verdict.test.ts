@@ -132,3 +132,14 @@ describe('development_engines_verdict.describe — an unreadable manifest', () =
 		)
 	})
 })
+
+describe('development_engines_verdict.is_intact', () => {
+	it.each([
+		[UNCHANGED, true],
+		[KEPT, true],
+		[judge(BEFORE, build_package_manager_manifest(NEW_PIN, NEW_BARE_VERSION)), false],
+		[development_engines_verdict.describe(BEFORE, '{'), false],
+	])('answers %j as %s', (verdict, expected) => {
+		expect(development_engines_verdict.is_intact(verdict)).toBe(expected)
+	})
+})
