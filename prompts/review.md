@@ -70,15 +70,7 @@ merge is refused: `prompts/collaboration-workflow/report-format.md` → "PR 本�
 
 ## Review level (decided by `pnpm josh review:brief --level-only`, never by judgement)
 
-Run `pnpm josh review:brief --level-only` and use what it prints — `low` or `medium`, from the changed
-paths only, never "this one is small". `--staged` classifies the staged diff, `--json` adds the reason;
-inside a workflow `pnpm josh review:brief` prints the level on its first line. `low` gets 1 round,
-`medium` up to 2. A diff that touches documentation is not inert: it stays at `medium`.
-
-```bash
-pnpm josh review:brief --level-only            # the branch diff
-pnpm josh review:brief --level-only --staged   # the staged diff
-```
+Use the level `pnpm josh review:brief --level-only [--staged] [--json]` prints: `low` gets 1 round, `medium` up to 2; a documentation diff stays `medium`.
 
 **A confirmed High blocks regardless of round count**, whatever the cap.
 
@@ -119,17 +111,7 @@ Ask once round 1's fixes are in and the round is recorded with each finding's di
 every round-1 High/Medium as `fixed` or `false-positive`. Anything else, including a missing round-1
 snapshot, answers `required`.
 
-`skip` has exactly two arms, and the reason line names which fired:
-
-- **A** — the fix delta is empty.
-- **B** — every path in the fix delta is inert by the review-level classification above:
-  `docs/**/*.md`, the root `README.md`, under `prompts/`, a metrics approval under
-  `.josh/metrics-accepted/`, or a `.ts` / `.js` / `.svelte` file outside
-  `.claude/` changed only in comments (a lint, type-check, coverage or bundler directive comment counts
-  as code).
-
-One path outside that set makes it `required` — `.claude/**`, `CLAUDE.md`, a test, configuration, a
-code line, or a source file whose comment-free text cannot be read.
+`skip` has two arms, and the reason line says which fired — A, an empty fix delta; B, one that leaves what executes unchanged (the path set: `scripts/review/review-round2.ts` → `is_unexecuted`).
 
 `--record <N>` records a skipped round on the Issue itself: a comment under `## Round 2 skipped`
 naming which arm fired and quoting the reason line verbatim, written once however often it is asked.
