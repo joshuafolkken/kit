@@ -8,6 +8,7 @@ import { issue_park } from '#scripts/issue/issue-park'
 import { session_cite } from '#scripts/issue/session-cite'
 import { cli_flags } from '#scripts/lib/cli-flags'
 import { run_park } from './run-park'
+import { run_park_lane } from './run-park-lane'
 import { run_park_release } from './run-park-release'
 
 // `josh run:park <N> --body-file <path>` — park a lane child for a person's decision in one call: the
@@ -21,6 +22,9 @@ import { run_park_release } from './run-park-release'
 // **Every parked ending owes the release, so the park runs it** (joshuafolkken/kit#5737): once the
 // label and the comment are on, `run_park_release` drops the hold and `in-progress`. A failed release
 // keeps the park.
+//
+// **A park from inside a lane names the lane it keeps** (joshuafolkken/kit#5840): `run_park_lane`
+// appends the lane directory, the held seat and the `lane:close` hint to the comment.
 
 const SUCCESS_EXIT_CODE = 0
 const FAILURE_EXIT_CODE = 1
@@ -52,7 +56,8 @@ async function park(request: CommentRequest, directory: string): Promise<number>
 
 	if (has_recommendation(body)) return FAILURE_EXIT_CODE
 
-	const write = await issue_park.apply(issue_number, NEEDS_DECISION_LABEL, body)
+	const lane_body = run_park_lane.with_lane_note(body, directory)
+	const write = await issue_park.apply(issue_number, NEEDS_DECISION_LABEL, lane_body)
 	const is_parked = write.is_labelled && write.is_commented
 	const is_recorded = is_parked && run_park.record(issue_number, directory)
 

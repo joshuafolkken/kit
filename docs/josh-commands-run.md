@@ -298,6 +298,8 @@ pnpm josh run:park 1839 --clear                              # remove needs-deci
 
 The local park record is what the `lane-park` guard reads, so a child that parked is not asked to again. `--clear` succeeds when the label is already off and releases nothing. A park that lands runs `run:release <N>`'s own implementation next, so the hold and `in-progress` come off in the same call; a tree whose hold names another run releases nothing — that run's own ending does.
 
+A park from inside a lane appends the lane directory, its held seat and `pnpm josh lane:close <N>` to the comment.
+
 **Output / exit codes:** one `park #<N>` line naming what was written, then the release's line; exit `0` once the label and the comment are both on the issue and the release succeeded (or, with `--clear`, once the label is off), `1` otherwise. The record is written only once both are on; a failed release keeps it and prints `pnpm josh run:release <N>` to re-run.
 
 ### `josh upstream:interrupt`
