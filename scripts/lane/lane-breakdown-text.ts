@@ -28,7 +28,7 @@ interface Report {
 	related?: string
 	// The followup's CI wait's last check to settle, `''` when none was recorded (joshuafolkken/kit#5295).
 	critical?: string
-	// Each ship stage's laps, and the Bash between ship stages, longest first (joshuafolkken/kit#5294).
+	// Each ship stage's laps, and the call kinds between ship stages, longest first (joshuafolkken/kit#5294).
 	laps?: Laps
 	// The start to plan's longest call groups (joshuafolkken/kit#5539).
 	plan_calls?: ReadonlyArray<CallGroup>

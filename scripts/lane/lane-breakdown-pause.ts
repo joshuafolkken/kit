@@ -6,7 +6,7 @@ import { lane_stop_stats } from './lane-stop-stats'
 // The stops a lane's time between ship stages went to (joshuafolkken/kit#5646): each `park` event of
 // the lane — `run:merge`'s `#<N> waiting on #<M>` for a pause on a blocker, `#<N> parked (<reason>)`
 // for a park — named where it fell, so the stretch it opened (the blocker filed, the pause, the
-// resume and the re-ship) is attributed to it rather than left to the Bash kinds.
+// resume and the re-ship) is attributed to it rather than left to the call kinds.
 
 const { EVENT_KIND } = run_event_stream
 const IMPLEMENT_SUFFIX = ' implement'

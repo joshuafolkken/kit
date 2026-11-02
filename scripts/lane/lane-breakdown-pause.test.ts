@@ -7,7 +7,7 @@ import type { LedgerEntry } from './lane-ledger'
 import type { ToolCall } from './lane-transcript-calls'
 
 // joshuafolkken/kit#5646: the time between ship stages a park fell in is named after the park — the
-// blocker a pause waited on — rather than left to the Bash kinds.
+// blocker a pause waited on — rather than left to the call kinds.
 
 const MINUTE_MS = 60_000
 const ISSUE = 5544
