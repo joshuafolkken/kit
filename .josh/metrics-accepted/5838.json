@@ -1,0 +1,8 @@
+{
+	"reason": "epic:bundle --apply now places an ask answer into the recommended epic and records the decision (#5838); the new code replaces a manual per-caller procedure",
+	"date": "2026-11-02",
+	"growth": {
+		"scripts.code_lines": 87,
+		"prose.long_paragraphs": 1
+	}
+}

@@ -122,15 +122,15 @@ learn their state** — only to implement.
 ## `josh epic:bundle <N>` — does this new issue belong with one already filed?
 
 Runs right after any filing; **`pnpm josh issue:file` runs it as its last step** — run it by hand only
-when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes an `add_to_epic` /
-`create_epic` answer.**
+when that step printed `⚠`. **It recommends and writes nothing; `--apply` writes every placing answer
+— `ask` into its `Recommended:` epic, with the decision recorded.**
 
 | Candidates | Do | Tier |
 | --- | --- | --- |
 | **The new issue itself already has an epic** | Nothing — an issue belongs to at most one | — |
 | Already a child of an epic | Add to **that** epic; do not create a second | A |
 | Spread across an epic and its **own parent** | Add to the inner epic — the parent already contains it | A |
-| Spread across **different** epics | **Choose the one you recommend** (`epic-bundle.md`) | **A** |
+| Spread across **different** epics | **The `Recommended:` epic** — most related issues, older on a tie; none on a cycle (`epic-bundle.md`) | **A** |
 | In no epic, two or more counting the new issue | Create an epic | A |
 | No strong signal | Nothing | — |
 | **The epic listing was cut short** | **Nothing** — every placing row above is withheld | — |

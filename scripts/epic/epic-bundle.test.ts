@@ -160,6 +160,8 @@ describe('epic_bundle.decide_bundle — nesting that cannot be narrowed', () => 
 
 		expect(decision.action).toBe('ask')
 		expect(decision.epics).toEqual([900, 901, 950])
+		// Nothing to recommend on a cycle, so `--apply` writes nothing and a person chooses.
+		expect(decision.recommended).toBeUndefined()
 	})
 
 	// The one-step cycle: an epic whose task list names itself must not drop itself.

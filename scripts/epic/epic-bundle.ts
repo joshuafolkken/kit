@@ -1,6 +1,7 @@
 import { issue_cite } from '#scripts/issue/issue-cite'
 import { has_label_name, RELEASE_LABEL } from '#scripts/issue/issue-labels'
 import { epic_audit_logic, type SignalSection } from './epic-audit'
+import { epic_bundle_recommend } from './epic-bundle-recommend'
 import { epic_graph } from './epic-graph'
 import type { DependencyLink } from './epic-parse'
 import type { IssueReference } from './epic-reference'
@@ -55,6 +56,9 @@ interface BundleDecision {
 	epic?: number
 	// The epics the candidates are spread across, for `ask`.
 	epics: ReadonlyArray<number>
+	// The epic `ask` recommends (`epic-bundle-recommend.ts`). Absent on a cyclic declaration, which
+	// has no innermost epic and stays a person's choice.
+	recommended?: number
 	candidates: ReadonlyArray<number>
 	reason: string
 }
@@ -247,6 +251,29 @@ function tracks_reason(epic: number, involved: ReadonlyArray<number>): string {
 	return `${tracks}; the other epics the candidates sit in are its own parents`
 }
 
+// The spread verdict, carrying the epic it recommends unless the epics left sit on a cycle.
+function ask_decision(
+	epics: ReadonlyArray<number>,
+	candidates: ReadonlyArray<BacklogIssue>,
+	parents: ReadonlyMap<number, number>,
+): BundleDecision {
+	const has_cycle = is_cyclic(
+		epics,
+		epics.map((epic) => ancestors_of(epic, parents)),
+	)
+	const recommended = has_cycle
+		? undefined
+		: epic_bundle_recommend.recommend_epic(epics, candidates)
+
+	return {
+		action: 'ask',
+		epics,
+		candidates: to_numbers(candidates),
+		reason: SPREAD_REASON,
+		...(recommended !== undefined && { recommended }),
+	}
+}
+
 // Which of the three the candidates call for, once there is at least one.
 function decide_with_candidates(
 	subject: BacklogIssue,
@@ -256,7 +283,7 @@ function decide_with_candidates(
 	const numbers = to_numbers(candidates)
 	const involved = candidate_epics(candidates)
 	const epics = narrow_to_innermost(involved, parents)
-	if (epics.length > 1) return { action: 'ask', epics, candidates: numbers, reason: SPREAD_REASON }
+	if (epics.length > 1) return ask_decision(epics, candidates, parents)
 	const [epic] = epics
 	if (epic === undefined) return create_decision(subject, numbers)
 

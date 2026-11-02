@@ -661,18 +661,18 @@ pnpm josh epic:bundle 874 --apply   # write it
 
 <!-- /usage -->
 
-It writes nothing without `--apply`; [`josh issue:file`](#josh-issuefile) runs it on the issue it creates as its last filing step.
+It writes nothing without `--apply`, which writes every placing answer — `ask` into the `Recommended:` epic, recording the decision on the epic and the issue; [`josh issue:file`](#josh-issuefile) runs it on the issue it creates as its last filing step.
 
 Only two things count as a signal: one issue naming the other in its acceptance criteria (`## 受け入れ条件` / `## Acceptance criteria`) or its `parent: #N` / `親: #N` line, or an already-recorded `blocked-by`. A reference in any other section, or a similar title, does not.
 
-| Candidates                                     | What to do                                          | Tier |
-| ---------------------------------------------- | --------------------------------------------------- | ---- |
-| The new issue itself already has an epic       | Nothing                                             | —    |
-| Already a child of an epic                     | Add to that epic                                    | A    |
-| Spread across an epic and its own parent       | Add to the inner epic                               | A    |
-| Spread across different epics                  | Choose the one you recommend, add to it, record why | A    |
-| In no epic, two or more counting the new issue | Create an epic                                      | A    |
-| No strong signal / listing cut short           | Nothing                                             | —    |
+| Candidates                                     | What to do                              | Tier |
+| ---------------------------------------------- | --------------------------------------- | ---- |
+| The new issue itself already has an epic       | Nothing                                 | —    |
+| Already a child of an epic                     | Add to that epic                        | A    |
+| Spread across an epic and its own parent       | Add to the inner epic                   | A    |
+| Spread across different epics                  | Add to the recommended epic, record why | A    |
+| In no epic, two or more counting the new issue | Create an epic                          | A    |
+| No strong signal / listing cut short           | Nothing                                 | —    |
 
 Prints an `Order:` line with an `Evidence:` block, or `Order: none declared — do not invent one`. Exit is non-zero only when a listing could not be read; a cut epic listing withholds every placing verdict.
 

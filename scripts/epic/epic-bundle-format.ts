@@ -15,7 +15,7 @@ import { format_dependency_links } from './epic-reference'
 const ACTION_LINES: Readonly<Record<string, string>> = {
 	add_to_epic: 'Add it to the epic that already tracks a related issue (Tier A — do it).',
 	create_epic: 'Create an epic for these (Tier A — do it).',
-	ask: 'Related issues sit in more than one epic: choose the one you recommend, add it, and record why (Tier A — do it).',
+	ask: 'Related issues sit in more than one epic: place it in the recommended one and record why — `epic:bundle --apply` does both (Tier A — do it).',
 	none: 'Nothing to bundle.',
 }
 
@@ -79,6 +79,15 @@ const PLACING_ACTIONS: ReadonlySet<BundleAction> = new Set<BundleAction>([
 	'ask',
 ])
 
+// The spread and, when there is one, the epic `ask` recommends — what `--apply` places the issue in.
+function format_epics(decision: BundleDecision): Array<string> {
+	if (decision.epics.length <= 1) return []
+	const involved = `  Epics involved: ${format_numbers(decision.epics)}`
+	if (decision.recommended === undefined) return [involved]
+
+	return [involved, `  Recommended: ${issue_cite.plain(decision.recommended)}`]
+}
+
 // `is_membership_established` is what separates "no epic tracks these" from "their epics were never
 // read".
 function format_decision(
@@ -97,11 +106,9 @@ function format_decision(
 		lines.push(`  Related: ${format_numbers(decision.candidates)}`)
 	}
 
-	if (decision.epics.length > 1) {
-		lines.push(`  Epics involved: ${format_numbers(decision.epics)}`)
-	}
-
-	return [...lines, ...format_order(decision, subject, backlog)].join('\n')
+	return [...lines, ...format_epics(decision), ...format_order(decision, subject, backlog)].join(
+		'\n',
+	)
 }
 
 const epic_bundle_format = {
