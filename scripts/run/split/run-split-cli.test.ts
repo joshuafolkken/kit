@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { run_split_cli } from './run-split-cli'
 
-// joshuafolkken/kit#5846: the arguments `run:split` refuses before anything is written, the verdict
+// joshuafolkken/kit#5846, #5895: the arguments `run:split` refuses before anything is written, the verdict
 // line a run branches on, and the report a failure leaves for the rerun.
 
 const CHILDREN = '--children'
 const ONE_CHILD = ['10', CHILDREN, '11']
 const NEEDS_DECISION = 'needs-decision'
+const PREREQUISITE = '--prerequisite'
 const split = vi.hoisted(() => vi.fn())
+const prerequisite = vi.hoisted(() => vi.fn())
 
 vi.mock('./run-split', () => ({ run_split: { split } }))
+vi.mock('./run-split-prerequisite', () => ({ run_split_prerequisite: { prerequisite } }))
 
 const infos: Array<string> = []
 const errors: Array<string> = []
@@ -18,6 +21,7 @@ beforeEach(() => {
 	infos.length = 0
 	errors.length = 0
 	split.mockReset().mockResolvedValue({ kind: 'epic', epic: 20, done: [] })
+	prerequisite.mockReset().mockResolvedValue({ kind: 'epic', epic: 20, done: [] })
 	vi.spyOn(console, 'info').mockImplementation((line: string) => {
 		infos.push(line)
 	})
@@ -66,6 +70,28 @@ describe('run_split_cli.run — arguments', () => {
 			is_ordered: false,
 			title: undefined,
 		})
+	})
+})
+
+describe('run_split_cli.run — `--prerequisite`', () => {
+	it.each([
+		[['10', PREREQUISITE]],
+		[['10', PREREQUISITE, 'x']],
+		[['10', PREREQUISITE, '10']],
+		[['10', PREREQUISITE, '11', CHILDREN, '12']],
+		[['10', PREREQUISITE, '11', '--ordered']],
+	])('refuses %j, which no prerequisite form reads, and writes nothing', async (argv) => {
+		expect(await run_split_cli.run(argv)).toBe(1)
+		expect(prerequisite).not.toHaveBeenCalled()
+		expect(split).not.toHaveBeenCalled()
+		expect(errors).toStrictEqual([run_split_cli.USAGE])
+	})
+
+	it('pauses `#N` on its prerequisite with the title', async () => {
+		expect(await run_split_cli.run(['10', PREREQUISITE, '11', '--title', 'T'])).toBe(0)
+		expect(prerequisite).toHaveBeenCalledWith({ issue: '10', prerequisite: '11', title: 'T' })
+		expect(split).not.toHaveBeenCalled()
+		expect(infos.at(-1)).toMatch(/^epic .*#20/u)
 	})
 })
 
